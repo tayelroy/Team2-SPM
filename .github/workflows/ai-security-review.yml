@@ -1,0 +1,61 @@
+name: AI Security Review
+
+# The only pull-request check. It scans the PR diff for security issues to
+# remediate and posts findings on the pull request.
+#
+# This workflow needs a repository secret and permission to comment on PRs,
+# including PRs from forks. pull_request_target provides that trusted context.
+# SECURITY INVARIANT: only check out the repository's trusted default branch. The
+# PR diff is fetched as inert data and is never written to disk or executed.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ai-security-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Review changed code for security findings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # Action pins are deferred until the SPM stack is settled; use release tags.
+      - name: Check out reviewer from the trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test the reviewer
+        run: node --test .github/scripts/security-review.test.mjs
+
+      - name: Run AI security review and update the PR comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SECURITY_REVIEW_PROVIDER: ${{ vars.SECURITY_REVIEW_PROVIDER }}
+          SECURITY_REVIEW_MODEL: ${{ vars.SECURITY_REVIEW_MODEL }}
+          # Give long generations time to finish. Timed-out requests are never retried,
+          # because the provider may still bill an abandoned inference (default: 600000).
+          SECURITY_REVIEW_PROVIDER_TIMEOUT_MS: ${{ vars.SECURITY_REVIEW_PROVIDER_TIMEOUT_MS }}
+          # UTF-8 bytes of diff data per request (default: 75,000; maximum: 100,000).
+          # The trusted prompt and JSON schema add a small amount of overhead.
+          SECURITY_REVIEW_CHUNK_BYTES: ${{ vars.SECURITY_REVIEW_CHUNK_BYTES }}
+          # Cost/timeout guard; the script fails rather than returning a partial review.
+          SECURITY_REVIEW_MAX_CHUNKS: ${{ vars.SECURITY_REVIEW_MAX_CHUNKS }}
+          # Backward-compatible fallback for repositories using the old variable.
+          SECURITY_REVIEW_MAX_DIFF_BYTES: ${{ vars.SECURITY_REVIEW_MAX_DIFF_BYTES }}
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node .github/scripts/security-review.mjs
