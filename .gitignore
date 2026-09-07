@@ -6,6 +6,9 @@ node_modules/
 # Production build artifacts
 dist/
 build/
+coverage/
+.nyc_output/
+.coverage-build/
 
 # Environment variables
 .env

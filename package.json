@@ -10,7 +10,10 @@
     "install:all": "npm install",
     "dev": "concurrently -n \"server,client\" -c \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix server && npm run build --prefix client",
-    "test": "npm run test --prefix server"
+    "test": "npm run test --workspace server && npm run test --workspace client && npm run test:reviewer",
+    "ci": "npm run build && npm run test:coverage",
+    "test:reviewer": "node --test .github/scripts/security-review.test.mjs",
+    "test:coverage": "npm run test:coverage --workspace server && npm run test:coverage --workspace client && npm run test:reviewer"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

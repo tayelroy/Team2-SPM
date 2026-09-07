@@ -1,6 +1,6 @@
 name: AI Security Review
 
-# The only pull-request check. It scans the PR diff for security issues to
+# Alongside application CI, this scans the PR diff for security issues to
 # remediate and posts findings on the pull request.
 #
 # This workflow needs a repository secret and permission to comment on PRs,

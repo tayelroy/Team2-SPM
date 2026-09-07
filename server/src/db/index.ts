@@ -1,32 +1,24 @@
 export * from './config';
 export * from './supabase';
-export * from './postgres';
 
 import { checkSupabaseHealth, SupabaseHealthResult } from './supabase';
-import { checkPostgresHealth, PostgresHealthResult } from './postgres';
-import { isSupabaseConfigured, isPostgresConfigured } from './config';
+import { isSupabaseConfigured } from './config';
 
 export interface UnifiedDatabaseHealth {
-  provider: 'Supabase Postgres';
+  provider: 'Supabase';
   configured: boolean;
   supabase: SupabaseHealthResult;
-  postgres: PostgresHealthResult;
 }
 
 /**
- * Checks overall Supabase Postgres database connectivity across both
- * the Supabase API client and direct PostgreSQL connection pool.
+ * Checks the Supabase API's availability over HTTPS, without querying tables.
  */
 export async function checkDatabaseHealth(): Promise<UnifiedDatabaseHealth> {
-  const [supabase, postgres] = await Promise.all([
-    checkSupabaseHealth(),
-    checkPostgresHealth()
-  ]);
+  const supabase = await checkSupabaseHealth();
 
   return {
-    provider: 'Supabase Postgres',
-    configured: isSupabaseConfigured() || isPostgresConfigured(),
-    supabase,
-    postgres
+    provider: 'Supabase',
+    configured: isSupabaseConfigured(),
+    supabase
   };
 }
