@@ -1,12 +1,18 @@
-import express, { Request, Response } from 'express';
+import express, { Request, RequestHandler, Response } from 'express';
 import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
+import { createRegisterHandler } from './auth/register';
 
-export function createApp(databaseHealthCheck = checkDatabaseHealth) {
+export function createApp(
+  databaseHealthCheck = checkDatabaseHealth,
+  registerHandler: RequestHandler = createRegisterHandler()
+) {
   const app = express();
 
   app.use(cors());
   app.use(express.json());
+
+  app.post('/api/auth/register', registerHandler);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
