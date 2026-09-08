@@ -147,9 +147,8 @@ export default function Register() {
               value={form[key]}
               onChange={updateField(key)}
               required
+              className="field-input"
               style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-line)'; }}
             />
           </div>
         ))}
@@ -157,6 +156,7 @@ export default function Register() {
         <button
           type="submit"
           disabled={status === 'submitting'}
+          className="btn-lift btn-lift--accent"
           style={{
             width: '100%',
             marginTop: '0.5rem',
@@ -169,16 +169,6 @@ export default function Register() {
             fontSize: '0.95rem',
             cursor: status === 'submitting' ? 'default' : 'pointer',
             opacity: status === 'submitting' ? 0.7 : 1,
-            transition: 'transform 160ms ease, box-shadow 160ms ease',
-          }}
-          onMouseEnter={(e) => {
-            if (status === 'submitting') return;
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 12px 20px -10px rgba(193, 68, 14, 0.6)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
           }}
         >
           {status === 'submitting' ? 'Registering...' : 'Register'}

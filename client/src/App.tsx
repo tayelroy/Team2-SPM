@@ -47,6 +47,7 @@ export default function App() {
         </p>
         <a
           href="/register"
+          className="btn-lift btn-lift--ink"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -59,15 +60,6 @@ export default function App() {
             fontWeight: 600,
             fontSize: '0.95rem',
             borderRadius: '999px',
-            transition: 'transform 160ms ease, box-shadow 160ms ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 10px 24px -12px rgba(23, 19, 15, 0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
           }}
         >
           Register an account

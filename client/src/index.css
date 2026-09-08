@@ -81,3 +81,27 @@ button {
     transform: translateY(0);
   }
 }
+
+.btn-lift {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.btn-lift:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn-lift.btn-lift--ink:hover:not(:disabled) {
+  box-shadow: 0 10px 24px -12px rgba(23, 19, 15, 0.5);
+}
+
+.btn-lift.btn-lift--accent:hover:not(:disabled) {
+  box-shadow: 0 12px 20px -10px rgba(193, 68, 14, 0.6);
+}
+
+.field-input {
+  transition: border-color 160ms ease;
+}
+
+.field-input:focus {
+  border-color: var(--color-accent);
+}
