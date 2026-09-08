@@ -33,7 +33,8 @@ test('the home route renders the application heading', async () => {
 
 test('the healthcheck route renders the API health result', async () => {
   window.history.replaceState(null, '', '/healthcheck');
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"status":"ok"}')));
+  // StrictMode may fetch twice; each HTTP response needs its own consumable body.
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{"status":"ok"}')));
   await act(async () => { await import('./main'); });
   expect(await screen.findByText('{"status":"ok"}')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'ConnectSphere' })).not.toBeInTheDocument();

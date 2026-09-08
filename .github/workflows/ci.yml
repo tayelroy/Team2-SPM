@@ -17,6 +17,16 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       NODE_ENV: test
       SUPABASE_URL: ''
@@ -36,6 +46,15 @@ jobs:
         run: npm ci
       - name: Build applications, test, and enforce coverage
         run: npm run ci
+      - name: Test authorisation database policies
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/auth.sql
+          for migration in supabase/migrations/*.sql; do
+            docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$migration"
+          done
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/account_roles.sql
       - name: Summarize application coverage
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
