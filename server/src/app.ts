@@ -1,12 +1,16 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
+import profileRouter from './routes/profile';
 
 export function createApp(databaseHealthCheck = checkDatabaseHealth) {
   const app = express();
 
   app.use(cors());
   app.use(express.json());
+
+  // SG2-27: view/update the current user's profile
+  app.use('/api/profile', profileRouter);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {

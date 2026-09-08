@@ -31,9 +31,18 @@ test('the home route renders the application heading', async () => {
   expect(screen.getByRole('main')).toHaveTextContent('Event Planning');
 });
 
+test('the profile route renders the profile page', async () => {
+  window.history.replaceState(null, '', '/profile');
+  await act(async () => { await import('./main'); });
+  expect(await screen.findByText(/No user signed in/)).toBeInTheDocument();
+});
+
 test('the healthcheck route renders the API health result', async () => {
   window.history.replaceState(null, '', '/healthcheck');
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"status":"ok"}')));
+  // React StrictMode double-invokes the effect in tests, so fetch is called
+  // twice; a fresh Response must be created per call since a Response body
+  // can only be read once (mockResolvedValue would reuse the same instance).
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(new Response('{"status":"ok"}'))));
   await act(async () => { await import('./main'); });
   expect(await screen.findByText('{"status":"ok"}')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'ConnectSphere' })).not.toBeInTheDocument();
