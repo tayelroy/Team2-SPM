@@ -2,6 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./.coverage-build",
+    "rootDir": ".",
     "sourceMap": true
-  }
+  },
+  "include": ["src/**/*", "api/**/*"]
 }

@@ -7,8 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "tsx --test src/*.test.ts src/db/*.test.ts",
-    "test:coverage": "node -e \"require('node:fs').rmSync('.coverage-build', { recursive: true, force: true })\" && tsc -p tsconfig.coverage.json && c8 node --test .coverage-build/*.test.js .coverage-build/db/*.test.js"
+    "test": "tsx --test src/*.test.ts src/db/*.test.ts api/*.test.ts",
+    "test:coverage": "node -e \"require('node:fs').rmSync('.coverage-build', { recursive: true, force: true })\" && tsc -p tsconfig.coverage.json && c8 node --test .coverage-build/src/*.test.js .coverage-build/src/db/*.test.js .coverage-build/api/*.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
