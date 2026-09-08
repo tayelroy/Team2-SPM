@@ -1,0 +1,15 @@
+{
+  "all": true,
+  "src": ["src"],
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.d.ts"],
+  "exclude-after-remap": true,
+  "reporter": ["text", "html", "lcovonly", "json-summary"],
+  "reports-dir": "coverage",
+  "check-coverage": true,
+  "per-file": true,
+  "lines": 80,
+  "statements": 80,
+  "functions": 80,
+  "branches": 80
+}
