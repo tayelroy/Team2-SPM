@@ -1,35 +1,88 @@
+/**
+ * Global baseline for the ConnectSphere mockups. Component styling lives
+ * alongside its markup as inline style objects; this file carries only what
+ * inline styles cannot express — the reset, the font, keyframes, and the
+ * pseudo-element states.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap');
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: light dark;
-  color: #1e293b;
-  background-color: #f8fafc;
+  /* DM Sans stands in for Matter, the mockup's display face. */
+  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f1f5f9;
-    background-color: #0f172a;
-  }
-}
-
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
+html,
 body {
+  margin: 0;
+  padding: 0;
+  background: #012624;
+  color: #ffffff;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
 #root {
   width: 100%;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+::placeholder {
+  color: #707777;
+}
+
+/* Inputs and controls carry their own borders; show focus without shifting layout. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #cbfffc;
+  outline-offset: 2px;
+}
+
+a {
+  color: #edfffe;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #ffffff;
+}
+
+@keyframes orbdrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* The drifting hero glows are decorative; hold them still when asked. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
