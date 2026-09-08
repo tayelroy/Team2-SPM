@@ -58,3 +58,4 @@ export function createApp(databaseHealthCheck = checkDatabaseHealth) {
 }
 
 export const app = createApp();
+export default app;
