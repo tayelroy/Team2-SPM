@@ -15,6 +15,7 @@ branch protection, and the Supabase HTTPS configuration.
 For the combined Vercel deployment, set **Root Directory** to `server` and enable
 **Include source files outside of the Root Directory in the Build Step** so the
 build can access `client`. `server/vercel.json` selects the Express framework and
+installs both workspaces from the root lockfile, including build dependencies, then
 runs the server build, which copies the React frontend into `server/public`
 for Vercel to serve as static assets. `/` loads
 `index.html` → `main.tsx` → `App.tsx`; `/healthcheck` loads the health-check page,

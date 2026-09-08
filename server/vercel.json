@@ -1,5 +1,6 @@
 {
   "framework": "express",
+  "installCommand": "npm ci --prefix .. --workspaces --include-workspace-root --include=dev",
   "buildCommand": "npm run build",
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
