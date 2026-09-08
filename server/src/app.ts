@@ -8,13 +8,6 @@ export function createApp(databaseHealthCheck = checkDatabaseHealth) {
   app.use(cors());
   app.use(express.json());
 
-  // Vercel serves server/public/** as static assets via its CDN, but the bare
-  // root path doesn't automatically resolve to index.html there, so redirect
-  // explicitly rather than depend on routing-manifest rewrite behavior.
-  app.get('/', (_req: Request, res: Response) => {
-    res.redirect('/index.html');
-  });
-
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
     res.status(200).json({

@@ -1,9 +1,17 @@
 {
-  "framework": "express",
+  "framework": null,
   "installCommand": "npm ci --prefix .. --workspaces --include-workspace-root --include=dev",
   "buildCommand": "npm run build",
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/healthcheck", "destination": "/index.html" }
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": { "includeFiles": "dist/**" }
+  },
+  "routes": [
+    { "src": "/api(?:/.*)?", "dest": "/api/index.js" },
+    { "src": "/health(?:/.*)?", "dest": "/api/index.js" },
+    { "src": "/\\.index\\.html", "status": 307, "headers": { "Location": "/" } },
+    { "src": "/healthcheck/", "status": 307, "headers": { "Location": "/healthcheck" } },
+    { "handle": "filesystem" },
+    { "src": "/(?:healthcheck)?", "dest": "/index.html" }
   ]
 }
