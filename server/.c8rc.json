@@ -1,8 +1,8 @@
 {
   "all": true,
-  "src": ["src", "api"],
-  "include": ["src/**/*.ts", "api/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.d.ts", "api/**/*.test.ts", "api/**/*.d.ts"],
+  "src": ["src"],
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.d.ts"],
   "exclude-after-remap": true,
   "reporter": ["text", "html", "lcovonly", "json-summary"],
   "reports-dir": "coverage",
