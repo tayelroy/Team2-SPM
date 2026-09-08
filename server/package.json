@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm run build --prefix ../client && node -e \"const fs=require('node:fs'); fs.rmSync('public',{recursive:true,force:true}); fs.cpSync('../client/dist','public',{recursive:true});\" && tsc",
     "start": "node dist/index.js",
     "test": "tsx --test src/*.test.ts src/db/*.test.ts",
     "test:coverage": "node -e \"require('node:fs').rmSync('.coverage-build', { recursive: true, force: true })\" && tsc -p tsconfig.coverage.json && c8 node --test .coverage-build/*.test.js .coverage-build/db/*.test.js"
