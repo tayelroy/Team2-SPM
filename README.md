@@ -11,3 +11,11 @@ and `client/coverage/index.html`.
 
 See [CI setup and validation](docs/ci.md) for SG2-22 acceptance criteria, required
 branch protection, and the Supabase HTTPS configuration.
+
+For the combined Vercel deployment, set **Root Directory** to `server` and enable
+**Include source files outside of the Root Directory in the Build Step** so the
+build can access `client`. `server/vercel.json` selects the Express framework and
+runs the server build, which copies the React frontend into `server/public`
+for Vercel to serve as static assets. `/` loads
+`index.html` → `main.tsx` → `App.tsx`; `/healthcheck` loads the health-check page,
+and `/api/*` and `/health/*` go to the backend. Redeploy after pushing changes.

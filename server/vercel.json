@@ -1,5 +1,8 @@
 {
+  "framework": "express",
+  "buildCommand": "npm run build",
   "rewrites": [
-    { "source": "/", "destination": "/index.html" }
+    { "source": "/", "destination": "/index.html" },
+    { "source": "/healthcheck", "destination": "/index.html" }
   ]
 }
