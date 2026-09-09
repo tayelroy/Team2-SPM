@@ -23,7 +23,7 @@ afterEach(() => {
 
 function guardedApp(access: ReturnType<typeof createAuthorization>) {
   let calls = 0;
-  const app = createApp(undefined, access);
+  const app = createApp(undefined, undefined, access);
   const router = access.protectedRouter();
   router.post('/edit', access.requirePermission('fixture.edit'), (req, res) => {
     calls++;
@@ -43,6 +43,23 @@ function fixture(principal: Principal = { userId, role: 'event_organiser' }) {
     permissions: { 'fixture.edit': ['event_organiser'] }
   }));
 }
+
+test('registration stays public alongside authenticated identity routes', async () => {
+  let resolutions = 0;
+  const access = createAuthorization({ resolvePrincipal: async () => {
+    resolutions++;
+    return { userId, role: 'attendee' };
+  } });
+  const app = createApp(undefined, (_req, res) => { res.sendStatus(201); }, access);
+
+  assert.equal((await request(app).post('/api/auth/register')).status, 201);
+  assert.equal(resolutions, 0);
+  assert.equal((await request(app).get('/api/auth/me')).status, 401);
+  const identity = await request(app).get('/api/auth/me').set('Authorization', 'Bearer token');
+  assert.equal(identity.status, 200);
+  assert.equal(identity.body.userId, userId);
+  assert.equal(resolutions, 1);
+});
 
 for (const header of [undefined, 'Basic token', 'Bearer', 'Bearer one two', 'Bearer a,b']) {
   test(`SG2-25: refuses missing/malformed credentials (${header}) before side effects`, async () => {
@@ -101,7 +118,7 @@ for (const principal of [{ userId, role: 'admin' }, { userId: '', role: 'attende
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET_SENTINEL'), 'SECRET_SENTINEL']) {
   test(`resolver failure returns generic JSON: ${String(error)}`, async () => {
     const access = createAuthorization({ resolvePrincipal: async () => { throw error; } });
-    const res = await request(createApp(undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
+    const res = await request(createApp(undefined, undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
     assert.equal(res.status, error instanceof AccessError ? error.status : 503);
     assert.doesNotMatch(res.text, /SENTINEL|stack/);
   });
@@ -119,7 +136,7 @@ test('server policy is snapshotted, not mutable through its input arrays', async
   const roles: Principal['role'][] = ['attendee'];
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId, role: 'attendee' }), permissions: { read: roles } });
   roles.pop();
-  const res = await request(createApp(undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
+  const res = await request(createApp(undefined, undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
   assert.deepEqual(res.body.permissions, ['read']);
 });
 

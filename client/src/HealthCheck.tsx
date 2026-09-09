@@ -18,5 +18,9 @@ export default function HealthCheck() {
       });
   }, []);
 
-  return <div>{message}</div>;
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {message}
+    </div>
+  );
 }

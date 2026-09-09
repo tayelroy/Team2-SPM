@@ -1,16 +1,23 @@
-import express, { Request, Response } from 'express';
+import express, { Request, RequestHandler, Response } from 'express';
 import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
+import { createRegisterHandler } from './auth/register';
 import { authorization } from './auth';
 
-export function createApp(databaseHealthCheck = checkDatabaseHealth, access = authorization) {
+export function createApp(
+  databaseHealthCheck = checkDatabaseHealth,
+  registerHandler: RequestHandler = createRegisterHandler(),
+  access = authorization
+) {
   const app = express();
 
   app.use(cors());
   app.use(express.json());
+
+  app.post('/api/auth/register', registerHandler);
   app.use('/api/auth', access.router);
 
-  // Public liveness endpoint.
+  // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
@@ -60,3 +67,4 @@ export function createApp(databaseHealthCheck = checkDatabaseHealth, access = au
 }
 
 export const app = createApp();
+export default app;
