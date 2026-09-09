@@ -19,7 +19,7 @@ function buildApp(register: (input: unknown) => Promise<RegisterAccountResult>) 
 const validInput = {
   name: 'Ada Lovelace',
   email: 'ada@example.com',
-  password: 'correct-horse-battery',
+  password: 'Correct-Horse-9',
   organisation: 'Analytical Engines Ltd'
 };
 
@@ -128,6 +128,37 @@ describe('registerAccount', () => {
 
   test('rejects a malformed email address', async () => {
     const result = await registerAccount({ ...validInput, email: 'not-an-email' }, () => null);
+    assert.equal(result.outcome, 'invalid');
+  });
+
+  test('rejects a password shorter than 8 characters', async () => {
+    let called = false;
+    const result = await registerAccount({ ...validInput, password: 'Sh0rt-x' }, () => {
+      called = true;
+      return null;
+    });
+    assert.deepEqual(result, {
+      outcome: 'invalid',
+      message: 'Password must be at least 8 characters long.'
+    });
+    assert.equal(called, false);
+  });
+
+  test('rejects a password missing an uppercase letter', async () => {
+    const result = await registerAccount({ ...validInput, password: 'lowercase-9' }, () => null);
+    assert.deepEqual(result, {
+      outcome: 'invalid',
+      message: 'Password must include an uppercase letter, a lowercase letter, and a number.'
+    });
+  });
+
+  test('rejects a password missing a lowercase letter', async () => {
+    const result = await registerAccount({ ...validInput, password: 'UPPERCASE-9' }, () => null);
+    assert.equal(result.outcome, 'invalid');
+  });
+
+  test('rejects a password missing a number', async () => {
+    const result = await registerAccount({ ...validInput, password: 'NoNumbers-Here' }, () => null);
     assert.equal(result.outcome, 'invalid');
   });
 
