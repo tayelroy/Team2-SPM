@@ -152,6 +152,9 @@ export default function Login({
             Access is scoped to your role — you only see the events and actions that
             belong to you.
           </span>
+          <span style={{ fontSize: '13px', color: color.silver }}>
+            New here? <a href="/register">Register an account</a>
+          </span>
         </Card>
       </div>
     </div>
