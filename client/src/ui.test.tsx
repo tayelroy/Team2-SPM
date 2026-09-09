@@ -60,42 +60,25 @@ test('the buttons report their clicks', () => {
   );
 });
 
-test('buttons render without handlers', () => {
+test('fields preserve labels, descriptions, editable values and read-only reference data', () => {
   render(
     <>
-      <GradientButton>Approve</GradientButton>
-      <GhostButton>Reject</GhostButton>
-      <IconButton label="Next month">→</IconButton>
-      <Chip bg="#000" bd="#111" fg="#fff">
-        Parking
-      </Chip>
+      <Field
+        label="Expected attendance"
+        defaultValue="180"
+        hint="Drives venue suitability checks"
+      />
+      <Field label="Currently confirmed" defaultValue="90" muted />
+      <Field label="Date" defaultValue="12 Oct 2026" onAbyss />
     </>,
-  );
-  expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Next month' })).toBeInTheDocument();
-});
-
-test('fields render their label, value and hint', () => {
-  render(
-    <Field
-      label="Expected attendance"
-      defaultValue="180"
-      hint="Drives venue suitability checks"
-    />,
   );
   const input = screen.getByLabelText('Expected attendance');
   expect(input).toHaveValue('180');
   expect(screen.getByText('Drives venue suitability checks')).toBeInTheDocument();
+  expect(input).toHaveAccessibleDescription('Drives venue suitability checks');
   expect(input).not.toHaveAttribute('readonly');
-});
-
-test('a muted field is read-only reference data', () => {
-  render(<Field label="Currently confirmed" defaultValue="90" muted />);
   expect(screen.getByLabelText('Currently confirmed')).toHaveAttribute('readonly');
-});
-
-test('a field on the canvas keeps its own inset fill', () => {
-  render(<Field label="Date" defaultValue="12 Oct 2026" onAbyss />);
+  expect(screen.getByLabelText('Currently confirmed')).toHaveValue('90');
   expect(screen.getByLabelText('Date')).toHaveValue('12 Oct 2026');
 });
 

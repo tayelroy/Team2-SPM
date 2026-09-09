@@ -2,6 +2,7 @@ import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
+import { AuthClient, AuthError } from '@supabase/supabase-js';
 import { createApp } from './app';
 import { AccessError, createAuthorization, Principal, ROLES } from './auth';
 import { dbConfig } from './db/config';
@@ -283,6 +284,21 @@ test('network failure is a generic 503', async () => {
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 503);
   assert.deepEqual(res.body, { error: 'Access service unavailable' });
+});
+
+test('an Auth SDK error without an HTTP status denies access before the action', async () => {
+  mock.method(AuthClient.prototype, 'getUser', async () => ({
+    data: { user: null }, error: new AuthError('SDK_SECRET_SENTINEL')
+  }));
+  const fetchMock = provider();
+  const { app, calls } = guardedApp(createAuthorization({
+    permissions: { 'fixture.edit': ['event_organiser'] }
+  }));
+  const res = await request(app).post('/fixture/edit').set('Authorization', 'Bearer test-token');
+  assert.equal(res.status, 503);
+  assert.deepEqual(res.body, { error: 'Access service unavailable' });
+  assert.equal(fetchMock.mock.callCount(), 0);
+  assert.equal(calls(), 0);
 });
 
 test('concurrent requests use separate user tokens and database identities', async () => {

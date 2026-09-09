@@ -4,7 +4,7 @@ const metrics = ['lines', 'statements', 'functions', 'branches'];
 const rows = [
   '## Application test coverage',
   '',
-  'Minimum: 80% for each metric in every application source file.',
+  'Minimum: 100% for each metric in every application source file.',
   '',
   '| Application | Lines | Statements | Functions | Branches |',
   '| --- | ---: | ---: | ---: | ---: |',
