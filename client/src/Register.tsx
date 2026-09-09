@@ -1,4 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { useId, useState } from 'react';
+import type { ChangeEvent } from 'react';
+import { color, radius, rule, surface, label as labelToken } from './theme';
+import { Card, GradientButton, Mark } from './ui';
 
 interface FormState {
   name: string;
@@ -18,32 +21,63 @@ const FIELDS: Array<{ key: keyof FormState; label: string; type: string }> = [
   { key: 'organisation', label: 'Organisation', type: 'text' }
 ];
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  border: 'none',
-  borderBottom: '1px solid var(--color-line)',
-  background: 'transparent',
-  padding: '0.6rem 0',
-  fontFamily: 'var(--font-body)',
-  fontSize: '1.05rem',
-  color: 'var(--color-ink)',
-  outline: 'none',
-  transition: 'border-color 160ms ease',
-};
+/**
+ * Styled like ui.tsx's Field, but controlled: Field only takes defaultValue
+ * (it's built for the static mockups), and this page needs real state to
+ * submit and clear the form against the live API.
+ */
+function ControlledField({
+  id,
+  label,
+  type,
+  value,
+  onChange
+}: {
+  id: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <label htmlFor={id} style={labelToken}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={onChange}
+        required
+        style={{
+          background: surface.field,
+          border: rule.control,
+          borderRadius: radius.sm,
+          padding: '13px 14px',
+          color: color.mist,
+          fontSize: '14px',
+          outline: 'none'
+        }}
+      />
+    </div>
+  );
+}
 
 export default function Register() {
+  const baseId = useId();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
 
   function updateField(field: keyof FormState) {
-    return (event: React.ChangeEvent<HTMLInputElement>) => {
+    return (event: ChangeEvent<HTMLInputElement>) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
     };
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleRegister() {
+    if (status === 'submitting') return;
     setStatus('submitting');
     setMessage('');
 
@@ -71,122 +105,88 @@ export default function Register() {
   }
 
   return (
-    <main
+    <div
       style={{
         minHeight: '100vh',
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
-        gap: '2rem',
-        padding: '5vw 6vw',
-        alignItems: 'start',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '64px 24px'
       }}
     >
-      <div style={{ position: 'sticky', top: '5vw' }}>
-        <p
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(6rem, 14vw, 11rem)',
-            lineHeight: 0.85,
-            color: 'var(--color-line)',
-          }}
-        >
-          02
-        </p>
-        <h1
-          style={{
-            fontSize: 'clamp(2.25rem, 4vw, 3rem)',
-            marginTop: '-1rem',
-            color: 'var(--color-ink)',
-          }}
-        >
-          Register an account
-        </h1>
-        <p style={{ marginTop: '1rem', maxWidth: '32ch', color: 'var(--color-ink-soft)' }}>
-          For Event Organisers and Attendees. Staff accounts are provisioned separately.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
-        noValidate
+      <div
         style={{
-          maxWidth: '30rem',
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-line)',
-          borderRadius: '4px',
-          padding: '2.5rem',
+          width: '100%',
+          maxWidth: '460px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '32px'
         }}
       >
-        {FIELDS.map(({ key, label, type }, index) => (
-          <div
-            key={key}
-            style={{
-              marginBottom: '1.75rem',
-              animation: 'rise-in 480ms ease both',
-              animationDelay: `${index * 70}ms`,
-            }}
-          >
-            <label
-              htmlFor={key}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Mark size={26} />
+            <span
               style={{
-                display: 'block',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                letterSpacing: '0.14em',
+                fontSize: '12px',
+                fontWeight: 500,
+                letterSpacing: '0.15em',
                 textTransform: 'uppercase',
-                color: 'var(--color-ink-soft)',
-                marginBottom: '0.4rem',
+                color: color.silver
               }}
             >
-              {label}
-            </label>
-            <input
-              id={key}
-              name={key}
+              ConnectSphere
+            </span>
+          </div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 'clamp(2.1rem,5.5vw,3rem)',
+              fontWeight: 500,
+              lineHeight: 1,
+              letterSpacing: '-0.04em',
+              color: color.platinum,
+              textWrap: 'pretty'
+            }}
+          >
+            Register an account
+          </h1>
+          <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver, maxWidth: '380px' }}>
+            For Event Organisers and Attendees. Staff accounts are provisioned separately.
+          </p>
+        </div>
+
+        <Card style={{ gap: '20px' }}>
+          {FIELDS.map(({ key, label, type }) => (
+            <ControlledField
+              key={key}
+              id={`${baseId}-${key}`}
+              label={label}
               type={type}
               value={form[key]}
               onChange={updateField(key)}
-              required
-              className="field-input"
-              style={inputStyle}
             />
-          </div>
-        ))}
+          ))}
 
-        <button
-          type="submit"
-          disabled={status === 'submitting'}
-          className="btn-lift btn-lift--accent"
-          style={{
-            width: '100%',
-            marginTop: '0.5rem',
-            padding: '0.95rem',
-            border: 'none',
-            borderRadius: '999px',
-            backgroundColor: 'var(--color-accent)',
-            color: 'var(--color-accent-ink)',
-            fontWeight: 600,
-            fontSize: '0.95rem',
-            cursor: status === 'submitting' ? 'default' : 'pointer',
-            opacity: status === 'submitting' ? 0.7 : 1,
-          }}
-        >
-          {status === 'submitting' ? 'Registering...' : 'Register'}
-        </button>
+          <GradientButton onClick={handleRegister} style={{ marginTop: '4px', borderRadius: radius.sm }}>
+            {status === 'submitting' ? 'Registering…' : 'Register'}
+          </GradientButton>
 
-        {message && (
-          <p
-            role={status === 'error' ? 'alert' : 'status'}
-            style={{
-              marginTop: '1.25rem',
-              fontSize: '0.9rem',
-              color: status === 'error' ? 'var(--color-bad)' : 'var(--color-good)',
-            }}
-          >
-            {message}
-          </p>
-        )}
-      </form>
-    </main>
+          {message && (
+            <span
+              role={status === 'error' ? 'alert' : 'status'}
+              style={{
+                fontSize: '13px',
+                lineHeight: 1.4,
+                color: status === 'error' ? '#ff8a80' : color.accent
+              }}
+            >
+              {message}
+            </span>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }
