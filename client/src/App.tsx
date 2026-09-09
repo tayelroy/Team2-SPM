@@ -16,17 +16,25 @@ import Venues from './screens/Venues';
 
 const DEFAULT_ROLE: Role = 'Event Coordinator';
 
+/** Real pages outside this state machine (e.g. /register) link back in here. */
+function initialScreen(): Screen {
+  return new URLSearchParams(window.location.search).get('screen') === 'login' ? 'login' : 'landing';
+}
+
 /**
  * ConnectSphere prototype shell.
  *
  * Navigation is a plain screen state machine rather than a router: the
- * mockups are a clickable walkthrough with no shareable URLs, so this keeps
- * the dependency surface at zero. Swap in a router once screens need to be
- * deep-linked or the API is wired up.
+ * mockups are a clickable walkthrough with no shareable URLs for screens
+ * reached from within the shell, so this keeps the dependency surface at
+ * zero. The one exception is the initial screen, read once from `?screen=`,
+ * since real pages elsewhere in the app need somewhere to link "sign in" to.
+ * Swap in a router once more screens need to be deep-linked or the API is
+ * wired up.
  */
 export default function App() {
   const [role, setRole] = useState<Role>(DEFAULT_ROLE);
-  const [screen, setScreen] = useState<Screen>('landing');
+  const [screen, setScreen] = useState<Screen>(initialScreen);
 
   /** Picking a role also decides the landing screen for that role. */
   const enterAs = (next: Role) => {

@@ -15,6 +15,7 @@ const EMPTY_FORM: FormState = { name: '', email: '', password: '', organisation:
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
 const REDIRECT_DELAY_MS = 1500;
+const SIGN_IN_URL = '/?screen=login';
 
 const FIELDS: Array<{ key: keyof FormState; label: string; type: string }> = [
   { key: 'name', label: 'Name', type: 'text' },
@@ -73,12 +74,11 @@ export default function Register() {
   const [message, setMessage] = useState('');
 
   // There's no standalone /login page yet (SG2-23) — Sign in only exists
-  // inside the mock click-through at "/". Redirecting there is the closest
-  // approximation of "go sign in" until that story ships a real route.
+  // inside the mock click-through, opened via App's ?screen=login entry point.
   useEffect(() => {
     if (status !== 'success') return;
     const id = setTimeout(() => {
-      window.location.href = '/';
+      window.location.href = SIGN_IN_URL;
     }, REDIRECT_DELAY_MS);
     return () => clearTimeout(id);
   }, [status]);
@@ -145,7 +145,7 @@ export default function Register() {
             ConnectSphere
           </span>
         </a>
-        <GhostButton onClick={() => { window.location.href = '/'; }}>Sign in</GhostButton>
+        <GhostButton onClick={() => { window.location.href = SIGN_IN_URL; }}>Sign in</GhostButton>
       </header>
 
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>

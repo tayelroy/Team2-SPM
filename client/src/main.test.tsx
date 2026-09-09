@@ -40,6 +40,15 @@ test('the home route renders the landing hero', async () => {
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
+test('the ?screen=login entry point opens straight on sign in', async () => {
+  window.history.replaceState(null, '', '/?screen=login');
+  await act(async () => { await import('./main'); });
+  expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  expect(
+    screen.queryByRole('heading', { name: /Exceptional Events Begin with the Perfect Space/ })
+  ).not.toBeInTheDocument();
+});
+
 test('the register route renders the registration form', async () => {
   window.history.replaceState(null, '', '/register');
   await act(async () => { await import('./main'); });

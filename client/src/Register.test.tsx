@@ -90,13 +90,13 @@ test('shows a generic message when the server is unreachable', async () => {
   ).toBeInTheDocument();
 });
 
-test('the header Sign in button takes you to the homepage', () => {
+test('the header Sign in button takes you straight to sign in, not the homepage', () => {
   render(<Register />);
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-  expect(window.location.href).toBe('/');
+  expect(window.location.href).toBe('/?screen=login');
 });
 
-test('redirects to the homepage shortly after a successful registration', async () => {
+test('redirects to sign in shortly after a successful registration', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Account created successfully.' }), { status: 201 }))
@@ -110,7 +110,7 @@ test('redirects to the homepage shortly after a successful registration', async 
   expect(window.location.href).toBe('');
 
   await new Promise((resolve) => setTimeout(resolve, 1600));
-  expect(window.location.href).toBe('/');
+  expect(window.location.href).toBe('/?screen=login');
 }, 10000);
 
 test('does not redirect after an unsuccessful registration', async () => {
