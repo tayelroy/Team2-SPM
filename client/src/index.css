@@ -1,107 +1,88 @@
+/**
+ * Global baseline for the ConnectSphere mockups. Component styling lives
+ * alongside its markup as inline style objects; this file carries only what
+ * inline styles cannot express — the reset, the font, keyframes, and the
+ * pseudo-element states.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap');
+
 :root {
-  --font-display: 'Fraunces', 'Iowan Old Style', serif;
-  --font-body: 'Archivo', 'Helvetica Neue', sans-serif;
-
-  --color-bg: #f4efe4;
-  --color-surface: #fdfbf5;
-  --color-ink: #17130f;
-  --color-ink-soft: #5a5147;
-  --color-line: #d8cdb8;
-  --color-accent: #c1440e;
-  --color-accent-ink: #fdfbf5;
-  --color-good: #2f5233;
-  --color-bad: #a3231f;
-
-  color-scheme: light;
-  line-height: 1.5;
+  /* DM Sans stands in for Matter, the mockup's display face. */
+  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #16130f;
-    --color-surface: #201b15;
-    --color-ink: #f4efe4;
-    --color-ink-soft: #b9ac97;
-    --color-line: #3a3227;
-    --color-accent: #e0631f;
-    --color-accent-ink: #16130f;
-    --color-good: #6fae76;
-    --color-bad: #e2635f;
-    color-scheme: dark;
-  }
-}
-
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
+html,
 body {
+  margin: 0;
+  padding: 0;
+  background: #012624;
+  color: #ffffff;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-bg);
-  color: var(--color-ink);
-  font-family: var(--font-body);
-  font-weight: 400;
 }
 
 #root {
   width: 100%;
 }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+::placeholder {
+  color: #707777;
+}
+
+/* Inputs and controls carry their own borders; show focus without shifting layout. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #cbfffc;
+  outline-offset: 2px;
 }
 
 a {
-  color: inherit;
+  color: #edfffe;
+  text-decoration: none;
 }
 
-button {
-  font-family: var(--font-body);
+a:hover {
+  color: #ffffff;
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+@keyframes orbdrift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  50% {
+    transform: translate3d(0, -14px, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
-.btn-lift {
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-
-.btn-lift:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-
-.btn-lift.btn-lift--ink:hover:not(:disabled) {
-  box-shadow: 0 10px 24px -12px rgba(23, 19, 15, 0.5);
-}
-
-.btn-lift.btn-lift--accent:hover:not(:disabled) {
-  box-shadow: 0 12px 20px -10px rgba(193, 68, 14, 0.6);
-}
-
-.field-input {
-  transition: border-color 160ms ease;
-}
-
-.field-input:focus {
-  border-color: var(--color-accent);
+/* The drifting hero glows are decorative; hold them still when asked. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

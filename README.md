@@ -11,3 +11,14 @@ and `client/coverage/index.html`.
 
 See [CI setup and validation](docs/ci.md) for SG2-22 acceptance criteria, required
 branch protection, and the Supabase HTTPS configuration.
+
+For the combined Vercel deployment, set **Root Directory** to `server` and enable
+**Include source files outside of the Root Directory in the Build Step** so the
+build can access `client`. `server/vercel.json` uses the **Other** framework preset,
+installs both workspaces from the root lockfile, including build dependencies, and
+runs the server build. Vercel publishes `server/public` as the static output and
+packages `server/api/index.js` as the Express API function. `/` loads
+`index.html` → `main.tsx` → `App.tsx`; `/healthcheck` loads the health-check page,
+and `/api/*` and `/health/*` go to the backend. Static files are resolved before
+page fallbacks, without rewriting page requests into the backend. The malformed
+`/.index.html` path redirects to `/`. Redeploy after pushing changes.
