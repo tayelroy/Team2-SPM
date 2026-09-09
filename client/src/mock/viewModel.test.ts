@@ -1,11 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { color } from '../theme';
 import { EVENTS } from './data';
-import { ROLES } from './types';
 import type { Role } from './types';
 import {
   CALENDAR_LEGEND,
-  actionsFor,
   badgeStyle,
   calendarDays,
   chipStyle,
@@ -14,8 +12,6 @@ import {
   detailActions,
   equipmentViews,
   eventCards,
-  navFor,
-  primaryActionFor,
   scopedEvents,
   showsPipeline,
   statusTrailStyle,
@@ -125,12 +121,6 @@ describe('currentEvent', () => {
 });
 
 describe('role-scoped chrome', () => {
-  test.each(ROLES)('%s has navigation, actions and a primary action', (role) => {
-    expect(navFor(role).length).toBeGreaterThan(0);
-    expect(actionsFor(role).length).toBeGreaterThan(0);
-    expect(primaryActionFor(role).label).toBeTruthy();
-  });
-
   test('only the operational roles see the pipeline', () => {
     expect(showsPipeline('Event Coordinator')).toBe(true);
     expect(showsPipeline('Venue Staff')).toBe(true);

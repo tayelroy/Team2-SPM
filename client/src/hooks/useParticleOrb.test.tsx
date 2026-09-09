@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { StrictMode } from 'react';
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { useParticleOrb } from './useParticleOrb';
 
@@ -106,9 +106,13 @@ test('grows the spacer so the sphere clears the hero copy', () => {
   expect(getByTestId('spacer').style.height).toMatch(/^\d+px$/);
 });
 
-test('runs without a spacer element', () => {
-  render(<Harness withSpacer={false} />);
+test('renders without a spacer or a reported device scale', () => {
+  vi.stubGlobal('devicePixelRatio', undefined);
+  const { getByTestId } = render(<Harness withSpacer={false} />);
   expect(() => tick()).not.toThrow();
+  expect(getByTestId('orb')).toHaveAttribute('width', '800');
+  expect(getByTestId('orb')).toHaveAttribute('height', '600');
+  expect(ctx.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
 });
 
 test('the pointer pushes particles and a press pulls them back', () => {
@@ -171,4 +175,12 @@ test('no-ops when the host has no 2D context', () => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   expect(() => render(<Harness />)).not.toThrow();
   expect(ctx.setTransform).not.toHaveBeenCalled();
+});
+
+test('does not start drawing or schedule work for a detached canvas', () => {
+  const { result } = renderHook(() => useParticleOrb());
+  result.current.canvasRef(document.createElement('canvas'));
+  expect(ctx.setTransform).not.toHaveBeenCalled();
+  expect(ctx.arc).not.toHaveBeenCalled();
+  expect(frames.size).toBe(0);
 });
