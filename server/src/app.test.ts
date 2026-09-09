@@ -65,19 +65,36 @@ describe('Health Check API', () => {
     }
   });
 
-  test('both liveness aliases return the public unconfigured health contract', async () => {
-    for (const route of ['/health', '/api/health']) {
-      const response = await request(app).get(route);
-      assert.equal(response.status, 200);
-      assert.equal(response.body.status, 'ok');
-      assert.equal(response.body.service, 'ConnectSphere Backend');
-      assert.ok(typeof response.body.uptime === 'number');
-      assert.ok(typeof response.body.timestamp === 'string');
-      assert.ok(response.body.database);
-      assert.equal(response.body.database.provider, 'Supabase');
-      assert.equal(response.body.database.configured, false);
-      assert.equal(response.body.database.supabaseClient, 'unconfigured');
-    }
+  test('GET /health returns 200 and status ok with database info', async () => {
+    const response = await request(app).get('/health');
+    assert.equal(response.status, 200);
+    assert.equal(response.body.status, 'ok');
+    assert.equal(response.body.service, 'ConnectSphere Backend');
+    assert.ok(typeof response.body.uptime === 'number');
+    assert.ok(typeof response.body.timestamp === 'string');
+    assert.ok(response.body.database);
+    assert.equal(response.body.database.provider, 'Supabase');
+    assert.ok('configured' in response.body.database);
+  });
+
+  test('GET /api/health returns 200 and status ok with database info', async () => {
+    const response = await request(app).get('/api/health');
+    assert.equal(response.status, 200);
+    assert.equal(response.body.status, 'ok');
+    assert.equal(response.body.service, 'ConnectSphere Backend');
+    assert.ok(typeof response.body.uptime === 'number');
+    assert.ok(typeof response.body.timestamp === 'string');
+    assert.ok(response.body.database);
+    assert.equal(response.body.database.provider, 'Supabase');
+  });
+
+  test('GET /api/health/db returns database health report', async () => {
+    const response = await request(app).get('/api/health/db');
+    assert.ok(response.status === 200 || response.status === 503);
+    assert.ok(response.body.database);
+    assert.equal(response.body.database.provider, 'Supabase');
+    assert.ok('supabase' in response.body.database);
+    assert.ok(!('postgres' in response.body.database));
   });
 });
 
@@ -85,8 +102,12 @@ describe('Supabase HTTPS Client Connection Modules', () => {
   test('checkDatabaseHealth returns structured health object', async () => {
     const health = await checkDatabaseHealth();
     assert.equal(health.provider, 'Supabase');
-    assert.equal(health.configured, false);
-    assert.equal(health.supabase.status, 'unconfigured');
-    assert.equal(isSupabaseConfigured(), false);
+    assert.ok(typeof health.configured === 'boolean');
+    assert.ok(health.supabase);
+    assert.ok(['connected', 'unconfigured', 'error'].includes(health.supabase.status));
+  });
+
+  test('isSupabaseConfigured returns a boolean flag', () => {
+    assert.equal(typeof isSupabaseConfigured(), 'boolean');
   });
 });

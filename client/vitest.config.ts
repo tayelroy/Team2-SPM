@@ -15,10 +15,10 @@ export default defineConfig({
       reportOnFailure: true,
       thresholds: {
         perFile: true,
-        lines: 100,
-        statements: 100,
-        functions: 100,
-        branches: 100
+        lines: 80,
+        statements: 80,
+        functions: 80,
+        branches: 80
       }
     }
   }

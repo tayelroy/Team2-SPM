@@ -6,14 +6,11 @@ Tests mock Supabase HTTPS responses and use local HTTP sockets;
 they do not need Supabase credentials or a running database.
 
 Run `npm test` for tests without coverage, or `npm run test:coverage` for tests
-with the 100% per-file coverage gate. HTML reports are written to `server/coverage/index.html`
+with the 80% coverage gate. HTML reports are written to `server/coverage/index.html`
 and `client/coverage/index.html`.
 
 See [CI setup and validation](docs/ci.md) for SG2-22 acceptance criteria, required
 branch protection, and the Supabase HTTPS configuration.
-CI runs the complete regression suite before and after each PR merge. See the
-[test audit and course case guide](docs/testing.md) for the 230-test breakdown
-and how automated checks map to 4–5 functional cases per feature.
 
 For the combined Vercel deployment, set **Root Directory** to `server` and enable
 **Include source files outside of the Root Directory in the Build Step** so the

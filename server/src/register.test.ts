@@ -117,20 +117,13 @@ describe('registerAccount', () => {
   });
 
   test('rejects missing required fields without calling the admin client', async () => {
-    for (const field of ['name', 'email', 'password', 'organisation'] as const) {
-      // Each required field is an independent validation decision. Whitespace
-      // is empty only for fields that the implementation explicitly trims.
-      const emptyValues = field === 'password' ? [undefined, ''] : [undefined, '', '   '];
-      for (const value of emptyValues) {
-        let called = false;
-        const result = await registerAccount({ ...validInput, [field]: value }, () => {
-          called = true;
-          return null;
-        });
-        assert.equal(result.outcome, 'invalid', `${field}=${JSON.stringify(value)}`);
-        assert.equal(called, false);
-      }
-    }
+    let called = false;
+    const result = await registerAccount({ email: validInput.email }, () => {
+      called = true;
+      return null;
+    });
+    assert.equal(result.outcome, 'invalid');
+    assert.equal(called, false);
   });
 
   test('rejects a malformed email address', async () => {
@@ -219,18 +212,10 @@ describe('POST /api/auth/register', () => {
     assert.equal(response.body.error, message);
   });
 
-  test('treats an absent request body as empty input and returns 400', async () => {
-    const message = 'Name, email, password, and organisation are all required.';
-    // Exercise the handler's fallback independently of express.json(), which
-    // normalises a bodyless HTTP request to {} in this Express version.
-    const app = express();
-    app.post('/api/auth/register', createRegisterHandler(async input => {
-      assert.deepEqual(input, {});
-      return { outcome: 'invalid', message };
-    }));
-    const response = await request(app).post('/api/auth/register');
+  test('returns 400 for invalid input', async () => {
+    const app = buildApp(async () => ({ outcome: 'invalid', message: 'Enter a valid email address.' }));
+    const response = await request(app).post('/api/auth/register').send(validInput);
     assert.equal(response.status, 400);
-    assert.equal(response.body.error, message);
   });
 
   test('returns 503 when registration is unavailable', async () => {

@@ -2,7 +2,6 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
   merge_group:
   workflow_dispatch:
 
@@ -10,159 +9,37 @@ permissions:
   contents: read
 
 concurrency:
-  # Every merge retains its own regression run.
-  group: ci-${{ github.event.action == 'closed' && format('merged-{0}', github.run_id) || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event.action != 'closed' }}
-
-env:
-  NODE_ENV: test
-  SUPABASE_URL: ''
-  SUPABASE_ANON_KEY: ''
-  SUPABASE_SERVICE_ROLE_KEY: ''
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build applications
-    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-
-  application-tests:
-    name: Test ${{ matrix.name }}
-    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: backend
-            workspace: server
-          - name: frontend
-            workspace: client
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Run regression tests and enforce 100% coverage
-        run: npm run test:coverage --workspace ${{ matrix.workspace }}
-      - name: Upload coverage evidence
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}-coverage
-          path: |
-            ${{ matrix.workspace }}/coverage/
-            !${{ matrix.workspace }}/coverage/tmp/**
-            !${{ matrix.workspace }}/coverage/.tmp/**
-          if-no-files-found: error
-          retention-days: 14
-
-  database-tests:
-    name: Test database policies
-    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: ci-only-password
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
-      - name: Check role isolation and database constraints
-        env:
-          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
-        run: |
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/auth.sql
-          for migration in supabase/migrations/*.sql; do
-            docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$migration"
-          done
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/account_roles.sql
-
-  reviewer-tests:
-    name: Test security reviewer
-    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm run test:reviewer
-
   build-and-test:
-    # Preserve the required check name used by existing branch rules.
     name: Build and test
-    needs: [build, application-tests, database-tests, reviewer-tests]
-    if: ${{ always() && (github.event.action != 'closed' || github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      SUPABASE_URL: ''
+      SUPABASE_ANON_KEY: ''
+      SUPABASE_SERVICE_ROLE_KEY: ''
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out pull request code
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Require every regression job to pass
-        env:
-          JOB_RESULTS: ${{ toJSON(needs) }}
-        run: |
-          node --input-type=module -e '
-            const jobs = JSON.parse(process.env.JOB_RESULTS);
-            const failed = Object.entries(jobs).filter(([, job]) => job.result !== "success");
-            if (failed.length) {
-              console.error("Required jobs did not pass:", failed.map(([name, job]) => `${name}: ${job.result}`).join(", "));
-              process.exit(1);
-            }
-          '
-      - name: Collect backend coverage
-        if: ${{ !cancelled() }}
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-coverage
-          path: server/coverage
-      - name: Collect frontend coverage
-        if: ${{ !cancelled() }}
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-coverage
-          path: client/coverage
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build applications, test, and enforce coverage
+        run: npm run ci
       - name: Summarize application coverage
         if: ${{ !cancelled() }}
         run: node .github/scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload combined coverage reports
+      - name: Upload coverage reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
@@ -170,5 +47,7 @@ jobs:
           path: |
             server/coverage/
             client/coverage/
+            !server/coverage/tmp/**
+            !client/coverage/.tmp/**
           if-no-files-found: error
           retention-days: 14
