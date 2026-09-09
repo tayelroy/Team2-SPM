@@ -1,7 +1,7 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { color, radius, rule, surface, label as labelToken } from './theme';
-import { Card, GradientButton, Mark } from './ui';
+import { color, layout, radius, rule, surface, label as labelToken } from './theme';
+import { Card, GhostButton, GradientButton, Mark } from './ui';
 
 interface FormState {
   name: string;
@@ -13,6 +13,8 @@ interface FormState {
 const EMPTY_FORM: FormState = { name: '', email: '', password: '', organisation: '' };
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
+
+const REDIRECT_DELAY_MS = 1500;
 
 const FIELDS: Array<{ key: keyof FormState; label: string; type: string }> = [
   { key: 'name', label: 'Name', type: 'text' },
@@ -70,6 +72,17 @@ export default function Register() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
 
+  // There's no standalone /login page yet (SG2-23) — Sign in only exists
+  // inside the mock click-through at "/". Redirecting there is the closest
+  // approximation of "go sign in" until that story ships a real route.
+  useEffect(() => {
+    if (status !== 'success') return;
+    const id = setTimeout(() => {
+      window.location.href = '/';
+    }, REDIRECT_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [status]);
+
   function updateField(field: keyof FormState) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -96,7 +109,7 @@ export default function Register() {
       }
 
       setStatus('success');
-      setMessage(data.message || 'Account created successfully.');
+      setMessage(data.message || 'Account created successfully. Taking you to sign in…');
       setForm(EMPTY_FORM);
     } catch {
       setStatus('error');
@@ -105,87 +118,87 @@ export default function Register() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '64px 24px'
-      }}
-    >
-      <div
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <header
         style={{
+          maxWidth: layout.maxWidth,
           width: '100%',
-          maxWidth: '460px',
+          margin: '0 auto',
+          padding: layout.gutter,
           display: 'flex',
-          flexDirection: 'column',
-          gap: '32px'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '20px'
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <Mark size={26} />
-            <span
-              style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                letterSpacing: '0.15em',
-                textTransform: 'uppercase',
-                color: color.silver
-              }}
-            >
-              ConnectSphere
-            </span>
-          </div>
-          <h1
+        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Mark />
+          <span
             style={{
-              margin: 0,
-              fontSize: 'clamp(2.1rem,5.5vw,3rem)',
+              fontSize: '12px',
               fontWeight: 500,
-              lineHeight: 1,
-              letterSpacing: '-0.04em',
-              color: color.platinum,
-              textWrap: 'pretty'
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              color: color.platinum
             }}
           >
-            Register an account
-          </h1>
-          <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver, maxWidth: '380px' }}>
-            For Event Organisers and Attendees. Staff accounts are provisioned separately.
-          </p>
-        </div>
+            ConnectSphere
+          </span>
+        </a>
+        <GhostButton onClick={() => { window.location.href = '/'; }}>Sign in</GhostButton>
+      </header>
 
-        <Card style={{ gap: '20px' }}>
-          {FIELDS.map(({ key, label, type }) => (
-            <ControlledField
-              key={key}
-              id={`${baseId}-${key}`}
-              label={label}
-              type={type}
-              value={form[key]}
-              onChange={updateField(key)}
-            />
-          ))}
-
-          <GradientButton onClick={handleRegister} style={{ marginTop: '4px', borderRadius: radius.sm }}>
-            {status === 'submitting' ? 'Registering…' : 'Register'}
-          </GradientButton>
-
-          {message && (
-            <span
-              role={status === 'error' ? 'alert' : 'status'}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ width: '100%', maxWidth: '460px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start' }}>
+            <h1
               style={{
-                fontSize: '13px',
-                lineHeight: 1.4,
-                color: status === 'error' ? '#ff8a80' : color.accent
+                margin: 0,
+                fontSize: 'clamp(2.1rem,5.5vw,3rem)',
+                fontWeight: 500,
+                lineHeight: 1,
+                letterSpacing: '-0.04em',
+                color: color.platinum,
+                textWrap: 'pretty'
               }}
             >
-              {message}
-            </span>
-          )}
-        </Card>
+              Register an account
+            </h1>
+            <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver, maxWidth: '380px' }}>
+              For Event Organisers and Attendees. Staff accounts are provisioned separately.
+            </p>
+          </div>
+
+          <Card style={{ gap: '20px' }}>
+            {FIELDS.map(({ key, label, type }) => (
+              <ControlledField
+                key={key}
+                id={`${baseId}-${key}`}
+                label={label}
+                type={type}
+                value={form[key]}
+                onChange={updateField(key)}
+              />
+            ))}
+
+            <GradientButton onClick={handleRegister} style={{ marginTop: '4px', borderRadius: radius.sm }}>
+              {status === 'submitting' ? 'Registering…' : 'Register'}
+            </GradientButton>
+
+            {message && (
+              <span
+                role={status === 'error' ? 'alert' : 'status'}
+                style={{
+                  fontSize: '13px',
+                  lineHeight: 1.4,
+                  color: status === 'error' ? '#ff8a80' : color.accent
+                }}
+              >
+                {message}
+              </span>
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );
