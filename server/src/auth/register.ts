@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
+import { createUserRecord } from '../db/users';
 
 export interface RegisterAccountInput {
   name: string;
@@ -17,6 +18,7 @@ export type RegisterAccountResult =
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUPLICATE_EMAIL_PATTERN = /already (been )?registered|already exists/i;
+const UNAVAILABLE_MESSAGE = 'Registration is temporarily unavailable. Please try again later.';
 
 function validate(input: Partial<RegisterAccountInput>): string | null {
   const { name, email, password, organisation } = input;
@@ -45,10 +47,7 @@ export async function registerAccount(
 
   const admin = getAdminClient();
   if (!admin) {
-    return {
-      outcome: 'unavailable',
-      message: 'Registration is temporarily unavailable. Please try again later.'
-    };
+    return { outcome: 'unavailable', message: UNAVAILABLE_MESSAGE };
   }
 
   const { name, email, password, organisation } = input as RegisterAccountInput;
@@ -56,8 +55,7 @@ export async function registerAccount(
   const { data, error } = await admin.auth.admin.createUser({
     email: email.trim(),
     password,
-    email_confirm: true,
-    user_metadata: { name: name.trim(), organisation: organisation.trim() }
+    email_confirm: true
   });
 
   if (error) {
@@ -71,10 +69,21 @@ export async function registerAccount(
   }
 
   if (!data?.user) {
-    return {
-      outcome: 'unavailable',
-      message: 'Registration is temporarily unavailable. Please try again later.'
-    };
+    return { outcome: 'unavailable', message: UNAVAILABLE_MESSAGE };
+  }
+
+  const record = await createUserRecord(admin, {
+    userId: data.user.id,
+    name: name.trim(),
+    organisation: organisation.trim()
+  });
+
+  if (!record.ok) {
+    // The Auth account was created but has no matching public.users row
+    // (role_id is NOT NULL there) — remove it so the email isn't stuck
+    // as "already registered" for a signup that never actually completed.
+    await admin.auth.admin.deleteUser(data.user.id).catch(() => {});
+    return { outcome: 'unavailable', message: UNAVAILABLE_MESSAGE };
   }
 
   return { outcome: 'created', userId: data.user.id };
