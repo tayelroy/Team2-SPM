@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Role, Screen } from './mock/types';
+import { clearSession, loadSession, saveSession } from './auth/session';
+import type { StoredSession } from './auth/session';
 import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
@@ -14,48 +16,92 @@ import Login from './screens/Login';
 import RequestForm from './screens/RequestForm';
 import Venues from './screens/Venues';
 
-const DEFAULT_ROLE: Role = 'Event Coordinator';
+/** The screen a signed-in user of a given role opens on. */
+function landingScreenFor(role: Role): Screen {
+  return role === 'Attendee' ? 'attendee' : 'dashboard';
+}
 
-/** Real pages outside this state machine (e.g. /register) link back in here. */
-function initialScreen(): Screen {
+/**
+ * A persisted session takes priority — someone with a live session landing
+ * on "/" or "/?screen=login" resumes where they left off rather than seeing
+ * sign-in again. Without one, "/?screen=login" is real pages elsewhere in
+ * the app (e.g. /register) linking back in here.
+ */
+function initialScreen(session: StoredSession | null): Screen {
+  if (session) return landingScreenFor(session.user.role as Role);
   return new URLSearchParams(window.location.search).get('screen') === 'login' ? 'login' : 'landing';
 }
 
 /**
- * ConnectSphere prototype shell.
+ * ConnectSphere app shell.
  *
- * Navigation is a plain screen state machine rather than a router: the
- * mockups are a clickable walkthrough with no shareable URLs for screens
- * reached from within the shell, so this keeps the dependency surface at
- * zero. The one exception is the initial screen, read once from `?screen=`,
- * since real pages elsewhere in the app need somewhere to link "sign in" to.
- * Swap in a router once more screens need to be deep-linked or the API is
- * wired up.
+ * Navigation is a plain screen state machine rather than a router: screens
+ * reached from within the shell have no shareable URLs, which keeps the
+ * dependency surface at zero. The one deliberate exception is the initial
+ * screen, resolved once at mount from a persisted session or `?screen=`,
+ * since real pages outside the shell need somewhere to land a signed-in (or
+ * about-to-sign-in) user. Swap in a router once more screens need to be
+ * deep-linked.
  */
 export default function App() {
-  const [role, setRole] = useState<Role>(DEFAULT_ROLE);
-  const [screen, setScreen] = useState<Screen>(initialScreen);
+  const [session, setSession] = useState<StoredSession | null>(() => loadSession());
+  const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
 
-  /** Picking a role also decides the landing screen for that role. */
-  const enterAs = (next: Role) => {
-    setRole(next);
-    setScreen(next === 'Attendee' ? 'attendee' : 'dashboard');
-  };
+  // Best-effort background check that a persisted session is still valid.
+  // Trusts the cached session for the current render (no loading flash);
+  // a network hiccup doesn't kick the user out, only a confirmed 401/403 does.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${session.accessToken}` } })
+      .then((response) => {
+        if (cancelled || response.ok) return;
+        clearSession();
+        setSession(null);
+        setScreen('landing');
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Re-check only when the signed-in identity actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.accessToken]);
+
+  function handleSignIn(newSession: StoredSession) {
+    saveSession(newSession);
+    setSession(newSession);
+    setScreen(landingScreenFor(newSession.user.role as Role));
+  }
+
+  function handleSignOut() {
+    if (session) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: session.accessToken, refreshToken: session.refreshToken })
+      }).catch(() => {});
+    }
+    clearSession();
+    setSession(null);
+    setScreen('landing');
+  }
 
   if (screen === 'landing') {
     return <Landing onOpenApp={() => setScreen('login')} />;
   }
 
   if (screen === 'login') {
-    return (
-      <Login
-        role={role}
-        onPickRole={enterAs}
-        onSignIn={() => enterAs(role)}
-        onBack={() => setScreen('landing')}
-      />
-    );
+    return <Login onSignIn={handleSignIn} onBack={() => setScreen('landing')} />;
   }
+
+  // Every other screen requires a session (only reachable via handleSignIn,
+  // which sets both together, or a persisted one restored at mount).
+  if (!session) {
+    return <Login onSignIn={handleSignIn} onBack={() => setScreen('landing')} />;
+  }
+
+  const role = session.user.role as Role;
 
   const body = {
     dashboard: <Dashboard role={role} onNavigate={setScreen} />,
@@ -67,17 +113,11 @@ export default function App() {
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,
-    change: <ChangeRequest />,
+    change: <ChangeRequest />
   }[screen];
 
   return (
-    <AppShell
-      role={role}
-      screen={screen}
-      onNavigate={setScreen}
-      onChangeRole={enterAs}
-      onSignOut={() => setScreen('landing')}
-    >
+    <AppShell role={role} screen={screen} onNavigate={setScreen} onSignOut={handleSignOut}>
       {body}
     </AppShell>
   );

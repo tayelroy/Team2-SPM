@@ -2,10 +2,18 @@ import express, { Request, RequestHandler, Response } from 'express';
 import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
 import { createRegisterHandler } from './auth/register';
+import { createLoginHandler } from './auth/login';
+import { createLogoutHandler } from './auth/logout';
+import { createMeHandler } from './auth/me';
+import { createUpdateRoleHandler } from './auth/roles';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
-  registerHandler: RequestHandler = createRegisterHandler()
+  registerHandler: RequestHandler = createRegisterHandler(),
+  loginHandler: RequestHandler = createLoginHandler(),
+  logoutHandler: RequestHandler = createLogoutHandler(),
+  meHandler: RequestHandler = createMeHandler(),
+  updateRoleHandler: RequestHandler = createUpdateRoleHandler()
 ) {
   const app = express();
 
@@ -13,6 +21,10 @@ export function createApp(
   app.use(express.json());
 
   app.post('/api/auth/register', registerHandler);
+  app.post('/api/auth/login', loginHandler);
+  app.post('/api/auth/logout', logoutHandler);
+  app.get('/api/auth/me', meHandler);
+  app.patch('/api/users/:userId/role', updateRoleHandler);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {

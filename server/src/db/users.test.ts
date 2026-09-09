@@ -1,11 +1,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createUserRecord } from './users';
+import { createUserRecord, updateUserRole } from './users';
 
 function fakeAdmin(options: {
   roleLookup?: () => Promise<{ data: { role_id: number } | null; error: { message: string } | null }>;
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
+  update?: (payload: any) => Promise<{ data: any; error: { message: string } | null }>;
 }): SupabaseClient {
   return {
     from(table: string) {
@@ -20,7 +21,13 @@ function fakeAdmin(options: {
       }
       if (table === 'users') {
         return {
-          insert: options.insert ?? (async () => ({ error: null }))
+          insert: options.insert ?? (async () => ({ error: null })),
+          update: (payload: any) => ({
+            eq: () => ({
+              select: async () =>
+                options.update ? options.update(payload) : { data: [{ user_id: 'target-1' }], error: null }
+            })
+          })
         };
       }
       throw new Error(`Unexpected table: ${table}`);
@@ -85,5 +92,51 @@ describe('createUserRecord', () => {
     const result = await createUserRecord(admin, record);
 
     assert.deepEqual(result, { ok: false, error: 'duplicate key value violates unique constraint' });
+  });
+});
+
+describe('updateUserRole', () => {
+  test('updates the role id looked up from the given role name', async () => {
+    let updatePayload: any;
+    const admin = fakeAdmin({
+      roleLookup: async () => ({ data: { role_id: 3 }, error: null }),
+      update: async (payload) => {
+        updatePayload = payload;
+        return { data: [{ user_id: 'target-1' }], error: null };
+      }
+    });
+
+    const result = await updateUserRole(admin, 'target-1', 'Venue Staff');
+
+    assert.deepEqual(result, { ok: true });
+    assert.deepEqual(updatePayload, { role_id: 3 });
+  });
+
+  test('rejects a role name that is not one of the five valid roles', async () => {
+    let roleLookupCalled = false;
+    const admin = fakeAdmin({ roleLookup: async () => { roleLookupCalled = true; return { data: { role_id: 1 }, error: null }; } });
+
+    const result = await updateUserRole(admin, 'target-1', 'Overlord');
+
+    assert.deepEqual(result, { ok: false, reason: 'invalid_role' });
+    assert.equal(roleLookupCalled, false);
+  });
+
+  test('reports invalid_role when a valid-looking name has no matching row', async () => {
+    const admin = fakeAdmin({ roleLookup: async () => ({ data: null, error: null }) });
+    const result = await updateUserRole(admin, 'target-1', 'Venue Staff');
+    assert.deepEqual(result, { ok: false, reason: 'invalid_role' });
+  });
+
+  test('reports user_not_found when no row matches the target user id', async () => {
+    const admin = fakeAdmin({ update: async () => ({ data: [], error: null }) });
+    const result = await updateUserRole(admin, 'does-not-exist', 'Venue Staff');
+    assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
+  });
+
+  test('surfaces a database error from the update itself', async () => {
+    const admin = fakeAdmin({ update: async () => ({ data: null, error: { message: 'connection reset' } }) });
+    const result = await updateUserRole(admin, 'target-1', 'Venue Staff');
+    assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
   });
 });
