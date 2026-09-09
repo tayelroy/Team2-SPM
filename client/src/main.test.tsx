@@ -40,6 +40,22 @@ test('the home route renders the landing hero', async () => {
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
+test('the ?screen=login entry point opens straight on sign in', async () => {
+  window.history.replaceState(null, '', '/?screen=login');
+  await act(async () => { await import('./main'); });
+  expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+  expect(
+    screen.queryByRole('heading', { name: /Exceptional Events Begin with the Perfect Space/ })
+  ).not.toBeInTheDocument();
+});
+
+test('the register route renders the registration form', async () => {
+  window.history.replaceState(null, '', '/register');
+  await act(async () => { await import('./main'); });
+  expect(screen.getByRole('heading', { name: 'Register an account' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'ConnectSphere' })).not.toBeInTheDocument();
+});
+
 test('the healthcheck route renders the API health result', async () => {
   window.history.replaceState(null, '', '/healthcheck');
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{"status":"ok"}')));
