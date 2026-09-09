@@ -19,6 +19,17 @@ export type RegisterAccountResult =
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUPLICATE_EMAIL_PATTERN = /already (been )?registered|already exists/i;
 const UNAVAILABLE_MESSAGE = 'Registration is temporarily unavailable. Please try again later.';
+const PASSWORD_MIN_LENGTH = 8;
+
+function passwordError(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.`;
+  }
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return 'Password must include an uppercase letter, a lowercase letter, and a number.';
+  }
+  return null;
+}
 
 function validate(input: Partial<RegisterAccountInput>): string | null {
   const { name, email, password, organisation } = input;
@@ -28,7 +39,7 @@ function validate(input: Partial<RegisterAccountInput>): string | null {
   if (!EMAIL_PATTERN.test(email.trim())) {
     return 'Enter a valid email address.';
   }
-  return null;
+  return passwordError(password);
 }
 
 /**
