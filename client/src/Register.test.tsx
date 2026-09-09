@@ -23,6 +23,7 @@ function fillForm() {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@example.com' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'correct-horse-battery' } });
   fireEvent.change(screen.getByLabelText('Organisation'), { target: { value: 'Analytical Engines Ltd' } });
+  fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'Attendee' } });
 }
 
 test('submits the form fields as JSON to the register endpoint', async () => {
@@ -43,7 +44,8 @@ test('submits the form fields as JSON to the register endpoint', async () => {
       name: 'Ada Lovelace',
       email: 'ada@example.com',
       password: 'correct-horse-battery',
-      organisation: 'Analytical Engines Ltd'
+      organisation: 'Analytical Engines Ltd',
+      role: 'Attendee'
     })
   });
 });
@@ -61,6 +63,20 @@ test('clears the form and shows a success message after registering', async () =
   await screen.findByText('Account created successfully.');
   expect(screen.getByLabelText('Name')).toHaveValue('');
   expect(screen.getByLabelText('Email')).toHaveValue('');
+  expect(screen.getByLabelText('Role')).toHaveValue('');
+});
+
+test('role options match the five real account roles', () => {
+  render(<Register />);
+  const options = screen.getAllByRole('option').map((option) => option.textContent);
+  expect(options).toEqual([
+    'Choose a role',
+    'Event Organiser',
+    'Event Coordinator',
+    'Venue Staff',
+    'Technical Support Staff',
+    'Attendee'
+  ]);
 });
 
 test('shows the server error message on a duplicate email', async () => {

@@ -20,7 +20,8 @@ const validInput = {
   name: 'Ada Lovelace',
   email: 'ada@example.com',
   password: 'Correct-Horse-9',
-  organisation: 'Analytical Engines Ltd'
+  organisation: 'Analytical Engines Ltd',
+  role: 'Attendee'
 };
 
 interface FakeAdminOptions {
@@ -58,8 +59,9 @@ function fakeAdmin(options: FakeAdminOptions): () => SupabaseClient | null {
 }
 
 describe('registerAccount', () => {
-  test('creates the Auth account and a matching public.users row with the Attendee role', async () => {
+  test('creates the Auth account and a matching public.users row with the chosen role', async () => {
     let insertedRow: any;
+    let roleQueried: string | undefined;
     const result = await registerAccount(
       validInput,
       fakeAdmin({
@@ -69,6 +71,7 @@ describe('registerAccount', () => {
           assert.equal(payload.email_confirm, true);
           return { data: { user: { id: 'user-123' } }, error: null };
         },
+        roleLookup: async () => ({ data: { role_id: 5 }, error: null }),
         usersInsert: async (row) => {
           insertedRow = row;
           return { error: null };
@@ -82,6 +85,33 @@ describe('registerAccount', () => {
       organisation: validInput.organisation,
       role_id: 5
     });
+  });
+
+  test('creates the account with a different chosen role (e.g. Event Organiser)', async () => {
+    let insertedRow: any;
+    const result = await registerAccount(
+      { ...validInput, role: 'Event Organiser' },
+      fakeAdmin({
+        createUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
+        roleLookup: async () => ({ data: { role_id: 1 }, error: null }),
+        usersInsert: async (row) => {
+          insertedRow = row;
+          return { error: null };
+        }
+      })
+    );
+    assert.deepEqual(result, { outcome: 'created', userId: 'user-123' });
+    assert.equal(insertedRow.role_id, 1);
+  });
+
+  test('rejects a role that is not one of the five valid roles', async () => {
+    let called = false;
+    const result = await registerAccount({ ...validInput, role: 'Overlord' }, () => {
+      called = true;
+      return null;
+    });
+    assert.deepEqual(result, { outcome: 'invalid', message: 'Choose a valid role.' });
+    assert.equal(called, false);
   });
 
   test('rejects a duplicate email with a clear, generic message', async () => {
@@ -178,7 +208,7 @@ describe('registerAccount', () => {
     assert.equal(result.outcome, 'unavailable');
   });
 
-  test('rolls back the Auth account when the Attendee role is not configured', async () => {
+  test('rolls back the Auth account when the chosen role is not configured', async () => {
     let deletedId: string | undefined;
     const result = await registerAccount(
       validInput,

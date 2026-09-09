@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { ROLES } from './mock/types';
 import { color, layout, radius, rule, surface, label as labelToken } from './theme';
 import { Card, GhostButton, GradientButton, Mark } from './ui';
 
@@ -8,21 +9,32 @@ interface FormState {
   email: string;
   password: string;
   organisation: string;
+  role: string;
 }
 
-const EMPTY_FORM: FormState = { name: '', email: '', password: '', organisation: '' };
+const EMPTY_FORM: FormState = { name: '', email: '', password: '', organisation: '', role: '' };
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
 const REDIRECT_DELAY_MS = 1500;
 const SIGN_IN_URL = '/?screen=login';
 
-const FIELDS: Array<{ key: keyof FormState; label: string; type: string }> = [
+const FIELDS: Array<{ key: 'name' | 'email' | 'password' | 'organisation'; label: string; type: string }> = [
   { key: 'name', label: 'Name', type: 'text' },
   { key: 'email', label: 'Email', type: 'email' },
   { key: 'password', label: 'Password', type: 'password' },
   { key: 'organisation', label: 'Organisation', type: 'text' }
 ];
+
+const fieldStyle = {
+  background: surface.field,
+  border: rule.control,
+  borderRadius: radius.sm,
+  padding: '13px 14px',
+  color: color.mist,
+  fontSize: '14px',
+  outline: 'none'
+};
 
 /**
  * Styled like ui.tsx's Field, but controlled: Field only takes defaultValue
@@ -47,22 +59,35 @@ function ControlledField({
       <label htmlFor={id} style={labelToken}>
         {label}
       </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={onChange}
-        required
-        style={{
-          background: surface.field,
-          border: rule.control,
-          borderRadius: radius.sm,
-          padding: '13px 14px',
-          color: color.mist,
-          fontSize: '14px',
-          outline: 'none'
-        }}
-      />
+      <input id={id} type={type} value={value} onChange={onChange} required style={fieldStyle} />
+    </div>
+  );
+}
+
+function RoleSelect({
+  id,
+  value,
+  onChange
+}: {
+  id: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLSelectElement>) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <label htmlFor={id} style={labelToken}>
+        Role
+      </label>
+      <select id={id} value={value} onChange={onChange} required style={fieldStyle}>
+        <option value="" disabled>
+          Choose a role
+        </option>
+        {ROLES.map((role) => (
+          <option key={role} value={role}>
+            {role}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -84,7 +109,7 @@ export default function Register() {
   }, [status]);
 
   function updateField(field: keyof FormState) {
-    return (event: ChangeEvent<HTMLInputElement>) => {
+    return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setForm((prev) => ({ ...prev, [field]: event.target.value }));
     };
   }
@@ -165,7 +190,7 @@ export default function Register() {
               Register an account
             </h1>
             <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver, maxWidth: '380px' }}>
-              For Event Organisers and Attendees. Staff accounts are provisioned separately.
+              Choose the role that matches what you'll be doing in ConnectSphere.
             </p>
           </div>
 
@@ -180,6 +205,8 @@ export default function Register() {
                 onChange={updateField(key)}
               />
             ))}
+
+            <RoleSelect id={`${baseId}-role`} value={form.role} onChange={updateField('role')} />
 
             <GradientButton onClick={handleRegister} style={{ marginTop: '4px', borderRadius: radius.sm }}>
               {status === 'submitting' ? 'Registering…' : 'Register'}
