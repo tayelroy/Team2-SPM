@@ -14,6 +14,11 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: '', email: '', password: '', organisation: '', role: '' };
 
+// Technical Support Staff holds role-management permissions, so it's excluded
+// from self-registration (mirrors server/src/auth/register.ts's
+// SELF_REGISTERABLE_ROLES) — those accounts are provisioned out of band.
+const REGISTERABLE_ROLES = ROLES.filter((role) => role !== 'Technical Support Staff');
+
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
 const REDIRECT_DELAY_MS = 1500;
@@ -82,7 +87,7 @@ function RoleSelect({
         <option value="" disabled>
           Choose a role
         </option>
-        {ROLES.map((role) => (
+        {REGISTERABLE_ROLES.map((role) => (
           <option key={role} value={role}>
             {role}
           </option>

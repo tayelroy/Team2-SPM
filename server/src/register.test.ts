@@ -101,10 +101,10 @@ describe('registerAccount', () => {
     assert.deepEqual(insertedRoleRow, { user_id: 'user-123', role: 'attendee' });
   });
 
-  test('converts a multi-word role to snake_case (e.g. Technical Support Staff)', async () => {
+  test('converts a multi-word role to snake_case (e.g. Event Coordinator)', async () => {
     let insertedRoleRow: any;
     const result = await registerAccount(
-      { ...validInput, role: 'Technical Support Staff' },
+      { ...validInput, role: 'Event Coordinator' },
       fakeAdmin({
         createUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
         accountRoleInsert: async (row) => {
@@ -114,12 +114,22 @@ describe('registerAccount', () => {
       })
     );
     assert.deepEqual(result, { outcome: 'created', userId: 'user-123' });
-    assert.equal(insertedRoleRow.role, 'technical_support_staff');
+    assert.equal(insertedRoleRow.role, 'event_coordinator');
   });
 
-  test('rejects a role that is not one of the five valid roles', async () => {
+  test('rejects a role that is not one of the self-registerable roles', async () => {
     let called = false;
     const result = await registerAccount({ ...validInput, role: 'Overlord' }, () => {
+      called = true;
+      return null;
+    });
+    assert.deepEqual(result, { outcome: 'invalid', message: 'Choose a valid role.' });
+    assert.equal(called, false);
+  });
+
+  test('rejects Technical Support Staff at self-registration (privilege escalation guard)', async () => {
+    let called = false;
+    const result = await registerAccount({ ...validInput, role: 'Technical Support Staff' }, () => {
       called = true;
       return null;
     });

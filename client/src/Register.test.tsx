@@ -112,15 +112,8 @@ test('the header Sign in button opens sign in', () => {
   expect(window.location.href).toBe('/?screen=login');
 });
 
-test('role options match the five real account roles', () => {
+test('role options exclude Technical Support Staff (self-registration is limited to non-privileged roles)', () => {
   render(<Register />);
   const options = screen.getAllByRole('option').map((option) => option.textContent);
-  expect(options).toEqual([
-    'Choose a role',
-    'Event Organiser',
-    'Event Coordinator',
-    'Venue Staff',
-    'Technical Support Staff',
-    'Attendee'
-  ]);
+  expect(options).toEqual(['Choose a role', 'Event Organiser', 'Event Coordinator', 'Venue Staff', 'Attendee']);
 });

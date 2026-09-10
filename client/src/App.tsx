@@ -79,8 +79,8 @@ export default function App() {
     // signed-in tree — session is non-null by construction whenever this runs.
     fetch('/api/auth/logout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accessToken: session!.accessToken, refreshToken: session!.refreshToken })
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.accessToken}` },
+      body: JSON.stringify({ refreshToken: session!.refreshToken })
     }).catch(() => {});
     clearSession();
     setSession(null);

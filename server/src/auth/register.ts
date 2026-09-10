@@ -20,12 +20,16 @@ export type RegisterAccountResult =
   | { outcome: 'unavailable'; message: string };
 
 /**
- * Roles selectable at registration. Currently all five — the team's
- * decision as of 2026-09-09, expected to narrow later (e.g. to just the
- * externally-facing Event Organiser / Attendee) once internal-staff
- * provisioning is settled. Change only this list to change what's offered.
+ * Roles selectable at registration. Excludes Technical Support Staff: that
+ * role holds 'users.role.update' (see policy.ts), so letting anyone
+ * self-register into it is a direct privilege-escalation path — register,
+ * then reassign every other account's role. Support-staff accounts are
+ * provisioned out of band (seeded directly) instead. Change only this list
+ * to change what's offered.
  */
-export const SELF_REGISTERABLE_ROLES: readonly RoleName[] = VALID_ROLE_NAMES;
+export const SELF_REGISTERABLE_ROLES: readonly RoleName[] = VALID_ROLE_NAMES.filter(
+  (role) => role !== 'Technical Support Staff'
+);
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUPLICATE_EMAIL_PATTERN = /already (been )?registered|already exists/i;
