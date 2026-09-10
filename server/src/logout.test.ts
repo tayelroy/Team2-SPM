@@ -56,4 +56,14 @@ describe('POST /api/auth/logout', () => {
     const response = await request(app).post('/api/auth/logout').send({});
     assert.equal(response.status, 200);
   });
+
+  test('treats an absent request body as empty input', async () => {
+    const app = express();
+    app.post('/api/auth/logout', createLogoutHandler(async (input) => {
+      assert.deepEqual(input, {});
+      return { outcome: 'success' };
+    }));
+    const response = await request(app).post('/api/auth/logout');
+    assert.equal(response.status, 200);
+  });
 });

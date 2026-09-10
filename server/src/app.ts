@@ -4,15 +4,15 @@ import { checkDatabaseHealth, isSupabaseConfigured } from './db';
 import { createRegisterHandler } from './auth/register';
 import { createLoginHandler } from './auth/login';
 import { createLogoutHandler } from './auth/logout';
-import { createMeHandler } from './auth/me';
 import { createUpdateRoleHandler } from './auth/roles';
+import { authorization } from './auth';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
   registerHandler: RequestHandler = createRegisterHandler(),
+  access = authorization,
   loginHandler: RequestHandler = createLoginHandler(),
   logoutHandler: RequestHandler = createLogoutHandler(),
-  meHandler: RequestHandler = createMeHandler(),
   updateRoleHandler: RequestHandler = createUpdateRoleHandler()
 ) {
   const app = express();
@@ -23,8 +23,14 @@ export function createApp(
   app.post('/api/auth/register', registerHandler);
   app.post('/api/auth/login', loginHandler);
   app.post('/api/auth/logout', logoutHandler);
-  app.get('/api/auth/me', meHandler);
-  app.patch('/api/users/:userId/role', updateRoleHandler);
+  app.use('/api/auth', access.router);
+
+  // Only Technical Support Staff hold the 'users.role.update' permission
+  // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
+  // caller, requirePermission checks that grant on every request.
+  const rolesRouter = access.protectedRouter();
+  rolesRouter.patch('/:userId/role', access.requirePermission('users.role.update'), updateRoleHandler);
+  app.use('/api/users', rolesRouter);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {

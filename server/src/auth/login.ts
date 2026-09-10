@@ -1,15 +1,23 @@
 import type { RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseAdminClient, getSupabaseClient } from '../db';
-import { verifyCaller, type AuthenticatedCaller } from './session';
+import { getSupabaseClient } from '../db';
+import { resolveSupabasePrincipal } from './supabase';
+import { AccessError, type Principal } from './policy';
+import { toDisplayRole } from './roleFormat';
 
 export interface LoginInput {
   email: string;
   password: string;
 }
 
+export interface LoginUser {
+  userId: string;
+  email: string;
+  role: string;
+}
+
 export type LoginResult =
-  | { outcome: 'success'; accessToken: string; refreshToken: string; user: AuthenticatedCaller }
+  | { outcome: 'success'; accessToken: string; refreshToken: string; user: LoginUser }
   | { outcome: 'invalid_credentials' }
   | { outcome: 'incomplete_account' }
   | { outcome: 'unavailable' };
@@ -21,11 +29,16 @@ const GENERIC_INVALID = { outcome: 'invalid_credentials' as const };
  * would — password verification doesn't need the service-role key. Supabase
  * returns one generic error for both "wrong password" and "no such email",
  * which already satisfies the no-enumeration requirement without extra work.
+ *
+ * Role resolution reuses auth/supabase.ts's resolveSupabasePrincipal (the
+ * same lookup requireAuth uses) rather than querying account_roles again
+ * independently, so login and every other authenticated request agree by
+ * construction on what "signed in with a role" means.
  */
 export async function loginAccount(
   input: Partial<LoginInput>,
   getClient: () => SupabaseClient | null = getSupabaseClient,
-  getAdminClient: () => SupabaseClient | null = getSupabaseAdminClient
+  resolvePrincipal: (token: string) => Promise<Principal> = resolveSupabasePrincipal
 ): Promise<LoginResult> {
   const email = input.email?.trim();
   const password = input.password;
@@ -34,8 +47,7 @@ export async function loginAccount(
   }
 
   const client = getClient();
-  const admin = getAdminClient();
-  if (!client || !admin) {
+  if (!client) {
     return { outcome: 'unavailable' };
   }
 
@@ -44,17 +56,20 @@ export async function loginAccount(
     return GENERIC_INVALID;
   }
 
-  const verified = await verifyCaller(client, admin, data.session.access_token);
-  if (!verified.ok) {
-    return { outcome: 'incomplete_account' };
+  try {
+    const principal = await resolvePrincipal(data.session.access_token);
+    return {
+      outcome: 'success',
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      user: { userId: principal.userId, email: data.user.email ?? email, role: toDisplayRole(principal.role) }
+    };
+  } catch (err) {
+    if (err instanceof AccessError && err.status === 403) {
+      return { outcome: 'incomplete_account' };
+    }
+    return { outcome: 'unavailable' };
   }
-
-  return {
-    outcome: 'success',
-    accessToken: data.session.access_token,
-    refreshToken: data.session.refresh_token,
-    user: verified.caller
-  };
 }
 
 export function createLoginHandler(login: typeof loginAccount = loginAccount): RequestHandler {

@@ -4,44 +4,17 @@ import request from 'supertest';
 import express from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loginAccount, createLoginHandler, LoginResult } from './auth/login';
+import { AccessError } from './auth/policy';
 
-function fakeClient(options: {
-  signIn?: () => Promise<any>;
-  getUser?: () => Promise<any>;
-  userRow?: any;
-  roleRow?: any;
-}): SupabaseClient {
+function fakeClient(signIn?: () => Promise<any>): SupabaseClient {
   return {
     auth: {
       signInWithPassword:
-        options.signIn ??
+        signIn ??
         (async () => ({
-          data: { session: { access_token: 'access-1', refresh_token: 'refresh-1' }, user: { id: 'user-1' } },
+          data: { session: { access_token: 'access-1', refresh_token: 'refresh-1' }, user: { id: 'user-1', email: 'ada@example.com' } },
           error: null
-        })),
-      getUser:
-        options.getUser ?? (async () => ({ data: { user: { id: 'user-1', email: 'ada@example.com' } }, error: null }))
-    },
-    from(table: string) {
-      if (table === 'users') {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => options.userRow ?? { data: { name: 'Ada', organisation: 'Org', role_id: 5 }, error: null }
-            })
-          })
-        };
-      }
-      if (table === 'roles') {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => options.roleRow ?? { data: { role_name: 'Attendee' }, error: null }
-            })
-          })
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
+        }))
     }
   } as unknown as SupabaseClient;
 }
@@ -55,56 +28,81 @@ function buildApp(login: (input: unknown) => Promise<LoginResult>) {
 
 describe('loginAccount', () => {
   test('returns a session and the caller role on valid credentials', async () => {
-    const client = fakeClient({});
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
-      () => client,
-      () => client
+      () => fakeClient(),
+      async () => ({ userId: 'user-1', role: 'venue_staff' })
     );
     assert.deepEqual(result, {
       outcome: 'success',
       accessToken: 'access-1',
       refreshToken: 'refresh-1',
-      user: { userId: 'user-1', email: 'ada@example.com', name: 'Ada', organisation: 'Org', role: 'Attendee' }
+      user: { userId: 'user-1', email: 'ada@example.com', role: 'Venue Staff' }
     });
   });
 
   test('rejects missing fields without calling Supabase', async () => {
     let called = false;
-    const guard = () => {
+    const result = await loginAccount({ email: 'ada@example.com' }, () => {
       called = true;
-      return fakeClient({});
-    };
-    const result = await loginAccount({ email: 'ada@example.com' }, guard, guard);
+      return fakeClient();
+    });
     assert.equal(result.outcome, 'invalid_credentials');
     assert.equal(called, false);
   });
 
   test('returns a generic error for wrong credentials, same as a nonexistent email', async () => {
-    const client = fakeClient({
-      signIn: async () => ({ data: { session: null, user: null }, error: { message: 'Invalid login credentials' } })
-    });
-    const result = await loginAccount({ email: 'ada@example.com', password: 'wrong' }, () => client, () => client);
+    const client = fakeClient(async () => ({
+      data: { session: null, user: null },
+      error: { message: 'Invalid login credentials' }
+    }));
+    const result = await loginAccount({ email: 'ada@example.com', password: 'wrong' }, () => client);
     assert.deepEqual(result, { outcome: 'invalid_credentials' });
   });
 
-  test('reports incomplete_account when Auth succeeds but no public.users row exists', async () => {
-    const client = fakeClient({ userRow: { data: null, error: null } });
+  test('reports incomplete_account when the caller has no account_roles row', async () => {
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
-      () => client,
-      () => client
+      () => fakeClient(),
+      async () => {
+        throw new AccessError(403);
+      }
     );
     assert.deepEqual(result, { outcome: 'incomplete_account' });
   });
 
-  test('reports unavailable when Supabase is not configured', async () => {
+  test('reports unavailable when role resolution fails for any other reason', async () => {
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
-      () => null,
-      () => null
+      () => fakeClient(),
+      async () => {
+        throw new AccessError(503);
+      }
     );
     assert.deepEqual(result, { outcome: 'unavailable' });
+  });
+
+  test('reports unavailable when Supabase is not configured', async () => {
+    const result = await loginAccount({ email: 'ada@example.com', password: 'Correct-Horse-9' }, () => null);
+    assert.deepEqual(result, { outcome: 'unavailable' });
+  });
+
+  test('falls back to the submitted email if Auth returns none on the user object', async () => {
+    const client = fakeClient(async () => ({
+      data: { session: { access_token: 'access-1', refresh_token: 'refresh-1' }, user: { id: 'user-1' } },
+      error: null
+    }));
+    const result = await loginAccount(
+      { email: 'ada@example.com', password: 'Correct-Horse-9' },
+      () => client,
+      async () => ({ userId: 'user-1', role: 'attendee' })
+    );
+    assert.deepEqual(result, {
+      outcome: 'success',
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      user: { userId: 'user-1', email: 'ada@example.com', role: 'Attendee' }
+    });
   });
 });
 
@@ -114,7 +112,7 @@ describe('POST /api/auth/login', () => {
       outcome: 'success',
       accessToken: 'a',
       refreshToken: 'r',
-      user: { userId: '1', email: 'x', name: 'x', organisation: null, role: 'Attendee' }
+      user: { userId: '1', email: 'x', role: 'Attendee' }
     }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 200);
@@ -137,5 +135,17 @@ describe('POST /api/auth/login', () => {
     const app = buildApp(async () => ({ outcome: 'unavailable' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 503);
+  });
+
+  test('treats an absent request body as empty input', async () => {
+    // Exercise the handler's fallback independently of express.json(), which
+    // normalises a bodyless HTTP request to {} in this Express version.
+    const app = express();
+    app.post('/api/auth/login', createLoginHandler(async (input) => {
+      assert.deepEqual(input, {});
+      return { outcome: 'invalid_credentials' };
+    }));
+    const response = await request(app).post('/api/auth/login');
+    assert.equal(response.status, 401);
   });
 });

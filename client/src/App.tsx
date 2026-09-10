@@ -75,13 +75,13 @@ export default function App() {
   }
 
   function handleSignOut() {
-    if (session) {
-      fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: session.accessToken, refreshToken: session.refreshToken })
-      }).catch(() => {});
-    }
+    // Only wired to AppShell's sign-out control, which renders solely in the
+    // signed-in tree — session is non-null by construction whenever this runs.
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: session!.accessToken, refreshToken: session!.refreshToken })
+    }).catch(() => {});
     clearSession();
     setSession(null);
     setScreen('landing');
@@ -95,13 +95,12 @@ export default function App() {
     return <Login onSignIn={handleSignIn} onBack={() => setScreen('landing')} />;
   }
 
-  // Every other screen requires a session (only reachable via handleSignIn,
-  // which sets both together, or a persisted one restored at mount).
-  if (!session) {
-    return <Login onSignIn={handleSignIn} onBack={() => setScreen('landing')} />;
-  }
-
-  const role = session.user.role as Role;
+  // Every other screen requires a session. `session` is non-null here by
+  // construction: `screen` only reaches a protected value via handleSignIn
+  // (which sets both together) or a persisted session restored at mount
+  // (same). The assertion documents that invariant rather than adding an
+  // unreachable branch just to satisfy the type checker.
+  const role = session!.user.role as Role;
 
   const body = {
     dashboard: <Dashboard role={role} onNavigate={setScreen} />,

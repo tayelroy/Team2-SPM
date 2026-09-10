@@ -2,6 +2,8 @@ import type { RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import { createUserRecord, VALID_ROLE_NAMES, type RoleName } from '../db/users';
+import { createAccountRole, deleteAccountRole } from '../db/accountRoles';
+import { toSnakeRole } from './roleFormat';
 
 export interface RegisterAccountInput {
   name: string;
@@ -11,6 +13,12 @@ export interface RegisterAccountInput {
   role: string;
 }
 
+export type RegisterAccountResult =
+  | { outcome: 'created'; userId: string }
+  | { outcome: 'invalid'; message: string }
+  | { outcome: 'duplicate'; message: string }
+  | { outcome: 'unavailable'; message: string };
+
 /**
  * Roles selectable at registration. Currently all five — the team's
  * decision as of 2026-09-09, expected to narrow later (e.g. to just the
@@ -18,12 +26,6 @@ export interface RegisterAccountInput {
  * provisioning is settled. Change only this list to change what's offered.
  */
 export const SELF_REGISTERABLE_ROLES: readonly RoleName[] = VALID_ROLE_NAMES;
-
-export type RegisterAccountResult =
-  | { outcome: 'created'; userId: string }
-  | { outcome: 'invalid'; message: string }
-  | { outcome: 'duplicate'; message: string }
-  | { outcome: 'unavailable'; message: string };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DUPLICATE_EMAIL_PATTERN = /already (been )?registered|already exists/i;
@@ -58,6 +60,12 @@ function validate(input: Partial<RegisterAccountInput>): string | null {
  * Uses the service-role client so account creation and duplicate-email
  * detection are deterministic, instead of relying on anon-key signUp's
  * enumeration-safe (and therefore ambiguous) response for existing emails.
+ *
+ * Writes land in two tables: public.users holds profile data (name,
+ * organisation) and a legacy role_id kept only to satisfy that column's
+ * NOT NULL constraint — it is not read for authorisation. The account's
+ * real, authoritative role lives in public.account_roles (SG2-25), which
+ * requireAuth/requirePermission actually check.
  */
 export async function registerAccount(
   input: Partial<RegisterAccountInput>,
@@ -95,22 +103,31 @@ export async function registerAccount(
     return { outcome: 'unavailable', message: UNAVAILABLE_MESSAGE };
   }
 
-  const record = await createUserRecord(admin, {
-    userId: data.user.id,
+  const userId = data.user.id;
+
+  const profile = await createUserRecord(admin, {
+    userId,
     name: name.trim(),
     organisation: organisation.trim(),
     roleName: role
   });
 
-  if (!record.ok) {
-    // The Auth account was created but has no matching public.users row
-    // (role_id is NOT NULL there) — remove it so the email isn't stuck
-    // as "already registered" for a signup that never actually completed.
-    await admin.auth.admin.deleteUser(data.user.id).catch(() => {});
+  const roleRecord = profile.ok
+    ? await createAccountRole(admin, userId, toSnakeRole(role))
+    : { ok: false as const, error: 'skipped: profile creation already failed' };
+
+  if (!profile.ok || !roleRecord.ok) {
+    // Either write failing leaves an incomplete account — role_id is NOT
+    // NULL on public.users, and account_roles is what authorisation
+    // actually checks, so a partial account can neither exist cleanly nor
+    // authenticate correctly. Remove it so the email isn't stuck as
+    // "already registered" for a signup that never completed.
+    await deleteAccountRole(admin, userId);
+    await admin.auth.admin.deleteUser(userId).catch(() => {});
     return { outcome: 'unavailable', message: UNAVAILABLE_MESSAGE };
   }
 
-  return { outcome: 'created', userId: data.user.id };
+  return { outcome: 'created', userId };
 }
 
 export function createRegisterHandler(

@@ -28,6 +28,7 @@ interface FakeAdminOptions {
   createUser: (payload: any) => Promise<any>;
   roleLookup?: () => Promise<{ data: { role_id: number } | null; error: { message: string } | null }>;
   usersInsert?: (row: any) => Promise<{ error: { message: string } | null }>;
+  accountRoleInsert?: (row: any) => Promise<{ error: { message: string } | null }>;
   deleteUser?: (id: string) => Promise<any>;
 }
 
@@ -53,15 +54,21 @@ function fakeAdmin(options: FakeAdminOptions): () => SupabaseClient | null {
         if (table === 'users') {
           return { insert: options.usersInsert ?? (async () => ({ error: null })) };
         }
+        if (table === 'account_roles') {
+          return {
+            insert: options.accountRoleInsert ?? (async () => ({ error: null })),
+            delete: () => ({ eq: async () => ({ error: null }) })
+          };
+        }
         throw new Error(`Unexpected table: ${table}`);
       }
     }) as unknown as SupabaseClient;
 }
 
 describe('registerAccount', () => {
-  test('creates the Auth account and a matching public.users row with the chosen role', async () => {
-    let insertedRow: any;
-    let roleQueried: string | undefined;
+  test('creates the Auth account, a public.users profile row, and an account_roles row', async () => {
+    let insertedUserRow: any;
+    let insertedRoleRow: any;
     const result = await registerAccount(
       validInput,
       fakeAdmin({
@@ -73,35 +80,41 @@ describe('registerAccount', () => {
         },
         roleLookup: async () => ({ data: { role_id: 5 }, error: null }),
         usersInsert: async (row) => {
-          insertedRow = row;
+          insertedUserRow = row;
+          return { error: null };
+        },
+        accountRoleInsert: async (row) => {
+          insertedRoleRow = row;
           return { error: null };
         }
       })
     );
     assert.deepEqual(result, { outcome: 'created', userId: 'user-123' });
-    assert.deepEqual(insertedRow, {
+    assert.deepEqual(insertedUserRow, {
       user_id: 'user-123',
       name: validInput.name,
       organisation: validInput.organisation,
       role_id: 5
     });
+    // account_roles is the authoritative store — the role is written in its
+    // own snake_case form, converted from the Title Case the UI sent.
+    assert.deepEqual(insertedRoleRow, { user_id: 'user-123', role: 'attendee' });
   });
 
-  test('creates the account with a different chosen role (e.g. Event Organiser)', async () => {
-    let insertedRow: any;
+  test('converts a multi-word role to snake_case (e.g. Technical Support Staff)', async () => {
+    let insertedRoleRow: any;
     const result = await registerAccount(
-      { ...validInput, role: 'Event Organiser' },
+      { ...validInput, role: 'Technical Support Staff' },
       fakeAdmin({
         createUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
-        roleLookup: async () => ({ data: { role_id: 1 }, error: null }),
-        usersInsert: async (row) => {
-          insertedRow = row;
+        accountRoleInsert: async (row) => {
+          insertedRoleRow = row;
           return { error: null };
         }
       })
     );
     assert.deepEqual(result, { outcome: 'created', userId: 'user-123' });
-    assert.equal(insertedRow.role_id, 1);
+    assert.equal(insertedRoleRow.role, 'technical_support_staff');
   });
 
   test('rejects a role that is not one of the five valid roles', async () => {
@@ -147,13 +160,20 @@ describe('registerAccount', () => {
   });
 
   test('rejects missing required fields without calling the admin client', async () => {
-    let called = false;
-    const result = await registerAccount({ email: validInput.email }, () => {
-      called = true;
-      return null;
-    });
-    assert.equal(result.outcome, 'invalid');
-    assert.equal(called, false);
+    for (const field of ['name', 'email', 'password', 'organisation', 'role'] as const) {
+      // Each required field is an independent validation decision. Whitespace
+      // is empty only for fields that the implementation explicitly trims.
+      const emptyValues = field === 'password' ? [undefined, ''] : [undefined, '', '   '];
+      for (const value of emptyValues) {
+        let called = false;
+        const result = await registerAccount({ ...validInput, [field]: value }, () => {
+          called = true;
+          return null;
+        });
+        assert.equal(result.outcome, 'invalid', `${field}=${JSON.stringify(value)}`);
+        assert.equal(called, false);
+      }
+    }
   });
 
   test('rejects a malformed email address', async () => {
@@ -208,7 +228,7 @@ describe('registerAccount', () => {
     assert.equal(result.outcome, 'unavailable');
   });
 
-  test('rolls back the Auth account when the chosen role is not configured', async () => {
+  test('rolls back the Auth account when the profile role is not configured', async () => {
     let deletedId: string | undefined;
     const result = await registerAccount(
       validInput,
@@ -232,6 +252,23 @@ describe('registerAccount', () => {
       fakeAdmin({
         createUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
         usersInsert: async () => ({ error: { message: 'connection reset' } }),
+        deleteUser: async (id) => {
+          deletedId = id;
+          return { error: null };
+        }
+      })
+    );
+    assert.equal(result.outcome, 'unavailable');
+    assert.equal(deletedId, 'user-123');
+  });
+
+  test('rolls back the Auth account when the account_roles insert fails', async () => {
+    let deletedId: string | undefined;
+    const result = await registerAccount(
+      validInput,
+      fakeAdmin({
+        createUser: async () => ({ data: { user: { id: 'user-123' } }, error: null }),
+        accountRoleInsert: async () => ({ error: { message: 'connection reset' } }),
         deleteUser: async (id) => {
           deletedId = id;
           return { error: null };
@@ -273,10 +310,18 @@ describe('POST /api/auth/register', () => {
     assert.equal(response.body.error, message);
   });
 
-  test('returns 400 for invalid input', async () => {
-    const app = buildApp(async () => ({ outcome: 'invalid', message: 'Enter a valid email address.' }));
-    const response = await request(app).post('/api/auth/register').send(validInput);
+  test('treats an absent request body as empty input and returns 400', async () => {
+    const message = 'Name, email, password, organisation, and role are all required.';
+    // Exercise the handler's fallback independently of express.json(), which
+    // normalises a bodyless HTTP request to {} in this Express version.
+    const app = express();
+    app.post('/api/auth/register', createRegisterHandler(async input => {
+      assert.deepEqual(input, {});
+      return { outcome: 'invalid', message };
+    }));
+    const response = await request(app).post('/api/auth/register');
     assert.equal(response.status, 400);
+    assert.equal(response.body.error, message);
   });
 
   test('returns 503 when registration is unavailable', async () => {

@@ -1,60 +1,39 @@
 import type { RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseAdminClient, getSupabaseClient } from '../db';
-import { readBearerToken, verifyCaller } from './session';
-import { updateUserRole } from '../db/users';
-
-const TECH_SUPPORT_ROLE = 'Technical Support Staff';
+import { getSupabaseAdminClient } from '../db';
+import { VALID_ROLE_NAMES, type RoleName } from '../db/users';
+import { updateAccountRole } from '../db/accountRoles';
+import { toSnakeRole } from './roleFormat';
 
 /**
- * PATCH /api/users/:userId/role — only Technical Support Staff may call
- * this (SG2-24). Authorisation is re-checked against the live public.users
- * row every request, not cached on the token, so a role change takes effect
- * on the caller's very next request.
+ * PATCH /api/users/:userId/role — mounted behind requireAuth +
+ * requirePermission('users.role.update') in app.ts, so only Technical
+ * Support Staff reach this handler at all (SG2-24). This function only
+ * validates the target role and performs the write.
  */
 export function createUpdateRoleHandler(
-  getClient: () => SupabaseClient | null = getSupabaseClient,
   getAdminClient: () => SupabaseClient | null = getSupabaseAdminClient
 ): RequestHandler {
   return async (req, res) => {
-    const token = readBearerToken(req.header('authorization'));
-    if (!token) {
-      res.status(401).json({ error: 'Missing or malformed Authorization header.' });
-      return;
-    }
-
-    const client = getClient();
     const admin = getAdminClient();
-    if (!client || !admin) {
+    if (!admin) {
       res.status(503).json({ error: 'Service temporarily unavailable. Please try again later.' });
       return;
     }
 
-    const verified = await verifyCaller(client, admin, token);
-    if (!verified.ok) {
-      res.status(verified.reason === 'invalid_token' ? 401 : 403).json({ error: 'Not signed in.' });
-      return;
-    }
-
-    if (verified.caller.role !== TECH_SUPPORT_ROLE) {
-      res.status(403).json({ error: 'Only Technical Support Staff can change a user’s role.' });
-      return;
-    }
-
-    const targetUserId = req.params.userId;
     const roleName = typeof req.body?.role === 'string' ? req.body.role : undefined;
     if (!roleName) {
       res.status(400).json({ error: 'A target role is required.' });
       return;
     }
-
-    const result = await updateUserRole(admin, targetUserId, roleName);
-    if (result.ok) {
-      res.status(200).json({ message: 'Role updated.' });
+    if (!VALID_ROLE_NAMES.includes(roleName as RoleName)) {
+      res.status(400).json({ error: 'Not a recognised role.' });
       return;
     }
-    if (result.reason === 'invalid_role') {
-      res.status(400).json({ error: 'Not a recognised role.' });
+
+    const result = await updateAccountRole(admin, req.params.userId, toSnakeRole(roleName));
+    if (result.ok) {
+      res.status(200).json({ message: 'Role updated.' });
       return;
     }
     if (result.reason === 'user_not_found') {

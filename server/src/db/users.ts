@@ -19,10 +19,6 @@ export const VALID_ROLE_NAMES = [
 
 export type RoleName = (typeof VALID_ROLE_NAMES)[number];
 
-export type UpdateUserRoleResult =
-  | { ok: true }
-  | { ok: false; reason: 'invalid_role' | 'user_not_found' | 'error'; error?: string };
-
 async function getRoleId(admin: SupabaseClient, roleName: string): Promise<number | null> {
   const { data, error } = await admin
     .from('roles')
@@ -60,36 +56,6 @@ export async function createUserRecord(
 
   if (error) {
     return { ok: false, error: error.message };
-  }
-  return { ok: true };
-}
-
-/**
- * Changes a user's role. Caller authorisation (only Technical Support Staff
- * may call this) is enforced by the route handler, not here — this function
- * only validates that the target role name is a real one.
- */
-export async function updateUserRole(
-  admin: SupabaseClient,
-  userId: string,
-  roleName: string
-): Promise<UpdateUserRoleResult> {
-  if (!VALID_ROLE_NAMES.includes(roleName as RoleName)) {
-    return { ok: false, reason: 'invalid_role' };
-  }
-
-  const roleId = await getRoleId(admin, roleName);
-  if (roleId === null) {
-    return { ok: false, reason: 'invalid_role' };
-  }
-
-  const { data, error } = await admin.from('users').update({ role_id: roleId }).eq('user_id', userId).select('user_id');
-
-  if (error) {
-    return { ok: false, reason: 'error', error: error.message };
-  }
-  if (!data || data.length === 0) {
-    return { ok: false, reason: 'user_not_found' };
   }
   return { ok: true };
 }
