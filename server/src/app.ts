@@ -1,13 +1,15 @@
-import express, { Request, RequestHandler, Response } from 'express';
+import express, { Request, RequestHandler, Response, Router } from 'express';
 import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
 import { createRegisterHandler } from './auth/register';
 import { authorization } from './auth';
+import { createEventRequestsRouter } from './eventRequests/routes';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
   registerHandler: RequestHandler = createRegisterHandler(),
-  access = authorization
+  access = authorization,
+  eventRequestsRouter: Router = createEventRequestsRouter(access)
 ) {
   const app = express();
 
@@ -16,6 +18,7 @@ export function createApp(
 
   app.post('/api/auth/register', registerHandler);
   app.use('/api/auth', access.router);
+  app.use('/api/event-requests', eventRequestsRouter);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
