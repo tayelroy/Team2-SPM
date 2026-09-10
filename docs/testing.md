@@ -13,12 +13,16 @@ acceptance scenarios. Several tests were repetitive or weak, so the revised
 suite consolidates them while improving the assertions and covering missing
 decisions.
 
-| Suite | Before | After |
-| --- | ---: | ---: |
-| Backend | 102 | 100 |
-| Frontend | 118 | 111 |
-| Security reviewer tooling | 19 | 19 |
-| Total automated tests | **239** | **230** |
+| Suite | Before | After | + SG2-44 |
+| --- | ---: | ---: | ---: |
+| Backend | 102 | 100 | 143 |
+| Frontend | 118 | 111 | 111 |
+| Security reviewer tooling | 19 | 19 | 19 |
+| Total automated tests | **239** | **230** | **273** |
+
+The "+ SG2-44" column reflects the venue availability backend work
+(`venue-availability.test.ts`, `db/user-client.test.ts`); the frontend screen is
+unchanged pending client login (SG2-23).
 
 SQL policy assertions run separately and are not included in either total.
 Parameterized test rows are counted individually by the runners; assertions
@@ -75,6 +79,10 @@ and an index of all 230 executed automated tests. The five SG2-25 identifiers
 are retained. Frontend permission-helper tests link to the same SG2-25 cases
 instead of duplicating that feature's specifications.
 
+SG2-44 adds five backend scenarios and one SQL scenario (see the section above);
+the executed automated-test index grows to 273. Add the matching workbook rows
+when that feature is recorded.
+
 The course template fields are preserved. Specification and execution sections
 use different colours; explicit status labels distinguish Pass from Not
 Executed. The five SQL scenarios and three hosted workflow scenarios are Not
@@ -109,6 +117,20 @@ For **SG2-25 — See only the functions my role permits**, keep these five cases
 The authorised route in these tests is a controlled fixture. It proves the
 middleware decision and that a denied request does not execute the action; it
 does not prove a future event-management endpoint has installed that middleware.
+
+For **SG2-44 — View venue availability** (backend slice), keep these five cases:
+
+| Case | Course purpose | Acceptance criterion / automated evidence |
+| --- | --- | --- |
+| Internal role reads a venue's occupied periods over a date range | Happy path | AC1/AC2: `GET /api/venues/:id/availability` returns bookings + recorded unavailability, merged and sorted, each with what occupies the venue and when. `venue-availability.test.ts` merge case; SQL `venue_availability.sql` internal-role read. |
+| Attendee and Event Organiser are refused | Negative and security quality | AC3: the `venues.availability.view` policy denies both roles (`403`); RLS on `venue_bookings`/`venue_unavailability` returns nothing to them as defence in depth. Backend role matrix; `venue_availability.sql`. |
+| Logged-out request is refused | Negative | `requireAuth` returns `401` before the handler runs. Backend unauthenticated case. |
+| Invalid date range is rejected | Boundary | Missing/non-ISO `from`/`to`, `from >= to`, or a span over 366 days returns `400` without querying. `getVenueAvailability` validation partitions. |
+| Provider or query failure fails soft | Negative | An error from either table query returns `503`, never a partial list. Backend unavailable cases. |
+
+The endpoint enforces the policy itself; the frontend screen
+([client/src/screens/AvailabilityCalendar.tsx](../client/src/screens/AvailabilityCalendar.tsx))
+still renders mock data until the client has a login session (SG2-23).
 
 Each spreadsheet record should contain the course fields: unique Test Case ID,
 scenario, preconditions (including fixture/reset), numbered test steps, specific

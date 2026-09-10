@@ -12,7 +12,7 @@ and `client/coverage/index.html`.
 See [CI setup and validation](docs/ci.md) for SG2-22 acceptance criteria, required
 branch protection, and the Supabase HTTPS configuration.
 CI runs the complete regression suite before and after each PR merge. See the
-[test audit and course case guide](docs/testing.md) for the 230-test breakdown
+[test audit and course case guide](docs/testing.md) for the test-suite breakdown
 and how automated checks map to 4–5 functional cases per feature.
 
 For the combined Vercel deployment, set **Root Directory** to `server` and enable

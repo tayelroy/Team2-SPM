@@ -81,19 +81,18 @@ accounts or expose an endpoint for changing roles.
 | Attendee | `attendee` |
 
 Permissions map an action name to the roles allowed to perform it. Define them
-in `PERMISSIONS` in `server/src/auth/policy.ts`. For example, a policy granting
-event updates to organisers would look like this:
+in `PERMISSIONS` in `server/src/auth/policy.ts`. The current policy is:
 
 ```ts
 export const PERMISSIONS: PermissionMap = Object.freeze({
-  'events.update': ['event_organiser']
+  'venues.availability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff']
 });
 ```
 
-This is a configuration example. The default map is empty. Actions without a
-grant return `403`, including for Technical Support Staff. Use the same action
-name in the backend guard and the page helper. Restart the backend after changing
-the map; each module instance takes a copy of the policy when it starts.
+Actions without a grant return `403`, including for Technical Support Staff. Use
+the same action name in the backend guard and the page helper. Restart the
+backend after changing the map; each module instance takes a copy of the policy
+when it starts.
 
 ## Protect a backend route
 
