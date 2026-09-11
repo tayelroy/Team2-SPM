@@ -90,10 +90,34 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
 });
 ```
 
-This is a configuration example. The default map is empty. Actions without a
-grant return `403`, including for Technical Support Staff. Use the same action
+This is a configuration example. The current map grants pages and actions as
+listed below. Actions without a grant return `403`, including for Technical
+Support Staff. Use the same action
 name in the backend guard and the page helper. Restart the backend after changing
 the map; each module instance takes a copy of the policy when it starts.
+
+| Role | Pages | Business actions |
+| --- | --- | --- |
+| Event Organiser | Dashboard, event detail, new request, change request | Create a draft; amend own request UI |
+| Event Coordinator | Dashboard, events, detail, venues, calendar, booking, equipment, change | Review request UI; request a venue booking UI |
+| Venue Staff | Dashboard, venues, calendar, booking | Decide booking UI |
+| Technical Support Staff | Dashboard, calendar, equipment | Reserve equipment UI; update account roles API |
+| Attendee | Dashboard, attendee event | Manage event registration UI |
+
+`App` verifies the stored access token through `/api/auth/me` before displaying
+protected content. Cached user/role fields do not grant access. Deep links,
+navigation and implemented UI actions use the current server grants; focus
+refreshes them as well. While checking, controls are hidden. A denied request,
+outage or expired session cannot continue an action. Aborted results cannot
+restore old access after logout or a newer check.
+
+Page grants control navigation and presentation. The actual event-draft and
+role-update API routes independently enforce their action permissions. Other
+business screens are still prototypes: their action buttons do not establish
+persisted bookings, equipment reservations or event registrations. When those
+stories add endpoints, apply `requirePermission` and record-level checks there.
+This change consumes the merged seeded-account login/session contract; it does
+not add self-registration or change the login, logout or role-update handlers.
 
 ## Protect a backend route
 
@@ -147,7 +171,7 @@ A user with a recognised database role receives:
 {
   "userId": "10000000-0000-4000-8000-000000000001",
   "role": "event_organiser",
-  "permissions": []
+  "permissions": ["page.dashboard", "page.detail", "page.change", "event_request.change", "event_request.create"]
 }
 ```
 

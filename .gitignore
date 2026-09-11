@@ -32,3 +32,7 @@ lerna-debug.log*
 *.sln
 *.sw?
 .vercel
+
+# Browser test evidence
+playwright-report/
+test-results/

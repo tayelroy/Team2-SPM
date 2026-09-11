@@ -1,3 +1,5 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { useState } from 'react';
 import { ATTENDEE_FACTS } from '../mock/data';
 import { color, gradient, radius, rule } from '../theme';
@@ -14,6 +16,7 @@ import {
  * list below reflects it so the state change is visible in both places.
  */
 export default function AttendeeEvent() {
+  const { access, run } = usePageAccess();
   const [registered, setRegistered] = useState(true);
 
   const registrations = [
@@ -103,9 +106,9 @@ export default function AttendeeEvent() {
             alignItems: 'center',
           }}
         >
-          <button
+          {can(access, 'event_registration.manage') ? <button
             type="button"
-            onClick={() => setRegistered((on) => !on)}
+            onClick={() => run('event_registration.manage', () => setRegistered((on) => !on))}
             style={{
               border: 'none',
               borderRadius: radius.sm,
@@ -121,7 +124,7 @@ export default function AttendeeEvent() {
             }}
           >
             {registered ? 'Withdraw registration' : 'Register'}
-          </button>
+          </button> : null}
           <span style={{ fontSize: '14px', color: color.mist }}>
             {registered
               ? "You're registered — confirmation sent to your email."

@@ -168,7 +168,7 @@ test('production adapter verifies Auth then reads the database role, ignoring me
   const fetchMock = provider();
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { userId, role: 'attendee', permissions: [] });
+  assert.deepEqual(res.body, { userId, role: 'attendee', permissions: ['page.dashboard', 'page.attendee', 'event_registration.manage'] });
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
@@ -225,7 +225,7 @@ test('removing a role grant blocks the next action with the same access token', 
 });
 
 for (const role of ROLES) {
-  test(`default policy grants no action to ${role}`, async () => {
+  test(`default policy denies an unmapped action for ${role}`, async () => {
     const { app, calls } = guardedApp(createAuthorization({
       resolvePrincipal: async () => ({ userId, role })
     }));

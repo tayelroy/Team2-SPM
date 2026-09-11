@@ -1,3 +1,5 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { useState } from 'react';
 import { EQUIPMENT_STOCK } from '../mock/data';
 import { equipmentViews } from '../mock/viewModel';
@@ -12,6 +14,7 @@ const COLUMNS = 'minmax(200px,2fr) 1fr 1fr 1.4fr 130px';
  * events.
  */
 export default function EquipmentDesk() {
+  const { access, run } = usePageAccess();
   const [reserved, setReserved] = useState<Record<number, boolean>>({});
   const rows = equipmentViews(reserved);
 
@@ -73,10 +76,10 @@ export default function EquipmentDesk() {
             <span style={{ fontSize: '14px', lineHeight: 1.43, color: row.availFg }}>
               {row.avail}
             </span>
-            <button
+            {can(access, 'equipment.reserve') ? <button
               type="button"
               disabled={row.done}
-              onClick={() => setReserved((current) => ({ ...current, [i]: true }))}
+              onClick={() => run('equipment.reserve', () => setReserved((current) => ({ ...current, [i]: true })))}
               style={{
                 justifySelf: 'start',
                 background: row.btnBg,
@@ -90,7 +93,7 @@ export default function EquipmentDesk() {
               }}
             >
               {row.btn}
-            </button>
+            </button> : null}
           </div>
         ))}
       </div>

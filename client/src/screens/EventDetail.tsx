@@ -1,5 +1,7 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { ACTIVITY, ARRANGEMENTS, STATUS_TRAIL } from '../mock/data';
-import type { Role, Screen } from '../mock/types';
+import type { Role, ProtectedScreen } from '../mock/types';
 import { currentEvent, detailActions, statusTrailStyle } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
 import {
@@ -23,8 +25,10 @@ export default function EventDetail({
   onNavigate,
 }: {
   role: Role;
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: ProtectedScreen) => void;
 }) {
+  const { access, run } = usePageAccess();
+  const permission = role === 'Event Coordinator' ? 'event_request.review' : 'event_request.create';
   const event = currentEvent(role);
   const isCoordinator = role === 'Event Coordinator';
   const facts = [
@@ -207,11 +211,11 @@ export default function EventDetail({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <Card style={{ gap: '18px' }}>
           <Eyebrow>{isCoordinator ? 'Review actions' : 'Your options'}</Eyebrow>
-          {detailActions(role).map((action) => (
+          {detailActions(role).filter(() => can(access, permission)).map((action) => (
             <button
               key={action.label}
               type="button"
-              onClick={() => onNavigate(action.screen)}
+              onClick={() => run(permission, () => onNavigate(action.screen))}
               style={{
                 textAlign: 'left',
                 background: action.bg,

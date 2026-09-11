@@ -1,7 +1,8 @@
+import { canOpen, usePageAccess } from '../auth/pages';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
-import type { Role, Screen } from '../mock/types';
+import type { Role, ProtectedScreen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GradientButton, IconButton, Mark } from '../ui';
@@ -112,11 +113,12 @@ export default function AppShell({
   children,
 }: {
   role: Role;
-  screen: Exclude<Screen, 'landing' | 'login'>;
-  onNavigate: (screen: Screen) => void;
+  screen: ProtectedScreen;
+  onNavigate: (screen: ProtectedScreen) => void;
   onSignOut: () => void;
   children: ReactNode;
 }) {
+  const { access } = usePageAccess();
   const [notifOpen, setNotifOpen] = useState(false);
   const head = HEAD[role];
   const primary = primaryActionFor(role);
@@ -181,7 +183,7 @@ export default function AppShell({
               minWidth: 0,
             }}
           >
-            {navFor(role).map((item) => {
+            {navFor(role).filter(item => canOpen(access, item.screen)).map((item) => {
               const active = item.screen === screen;
               return (
                 <button
@@ -321,7 +323,7 @@ export default function AppShell({
             </p>
           </div>
           {/* The primary CTA belongs to the dashboard only. */}
-          {screen === 'dashboard' ? (
+          {screen === 'dashboard' && canOpen(access, primary.screen) ? (
             <GradientButton onClick={() => onNavigate(primary.screen)}>
               {primary.label}
             </GradientButton>

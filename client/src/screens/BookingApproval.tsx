@@ -1,3 +1,5 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { BOOKING_FACTS, BOOKING_QUEUE } from '../mock/data';
 import { color, radius, rule } from '../theme';
 import {
@@ -18,6 +20,7 @@ import {
  * conflicts are surfaced with concrete alternatives before anyone approves.
  */
 export default function BookingApproval() {
+  const { access } = usePageAccess();
   return (
     <div
       style={{
@@ -27,6 +30,7 @@ export default function BookingApproval() {
         alignItems: 'start',
       }}
     >
+      <fieldset disabled={!can(access, 'venue_booking.decide')} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <Card style={{ gap: '26px' }}>
         <h2
           style={{
@@ -92,10 +96,11 @@ export default function BookingApproval() {
         />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-          <GradientButton>Approve booking</GradientButton>
-          <GhostButton>Reject with reason</GhostButton>
+          {can(access, 'venue_booking.decide') ? <GradientButton>Approve booking</GradientButton> : null}
+          {can(access, 'venue_booking.decide') ? <GhostButton>Reject with reason</GhostButton> : null}
         </div>
       </Card>
+      </fieldset>
 
       <RecessedCard style={{ gap: '18px' }}>
         <Eyebrow>Pending booking requests</Eyebrow>

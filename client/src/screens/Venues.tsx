@@ -1,3 +1,5 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { VENUE_FILTERS } from '../mock/data';
 import { venueViews } from '../mock/viewModel';
 import { color, radius, rule } from '../theme';
@@ -8,6 +10,7 @@ import { Card, Dot, Field, IconButton, ImagePlaceholder, RecessedCard } from '..
  * currently being placed — the check that drives the whole booking flow.
  */
 export default function Venues({ onBook }: { onBook: () => void }) {
+  const { access, run } = usePageAccess();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <RecessedCard
@@ -54,9 +57,9 @@ export default function Venues({ onBook }: { onBook: () => void }) {
                 </span>
                 <span style={{ fontSize: '14px', color: color.silver }}>{venue.meta}</span>
               </div>
-              <IconButton label={`Request ${venue.name}`} onClick={onBook}>
+              {can(access, 'venue_booking.request') ? <IconButton label={`Request ${venue.name}`} onClick={() => run('venue_booking.request', onBook)}>
                 ↗
-              </IconButton>
+              </IconButton> : null}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {venue.tags.map((tag) => (

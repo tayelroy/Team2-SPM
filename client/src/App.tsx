@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
-import type { Role, Screen } from './mock/types';
+import { useEffect, useRef, useState } from 'react';
+import type { Screen, ProtectedScreen } from './mock/types';
 import { clearSession, loadSession, saveSession } from './auth/session';
 import type { StoredSession } from './auth/session';
+import { can, loadAccess } from './auth/access';
+import type { Access } from './auth/access';
+import { canOpen, isProtectedScreen, PAGE_PERMISSIONS, PageAccess, roleLabel } from './auth/pages';
 import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
@@ -15,108 +18,128 @@ import Landing from './screens/Landing';
 import Login from './screens/Login';
 import RequestForm from './screens/RequestForm';
 import Venues from './screens/Venues';
+import { Card, GhostButton } from './ui';
 
-/** The screen a signed-in user of a given role opens on. */
-function landingScreenFor(role: Role): Screen {
-  return role === 'Attendee' ? 'attendee' : 'dashboard';
+/** Protected deep links are checked against the server, including on reload. */
+function initialScreen(): Screen | null {
+  const requested = new URLSearchParams(window.location.search).get('screen') ?? '';
+  if (isProtectedScreen(requested)) return requested;
+  return requested === 'login' ? 'login' : null;
 }
 
-/**
- * A persisted session takes priority — someone with a live session landing
- * on "/" or "/?screen=login" resumes where they left off rather than seeing
- * sign-in again. Without one, "/?screen=login" is a deep link straight to
- * sign-in for anything outside the shell that needs one.
- */
-function initialScreen(session: StoredSession | null): Screen {
-  if (session) return landingScreenFor(session.user.role as Role);
-  return new URLSearchParams(window.location.search).get('screen') === 'login' ? 'login' : 'landing';
-}
-
-/**
- * ConnectSphere app shell.
- *
- * Navigation is a plain screen state machine rather than a router: screens
- * reached from within the shell have no shareable URLs, which keeps the
- * dependency surface at zero. The one deliberate exception is the initial
- * screen, resolved once at mount from a persisted session or `?screen=`,
- * since real pages outside the shell need somewhere to land a signed-in (or
- * about-to-sign-in) user. Swap in a router once more screens need to be
- * deep-linked.
- */
 export default function App() {
   const [session, setSession] = useState<StoredSession | null>(() => loadSession());
-  const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
+  const [screen, setScreen] = useState<Screen | null>(initialScreen);
+  const [access, setAccess] = useState<Access | null>(null);
+  const [status, setStatus] = useState<'checking' | 'ready' | 'error'>('checking');
+  const [denied, setDenied] = useState(false);
+  const pending = useRef<AbortController | null>(null);
+  const token = typeof session?.accessToken === 'string' ? session.accessToken : null;
 
-  // Best-effort background check that a persisted session is still valid.
-  // Trusts the cached session for the current render (no loading flash);
-  // a network hiccup doesn't kick the user out, only a confirmed 401/403 does.
+  function forgetSession() {
+    pending.current?.abort();
+    clearSession();
+    setSession(null);
+    setAccess(null);
+    setScreen('landing');
+  }
+
+  // Every navigation/action and window-focus check reads current server grants.
+  // Abort and identity checks prevent an older response restoring stale access.
+  async function verify(permission?: string, action?: () => void) {
+    pending.current?.abort();
+    const controller = new AbortController();
+    pending.current = controller;
+    setStatus('checking');
+    try {
+      const current = await loadAccess(token, controller.signal);
+      if (controller.signal.aborted) return;
+      if (!current) { forgetSession(); return; }
+      if (!roleLabel(current.role)) throw new Error('Unknown role');
+      setAccess(current);
+      setStatus('ready');
+      const allowed = !permission || can(current, permission);
+      setDenied(!allowed);
+      if (allowed) action?.();
+    } catch {
+      if (controller.signal.aborted) return;
+      setAccess(null);
+      setStatus('error');
+    }
+  }
+
   useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${session.accessToken}` } })
-      .then((response) => {
-        if (cancelled || response.ok) return;
-        clearSession();
-        setSession(null);
-        setScreen('landing');
-      })
-      .catch(() => {});
+    if (!token) return;
+    void verify();
+    const recheck = () => { void verify(); };
+    window.addEventListener('focus', recheck);
     return () => {
-      cancelled = true;
+      pending.current?.abort();
+      window.removeEventListener('focus', recheck);
     };
-    // Re-check only when the signed-in identity actually changes.
+    // The checker captures only the token; permission and action are arguments.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.accessToken]);
+  }, [token]);
 
   function handleSignIn(newSession: StoredSession) {
     saveSession(newSession);
     setSession(newSession);
-    setScreen(landingScreenFor(newSession.user.role as Role));
+    setAccess(null);
+    setStatus('checking');
+    setScreen(null);
   }
 
   function handleSignOut() {
-    // Only wired to AppShell's sign-out control, which renders solely in the
-    // signed-in tree — session is non-null by construction whenever this runs.
     fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${session!.accessToken}` }
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }
     }).catch(() => {});
-    clearSession();
-    setSession(null);
-    setScreen('landing');
+    forgetSession();
   }
 
-  if (screen === 'landing') {
-    return <Landing onOpenApp={() => setScreen('login')} />;
+  if (!token) {
+    return screen === 'login' || (screen !== null && isProtectedScreen(screen))
+      ? <Login onSignIn={handleSignIn} onBack={() => setScreen('landing')} />
+      : <Landing onOpenApp={() => setScreen('login')} />;
   }
 
-  if (screen === 'login') {
-    return <Login onSignIn={handleSignIn} onBack={() => setScreen('landing')} />;
-  }
-
-  // Every other screen requires a session. `session` is non-null here by
-  // construction: `screen` only reaches a protected value via handleSignIn
-  // (which sets both together) or a persisted session restored at mount
-  // (same). The assertion documents that invariant rather than adding an
-  // unreachable branch just to satisfy the type checker.
-  const role = session!.user.role as Role;
-
-  const body = {
-    dashboard: <Dashboard role={role} onNavigate={setScreen} />,
-    events: <EventsTable role={role} onOpenEvent={() => setScreen('detail')} />,
-    detail: <EventDetail role={role} onNavigate={setScreen} />,
-    form: <RequestForm onSubmit={() => setScreen('detail')} />,
-    venues: <Venues onBook={() => setScreen('booking')} />,
+  const navigate = (next: ProtectedScreen) => {
+    void verify(PAGE_PERMISSIONS[next], () => setScreen(next));
+  };
+  const role = access ? roleLabel(access.role) : undefined;
+  const currentScreen = screen && isProtectedScreen(screen) ? screen : access?.role === 'attendee' ? 'attendee' : 'dashboard';
+  const permitted = access && canOpen(access, currentScreen);
+  const body = role && permitted ? {
+    dashboard: <Dashboard role={role} onNavigate={navigate} />,
+    events: <EventsTable role={role} onOpenEvent={() => navigate('detail')} />,
+    detail: <EventDetail role={role} onNavigate={navigate} />,
+    form: <RequestForm onSubmit={() => navigate('detail')} />,
+    venues: <Venues onBook={() => navigate('booking')} />,
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />
-  }[screen];
+  }[currentScreen] : null;
 
-  return (
-    <AppShell role={role} screen={screen} onNavigate={setScreen} onSignOut={handleSignOut}>
-      {body}
-    </AppShell>
-  );
+  return <>
+    {status !== 'ready' ? <main style={{ padding: '64px 28px' }}>
+      <Card>
+        <p role={status === 'error' ? 'alert' : 'status'}>
+          {status === 'error' ? 'Unable to verify access. Please try again.' : 'Checking access…'}
+        </p>
+        {status === 'error' ? <GhostButton onClick={() => { void verify(); }}>Try again</GhostButton> : null}
+        <GhostButton onClick={handleSignOut}>Sign out</GhostButton>
+      </Card>
+    </main> : null}
+    {role && access ? <div hidden={status !== 'ready'}>
+      <PageAccess.Provider value={{ access, run: (permission, action) => { void verify(permission, action); } }}>
+        <AppShell key={`${access.userId}:${access.role}`} role={role} screen={currentScreen} onNavigate={navigate} onSignOut={handleSignOut}>
+          {denied || !permitted ? <Card>
+            <p role="alert">Access denied. Your role does not permit this page or action.</p>
+            <GhostButton onClick={() => navigate('dashboard')}>Back to dashboard</GhostButton>
+          </Card> : body}
+        </AppShell>
+      </PageAccess.Provider>
+    </div> : null}
+  </>;
 }

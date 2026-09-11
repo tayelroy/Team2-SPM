@@ -12,7 +12,7 @@ import type {
   EventCard,
   EventRecord,
   Role,
-  Screen,
+  ProtectedScreen,
   Venue,
 } from './types';
 
@@ -94,7 +94,7 @@ export function currentEvent(role: Role): EventCard {
   return cards.find((e) => e.ref === 'E-201') ?? cards[0];
 }
 
-export function navFor(role: Role): { screen: Screen; label: string }[] {
+export function navFor(role: Role): { screen: ProtectedScreen; label: string }[] {
   return NAV[role].map(([screen, label]) => ({ screen, label }));
 }
 
@@ -126,7 +126,7 @@ export interface DetailAction {
   bg: string;
   bd: string;
   fg: string;
-  screen: Screen;
+  screen: ProtectedScreen;
 }
 
 /** Coordinators decide; everyone else can only amend their own request. */

@@ -1,5 +1,6 @@
+import { canOpen, usePageAccess } from '../auth/pages';
 import { PIPELINE, STATS } from '../mock/data';
-import type { EventCard, Role, Screen } from '../mock/types';
+import type { EventCard, Role, ProtectedScreen } from '../mock/types';
 import {
   actionsFor,
   dashboardListTitle,
@@ -87,8 +88,9 @@ export default function Dashboard({
   onNavigate,
 }: {
   role: Role;
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: ProtectedScreen) => void;
 }) {
+  const { access } = usePageAccess();
   const cards = eventCards(role).slice(0, 4);
   const openEvent = role === 'Attendee' ? 'attendee' : 'detail';
   // An organiser has no list view to expand into, so the arrow goes to detail.
@@ -139,12 +141,12 @@ export default function Dashboard({
             >
               {dashboardListTitle(role)}
             </h2>
-            <IconButton label="See all events" onClick={() => onNavigate(expandTo)}>
+            {canOpen(access, expandTo) ? <IconButton label="See all events" onClick={() => onNavigate(expandTo)}>
               ↗
-            </IconButton>
+            </IconButton> : null}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {cards.map((event) => (
+            {cards.filter(() => canOpen(access, openEvent)).map((event) => (
               <EventTile
                 key={event.ref}
                 event={event}
@@ -169,7 +171,7 @@ export default function Dashboard({
               Needs your attention
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {actionsFor(role).map((action) => (
+              {actionsFor(role).filter(action => canOpen(access, action.screen)).map((action) => (
                 <div
                   key={action.title}
                   style={{

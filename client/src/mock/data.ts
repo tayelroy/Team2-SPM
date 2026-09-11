@@ -11,7 +11,7 @@ import type {
   EventRecord,
   Notification,
   Role,
-  Screen,
+  ProtectedScreen,
   Stat,
   Venue,
 } from './types';
@@ -90,7 +90,7 @@ export const EVENTS: EventRecord[] = [
 ];
 
 /** Nav items per role — the mockup scopes navigation, not just data. */
-export const NAV: Record<Role, [Screen, string][]> = {
+export const NAV: Record<Role, [ProtectedScreen, string][]> = {
   'Event Organiser': [
     ['dashboard', 'My events'],
     ['form', 'New request'],
@@ -330,7 +330,7 @@ export const ACTIONS: Record<Role, ActionItem[]> = {
   ],
 };
 
-export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
+export const PRIMARY_ACTION: Record<Role, { label: string; screen: ProtectedScreen }> = {
   'Event Organiser': { label: 'New event request', screen: 'form' },
   'Event Coordinator': { label: 'Search venues', screen: 'venues' },
   'Venue Staff': { label: 'Open availability', screen: 'calendar' },

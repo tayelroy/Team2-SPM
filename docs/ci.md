@@ -19,6 +19,8 @@ npm run ci
 | `npm test` | Backend, frontend, and security reviewer tests. |
 | `npm run test:coverage` | Tests and application coverage thresholds. |
 | `npm run ci` | Builds followed by tests with coverage. |
+| `npm run test:ci` | Workflow wiring and execution of the actual aggregate gate with successful, failed, cancelled and skipped jobs. |
+| `npm run test:e2e` | Four SG2-25 Chromium page/API authorization scenarios. Install Chromium with `npx playwright install chromium` first. |
 
 Tests mock Supabase responses and use temporary local HTTP sockets. They do not
 need Supabase credentials or a running database.
@@ -36,7 +38,8 @@ Each merge has its own concurrency group and cannot cancel another merge's run.
 Newer pre-merge updates may cancel older checks for the same pull request.
 
 The workflow exposes separate PR checks: **Build applications**, **Test backend**,
-**Test frontend**, **Test database policies**, and **Test security reviewer**.
+**Test frontend**, **Test authorization browser flows**, **Test database policies**,
+and **Test security reviewer** (including CI gate regressions).
 They run independently, so a failed build or backend test does not suppress
 frontend or database results. Application jobs use Node 22 and install locked
 dependencies with `npm ci`; the reviewer uses only Node built-ins. Backend and
@@ -57,6 +60,20 @@ Every pull request, subsequent commit update, and PR merge runs the backend
 authorisation tests and frontend access-helper tests as part of the full
 regression suite. The suite covers all committed automated application tests,
 not just files changed by that pull request.
+
+The browser job runs four focused scenarios in
+[`e2e/authorization.spec.ts`](../e2e/authorization.spec.ts): permitted organiser
+access, forged-role/direct-request denial, logged-out/expired sessions, and a
+role downgrade without a new token. It runs the real UI, policy and application
+routes with test identity/storage adapters bound to loopback. It does not use
+live Supabase accounts. HTML reports and failure traces/screenshots are uploaded
+as **playwright-report** for 14 days.
+
+[`ci-regression.test.mjs`](../.github/scripts/ci-regression.test.mjs) verifies
+browser-job wiring and executes the workflow's own gate with all-success results
+and each of 15 failed/cancelled/skipped dependency combinations. These are local
+script checks, not proof of hosted event delivery or branch-protection settings.
+See [SG2-25 regression cases](sg2-25-regression.md) for acceptance traceability.
 
 The **Test database policies** job starts a temporary PostgreSQL 17 service, loads the
 [test identity schema](../supabase/tests/fixtures/auth.sql), applies the committed
@@ -113,8 +130,8 @@ uploads the combined **application-coverage** artifact. Reports are retained for
 cancelled. Missing coverage summaries fail the summary step.
 
 The [Google Sheet test register](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-separates backend, frontend, and database/CI scenarios, with an index of all 230
-automated tests. Spreadsheet results are dated execution records; CI does not
+separates backend, frontend, and database/CI scenarios, with an automation index.
+Spreadsheet results are dated execution records; CI does not
 automatically overwrite them after a PR run.
 
 ## Required checks

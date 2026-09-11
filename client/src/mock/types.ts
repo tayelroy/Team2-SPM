@@ -24,6 +24,8 @@ export type Screen =
   | 'attendee'
   | 'change';
 
+export type ProtectedScreen = Exclude<Screen, 'landing' | 'login'>;
+
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;
 
@@ -86,7 +88,7 @@ export interface ActionItem {
   title: string;
   body: string;
   dot: string;
-  screen: Screen;
+  screen: ProtectedScreen;
 }
 
 export interface Stat {

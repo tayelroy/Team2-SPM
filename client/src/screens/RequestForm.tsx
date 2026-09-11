@@ -1,3 +1,5 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { useState } from 'react';
 import { FORM_FIELDS, NEXT_STEPS, REQUIREMENT_CHIPS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
@@ -34,6 +36,7 @@ export default function RequestForm({
   /** Mirrors the mockup's `flagConflicts` prop — hides the suitability warning. */
   showConflicts?: boolean;
 }) {
+  const { access, run } = usePageAccess();
   const [requirements, setRequirements] = useState<string[]>(INITIAL_REQUIREMENTS);
   const [drafted, setDrafted] = useState(false);
 
@@ -121,8 +124,8 @@ export default function RequestForm({
             alignItems: 'center',
           }}
         >
-          <GhostButton onClick={() => setDrafted(true)}>Save draft</GhostButton>
-          <GradientButton onClick={onSubmit}>Submit request</GradientButton>
+          {can(access, 'event_request.create') ? <GhostButton onClick={() => run('event_request.create', () => setDrafted(true))}>Save draft</GhostButton> : null}
+          {can(access, 'event_request.create') ? <GradientButton onClick={() => run('event_request.create', onSubmit)}>Submit request</GradientButton> : null}
           <span style={{ fontSize: '13px', color: color.silver }}>
             {drafted
               ? 'Draft saved — you can come back to it any time.'

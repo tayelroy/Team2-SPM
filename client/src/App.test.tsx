@@ -1,7 +1,15 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import App from './App';
+import type { ReactElement } from 'react';
+import { PageAccess } from './auth/pages';
+import { accessFor } from '../test/access';
+function render(ui: ReactElement) {
+  return rtlRender(<PageAccess.Provider value={{ access: null, run: () => {} }}>{ui}</PageAccess.Provider>);
+}
+async function click(element: HTMLElement) { await act(async () => { fireEvent.click(element); }); }
+
 import { NOTIFICATIONS } from './mock/data';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
@@ -23,34 +31,28 @@ beforeAll(() => {
 });
 
 function mockLoginResponse(role: Role) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          accessToken: 'test-access-token',
-          user: { userId: 'user-1', email: 'test@example.com', role }
-        }),
-        { status: 200 }
-      )
-    )
-  );
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(
+    url === '/api/auth/me' ? accessFor(role) : {
+      accessToken: 'test-access-token',
+      user: { userId: 'user-1', email: 'test@example.com', role }
+    }
+  )));
 }
 
 /** Walk landing -> login -> signed in as `role`, via a mocked real login call. */
 async function signInAs(role: Role) {
   mockLoginResponse(role);
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+  await click(screen.getByRole('button', { name: 'Open app' }));
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  await click(screen.getByRole('button', { name: 'Sign in' }));
   await screen.findByRole('banner');
 }
 
 const header = () => screen.getByRole('banner');
 
-test('the landing page leads into sign-in', () => {
+test('the landing page leads into sign-in', async () => {
   render(<App />);
   expect(
     screen.getByRole('heading', {
@@ -58,14 +60,14 @@ test('the landing page leads into sign-in', () => {
     }),
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+  await click(screen.getByRole('button', { name: 'Open app' }));
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('the wordmark returns from sign-in to the landing page', () => {
+test('the wordmark returns from sign-in to the landing page', async () => {
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
-  fireEvent.click(screen.getByRole('button', { name: /ConnectSphere/ }));
+  await click(screen.getByRole('button', { name: 'Open app' }));
+  await click(screen.getByRole('button', { name: /ConnectSphere/ }));
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
@@ -75,10 +77,10 @@ test('invalid credentials show a generic error and keep you on sign-in', async (
     vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Invalid email or password.' }), { status: 401 }))
   );
   render(<App />);
-  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+  await click(screen.getByRole('button', { name: 'Open app' }));
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'wrong@example.com' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'whatever' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  await click(screen.getByRole('button', { name: 'Sign in' }));
 
   expect(await screen.findByText('Invalid email or password.')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
@@ -92,7 +94,7 @@ test('an attendee lands on the event page rather than a dashboard', async () => 
   ).toBeInTheDocument();
 });
 
-describe('every role can reach every screen in its navigation', () => {
+describe('every role can reach every screen in its navigation', async () => {
   // Keep expected destinations independent of the navigation data under test.
   // A wrong destination or a removed menu item must fail this contract.
   const destinations: Record<Role, [string, string][]> = {
@@ -118,7 +120,7 @@ describe('every role can reach every screen in its navigation', () => {
   test.each(ROLES)('%s', async (role) => {
     await signInAs(role);
     for (const [navLabel, heading] of destinations[role]) {
-      fireEvent.click(within(header()).getByRole('button', { name: navLabel }));
+      await click(within(header()).getByRole('button', { name: navLabel }));
       expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     }
@@ -140,7 +142,7 @@ test('a persisted session resumes straight into the app on the next visit', asyn
 
   // Re-render as a fresh page load would: reads the session already saved
   // in sessionStorage, without going through landing/login again.
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+  mockLoginResponse('Venue Staff');
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
 });
@@ -154,25 +156,29 @@ test('a session that no longer validates is cleared and returns to landing', asy
   expect(await screen.findByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
-test('a network hiccup during background validation keeps the session, not just a 401', async () => {
+test('an access outage keeps protected content hidden and allows retry', async () => {
   await signInAs('Venue Staff');
   cleanup();
 
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
   render(<App />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to verify access');
+  expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  mockLoginResponse('Venue Staff');
+  await click(screen.getByRole('button', { name: 'Try again' }));
   expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
 });
 
 test('the wordmark signs out back to the landing page', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
+  await click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
 test('signing out still completes even if the logout request fails', async () => {
   await signInAs('Event Coordinator');
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
+  await click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
@@ -180,7 +186,7 @@ test('the notification drawer opens and closes', async () => {
   await signInAs('Event Coordinator');
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 
-  fireEvent.click(
+  await click(
     screen.getByRole('button', { name: `Notifications (${NOTIFICATIONS.length})` }),
   );
   const drawer = screen.getByRole('complementary', { name: 'Notifications' });
@@ -188,13 +194,13 @@ test('the notification drawer opens and closes', async () => {
     within(drawer).getByText('Clarification requested on E-201'),
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Close notifications' }));
+  await click(screen.getByRole('button', { name: 'Close notifications' }));
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 });
 
 test('the dashboard primary action opens the venue catalogue', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(screen.getByRole('button', { name: 'Search venues' }));
+  await click(screen.getByRole('button', { name: 'Search venues' }));
   expect(screen.getByRole('heading', { name: 'Venue catalogue' })).toBeInTheDocument();
   // The primary CTA belongs to the dashboard only.
   expect(screen.queryByRole('button', { name: 'Search venues' })).not.toBeInTheDocument();
@@ -202,7 +208,7 @@ test('the dashboard primary action opens the venue catalogue', async () => {
 
 test('an attention item jumps straight to the screen that resolves it', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(
+  await click(
     screen.getByRole('button', { name: 'Open: Atrium Hall booking overlaps E-190' }),
   );
   expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
@@ -211,42 +217,42 @@ test('an attention item jumps straight to the screen that resolves it', async ()
 
 test('dashboard links open the event list and the selected event detail', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
+  await click(screen.getByRole('button', { name: 'See all events' }));
   expect(screen.getByRole('heading', { name: 'All events' })).toBeInTheDocument();
-  fireEvent.click(within(header()).getByRole('button', { name: 'Dashboard' }));
-  fireEvent.click(
+  await click(within(header()).getByRole('button', { name: 'Dashboard' }));
+  await click(
     screen.getByRole('button', { name: /Northbridge Investor Forum/ }),
   );
   expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
 });
 
-describe('the events table', () => {
+describe('the events table', async () => {
   const openTable = async () => {
     await signInAs('Event Coordinator');
-    fireEvent.click(within(header()).getByRole('button', { name: 'All events' }));
+    await click(within(header()).getByRole('button', { name: 'All events' }));
   };
 
   test('filters rows by status', async () => {
     await openTable();
     expect(screen.getByText('Product Launch — Tideline')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }));
+    await click(screen.getByRole('button', { name: 'Confirmed' }));
     expect(screen.getByText('Quarterly Partner Dinner')).toBeInTheDocument();
     expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    await click(screen.getByRole('button', { name: 'All' }));
     expect(screen.getByText('Product Launch — Tideline')).toBeInTheDocument();
   });
 
   test('a row opens the event detail', async () => {
     await openTable();
-    fireEvent.click(screen.getByRole('button', { name: /Board Strategy Offsite/ }));
+    await click(screen.getByRole('button', { name: /Board Strategy Offsite/ }));
     expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
   });
 });
 
-describe('the event detail action panel', () => {
-  test('an attendee detail view hides the internal capacity warning and approval control', () => {
+describe('the event detail action panel', async () => {
+  test('an attendee detail view hides the internal capacity warning and approval control', async () => {
     render(<EventDetail role="Attendee" onNavigate={vi.fn()} />);
     expect(screen.getByRole('heading', { name: 'Quarterly Partner Dinner' })).toBeInTheDocument();
     expect(screen.queryByText(/Capacity check/)).not.toBeInTheDocument();
@@ -255,51 +261,51 @@ describe('the event detail action panel', () => {
 
   test('a coordinator gets decision actions, and approving goes to venues', async () => {
     await signInAs('Event Coordinator');
-    fireEvent.click(within(header()).getByRole('button', { name: 'Review' }));
+    await click(within(header()).getByRole('button', { name: 'Review' }));
     expect(screen.getByText('Review actions')).toBeInTheDocument();
     expect(screen.getByText(/Capacity check/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
+    await click(screen.getByRole('button', { name: 'Approve request' }));
     expect(screen.getByRole('heading', { name: 'Venue catalogue' })).toBeInTheDocument();
   });
 
   test('an organiser gets amendment actions instead', async () => {
     await signInAs('Event Organiser');
-    fireEvent.click(within(header()).getByRole('button', { name: 'Event detail' }));
+    await click(within(header()).getByRole('button', { name: 'Event detail' }));
     expect(screen.getByText('Your options')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Request a change' }));
+    await click(screen.getByRole('button', { name: 'Request a change' }));
     expect(screen.getByRole('heading', { name: 'Change request' })).toBeInTheDocument();
   });
 });
 
-describe('the request form', () => {
+describe('the request form', async () => {
   const openForm = async () => {
     await signInAs('Event Organiser');
-    fireEvent.click(within(header()).getByRole('button', { name: 'New request' }));
+    await click(within(header()).getByRole('button', { name: 'New request' }));
   };
 
-  test('requirement chips toggle when no suitability conflict is reported', () => {
+  test('requirement chips toggle when no suitability conflict is reported', async () => {
     render(<RequestForm onSubmit={vi.fn()} showConflicts={false} />);
     expect(screen.queryByText(/180 expected attendance rules out/)).not.toBeInTheDocument();
     const chip = screen.getByRole('button', { name: 'Hearing loop' });
     expect(chip).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(chip);
+    await click(chip);
     expect(chip).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(chip);
+    await click(chip);
     expect(chip).toHaveAttribute('aria-pressed', 'true');
 
     const unselected = screen.getByRole('button', { name: 'Parking' });
     expect(unselected).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(unselected);
+    await click(unselected);
     expect(unselected).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('saving a draft confirms it was kept', async () => {
     await openForm();
     expect(screen.getByText('You can save and finish this later.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await click(screen.getByRole('button', { name: 'Save draft' }));
     expect(
       screen.getByText('Draft saved — you can come back to it any time.'),
     ).toBeInTheDocument();
@@ -307,25 +313,25 @@ describe('the request form', () => {
 
   test('submitting goes to the event detail', async () => {
     await openForm();
-    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    await click(screen.getByRole('button', { name: 'Submit request' }));
     expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
   });
 });
 
 test('requesting a venue opens the booking approval screen', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Request Atrium Hall' }));
+  await click(within(header()).getByRole('button', { name: 'Venues' }));
+  await click(screen.getByRole('button', { name: 'Request Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
 });
 
 test('reserving equipment settles the row', async () => {
   await signInAs('Technical Support Staff');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Equipment requests' }));
+  await click(within(header()).getByRole('button', { name: 'Equipment requests' }));
 
   const reserveButtons = screen.getAllByRole('button', { name: 'Reserve' });
   expect(reserveButtons.length).toBeGreaterThan(0);
-  fireEvent.click(reserveButtons[0]);
+  await click(reserveButtons[0]);
 
   expect(screen.getAllByRole('button', { name: 'Reserve' })).toHaveLength(
     reserveButtons.length - 1,
@@ -338,7 +344,7 @@ test('reserving equipment settles the row', async () => {
 
 test('the calendar shows the month grid with its legend', async () => {
   await signInAs('Venue Staff');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Availability' }));
+  await click(within(header()).getByRole('button', { name: 'Availability' }));
   expect(
     screen.getByRole('heading', { name: 'Atrium Hall · October 2026' }),
   ).toBeInTheDocument();
@@ -352,13 +358,13 @@ test('an attendee can withdraw and re-register', async () => {
     screen.getByText("You're registered — confirmation sent to your email."),
   ).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Withdraw registration' }));
+  await click(screen.getByRole('button', { name: 'Withdraw registration' }));
   expect(
     screen.getByText('Places are held as soon as you register.'),
   ).toBeInTheDocument();
   expect(screen.getByText('Not registered')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Register' }));
+  await click(screen.getByRole('button', { name: 'Register' }));
   expect(
     screen.getByText("You're registered — confirmation sent to your email."),
   ).toBeInTheDocument();
@@ -366,15 +372,15 @@ test('an attendee can withdraw and re-register', async () => {
 
 test('change-request categories toggle', async () => {
   await signInAs('Event Organiser');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Change request' }));
+  await click(within(header()).getByRole('button', { name: 'Change request' }));
 
   const selected = screen.getByRole('button', { name: 'Expected attendance' });
   expect(selected).toHaveAttribute('aria-pressed', 'true');
 
   const other = screen.getByRole('button', { name: 'Date or time' });
   expect(other).toHaveAttribute('aria-pressed', 'false');
-  fireEvent.click(other);
+  await click(other);
   expect(other).toHaveAttribute('aria-pressed', 'true');
-  fireEvent.click(other);
+  await click(other);
   expect(other).toHaveAttribute('aria-pressed', 'false');
 });

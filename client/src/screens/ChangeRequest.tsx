@@ -1,3 +1,5 @@
+import { can } from '../auth/access';
+import { usePageAccess } from '../auth/pages';
 import { useState } from 'react';
 import { CHANGE_CHIPS, IMPACTS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
@@ -29,6 +31,7 @@ export default function ChangeRequest() {
         : current.concat(name),
     );
 
+  const { access } = usePageAccess();
   return (
     <div
       style={{
@@ -38,6 +41,7 @@ export default function ChangeRequest() {
         alignItems: 'start',
       }}
     >
+      <fieldset disabled={!can(access, 'event_request.change')} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <Card style={{ gap: '26px' }}>
         <h2
           style={{
@@ -86,10 +90,11 @@ export default function ChangeRequest() {
           defaultValue="Two extra partner firms confirmed attendance this week."
         />
 
-        <GradientButton style={{ alignSelf: 'flex-start' }}>
+        {can(access, 'event_request.change') ? <GradientButton style={{ alignSelf: 'flex-start' }}>
           Send change request
-        </GradientButton>
+        </GradientButton> : null}
       </Card>
+      </fieldset>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <Notice>
