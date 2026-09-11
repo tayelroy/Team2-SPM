@@ -88,10 +88,6 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(response.body.request.name, 'Partner Forum');
     assert.equal(captured?.organiserId, 'user-1');
     assert.equal(captured?.organisation, 'ConnectSphere Test');
-  });
-
-  test('a complete draft reports nothing outstanding for submission', async () => {
-    const response = await request(buildApp()).post('/api/event-requests').send(COMPLETE_BODY);
     assert.deepEqual(response.body.missingForSubmission, []);
   });
 
@@ -311,10 +307,15 @@ describe('validateDraftInput', () => {
     if (result.valid) assert.equal(result.values.registration_needed, false);
   });
 
-  test('rejects a non-integer attendance', () => {
-    const result = validateDraftInput({ expected_attendance: 12.5 });
-    assert.equal(result.valid, false);
-    if (!result.valid) assert.match(result.errors[0], /whole number/);
+  test('attendance accepts 1 and rejects 0 and fractional values', () => {
+    const valid = validateDraftInput({ expected_attendance: 1 });
+    assert.equal(valid.valid, true);
+    if (valid.valid) assert.equal(valid.values.expected_attendance, 1);
+    for (const [value, message] of [[0, /at least 1/], [12.5, /whole number/]] as const) {
+      const result = validateDraftInput({ expected_attendance: value });
+      assert.equal(result.valid, false);
+      if (!result.valid) assert.match(result.errors[0], message);
+    }
   });
 
   test('rejects an empty proposed_date string', () => {
@@ -322,15 +323,13 @@ describe('validateDraftInput', () => {
     assert.equal(result.valid, false);
   });
 
-  test('rejects free text beyond the length limit', () => {
+  test('free text accepts 5000 characters and rejects 5001', () => {
+    const valid = validateDraftInput({ description: 'x'.repeat(5000) });
+    assert.equal(valid.valid, true);
+    if (valid.valid) assert.equal(valid.values.description?.length, 5000);
     const result = validateDraftInput({ description: 'x'.repeat(5001) });
     assert.equal(result.valid, false);
     if (!result.valid) assert.match(result.errors[0], /5000 characters/);
-  });
-
-  test('accepts free text at exactly the length limit', () => {
-    const result = validateDraftInput({ description: 'x'.repeat(5000) });
-    assert.equal(result.valid, true);
   });
 
   for (const body of [null, 'a string', ['an', 'array'], 42]) {

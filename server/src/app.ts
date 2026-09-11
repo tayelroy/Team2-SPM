@@ -4,6 +4,7 @@ import { checkDatabaseHealth, isSupabaseConfigured } from './db';
 import { createRegisterHandler } from './auth/register';
 import { authorization } from './auth';
 import { createEventDraftHandler } from './events/createDraft';
+import { createVenuesRouter } from './venues';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -18,6 +19,7 @@ export function createApp(
 
   app.post('/api/auth/register', registerHandler);
   app.use('/api/auth', access.router);
+  app.use('/api/venues', createVenuesRouter(access));
 
   // SG2-28: raise an event request as a draft.
   const eventRequests = access.protectedRouter();

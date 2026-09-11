@@ -1,5 +1,43 @@
 # Test audit and course case design
 
+## Latest review — 11 September 2026
+
+Reviewed all 24 automated test files and both SQL policy test files on the
+SG2-42 working branch. The local build passed, along with 155 backend, 132
+frontend, 19 reviewer and 4 Playwright tests: **310 passed**. Backend and
+frontend coverage remained 100% for statements, branches, functions and lines.
+Evidence: Node 22.23.2, base `1cdab2a3f2bb`, reviewed source SHA256 prefix
+`e1ece8b2b408`; these results describe the uncommitted working tree.
+
+Consolidated three redundant cases: complete-draft submission readiness into
+the creation workflow, the 5000/5001-character draft boundary into one case,
+and the shared field placeholder into its existing field contract. Strengthened
+attendance coverage to accept 1 and reject 0/fractions. Corrected overstated
+test names, made configuration variants distinguishable, used independent
+expected venue error messages, and ensured global mocks are cleaned up even
+when an assertion fails. Login/registration code and tests were not changed in
+this review; their existing regressions are not acceptance requirements for
+the agreed seeded-account flow.
+
+SG2-42 has four browser scenarios: staff create/edit/search with reload
+persistence (positive), coordinator write rejection including direct/forged
+requests (negative), capacity 1/2147483647 versus 0/fractions/overflow
+(boundary), and venue names of 255 versus 256 characters (boundary). One
+additional course scenario groups component/API recovery, duplicate-submit,
+cancel and stale-request assertions. Browser tests use the isolated test
+server/store and injected test identities; they do not establish live Supabase
+or login integration. The workflow runs these through `npm run test:e2e`.
+
+Both SQL policy files passed locally in PGlite 0.5.8/PostgreSQL 18.3 with the
+auth fixture and migrations. The anonymous venue read assertion uses
+`PERFORM` so a missing-result-destination error cannot masquerade as an access
+denial. This is additional local evidence; hosted PostgreSQL 17 and live
+Supabase remain unverified. The actual CI aggregate script accepted all-success
+results and rejected browser failure, cancellation and skip; hosted CI and
+branch protection scenarios remain Not Executed.
+
+## Earlier review — 9 September 2026
+
 Audit date: 9 September 2026. Baseline: `3ca7ddd759e2d832c7dc96a61fd5f0a65a4ff2f5`.
 The course source is the supplied **Week4-TestCases_SoftwareArchitecture.pdf**,
 especially slides 16, 21–23 and 26–36. This guide applies its workflow, happy-path,
@@ -70,15 +108,18 @@ dependency combinations. Hosted workflow execution remains to be verified.
 ## Google Sheet register
 
 The [SPM Test Cases workbook](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-contains 14 backend scenarios, 14 frontend scenarios, 9 database/CI scenarios,
-and an index of all 230 executed automated tests. The five SG2-25 identifiers
+contains 18 backend scenarios, 19 frontend scenarios, 12 database/CI scenarios,
+and an index of all 310 executed automated tests as of 11 September 2026.
+These occupy the existing category tabs; the template tab is unchanged.
+The five SG2-25 identifiers
 are retained. Frontend permission-helper tests link to the same SG2-25 cases
 instead of duplicating that feature's specifications.
 
 The course template fields are preserved. Specification and execution sections
 use different colours; explicit status labels distinguish Pass from Not
-Executed. The five SQL scenarios and three hosted workflow scenarios are Not
-Executed. Application and reviewer results are dated local automation records,
+Executed. Seven SQL scenarios passed locally in PGlite/PostgreSQL 18.3;
+the three hosted workflow scenarios remain Not Executed. Application, browser,
+SQL and reviewer results are dated local automation records,
 not deployed acceptance or hosted CI results. The automation index maps
 supporting UI/component checks to their workflow context without claiming each
 one independently proves an acceptance criterion.

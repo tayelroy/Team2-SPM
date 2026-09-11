@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 .pnp
+
+# Playwright evidence (uploaded by CI)
+/playwright-report/
+/test-results/
 .pnp.js
 
 # Production build artifacts

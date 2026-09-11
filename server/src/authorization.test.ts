@@ -225,7 +225,7 @@ test('removing a role grant blocks the next action with the same access token', 
 });
 
 for (const role of ROLES) {
-  test(`default policy grants no action to ${role}`, async () => {
+  test(`default policy denies the unmapped fixture action to ${role}`, async () => {
     const { app, calls } = guardedApp(createAuthorization({
       resolvePrincipal: async () => ({ userId, role })
     }));
@@ -271,7 +271,7 @@ for (const config of [
   { supabaseUrl: undefined }, { supabaseAnonKey: undefined },
   { supabaseUrl: 'http://auth-test.supabase.co' }, { supabaseUrl: 'not-a-url' }
 ]) {
-  test(`configuration fails closed without a privileged fallback: ${JSON.stringify(config)}`, async () => {
+  test(`configuration fails closed without a privileged fallback: ${Object.entries(config).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`, async () => {
     Object.assign(dbConfig, config);
     const fetchMock = provider();
     assert.equal((await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token')).status, 503);

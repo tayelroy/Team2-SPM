@@ -19,6 +19,7 @@ npm run ci
 | `npm test` | Backend, frontend, and security reviewer tests. |
 | `npm run test:coverage` | Tests and application coverage thresholds. |
 | `npm run ci` | Builds followed by tests with coverage. |
+| `npm run test:e2e` | Four SG2-42 Playwright scenarios in Chromium (run `npx playwright install chromium` once). |
 
 Tests mock Supabase responses and use temporary local HTTP sockets. They do not
 need Supabase credentials or a running database.
@@ -36,11 +37,18 @@ Each merge has its own concurrency group and cannot cancel another merge's run.
 Newer pre-merge updates may cancel older checks for the same pull request.
 
 The workflow exposes separate PR checks: **Build applications**, **Test backend**,
-**Test frontend**, **Test database policies**, and **Test security reviewer**.
+**Test frontend**, **Test venue browser flows**, **Test database policies**, and **Test security reviewer**.
 They run independently, so a failed build or backend test does not suppress
 frontend or database results. Application jobs use Node 22 and install locked
 dependencies with `npm ci`; the reviewer uses only Node built-ins. Backend and
 frontend matrix fail-fast is disabled.
+
+The browser job installs Chromium and its OS dependencies, runs `npm run test:e2e`,
+and uploads **venue-playwright-report** (HTML plus failure screenshots/traces)
+for 14 days. The [four venue cases](venues.md#playwright-acceptance-cases) cover
+positive, negative and boundary scenarios using the real venue UI/API with
+isolated test identity/storage. Login and deployed Supabase are outside this
+fixture. Playwright starts/stops its local test server automatically.
 
 The final **Build and test** check waits for every job and succeeds only when all
 of them succeed. Failed, cancelled, or skipped dependencies fail this aggregate
@@ -61,7 +69,8 @@ not just files changed by that pull request.
 The **Test database policies** job starts a temporary PostgreSQL 17 service, loads the
 [test identity schema](../supabase/tests/fixtures/auth.sql), applies the committed
 migrations in filename order, and runs
-[`supabase/tests/account_roles.sql`](../supabase/tests/account_roles.sql).
+[`supabase/tests/account_roles.sql`](../supabase/tests/account_roles.sql) and
+[`supabase/tests/venues.sql`](../supabase/tests/venues.sql).
 These checks cover role isolation, blocked role writes, role changes, and schema
 constraints. SQL errors stop the step and fail **Build and test**.
 

@@ -75,6 +75,34 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  browser-tests:
+    name: Test venue browser flows
+    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload browser test evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: venue-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: error
+          retention-days: 14
+
   database-tests:
     name: Test database policies
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
@@ -104,6 +132,7 @@ jobs:
             docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$migration"
           done
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/account_roles.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venues.sql
 
   reviewer-tests:
     name: Test security reviewer
@@ -123,7 +152,7 @@ jobs:
   build-and-test:
     # Preserve the required check name used by existing branch rules.
     name: Build and test
-    needs: [build, application-tests, database-tests, reviewer-tests]
+    needs: [build, application-tests, browser-tests, database-tests, reviewer-tests]
     if: ${{ always() && (github.event.action != 'closed' || github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

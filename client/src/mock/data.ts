@@ -177,7 +177,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   detail: 'Full request, activity trail, and the actions available to you.',
   form: 'Save as a draft at any point — nothing is sent until you submit.',
   venues:
-    'Filter by date, capacity, accessibility and layout. Suitability is checked as you go.',
+    'Find venue details for planning. Venue Staff keep facilities, accessibility and operating information up to date.',
   calendar:
     'Available, held, confirmed and blocked days for the selected venue.',
   booking: 'Approve or reject with a reason. Overlaps are detected automatically.',

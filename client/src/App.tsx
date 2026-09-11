@@ -32,7 +32,7 @@ function initialScreen(): Screen {
  * Swap in a router once more screens need to be deep-linked or the API is
  * wired up.
  */
-export default function App() {
+export default function App({ accessToken = null }: { accessToken?: string | null }) {
   const [role, setRole] = useState<Role>(DEFAULT_ROLE);
   const [screen, setScreen] = useState<Screen>(initialScreen);
 
@@ -62,7 +62,7 @@ export default function App() {
     events: <EventsTable role={role} onOpenEvent={() => setScreen('detail')} />,
     detail: <EventDetail role={role} onNavigate={setScreen} />,
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
-    venues: <Venues onBook={() => setScreen('booking')} />,
+    venues: <Venues accessToken={accessToken} onBook={() => setScreen('booking')} />,
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,

@@ -70,6 +70,7 @@ test('fields preserve labels, descriptions, editable values and read-only refere
       />
       <Field label="Currently confirmed" defaultValue="90" muted />
       <Field label="Date" defaultValue="12 Oct 2026" onAbyss />
+      <TextField label="Why" placeholder="Reason for the change…" rows={4} />
     </>,
   );
   const input = screen.getByLabelText('Expected attendance');
@@ -80,10 +81,6 @@ test('fields preserve labels, descriptions, editable values and read-only refere
   expect(screen.getByLabelText('Currently confirmed')).toHaveAttribute('readonly');
   expect(screen.getByLabelText('Currently confirmed')).toHaveValue('90');
   expect(screen.getByLabelText('Date')).toHaveValue('12 Oct 2026');
-});
-
-test('the text field carries its placeholder', () => {
-  render(<TextField label="Why" placeholder="Reason for the change…" rows={4} />);
   expect(screen.getByLabelText('Why')).toHaveAttribute(
     'placeholder',
     'Reason for the change…',

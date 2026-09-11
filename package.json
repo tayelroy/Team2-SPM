@@ -12,10 +12,12 @@
     "build": "npm run build --prefix server && npm run build --prefix client",
     "test": "npm run test --workspace server && npm run test --workspace client && npm run test:reviewer",
     "ci": "npm run build && npm run test:coverage",
+    "test:e2e": "playwright test",
     "test:reviewer": "node --test .github/scripts/security-review.test.mjs",
     "test:coverage": "npm run test:coverage --workspace server && npm run test:coverage --workspace client && npm run test:reviewer"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "concurrently": "^9.1.2"
   }
 }

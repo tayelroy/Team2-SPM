@@ -10,7 +10,7 @@ import RequestForm from './screens/RequestForm';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
 // this project does not, so unmount between tests explicitly.
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 // jsdom has no canvas implementation; the orb hook is written to no-op when
 // there is no 2D context, and stubbing this keeps the console clean.
@@ -251,10 +251,24 @@ describe('the request form', () => {
   });
 });
 
-test('requesting a venue opens the booking approval screen', () => {
+test('the prototype role picker cannot authorize access to real venue records', () => {
   signInAs('Event Coordinator');
   fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Request Atrium Hall' }));
+  expect(screen.getByText('Sign in with your account to view venue records.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
+});
+
+test('the venue integration accepts a verified session and preserves the booking navigation', async () => {
+  const fetch = vi.fn(async (url: string) => new Response(JSON.stringify(url === '/api/auth/me'
+    ? { userId: 'coordinator', role: 'event_coordinator', permissions: ['venues.read'] }
+    : { venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'Level 1', capacity: 100,
+      facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] })));
+  vi.stubGlobal('fetch', fetch);
+  render(<App accessToken="verified-token" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Event Coordinator' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Request Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
 });
 
