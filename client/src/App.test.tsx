@@ -29,7 +29,6 @@ function mockLoginResponse(role: Role) {
       new Response(
         JSON.stringify({
           accessToken: 'test-access-token',
-          refreshToken: 'test-refresh-token',
           user: { userId: 'user-1', email: 'test@example.com', role }
         }),
         { status: 200 }

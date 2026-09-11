@@ -4,7 +4,6 @@ import type { StoredSession } from './session';
 
 const session: StoredSession = {
   accessToken: 'access-1',
-  refreshToken: 'refresh-1',
   user: { userId: 'user-1', email: 'ada@example.com', role: 'Attendee' }
 };
 

@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express';
+import rateLimit from 'express-rate-limit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../db';
 import { resolveSupabasePrincipal } from './supabase';
@@ -17,12 +18,32 @@ export interface LoginUser {
 }
 
 export type LoginResult =
-  | { outcome: 'success'; accessToken: string; refreshToken: string; user: LoginUser }
+  | { outcome: 'success'; accessToken: string; user: LoginUser }
   | { outcome: 'invalid_credentials' }
   | { outcome: 'incomplete_account' }
   | { outcome: 'unavailable' };
 
 const GENERIC_INVALID = { outcome: 'invalid_credentials' as const };
+
+/**
+ * Throttles sign-in attempts per IP so a caller can't brute-force or
+ * credential-stuff against seeded accounts (AI security review, MEDIUM).
+ * Standard headers (RateLimit-*) let a well-behaved client back off;
+ * legacy X-RateLimit-* headers are skipped since nothing here reads them.
+ *
+ * A factory, not a shared instance: each caller (createApp() in
+ * particular) gets its own counter, so one test file's requests can't push
+ * another test's login calls over the limit.
+ */
+export function createLoginRateLimiter(options: { windowMs?: number; limit?: number } = {}): RequestHandler {
+  return rateLimit({
+    windowMs: options.windowMs ?? 15 * 60 * 1000,
+    limit: options.limit ?? 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many sign-in attempts. Please try again later.' }
+  });
+}
 
 /**
  * Uses the anon client for signInWithPassword, same as any browser client
@@ -34,6 +55,12 @@ const GENERIC_INVALID = { outcome: 'invalid_credentials' as const };
  * same lookup requireAuth uses) rather than querying account_roles again
  * independently, so login and every other authenticated request agree by
  * construction on what "signed in with a role" means.
+ *
+ * The response deliberately excludes the refresh token: nothing client-side
+ * uses it (logout revokes via the admin API from the access token alone —
+ * see auth/logout.ts), so there's no reason to hand a long-lived credential
+ * to the browser, where sessionStorage/XSS exposure was flagged separately
+ * (AI security review, LOW).
  */
 export async function loginAccount(
   input: Partial<LoginInput>,
@@ -61,7 +88,6 @@ export async function loginAccount(
     return {
       outcome: 'success',
       accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
       user: { userId: principal.userId, email: data.user.email ?? email, role: toDisplayRole(principal.role) }
     };
   } catch (err) {
@@ -80,7 +106,6 @@ export function createLoginHandler(login: typeof loginAccount = loginAccount): R
       case 'success':
         res.status(200).json({
           accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
           user: result.user
         });
         return;

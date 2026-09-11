@@ -86,7 +86,7 @@ export default function Login({
         return;
       }
 
-      onSignIn({ accessToken: data.accessToken, refreshToken: data.refreshToken, user: data.user });
+      onSignIn({ accessToken: data.accessToken, user: data.user });
     } catch {
       setStatus('error');
       setMessage('Could not reach the server. Check your connection and try again.');

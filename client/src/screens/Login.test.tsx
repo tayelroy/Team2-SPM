@@ -18,7 +18,6 @@ test('submits credentials and hands the session to onSignIn', async () => {
     new Response(
       JSON.stringify({
         accessToken: 'access-1',
-        refreshToken: 'refresh-1',
         user: { userId: 'user-1', email: 'ada@example.com', role: 'Venue Staff' }
       }),
       { status: 200 }
@@ -34,7 +33,6 @@ test('submits credentials and hands the session to onSignIn', async () => {
   await vi.waitFor(() => expect(onSignIn).toHaveBeenCalledOnce());
   expect(onSignIn).toHaveBeenCalledWith({
     accessToken: 'access-1',
-    refreshToken: 'refresh-1',
     user: { userId: 'user-1', email: 'ada@example.com', role: 'Venue Staff' }
   });
   expect(fetchMock).toHaveBeenCalledWith('/api/auth/login', {
@@ -94,7 +92,7 @@ test('a second click while a request is outstanding does not submit again', asyn
 
   resolveResponse(
     new Response(
-      JSON.stringify({ accessToken: 'a', refreshToken: 'r', user: { userId: '1', email: 'x', role: 'Attendee' } }),
+      JSON.stringify({ accessToken: 'a', user: { userId: '1', email: 'x', role: 'Attendee' } }),
       { status: 200 }
     )
   );

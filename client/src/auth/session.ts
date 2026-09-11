@@ -4,9 +4,11 @@ export interface StoredUser {
   role: string;
 }
 
+// No refreshToken: the server never sends one (see auth/login.ts) — nothing
+// client-side used it, and an unused long-lived credential sitting in
+// sessionStorage was exactly the exposure an AI security review flagged.
 export interface StoredSession {
   accessToken: string;
-  refreshToken: string;
   user: StoredUser;
 }
 
