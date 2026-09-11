@@ -6,11 +6,13 @@ import { createLoginHandler } from './auth/login';
 import { createLogoutHandler } from './auth/logout';
 import { createUpdateRoleHandler } from './auth/roles';
 import { authorization } from './auth';
+import { createEventDraftHandler } from './events/createDraft';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
   registerHandler: RequestHandler = createRegisterHandler(),
   access = authorization,
+  eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal }),
   loginHandler: RequestHandler = createLoginHandler(),
   logoutHandler: RequestHandler = createLogoutHandler(),
   updateRoleHandler: RequestHandler = createUpdateRoleHandler()
@@ -31,6 +33,11 @@ export function createApp(
   const rolesRouter = access.protectedRouter();
   rolesRouter.patch('/:userId/role', access.requirePermission('users.role.update'), updateRoleHandler);
   app.use('/api/users', rolesRouter);
+
+  // SG2-28: raise an event request as a draft.
+  const eventRequests = access.protectedRouter();
+  eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
+  app.use('/api/event-requests', eventRequests);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
