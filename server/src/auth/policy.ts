@@ -11,7 +11,11 @@ export type PermissionMap = Readonly<Record<string, readonly Role[]>>;
 export interface Principal { userId: string; role: Role }
 
 // Actions without an explicit role grant are denied.
-export const PERMISSIONS: PermissionMap = Object.freeze({});
+export const PERMISSIONS: PermissionMap = Object.freeze({
+  // SG2-28: only an Event Organiser raises an event request for their own
+  // client organisation.
+  'event_request.create': ['event_organiser']
+});
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
