@@ -3,11 +3,13 @@ import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
 import { createRegisterHandler } from './auth/register';
 import { authorization } from './auth';
+import { createEventDraftHandler } from './events/createDraft';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
   registerHandler: RequestHandler = createRegisterHandler(),
-  access = authorization
+  access = authorization,
+  eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -16,6 +18,11 @@ export function createApp(
 
   app.post('/api/auth/register', registerHandler);
   app.use('/api/auth', access.router);
+
+  // SG2-28: raise an event request as a draft.
+  const eventRequests = access.protectedRouter();
+  eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
+  app.use('/api/event-requests', eventRequests);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
