@@ -5,85 +5,63 @@ import express from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logoutAccount, createLogoutHandler } from './auth/logout';
 
-function fakeClient(options: { getUser?: () => Promise<any>; setSession?: () => Promise<any>; signOut?: () => Promise<any> }) {
+function fakeClient(options: { signOut?: (jwt: string) => Promise<any> }) {
   return {
     auth: {
-      getUser: options.getUser ?? (async () => ({ data: { user: { id: 'user-1' } }, error: null })),
-      setSession: options.setSession ?? (async () => ({ data: {}, error: null })),
-      signOut: options.signOut ?? (async () => ({ error: null }))
+      admin: {
+        signOut: options.signOut ?? (async () => ({ data: {}, error: null }))
+      }
     }
   } as unknown as SupabaseClient;
 }
 
 describe('logoutAccount', () => {
-  test('verifies the access token, then revokes the session, when both tokens are present', async () => {
-    let getUserCalledWith: string | undefined;
-    let setSessionCalled = false;
-    let signOutCalled = false;
+  test('revokes the session tied to the access token via the admin API', async () => {
+    let signOutCalledWith: string | undefined;
     const client = fakeClient({
-      getUser: async (...args: any[]) => {
-        getUserCalledWith = args[0];
-        return { data: { user: { id: 'user-1' } }, error: null };
-      },
-      setSession: async () => {
-        setSessionCalled = true;
-        return { data: {}, error: null };
-      },
-      signOut: async () => {
-        signOutCalled = true;
-        return { error: null };
-      }
-    });
-
-    const result = await logoutAccount('access-1', { refreshToken: 'refresh-1' }, () => client);
-    assert.deepEqual(result, { outcome: 'success' });
-    assert.equal(getUserCalledWith, 'access-1');
-    assert.equal(setSessionCalled, true);
-    assert.equal(signOutCalled, true);
-  });
-
-  test('does not attempt revocation when the access token does not verify', async () => {
-    let setSessionCalled = false;
-    const client = fakeClient({
-      getUser: async () => ({ data: { user: null }, error: { message: 'invalid JWT' } }),
-      setSession: async () => {
-        setSessionCalled = true;
+      signOut: async (jwt) => {
+        signOutCalledWith = jwt;
         return { data: {}, error: null };
       }
     });
 
-    const result = await logoutAccount('bad-token', { refreshToken: 'refresh-1' }, () => client);
+    const result = await logoutAccount('access-1', () => client);
     assert.deepEqual(result, { outcome: 'success' });
-    assert.equal(setSessionCalled, false);
+    assert.equal(signOutCalledWith, 'access-1');
   });
 
   test('does not attempt revocation with no access token (unauthenticated request)', async () => {
-    let getUserCalled = false;
+    let signOutCalled = false;
     const client = fakeClient({
-      getUser: async () => {
-        getUserCalled = true;
-        return { data: { user: { id: 'user-1' } }, error: null };
+      signOut: async () => {
+        signOutCalled = true;
+        return { data: {}, error: null };
       }
     });
 
-    const result = await logoutAccount(null, { refreshToken: 'refresh-1' }, () => client);
+    const result = await logoutAccount(null, () => client);
     assert.deepEqual(result, { outcome: 'success' });
-    assert.equal(getUserCalled, false);
+    assert.equal(signOutCalled, false);
   });
 
   test('still succeeds when revocation itself throws', async () => {
     const client = fakeClient({
-      setSession: async () => {
+      signOut: async () => {
         throw new Error('network down');
       }
     });
 
-    const result = await logoutAccount('access-1', { refreshToken: 'refresh-1' }, () => client);
+    const result = await logoutAccount('access-1', () => client);
     assert.deepEqual(result, { outcome: 'success' });
   });
 
-  test('succeeds with no tokens and no client configured', async () => {
-    const result = await logoutAccount(null, {}, () => null);
+  test('succeeds with no access token and no client configured', async () => {
+    const result = await logoutAccount(null, () => null);
+    assert.deepEqual(result, { outcome: 'success' });
+  });
+
+  test('succeeds with an access token but no client configured', async () => {
+    const result = await logoutAccount('access-1', () => null);
     assert.deepEqual(result, { outcome: 'success' });
   });
 });
@@ -127,15 +105,9 @@ describe('POST /api/auth/logout', () => {
     assert.equal(receivedToken, null);
   });
 
-  test('treats an absent request body as empty input', async () => {
+  test('returns 200 with no request body at all', async () => {
     const app = express();
-    app.post(
-      '/api/auth/logout',
-      createLogoutHandler(async (_accessToken, input) => {
-        assert.deepEqual(input, {});
-        return { outcome: 'success' };
-      })
-    );
+    app.post('/api/auth/logout', createLogoutHandler(async () => ({ outcome: 'success' })));
     const response = await request(app).post('/api/auth/logout');
     assert.equal(response.status, 200);
   });

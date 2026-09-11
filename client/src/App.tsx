@@ -24,8 +24,8 @@ function landingScreenFor(role: Role): Screen {
 /**
  * A persisted session takes priority — someone with a live session landing
  * on "/" or "/?screen=login" resumes where they left off rather than seeing
- * sign-in again. Without one, "/?screen=login" is real pages elsewhere in
- * the app (e.g. /register) linking back in here.
+ * sign-in again. Without one, "/?screen=login" is a deep link straight to
+ * sign-in for anything outside the shell that needs one.
  */
 function initialScreen(session: StoredSession | null): Screen {
   if (session) return landingScreenFor(session.user.role as Role);
@@ -79,8 +79,7 @@ export default function App() {
     // signed-in tree — session is non-null by construction whenever this runs.
     fetch('/api/auth/logout', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.accessToken}` },
-      body: JSON.stringify({ refreshToken: session!.refreshToken })
+      headers: { Authorization: `Bearer ${session!.accessToken}` }
     }).catch(() => {});
     clearSession();
     setSession(null);
