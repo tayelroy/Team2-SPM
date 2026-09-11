@@ -4,12 +4,14 @@ import { checkDatabaseHealth, isSupabaseConfigured } from './db';
 import { createRegisterHandler } from './auth/register';
 import { authorization } from './auth';
 import { createEventDraftHandler } from './events/createDraft';
+import { submitEventRequestHandler } from './events/submit';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
   registerHandler: RequestHandler = createRegisterHandler(),
   access = authorization,
-  eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal })
+  eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal }),
+  eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -22,6 +24,12 @@ export function createApp(
   // SG2-28: raise an event request as a draft.
   const eventRequests = access.protectedRouter();
   eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
+  // SG2-30: submit a draft event request for review.
+  eventRequests.patch(
+    '/:eventId/submit',
+    access.requirePermission('event_request.submit'),
+    eventSubmitHandler
+  );
   app.use('/api/event-requests', eventRequests);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)

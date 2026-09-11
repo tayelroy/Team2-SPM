@@ -1,7 +1,12 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { fetchOrganiserOrganisation, insertEventRequestDraft } from './eventRequests';
+import {
+  fetchOrganiserOrganisation,
+  fetchOwnEventRequest,
+  insertEventRequestDraft,
+  submitEventRequest
+} from './eventRequests';
 import type { DraftValues } from '../events/fields';
 
 type Result = { data: unknown; error: { message: string } | null };
@@ -34,6 +39,62 @@ function fakeEventsClient(result: Result, capture?: (row: Record<string, unknown
         insert: (row: Record<string, unknown>) => {
           capture?.(row);
           return { select: async () => result };
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+function fakeEventsSelectClient(
+  result: Result,
+  capture?: (filters: { eventId: unknown; organiserId: unknown }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        select: (_columns: string) => {
+          const filters: { eventId?: unknown; organiserId?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
+              if (column === 'organiser_id') filters.organiserId = value;
+              return chain;
+            },
+            then(resolve: (value: Result) => unknown) {
+              capture?.({ eventId: filters.eventId, organiserId: filters.organiserId });
+              return Promise.resolve(result).then(resolve);
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+function fakeEventsUpdateClient(
+  result: Result,
+  capture?: (update: { row: Record<string, unknown>; eventId: unknown; status: unknown }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        update: (row: Record<string, unknown>) => {
+          const filters: { eventId?: unknown; status?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            select: async () => {
+              capture?.({ row, eventId: filters.eventId, status: filters.status });
+              return result;
+            }
+          };
+          return chain;
         }
       };
     }
@@ -131,6 +192,74 @@ describe('insertEventRequestDraft', () => {
         organisation: null,
         values: EMPTY_VALUES
       });
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.match(result.message, /not returned/);
+    });
+  }
+});
+
+describe('fetchOwnEventRequest', () => {
+  test('returns the request scoped to the given event and organiser', async () => {
+    let filters: { eventId: unknown; organiserId: unknown } | undefined;
+    const result = await fetchOwnEventRequest(
+      fakeEventsSelectClient({ data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft' }], error: null }, (f) => (filters = f)),
+      7,
+      'user-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.event_id, 7);
+    assert.deepEqual(filters, { eventId: 7, organiserId: 'user-1' });
+  });
+
+  test('reports not_found when no row matches the event and organiser', async () => {
+    const result = await fetchOwnEventRequest(fakeEventsSelectClient({ data: [], error: null }), 7, 'user-1');
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'not_found');
+  });
+
+  test('reports unavailable when the query errors', async () => {
+    const result = await fetchOwnEventRequest(
+      fakeEventsSelectClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      'user-1'
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.reason, 'unavailable');
+      assert.equal(result.message, 'connection reset');
+    }
+  });
+});
+
+describe('submitEventRequest', () => {
+  test('updates status to submitted, filtered to the draft row', async () => {
+    let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
+    const result = await submitEventRequest(
+      fakeEventsUpdateClient(
+        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'submitted' }], error: null },
+        (c) => (captured = c)
+      ),
+      7
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.status, 'submitted');
+    assert.equal(captured?.row.status, 'submitted');
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.status, 'draft');
+  });
+
+  test('reports unavailable when the update errors', async () => {
+    const result = await submitEventRequest(
+      fakeEventsUpdateClient({ data: null, error: { message: 'connection reset' } }),
+      7
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.message, 'connection reset');
+  });
+
+  for (const data of [[], null]) {
+    test(`reports unavailable when the update returns ${JSON.stringify(data)}`, async () => {
+      const result = await submitEventRequest(fakeEventsUpdateClient({ data, error: null }), 7);
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
     });

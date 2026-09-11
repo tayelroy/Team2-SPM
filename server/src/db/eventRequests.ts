@@ -17,6 +17,14 @@ export type CreateDraftResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'unavailable'; message: string };
 
+export type FetchEventRequestResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
+
+export type SubmitEventRequestResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'unavailable'; message: string };
+
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
@@ -76,5 +84,61 @@ export async function insertEventRequestDraft(
   }
   // Cast through unknown: selecting an explicit column list leaves supabase-js
   // unable to infer the row shape, so it falls back to a string-error type.
+  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+}
+
+/**
+ * Reads an event request scoped to its owning organiser (SG2-30).
+ *
+ * Scoping the lookup by `organiser_id` in the same query — rather than
+ * fetching by `event_id` alone and comparing ownership afterwards — means a
+ * request belonging to someone else is indistinguishable from one that does
+ * not exist at all.
+ */
+export async function fetchOwnEventRequest(
+  admin: SupabaseClient,
+  eventId: number,
+  organiserId: string
+): Promise<FetchEventRequestResult> {
+  const { data, error } = await admin
+    .from('events')
+    .select(RETURNED_COLUMNS)
+    .eq('event_id', eventId)
+    .eq('organiser_id', organiserId);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'not_found', message: 'No event request found for this account.' };
+  }
+  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+}
+
+/**
+ * Transitions an event request from `draft` to `submitted` (SG2-30).
+ *
+ * The `status = 'draft'` filter is repeated here as a second guard alongside
+ * the caller's own draft check, so a concurrent submission cannot race two
+ * requests through at once: whichever update loses the race matches zero
+ * rows and reports unavailable rather than silently double-submitting.
+ */
+export async function submitEventRequest(
+  admin: SupabaseClient,
+  eventId: number
+): Promise<SubmitEventRequestResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update({ status: 'submitted' })
+    .eq('event_id', eventId)
+    .eq('status', 'draft')
+    .select(RETURNED_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
+  }
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }

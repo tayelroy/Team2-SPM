@@ -14,7 +14,9 @@ export interface Principal { userId: string; role: Role }
 export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-28: only an Event Organiser raises an event request for their own
   // client organisation.
-  'event_request.create': ['event_organiser']
+  'event_request.create': ['event_organiser'],
+  // SG2-30: only the organiser who owns a draft can submit it for review.
+  'event_request.submit': ['event_organiser']
 });
 
 export function isRole(value: unknown): value is Role {
