@@ -24,15 +24,19 @@ export interface SubmitEventRequestDependencies {
   submitRequest?: (admin: SupabaseClient, eventId: number) => Promise<SubmitEventRequestResult>;
 }
 
+/** Statuses a caller may submit from: a fresh draft, or a rejected request being reworked. */
+const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected']);
+
 /**
  * PATCH /api/event-requests/:eventId/submit — submits a draft for review (SG2-30).
  *
  * Only the request's own organiser may submit it, only while it is still a
- * `draft`, and only once every SUBMISSION_REQUIRED_FIELDS value (SG2-28) is
- * filled in. The `draft` → `submitted` transition happens only here, through
- * the admin client, so it can never be forged by a direct client write to
- * `status` — the gap the AI Security Review flagged on the earlier attempt
- * at this ticket (PR #13).
+ * `draft` or `rejected` (customer clarification: rejection is not final —
+ * organisers may revise and resubmit), and only once every
+ * SUBMISSION_REQUIRED_FIELDS value (SG2-28) is filled in. The transition to
+ * `submitted` happens only here, through the admin client, so it can never be
+ * forged by a direct client write to `status` — the gap the AI Security
+ * Review flagged on the earlier attempt at this ticket (PR #13).
  */
 export function submitEventRequestHandler({
   getPrincipal,
@@ -72,10 +76,13 @@ export function submitEventRequestHandler({
       return;
     }
 
-    if (existing.request.status !== 'draft') {
-      // Criterion #3: once a request has left draft, it is not a valid
-      // submission target — this is also what makes it immutable.
-      res.status(409).json({ error: 'Only a draft event request can be submitted.' });
+    if (!SUBMITTABLE_STATUSES.has(existing.request.status)) {
+      // Criterion #3: once a request has been submitted (or is otherwise
+      // beyond draft/rejected) it is not a valid submission target — this is
+      // also what makes it immutable.
+      res
+        .status(409)
+        .json({ error: 'Only a draft or rejected event request can be submitted.' });
       return;
     }
 

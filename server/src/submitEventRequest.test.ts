@@ -20,7 +20,7 @@ const COMPLETE_DRAFT = {
   status: 'draft',
   name: 'Partner Forum',
   purpose: 'Client relationship building',
-  description: null,
+  description: 'Quarterly partner networking session.',
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
@@ -108,11 +108,32 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 409 when the request is not a draft', async () => {
+  test('returns 409 when the request is already submitted', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'submitted' } } })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 409);
+  });
+
+  test('returns 409 for a status that is neither draft nor rejected', async () => {
+    const response = await request(
+      buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'under_review' } } })
+    ).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 409);
+  });
+
+  test('resubmits a rejected request owned by the caller', async () => {
+    let submitted: number | undefined;
+    const response = await request(
+      buildApp({
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'rejected' } },
+        captureSubmit: (eventId) => (submitted = eventId)
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'submitted');
+    assert.equal(submitted, 7);
   });
 
   test('returns 400 and lists outstanding fields for an incomplete draft', async () => {
@@ -127,6 +148,20 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body.missing, ['name', 'purpose']);
+  });
+
+  test('returns 400 and lists description when it is blank', async () => {
+    const response = await request(
+      buildApp({
+        fetchResult: {
+          ok: true,
+          request: { ...COMPLETE_DRAFT, description: null }
+        }
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body.missing, ['description']);
   });
 
   test('a draft omitting only accessibility needs is submission-ready', async () => {

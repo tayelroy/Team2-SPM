@@ -36,6 +36,7 @@ export type DraftField = (typeof DRAFT_FIELDS)[number];
 export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'name',
   'purpose',
+  'description',
   'proposed_date',
   'expected_attendance',
   'venue_requirements'

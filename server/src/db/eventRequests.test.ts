@@ -86,6 +86,9 @@ function fakeEventsUpdateClient(
           const chain = {
             eq(column: string, value: unknown) {
               if (column === 'event_id') filters.eventId = value;
+              return chain;
+            },
+            in(column: string, value: unknown) {
               if (column === 'status') filters.status = value;
               return chain;
             },
@@ -232,7 +235,7 @@ describe('fetchOwnEventRequest', () => {
 });
 
 describe('submitEventRequest', () => {
-  test('updates status to submitted, filtered to the draft row', async () => {
+  test('updates status to submitted, filtered to draft or rejected rows', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
     const result = await submitEventRequest(
       fakeEventsUpdateClient(
@@ -245,7 +248,7 @@ describe('submitEventRequest', () => {
     if (result.ok) assert.equal(result.request.status, 'submitted');
     assert.equal(captured?.row.status, 'submitted');
     assert.equal(captured?.eventId, 7);
-    assert.equal(captured?.status, 'draft');
+    assert.deepEqual(captured?.status, ['draft', 'rejected']);
   });
 
   test('reports unavailable when the update errors', async () => {

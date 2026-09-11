@@ -115,11 +115,16 @@ export async function fetchOwnEventRequest(
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }
 
+/** Statuses a row may transition from when submitted (SG2-30). */
+const SUBMITTABLE_STATUSES = ['draft', 'rejected'];
+
 /**
- * Transitions an event request from `draft` to `submitted` (SG2-30).
+ * Transitions an event request from `draft` or `rejected` to `submitted`
+ * (SG2-30). Rejected requests may be revised and resubmitted rather than
+ * being a dead end.
  *
- * The `status = 'draft'` filter is repeated here as a second guard alongside
- * the caller's own draft check, so a concurrent submission cannot race two
+ * The status filter is repeated here as a second guard alongside the
+ * caller's own status check, so a concurrent submission cannot race two
  * requests through at once: whichever update loses the race matches zero
  * rows and reports unavailable rather than silently double-submitting.
  */
@@ -131,7 +136,7 @@ export async function submitEventRequest(
     .from('events')
     .update({ status: 'submitted' })
     .eq('event_id', eventId)
-    .eq('status', 'draft')
+    .in('status', SUBMITTABLE_STATUSES)
     .select(RETURNED_COLUMNS);
 
   if (error) {

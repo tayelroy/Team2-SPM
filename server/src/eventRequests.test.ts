@@ -347,6 +347,7 @@ describe('missingForSubmission', () => {
     const missing = missingForSubmission({
       name: null,
       purpose: '',
+      description: 'Half-day forum with keynotes and a reception.',
       proposed_date: '2026-11-04T09:00:00.000Z',
       expected_attendance: 10,
       venue_requirements: 'Stage'
