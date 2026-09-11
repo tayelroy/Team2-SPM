@@ -32,3 +32,5 @@ lerna-debug.log*
 *.sln
 *.sw?
 .vercel
+.claude/*
+.agents/*
