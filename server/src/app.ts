@@ -1,7 +1,6 @@
 import express, { Request, RequestHandler, Response } from 'express';
 import cors from 'cors';
 import { checkDatabaseHealth, isSupabaseConfigured } from './db';
-import { createRegisterHandler } from './auth/register';
 import { createLoginHandler } from './auth/login';
 import { createLogoutHandler } from './auth/logout';
 import { createUpdateRoleHandler } from './auth/roles';
@@ -10,7 +9,6 @@ import { createEventDraftHandler } from './events/createDraft';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
-  registerHandler: RequestHandler = createRegisterHandler(),
   access = authorization,
   eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal }),
   loginHandler: RequestHandler = createLoginHandler(),
@@ -22,7 +20,9 @@ export function createApp(
   app.use(cors());
   app.use(express.json());
 
-  app.post('/api/auth/register', registerHandler);
+  // No self-registration: accounts are seeded directly (see
+  // project_seeded_test_accounts memory) rather than created through a
+  // public endpoint — customer feedback confirmed roles are pre-seeded.
   app.post('/api/auth/login', loginHandler);
   app.post('/api/auth/logout', logoutHandler);
   app.use('/api/auth', access.router);

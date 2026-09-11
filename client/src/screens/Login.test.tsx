@@ -106,8 +106,3 @@ test('the wordmark calls onBack', () => {
   fireEvent.click(screen.getByRole('button', { name: /ConnectSphere/ }));
   expect(onBack).toHaveBeenCalledOnce();
 });
-
-test('links to registration', () => {
-  render(<Login onSignIn={vi.fn()} onBack={vi.fn()} />);
-  expect(screen.getByRole('link', { name: 'Register an account' })).toHaveAttribute('href', '/register');
-});
