@@ -102,19 +102,19 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['events', 'All events'],
     ['detail', 'Review'],
     ['venues', 'Venues'],
-    ['calendar', 'Calendar'],
+    ['calendar', 'Venue Availability'],
     ['equipment', 'Equipment'],
   ],
   'Venue Staff': [
     ['dashboard', 'Dashboard'],
     ['booking', 'Booking requests'],
-    ['calendar', 'Availability'],
+    ['calendar', 'Venue Availability'],
     ['venues', 'Catalogue'],
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['equipment', 'Equipment requests'],
-    ['calendar', 'Schedule'],
+    ['calendar', 'Venue Availability'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
