@@ -7,8 +7,10 @@ import { createApp } from './app';
 import { createAuthorization, ROLES } from './auth';
 import { dbConfig } from './db/config';
 import {
+  createAllVenuesAvailabilityHandler,
   createAvailabilityHandler,
   createVenuesRouter,
+  getAllVenuesAvailability,
   getVenueAvailability
 } from './venues/availability';
 
@@ -17,16 +19,23 @@ const TO = '2026-10-31T00:00:00.000Z';
 
 type TableResult = { data?: unknown; error?: unknown };
 
-/** Minimal stand-in for the PostgREST query builder used by getVenueAvailability. */
+/**
+ * Minimal stand-in for the PostgREST query builder: chainable on every method
+ * and thenable at any point in the chain, since the two read paths stop the
+ * chain at different methods (single-venue ends in .order(), all-venues ends
+ * in .gt() for the booking/unavailability tables).
+ */
 function fakeClient(tables: Record<string, TableResult>): SupabaseClient {
   return {
     from(table: string) {
       const result = tables[table] ?? { data: [], error: null };
-      const builder: Record<string, unknown> = {};
-      for (const method of ['select', 'eq', 'lt', 'gt']) {
+      const builder: Record<string, unknown> = {
+        then: (resolve: (value: TableResult) => unknown, reject?: (reason: unknown) => unknown) =>
+          Promise.resolve(result).then(resolve, reject)
+      };
+      for (const method of ['select', 'eq', 'lt', 'gt', 'order']) {
         builder[method] = () => builder;
       }
-      builder.order = () => Promise.resolve(result);
       return builder;
     }
   } as unknown as SupabaseClient;
@@ -148,6 +157,108 @@ test('rejects a range longer than 366 days', async () => {
   );
 });
 
+// --- getAllVenuesAvailability --------------------------------------------------
+
+test('lists every venue in DB order, each with its own sorted entries', async () => {
+  const client = fakeClient({
+    venues: {
+      data: [
+        { venue_id: 1, name: 'Atrium' },
+        { venue_id: 2, name: 'Rooftop' },
+        { venue_id: 3, name: 'Empty Room' }
+      ],
+      error: null
+    },
+    venue_bookings: {
+      data: [
+        { venue_id: 1, starts_at: '2026-10-05T09:00:00.000Z', ends_at: '2026-10-05T12:00:00.000Z', status: 'held', event_id: null },
+        { venue_id: 1, starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', status: 'confirmed', event_id: 12 }
+      ],
+      error: null
+    },
+    venue_unavailability: {
+      data: [
+        { venue_id: 2, starts_at: '2026-10-03T00:00:00.000Z', ends_at: '2026-10-04T00:00:00.000Z', reason: 'Maintenance' }
+      ],
+      error: null
+    }
+  });
+
+  const result = await getAllVenuesAvailability(FROM, TO, client);
+
+  assert.deepEqual(result, {
+    outcome: 'ok',
+    venues: [
+      {
+        venueId: 1,
+        name: 'Atrium',
+        entries: [
+          { start: '2026-10-01T09:00:00.000Z', end: '2026-10-01T17:00:00.000Z', kind: 'booking', label: 'confirmed · event 12' },
+          { start: '2026-10-05T09:00:00.000Z', end: '2026-10-05T12:00:00.000Z', kind: 'booking', label: 'held' }
+        ]
+      },
+      {
+        venueId: 2,
+        name: 'Rooftop',
+        entries: [
+          { start: '2026-10-03T00:00:00.000Z', end: '2026-10-04T00:00:00.000Z', kind: 'unavailable', label: 'Maintenance' }
+        ]
+      },
+      { venueId: 3, name: 'Empty Room', entries: [] }
+    ]
+  });
+});
+
+test('all-venues read treats a null venue list as empty', async () => {
+  const client = fakeClient({ venues: { data: null, error: null } });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'ok', venues: [] });
+});
+
+test('all-venues read treats null booking/unavailability data as empty', async () => {
+  const client = fakeClient({
+    venues: { data: [{ venue_id: 1, name: 'Atrium' }], error: null },
+    venue_bookings: { data: null, error: null },
+    venue_unavailability: { data: null, error: null }
+  });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), {
+    outcome: 'ok',
+    venues: [{ venueId: 1, name: 'Atrium', entries: [] }]
+  });
+});
+
+test('all-venues read rejects an invalid range', async () => {
+  assert.deepEqual(await getAllVenuesAvailability('not-a-date', TO, fakeClient({})), {
+    outcome: 'invalid',
+    message: 'from and to must be ISO 8601 date-times.'
+  });
+});
+
+test('all-venues read is unavailable without a Supabase client', async () => {
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, null), { outcome: 'unavailable' });
+});
+
+test('all-venues read is unavailable when the venue list query fails', async () => {
+  const client = fakeClient({ venues: { data: null, error: { message: 'boom' } } });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });
+});
+
+test('all-venues read is unavailable when the bookings query fails', async () => {
+  const client = fakeClient({
+    venues: { data: [], error: null },
+    venue_bookings: { data: null, error: { message: 'boom' } }
+  });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });
+});
+
+test('all-venues read is unavailable when the unavailability query fails', async () => {
+  const client = fakeClient({
+    venues: { data: [], error: null },
+    venue_bookings: { data: [], error: null },
+    venue_unavailability: { data: null, error: { message: 'boom' } }
+  });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });
+});
+
 // --- createAvailabilityHandler ------------------------------------------------
 
 function handlerApp(
@@ -227,6 +338,73 @@ test('handler ignores a non-bearer Authorization header', async () => {
   assert.equal(clientArg, null);
 });
 
+// --- createAllVenuesAvailabilityHandler -----------------------------------
+
+function allVenuesHandlerApp(
+  getAvailability: typeof getAllVenuesAvailability,
+  makeClient: (token: string) => SupabaseClient | null = () => ({}) as SupabaseClient
+) {
+  const app = express();
+  app.get('/v/availability', createAllVenuesAvailabilityHandler(getAvailability, makeClient));
+  return app;
+}
+
+test('all-venues handler passes query and caller-scoped client through and returns 200', async () => {
+  const calls: { args?: unknown[]; token?: string } = {};
+  const app = allVenuesHandlerApp(
+    async (...args) => {
+      calls.args = args;
+      return { outcome: 'ok', venues: [{ venueId: 1, name: 'Atrium', entries: [] }] };
+    },
+    (token) => {
+      calls.token = token;
+      return { scoped: token } as unknown as SupabaseClient;
+    }
+  );
+
+  const res = await request(app).get('/v/availability?from=A&to=B').set('Authorization', 'Bearer tok-123');
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { from: 'A', to: 'B', venues: [{ venueId: 1, name: 'Atrium', entries: [] }] });
+  assert.equal(res.headers['cache-control'], 'no-store');
+  assert.equal(calls.token, 'tok-123');
+  assert.deepEqual(calls.args, ['A', 'B', { scoped: 'tok-123' }]);
+});
+
+test('all-venues handler maps an invalid result to 400', async () => {
+  const app = allVenuesHandlerApp(async () => ({ outcome: 'invalid', message: 'bad range' }));
+  const res = await request(app).get('/v/availability').set('Authorization', 'Bearer tok');
+  assert.equal(res.status, 400);
+  assert.deepEqual(res.body, { error: 'bad range' });
+});
+
+test('all-venues handler maps an unavailable result to 503', async () => {
+  const app = allVenuesHandlerApp(async () => ({ outcome: 'unavailable' }));
+  const res = await request(app).get('/v/availability').set('Authorization', 'Bearer tok');
+  assert.equal(res.status, 503);
+  assert.deepEqual(res.body, { error: 'Venue availability is temporarily unavailable.' });
+});
+
+test('all-venues handler passes a null client when the request carries no bearer token', async () => {
+  let clientArg: unknown = 'unset';
+  let madeClient = false;
+  const app = allVenuesHandlerApp(
+    async (_from, _to, client) => {
+      clientArg = client;
+      return { outcome: 'unavailable' };
+    },
+    () => {
+      madeClient = true;
+      return {} as SupabaseClient;
+    }
+  );
+
+  const res = await request(app).get('/v/availability');
+  assert.equal(res.status, 503);
+  assert.equal(clientArg, null);
+  assert.equal(madeClient, false);
+});
+
 // --- createVenuesRouter + policy (SG2-44 AC3) -------------------------------
 
 const userId = '10000000-0000-4000-8000-000000000001';
@@ -271,6 +449,22 @@ for (const role of ROLES) {
     assert.equal(res.status, allowed ? 200 : 403);
     if (allowed) {
       assert.deepEqual(res.body, { venueId: 5, from: FROM, to: TO, entries: [] });
+    }
+  });
+}
+
+for (const role of ROLES) {
+  test(`SG2-44: all-venues availability view obeys the policy for ${role}`, async () => {
+    const allowed = ['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role);
+    mock.method(globalThis, 'fetch', async () => Response.json([]));
+
+    const res = await request(appAs(role))
+      .get(`/api/venues/availability?from=${FROM}&to=${TO}`)
+      .set('Authorization', 'Bearer verified-token');
+
+    assert.equal(res.status, allowed ? 200 : 403);
+    if (allowed) {
+      assert.deepEqual(res.body, { from: FROM, to: TO, venues: [] });
     }
   });
 }

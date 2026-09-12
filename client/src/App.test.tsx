@@ -103,15 +103,15 @@ describe('every role can reach every screen in its navigation', () => {
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
       ['Review', 'Event detail'], ['Venues', 'Venue catalogue'],
-      ['Calendar', 'Venue availability'], ['Equipment', 'Equipment requests'],
+      ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
     ],
     'Venue Staff': [
       ['Dashboard', 'Venue desk'], ['Booking requests', 'Booking approval'],
-      ['Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
+      ['Venue Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'], ['Equipment requests', 'Equipment requests'],
-      ['Schedule', 'Venue availability'],
+      ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
   };
@@ -336,14 +336,32 @@ test('reserving equipment settles the row', async () => {
   }
 });
 
-test('the calendar shows the month grid with its legend', async () => {
+test('the calendar shows the month grid with real venue availability', async () => {
   await signInAs('Venue Staff');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Availability' }));
-  expect(
-    screen.getByRole('heading', { name: 'Atrium Hall · October 2026' }),
-  ).toBeInTheDocument();
-  expect(screen.getByText('Confirmed · E-186')).toBeInTheDocument();
-  expect(screen.getByText('Blocked')).toBeInTheDocument();
+  const now = new Date();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      Response.json({
+        from: now.toISOString(),
+        to: now.toISOString(),
+        venues: [
+          {
+            venueId: 1,
+            name: 'Atrium Hall',
+            entries: [
+              { start: now.toISOString(), end: new Date(now.getTime() + 3_600_000).toISOString(), kind: 'booking', label: 'confirmed' },
+            ],
+          },
+        ],
+      }),
+    ),
+  );
+
+  fireEvent.click(within(header()).getByRole('button', { name: 'Venue Availability' }));
+  expect(await screen.findByText('Atrium Hall · confirmed')).toBeInTheDocument();
+  expect(screen.getByText('Booked')).toBeInTheDocument();
+  expect(screen.getByText('Unavailable')).toBeInTheDocument();
 });
 
 test('an attendee can withdraw and re-register', async () => {
