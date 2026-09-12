@@ -111,7 +111,7 @@ export function showsPipeline(role: Role): boolean {
   return (
     role === 'Event Coordinator' ||
     role === 'Venue Staff' ||
-    role === 'Technical Support'
+    role === 'Technical Support Staff'
   );
 }
 

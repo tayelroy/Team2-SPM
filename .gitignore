@@ -35,3 +35,6 @@ lerna-debug.log*
 
 # MCP server config (contains Supabase access token)
 .mcp.json
+
+# Local agent instructions (personal, not shared with the team)
+AGENTS.md

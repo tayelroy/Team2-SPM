@@ -1,25 +1,98 @@
-import { ROLES } from '../mock/types';
-import type { Role } from '../mock/types';
-import { chipStyle } from '../mock/viewModel';
-import { color, radius } from '../theme';
-import { Card, Chip, Eyebrow, Field, GradientButton, Mark } from '../ui';
+import { useId, useState } from 'react';
+import type { ChangeEvent } from 'react';
+import type { StoredSession } from '../auth/session';
+import { color, radius, rule, surface, label as labelToken } from '../theme';
+import { Card, GradientButton, Mark } from '../ui';
+
+type Status = 'idle' | 'submitting' | 'error';
 
 /**
- * Sign-in screen. The role chips are the prototype's role switch — picking one
- * decides which scoped view the app opens on, since every downstream screen is
- * filtered by role.
+ * Styled like ui.tsx's Field, but controlled: Field only takes defaultValue
+ * (it's built for the static mockups), and this page needs real state to
+ * submit against the live API.
+ */
+function ControlledField({
+  id,
+  label,
+  type,
+  value,
+  onChange
+}: {
+  id: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <label htmlFor={id} style={labelToken}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={onChange}
+        required
+        style={{
+          background: surface.field,
+          border: rule.control,
+          borderRadius: radius.sm,
+          padding: '13px 14px',
+          color: color.mist,
+          fontSize: '14px',
+          outline: 'none'
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Real sign-in screen. Used to be a role-picking mockup — the chips let you
+ * preview any role's view with no credentials. Real auth replaces that: the
+ * role now comes from the server, not a self-selected preview.
  */
 export default function Login({
-  role,
-  onPickRole,
   onSignIn,
-  onBack,
+  onBack
 }: {
-  role: Role;
-  onPickRole: (role: Role) => void;
-  onSignIn: () => void;
+  onSignIn: (session: StoredSession) => void;
   onBack: () => void;
 }) {
+  const baseId = useId();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<Status>('idle');
+  const [message, setMessage] = useState('');
+
+  async function handleSignIn() {
+    if (status === 'submitting') return;
+    setStatus('submitting');
+    setMessage('');
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setStatus('error');
+        setMessage(data.error || 'Sign-in failed. Please try again.');
+        return;
+      }
+
+      onSignIn({ accessToken: data.accessToken, user: data.user });
+    } catch {
+      setStatus('error');
+      setMessage('Could not reach the server. Check your connection and try again.');
+    }
+  }
+
   return (
     <div
       style={{
@@ -30,7 +103,7 @@ export default function Login({
         justifyContent: 'center',
         padding: '64px 24px',
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'hidden'
       }}
     >
       <div
@@ -45,7 +118,7 @@ export default function Login({
           background:
             'radial-gradient(circle at 40% 35%, rgba(203,255,252,0.14), rgba(0,130,124,0.12) 45%, rgba(1,38,36,0) 70%)',
           animation: 'orbdrift 14s ease-in-out infinite',
-          pointerEvents: 'none',
+          pointerEvents: 'none'
         }}
       />
 
@@ -56,17 +129,10 @@ export default function Login({
           maxWidth: '460px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '32px',
+          gap: '32px'
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            alignItems: 'flex-start',
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start' }}>
           <button
             type="button"
             onClick={onBack}
@@ -77,7 +143,7 @@ export default function Login({
               background: 'none',
               border: 'none',
               padding: 0,
-              cursor: 'pointer',
+              cursor: 'pointer'
             }}
           >
             <Mark size={26} />
@@ -87,7 +153,7 @@ export default function Login({
                 fontWeight: 500,
                 letterSpacing: '0.15em',
                 textTransform: 'uppercase',
-                color: color.silver,
+                color: color.silver
               }}
             >
               ConnectSphere
@@ -101,59 +167,44 @@ export default function Login({
               lineHeight: 1,
               letterSpacing: '-0.04em',
               color: color.platinum,
-              textWrap: 'pretty',
+              textWrap: 'pretty'
             }}
           >
             Sign in
           </h2>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '16px',
-              lineHeight: 1.4,
-              color: color.silver,
-              maxWidth: '380px',
-            }}
-          >
+          <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver, maxWidth: '380px' }}>
             Pick up where things stand. Your view is scoped to your role.
           </p>
         </div>
 
         <Card style={{ gap: '20px' }}>
-          <Field label="Work email" defaultValue="a.vance@connectsphere.co" />
-          <Field label="Password" type="password" defaultValue="............" />
+          <ControlledField
+            id={`${baseId}-email`}
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <ControlledField
+            id={`${baseId}-password`}
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <Eyebrow>Sign in as (mockup role switch)</Eyebrow>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {ROLES.map((r) => {
-                const style = chipStyle(r === role);
-                return (
-                  <Chip
-                    key={r}
-                    {...style}
-                    pressed={r === role}
-                    onClick={() => onPickRole(r)}
-                  >
-                    {r}
-                  </Chip>
-                );
-              })}
-            </div>
-          </div>
-
-          <GradientButton
-            onClick={onSignIn}
-            style={{ marginTop: '4px', borderRadius: radius.sm }}
-          >
-            Sign in
+          <GradientButton onClick={handleSignIn} style={{ marginTop: '4px', borderRadius: radius.sm }}>
+            {status === 'submitting' ? 'Signing in…' : 'Sign in'}
           </GradientButton>
+
+          {message && (
+            <span role="alert" style={{ fontSize: '13px', lineHeight: 1.4, color: '#ff8a80' }}>
+              {message}
+            </span>
+          )}
+
           <span style={{ fontSize: '13px', color: color.silver }}>
-            Access is scoped to your role — you only see the events and actions that
-            belong to you.
-          </span>
-          <span style={{ fontSize: '13px', color: color.silver }}>
-            New here? <a href="/register">Register an account</a>
+            Access is scoped to your role — you only see the events and actions that belong to you.
           </span>
         </Card>
       </div>

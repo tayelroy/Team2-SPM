@@ -246,7 +246,6 @@ afterEach(() => {
 function appAs(role: string) {
   return createApp(
     undefined,
-    undefined,
     createAuthorization({ resolvePrincipal: async () => ({ userId, role: role as never }) })
   );
 }

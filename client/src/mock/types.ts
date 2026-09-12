@@ -4,7 +4,7 @@ export const ROLES = [
   'Event Organiser',
   'Event Coordinator',
   'Venue Staff',
-  'Technical Support',
+  'Technical Support Staff',
   'Attendee',
 ] as const;
 
