@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
 import type { Role, Screen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
-import { Dot, GradientButton, IconButton, Mark } from '../ui';
+import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 
 /** Slide-over notification panel. */
 function NotificationDrawer({ onClose }: { onClose: () => void }) {
@@ -118,8 +118,24 @@ export default function AppShell({
   children: ReactNode;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const profileButton = useRef<HTMLButtonElement>(null);
   const head = HEAD[role];
   const primary = primaryActionFor(role);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const dismissOutside = (event: Event) => {
+      if (!profileRef.current!.contains(event.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('focusin', dismissOutside);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('focusin', dismissOutside);
+    };
+  }, [profileOpen]);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -146,7 +162,7 @@ export default function AppShell({
         >
           <button
             type="button"
-            onClick={onSignOut}
+            onClick={() => onNavigate(role === 'Attendee' ? 'attendee' : 'dashboard')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -245,20 +261,38 @@ export default function AppShell({
               </span>
             </button>
 
-            <span
-              aria-label="Your role"
-              style={{
-                background: color.kelp,
-                border: rule.control,
-                borderRadius: radius.sm,
-                color: color.mist,
-                fontSize: '12px',
-                letterSpacing: '0.06em',
-                padding: '8px 10px',
+            <div
+              ref={profileRef}
+              style={{ position: 'relative' }}
+              onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  setProfileOpen(false);
+                  profileButton.current!.focus();
+                }
               }}
             >
-              {role}
-            </span>
+              <button
+                ref={profileButton}
+                type="button"
+                aria-label="Profile"
+                aria-expanded={profileOpen}
+                aria-controls="profile-options"
+                onClick={() => setProfileOpen(open => !open)}
+                style={{ background: color.kelp, border: rule.control, borderRadius: radius.sm,
+                  color: color.mist, fontSize: '12px', letterSpacing: '0.06em',
+                  padding: '8px 10px', cursor: 'pointer' }}
+              >
+                <span aria-label="Your role">{role}</span> <span aria-hidden="true">▾</span>
+              </button>
+              {profileOpen && (
+                <div id="profile-options" role="group" aria-label="Profile options"
+                  style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    minWidth: '160px', padding: '8px', background: color.deep,
+                    border: rule.raised, borderRadius: radius.sm }}>
+                  <GhostButton onClick={onSignOut} style={{ width: '100%', padding: '10px 16px' }}>Logout</GhostButton>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

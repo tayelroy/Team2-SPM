@@ -13,7 +13,6 @@ import type {
   Role,
   Screen,
   Stat,
-  Venue,
 } from './types';
 
 export const EVENTS: EventRecord[] = [
@@ -177,7 +176,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   detail: 'Full request, activity trail, and the actions available to you.',
   form: 'Save as a draft at any point — nothing is sent until you submit.',
   venues:
-    'Filter by date, capacity, accessibility and layout. Suitability is checked as you go.',
+    'Search venue details, facilities and accessibility features. Keep planning information current.',
   calendar:
     'Available, held, confirmed and blocked days for the selected venue.',
   booking: 'Approve or reject with a reason. Overlaps are detected automatically.',
@@ -352,49 +351,6 @@ export const STATUS_FILTERS = [
   'Under review',
   'Planning',
   'Confirmed',
-];
-
-export const VENUES: Venue[] = [
-  {
-    name: 'Atrium Hall',
-    capacity: 320,
-    meta: 'Capacity 320 · Theatre / standing · Level 1',
-    tags: ['Step-free', 'Hearing loop', 'Stage', 'Catering kitchen'],
-    fit: 'Suitable — capacity and accessibility match E-201',
-    suitability: 1,
-  },
-  {
-    name: 'The Kelp Room',
-    capacity: 120,
-    meta: 'Capacity 120 · Banquet / cabaret · Level 2',
-    tags: ['Step-free', 'Dimmable', 'Catering kitchen'],
-    fit: 'Too small — 180 expected exceeds capacity 120',
-    suitability: 0,
-  },
-  {
-    name: 'Deepwater Auditorium',
-    capacity: 500,
-    meta: 'Capacity 500 · Tiered theatre · Basement',
-    tags: ['Step-free', 'Hearing loop', 'Recording rig'],
-    fit: 'Suitable — no hold on 12 Oct',
-    suitability: 1,
-  },
-  {
-    name: 'Harbour Terrace',
-    capacity: 200,
-    meta: 'Capacity 200 · Outdoor standing · Roof',
-    tags: ['Covered area', 'Bar'],
-    fit: 'Check — outdoor, no hearing loop',
-    suitability: 2,
-  },
-];
-
-export const VENUE_FILTERS = [
-  { label: 'Date', value: '12 Oct 2026' },
-  { label: 'Time', value: '10:00 – 17:00' },
-  { label: 'Min capacity', value: '180' },
-  { label: 'Accessibility', value: 'Step-free + loop' },
-  { label: 'Layout', value: 'Theatre' },
 ];
 
 export const EQUIPMENT: EquipmentRequest[] = [

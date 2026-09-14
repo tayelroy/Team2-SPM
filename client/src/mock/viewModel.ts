@@ -6,14 +6,13 @@
  */
 
 import { color } from '../theme';
-import { ACTIONS, EVENTS, NAV, VENUES, EQUIPMENT, PRIMARY_ACTION } from './data';
+import { ACTIONS, EVENTS, NAV, EQUIPMENT, PRIMARY_ACTION } from './data';
 import type {
   EquipmentRequest,
   EventCard,
   EventRecord,
   Role,
   Screen,
-  Venue,
 } from './types';
 
 export interface BadgeStyle {
@@ -242,20 +241,6 @@ export const CALENDAR_LEGEND = [
   { label: 'Confirmed', bg: color.teal, bd: color.teal },
   { label: 'Blocked', bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)' },
 ];
-
-export interface VenueView extends Venue {
-  dot: string;
-  fitFg: string;
-}
-
-export function venueViews(): VenueView[] {
-  return VENUES.map((v) => ({
-    ...v,
-    dot:
-      v.suitability === 1 ? color.teal : v.suitability === 0 ? color.accent : color.slate,
-    fitFg: v.suitability === 0 ? color.mist : color.silver,
-  }));
-}
 
 export interface EquipmentView extends EquipmentRequest {
   availFg: string;

@@ -187,6 +187,26 @@ Send the current bearer token on the business request as well. The backend
 checks permissions again, so pages must handle a denial even when a control was
 visible. The helpers do not manage login, token refresh, or token revocation.
 
+## Logout
+
+The top-right Profile button opens Logout. The app immediately removes the
+stored session and unmounts protected screens, then awaits `POST /api/auth/logout`
+with a ten-second deadline. It stays signed out locally on a network failure,
+timeout or server rejection, but explains that server sign-out was not confirmed.
+The endpoint returns 503 if its client is unavailable or the SDK returns/throws
+an error; it no longer reports successful revocation in those cases.
+
+The server calls `auth.admin.signOut(bearerToken, 'local')`, revoking only the
+current session. Body-supplied tokens and user IDs are ignored. Other devices
+remain signed in. Protected ConnectSphere endpoints continue to call `getUser()`
+on every request and reject a session that Auth reports as revoked. See the
+[Supabase session-validation guidance](https://supabase.com/docs/guides/auth/server-side/advanced-guide).
+
+Revocation prevents session refresh; an already-issued JWT can still be valid
+until expiry for services using only JWT verification, including direct database
+access. This change does not add a database revocation policy or change shared
+Supabase settings. See [Supabase sign-out semantics](https://supabase.com/docs/guides/auth/signout).
+
 ## Database access
 
 RLS lets authenticated users read only their own `account_roles` row. Table

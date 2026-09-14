@@ -113,9 +113,13 @@ uploads the combined **application-coverage** artifact. Reports are retained for
 cancelled. Missing coverage summaries fail the summary step.
 
 The [Google Sheet test register](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-separates backend, frontend, and database/CI scenarios, with an index of all 230
+separates backend, frontend, and database/CI scenarios, with an index of all 343
 automated tests. Spreadsheet results are dated execution records; CI does not
 automatically overwrite them after a PR run.
+
+The [14 September hosted verification](testing.md#hosted-verification-of-the-eight-pending-cases)
+records the SQL, successful PR checks, overlapping merge runs, controlled
+regression failure, artifact retention, recovery and unmerged-close behavior.
 
 ## Required checks
 
@@ -133,8 +137,43 @@ the test and confirm the check passes.
 Committing this workflow does not configure repository rules. The workflow must
 be pushed and merged to take effect; branch protection is a separate repository
 setting. Post-merge failures flag a regression but cannot undo a merge. Vercel's
-deployment integration is configured separately; this workflow does not add a
-deployment dependency or automatically roll back a release.
+GitHub integration is separate; its repository build command now runs the
+application regression gate described below. Neither gate automatically rolls
+back an existing release.
 
 See the [project README](../README.md) for environment configuration and deployment,
 and the [authorisation guide](authorization.md) for database policy tests.
+
+
+## Profile/logout regression and Vercel gate — 14 September 2026
+
+The focused `npm run test:regression:sg2-42` command includes the server logout
+and authorization suites as well as venue adapters/routes, catalogue and App
+navigation. The existing CI globs already discover them; no duplicate job was
+added. All four per-file coverage thresholds remain 100% with no new exclusions.
+
+`server/vercel.json` now runs this command from Vercel's existing server root:
+
+```sh
+NODE_ENV=test SUPABASE_URL= SUPABASE_ANON_KEY= SUPABASE_SERVICE_ROLE_KEY= npm run ci --prefix ..
+```
+
+It builds the application, runs backend/frontend coverage and reviewer tests,
+and exits unsuccessfully if any stage fails. The empty environment values apply
+only to that build command; deployed runtime settings are unchanged. The server
+build already builds/copies the client, so the duplicate root client build was
+removed. Database policy tests remain in GitHub's isolated PostgreSQL job;
+Vercel does not run Docker or touch hosted Supabase.
+
+Validation of the exact Vercel command on Node 22 rejected a deliberate SDK-error
+handling regression (exit 1), then passed after source restoration (exit 0):
+179 backend + 152 frontend + 19 reviewer tests, all application source coverage
+at 100%. The focused regression command passed 78 backend + 65 frontend tests.
+Executing the actual aggregate script from `ci.yml` accepted all-success and
+rejected all 12 single-dependency failure/cancelled/skipped combinations.
+
+The latest inspected [PR #19 hosted run](https://github.com/tayelroy/Team2-SPM/actions/runs/34858630653)
+passed all six jobs for `9c00a9081909`. It predates these uncommitted changes;
+the new revision's hosted CI and Vercel deployment must still run after push.
+Current branch-protection settings could not be reread through the connector
+(403); earlier hosted required-check evidence is recorded in [testing.md](testing.md).
