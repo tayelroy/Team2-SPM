@@ -34,7 +34,7 @@ export function createVenuesRouter(
         res.status(operation === 'update' ? 404 : 503).json({ error: operation === 'update' ? 'Venue not found or no longer editable.' : 'Venue could not be saved.' });
         return;
       }
-      res.status(operation === 'create' ? 201 : 200).json({ venue });
+      res.status(operation === 'create' ? 202 : 200).json({ venue });
     } catch (error) {
       const failure = error instanceof AccessError ? error : new AccessError(503);
       res.status(failure.status).json({ error: failure.message });
