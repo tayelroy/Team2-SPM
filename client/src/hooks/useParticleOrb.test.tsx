@@ -115,7 +115,7 @@ test('renders without a spacer or a reported device scale', () => {
   expect(ctx.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
 });
 
-test('pointer interaction keeps frames rendering without errors', () => {
+test('the pointer pushes particles and a press pulls them back', () => {
   const { getByTestId } = render(<Harness />);
   const hero = getByTestId('hero');
   tick();

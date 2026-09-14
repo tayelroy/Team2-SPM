@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
-import { ROLES } from '../mock/types';
 import type { Role, Screen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
@@ -101,21 +100,20 @@ function NotificationDrawer({ onClose }: { onClose: () => void }) {
 /**
  * Chrome shared by every signed-in screen: the sticky header with role-scoped
  * navigation, the page heading block, and the notification drawer. The role
- * select is the prototype's shortcut for re-entering as someone else without
- * signing out.
+ * is a real, server-assigned attribute of the signed-in account — displayed
+ * here, not switchable (only Technical Support Staff can change a role, and
+ * only for someone else's account; see SG2-24).
  */
 export default function AppShell({
   role,
   screen,
   onNavigate,
-  onChangeRole,
   onSignOut,
   children,
 }: {
   role: Role;
   screen: Exclude<Screen, 'landing' | 'login'>;
   onNavigate: (screen: Screen) => void;
-  onChangeRole: (role: Role) => void;
   onSignOut: () => void;
   children: ReactNode;
 }) {
@@ -247,10 +245,8 @@ export default function AppShell({
               </span>
             </button>
 
-            <select
-              value={role}
-              onChange={(e) => onChangeRole(e.target.value as Role)}
-              aria-label="Switch role"
+            <span
+              aria-label="Your role"
               style={{
                 background: color.kelp,
                 border: rule.control,
@@ -259,15 +255,10 @@ export default function AppShell({
                 fontSize: '12px',
                 letterSpacing: '0.06em',
                 padding: '8px 10px',
-                outline: 'none',
               }}
             >
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              {role}
+            </span>
           </div>
         </div>
       </header>

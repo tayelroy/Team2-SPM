@@ -24,7 +24,7 @@ afterEach(() => {
 
 function guardedApp(access: ReturnType<typeof createAuthorization>) {
   let calls = 0;
-  const app = createApp(undefined, undefined, access);
+  const app = createApp(undefined, access);
   const router = access.protectedRouter();
   router.post('/edit', access.requirePermission('fixture.edit'), (req, res) => {
     calls++;
@@ -45,15 +45,15 @@ function fixture(principal: Principal = { userId, role: 'event_organiser' }) {
   }));
 }
 
-test('registration stays public alongside authenticated identity routes', async () => {
+test('login stays public alongside authenticated identity routes', async () => {
   let resolutions = 0;
   const access = createAuthorization({ resolvePrincipal: async () => {
     resolutions++;
     return { userId, role: 'attendee' };
   } });
-  const app = createApp(undefined, (_req, res) => { res.sendStatus(201); }, access);
+  const app = createApp(undefined, access, undefined, (_req, res) => { res.sendStatus(201); });
 
-  assert.equal((await request(app).post('/api/auth/register')).status, 201);
+  assert.equal((await request(app).post('/api/auth/login')).status, 201);
   assert.equal(resolutions, 0);
   assert.equal((await request(app).get('/api/auth/me')).status, 401);
   const identity = await request(app).get('/api/auth/me').set('Authorization', 'Bearer token');
@@ -119,7 +119,7 @@ for (const principal of [{ userId, role: 'admin' }, { userId: '', role: 'attende
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET_SENTINEL'), 'SECRET_SENTINEL']) {
   test(`resolver failure returns generic JSON: ${String(error)}`, async () => {
     const access = createAuthorization({ resolvePrincipal: async () => { throw error; } });
-    const res = await request(createApp(undefined, undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
+    const res = await request(createApp(undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
     assert.equal(res.status, error instanceof AccessError ? error.status : 503);
     assert.doesNotMatch(res.text, /SENTINEL|stack/);
   });
@@ -137,7 +137,7 @@ test('server policy is snapshotted, not mutable through its input arrays', async
   const roles: Principal['role'][] = ['attendee'];
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId, role: 'attendee' }), permissions: { read: roles } });
   roles.pop();
-  const res = await request(createApp(undefined, undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
+  const res = await request(createApp(undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
   assert.deepEqual(res.body.permissions, ['read']);
 });
 
@@ -225,7 +225,7 @@ test('removing a role grant blocks the next action with the same access token', 
 });
 
 for (const role of ROLES) {
-  test(`default policy denies the unmapped fixture action to ${role}`, async () => {
+  test(`default policy grants no action to ${role}`, async () => {
     const { app, calls } = guardedApp(createAuthorization({
       resolvePrincipal: async () => ({ userId, role })
     }));
@@ -271,7 +271,7 @@ for (const config of [
   { supabaseUrl: undefined }, { supabaseAnonKey: undefined },
   { supabaseUrl: 'http://auth-test.supabase.co' }, { supabaseUrl: 'not-a-url' }
 ]) {
-  test(`configuration fails closed without a privileged fallback: ${Object.entries(config).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`, async () => {
+  test(`configuration fails closed without a privileged fallback: ${JSON.stringify(config)}`, async () => {
     Object.assign(dbConfig, config);
     const fetchMock = provider();
     assert.equal((await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token')).status, 503);
