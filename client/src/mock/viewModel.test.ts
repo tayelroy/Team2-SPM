@@ -58,7 +58,7 @@ describe('scopedEvents', () => {
     expect(scopedEvents('Attendee').every((e) => e.status === 'Confirmed')).toBe(true);
   });
 
-  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support'] as Role[])(
+  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff'] as Role[])(
     '%s sees every event',
     (role) => {
       expect(scopedEvents(role)).toHaveLength(EVENTS.length);
@@ -124,7 +124,7 @@ describe('role-scoped chrome', () => {
   test('only the operational roles see the pipeline', () => {
     expect(showsPipeline('Event Coordinator')).toBe(true);
     expect(showsPipeline('Venue Staff')).toBe(true);
-    expect(showsPipeline('Technical Support')).toBe(true);
+    expect(showsPipeline('Technical Support Staff')).toBe(true);
     expect(showsPipeline('Event Organiser')).toBe(false);
     expect(showsPipeline('Attendee')).toBe(false);
   });

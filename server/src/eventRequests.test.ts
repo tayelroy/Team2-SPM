@@ -245,7 +245,6 @@ describe('POST /api/event-requests authorisation wiring', () => {
   const appForRole = (role: Role) =>
     createApp(
       undefined,
-      undefined,
       createAuthorization({ resolvePrincipal: async () => ({ userId, role }) }),
       (_req, res) => { res.status(201).json({ reached: true }); }
     );

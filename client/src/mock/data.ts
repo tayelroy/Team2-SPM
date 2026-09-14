@@ -111,7 +111,7 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['calendar', 'Availability'],
     ['venues', 'Catalogue'],
   ],
-  'Technical Support': [
+  'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['equipment', 'Equipment requests'],
     ['calendar', 'Schedule'],
@@ -144,7 +144,7 @@ export const HEAD: Record<
     blurb:
       'Booking requests awaiting a decision, with overlaps flagged before you approve.',
   },
-  'Technical Support': {
+  'Technical Support Staff': {
     eyebrow: 'Technical Support · AV',
     title: 'Equipment desk',
     blurb:
@@ -207,7 +207,7 @@ export const STATS: Record<Role, Stat[]> = {
     { value: '6', label: 'Venues live' },
     { value: '9', label: 'Confirmed this month' },
   ],
-  'Technical Support': [
+  'Technical Support Staff': [
     { value: '5', label: 'Equipment requests' },
     { value: '1', label: 'Shortfall' },
     { value: '12', label: 'Items reserved' },
@@ -288,7 +288,7 @@ export const ACTIONS: Record<Role, ActionItem[]> = {
       screen: 'calendar',
     },
   ],
-  'Technical Support': [
+  'Technical Support Staff': [
     {
       title: 'Projector shortfall — E-201',
       body: '2 requested, only 1 free in the 12 Oct window.',
@@ -334,7 +334,7 @@ export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
   'Event Organiser': { label: 'New event request', screen: 'form' },
   'Event Coordinator': { label: 'Search venues', screen: 'venues' },
   'Venue Staff': { label: 'Open availability', screen: 'calendar' },
-  'Technical Support': { label: 'Check availability', screen: 'equipment' },
+  'Technical Support Staff': { label: 'Check availability', screen: 'equipment' },
   Attendee: { label: 'Browse events', screen: 'attendee' },
 };
 

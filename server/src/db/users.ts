@@ -4,11 +4,20 @@ export interface NewUserRecord {
   userId: string;
   name: string;
   organisation: string;
+  roleName: string;
 }
 
 export type CreateUserRecordResult = { ok: true } | { ok: false; error: string };
 
-const DEFAULT_ROLE_NAME = 'Attendee';
+export const VALID_ROLE_NAMES = [
+  'Event Organiser',
+  'Event Coordinator',
+  'Venue Staff',
+  'Technical Support Staff',
+  'Attendee'
+] as const;
+
+export type RoleName = (typeof VALID_ROLE_NAMES)[number];
 
 async function getRoleId(admin: SupabaseClient, roleName: string): Promise<number | null> {
   const { data, error } = await admin
@@ -26,16 +35,16 @@ async function getRoleId(admin: SupabaseClient, roleName: string): Promise<numbe
 /**
  * Creates the public.users row backing a newly created Auth account.
  * public.users.role_id is NOT NULL, so every account needs a role at
- * creation time; new accounts default to Attendee since only Technical
- * Support Staff may assign or change a role afterward (SG2-24).
+ * creation time; the caller (registration) is responsible for choosing
+ * and validating that role.
  */
 export async function createUserRecord(
   admin: SupabaseClient,
   record: NewUserRecord
 ): Promise<CreateUserRecordResult> {
-  const roleId = await getRoleId(admin, DEFAULT_ROLE_NAME);
+  const roleId = await getRoleId(admin, record.roleName);
   if (roleId === null) {
-    return { ok: false, error: `Default role "${DEFAULT_ROLE_NAME}" is not configured.` };
+    return { ok: false, error: `Role "${record.roleName}" is not configured.` };
   }
 
   const { error } = await admin.from('users').insert({
