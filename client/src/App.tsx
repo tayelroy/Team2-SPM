@@ -106,7 +106,7 @@ export default function App() {
     events: <EventsTable role={role} onOpenEvent={() => setScreen('detail')} />,
     detail: <EventDetail role={role} onNavigate={setScreen} />,
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
-    venues: <Venues onBook={() => setScreen('booking')} />,
+    venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,

@@ -11,6 +11,7 @@
     "dev": "concurrently -n \"server,client\" -c \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix server && npm run build --prefix client",
     "test": "npm run test --workspace server && npm run test --workspace client && npm run test:reviewer",
+    "test:regression:sg2-42": "npm exec --workspace server -- tsx --test src/venues.test.ts src/db/venues.test.ts && npm exec --workspace client -- vitest run src/venues/Venues.test.tsx src/App.test.tsx",
     "ci": "npm run build && npm run test:coverage",
     "test:reviewer": "node --test .github/scripts/security-review.test.mjs",
     "test:coverage": "npm run test:coverage --workspace server && npm run test:coverage --workspace client && npm run test:reviewer"

@@ -23,17 +23,19 @@ beforeAll(() => {
 });
 
 function mockLoginResponse(role: Role) {
+  const permissions = role === 'Venue Staff' ? ['venues.read', 'venues.create', 'venues.update']
+    : role === 'Event Coordinator' ? ['venues.read'] : [];
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          accessToken: 'test-access-token',
-          user: { userId: 'user-1', email: 'test@example.com', role }
-        }),
-        { status: 200 }
-      )
-    )
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
+      if (url === '/api/venues') {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
+        return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
+          facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
+      }
+      return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role } });
+    })
   );
 }
 
@@ -315,8 +317,17 @@ describe('the request form', () => {
 test('requesting a venue opens the booking approval screen', async () => {
   await signInAs('Event Coordinator');
   fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Request Atrium Hall' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Request Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
+});
+
+test('signed-in Venue Staff navigate to the catalogue and open an editor populated from the API', async () => {
+  await signInAs('Venue Staff');
+  fireEvent.click(within(header()).getByRole('button', { name: 'Catalogue' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Atrium Hall' }));
+  expect(screen.getByLabelText('Venue name')).toHaveValue('Atrium Hall');
+  expect(screen.getByLabelText('Capacity')).toHaveValue(100);
+  expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
 });
 
 test('reserving equipment settles the row', async () => {

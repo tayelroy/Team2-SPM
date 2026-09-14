@@ -70,10 +70,22 @@ dependency combinations. Hosted workflow execution remains to be verified.
 ## Google Sheet register
 
 The [SPM Test Cases workbook](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-contains 14 backend scenarios, 14 frontend scenarios, 9 database/CI scenarios,
-and an index of all 230 executed automated tests. The five SG2-25 identifiers
-are retained. Frontend permission-helper tests link to the same SG2-25 cases
-instead of duplicating that feature's specifications.
+was reconciled on 14 September 2026 against the SG2-42 working tree at base
+`817881abbb1c`. It now contains 13 backend scenarios, 14 frontend scenarios,
+9 database/CI scenarios, and 343 current executed automated tests (183 backend,
+141 frontend, 19 reviewer). The earlier numbers in this document describe the
+9 September audit, not the current register.
+
+Reconciliation removed 13 obsolete scenario records and 56 removed/replaced
+automation entries, updated 15 reviewed test renames, and added 70 current tests
+missing from the old inventory. The five SG2-25 and five SG2-42 case IDs remain,
+with evidence narrowed to tests present on this branch. Removed registration,
+browser-fixture, venue-RLS and browser-CI tests are no longer presented as current
+Pass results. Current supporting helper tests remain listed without claiming a
+removed registration workflow exists.
+
+The [pre-reconciliation backup](https://docs.google.com/spreadsheets/d/1LQPKwlgd5Xzd0C6EL_bTYFpChQVhvxllAFCTuMxxa_M/edit)
+preserves the previous workbook and its historical execution records.
 
 The course template fields are preserved. Specification and execution sections
 use different colours; explicit status labels distinguish Pass from Not
