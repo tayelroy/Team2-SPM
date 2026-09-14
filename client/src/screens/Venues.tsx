@@ -32,9 +32,15 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
     setVenues([]);
     async function load() {
       try {
-        const identity = await loadAccess(token, controller.signal);
-        if (!can(identity, 'venues.read')) throw new VenueError(403);
-        const data = await venueRequest(token!, controller.signal);
+        // Both endpoints enforce authorization independently. Start them together,
+        // but expose neither records nor controls until both checks succeed.
+        const [identity, data] = await Promise.all([
+          loadAccess(token, controller.signal).then(identity => {
+            if (!can(identity, 'venues.read')) throw new VenueError(403);
+            return identity;
+          }),
+          venueRequest(token!, controller.signal),
+        ]);
         if (controller.signal.aborted) return;
         setAccess(identity);
         setVenues(data.venues);

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import App from './App';
 import { NOTIFICATIONS } from './mock/data';
@@ -147,35 +147,108 @@ test('a persisted session resumes straight into the app on the next visit', asyn
   expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
 });
 
-test('a session that no longer validates is cleared and returns to landing', async () => {
+test.each([401, 403])('a %s validation denial clears the session and returns to landing', async (status) => {
   await signInAs('Venue Staff');
   cleanup();
 
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
   render(<App />);
   expect(await screen.findByRole('button', { name: 'Open app' })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
 });
 
-test('a network hiccup during background validation keeps the session, not just a 401', async () => {
+test.each([500, 503, 'offline'] as const)('a %s validation failure preserves the session after the check finishes', async (failure) => {
   await signInAs('Venue Staff');
   cleanup();
+  const saved = sessionStorage.getItem('connectsphere.session');
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (failure === 'offline') throw new Error('network down');
+    return new Response(null, { status: failure });
+  }));
+  await act(async () => { render(<App />); });
+  expect(screen.getByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).toBe(saved);
+});
 
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+test.each([
+  ['Venue Staff', 'Catalogue', 'Venue desk'],
+  ['Attendee', 'My registrations', 'Event page'],
+] as const)('the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
+  await signInAs(role);
+  fireEvent.click(within(header()).getByRole('button', { name: destination }));
+  const saved = sessionStorage.getItem('connectsphere.session');
+  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
+  expect(screen.getByRole('heading', { level: 1, name: home })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).toBe(saved);
+  expect(fetch).not.toHaveBeenCalledWith('/api/auth/logout', expect.anything());
+  cleanup();
+  await act(async () => { render(<App />); });
+  expect(screen.getByRole('heading', { level: 1, name: home })).toBeInTheDocument();
+});
+
+test('the profile options open, toggle and dismiss with Escape, outside clicks or focus', async () => {
+  await signInAs('Event Coordinator');
+  const profile = screen.getByRole('button', { name: 'Profile' });
+  expect(profile).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  fireEvent.click(profile);
+  expect(profile).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.pointerDown(screen.getByRole('group', { name: 'Profile options' }));
+  const logout = screen.getByRole('button', { name: 'Logout' });
+  act(() => logout.focus());
+  expect(logout).toHaveFocus();
+  fireEvent.keyDown(logout, { key: 'Tab' });
+  expect(logout).toBeInTheDocument();
+  fireEvent.keyDown(logout, { key: 'Escape' });
+  expect(profile).toHaveFocus();
+  expect(profile).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(profile);
+  fireEvent.click(profile);
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  fireEvent.click(profile);
+  fireEvent.pointerDown(screen.getByRole('main'));
+  expect(profile).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(profile);
+  act(() => screen.getByRole('button', { name: 'Dashboard' }).focus());
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).not.toBeNull();
+  expect(fetch).not.toHaveBeenCalledWith('/api/auth/logout', expect.anything());
+});
+
+test('profile Logout immediately removes local access and waits for server confirmation', async () => {
+  await signInAs('Event Coordinator');
+  let complete!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+  expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
+  expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Signing out');
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/auth/logout', {
+    method: 'POST', headers: { Authorization: 'Bearer test-access-token' },
+    keepalive: true, signal: expect.any(AbortSignal),
+  });
+  await act(async () => { complete(new Response(null, { status: 200 })); });
+  expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
+  cleanup();
   render(<App />);
-  expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
-});
-
-test('the wordmark signs out back to the landing page', async () => {
-  await signInAs('Event Coordinator');
-  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
-test('signing out still completes even if the logout request fails', async () => {
+test.each(['offline', 'server failure'])('Logout clears local access and reports unconfirmed revocation on %s', async failure => {
   await signInAs('Event Coordinator');
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
-  expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (failure === 'server failure') return new Response(null, { status: 503 });
+    throw new Error('network down');
+  }));
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+  expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not confirm server sign-out');
+  expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
+  expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
 test('the notification drawer opens and closes', async () => {

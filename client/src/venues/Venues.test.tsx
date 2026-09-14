@@ -130,11 +130,45 @@ test('cancel discards an unsaved form and the empty state explains there are no 
   expect(screen.getByLabelText('Venue name')).toHaveValue('');
 });
 
-test('unauthorized roles cannot reach the venue API', async () => {
+test('unauthorized roles never see returned venue data or write controls', async () => {
   const fetch = api({ userId: 'attendee', role: 'attendee', permissions: [] });
   render(<Venues accessToken="test-token" onBook={vi.fn()} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('permission');
-  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
+});
+
+test.each(['permissions', 'catalogue'] as const)('loads both requests concurrently and waits for %s when it is slower', async (slower) => {
+  const identity = deferred(); const catalogue = deferred();
+  const fetch = vi.fn((url: string) => url === '/api/auth/me' ? identity.promise : catalogue.promise);
+  vi.stubGlobal('fetch', fetch);
+  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  // Neither response has arrived: both protected requests must already be in flight.
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/auth/me', '/api/venues']);
+  await act(async () => {
+    if (slower === 'permissions') catalogue.resolve(Response.json({ venues: [venue] }));
+    else identity.resolve(Response.json(staff));
+  });
+  expect(screen.getByRole('status')).toHaveTextContent('Loading venue catalogue');
+  expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
+  await act(async () => {
+    if (slower === 'permissions') identity.resolve(Response.json(staff));
+    else catalogue.resolve(Response.json({ venues: [venue] }));
+  });
+  expect(screen.getByRole('heading', { name: 'Atrium Hall' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Add venue' })).toBeInTheDocument();
+});
+
+test.each([401, 403])('a %s catalogue response hides data even when permissions allow reading', async (status) => {
+  const fetch = api();
+  fetch.mockResolvedValueOnce(Response.json(staff))
+    .mockResolvedValueOnce(Response.json({}, { status }));
+  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(status === 401 ? 'session has expired' : 'permission');
+  expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
 });
 
 test('network failure offers retry and recovers', async () => {

@@ -173,6 +173,47 @@ test('production adapter verifies Auth then reads the database role, ignoring me
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
 
+test('logout uses the SDK current-session scope; subsequent protected requests reject a revoked session', async () => {
+  // Only the external Auth/role service is simulated. Exercise the production
+  // logout route, SDK request, authorization adapter and venue write guard.
+  const active = new Set(['current-token', 'other-device-token']);
+  const revocations: string[] = [];
+  mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
+    const url = new URL(String(input));
+    assert.equal(url.origin, 'https://auth-test.supabase.co');
+    const headers = new Headers(init?.headers);
+    const token = headers.get('authorization')!.replace('Bearer ', '');
+    if (url.pathname === '/auth/v1/logout') {
+      assert.equal(init?.method, 'POST');
+      assert.equal(url.searchParams.get('scope'), 'local');
+      assert.equal(headers.get('apikey'), 'ADMIN_SECRET_SENTINEL');
+      active.delete(token);
+      revocations.push(token);
+      return new Response(null, { status: 204 });
+    }
+    assert.equal(headers.get('apikey'), 'sb_publishable_test');
+    if (url.pathname === '/auth/v1/user') {
+      return active.has(token)
+        ? Response.json({ id: userId, aud: 'authenticated' })
+        : Response.json({ code: 'session_not_found', msg: 'Session revoked' }, { status: 401 });
+    }
+    assert.equal(url.pathname, '/rest/v1/account_roles');
+    assert.ok(active.has(token));
+    return Response.json([{ role: 'venue_staff' }]);
+  });
+  const app = createApp();
+  assert.equal((await request(app).get('/api/auth/me').set('Authorization', 'Bearer current-token')).status, 200);
+  const logout = await request(app).post('/api/auth/logout').set('Authorization', 'Bearer current-token')
+    .send({ accessToken: 'other-device-token', refreshToken: 'another-session', userId: 'someone-else' });
+  assert.equal(logout.status, 200);
+  assert.equal(logout.headers['cache-control'], 'no-store');
+  assert.deepEqual(logout.body, { message: 'Signed out.' });
+  assert.deepEqual(revocations, ['current-token']);
+  assert.equal((await request(app).get('/api/auth/me').set('Authorization', 'Bearer current-token')).status, 401);
+  assert.equal((await request(app).post('/api/venues').set('Authorization', 'Bearer current-token').send({})).status, 401);
+  assert.equal((await request(app).get('/api/auth/me').set('Authorization', 'Bearer other-device-token')).status, 200);
+});
+
 for (const status of [400, 401, 403, 500]) {
   test(`Auth refuses invalid/expired credentials or fails closed on outage (${status})`, async () => {
     const fetchMock = provider({ authStatus: status });

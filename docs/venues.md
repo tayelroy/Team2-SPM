@@ -55,7 +55,7 @@ verify the application contract rather than live database configuration.
 ## Regression testing
 
 Run `npm run test:regression:sg2-42` with Node 22 for the venue router, database
-adapter, form/catalogue and application navigation tests. Run `npm run ci` before
+adapter, logout, authorization, form/catalogue and application navigation tests. Run `npm run ci` before
 merging to also build and check all application tests and coverage. The existing
 CI workflow already discovers these suites on PR creation, every PR update,
 merge queue runs and completed PR merges. There is no duplicate venue-only CI
@@ -71,6 +71,8 @@ on failures; this change does not configure GitHub branch protection.
 | Authorization | Every role on both write routes; anonymous requests denied; forged role/ID fields ignored; coordinator has no editor; changing staff role denies the same token's next write before storage | Router + production app/adapter integration + catalogue |
 | Save failure | 400/404/503 preserve all edits and allow retry; network failure leaves values and catalogue intact; 401/403 clear controls/data; missing row never reports success | Router + adapter + catalogue |
 | Request lifecycle | Duplicate submissions make one request; pending form disabled; leaving aborts load/save; late success/failure cannot restore stale data | Catalogue |
+| Catalogue loading | Permission and catalogue requests start together; either response may arrive first; neither records nor controls appear until both succeed; denied reads remain hidden | Catalogue |
+| Session navigation | Logo returns staff/attendee home and preserves the session across reload; explicit sign-out clears it; 401/403 invalidate it while 500/503/network failures preserve it | App |
 | Storage contract | Caller bearer token and public key; exact selected columns; update only specified ID; stable read order; timeout signal on attempts; failed writes are not retried; configuration cannot fall back to admin credentials | Adapter |
 | Existing data/navigation | Null legacy fields display and can be completed; login opens the catalogue/editor; coordinator's existing request navigation still works | Catalogue + App |
 
@@ -101,6 +103,45 @@ facilities from search; duplicating edited records; discarding failed edits;
 not aborting a load; and allowing duplicate saves. Source files were restored
 byte-for-byte after each run. This is a targeted fault check, not an exhaustive
 mutation score. No mutation framework or dependency was added to the project.
+
+### Session, profile and catalogue regression audit — 14 September 2026
+
+The logo opens the signed-in user's home screen. Logout is inside the top-right
+Profile options. Background validation clears the session only on 401/403;
+permissions and catalogue records load concurrently without caching permissions
+or changing database settings.
+
+`npm run test:regression:sg2-42` passes 78 backend and 65 frontend checks. It now
+includes the logout and authorization suites, alongside venue and App tests.
+The complete CI command passes **350 tests**: 179 backend, 152 frontend and 19
+reviewer, with 100% per-file statements, branches, functions and lines.
+Six overlapping logout tests were consolidated into route-level contracts using
+the real logout service, plus the existing production-app/SDK success workflow.
+Unused fallback/`any` scaffolding was removed from the logout test fixture.
+
+| Test design | Evidence |
+| --- | --- |
+| Positive | Logo/reload retain session; profile toggle and dismissal; Logout clears browser state immediately, waits for server confirmation, and stays signed out after reload |
+| Negative | SDK returned/thrown errors and missing client produce 503; HTTP/network failures never restore local access; body tokens cannot select another session |
+| Loading order | Either catalogue response may arrive first without exposing data early |
+| Authorization | SDK receives current-session scope; simulated Auth revocation blocks the same token's subsequent read/write while another device remains signed in |
+
+Five retained fault checks caused assertion failures: global logout scope,
+ignoring SDK errors, retaining local session storage, ignoring logout HTTP errors,
+and closing the profile on inside clicks.
+Every source was restored byte-for-byte. This is targeted fault testing, not an
+exhaustive mutation score or evidence of live Supabase revocation.
+
+Browser checks used the built client and loopback fixtures: login, catalogue,
+logo, reload, profile dropdown, keyboard dismissal, Logout and reload passed.
+Controlled 2/3-second permission/catalogue delays started 2 ms apart and completed
+in about 3 seconds overall; this is not a measurement of hosted latency.
+No application console errors were observed. Shared Supabase was not accessed.
+
+The root build now builds the client once through the server build. Vercel's
+build command reuses `npm run ci` with blank Supabase credentials. Running that
+exact command locally rejected a deliberate revocation regression (exit 1), then
+passed after restoration (exit 0). See [CI and deployment gates](ci.md).
 
 ### Course test register
 
