@@ -113,9 +113,13 @@ uploads the combined **application-coverage** artifact. Reports are retained for
 cancelled. Missing coverage summaries fail the summary step.
 
 The [Google Sheet test register](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-separates backend, frontend, and database/CI scenarios, with an index of all 230
+separates backend, frontend, and database/CI scenarios, with an index of all 343
 automated tests. Spreadsheet results are dated execution records; CI does not
 automatically overwrite them after a PR run.
+
+The [14 September hosted verification](testing.md#hosted-verification-of-the-eight-pending-cases)
+records the SQL, successful PR checks, overlapping merge runs, controlled
+regression failure, artifact retention, recovery and unmerged-close behavior.
 
 ## Required checks
 
