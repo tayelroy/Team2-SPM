@@ -371,12 +371,30 @@ describe('the request form', () => {
     expect(unselected).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('saving a draft confirms it was kept', async () => {
+  test('saving a draft creates it and reports what is still outstanding', async () => {
     await openForm();
     expect(screen.getByText('You can save and finish this later.')).toBeInTheDocument();
+
+    // Save draft now calls POST /api/event-requests (SG2-28) rather than just
+    // flipping local state, so the response drives the confirmation copy.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            request: { event_id: 7, status: 'draft' },
+            missingForSubmission: ['name', 'purpose'],
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(
-      screen.getByText('Draft saved — you can come back to it any time.'),
+      await screen.findByText(
+        'Draft 7 saved. Still needed to submit: Event name, Purpose.',
+      ),
     ).toBeInTheDocument();
   });
 
