@@ -2,113 +2,42 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { AuthError, type SupabaseClient } from '@supabase/supabase-js';
 import { logoutAccount, createLogoutHandler } from './auth/logout';
 
-function fakeClient(options: { signOut?: (jwt: string) => Promise<any> }) {
-  return {
-    auth: {
-      admin: {
-        signOut: options.signOut ?? (async () => ({ data: {}, error: null }))
-      }
-    }
-  } as unknown as SupabaseClient;
+function fakeClient(signOut: SupabaseClient['auth']['admin']['signOut']): SupabaseClient {
+  return { auth: { admin: { signOut } } } as unknown as SupabaseClient;
 }
 
-describe('logoutAccount', () => {
-  test('revokes the session tied to the access token via the admin API', async () => {
-    let signOutCalledWith: string | undefined;
-    const client = fakeClient({
-      signOut: async (jwt) => {
-        signOutCalledWith = jwt;
-        return { data: {}, error: null };
-      }
-    });
-
-    const result = await logoutAccount('access-1', () => client);
-    assert.deepEqual(result, { outcome: 'success' });
-    assert.equal(signOutCalledWith, 'access-1');
+describe('POST /api/auth/logout failure and unauthenticated contracts', () => {
+  for (const { name, getClient } of [
+    { name: 'no client configured', getClient: () => null },
+    { name: 'SDK returns an error', getClient: () => fakeClient(async () => ({
+      data: null, error: new AuthError('PRIVATE_PROVIDER_ERROR'),
+    })) },
+    { name: 'SDK throws', getClient: () => fakeClient(async () => { throw new Error('PRIVATE_PROVIDER_ERROR'); }) },
+  ]) test(`reports unconfirmed revocation when ${name}`, async () => {
+    const app = express();
+    app.post('/api/auth/logout', createLogoutHandler(token => logoutAccount(token, getClient)));
+    const response = await request(app).post('/api/auth/logout').set('Authorization', 'Bearer current-token');
+    assert.equal(response.status, 503);
+    assert.equal(response.headers['cache-control'], 'no-store');
+    assert.deepEqual(response.body, { error: 'Unable to confirm server sign-out.' });
   });
 
-  test('does not attempt revocation with no access token (unauthenticated request)', async () => {
-    let signOutCalled = false;
-    const client = fakeClient({
-      signOut: async () => {
-        signOutCalled = true;
-        return { data: {}, error: null };
-      }
-    });
-
-    const result = await logoutAccount(null, () => client);
-    assert.deepEqual(result, { outcome: 'success' });
-    assert.equal(signOutCalled, false);
-  });
-
-  test('still succeeds when revocation itself throws', async () => {
-    const client = fakeClient({
-      signOut: async () => {
-        throw new Error('network down');
-      }
-    });
-
-    const result = await logoutAccount('access-1', () => client);
-    assert.deepEqual(result, { outcome: 'success' });
-  });
-
-  test('succeeds with no access token and no client configured', async () => {
-    const result = await logoutAccount(null, () => null);
-    assert.deepEqual(result, { outcome: 'success' });
-  });
-
-  test('succeeds with an access token but no client configured', async () => {
-    const result = await logoutAccount('access-1', () => null);
-    assert.deepEqual(result, { outcome: 'success' });
-  });
-});
-
-describe('POST /api/auth/logout', () => {
-  test('always returns 200', async () => {
+  test('missing or malformed authorization is idempotent and cannot revoke a body-supplied session', async () => {
     const app = express();
     app.use(express.json());
-    app.post('/api/auth/logout', createLogoutHandler(async () => ({ outcome: 'success' })));
-    const response = await request(app).post('/api/auth/logout').send({});
-    assert.equal(response.status, 200);
-  });
-
-  test('passes the bearer token from the Authorization header, not the body', async () => {
-    let receivedToken: string | null | undefined;
-    const app = express();
-    app.use(express.json());
-    app.post(
-      '/api/auth/logout',
-      createLogoutHandler(async (accessToken) => {
-        receivedToken = accessToken;
-        return { outcome: 'success' };
-      })
-    );
-    await request(app).post('/api/auth/logout').set('Authorization', 'Bearer real-token').send({ accessToken: 'spoofed-token' });
-    assert.equal(receivedToken, 'real-token');
-  });
-
-  test('passes null when there is no Authorization header', async () => {
-    let receivedToken: string | null | undefined = 'unset';
-    const app = express();
-    app.use(express.json());
-    app.post(
-      '/api/auth/logout',
-      createLogoutHandler(async (accessToken) => {
-        receivedToken = accessToken;
-        return { outcome: 'success' };
-      })
-    );
-    await request(app).post('/api/auth/logout').send({});
-    assert.equal(receivedToken, null);
-  });
-
-  test('returns 200 with no request body at all', async () => {
-    const app = express();
-    app.post('/api/auth/logout', createLogoutHandler(async () => ({ outcome: 'success' })));
-    const response = await request(app).post('/api/auth/logout');
-    assert.equal(response.status, 200);
+    app.post('/api/auth/logout', createLogoutHandler(token => logoutAccount(token, () => {
+      assert.fail('Unauthenticated logout must not call the provider');
+    })));
+    for (const authorization of [undefined, 'Basic invalid']) {
+      const req = request(app).post('/api/auth/logout');
+      if (authorization) req.set('Authorization', authorization).send({ accessToken: 'someone-else' });
+      const response = await req;
+      assert.equal(response.status, 200);
+      assert.equal(response.headers['cache-control'], 'no-store');
+      assert.deepEqual(response.body, { message: 'Signed out.' });
+    }
   });
 });

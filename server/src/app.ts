@@ -7,6 +7,7 @@ import { createUpdateRoleHandler } from './auth/roles';
 import { authorization } from './auth';
 import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
+import { createVenuesRouter } from './venues';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -48,6 +49,8 @@ export function createApp(
   const eventRequests = access.protectedRouter();
   eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
   app.use('/api/event-requests', eventRequests);
+
+  app.use('/api/venues', createVenuesRouter(access));
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {

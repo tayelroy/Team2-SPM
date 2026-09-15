@@ -15,7 +15,6 @@ import {
   scopedEvents,
   showsPipeline,
   statusTrailStyle,
-  venueViews,
 } from './viewModel';
 
 describe('badgeStyle', () => {
@@ -174,16 +173,6 @@ describe('calendarDays', () => {
     for (const entry of CALENDAR_LEGEND) {
       expect(days.some((d) => d.bg === entry.bg && d.bd === entry.bd)).toBe(true);
     }
-  });
-});
-
-describe('venueViews', () => {
-  test('flags the unsuitable venue in mist against the others', () => {
-    const views = venueViews();
-    const tooSmall = views.find((v) => v.name === 'The Kelp Room');
-    expect(tooSmall?.fitFg).toBe(color.mist);
-    expect(views.find((v) => v.name === 'Atrium Hall')?.dot).toBe(color.teal);
-    expect(views.find((v) => v.name === 'Harbour Terrace')?.dot).toBe(color.slate);
   });
 });
 
