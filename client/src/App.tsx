@@ -13,6 +13,7 @@ import EventDetail from './screens/EventDetail';
 import EventsTable from './screens/EventsTable';
 import Landing from './screens/Landing';
 import Login from './screens/Login';
+import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
 import Venues from './screens/Venues';
 import { GhostButton } from './ui';
@@ -130,7 +131,8 @@ export default function App() {
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,
-    change: <ChangeRequest />
+    change: <ChangeRequest />,
+    profile: <Profile />
   }[screen];
 
   return (

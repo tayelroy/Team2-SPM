@@ -168,6 +168,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   equipment: 'Equipment requests',
   attendee: 'Event page',
   change: 'Change request',
+  profile: 'My profile',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -185,6 +186,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   attendee: 'Confirmed event details, registration, and your current status.',
   change:
     'Ask for a change after submission — the coordinator sees the knock-on impact.',
+  profile: 'View and update your contact details and communication preferences.',
 };
 
 export const STATS: Record<Role, Stat[]> = {
