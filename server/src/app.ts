@@ -5,7 +5,7 @@ import { createLoginHandler, createLoginRateLimiter } from './auth/login';
 import { createLogoutHandler } from './auth/logout';
 import { createUpdateRoleHandler } from './auth/roles';
 import { authorization } from './auth';
-import { createVenuesRouter } from './venues/availability';
+import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
 
 export function createApp(
@@ -35,7 +35,7 @@ export function createApp(
   app.post('/api/auth/login', loginRateLimit, loginHandler);
   app.post('/api/auth/logout', logoutHandler);
   app.use('/api/auth', access.router);
-  app.use('/api/venues', createVenuesRouter(access));
+  app.use('/api/venues', createVenueAvailabilityRouter(access));
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

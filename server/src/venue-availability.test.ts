@@ -9,7 +9,7 @@ import { dbConfig } from './db/config';
 import {
   createAllVenuesAvailabilityHandler,
   createAvailabilityHandler,
-  createVenuesRouter,
+  createVenueAvailabilityRouter,
   getAllVenuesAvailability,
   getVenueAvailability
 } from './venues/availability';
@@ -405,7 +405,7 @@ test('all-venues handler passes a null client when the request carries no bearer
   assert.equal(madeClient, false);
 });
 
-// --- createVenuesRouter + policy (SG2-44 AC3) -------------------------------
+// --- createVenueAvailabilityRouter + policy (SG2-44 AC3) -------------------------------
 
 const userId = '10000000-0000-4000-8000-000000000001';
 const originalConfig = { ...dbConfig };
@@ -429,7 +429,7 @@ function appAs(role: string) {
 }
 
 test('venues router defaults to the shared authorization instance', () => {
-  assert.equal(typeof createVenuesRouter(), 'function');
+  assert.equal(typeof createVenueAvailabilityRouter(), 'function');
 });
 
 test('unauthenticated availability requests are refused', async () => {

@@ -254,8 +254,13 @@ export function createAllVenuesAvailabilityHandler(
   };
 }
 
-/** Router for venue endpoints. Every route requires a verified caller. */
-export function createVenuesRouter(access = authorization) {
+/**
+ * Router for venue availability endpoints. Every route requires a verified
+ * caller. Named distinctly from venues/index.ts's createVenuesRouter (venue
+ * CRUD, SG2-42) — both mount at /api/venues; their route patterns don't
+ * overlap (/, /:venueId vs /availability, /:venueId/availability).
+ */
+export function createVenueAvailabilityRouter(access = authorization) {
   const router = access.protectedRouter();
   const requireView = access.requirePermission('venues.availability.view');
   router.get('/availability', requireView, createAllVenuesAvailabilityHandler());
