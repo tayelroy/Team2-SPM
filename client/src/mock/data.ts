@@ -171,6 +171,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   change: 'Change request',
   drafts: 'My draft requests',
   editDraft: 'Edit draft request',
+  profile: 'My profile',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -191,6 +192,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   drafts:
     'Requests you have saved but not yet submitted. Delete one you no longer intend to send.',
   editDraft: 'Update the details, then save your changes or submit when ready.',
+  profile: 'View and update your contact details and communication preferences.',
 };
 
 export const STATS: Record<Role, Stat[]> = {
