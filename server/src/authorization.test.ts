@@ -168,7 +168,8 @@ test('production adapter verifies Auth then reads the database role, ignoring me
   const fetchMock = provider();
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { userId, role: 'attendee', permissions: [] });
+  // SG2-27: every role, including attendee, holds the profile grants.
+  assert.deepEqual(res.body, { userId, role: 'attendee', permissions: ['profile.read', 'profile.update'] });
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
