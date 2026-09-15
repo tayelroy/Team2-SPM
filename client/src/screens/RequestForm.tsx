@@ -209,15 +209,6 @@ export default function RequestForm({
   }
 
   async function handleSubmit() {
-    if (isSubmitDisabled) return;
-
-    // Reveal inline errors for any still-empty fields (defensive — button
-    // should already be disabled, but this guards programmatic calls).
-    if (emptyFields.length > 0) {
-      setTouched(new Set(REQUIRED_FIELDS));
-      return;
-    }
-
     // Mockup / prototype mode: no real API call needed.
     if (!eventId || !accessToken) {
       successCallback?.();
@@ -255,7 +246,7 @@ export default function RequestForm({
         'Could not reach the server. Check your connection and try again.',
       );
     } else {
-      setErrorMessage(result.message ?? 'Submission failed. Please try again.');
+      setErrorMessage(result.message);
     }
   }
 

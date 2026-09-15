@@ -80,6 +80,20 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     fireEvent.change(nameField, { target: { value: '' } });
     expect(screen.getByText('Event name is required')).toBeInTheDocument();
   });
+
+  test('shows inline errors for the description and venue fields when cleared', () => {
+    render(<RequestForm {...DEFAULT_PROPS} />);
+
+    const description = screen.getByLabelText(/Description/i);
+    fireEvent.change(description, { target: { value: 'details' } });
+    fireEvent.change(description, { target: { value: '' } });
+    expect(screen.getByText('Description is required')).toBeInTheDocument();
+
+    const venue = screen.getByLabelText(/Venue requirements/i);
+    fireEvent.change(venue, { target: { value: 'loop' } });
+    fireEvent.change(venue, { target: { value: '' } });
+    expect(screen.getByText('Venue requirements is required')).toBeInTheDocument();
+  });
 });
 
 // ─── AC1: Successful submission ──────────────────────────────────────────────
@@ -135,6 +149,49 @@ describe('AC1 — successful submission', () => {
     expect(btn).toBeDisabled();
     resolve(new Response(null, { status: 200 }));
   });
+
+  test('submits immediately in mockup mode when no event id is provided', async () => {
+    const onSuccess = vi.fn();
+    render(<RequestForm onSuccess={onSuccess} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+  });
+});
+
+describe('draft and presentation callbacks', () => {
+  test('fires the save-draft callback when provided', () => {
+    const onSaveDraft = vi.fn();
+    render(<RequestForm {...DEFAULT_PROPS} onSaveDraft={onSaveDraft} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Save draft/i }));
+    expect(onSaveDraft).toHaveBeenCalledOnce();
+  });
+
+  test('shows the prototype draft confirmation without a callback', () => {
+    render(<RequestForm {...DEFAULT_PROPS} onSaveDraft={undefined} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Save draft/i }));
+    expect(screen.getByText(/Draft saved/i)).toBeInTheDocument();
+  });
+
+  test('hides the suitability warning when conflicts are disabled', () => {
+    render(<RequestForm {...DEFAULT_PROPS} showConflicts={false} />);
+
+    expect(screen.queryByText(/180 expected attendance rules out/i)).not.toBeInTheDocument();
+  });
+
+  test('toggles requirement chips on and off', () => {
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    const chip = screen.getByRole('button', { name: 'Hearing loop' });
+
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+  });
 });
 
 // ─── AC2: Server error banners ───────────────────────────────────────────────
@@ -157,6 +214,20 @@ describe('AC2 — server error banners', () => {
     expect(
       await screen.findByText(/Event name.*Description/i),
     ).toBeInTheDocument();
+  });
+
+  test('preserves an unknown missing-field name from the server', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ missing: ['custom_requirement'] }), { status: 400 }),
+      ),
+    );
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
+
+    expect(await screen.findByText(/custom_requirement/)).toBeInTheDocument();
   });
 
   test('shows a 409 conflict banner when the request is already submitted', async () => {
@@ -199,6 +270,20 @@ describe('AC2 — server error banners', () => {
     expect(
       await screen.findByText(/Could not reach the server/i),
     ).toBeInTheDocument();
+  });
+
+  test('shows the server-provided message for an unexpected error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Submission window is closed' }), { status: 500 }),
+      ),
+    );
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
+
+    expect(await screen.findByText('Submission window is closed')).toBeInTheDocument();
   });
 });
 
