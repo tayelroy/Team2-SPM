@@ -8,6 +8,7 @@ import { authorization } from './auth';
 import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
 import { createVenuesRouter } from './venues';
+import { createProfileRouter } from './profile';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -51,6 +52,9 @@ export function createApp(
   app.use('/api/event-requests', eventRequests);
 
   app.use('/api/venues', createVenuesRouter(access));
+
+  // SG2-27: view/update the caller's own profile.
+  app.use('/api/profile', createProfileRouter(access));
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
