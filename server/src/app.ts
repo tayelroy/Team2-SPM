@@ -15,8 +15,7 @@ export function createApp(
   loginHandler: RequestHandler = createLoginHandler(),
   logoutHandler: RequestHandler = createLogoutHandler(),
   updateRoleHandler: RequestHandler = createUpdateRoleHandler(),
-  loginRateLimit: RequestHandler = createLoginRateLimiter()
-  eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal }),
+  loginRateLimit: RequestHandler = createLoginRateLimiter(),
   eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();

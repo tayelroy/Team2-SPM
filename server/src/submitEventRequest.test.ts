@@ -206,8 +206,11 @@ describe('PATCH /api/event-requests/:eventId/submit authorisation wiring', () =>
   const appForRole = (role: Role) =>
     createApp(
       undefined,
-      undefined,
       createAuthorization({ resolvePrincipal: async () => ({ userId, role }) }),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
       undefined,
       (_req, res) => {
         res.status(200).json({ reached: true });
