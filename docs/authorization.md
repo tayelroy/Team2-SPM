@@ -81,19 +81,18 @@ accounts or expose an endpoint for changing roles.
 | Attendee | `attendee` |
 
 Permissions map an action name to the roles allowed to perform it. Define them
-in `PERMISSIONS` in `server/src/auth/policy.ts`. For example, a policy granting
-event updates to organisers would look like this:
+in `PERMISSIONS` in `server/src/auth/policy.ts`. The current policy is:
 
 ```ts
 export const PERMISSIONS: PermissionMap = Object.freeze({
-  'events.update': ['event_organiser']
+  'venues.availability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff']
 });
 ```
 
-This is a configuration example. The default map is empty. Actions without a
-grant return `403`, including for Technical Support Staff. Use the same action
-name in the backend guard and the page helper. Restart the backend after changing
-the map; each module instance takes a copy of the policy when it starts.
+Actions without a grant return `403`, including for Technical Support Staff. Use
+the same action name in the backend guard and the page helper. Restart the
+backend after changing the map; each module instance takes a copy of the policy
+when it starts.
 
 ## Protect a backend route
 
@@ -186,6 +185,26 @@ changes, and discard results belonging to an earlier session.
 Send the current bearer token on the business request as well. The backend
 checks permissions again, so pages must handle a denial even when a control was
 visible. The helpers do not manage login, token refresh, or token revocation.
+
+## Logout
+
+The top-right Profile button opens Logout. The app immediately removes the
+stored session and unmounts protected screens, then awaits `POST /api/auth/logout`
+with a ten-second deadline. It stays signed out locally on a network failure,
+timeout or server rejection, but explains that server sign-out was not confirmed.
+The endpoint returns 503 if its client is unavailable or the SDK returns/throws
+an error; it no longer reports successful revocation in those cases.
+
+The server calls `auth.admin.signOut(bearerToken, 'local')`, revoking only the
+current session. Body-supplied tokens and user IDs are ignored. Other devices
+remain signed in. Protected ConnectSphere endpoints continue to call `getUser()`
+on every request and reject a session that Auth reports as revoked. See the
+[Supabase session-validation guidance](https://supabase.com/docs/guides/auth/server-side/advanced-guide).
+
+Revocation prevents session refresh; an already-issued JWT can still be valid
+until expiry for services using only JWT verification, including direct database
+access. This change does not add a database revocation policy or change shared
+Supabase settings. See [Supabase sign-out semantics](https://supabase.com/docs/guides/auth/signout).
 
 ## Database access
 

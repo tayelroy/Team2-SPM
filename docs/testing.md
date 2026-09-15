@@ -13,12 +13,16 @@ acceptance scenarios. Several tests were repetitive or weak, so the revised
 suite consolidates them while improving the assertions and covering missing
 decisions.
 
-| Suite | Before | After |
-| --- | ---: | ---: |
-| Backend | 102 | 100 |
-| Frontend | 118 | 111 |
-| Security reviewer tooling | 19 | 19 |
-| Total automated tests | **239** | **230** |
+| Suite | Before | After | + SG2-44 |
+| --- | ---: | ---: | ---: |
+| Backend | 102 | 100 | 143 |
+| Frontend | 118 | 111 | 111 |
+| Security reviewer tooling | 19 | 19 | 19 |
+| Total automated tests | **239** | **230** | **273** |
+
+The "+ SG2-44" column reflects the venue availability backend work
+(`venue-availability.test.ts`, `db/user-client.test.ts`); the frontend screen is
+unchanged pending client login (SG2-23).
 
 SQL policy assertions run separately and are not included in either total.
 Parameterized test rows are counted individually by the runners; assertions
@@ -70,18 +74,68 @@ dependency combinations. Hosted workflow execution remains to be verified.
 ## Google Sheet register
 
 The [SPM Test Cases workbook](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-contains 14 backend scenarios, 14 frontend scenarios, 9 database/CI scenarios,
-and an index of all 230 executed automated tests. The five SG2-25 identifiers
-are retained. Frontend permission-helper tests link to the same SG2-25 cases
-instead of duplicating that feature's specifications.
+was reconciled on 14 September 2026 against the SG2-42 working tree at base
+`817881abbb1c`. It now contains 13 backend scenarios, 14 frontend scenarios,
+9 database/CI scenarios, and 343 current executed automated tests (183 backend,
+141 frontend, 19 reviewer). The earlier numbers in this document describe the
+9 September audit, not the current register.
+
+Reconciliation removed 13 obsolete scenario records and 56 removed/replaced
+automation entries, updated 15 reviewed test renames, and added 70 current tests
+missing from the old inventory. The five SG2-25 and five SG2-42 case IDs remain,
+with evidence narrowed to tests present on this branch. Removed registration,
+browser-fixture, venue-RLS and browser-CI tests are no longer presented as current
+Pass results. Current supporting helper tests remain listed without claiming a
+removed registration workflow exists.
+
+The [pre-reconciliation backup](https://docs.google.com/spreadsheets/d/1LQPKwlgd5Xzd0C6EL_bTYFpChQVhvxllAFCTuMxxa_M/edit)
+preserves the previous workbook and its historical execution records.
+
+SG2-44 adds five backend scenarios and one SQL scenario (see the section above);
+the executed automated-test index grows to 273. Add the matching workbook rows
+when that feature is recorded.
 
 The course template fields are preserved. Specification and execution sections
 use different colours; explicit status labels distinguish Pass from Not
-Executed. The five SQL scenarios and three hosted workflow scenarios are Not
-Executed. Application and reviewer results are dated local automation records,
-not deployed acceptance or hosted CI results. The automation index maps
+Executed. The five SQL scenarios and three hosted workflow scenarios now have
+passing hosted evidence, verified on 14 September 2026. Application and reviewer
+results in the automation index retain their original dated execution records.
+The automation index maps
 supporting UI/component checks to their workflow context without claiming each
 one independently proves an acceptance criterion.
+
+### Hosted verification of the eight pending cases
+
+- **DB-ROLE-01–05 and CI-REG-01:** [PR #19 CI run](https://github.com/tayelroy/Team2-SPM/actions/runs/34856027583)
+  tested head `cfa6b8a60961` through merge revision `68b92e87bfb9`. All six CI
+  checks passed: 183 backend, 141 frontend and 19 reviewer tests, 100% application
+  coverage, and the SQL assertions in disposable PostgreSQL 17.11. The SQL
+  transaction rolled back and the container was removed. Coverage artifacts
+  uploaded and combined successfully. The current workflow has no Playwright job;
+  the workbook's stale browser-job expectation was corrected.
+- **CI-REG-02:** [PR #12's merge run](https://github.com/tayelroy/Team2-SPM/actions/runs/34607199507)
+  and [PR #11's merge run](https://github.com/tayelroy/Team2-SPM/actions/runs/34607202492)
+  overlapped on 11 September, both succeeded, and checked out their respective
+  merge SHAs `aa5df6668b60` and `fe4c7bcea371`. Their workflow blob
+  `fa0114b9818409530aa4cd4d83a58d15e4b5690c` is identical to PR #19's, so this is
+  retained execution evidence for unchanged workflow behavior, not a new merge
+  of SG2-42. [Closing temporary PR #20 without merging](https://github.com/tayelroy/Team2-SPM/actions/runs/34857589762)
+  on 14 September skipped every CI job as expected.
+- **CI-REG-03:** [The controlled failure run](https://github.com/tayelroy/Team2-SPM/actions/runs/34857073689)
+  changed venue creation's response from 201 to 202 only on a temporary branch.
+  Three existing tests failed; the aggregate exited 1; the other four independent
+  jobs passed. All three coverage artifacts were retained and the combined ZIP
+  was downloaded. GitHub displayed the failed aggregate as Required and disabled
+  merging. [Restoration passed all six checks](https://github.com/tayelroy/Team2-SPM/actions/runs/34857380972).
+  Restored commit `4ba0b7ba7f62` has the exact same file tree as PR #19. This
+  exercised assertion failure, not a separate below-100% coverage mutation.
+
+Temporary [PR #20](https://github.com/tayelroy/Team2-SPM/pull/20) is closed without
+merging. Both temporary `codex/sg2-42-ci-*` branches were deleted on 14 September
+2026 after validation; the closed PR and linked workflow runs retain the evidence.
+No changes were made to main, the SG2-42 branch, or shared Supabase by these
+hosted experiments. These SQL fixture results do not establish deployed Supabase
+permission enforcement or a deployment gate.
 
 ## Keep the course spreadsheet to 4–5 focused cases per feature
 
@@ -109,6 +163,20 @@ For **SG2-25 — See only the functions my role permits**, keep these five cases
 The authorised route in these tests is a controlled fixture. It proves the
 middleware decision and that a denied request does not execute the action; it
 does not prove a future event-management endpoint has installed that middleware.
+
+For **SG2-44 — View venue availability** (backend slice), keep these five cases:
+
+| Case | Course purpose | Acceptance criterion / automated evidence |
+| --- | --- | --- |
+| Internal role reads a venue's occupied periods over a date range | Happy path | AC1/AC2: `GET /api/venues/:id/availability` returns bookings + recorded unavailability, merged and sorted, each with what occupies the venue and when. `venue-availability.test.ts` merge case; SQL `venue_availability.sql` internal-role read. |
+| Attendee and Event Organiser are refused | Negative and security quality | AC3: the `venues.availability.view` policy denies both roles (`403`); RLS on `venue_bookings`/`venue_unavailability` returns nothing to them as defence in depth. Backend role matrix; `venue_availability.sql`. |
+| Logged-out request is refused | Negative | `requireAuth` returns `401` before the handler runs. Backend unauthenticated case. |
+| Invalid date range is rejected | Boundary | Missing/non-ISO `from`/`to`, `from >= to`, or a span over 366 days returns `400` without querying. `getVenueAvailability` validation partitions. |
+| Provider or query failure fails soft | Negative | An error from either table query returns `503`, never a partial list. Backend unavailable cases. |
+
+The endpoint enforces the policy itself; the frontend screen
+([client/src/screens/AvailabilityCalendar.tsx](../client/src/screens/AvailabilityCalendar.tsx))
+still renders mock data until the client has a login session (SG2-23).
 
 Each spreadsheet record should contain the course fields: unique Test Case ID,
 scenario, preconditions (including fixture/reset), numbered test steps, specific

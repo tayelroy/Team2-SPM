@@ -12,11 +12,15 @@ export interface Principal { userId: string; role: Role }
 
 // Actions without an explicit role grant are denied.
 export const PERMISSIONS: PermissionMap = Object.freeze({
+  'venues.availability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // Only Technical Support Staff may set or change a role (SG2-24).
   'users.role.update': ['technical_support_staff'],
   // SG2-28: only an Event Organiser raises an event request for their own
   // client organisation.
-  'event_request.create': ['event_organiser']
+  'event_request.create': ['event_organiser'],
+  'venues.read': ['venue_staff', 'event_coordinator'],
+  'venues.create': ['venue_staff'],
+  'venues.update': ['venue_staff']
 });
 
 export function isRole(value: unknown): value is Role {

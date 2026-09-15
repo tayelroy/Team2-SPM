@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import App from './App';
 import { NOTIFICATIONS } from './mock/data';
@@ -23,17 +23,19 @@ beforeAll(() => {
 });
 
 function mockLoginResponse(role: Role) {
+  const permissions = role === 'Venue Staff' ? ['venues.read', 'venues.create', 'venues.update']
+    : role === 'Event Coordinator' ? ['venues.read'] : [];
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          accessToken: 'test-access-token',
-          user: { userId: 'user-1', email: 'test@example.com', role }
-        }),
-        { status: 200 }
-      )
-    )
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
+      if (url === '/api/venues') {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
+        return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
+          facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
+      }
+      return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role } });
+    })
   );
 }
 
@@ -103,15 +105,15 @@ describe('every role can reach every screen in its navigation', () => {
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
       ['Review', 'Event detail'], ['Venues', 'Venue catalogue'],
-      ['Calendar', 'Venue availability'], ['Equipment', 'Equipment requests'],
+      ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
     ],
     'Venue Staff': [
       ['Dashboard', 'Venue desk'], ['Booking requests', 'Booking approval'],
-      ['Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
+      ['Venue Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'], ['Equipment requests', 'Equipment requests'],
-      ['Schedule', 'Venue availability'],
+      ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
   };
@@ -145,35 +147,108 @@ test('a persisted session resumes straight into the app on the next visit', asyn
   expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
 });
 
-test('a session that no longer validates is cleared and returns to landing', async () => {
+test.each([401, 403])('a %s validation denial clears the session and returns to landing', async (status) => {
   await signInAs('Venue Staff');
   cleanup();
 
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
   render(<App />);
   expect(await screen.findByRole('button', { name: 'Open app' })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
 });
 
-test('a network hiccup during background validation keeps the session, not just a 401', async () => {
+test.each([500, 503, 'offline'] as const)('a %s validation failure preserves the session after the check finishes', async (failure) => {
   await signInAs('Venue Staff');
   cleanup();
+  const saved = sessionStorage.getItem('connectsphere.session');
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (failure === 'offline') throw new Error('network down');
+    return new Response(null, { status: failure });
+  }));
+  await act(async () => { render(<App />); });
+  expect(screen.getByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).toBe(saved);
+});
 
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+test.each([
+  ['Venue Staff', 'Catalogue', 'Venue desk'],
+  ['Attendee', 'My registrations', 'Event page'],
+] as const)('the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
+  await signInAs(role);
+  fireEvent.click(within(header()).getByRole('button', { name: destination }));
+  const saved = sessionStorage.getItem('connectsphere.session');
+  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
+  expect(screen.getByRole('heading', { level: 1, name: home })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).toBe(saved);
+  expect(fetch).not.toHaveBeenCalledWith('/api/auth/logout', expect.anything());
+  cleanup();
+  await act(async () => { render(<App />); });
+  expect(screen.getByRole('heading', { level: 1, name: home })).toBeInTheDocument();
+});
+
+test('the profile options open, toggle and dismiss with Escape, outside clicks or focus', async () => {
+  await signInAs('Event Coordinator');
+  const profile = screen.getByRole('button', { name: 'Profile' });
+  expect(profile).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  fireEvent.click(profile);
+  expect(profile).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.pointerDown(screen.getByRole('group', { name: 'Profile options' }));
+  const logout = screen.getByRole('button', { name: 'Logout' });
+  act(() => logout.focus());
+  expect(logout).toHaveFocus();
+  fireEvent.keyDown(logout, { key: 'Tab' });
+  expect(logout).toBeInTheDocument();
+  fireEvent.keyDown(logout, { key: 'Escape' });
+  expect(profile).toHaveFocus();
+  expect(profile).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(profile);
+  fireEvent.click(profile);
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  fireEvent.click(profile);
+  fireEvent.pointerDown(screen.getByRole('main'));
+  expect(profile).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(profile);
+  act(() => screen.getByRole('button', { name: 'Dashboard' }).focus());
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).not.toBeNull();
+  expect(fetch).not.toHaveBeenCalledWith('/api/auth/logout', expect.anything());
+});
+
+test('profile Logout immediately removes local access and waits for server confirmation', async () => {
+  await signInAs('Event Coordinator');
+  let complete!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+  expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
+  expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Signing out');
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/auth/logout', {
+    method: 'POST', headers: { Authorization: 'Bearer test-access-token' },
+    keepalive: true, signal: expect.any(AbortSignal),
+  });
+  await act(async () => { complete(new Response(null, { status: 200 })); });
+  expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
+  cleanup();
   render(<App />);
-  expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
-});
-
-test('the wordmark signs out back to the landing page', async () => {
-  await signInAs('Event Coordinator');
-  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
-test('signing out still completes even if the logout request fails', async () => {
+test.each(['offline', 'server failure'])('Logout clears local access and reports unconfirmed revocation on %s', async failure => {
   await signInAs('Event Coordinator');
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
-  fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
-  expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (failure === 'server failure') return new Response(null, { status: 503 });
+    throw new Error('network down');
+  }));
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+  expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not confirm server sign-out');
+  expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
+  expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
 test('the notification drawer opens and closes', async () => {
@@ -333,8 +408,17 @@ describe('the request form', () => {
 test('requesting a venue opens the booking approval screen', async () => {
   await signInAs('Event Coordinator');
   fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Request Atrium Hall' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Request Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
+});
+
+test('signed-in Venue Staff navigate to the catalogue and open an editor populated from the API', async () => {
+  await signInAs('Venue Staff');
+  fireEvent.click(within(header()).getByRole('button', { name: 'Catalogue' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Atrium Hall' }));
+  expect(screen.getByLabelText('Venue name')).toHaveValue('Atrium Hall');
+  expect(screen.getByLabelText('Capacity')).toHaveValue(100);
+  expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
 });
 
 test('reserving equipment settles the row', async () => {
@@ -354,14 +438,32 @@ test('reserving equipment settles the row', async () => {
   }
 });
 
-test('the calendar shows the month grid with its legend', async () => {
+test('the calendar shows the month grid with real venue availability', async () => {
   await signInAs('Venue Staff');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Availability' }));
-  expect(
-    screen.getByRole('heading', { name: 'Atrium Hall · October 2026' }),
-  ).toBeInTheDocument();
-  expect(screen.getByText('Confirmed · E-186')).toBeInTheDocument();
-  expect(screen.getByText('Blocked')).toBeInTheDocument();
+  const now = new Date();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      Response.json({
+        from: now.toISOString(),
+        to: now.toISOString(),
+        venues: [
+          {
+            venueId: 1,
+            name: 'Atrium Hall',
+            entries: [
+              { start: now.toISOString(), end: new Date(now.getTime() + 3_600_000).toISOString(), kind: 'booking', label: 'confirmed' },
+            ],
+          },
+        ],
+      }),
+    ),
+  );
+
+  fireEvent.click(within(header()).getByRole('button', { name: 'Venue Availability' }));
+  expect(await screen.findByText('Atrium Hall · confirmed')).toBeInTheDocument();
+  expect(screen.getByText('Booked')).toBeInTheDocument();
+  expect(screen.getByText('Unavailable')).toBeInTheDocument();
 });
 
 test('an attendee can withdraw and re-register', async () => {

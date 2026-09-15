@@ -55,16 +55,6 @@ export interface EventCard extends EventRecord {
   next: string;
 }
 
-export interface Venue {
-  name: string;
-  capacity: number;
-  meta: string;
-  tags: string[];
-  fit: string;
-  /** 1 = suitable, 0 = unsuitable, 2 = needs a check. */
-  suitability: 0 | 1 | 2;
-}
-
 export interface EquipmentRequest {
   item: string;
   event: string;

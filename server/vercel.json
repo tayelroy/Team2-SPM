@@ -1,7 +1,7 @@
 {
   "framework": null,
   "installCommand": "npm ci --prefix .. --workspaces --include-workspace-root --include=dev",
-  "buildCommand": "npm run build",
+  "buildCommand": "NODE_ENV=test SUPABASE_URL= SUPABASE_ANON_KEY= SUPABASE_SERVICE_ROLE_KEY= npm run ci --prefix ..",
   "outputDirectory": "public",
   "functions": {
     "api/index.js": { "includeFiles": "dist/**" }

@@ -5,7 +5,9 @@ import { createLoginHandler, createLoginRateLimiter } from './auth/login';
 import { createLogoutHandler } from './auth/logout';
 import { createUpdateRoleHandler } from './auth/roles';
 import { authorization } from './auth';
+import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
+import { createVenuesRouter } from './venues';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -34,6 +36,7 @@ export function createApp(
   app.post('/api/auth/login', loginRateLimit, loginHandler);
   app.post('/api/auth/logout', logoutHandler);
   app.use('/api/auth', access.router);
+  app.use('/api/venues', createVenueAvailabilityRouter(access));
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
@@ -46,6 +49,8 @@ export function createApp(
   const eventRequests = access.protectedRouter();
   eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
   app.use('/api/event-requests', eventRequests);
+
+  app.use('/api/venues', createVenuesRouter(access));
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
