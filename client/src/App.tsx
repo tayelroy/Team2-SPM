@@ -15,6 +15,7 @@ import Landing from './screens/Landing';
 import Login from './screens/Login';
 import RequestForm from './screens/RequestForm';
 import Venues from './screens/Venues';
+import { GhostButton } from './ui';
 
 /** The screen a signed-in user of a given role opens on. */
 function landingScreenFor(role: Role): Screen {
@@ -46,6 +47,7 @@ function initialScreen(session: StoredSession | null): Screen {
 export default function App() {
   const [session, setSession] = useState<StoredSession | null>(() => loadSession());
   const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
+  const [logoutState, setLogoutState] = useState<'pending' | 'failed' | null>(null);
 
   // Best-effort background check that a persisted session is still valid.
   // Trusts the cached session for the current render (no loading flash);
@@ -55,7 +57,7 @@ export default function App() {
     let cancelled = false;
     fetch('/api/auth/me', { headers: { Authorization: `Bearer ${session.accessToken}` } })
       .then((response) => {
-        if (cancelled || response.ok) return;
+        if (cancelled || (response.status !== 401 && response.status !== 403)) return;
         clearSession();
         setSession(null);
         setScreen('landing');
@@ -74,16 +76,33 @@ export default function App() {
     setScreen(landingScreenFor(newSession.user.role as Role));
   }
 
-  function handleSignOut() {
-    // Only wired to AppShell's sign-out control, which renders solely in the
-    // signed-in tree — session is non-null by construction whenever this runs.
-    fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${session!.accessToken}` }
-    }).catch(() => {});
+  async function handleSignOut() {
+    const token = session!.accessToken;
+    // Remove local access immediately, even if the network is unavailable.
     clearSession();
     setSession(null);
     setScreen('landing');
+    setLogoutState('pending');
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+        signal: AbortSignal.timeout(10000),
+      });
+      setLogoutState(response.ok ? null : 'failed');
+    } catch {
+      setLogoutState('failed');
+    }
+  }
+
+  if (logoutState) {
+    return <main style={{ padding: '48px 28px', maxWidth: '640px', margin: '0 auto' }}>
+      {logoutState === 'pending' ? <p role="status">Signing out…</p> : <>
+        <p role="alert">You are signed out on this device, but we could not confirm server sign-out. Sign in again and retry Logout when your connection is available.</p>
+        <GhostButton onClick={() => { setLogoutState(null); setScreen('login'); }}>Return to sign in</GhostButton>
+      </>}
+    </main>;
   }
 
   if (screen === 'landing') {
@@ -106,7 +125,7 @@ export default function App() {
     events: <EventsTable role={role} onOpenEvent={() => setScreen('detail')} />,
     detail: <EventDetail role={role} onNavigate={setScreen} />,
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
-    venues: <Venues onBook={() => setScreen('booking')} />,
+    venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,
