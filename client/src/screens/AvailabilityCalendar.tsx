@@ -3,12 +3,27 @@ import { WEEKDAYS } from '../mock/data';
 import { loadSession } from '../auth/session';
 import { loadAllVenuesAvailability } from '../venues/availability';
 import type { VenueAvailabilitySummary } from '../venues/availability';
-import { buildCalendarDays, monthRange } from '../venues/calendarView';
+import { buildCalendarDays, monthRange, MONTH_LABELS } from '../venues/calendarView';
 import type { DayKind } from '../venues/calendarView';
-import { color, radius } from '../theme';
+import { color, radius, rule } from '../theme';
 import { Card, IconButton } from '../ui';
 
 type Status = 'loading' | 'ready' | 'no-access' | 'error';
+
+const CURRENT_YEAR = new Date().getUTCFullYear();
+/** Bounded range for the year dropdown; the arrows stay unbounded either side of it. */
+const YEAR_OPTIONS = Array.from({ length: 11 }, (_, i) => CURRENT_YEAR - 5 + i);
+
+const selectStyle = {
+  background: color.kelp,
+  border: rule.control,
+  borderRadius: radius.sm,
+  color: color.mist,
+  fontSize: '12px',
+  letterSpacing: '0.06em',
+  padding: '8px 10px',
+  outline: 'none',
+};
 
 const LEGEND: { label: string; bg: string; bd: string }[] = [
   { label: 'Free', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
@@ -62,7 +77,17 @@ export default function AvailabilityCalendar() {
     setReference((prev) => new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() + delta, 1)));
   }
 
+  function jumpTo(year: number, month: number) {
+    setReference(new Date(Date.UTC(year, month, 1)));
+  }
+
   const days = buildCalendarDays(reference, venues);
+  // Keep the dropdown in sync even if the arrows navigated past the fixed
+  // window (unbounded, unlike the dropdown) — extend it rather than showing
+  // a year that doesn't match the current selection.
+  const yearOptions = YEAR_OPTIONS.includes(range.year)
+    ? YEAR_OPTIONS
+    : [...YEAR_OPTIONS, range.year].sort((a, b) => a - b);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -86,7 +111,27 @@ export default function AvailabilityCalendar() {
         >
           {range.label}
         </h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <select
+            aria-label="Jump to month"
+            value={range.month}
+            onChange={(e) => jumpTo(range.year, Number(e.target.value))}
+            style={selectStyle}
+          >
+            {MONTH_LABELS.map((label, i) => (
+              <option key={label} value={i}>{label}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Jump to year"
+            value={range.year}
+            onChange={(e) => jumpTo(Number(e.target.value), range.month)}
+            style={selectStyle}
+          >
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
           <IconButton label="Previous month" onClick={() => shiftMonth(-1)}>←</IconButton>
           <IconButton label="Next month" onClick={() => shiftMonth(1)}>→</IconButton>
         </div>
