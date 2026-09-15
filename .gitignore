@@ -32,6 +32,8 @@ lerna-debug.log*
 *.sln
 *.sw?
 .vercel
+.claude/*
+.agents/*
 
 # MCP server config (contains Supabase access token)
 .mcp.json
