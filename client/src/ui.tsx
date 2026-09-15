@@ -94,12 +94,14 @@ export function Badge({
 export function GradientButton({
   children,
   onClick,
+  disabled,
   style,
-}: WithChildren & { onClick?: () => void; style?: CSSProperties }) {
+}: WithChildren & { onClick?: () => void; disabled?: boolean; style?: CSSProperties }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       style={{
         border: 'none',
         borderRadius: radius.sm,
@@ -109,7 +111,8 @@ export function GradientButton({
         fontSize: '14px',
         letterSpacing: '0.06em',
         textTransform: 'uppercase',
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
         ...style,
       }}
     >
