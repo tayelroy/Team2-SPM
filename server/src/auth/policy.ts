@@ -18,6 +18,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-28: only an Event Organiser raises an event request for their own
   // client organisation.
   'event_request.create': ['event_organiser'],
+  // SG2-30: only the organiser who owns a draft can submit it for review.
+  'event_request.submit': ['event_organiser'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],
