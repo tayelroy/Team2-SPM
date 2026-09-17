@@ -118,3 +118,33 @@ test('the presentational primitives render their content', () => {
   expect(screen.getByText('31')).toBeInTheDocument();
   expect(screen.getByText('venue photo')).toBeInTheDocument();
 });
+
+test('controlled Field and TextField treat an absent value as empty', () => {
+  const onField = vi.fn();
+  const onArea = vi.fn();
+  render(
+    <>
+      <Field label="Event name" onChange={onField} />
+      <TextField label="Description" onChange={onArea} />
+    </>,
+  );
+
+  const input = screen.getByLabelText('Event name');
+  const textarea = screen.getByLabelText('Description');
+  expect(input).toHaveValue('');
+  expect(textarea).toHaveValue('');
+
+  fireEvent.change(input, { target: { value: 'Forum' } });
+  fireEvent.change(textarea, { target: { value: 'Two keynotes' } });
+  expect(onField).toHaveBeenCalledWith('Forum');
+  expect(onArea).toHaveBeenCalledWith('Two keynotes');
+});
+
+test('a disabled GhostButton does not fire its click handler', () => {
+  const onClick = vi.fn();
+  render(<GhostButton onClick={onClick} disabled>Save draft</GhostButton>);
+  const button = screen.getByRole('button', { name: 'Save draft' });
+  expect(button).toBeDisabled();
+  fireEvent.click(button);
+  expect(onClick).not.toHaveBeenCalled();
+});
