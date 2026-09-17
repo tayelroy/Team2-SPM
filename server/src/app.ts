@@ -7,6 +7,7 @@ import { createUpdateRoleHandler } from './auth/roles';
 import { authorization } from './auth';
 import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
+import { submitEventRequestHandler } from './events/submit';
 import { createVenuesRouter } from './venues';
 
 export function createApp(
@@ -16,7 +17,8 @@ export function createApp(
   loginHandler: RequestHandler = createLoginHandler(),
   logoutHandler: RequestHandler = createLogoutHandler(),
   updateRoleHandler: RequestHandler = createUpdateRoleHandler(),
-  loginRateLimit: RequestHandler = createLoginRateLimiter()
+  loginRateLimit: RequestHandler = createLoginRateLimiter(),
+  eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -48,6 +50,12 @@ export function createApp(
   // SG2-28: raise an event request as a draft.
   const eventRequests = access.protectedRouter();
   eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
+  // SG2-30: submit a draft event request for review.
+  eventRequests.patch(
+    '/:eventId/submit',
+    access.requirePermission('event_request.submit'),
+    eventSubmitHandler
+  );
   app.use('/api/event-requests', eventRequests);
 
   app.use('/api/venues', createVenuesRouter(access));

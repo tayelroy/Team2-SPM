@@ -76,6 +76,15 @@ function tick(times = 1) {
   }
 }
 
+function dispatchPointer(target: EventTarget, type: string, x = 0, y = 0) {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperties(event, {
+    clientX: { value: x },
+    clientY: { value: y },
+  });
+  target.dispatchEvent(event);
+}
+
 function Harness({ withSpacer = true }: { withSpacer?: boolean }) {
   const { canvasRef, spacerRef } = useParticleOrb();
   return (
@@ -121,16 +130,19 @@ test('the pointer pushes particles and a press pulls them back', () => {
   tick();
   const restingCalls = ctx.arc.mock.calls.length;
 
-  fireEvent.pointerMove(hero, { clientX: 400, clientY: 300 });
+  // Aim at a real particle so the force branch is deterministic regardless of
+  // the sphere's projection and the random particle sizes.
+  const [particleX, particleY] = ctx.arc.mock.calls.at(-1) as [number, number, number, number, number];
+  dispatchPointer(hero, 'pointermove', particleX, particleY);
   tick();
   expect(ctx.arc.mock.calls.length).toBeGreaterThan(restingCalls);
 
   // Pressing inverts the force and widens the reach.
-  fireEvent.pointerDown(hero, { clientX: 400, clientY: 300 });
+  dispatchPointer(hero, 'pointerdown', particleX, particleY);
   tick();
-  fireEvent.pointerUp(window);
+  dispatchPointer(window, 'pointerup');
   tick();
-  fireEvent.pointerLeave(hero);
+  dispatchPointer(hero, 'pointerleave');
   expect(() => tick()).not.toThrow();
 });
 

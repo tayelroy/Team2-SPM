@@ -17,16 +17,28 @@ import {
  * The full request: facts, status trail, activity log, and the action panel —
  * which is where the role split is sharpest. Coordinators get decision
  * actions; organisers get amendment actions.
+ *
+ * AC3 (SG2-30): When `eventStatus === 'submitted'`, the organiser action panel
+ * is replaced with a read-only notice — direct editing is disabled until the
+ * coordinator reviews the request.
  */
 export default function EventDetail({
   role,
   onNavigate,
+  eventStatus,
 }: {
   role: Role;
   onNavigate: (screen: Screen) => void;
+  /**
+   * The current status of the event request. When `'submitted'`, organiser
+   * actions are disabled (AC3). Defaults to `undefined` (no restriction).
+   */
+  eventStatus?: string;
 }) {
   const event = currentEvent(role);
   const isCoordinator = role === 'Event Coordinator';
+  /** AC3: organisers cannot edit a submitted request until reviewed. */
+  const isSubmitted = eventStatus?.toLowerCase() === 'submitted';
   const facts = [
     { label: 'Client', value: event.client },
     { label: 'Date & time', value: `${event.date} · 10:00–17:00` },
@@ -207,30 +219,57 @@ export default function EventDetail({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <Card style={{ gap: '18px' }}>
           <Eyebrow>{isCoordinator ? 'Review actions' : 'Your options'}</Eyebrow>
-          {detailActions(role).map((action) => (
-            <button
-              key={action.label}
-              type="button"
-              onClick={() => onNavigate(action.screen)}
+
+          {/* AC3: Organisers cannot directly edit a submitted request. */}
+          {!isCoordinator && isSubmitted ? (
+            <Notice
               style={{
-                textAlign: 'left',
-                background: action.bg,
-                border: `1px solid ${action.bd}`,
-                borderRadius: radius.sm,
-                padding: '14px 18px',
-                color: action.fg,
-                fontSize: '14px',
-                letterSpacing: '0.04em',
-                cursor: 'pointer',
+                flexDirection: 'row',
+                gap: '14px',
+                alignItems: 'flex-start',
+                padding: '16px 20px',
               }}
             >
-              {action.label}
-            </button>
-          ))}
+              <NoticeMark size={20} />
+              <span
+                role="status"
+                aria-label="Editing disabled: request submitted"
+                style={{ fontSize: '14px', lineHeight: 1.43, color: color.mist }}
+              >
+                This request has been submitted and is now with your coordinator.
+                Direct editing is locked — use <strong>Request a change</strong> if
+                an amendment is needed.
+              </span>
+            </Notice>
+          ) : (
+            detailActions(role).map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={() => onNavigate(action.screen)}
+                style={{
+                  textAlign: 'left',
+                  background: action.bg,
+                  border: `1px solid ${action.bd}`,
+                  borderRadius: radius.sm,
+                  padding: '14px 18px',
+                  color: action.fg,
+                  fontSize: '14px',
+                  letterSpacing: '0.04em',
+                  cursor: 'pointer',
+                }}
+              >
+                {action.label}
+              </button>
+            ))
+          )}
+
           <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>
             {isCoordinator
               ? 'Approving moves the event into planning and unlocks venue and equipment booking.'
-              : 'Changes after submission go to your coordinator for review.'}
+              : isSubmitted
+                ? 'Your coordinator will be in touch if clarification is needed.'
+                : 'Changes after submission go to your coordinator for review.'}
           </span>
         </Card>
 

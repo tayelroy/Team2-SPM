@@ -400,6 +400,15 @@ describe('the request form', () => {
 
   test('submitting goes to the event detail', async () => {
     await openForm();
+    // AC2: fill all required fields before submit is enabled.
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
+    fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '12 Oct 2026' } });
+    fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
+    fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
+    fireEvent.change(screen.getByLabelText(/Description/i), {
+      target: { value: 'A half-day forum with two keynotes and a panel.' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
     expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
   });

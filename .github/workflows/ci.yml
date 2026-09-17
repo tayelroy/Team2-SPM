@@ -149,22 +149,22 @@ jobs:
             }
           '
       - name: Collect backend coverage
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage
           path: server/coverage
       - name: Collect frontend coverage
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: frontend-coverage
           path: client/coverage
       - name: Summarize application coverage
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         run: node .github/scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
       - name: Upload combined coverage reports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: application-coverage
