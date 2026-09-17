@@ -2,9 +2,11 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  deleteEventRequestDraft,
   fetchOrganiserOrganisation,
   fetchOwnEventRequest,
   insertEventRequestDraft,
+  listOwnEventRequests,
   submitEventRequest
 } from './eventRequests';
 import type { DraftValues } from '../events/fields';
@@ -94,6 +96,67 @@ function fakeEventsUpdateClient(
             },
             select: async () => {
               capture?.({ row, eventId: filters.eventId, status: filters.status });
+              return result;
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+function fakeEventsListClient(
+  result: Result,
+  capture?: (filters: { organiserId: unknown; order: { column: unknown; ascending: unknown } }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        select: (_columns: string) => {
+          const filters: { organiserId?: unknown } = {};
+          let order: { column: unknown; ascending: unknown } | undefined;
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'organiser_id') filters.organiserId = value;
+              return chain;
+            },
+            order(column: string, options: { ascending: boolean }) {
+              order = { column, ascending: options.ascending };
+              return chain;
+            },
+            then(resolve: (value: Result) => unknown) {
+              capture?.({ organiserId: filters.organiserId, order: order! });
+              return Promise.resolve(result).then(resolve);
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+function fakeEventsDeleteClient(
+  result: Result,
+  capture?: (filters: { eventId: unknown; status: unknown }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        delete: () => {
+          const filters: { eventId?: unknown; status?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            select: async (columns: string) => {
+              assert.equal(columns, 'event_id');
+              capture?.({ eventId: filters.eventId, status: filters.status });
               return result;
             }
           };
@@ -265,6 +328,70 @@ describe('submitEventRequest', () => {
       const result = await submitEventRequest(fakeEventsUpdateClient({ data, error: null }), 7);
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
+    });
+  }
+});
+
+describe('listOwnEventRequests', () => {
+  test('scopes to the given organiser, newest first', async () => {
+    let captured: { organiserId: unknown; order: { column: unknown; ascending: unknown } } | undefined;
+    const result = await listOwnEventRequests(
+      fakeEventsListClient(
+        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft' }], error: null },
+        (c) => (captured = c)
+      ),
+      'user-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.requests.length, 1);
+    assert.equal(captured?.organiserId, 'user-1');
+    assert.deepEqual(captured?.order, { column: 'event_id', ascending: false });
+  });
+
+  test('returns an empty list rather than failing when the caller has no requests', async () => {
+    const result = await listOwnEventRequests(fakeEventsListClient({ data: [], error: null }), 'user-1');
+    assert.deepEqual(result, { ok: true, requests: [] });
+  });
+
+  test('returns an empty list when the driver returns no data at all', async () => {
+    const result = await listOwnEventRequests(fakeEventsListClient({ data: null, error: null }), 'user-1');
+    assert.deepEqual(result, { ok: true, requests: [] });
+  });
+
+  test('reports unavailable when the query errors', async () => {
+    const result = await listOwnEventRequests(
+      fakeEventsListClient({ data: null, error: { message: 'connection reset' } }),
+      'user-1'
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+});
+
+describe('deleteEventRequestDraft', () => {
+  test('deletes, filtered to the given event and draft status', async () => {
+    let captured: { eventId: unknown; status: unknown } | undefined;
+    const result = await deleteEventRequestDraft(
+      fakeEventsDeleteClient({ data: [{ event_id: 7 }], error: null }, (c) => (captured = c)),
+      7
+    );
+    assert.deepEqual(result, { ok: true });
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.status, 'draft');
+  });
+
+  test('reports unavailable when the delete errors', async () => {
+    const result = await deleteEventRequestDraft(
+      fakeEventsDeleteClient({ data: null, error: { message: 'connection reset' } }),
+      7
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`reports unavailable if the status changed and the delete matches ${JSON.stringify(data)} rows`, async () => {
+      const result = await deleteEventRequestDraft(fakeEventsDeleteClient({ data, error: null }), 7);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.match(result.message, /status may have changed/);
     });
   }
 });

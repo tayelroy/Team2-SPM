@@ -25,6 +25,14 @@ export type SubmitEventRequestResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'unavailable'; message: string };
 
+export type ListOwnEventRequestsResult =
+  | { ok: true; requests: EventRequestRecord[] }
+  | { ok: false; reason: 'unavailable'; message: string };
+
+export type DeleteDraftResult =
+  | { ok: true }
+  | { ok: false; reason: 'unavailable'; message: string };
+
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
@@ -146,4 +154,57 @@ export async function submitEventRequest(
     return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
   }
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
+}
+
+/**
+ * Lists every event request belonging to the caller (SG2-32's minimal slice
+ * of SG2-31 — enough to see and act on your own requests, not the full "see
+ * the state of my requests" feature).
+ */
+export async function listOwnEventRequests(
+  admin: SupabaseClient,
+  organiserId: string
+): Promise<ListOwnEventRequestsResult> {
+  const { data, error } = await admin
+    .from('events')
+    .select(RETURNED_COLUMNS)
+    .eq('organiser_id', organiserId)
+    .order('event_id', { ascending: false });
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  return { ok: true, requests: (data ?? []) as unknown as EventRequestRecord[] };
+}
+
+/**
+ * Deletes an event request, but only while it is still a draft (SG2-32).
+ *
+ * Callers check ownership and status via fetchOwnEventRequest first, the
+ * same shape submitEventRequestHandler already uses (SG2-30) — this never
+ * confirms another organiser's request exists (see fetchOwnEventRequest).
+ * The `status = 'draft'` condition is repeated on the delete itself as a
+ * second guard: if the status changed in the gap between the two calls (a
+ * coordinator actions it right then), zero rows come back and this reports
+ * unavailable rather than silently deleting nothing, mirroring how
+ * submitEventRequest treats a lost race on its own status guard.
+ */
+export async function deleteEventRequestDraft(
+  admin: SupabaseClient,
+  eventId: number
+): Promise<DeleteDraftResult> {
+  const { data, error } = await admin
+    .from('events')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('status', 'draft')
+    .select('event_id');
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'unavailable', message: 'The draft was not deleted; its status may have changed.' };
+  }
+  return { ok: true };
 }

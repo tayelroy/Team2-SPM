@@ -34,6 +34,10 @@ function mockLoginResponse(role: Role) {
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
           facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
       }
+      if (url === '/api/event-requests') {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
+        return Response.json({ requests: [{ event_id: 9, status: 'draft', name: 'Draft Forum' }] });
+      }
       return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role } });
     })
   );
@@ -100,6 +104,7 @@ describe('every role can reach every screen in its navigation', () => {
   const destinations: Record<Role, [string, string][]> = {
     'Event Organiser': [
       ['My events', 'Your events'], ['New request', 'Event request'],
+      ['My drafts', 'My draft requests'],
       ['Event detail', 'Event detail'], ['Change request', 'Change request'],
     ],
     'Event Coordinator': [

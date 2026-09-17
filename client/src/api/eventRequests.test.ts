@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { createEventRequestDraft, submitEventRequest } from './eventRequests';
+import {
+  createEventRequestDraft,
+  deleteEventRequestDraft,
+  listMyEventRequests,
+  submitEventRequest,
+} from './eventRequests';
 
 const SESSION_KEY = 'connectsphere.session';
 
@@ -198,6 +203,134 @@ describe('submitEventRequest', () => {
     await expect(submitEventRequest('evt-1', 'token-1')).resolves.toEqual({
       ok: false,
       kind: 'unavailable',
+    });
+  });
+});
+
+describe('listMyEventRequests', () => {
+  test('sends the bearer token and returns the requests', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ requests: [{ event_id: 7, status: 'draft' }] }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const outcome = await listMyEventRequests('token-1');
+
+    expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/event-requests');
+    expect(init.headers.Authorization).toBe('Bearer token-1');
+  });
+
+  test('maps 401 to a signed-out message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
+
+    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+      ok: false,
+      message: 'You are signed out. Sign in again to see your requests.',
+    });
+  });
+
+  test('explains a 403 in terms of the caller role', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
+
+    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Your role cannot view event requests.',
+    });
+  });
+
+  test('reports a network failure without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('treats a success status with an unreadable body as a failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+
+    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('falls back to a generic message for an unexpected status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+
+    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+});
+
+describe('deleteEventRequestDraft', () => {
+  test('sends the bearer token to the event-scoped DELETE route', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer token-1' },
+    });
+  });
+
+  test('maps 401 to a signed-out message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
+      ok: false,
+      message: 'You are signed out. Sign in again to delete this draft.',
+    });
+  });
+
+  test('explains a 403 in terms of the caller role', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 403 })));
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Your role cannot delete event requests.',
+    });
+  });
+
+  test('reports a 404 as the draft no longer existing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
+      ok: false,
+      message: 'This draft no longer exists.',
+    });
+  });
+
+  test('reports a 409 as no longer being a draft', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Only a draft request can be deleted.',
+    });
+  });
+
+  test('maps a network failure to a generic unavailable message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('falls back to a generic message for an unexpected status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
+
+    await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
+      ok: false,
+      message: 'Could not reach the server. Please try again.',
     });
   });
 });

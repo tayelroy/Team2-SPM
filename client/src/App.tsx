@@ -8,6 +8,7 @@ import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import BookingApproval from './screens/BookingApproval';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
+import DraftRequests from './screens/DraftRequests';
 import EquipmentDesk from './screens/EquipmentDesk';
 import EventDetail from './screens/EventDetail';
 import EventsTable from './screens/EventsTable';
@@ -126,6 +127,7 @@ export default function App() {
     detail: <EventDetail role={role} onNavigate={setScreen} />,
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
     venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
+    drafts: <DraftRequests accessToken={session!.accessToken} />,
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,

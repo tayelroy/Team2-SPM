@@ -141,3 +141,64 @@ export async function submitEventRequest(
   const data = await response.json().catch(() => ({}));
   return { ok: false, kind: 'error', message: data.error ?? 'Submission failed. Please try again.' };
 }
+
+export type ListMyEventRequestsOutcome =
+  | { ok: true; requests: EventRequestDraft[] }
+  | { ok: false; message: string };
+
+/**
+ * Lists the caller's own event requests (SG2-32's minimal slice of SG2-31).
+ *
+ * @param token Bearer access token from the signed-in session.
+ */
+export async function listMyEventRequests(token: string): Promise<ListMyEventRequestsOutcome> {
+  let response: Response;
+  try {
+    response = await fetch('/api/event-requests', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) return { ok: false, message: 'You are signed out. Sign in again to see your requests.' };
+    if (response.status === 403) return { ok: false, message: 'Your role cannot view event requests.' };
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+  if (!Array.isArray(body?.requests)) return { ok: false, message: UNAVAILABLE };
+  return { ok: true, requests: body.requests as EventRequestDraft[] };
+}
+
+export type DeleteEventRequestDraftOutcome = { ok: true } | { ok: false; message: string };
+
+/**
+ * Deletes an event request while it is still a draft (SG2-32). Maps to
+ * `DELETE /api/event-requests/:eventId`.
+ *
+ * @param eventId UUID of the event request to delete.
+ * @param token   Bearer access token from the signed-in session.
+ */
+export async function deleteEventRequestDraft(
+  eventId: string,
+  token: string
+): Promise<DeleteEventRequestDraftOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  if (response.ok) return { ok: true };
+  if (response.status === 401) return { ok: false, message: 'You are signed out. Sign in again to delete this draft.' };
+  if (response.status === 403) return { ok: false, message: 'Your role cannot delete event requests.' };
+  if (response.status === 404) return { ok: false, message: 'This draft no longer exists.' };
+  if (response.status === 409) return { ok: false, message: 'Only a draft request can be deleted.' };
+  return { ok: false, message: UNAVAILABLE };
+}

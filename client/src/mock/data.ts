@@ -93,6 +93,7 @@ export const NAV: Record<Role, [Screen, string][]> = {
   'Event Organiser': [
     ['dashboard', 'My events'],
     ['form', 'New request'],
+    ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
     ['change', 'Change request'],
   ],
@@ -168,6 +169,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   equipment: 'Equipment requests',
   attendee: 'Event page',
   change: 'Change request',
+  drafts: 'My draft requests',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -185,6 +187,8 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   attendee: 'Confirmed event details, registration, and your current status.',
   change:
     'Ask for a change after submission — the coordinator sees the knock-on impact.',
+  drafts:
+    'Requests you have saved but not yet submitted. Delete one you no longer intend to send.',
 };
 
 export const STATS: Record<Role, Stat[]> = {
