@@ -109,22 +109,23 @@ function fakeEventsUpdateClient(
 
 function fakeEventsUpdateDraftClient(
   result: Result,
-  capture?: (update: { row: Record<string, unknown>; eventId: unknown; status: unknown }) => void
+  capture?: (update: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown; status: unknown }) => void
 ): SupabaseClient {
   return {
     from(table: string) {
       assert.equal(table, 'events');
       return {
         update: (row: Record<string, unknown>) => {
-          const filters: { eventId?: unknown; status?: unknown } = {};
+          const filters: { eventId?: unknown; organiserId?: unknown; status?: unknown } = {};
           const chain = {
             eq(column: string, value: unknown) {
               if (column === 'event_id') filters.eventId = value;
+              if (column === 'organiser_id') filters.organiserId = value;
               if (column === 'status') filters.status = value;
               return chain;
             },
             select: async () => {
-              capture?.({ row, eventId: filters.eventId, status: filters.status });
+              capture?.({ row, eventId: filters.eventId, organiserId: filters.organiserId, status: filters.status });
               return result;
             }
           };
@@ -169,23 +170,24 @@ function fakeEventsListClient(
 
 function fakeEventsDeleteClient(
   result: Result,
-  capture?: (filters: { eventId: unknown; status: unknown }) => void
+  capture?: (filters: { eventId: unknown; organiserId: unknown; status: unknown }) => void
 ): SupabaseClient {
   return {
     from(table: string) {
       assert.equal(table, 'events');
       return {
         delete: () => {
-          const filters: { eventId?: unknown; status?: unknown } = {};
+          const filters: { eventId?: unknown; organiserId?: unknown; status?: unknown } = {};
           const chain = {
             eq(column: string, value: unknown) {
               if (column === 'event_id') filters.eventId = value;
+              if (column === 'organiser_id') filters.organiserId = value;
               if (column === 'status') filters.status = value;
               return chain;
             },
             select: async (columns: string) => {
               assert.equal(columns, 'event_id');
-              capture?.({ eventId: filters.eventId, status: filters.status });
+              capture?.({ eventId: filters.eventId, organiserId: filters.organiserId, status: filters.status });
               return result;
             }
           };
@@ -397,28 +399,31 @@ describe('listOwnEventRequests', () => {
 });
 
 describe('deleteEventRequestDraft', () => {
-  test('deletes, filtered to the given event and draft status', async () => {
-    let captured: { eventId: unknown; status: unknown } | undefined;
+  test('deletes, filtered to the given event, organiser and draft status', async () => {
+    let captured: { eventId: unknown; organiserId: unknown; status: unknown } | undefined;
     const result = await deleteEventRequestDraft(
       fakeEventsDeleteClient({ data: [{ event_id: 7 }], error: null }, (c) => (captured = c)),
-      7
+      7,
+      'user-1'
     );
     assert.deepEqual(result, { ok: true });
     assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.organiserId, 'user-1');
     assert.equal(captured?.status, 'draft');
   });
 
   test('reports unavailable when the delete errors', async () => {
     const result = await deleteEventRequestDraft(
       fakeEventsDeleteClient({ data: null, error: { message: 'connection reset' } }),
-      7
+      7,
+      'user-1'
     );
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable if the status changed and the delete matches ${JSON.stringify(data)} rows`, async () => {
-      const result = await deleteEventRequestDraft(fakeEventsDeleteClient({ data, error: null }), 7);
+    test(`reports unavailable if the owner or status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
+      const result = await deleteEventRequestDraft(fakeEventsDeleteClient({ data, error: null }), 7, 'user-1');
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /status may have changed/);
     });
@@ -426,14 +431,15 @@ describe('deleteEventRequestDraft', () => {
 });
 
 describe('updateEventRequestDraft', () => {
-  test('updates the given fields, filtered to the event and draft status', async () => {
-    let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
+  test('updates the given fields, filtered to the event, organiser and draft status', async () => {
+    let captured: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown; status: unknown } | undefined;
     const result = await updateEventRequestDraft(
       fakeEventsUpdateDraftClient(
         { data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft', name: 'Renamed' }], error: null },
         (c) => (captured = c)
       ),
       7,
+      'user-1',
       { ...EMPTY_VALUES, name: 'Renamed' }
     );
 
@@ -441,6 +447,7 @@ describe('updateEventRequestDraft', () => {
     if (result.ok) assert.equal(result.request.name, 'Renamed');
     assert.equal(captured?.row.name, 'Renamed');
     assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.organiserId, 'user-1');
     assert.equal(captured?.status, 'draft');
   });
 
@@ -448,14 +455,20 @@ describe('updateEventRequestDraft', () => {
     const result = await updateEventRequestDraft(
       fakeEventsUpdateDraftClient({ data: null, error: { message: 'connection reset' } }),
       7,
+      'user-1',
       EMPTY_VALUES
     );
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable if the status changed and the update matches ${JSON.stringify(data)} rows`, async () => {
-      const result = await updateEventRequestDraft(fakeEventsUpdateDraftClient({ data, error: null }), 7, EMPTY_VALUES);
+    test(`reports unavailable if the owner or status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
+      const result = await updateEventRequestDraft(
+        fakeEventsUpdateDraftClient({ data, error: null }),
+        7,
+        'user-1',
+        EMPTY_VALUES
+      );
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
     });

@@ -182,25 +182,30 @@ export async function listOwnEventRequests(
 }
 
 /**
- * Deletes an event request, but only while it is still a draft (SG2-32).
+ * Deletes an event request, but only while it is the caller's own and still
+ * a draft (SG2-32).
  *
- * Callers check ownership and status via fetchOwnEventRequest first, the
- * same shape submitEventRequestHandler already uses (SG2-30) — this never
- * confirms another organiser's request exists (see fetchOwnEventRequest).
- * The `status = 'draft'` condition is repeated on the delete itself as a
- * second guard: if the status changed in the gap between the two calls (a
- * coordinator actions it right then), zero rows come back and this reports
- * unavailable rather than silently deleting nothing, mirroring how
- * submitEventRequest treats a lost race on its own status guard.
+ * Callers already check ownership and status via fetchOwnEventRequest first
+ * — the same shape submitEventRequestHandler uses (SG2-30) — but
+ * `organiser_id` is repeated here as a condition on the write itself, not
+ * just relied on as a pre-check: an AI security review flagged that a
+ * caller of this function skipping, reordering, or losing that pre-check
+ * would otherwise let the delete reach any organiser's row by id alone
+ * (IDOR). `status = 'draft'` is repeated for the same reason and the
+ * additional race-safety already documented: if either condition no longer
+ * holds by the time this runs, zero rows come back and this reports
+ * unavailable rather than silently deleting the wrong thing or nothing.
  */
 export async function deleteEventRequestDraft(
   admin: SupabaseClient,
-  eventId: number
+  eventId: number,
+  organiserId: string
 ): Promise<DeleteDraftResult> {
   const { data, error } = await admin
     .from('events')
     .delete()
     .eq('event_id', eventId)
+    .eq('organiser_id', organiserId)
     .eq('status', 'draft')
     .select('event_id');
 
@@ -214,22 +219,25 @@ export async function deleteEventRequestDraft(
 }
 
 /**
- * Updates a draft's own fields (SG2-29), but only while it is still a draft
- * — repeated here as a second guard for the same reason as
- * deleteEventRequestDraft/submitEventRequest: a status change landing
- * between the caller's own check and this write should lose the race
- * safely (reported as unavailable) rather than silently editing a request
- * that has since moved on.
+ * Updates a draft's own fields (SG2-29), but only while it is the caller's
+ * own and still a draft — `organiser_id` and `status = 'draft'` are both
+ * conditions on the write itself, not just the caller's own pre-check (see
+ * deleteEventRequestDraft's comment; the same AI security review flagged
+ * the same gap here). If either no longer holds, zero rows come back and
+ * this reports unavailable rather than silently editing the wrong request
+ * or one that has moved on.
  */
 export async function updateEventRequestDraft(
   admin: SupabaseClient,
   eventId: number,
+  organiserId: string,
   values: DraftValues
 ): Promise<UpdateDraftResult> {
   const { data, error } = await admin
     .from('events')
     .update(values)
     .eq('event_id', eventId)
+    .eq('organiser_id', organiserId)
     .eq('status', 'draft')
     .select(RETURNED_COLUMNS);
 

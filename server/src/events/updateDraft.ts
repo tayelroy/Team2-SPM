@@ -21,7 +21,12 @@ export interface UpdateEventDraftDependencies {
     eventId: number,
     organiserId: string
   ) => Promise<FetchEventRequestResult>;
-  updateDraft?: (admin: SupabaseClient, eventId: number, values: DraftValues) => Promise<UpdateDraftResult>;
+  updateDraft?: (
+    admin: SupabaseClient,
+    eventId: number,
+    organiserId: string,
+    values: DraftValues
+  ) => Promise<UpdateDraftResult>;
 }
 
 /**
@@ -30,7 +35,9 @@ export interface UpdateEventDraftDependencies {
  * still a draft — mirrors submitEventRequestHandler / createDeleteEventDraftHandler's
  * fetch-then-check shape, reusing fetchOwnEventRequest so a request
  * belonging to someone else is indistinguishable from one that doesn't
- * exist at all.
+ * exist at all. `updateEventRequestDraft` itself also filters on the
+ * caller's organiser id (not just this pre-check), so ownership holds even
+ * if a future caller of that function skips or reorders this step.
  *
  * The body is validated exactly like create (SG2-28's validateDraftInput —
  * malformed values rejected, missing ones accepted as still-incomplete) and
@@ -86,7 +93,7 @@ export function createUpdateEventDraftHandler({
       return;
     }
 
-    const updated = await updateDraft(admin, eventId, validated.values);
+    const updated = await updateDraft(admin, eventId, principal.userId, validated.values);
     if (!updated.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;

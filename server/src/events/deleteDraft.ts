@@ -20,7 +20,7 @@ export interface DeleteEventDraftDependencies {
     eventId: number,
     organiserId: string
   ) => Promise<FetchEventRequestResult>;
-  deleteDraft?: (admin: SupabaseClient, eventId: number) => Promise<DeleteDraftResult>;
+  deleteDraft?: (admin: SupabaseClient, eventId: number, organiserId: string) => Promise<DeleteDraftResult>;
 }
 
 /**
@@ -29,6 +29,9 @@ export interface DeleteEventDraftDependencies {
  * it is still a draft — mirrors submitEventRequestHandler's fetch-then-check
  * shape (SG2-30), reusing fetchOwnEventRequest so a request belonging to
  * someone else is indistinguishable from one that doesn't exist at all.
+ * `deleteEventRequestDraft` itself also filters on the caller's organiser id
+ * (not just this pre-check), so ownership holds even if a future caller of
+ * that function skips or reorders this step.
  */
 export function createDeleteEventDraftHandler({
   getPrincipal,
@@ -73,7 +76,7 @@ export function createDeleteEventDraftHandler({
       return;
     }
 
-    const deleted = await deleteDraft(admin, eventId);
+    const deleted = await deleteDraft(admin, eventId, principal.userId);
     if (!deleted.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;

@@ -47,7 +47,7 @@ interface HarnessOptions {
   fetchResult?: FetchEventRequestResult;
   updateResult?: UpdateDraftResult;
   captureFetch?: (eventId: number, organiserId: string) => void;
-  captureUpdate?: (eventId: number, values: unknown) => void;
+  captureUpdate?: (eventId: number, organiserId: string, values: unknown) => void;
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -62,8 +62,8 @@ function buildApp(options: HarnessOptions = {}) {
         options.captureFetch?.(eventId, organiserId);
         return options.fetchResult ?? { ok: true, request: DRAFT_REQUEST };
       },
-      updateDraft: async (_admin, eventId, values) => {
-        options.captureUpdate?.(eventId, values);
+      updateDraft: async (_admin, eventId, organiserId, values) => {
+        options.captureUpdate?.(eventId, organiserId, values);
         return (
           options.updateResult ?? {
             ok: true,
@@ -77,13 +77,13 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
-  test('updates a draft owned by the caller', async () => {
+  test('updates a draft owned by the caller, passing the caller id to both the lookup and the update', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
-    let updated: { eventId: number; values: unknown } | undefined;
+    let updated: { eventId: number; organiserId: string; values: unknown } | undefined;
     const response = await request(
       buildApp({
         captureFetch: (eventId, organiserId) => (fetched = { eventId, organiserId }),
-        captureUpdate: (eventId, values) => (updated = { eventId, values })
+        captureUpdate: (eventId, organiserId, values) => (updated = { eventId, organiserId, values })
       })
     )
       .patch('/api/event-requests/7')
@@ -94,6 +94,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.deepEqual(response.body.missingForSubmission, []);
     assert.deepEqual(fetched, { eventId: 7, organiserId: 'user-1' });
     assert.equal(updated?.eventId, 7);
+    assert.equal(updated?.organiserId, 'user-1');
     assert.equal((updated?.values as { name: string }).name, 'Partner Forum');
   });
 
@@ -113,7 +114,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
   test('ownership fields in the body are ignored, not trusted', async () => {
     let updated: { eventId: number; values: unknown } | undefined;
     const response = await request(
-      buildApp({ captureUpdate: (eventId, values) => (updated = { eventId, values }) })
+      buildApp({ captureUpdate: (eventId, _organiserId, values) => (updated = { eventId, values }) })
     )
       .patch('/api/event-requests/7')
       .send({ ...COMPLETE_BODY, organiser_id: 'someone-else', status: 'approved', event_id: 999 });
@@ -142,7 +143,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
         getPrincipal: () => ORGANISER,
         getAdminClient: () => ({}) as SupabaseClient,
         fetchOwnRequest: async () => ({ ok: true, request: DRAFT_REQUEST }),
-        updateDraft: async (_admin, _eventId, values) => ({ ok: true, request: { ...DRAFT_REQUEST, ...values } })
+        updateDraft: async (_admin, _eventId, _organiserId, values) => ({ ok: true, request: { ...DRAFT_REQUEST, ...values } })
       })
     );
     const response = await request(bare).patch('/api/event-requests/7');

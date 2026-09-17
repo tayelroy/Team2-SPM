@@ -35,7 +35,7 @@ interface HarnessOptions {
   fetchResult?: FetchEventRequestResult;
   deleteResult?: DeleteDraftResult;
   captureFetch?: (eventId: number, organiserId: string) => void;
-  captureDelete?: (eventId: number) => void;
+  captureDelete?: (eventId: number, organiserId: string) => void;
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -49,8 +49,8 @@ function buildApp(options: HarnessOptions = {}) {
         options.captureFetch?.(eventId, organiserId);
         return options.fetchResult ?? { ok: true, request: DRAFT_REQUEST };
       },
-      deleteDraft: async (_admin, eventId) => {
-        options.captureDelete?.(eventId);
+      deleteDraft: async (_admin, eventId, organiserId) => {
+        options.captureDelete?.(eventId, organiserId);
         return options.deleteResult ?? { ok: true };
       }
     })
@@ -59,19 +59,19 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
-  test('deletes a draft owned by the caller', async () => {
+  test('deletes a draft owned by the caller, passing the caller id to both the lookup and the delete', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
-    let deleted: number | undefined;
+    let deleted: { eventId: number; organiserId: string } | undefined;
     const response = await request(
       buildApp({
         captureFetch: (eventId, organiserId) => (fetched = { eventId, organiserId }),
-        captureDelete: (eventId) => (deleted = eventId)
+        captureDelete: (eventId, organiserId) => (deleted = { eventId, organiserId })
       })
     ).delete('/api/event-requests/7');
 
     assert.equal(response.status, 200);
     assert.deepEqual(fetched, { eventId: 7, organiserId: 'user-1' });
-    assert.equal(deleted, 7);
+    assert.deepEqual(deleted, { eventId: 7, organiserId: 'user-1' });
   });
 
   test('returns 400 for a non-numeric eventId, without querying the database', async () => {
