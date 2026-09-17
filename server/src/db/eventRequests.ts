@@ -25,6 +25,18 @@ export type SubmitEventRequestResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'unavailable'; message: string };
 
+export type ListOwnEventRequestsResult =
+  | { ok: true; requests: EventRequestRecord[] }
+  | { ok: false; reason: 'unavailable'; message: string };
+
+export type DeleteDraftResult =
+  | { ok: true }
+  | { ok: false; reason: 'unavailable'; message: string };
+
+export type UpdateDraftResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'unavailable'; message: string };
+
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
@@ -144,6 +156,96 @@ export async function submitEventRequest(
   }
   if (!data || data.length === 0) {
     return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
+  }
+  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+}
+
+/**
+ * Lists every event request belonging to the caller (SG2-32's minimal slice
+ * of SG2-31 — enough to see and act on your own requests, not the full "see
+ * the state of my requests" feature).
+ */
+export async function listOwnEventRequests(
+  admin: SupabaseClient,
+  organiserId: string
+): Promise<ListOwnEventRequestsResult> {
+  const { data, error } = await admin
+    .from('events')
+    .select(RETURNED_COLUMNS)
+    .eq('organiser_id', organiserId)
+    .order('event_id', { ascending: false });
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  return { ok: true, requests: (data ?? []) as unknown as EventRequestRecord[] };
+}
+
+/**
+ * Deletes an event request, but only while it is the caller's own and still
+ * a draft (SG2-32).
+ *
+ * Callers already check ownership and status via fetchOwnEventRequest first
+ * — the same shape submitEventRequestHandler uses (SG2-30) — but
+ * `organiser_id` is repeated here as a condition on the write itself, not
+ * just relied on as a pre-check: an AI security review flagged that a
+ * caller of this function skipping, reordering, or losing that pre-check
+ * would otherwise let the delete reach any organiser's row by id alone
+ * (IDOR). `status = 'draft'` is repeated for the same reason and the
+ * additional race-safety already documented: if either condition no longer
+ * holds by the time this runs, zero rows come back and this reports
+ * unavailable rather than silently deleting the wrong thing or nothing.
+ */
+export async function deleteEventRequestDraft(
+  admin: SupabaseClient,
+  eventId: number,
+  organiserId: string
+): Promise<DeleteDraftResult> {
+  const { data, error } = await admin
+    .from('events')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('organiser_id', organiserId)
+    .eq('status', 'draft')
+    .select('event_id');
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'unavailable', message: 'The draft was not deleted; its status may have changed.' };
+  }
+  return { ok: true };
+}
+
+/**
+ * Updates a draft's own fields (SG2-29), but only while it is the caller's
+ * own and still a draft — `organiser_id` and `status = 'draft'` are both
+ * conditions on the write itself, not just the caller's own pre-check (see
+ * deleteEventRequestDraft's comment; the same AI security review flagged
+ * the same gap here). If either no longer holds, zero rows come back and
+ * this reports unavailable rather than silently editing the wrong request
+ * or one that has moved on.
+ */
+export async function updateEventRequestDraft(
+  admin: SupabaseClient,
+  eventId: number,
+  organiserId: string,
+  values: DraftValues
+): Promise<UpdateDraftResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update(values)
+    .eq('event_id', eventId)
+    .eq('organiser_id', organiserId)
+    .eq('status', 'draft')
+    .select(RETURNED_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'unavailable', message: 'The draft was not returned after update.' };
   }
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { PIPELINE, STATS } from '../mock/data';
 import type { EventCard, Role, Screen } from '../mock/types';
 import {
@@ -17,6 +18,7 @@ import {
   RecessedCard,
   StatFigure,
 } from '../ui';
+import { listMyEventRequests } from '../api/eventRequests';
 
 /** One event summary in the left-hand list — the whole tile is the trigger. */
 function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) {
@@ -84,15 +86,44 @@ function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) 
  */
 export default function Dashboard({
   role,
+  accessToken = null,
   onNavigate,
 }: {
   role: Role;
+  accessToken?: string | null;
   onNavigate: (screen: Screen) => void;
 }) {
   const cards = eventCards(role).slice(0, 4);
   const openEvent = role === 'Attendee' ? 'attendee' : 'detail';
   // An organiser has no list view to expand into, so the arrow goes to detail.
   const expandTo = role === 'Event Organiser' ? 'detail' : 'events';
+
+  // Everything on this dashboard is still mock data (SG2-31 hasn't shipped)
+  // except this one figure: the "Draft" count for an Event Organiser, which
+  // now reads the real count instead of a hardcoded stat. Stays null (and
+  // the mock value shows through) until it loads, and on any failure —
+  // this single tile isn't worth an error state of its own.
+  const [draftCount, setDraftCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (role !== 'Event Organiser' || !accessToken) {
+      setDraftCount(null);
+      return;
+    }
+    let cancelled = false;
+    listMyEventRequests(accessToken).then((outcome) => {
+      if (cancelled || !outcome.ok) return;
+      setDraftCount(outcome.requests.filter((request) => request.status === 'draft').length);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, accessToken]);
+
+  const stats = STATS[role].map((stat) =>
+    role === 'Event Organiser' && stat.label === 'Draft' && draftCount !== null
+      ? { ...stat, value: String(draftCount) }
+      : stat
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -103,7 +134,7 @@ export default function Dashboard({
           gap: '20px',
         }}
       >
-        {STATS[role].map((stat) => (
+        {stats.map((stat) => (
           <Card key={stat.label} padding="28px 30px" style={{ gap: '10px' }}>
             <StatFigure value={stat.value} label={stat.label} />
           </Card>
