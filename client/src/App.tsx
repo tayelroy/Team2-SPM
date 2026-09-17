@@ -48,6 +48,7 @@ export default function App() {
   const [session, setSession] = useState<StoredSession | null>(() => loadSession());
   const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
   const [logoutState, setLogoutState] = useState<'pending' | 'failed' | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<number | undefined>(undefined);
 
   // Best-effort background check that a persisted session is still valid.
   // Trusts the cached session for the current render (no loading flash);
@@ -122,8 +123,24 @@ export default function App() {
 
   const body = {
     dashboard: <Dashboard role={role} onNavigate={setScreen} />,
-    events: <EventsTable role={role} onOpenEvent={() => setScreen('detail')} />,
-    detail: <EventDetail role={role} onNavigate={setScreen} />,
+    events: (
+      <EventsTable
+        role={role}
+        accessToken={session!.accessToken}
+        onOpenEvent={(id) => {
+          if (id !== undefined) setSelectedEventId(id);
+          setScreen('detail');
+        }}
+      />
+    ),
+    detail: (
+      <EventDetail
+        role={role}
+        onNavigate={setScreen}
+        selectedEventId={selectedEventId}
+        accessToken={session!.accessToken}
+      />
+    ),
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
     venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
     calendar: <AvailabilityCalendar />,

@@ -91,8 +91,8 @@ export default function Dashboard({
 }) {
   const cards = eventCards(role).slice(0, 4);
   const openEvent = role === 'Attendee' ? 'attendee' : 'detail';
-  // An organiser has no list view to expand into, so the arrow goes to detail.
-  const expandTo = role === 'Event Organiser' ? 'detail' : 'events';
+  // Both coordinators and organisers route to the full events table.
+  const expandTo = 'events';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
