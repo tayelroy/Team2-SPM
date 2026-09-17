@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { createEventRequestDraft, submitEventRequest } from '../api/eventRequests';
+import { createEventRequestDraft, submitEventRequest, updateEventRequestDraft } from '../api/eventRequests';
+import type { EventRequestDraftInput } from '../api/eventRequests';
 import { NEXT_STEPS, REQUIREMENT_CHIPS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
@@ -50,15 +51,6 @@ type SaveState =
   | { kind: 'error'; message: string; details?: string[] };
 
 type FormValues = Record<RequiredField, string>;
-
-const INITIAL_FORM: FormValues = {
-  name: '',
-  purpose: '',
-  description: '',
-  proposed_date: '',
-  expected_attendance: '',
-  venue_requirements: '',
-};
 
 const INITIAL_REQUIREMENTS = [
   'Step-free access',
@@ -179,8 +171,12 @@ function OptionalTextField({
  * returns is kept locally so a same-session "Submit request" targets the
  * draft that was just created, even though `eventId` was never passed in as
  * a prop. `onSaveDraft`, when provided, overrides this and takes over the
- * click entirely (used by callers reopening an already-saved draft with
- * their own persistence, e.g. a future edit screen).
+ * click entirely.
+ *
+ * Editing an existing draft (SG2-29): when `eventId` and `initialValues` are
+ * both supplied from the start (as the "My drafts" → Edit entry point does),
+ * the form seeds its fields from `initialValues` and "Save draft" calls
+ * `PATCH /api/event-requests/:eventId` instead of creating a new row.
  *
  * "Submit request" (SG2-30): AC1 — with a resolved event id and an
  * `accessToken`, calls `PATCH /api/event-requests/:eventId/submit` and fires
@@ -194,6 +190,7 @@ function OptionalTextField({
  */
 export default function RequestForm({
   eventId,
+  initialValues,
   accessToken,
   onSuccess,
   /** @deprecated Use `onSuccess` instead. Kept for backward compatibility. */
@@ -204,6 +201,11 @@ export default function RequestForm({
   /** The event request id this form is editing. Optional: when absent, a
    *  successful "Save draft" supplies one instead (see above). */
   eventId?: string;
+  /**
+   * An existing draft's saved field values, to seed the form when editing.
+   * Only meaningful alongside `eventId` — a fresh "New request" has none.
+   */
+  initialValues?: EventRequestDraftInput;
   /** Bearer token for the signed-in organiser. Required alongside a resolved event id. */
   accessToken?: string;
   /** Called after a successful submission (or immediately in mockup mode). */
@@ -216,7 +218,7 @@ export default function RequestForm({
   onSubmit?: () => void;
   /**
    * Overrides "Save draft" entirely when provided, instead of the built-in
-   * `POST /api/event-requests` call.
+   * create/update call.
    */
   onSaveDraft?: () => void;
   /** Mirrors the mockup's `flagConflicts` prop — hides the suitability warning. */
@@ -225,11 +227,19 @@ export default function RequestForm({
   // Resolve whichever success callback was provided (onSuccess takes priority).
   const successCallback = onSuccess ?? onSubmit;
 
-  const [values, setValues] = useState<FormValues>(INITIAL_FORM);
+  const [values, setValues] = useState<FormValues>(() => ({
+    name: initialValues?.name ?? '',
+    purpose: initialValues?.purpose ?? '',
+    description: initialValues?.description ?? '',
+    proposed_date: initialValues?.proposed_date ?? '',
+    expected_attendance:
+      initialValues?.expected_attendance != null ? String(initialValues.expected_attendance) : '',
+    venue_requirements: initialValues?.venue_requirements ?? '',
+  }));
   const [requirements, setRequirements] = useState<string[]>(INITIAL_REQUIREMENTS);
-  const [accessibility, setAccessibility] = useState('');
-  const [equipment, setEquipment] = useState('');
-  const [registrationNeeded, setRegistrationNeeded] = useState(false);
+  const [accessibility, setAccessibility] = useState(initialValues?.accessibility_needs ?? '');
+  const [equipment, setEquipment] = useState(initialValues?.equipment_requirements ?? '');
+  const [registrationNeeded, setRegistrationNeeded] = useState(initialValues?.registration_needed ?? false);
   const [touched, setTouched] = useState<Set<RequiredField>>(new Set());
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -266,7 +276,7 @@ export default function RequestForm({
 
     setSaveState({ kind: 'saving' });
     const attendanceValue = Number(values.expected_attendance);
-    const outcome = await createEventRequestDraft({
+    const payload = {
       ...(values.name.trim() ? { name: values.name.trim() } : {}),
       ...(values.purpose.trim() ? { purpose: values.purpose.trim() } : {}),
       ...(values.description.trim() ? { description: values.description.trim() } : {}),
@@ -278,13 +288,21 @@ export default function RequestForm({
       ...(accessibility.trim() ? { accessibility_needs: accessibility.trim() } : {}),
       ...(equipment.trim() ? { equipment_requirements: equipment.trim() } : {}),
       registration_needed: registrationNeeded,
-    });
+    };
+
+    // An `eventId` supplied from the start (editing an existing draft) plus
+    // an access token means there's a real row to update; otherwise this is
+    // a fresh draft being created for the first time.
+    const outcome =
+      eventId && accessToken
+        ? await updateEventRequestDraft(eventId, payload, accessToken)
+        : await createEventRequestDraft(payload);
 
     if (!outcome.ok) {
       setSaveState({ kind: 'error', message: outcome.message, details: outcome.details });
       return;
     }
-    setCreatedEventId(outcome.request.event_id);
+    if (!eventId) setCreatedEventId(outcome.request.event_id);
     setSaveState({ kind: 'saved', reference: outcome.request.event_id, missing: outcome.missingForSubmission });
   }
 

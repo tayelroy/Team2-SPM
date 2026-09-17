@@ -33,6 +33,10 @@ export type DeleteDraftResult =
   | { ok: true }
   | { ok: false; reason: 'unavailable'; message: string };
 
+export type UpdateDraftResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'unavailable'; message: string };
+
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
@@ -207,4 +211,33 @@ export async function deleteEventRequestDraft(
     return { ok: false, reason: 'unavailable', message: 'The draft was not deleted; its status may have changed.' };
   }
   return { ok: true };
+}
+
+/**
+ * Updates a draft's own fields (SG2-29), but only while it is still a draft
+ * — repeated here as a second guard for the same reason as
+ * deleteEventRequestDraft/submitEventRequest: a status change landing
+ * between the caller's own check and this write should lose the race
+ * safely (reported as unavailable) rather than silently editing a request
+ * that has since moved on.
+ */
+export async function updateEventRequestDraft(
+  admin: SupabaseClient,
+  eventId: number,
+  values: DraftValues
+): Promise<UpdateDraftResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update(values)
+    .eq('event_id', eventId)
+    .eq('status', 'draft')
+    .select(RETURNED_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'unavailable', message: 'The draft was not returned after update.' };
+  }
+  return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }

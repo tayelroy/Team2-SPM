@@ -10,16 +10,24 @@ function formatStatus(status: string): string {
 }
 
 /**
- * "My draft requests" — SG2-32's minimal slice of SG2-31: enough to see and
- * delete your own event requests. Not the full "see the state of my
- * requests" feature (no coordinator-facing view, no status history).
+ * "My draft requests" — SG2-32's minimal slice of SG2-31: enough to see,
+ * edit (SG2-29) and delete your own event requests. Not the full "see the
+ * state of my requests" feature (no coordinator-facing view, no status
+ * history).
  */
-export default function DraftRequests({ accessToken = null }: { accessToken?: string | null }) {
+export default function DraftRequests({
+  accessToken = null,
+  onEdit
+}: {
+  accessToken?: string | null;
+  /** Opens an existing draft in the edit form. */
+  onEdit: (request: EventRequestDraft) => void;
+}) {
   // Remount on identity changes, immediately removing the previous user's data.
-  return <MyDraftRequests key={accessToken} token={accessToken} />;
+  return <MyDraftRequests key={accessToken} token={accessToken} onEdit={onEdit} />;
 }
 
-function MyDraftRequests({ token }: { token: string | null }) {
+function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (request: EventRequestDraft) => void }) {
   const [requests, setRequests] = useState<EventRequestDraft[]>([]);
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState('');
@@ -135,14 +143,17 @@ function MyDraftRequests({ token }: { token: string | null }) {
                   </GhostButton>
                 </div>
               ) : (
-                <GhostButton
-                  onClick={() => {
-                    setDeleteError('');
-                    setConfirmingId(request.event_id);
-                  }}
-                >
-                  Delete
-                </GhostButton>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <GhostButton onClick={() => onEdit(request)}>Edit</GhostButton>
+                  <GhostButton
+                    onClick={() => {
+                      setDeleteError('');
+                      setConfirmingId(request.event_id);
+                    }}
+                  >
+                    Delete
+                  </GhostButton>
+                </div>
               ))}
           </Card>
         );

@@ -202,3 +202,61 @@ export async function deleteEventRequestDraft(
   if (response.status === 409) return { ok: false, message: 'Only a draft request can be deleted.' };
   return { ok: false, message: UNAVAILABLE };
 }
+
+export type UpdateDraftOutcome =
+  | { ok: true; request: EventRequestDraft; missingForSubmission: string[] }
+  | { ok: false; message: string; details?: string[] };
+
+/**
+ * Updates a draft's own fields while it is still a draft (SG2-29). Maps to
+ * `PATCH /api/event-requests/:eventId`. Sends the complete current field
+ * set as a full replace, same as createEventRequestDraft — the form holds
+ * complete state client-side rather than tracking a diff.
+ *
+ * @param eventId UUID of the event request to update.
+ * @param input   The complete current field values.
+ * @param token   Bearer access token from the signed-in session.
+ */
+export async function updateEventRequestDraft(
+  eventId: string,
+  input: EventRequestDraftInput,
+  token: string
+): Promise<UpdateDraftOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(input)
+    });
+  } catch {
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) return { ok: false, message: 'You are signed out. Sign in again to save this draft.' };
+    if (response.status === 403) return { ok: false, message: 'Your role cannot edit event requests.' };
+    if (response.status === 404) return { ok: false, message: 'This draft no longer exists.' };
+    if (response.status === 409) return { ok: false, message: 'Only a draft request can be edited.' };
+    return {
+      ok: false,
+      message: body?.error ?? `Could not save the draft (HTTP ${response.status}).`,
+      details: body?.details
+    };
+  }
+
+  if (!body?.request) {
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  return {
+    ok: true,
+    request: body.request as EventRequestDraft,
+    missingForSubmission: (body.missingForSubmission ?? []) as string[]
+  };
+}

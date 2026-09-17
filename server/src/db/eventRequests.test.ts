@@ -7,7 +7,8 @@ import {
   fetchOwnEventRequest,
   insertEventRequestDraft,
   listOwnEventRequests,
-  submitEventRequest
+  submitEventRequest,
+  updateEventRequestDraft
 } from './eventRequests';
 import type { DraftValues } from '../events/fields';
 
@@ -91,6 +92,34 @@ function fakeEventsUpdateClient(
               return chain;
             },
             in(column: string, value: unknown) {
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            select: async () => {
+              capture?.({ row, eventId: filters.eventId, status: filters.status });
+              return result;
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+function fakeEventsUpdateDraftClient(
+  result: Result,
+  capture?: (update: { row: Record<string, unknown>; eventId: unknown; status: unknown }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        update: (row: Record<string, unknown>) => {
+          const filters: { eventId?: unknown; status?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
               if (column === 'status') filters.status = value;
               return chain;
             },
@@ -392,6 +421,43 @@ describe('deleteEventRequestDraft', () => {
       const result = await deleteEventRequestDraft(fakeEventsDeleteClient({ data, error: null }), 7);
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /status may have changed/);
+    });
+  }
+});
+
+describe('updateEventRequestDraft', () => {
+  test('updates the given fields, filtered to the event and draft status', async () => {
+    let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
+    const result = await updateEventRequestDraft(
+      fakeEventsUpdateDraftClient(
+        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft', name: 'Renamed' }], error: null },
+        (c) => (captured = c)
+      ),
+      7,
+      { ...EMPTY_VALUES, name: 'Renamed' }
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.name, 'Renamed');
+    assert.equal(captured?.row.name, 'Renamed');
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.status, 'draft');
+  });
+
+  test('reports unavailable when the update errors', async () => {
+    const result = await updateEventRequestDraft(
+      fakeEventsUpdateDraftClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      EMPTY_VALUES
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`reports unavailable if the status changed and the update matches ${JSON.stringify(data)} rows`, async () => {
+      const result = await updateEventRequestDraft(fakeEventsUpdateDraftClient({ data, error: null }), 7, EMPTY_VALUES);
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.match(result.message, /not returned/);
     });
   }
 });

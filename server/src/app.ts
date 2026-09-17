@@ -10,6 +10,7 @@ import { createEventDraftHandler } from './events/createDraft';
 import { submitEventRequestHandler } from './events/submit';
 import { createListMyEventRequestsHandler } from './events/listMine';
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
+import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createVenuesRouter } from './venues';
 
 export function createApp(
@@ -22,7 +23,8 @@ export function createApp(
   loginRateLimit: RequestHandler = createLoginRateLimiter(),
   eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal }),
   listMyEventRequestsHandler: RequestHandler = createListMyEventRequestsHandler({ getPrincipal: access.getPrincipal }),
-  deleteEventDraftHandler: RequestHandler = createDeleteEventDraftHandler({ getPrincipal: access.getPrincipal })
+  deleteEventDraftHandler: RequestHandler = createDeleteEventDraftHandler({ getPrincipal: access.getPrincipal }),
+  updateEventDraftHandler: RequestHandler = createUpdateEventDraftHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -67,6 +69,12 @@ export function createApp(
     '/:eventId',
     access.requirePermission('event_request.delete'),
     deleteEventDraftHandler
+  );
+  // SG2-29: edit a request's own fields while it is still a draft.
+  eventRequests.patch(
+    '/:eventId',
+    access.requirePermission('event_request.update'),
+    updateEventDraftHandler
   );
   app.use('/api/event-requests', eventRequests);
 

@@ -23,7 +23,8 @@ export type Screen =
   | 'equipment'
   | 'attendee'
   | 'change'
-  | 'drafts';
+  | 'drafts'
+  | 'editDraft';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;

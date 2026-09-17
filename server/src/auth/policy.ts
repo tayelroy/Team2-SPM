@@ -25,6 +25,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // (fetchOwnEventRequest / listOwnEventRequests), not by this role grant.
   'event_request.read': ['event_organiser'],
   'event_request.delete': ['event_organiser'],
+  // SG2-29: an organiser can edit their own request's fields while it is
+  // still a draft.
+  'event_request.update': ['event_organiser'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff']

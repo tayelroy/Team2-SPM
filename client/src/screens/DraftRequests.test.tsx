@@ -8,6 +8,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const noop = () => {};
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: Error) => void;
@@ -39,38 +41,55 @@ const SUBMITTED = { event_id: 8, status: 'submitted', name: 'Board Offsite' };
 test('no token never loads data', () => {
   const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);
-  render(<DraftRequests />);
+  render(<DraftRequests onEdit={noop} />);
   expect(screen.getByText(/Sign in with your account/)).toBeInTheDocument();
   expect(fetch).not.toHaveBeenCalled();
 });
 
 test('shows loading, then the empty state when the caller has no requests', async () => {
   const fetch = api([]);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading your requests');
   expect(await screen.findByRole('heading', { name: 'No event requests yet' })).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith('/api/event-requests', { headers: { Authorization: 'Bearer test-token' } });
 });
 
-test('lists requests and only offers Delete on drafts', async () => {
+test('lists requests and only offers Edit/Delete on drafts', async () => {
   api([DRAFT, SUBMITTED]);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Board Offsite' })).toBeInTheDocument();
   expect(screen.getByText('Draft')).toBeInTheDocument();
   expect(screen.getByText('Submitted')).toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1);
   expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+});
+
+test('Edit hands the clicked request to onEdit', async () => {
+  api([DRAFT, SUBMITTED]);
+  const onEdit = vi.fn();
+  render(<DraftRequests accessToken="test-token" onEdit={onEdit} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+  expect(onEdit).toHaveBeenCalledOnce();
+  expect(onEdit).toHaveBeenCalledWith(DRAFT);
+});
+
+test('Edit is hidden once a delete confirmation is showing for that draft', async () => {
+  api([DRAFT]);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
 });
 
 test('falls back to "Untitled request" when the name is blank', async () => {
   api([{ event_id: 9, status: 'draft', name: '  ' }]);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('heading', { name: 'Untitled request' })).toBeInTheDocument();
 });
 
 test('deleting a draft requires confirmation, and Cancel backs out without calling the API', async () => {
   const fetch = api([DRAFT]);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(screen.getByRole('alert')).toHaveTextContent("Delete this draft? This can't be undone.");
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -82,7 +101,7 @@ test('deleting a draft requires confirmation, and Cancel backs out without calli
 test('confirming delete removes the request and disables the buttons while in flight', async () => {
   const fetch = api([DRAFT]);
   const del = deferred<Response>();
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   fetch.mockImplementationOnce(() => del.promise);
   fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
@@ -98,7 +117,7 @@ test('confirming delete removes the request and disables the buttons while in fl
 
 test('a failed delete shows an error and keeps the request in the list', async () => {
   const fetch = api([DRAFT]);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   fetch.mockImplementationOnce(async () => new Response(null, { status: 409 }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
@@ -121,7 +140,7 @@ test('clicking Delete on a different draft clears an existing delete error', asy
     throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
   });
   vi.stubGlobal('fetch', fetch);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   const deleteButtons = await screen.findAllByRole('button', { name: 'Delete' });
   fireEvent.click(deleteButtons[0]);
   fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
@@ -133,7 +152,7 @@ test('clicking Delete on a different draft clears an existing delete error', asy
 test('a load failure offers retry and recovers', async () => {
   const fetch = vi.fn().mockRejectedValueOnce(new Error('offline'));
   vi.stubGlobal('fetch', fetch);
-  render(<DraftRequests accessToken="test-token" />);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the server. Please try again.');
   fetch.mockResolvedValueOnce(Response.json({ requests: [DRAFT] }));
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -144,8 +163,8 @@ test('a stale successful load cannot restore another user’s requests', async (
   const load = deferred<Response>();
   const fetch = vi.fn(() => load.promise);
   vi.stubGlobal('fetch', fetch);
-  const { rerender } = render(<DraftRequests accessToken="test-token" />);
-  rerender(<DraftRequests accessToken={null} />);
+  const { rerender } = render(<DraftRequests accessToken="test-token" onEdit={noop} />);
+  rerender(<DraftRequests accessToken={null} onEdit={noop} />);
   await act(async () => load.resolve(Response.json({ requests: [DRAFT] })));
   expect(screen.queryByRole('heading', { name: 'Partner Forum' })).not.toBeInTheDocument();
 });

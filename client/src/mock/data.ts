@@ -170,6 +170,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   attendee: 'Event page',
   change: 'Change request',
   drafts: 'My draft requests',
+  editDraft: 'Edit draft request',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -189,6 +190,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Ask for a change after submission — the coordinator sees the knock-on impact.',
   drafts:
     'Requests you have saved but not yet submitted. Delete one you no longer intend to send.',
+  editDraft: 'Update the details, then save your changes or submit when ready.',
 };
 
 export const STATS: Record<Role, Stat[]> = {
