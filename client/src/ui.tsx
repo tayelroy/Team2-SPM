@@ -9,7 +9,7 @@
  */
 
 import { useId } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
+import type { ChangeEvent, CSSProperties, ReactNode } from 'react';
 import { color, gradient, label as labelToken, radius, rule, surface } from './theme';
 
 interface WithChildren {
@@ -125,12 +125,14 @@ export function GradientButton({
 export function GhostButton({
   children,
   onClick,
+  disabled,
   style,
-}: WithChildren & { onClick?: () => void; style?: CSSProperties }) {
+}: WithChildren & { onClick?: () => void; disabled?: boolean; style?: CSSProperties }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       style={{
         background: color.deep,
         border: rule.raised,
@@ -139,7 +141,8 @@ export function GhostButton({
         color: color.platinum,
         fontSize: '14px',
         letterSpacing: '0.06em',
-        cursor: 'pointer',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
         ...style,
       }}
     >
@@ -221,6 +224,8 @@ export function Chip({
 export function Field({
   label,
   defaultValue,
+  value,
+  onChange,
   hint,
   type,
   placeholder,
@@ -229,6 +234,9 @@ export function Field({
 }: {
   label: string;
   defaultValue?: string;
+  /** Controlled value. Pass together with onChange; omit both to stay uncontrolled. */
+  value?: string;
+  onChange?: (next: string) => void;
   hint?: string;
   type?: string;
   placeholder?: string;
@@ -239,6 +247,11 @@ export function Field({
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
+  // React warns when an input receives both value and defaultValue, so pick
+  // one mode: controlled only when a change handler is supplied.
+  const binding = onChange
+    ? { value: value ?? '', onChange: (e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value) }
+    : { defaultValue };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <label htmlFor={id} style={labelToken}>
@@ -247,7 +260,7 @@ export function Field({
       <input
         id={id}
         type={type}
-        defaultValue={defaultValue}
+        {...binding}
         placeholder={placeholder}
         readOnly={muted}
         aria-describedby={hint ? hintId : undefined}
@@ -281,15 +294,23 @@ export function Field({
 export function TextField({
   label,
   defaultValue,
+  value,
+  onChange,
   placeholder,
   rows = 3,
 }: {
   label: string;
   defaultValue?: string;
+  /** Controlled value. Pass together with onChange; omit both to stay uncontrolled. */
+  value?: string;
+  onChange?: (next: string) => void;
   placeholder?: string;
   rows?: number;
 }) {
   const id = useId();
+  const binding = onChange
+    ? { value: value ?? '', onChange: (e: ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value) }
+    : { defaultValue };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <label htmlFor={id} style={labelToken}>
@@ -298,7 +319,7 @@ export function TextField({
       <textarea
         id={id}
         rows={rows}
-        defaultValue={defaultValue}
+        {...binding}
         placeholder={placeholder}
         style={{
           background: surface.field,

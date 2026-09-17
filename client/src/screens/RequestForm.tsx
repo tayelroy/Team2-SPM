@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { submitEventRequest } from '../api/eventRequests';
+import { createEventRequestDraft, submitEventRequest } from '../api/eventRequests';
 import { NEXT_STEPS, REQUIREMENT_CHIPS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
@@ -31,7 +31,7 @@ const REQUIRED_FIELDS = [
 
 type RequiredField = (typeof REQUIRED_FIELDS)[number];
 
-/** Human-readable labels for inline validation errors. */
+/** Human-readable labels for inline validation errors and outstanding-field summaries. */
 const FIELD_LABELS: Record<RequiredField, string> = {
   name: 'Event name',
   purpose: 'Purpose',
@@ -42,6 +42,12 @@ const FIELD_LABELS: Record<RequiredField, string> = {
 };
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
+
+type SaveState =
+  | { kind: 'idle' }
+  | { kind: 'saving' }
+  | { kind: 'saved'; reference: number; missing: string[] }
+  | { kind: 'error'; message: string; details?: string[] };
 
 type FormValues = Record<RequiredField, string>;
 
@@ -123,21 +129,68 @@ function FormField({
 }
 
 /**
- * New / edit event request (SG2-30 — Phase 4 frontend).
+ * A non-mandatory multi-line field for the two optional details a draft can
+ * carry (SG2-28): accessibility needs and equipment requirements. Unlike
+ * FormField, blank is a valid, final answer — no `*`, no required styling.
+ */
+function OptionalTextField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = useId();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <label htmlFor={id} style={labelToken}>
+        {label}
+      </label>
+      <textarea
+        id={id}
+        rows={2}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          background: surface.fieldOnAbyss,
+          border: rule.control,
+          borderRadius: radius.sm,
+          padding: '13px 14px',
+          color: color.mist,
+          fontSize: '14px',
+          lineHeight: 1.43,
+          outline: 'none',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * New / edit event request.
  *
- * AC1: When `eventId` and `accessToken` are provided, submitting calls
- *      `PATCH /api/event-requests/:eventId/submit` and fires `onSuccess`
- *      (or the legacy `onSubmit` alias) on success.
- *      When those props are absent (mockup / prototype usage), the button
- *      immediately fires `onSuccess`/`onSubmit` so existing integration tests
- *      and the App.tsx mockup path continue to work.
- * AC2: The "Submit request" button is disabled while any mandatory field is
- *      empty. After a failed attempt, inline errors appear on each blank field.
- *      Server errors (400/409/503) surface as a visible alert banner.
- * AC3: Not in scope for RequestForm itself — see EventDetail for immutability.
+ * "Save draft" (SG2-28): posts the current field values to
+ * `POST /api/event-requests` and shows the server's outstanding-field list
+ * back to the user rather than blocking the save on completeness. The id it
+ * returns is kept locally so a same-session "Submit request" targets the
+ * draft that was just created, even though `eventId` was never passed in as
+ * a prop. `onSaveDraft`, when provided, overrides this and takes over the
+ * click entirely (used by callers reopening an already-saved draft with
+ * their own persistence, e.g. a future edit screen).
  *
- * "Save draft" is handled by SG2-28 / PR #18 — deliberately left untouched
- * aside from firing the `onSaveDraft` callback when provided.
+ * "Submit request" (SG2-30): AC1 — with a resolved event id and an
+ * `accessToken`, calls `PATCH /api/event-requests/:eventId/submit` and fires
+ * `onSuccess`. Without a resolved id (a fresh, never-saved draft with no
+ * `onSaveDraft` override), submission falls back to the prototype hand-off
+ * so the mockup / test paths that predate real wiring keep working.
+ * AC2 — the submit button is disabled while any mandatory field is empty;
+ * inline errors appear on a blank field once touched; server errors
+ * (400/409/503) surface as a visible alert banner.
+ * AC3 — not in scope for RequestForm itself; see EventDetail for immutability.
  */
 export default function RequestForm({
   eventId,
@@ -148,10 +201,10 @@ export default function RequestForm({
   onSaveDraft,
   showConflicts = true,
 }: {
-  /** The event request UUID this form is editing. Optional: when absent,
-   *  submission bypasses the API (prototype / mockup mode). */
+  /** The event request id this form is editing. Optional: when absent, a
+   *  successful "Save draft" supplies one instead (see above). */
   eventId?: string;
-  /** Bearer token for the signed-in organiser. Required alongside `eventId`. */
+  /** Bearer token for the signed-in organiser. Required alongside a resolved event id. */
   accessToken?: string;
   /** Called after a successful submission (or immediately in mockup mode). */
   onSuccess?: () => void;
@@ -162,8 +215,8 @@ export default function RequestForm({
    */
   onSubmit?: () => void;
   /**
-   * Called when "Save draft" is clicked. Left to the SG2-28 implementation;
-   * this component only fires the callback when provided.
+   * Overrides "Save draft" entirely when provided, instead of the built-in
+   * `POST /api/event-requests` call.
    */
   onSaveDraft?: () => void;
   /** Mirrors the mockup's `flagConflicts` prop — hides the suitability warning. */
@@ -174,14 +227,19 @@ export default function RequestForm({
 
   const [values, setValues] = useState<FormValues>(INITIAL_FORM);
   const [requirements, setRequirements] = useState<string[]>(INITIAL_REQUIREMENTS);
+  const [accessibility, setAccessibility] = useState('');
+  const [equipment, setEquipment] = useState('');
+  const [registrationNeeded, setRegistrationNeeded] = useState(false);
   const [touched, setTouched] = useState<Set<RequiredField>>(new Set());
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  // Local draft confirmation — keeps the original prototype feedback when
-  // no external onSaveDraft handler is wired up (SG2-28 handles real saves).
-  const [drafted, setDrafted] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
+  // Set once "Save draft" creates a real row, so "Submit request" in the same
+  // sitting targets it even though no eventId prop was ever passed in.
+  const [createdEventId, setCreatedEventId] = useState<number | null>(null);
 
   const emptyFields = REQUIRED_FIELDS.filter((k) => !values[k].trim());
+  const effectiveEventId = eventId ?? (createdEventId !== null ? String(createdEventId) : undefined);
 
   // When no real required-field data exists yet (fresh form), the submit
   // button is disabled. During an in-flight request it is also disabled.
@@ -199,18 +257,40 @@ export default function RequestForm({
         : current.concat(name),
     );
 
-  function handleSaveDraft() {
+  /** Blank optional fields are omitted so the server stores null, not an empty string. */
+  async function handleSaveDraft() {
     if (onSaveDraft) {
       onSaveDraft();
-    } else {
-      // Prototype fallback: show inline confirmation without an external handler.
-      setDrafted(true);
+      return;
     }
+
+    setSaveState({ kind: 'saving' });
+    const attendanceValue = Number(values.expected_attendance);
+    const outcome = await createEventRequestDraft({
+      ...(values.name.trim() ? { name: values.name.trim() } : {}),
+      ...(values.purpose.trim() ? { purpose: values.purpose.trim() } : {}),
+      ...(values.description.trim() ? { description: values.description.trim() } : {}),
+      ...(values.proposed_date.trim() ? { proposed_date: values.proposed_date.trim() } : {}),
+      ...(values.expected_attendance.trim() && Number.isFinite(attendanceValue)
+        ? { expected_attendance: attendanceValue }
+        : {}),
+      ...(values.venue_requirements.trim() ? { venue_requirements: values.venue_requirements.trim() } : {}),
+      ...(accessibility.trim() ? { accessibility_needs: accessibility.trim() } : {}),
+      ...(equipment.trim() ? { equipment_requirements: equipment.trim() } : {}),
+      registration_needed: registrationNeeded,
+    });
+
+    if (!outcome.ok) {
+      setSaveState({ kind: 'error', message: outcome.message, details: outcome.details });
+      return;
+    }
+    setCreatedEventId(outcome.request.event_id);
+    setSaveState({ kind: 'saved', reference: outcome.request.event_id, missing: outcome.missingForSubmission });
   }
 
   async function handleSubmit() {
-    // Mockup / prototype mode: no real API call needed.
-    if (!eventId || !accessToken) {
+    // Mockup / prototype mode: no resolvable draft to submit against.
+    if (!effectiveEventId || !accessToken) {
       successCallback?.();
       return;
     }
@@ -218,7 +298,7 @@ export default function RequestForm({
     setSubmitStatus('submitting');
     setErrorMessage('');
 
-    const result = await submitEventRequest(eventId, accessToken);
+    const result = await submitEventRequest(effectiveEventId, accessToken);
 
     if (result.ok) {
       setSubmitStatus('success');
@@ -281,6 +361,35 @@ export default function RequestForm({
             </span>
           </Notice>
         )}
+
+        {saveState.kind === 'error' ? (
+          <Notice
+            style={{
+              flexDirection: 'row',
+              gap: '14px',
+              alignItems: 'flex-start',
+              padding: '20px 24px',
+              borderColor: 'rgba(255,138,128,0.5)',
+              background: 'rgba(255,138,128,0.08)',
+            }}
+          >
+            <NoticeMark />
+            <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '14px', lineHeight: 1.43, color: '#ff8a80' }}>
+                {saveState.message}
+              </span>
+              {saveState.details?.length ? (
+                <ul style={{ margin: 0, paddingLeft: '18px' }}>
+                  {saveState.details.map((detail) => (
+                    <li key={detail} style={{ fontSize: '13px', color: color.silver }}>
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </Notice>
+        ) : null}
 
         {/* Mandatory fields grid (AC2) */}
         <div
@@ -380,6 +489,39 @@ export default function RequestForm({
           )}
         </div>
 
+        {/* Optional details (SG2-28) */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
+            gap: '20px',
+          }}
+        >
+          <OptionalTextField
+            label="Accessibility needs (optional)"
+            value={accessibility}
+            onChange={setAccessibility}
+          />
+          <OptionalTextField
+            label="Equipment requirements"
+            value={equipment}
+            onChange={setEquipment}
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <Eyebrow>Attendee registration</Eyebrow>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <Chip
+              {...chipStyle(registrationNeeded)}
+              pressed={registrationNeeded}
+              onClick={() => setRegistrationNeeded((on) => !on)}
+            >
+              Registration needed
+            </Chip>
+          </div>
+        </div>
+
         {/* Venue requirement chips */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <Eyebrow>Requirements</Eyebrow>
@@ -427,9 +569,9 @@ export default function RequestForm({
             alignItems: 'center',
           }}
         >
-          {/* Save draft — scope of SG2-28 / PR #18. Fires onSaveDraft when
-              provided; otherwise falls back to the prototype inline feedback. */}
-          <GhostButton onClick={handleSaveDraft}>Save draft</GhostButton>
+          <GhostButton onClick={handleSaveDraft} disabled={saveState.kind === 'saving'}>
+            {saveState.kind === 'saving' ? 'Saving…' : 'Save draft'}
+          </GhostButton>
 
           {/* Submit (AC2): disabled until all required fields are filled */}
           <GradientButton
@@ -440,8 +582,12 @@ export default function RequestForm({
           </GradientButton>
 
           <span style={{ fontSize: '13px', color: color.silver }}>
-            {drafted
-              ? 'Draft saved — you can come back to it any time.'
+            {saveState.kind === 'saved'
+              ? saveState.missing.length === 0
+                ? `Draft ${saveState.reference} saved — ready to submit.`
+                : `Draft ${saveState.reference} saved. Still needed to submit: ${saveState.missing
+                    .map((field) => FIELD_LABELS[field as RequiredField] ?? field)
+                    .join(', ')}.`
               : touched.size > 0 && emptyFields.length > 0
                 ? `${emptyFields.length} required field${emptyFields.length === 1 ? '' : 's'} still empty.`
                 : 'You can save and finish this later.'}
