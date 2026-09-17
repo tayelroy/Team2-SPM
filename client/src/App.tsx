@@ -122,7 +122,7 @@ export default function App() {
   const role = session!.user.role as Role;
 
   const body = {
-    dashboard: <Dashboard role={role} onNavigate={setScreen} />,
+    dashboard: <Dashboard role={role} accessToken={session!.accessToken} onNavigate={setScreen} />,
     events: <EventsTable role={role} onOpenEvent={() => setScreen('detail')} />,
     detail: <EventDetail role={role} onNavigate={setScreen} />,
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
