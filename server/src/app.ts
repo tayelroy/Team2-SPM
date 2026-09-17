@@ -8,6 +8,7 @@ import { authorization } from './auth';
 import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
 import { submitEventRequestHandler } from './events/submit';
+import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/list';
 import { createVenuesRouter } from './venues';
 
 export function createApp(
@@ -18,7 +19,9 @@ export function createApp(
   logoutHandler: RequestHandler = createLogoutHandler(),
   updateRoleHandler: RequestHandler = createUpdateRoleHandler(),
   loginRateLimit: RequestHandler = createLoginRateLimiter(),
-  eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal })
+  eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal }),
+  eventListHandler: RequestHandler = getEventRequestsHandler({ getPrincipal: access.getPrincipal }),
+  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -56,6 +59,9 @@ export function createApp(
     access.requirePermission('event_request.submit'),
     eventSubmitHandler
   );
+  // SG2-31: list and view state of event requests.
+  eventRequests.get('/', access.requirePermission('event_request.view'), eventListHandler);
+  eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
   app.use('/api/event-requests', eventRequests);
 
   app.use('/api/venues', createVenuesRouter(access));

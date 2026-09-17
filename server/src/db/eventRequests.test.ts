@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   fetchOrganiserOrganisation,
   fetchOwnEventRequest,
+  fetchOwnEventRequests,
   insertEventRequestDraft,
   submitEventRequest
 } from './eventRequests';
@@ -64,6 +65,38 @@ function fakeEventsSelectClient(
             then(resolve: (value: Result) => unknown) {
               capture?.({ eventId: filters.eventId, organiserId: filters.organiserId });
               return Promise.resolve(result).then(resolve);
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+function fakeEventsListClient(
+  result: Result,
+  capture?: (filters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        select: (_columns: string) => {
+          const filters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'organiser_id') filters.organiserId = value;
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            order(column: string, options: unknown) {
+              filters.orderColumn = column;
+              filters.orderOptions = options;
+              return Promise.resolve(result).then((res) => {
+                capture?.(filters);
+                return res;
+              });
             }
           };
           return chain;
@@ -210,8 +243,37 @@ describe('fetchOwnEventRequest', () => {
       'user-1'
     );
     assert.equal(result.ok, true);
-    if (result.ok) assert.equal(result.request.event_id, 7);
+    if (result.ok) {
+      assert.equal(result.request.event_id, 7);
+      assert.equal(result.request.coordinator_id, null);
+      assert.equal(result.request.coordinator_name, null);
+    }
     assert.deepEqual(filters, { eventId: 7, organiserId: 'user-1' });
+  });
+
+  test('extracts coordinator information from joined relation', async () => {
+    const result = await fetchOwnEventRequest(
+      fakeEventsSelectClient({
+        data: [
+          {
+            event_id: 101,
+            organiser_id: 'user-1',
+            status: 'draft',
+            coordinator_id: 'coord-uuid-1',
+            coordinator: { name: 'Sarah Coordinator' }
+          }
+        ],
+        error: null
+      }),
+      101,
+      'user-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.request.event_id, 101);
+      assert.equal(result.request.coordinator_id, 'coord-uuid-1');
+      assert.equal(result.request.coordinator_name, 'Sarah Coordinator');
+    }
   });
 
   test('reports not_found when no row matches the event and organiser', async () => {
@@ -230,6 +292,146 @@ describe('fetchOwnEventRequest', () => {
     if (!result.ok) {
       assert.equal(result.reason, 'unavailable');
       assert.equal(result.message, 'connection reset');
+    }
+  });
+});
+
+describe('fetchOwnEventRequests', () => {
+  test('returns list of event requests with coordinator name extracted from joined object', async () => {
+    let capturedFilters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown } | undefined;
+    const result = await fetchOwnEventRequests(
+      fakeEventsListClient(
+        {
+          data: [
+            {
+              event_id: 101,
+              name: 'Leadership Retreat',
+              proposed_date: '2026-11-15T09:00:00.000Z',
+              status: 'draft',
+              coordinator_id: 'coord-uuid-1',
+              coordinator: { name: 'Sarah Coordinator' }
+            }
+          ],
+          error: null
+        },
+        (f) => (capturedFilters = f)
+      ),
+      'user-1'
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.deepEqual(result.requests, [
+        {
+          event_id: 101,
+          name: 'Leadership Retreat',
+          proposed_date: '2026-11-15T09:00:00.000Z',
+          status: 'draft',
+          coordinator_id: 'coord-uuid-1',
+          coordinator_name: 'Sarah Coordinator'
+        }
+      ]);
+    }
+    assert.equal(capturedFilters?.organiserId, 'user-1');
+    assert.equal(capturedFilters?.status, undefined);
+    assert.equal(capturedFilters?.orderColumn, 'event_id');
+    assert.deepEqual(capturedFilters?.orderOptions, { ascending: false });
+  });
+
+  test('extracts coordinator name when coordinator is an array or coordinator_name string', async () => {
+    const result = await fetchOwnEventRequests(
+      fakeEventsListClient({
+        data: [
+          {
+            event_id: 102,
+            name: 'Annual Gala',
+            proposed_date: '2026-12-01T18:00:00.000Z',
+            status: 'submitted',
+            coordinator_id: 'coord-uuid-2',
+            coordinator: [{ name: 'Alex Coordinator' }]
+          },
+          {
+            event_id: 103,
+            name: 'Tech Talk',
+            proposed_date: null,
+            status: 'approved',
+            coordinator_id: 'coord-uuid-3',
+            coordinator_name: 'Jordan Coordinator'
+          }
+        ],
+        error: null
+      }),
+      'user-1'
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.requests[0].coordinator_name, 'Alex Coordinator');
+      assert.equal(result.requests[1].coordinator_name, 'Jordan Coordinator');
+    }
+  });
+
+  test('handles null/missing coordinator, dates, and non-string fields safely', async () => {
+    const result = await fetchOwnEventRequests(
+      fakeEventsListClient({
+        data: [
+          {
+            event_id: '104',
+            name: null,
+            proposed_date: null,
+            status: null,
+            coordinator_id: null,
+            coordinator: null
+          }
+        ],
+        error: null
+      }),
+      'user-1'
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.deepEqual(result.requests[0], {
+        event_id: 104,
+        name: '',
+        proposed_date: null,
+        status: 'draft',
+        coordinator_id: null,
+        coordinator_name: null
+      });
+    }
+  });
+
+  test('applies status filter when provided', async () => {
+    let capturedFilters: { organiserId?: unknown; status?: unknown } | undefined;
+    const result = await fetchOwnEventRequests(
+      fakeEventsListClient({ data: [], error: null }, (f) => (capturedFilters = f)),
+      'user-1',
+      'submitted'
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.deepEqual(result.requests, []);
+    assert.equal(capturedFilters?.status, 'submitted');
+  });
+
+  for (const data of [[], null]) {
+    test(`returns empty array when data is ${JSON.stringify(data)}`, async () => {
+      const result = await fetchOwnEventRequests(fakeEventsListClient({ data, error: null }), 'user-1');
+      assert.equal(result.ok, true);
+      if (result.ok) assert.deepEqual(result.requests, []);
+    });
+  }
+
+  test('reports unavailable when the query errors', async () => {
+    const result = await fetchOwnEventRequests(
+      fakeEventsListClient({ data: null, error: { message: 'connection failed' } }),
+      'user-1'
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.reason, 'unavailable');
+      assert.equal(result.message, 'connection failed');
     }
   });
 });

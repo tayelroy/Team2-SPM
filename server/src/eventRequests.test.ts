@@ -12,6 +12,8 @@ import {
   SUBMISSION_REQUIRED_FIELDS,
   missingForSubmission,
   validateDraftInput,
+  isEventStatus,
+  EVENT_STATUSES,
   type DraftValues
 } from './events/fields';
 import type { CreateDraftResult, OrganiserLookupResult } from './db/eventRequests';
@@ -358,3 +360,18 @@ describe('missingForSubmission', () => {
     assert.equal(SUBMISSION_REQUIRED_FIELDS.includes('accessibility_needs'), false);
   });
 });
+
+describe('isEventStatus', () => {
+  for (const status of EVENT_STATUSES) {
+    test(`recognises valid status: ${status}`, () => {
+      assert.equal(isEventStatus(status), true);
+    });
+  }
+
+  for (const invalid of ['not_a_status', '', 123, null, undefined, {}, []]) {
+    test(`rejects invalid value: ${JSON.stringify(invalid)}`, () => {
+      assert.equal(isEventStatus(invalid), false);
+    });
+  }
+});
+

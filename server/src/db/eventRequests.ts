@@ -7,6 +7,18 @@ export interface EventRequestRecord extends DraftValues {
   organiser_id: string;
   organisation: string | null;
   status: string;
+  coordinator_id?: string | null;
+  coordinator_name?: string | null;
+}
+
+/** An event request row in summary format for list views (SG2-31). */
+export interface EventRequestSummaryRecord {
+  event_id: number;
+  name: string;
+  proposed_date: string | null;
+  status: string;
+  coordinator_id: string | null;
+  coordinator_name: string | null;
 }
 
 export type OrganiserLookupResult =
@@ -21,6 +33,10 @@ export type FetchEventRequestResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
 
+export type FetchEventRequestsResult =
+  | { ok: true; requests: EventRequestSummaryRecord[] }
+  | { ok: false; reason: 'unavailable'; message: string };
+
 export type SubmitEventRequestResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'unavailable'; message: string };
@@ -30,6 +46,39 @@ const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
   'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
   'equipment_requirements, registration_needed';
+
+/** Columns returned for list summary views (SG2-31). */
+const SUMMARY_COLUMNS =
+  'event_id, name, proposed_date, status, coordinator_id, coordinator:users!coordinator_id(name)';
+
+/** Columns returned for an event request detail lookup (SG2-31). */
+const DETAIL_COLUMNS =
+  'event_id, organiser_id, organisation, status, name, purpose, description, ' +
+  'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
+  'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name)';
+
+function extractCoordinatorName(row: Record<string, unknown>): string | null {
+  if ('coordinator' in row && row.coordinator) {
+    if (Array.isArray(row.coordinator) && row.coordinator.length > 0) {
+      const first = row.coordinator[0] as Record<string, unknown>;
+      if (typeof first?.name === 'string') return first.name;
+    } else if (typeof row.coordinator === 'object') {
+      const coord = row.coordinator as Record<string, unknown>;
+      if (typeof coord.name === 'string') return coord.name;
+    }
+  }
+  if (typeof row.coordinator_name === 'string') {
+    return row.coordinator_name;
+  }
+  return null;
+}
+
+function extractCoordinatorId(row: Record<string, unknown>): string | null {
+  if (typeof row.coordinator_id === 'string') {
+    return row.coordinator_id;
+  }
+  return null;
+}
 
 /**
  * Reads the organiser's own client organisation.
@@ -88,12 +137,53 @@ export async function insertEventRequestDraft(
 }
 
 /**
- * Reads an event request scoped to its owning organiser (SG2-30).
+ * Reads all event requests belonging to the organiser (SG2-31).
+ *
+ * Scoped by `organiser_id` so an organiser never sees events from another
+ * tenant. Optionally filters by `status` if provided. Results are ordered by
+ * `event_id` descending so the newest requests appear first. Coordinator
+ * details are retrieved via foreign key join with public.users.
+ */
+export async function fetchOwnEventRequests(
+  admin: SupabaseClient,
+  organiserId: string,
+  statusFilter?: string
+): Promise<FetchEventRequestsResult> {
+  let query = admin
+    .from('events')
+    .select(SUMMARY_COLUMNS)
+    .eq('organiser_id', organiserId);
+
+  if (statusFilter) {
+    query = query.eq('status', statusFilter);
+  }
+
+  const { data, error } = await query.order('event_id', { ascending: false });
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+
+  const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
+  const requests: EventRequestSummaryRecord[] = rows.map((row) => ({
+    event_id: Number(row.event_id),
+    name: typeof row.name === 'string' ? row.name : '',
+    proposed_date: typeof row.proposed_date === 'string' ? row.proposed_date : null,
+    status: typeof row.status === 'string' ? row.status : 'draft',
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  }));
+
+  return { ok: true, requests };
+}
+
+/**
+ * Reads an event request scoped to its owning organiser (SG2-30, SG2-31).
  *
  * Scoping the lookup by `organiser_id` in the same query — rather than
  * fetching by `event_id` alone and comparing ownership afterwards — means a
  * request belonging to someone else is indistinguishable from one that does
- * not exist at all.
+ * not exist at all. Coordinator details are retrieved via foreign key join.
  */
 export async function fetchOwnEventRequest(
   admin: SupabaseClient,
@@ -102,7 +192,7 @@ export async function fetchOwnEventRequest(
 ): Promise<FetchEventRequestResult> {
   const { data, error } = await admin
     .from('events')
-    .select(RETURNED_COLUMNS)
+    .select(DETAIL_COLUMNS)
     .eq('event_id', eventId)
     .eq('organiser_id', organiserId);
 
@@ -112,7 +202,13 @@ export async function fetchOwnEventRequest(
   if (!data || data.length === 0) {
     return { ok: false, reason: 'not_found', message: 'No event request found for this account.' };
   }
-  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+  const row = data[0] as unknown as Record<string, unknown>;
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request };
 }
 
 /** Statuses a row may transition from when submitted (SG2-30). */
