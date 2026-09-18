@@ -91,7 +91,7 @@ export const EVENTS: EventRecord[] = [
 /** Nav items per role — the mockup scopes navigation, not just data. */
 export const NAV: Record<Role, [Screen, string][]> = {
   'Event Organiser': [
-    ['dashboard', 'My events'],
+    ['events', 'My events'],
     ['form', 'New request'],
     ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
@@ -354,9 +354,12 @@ export const PIPELINE = [
 export const STATUS_FILTERS = [
   'All',
   'Draft',
+  'Submitted',
   'Under review',
+  'Approved',
   'Planning',
   'Confirmed',
+  'Rejected',
 ];
 
 export const EQUIPMENT: EquipmentRequest[] = [

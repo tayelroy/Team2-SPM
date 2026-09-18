@@ -323,6 +323,74 @@ describe('the events table', () => {
     fireEvent.click(screen.getByRole('button', { name: /Board Strategy Offsite/ }));
     expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
   });
+
+  test('an organiser can see their events list and drill down into details from dashboard or nav', async () => {
+    mockLoginResponse('Event Organiser');
+    const prevFetch = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.startsWith('/api/event-requests/101')) {
+          return Response.json({
+            request: {
+              event_id: 101,
+              organiser_id: 'user-1',
+              organisation: 'Meridian Capital',
+              status: 'draft',
+              name: 'Annual General Meeting',
+              purpose: 'AGM 2026',
+              description: 'Yearly shareholder meeting',
+              proposed_date: '2026-10-25T10:00:00.000Z',
+              expected_attendance: 120,
+              venue_requirements: 'Auditorium',
+              accessibility_needs: 'Wheelchair ramp',
+              equipment_requirements: 'Wireless mics',
+              registration_needed: true,
+              coordinator_id: null,
+              coordinator_name: null,
+            },
+          });
+        }
+        if (url.startsWith('/api/event-requests')) {
+          return Response.json({
+            requests: [
+              {
+                event_id: 101,
+                name: 'Annual General Meeting',
+                proposed_date: '2026-10-25T10:00:00.000Z',
+                status: 'draft',
+                coordinator_id: null,
+                coordinator_name: null,
+              },
+            ],
+          });
+        }
+        return prevFetch(url, init);
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'org@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    const seeAllBtn = await screen.findByRole('button', { name: 'See all events' });
+    fireEvent.click(seeAllBtn);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your events' })).toBeInTheDocument();
+    expect(await screen.findByText('Annual General Meeting')).toBeInTheDocument();
+
+    const eventRow = screen.getByRole('button', { name: /Annual General Meeting/ });
+    fireEvent.click(eventRow);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Event detail' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Annual General Meeting' })).toBeInTheDocument();
+    expect(screen.getByText('AGM 2026')).toBeInTheDocument();
+    expect(screen.getByText('Yearly shareholder meeting')).toBeInTheDocument();
+
+    fireEvent.click(within(header()).getByRole('button', { name: 'My events' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your events' })).toBeInTheDocument();
+  });
 });
 
 describe('the event detail action panel', () => {

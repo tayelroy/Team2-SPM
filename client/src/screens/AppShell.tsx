@@ -340,7 +340,11 @@ export default function AppShell({
                 color: color.platinum,
               }}
             >
-              {screen === 'dashboard' ? head.title : PAGE_TITLE[screen]}
+              {screen === 'dashboard'
+                ? head.title
+                : role === 'Event Organiser' && screen === 'events'
+                  ? 'Your events'
+                  : PAGE_TITLE[screen]}
             </h1>
             <p
               style={{
@@ -351,7 +355,11 @@ export default function AppShell({
                 maxWidth: '620px',
               }}
             >
-              {screen === 'dashboard' ? head.blurb : PAGE_BLURB[screen]}
+              {screen === 'dashboard'
+                ? head.blurb
+                : role === 'Event Organiser' && screen === 'events'
+                  ? head.blurb
+                  : PAGE_BLURB[screen]}
             </p>
           </div>
           {/* The primary CTA belongs to the dashboard only. */}

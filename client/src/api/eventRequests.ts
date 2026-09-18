@@ -90,6 +90,35 @@ export async function createEventRequestDraft(
   };
 }
 
+export interface EventRequestSummary {
+  eventId: number;
+  name: string;
+  proposedDate: string | null;
+  status: string;
+  coordinatorId: string | null;
+  coordinatorName: string | null;
+  waitingOnMe: boolean;
+}
+
+export interface EventRequestDetail {
+  eventId: number;
+  organiserId: string;
+  organisation: string | null;
+  status: string;
+  name: string;
+  purpose: string;
+  description: string;
+  proposedDate: string | null;
+  expectedAttendance: number | null;
+  venueRequirements: string | null;
+  accessibilityNeeds: string | null;
+  equipmentRequirements: string | null;
+  registrationNeeded: boolean;
+  coordinatorId: string | null;
+  coordinatorName: string | null;
+  waitingOnMe: boolean;
+}
+
 export type SubmitResult =
   | { ok: true }
   | { ok: false; kind: 'missing'; missing: string[] }
@@ -97,16 +126,80 @@ export type SubmitResult =
   | { ok: false; kind: 'unavailable' }
   | { ok: false; kind: 'error'; message: string };
 
+export type FetchEventRequestsResult =
+  | { ok: true; requests: EventRequestSummary[] }
+  | { ok: false; kind: 'unauthorized' }
+  | { ok: false; kind: 'unavailable' }
+  | { ok: false; kind: 'error'; message: string };
+
+export type FetchEventDetailResult =
+  | { ok: true; request: EventRequestDetail }
+  | { ok: false; kind: 'not_found' }
+  | { ok: false; kind: 'unauthorized' }
+  | { ok: false; kind: 'unavailable' }
+  | { ok: false; kind: 'error'; message: string };
+
+/**
+ * Determines whether an event request is waiting on the organiser.
+ *
+ * Organisers must take action when a request is in `draft` (initial entry)
+ * or `rejected` (needs revision). Other states (submitted, under_review,
+ * confirmed, etc.) are locked or awaiting coordinator/system action.
+ */
+export function isWaitingOnOrganiser(status: string): boolean {
+  const normalized = status.trim().toLowerCase();
+  return normalized === 'draft' || normalized === 'rejected';
+}
+
+function mapEventRequestSummary(raw: Record<string, unknown>): EventRequestSummary {
+  const status = typeof raw.status === 'string' ? raw.status : 'draft';
+  return {
+    eventId: Number(raw.event_id) || 0,
+    name: typeof raw.name === 'string' ? raw.name : '',
+    proposedDate: typeof raw.proposed_date === 'string' ? raw.proposed_date : null,
+    status,
+    coordinatorId: typeof raw.coordinator_id === 'string' ? raw.coordinator_id : null,
+    coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
+    waitingOnMe: isWaitingOnOrganiser(status),
+  };
+}
+
+function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail {
+  const status = typeof raw.status === 'string' ? raw.status : 'draft';
+  return {
+    eventId: Number(raw.event_id) || 0,
+    organiserId: typeof raw.organiser_id === 'string' ? raw.organiser_id : '',
+    organisation: typeof raw.organisation === 'string' ? raw.organisation : null,
+    status,
+    name: typeof raw.name === 'string' ? raw.name : '',
+    purpose: typeof raw.purpose === 'string' ? raw.purpose : '',
+    description: typeof raw.description === 'string' ? raw.description : '',
+    proposedDate: typeof raw.proposed_date === 'string' ? raw.proposed_date : null,
+    expectedAttendance:
+      raw.expected_attendance !== null && raw.expected_attendance !== undefined
+        ? Number(raw.expected_attendance)
+        : null,
+    venueRequirements: typeof raw.venue_requirements === 'string' ? raw.venue_requirements : null,
+    accessibilityNeeds: typeof raw.accessibility_needs === 'string' ? raw.accessibility_needs : null,
+    equipmentRequirements:
+      typeof raw.equipment_requirements === 'string' ? raw.equipment_requirements : null,
+    registrationNeeded: Boolean(raw.registration_needed),
+    coordinatorId: typeof raw.coordinator_id === 'string' ? raw.coordinator_id : null,
+    coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
+    waitingOnMe: isWaitingOnOrganiser(status),
+  };
+}
+
 /**
  * Transitions an event request from `draft` (or `rejected`) → `submitted` (SG2-30).
  *
  * Maps to `PATCH /api/event-requests/:eventId/submit`.
  *
- * @param eventId   UUID of the event request to submit.
+ * @param eventId   ID of the event request to submit.
  * @param token     Bearer access token from the signed-in session.
  */
 export async function submitEventRequest(
-  eventId: string,
+  eventId: string | number,
   token: string,
 ): Promise<SubmitResult> {
   let response: Response;
@@ -140,6 +233,111 @@ export async function submitEventRequest(
 
   const data = await response.json().catch(() => ({}));
   return { ok: false, kind: 'error', message: data.error ?? 'Submission failed. Please try again.' };
+}
+
+/**
+ * Fetches all event requests owned by the authenticated organiser (SG2-31).
+ *
+ * Supports optional status filtering (e.g., 'draft', 'submitted').
+ * When status is 'All' or empty/whitespace, no filter query parameter is sent.
+ *
+ * @param token   Bearer access token from the signed-in session.
+ * @param status  Optional status filter string.
+ */
+export async function fetchOwnEventRequests(
+  token: string,
+  status?: string,
+): Promise<FetchEventRequestsResult> {
+  let url = '/api/event-requests';
+  if (status) {
+    const trimmed = status.trim().toLowerCase();
+    if (trimmed && trimmed !== 'all') {
+      url += `?status=${encodeURIComponent(trimmed)}`;
+    }
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable' };
+  }
+
+  if (response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const rawList = Array.isArray(data.requests) ? data.requests : [];
+    const requests: EventRequestSummary[] = rawList.map(mapEventRequestSummary);
+    return { ok: true, requests };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, kind: 'unauthorized' };
+  }
+
+  if (response.status === 503) {
+    return { ok: false, kind: 'unavailable' };
+  }
+
+  const data = await response.json().catch(() => ({}));
+  return {
+    ok: false,
+    kind: 'error',
+    message: typeof data.error === 'string' ? data.error : 'Failed to fetch event requests.',
+  };
+}
+
+/**
+ * Fetches full detail for a single event request owned by the caller (SG2-31).
+ *
+ * @param eventId  Event ID to look up.
+ * @param token    Bearer access token from the signed-in session.
+ */
+export async function fetchOwnEventDetail(
+  eventId: number | string,
+  token: string,
+): Promise<FetchEventDetailResult> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable' };
+  }
+
+  if (response.ok) {
+    const data = await response.json().catch(() => ({}));
+    if (!data.request || typeof data.request !== 'object') {
+      return { ok: false, kind: 'error', message: 'Invalid response format.' };
+    }
+    return {
+      ok: true,
+      request: mapEventRequestDetail(data.request as Record<string, unknown>),
+    };
+  }
+
+  if (response.status === 404) {
+    return { ok: false, kind: 'not_found' };
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, kind: 'unauthorized' };
+  }
+
+  if (response.status === 503) {
+    return { ok: false, kind: 'unavailable' };
+  }
+
+  const data = await response.json().catch(() => ({}));
+  return {
+    ok: false,
+    kind: 'error',
+    message: typeof data.error === 'string' ? data.error : 'Failed to fetch event request detail.',
+  };
 }
 
 export type ListMyEventRequestsOutcome =

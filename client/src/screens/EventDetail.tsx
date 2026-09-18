@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
+import { fetchOwnEventDetail, type EventRequestDetail } from '../api/eventRequests';
 import { ACTIVITY, ARRANGEMENTS, STATUS_TRAIL } from '../mock/data';
 import type { Role, Screen } from '../mock/types';
-import { currentEvent, detailActions, statusTrailStyle } from '../mock/viewModel';
+import { badgeStyle, currentEvent, detailActions, statusTrailStyle } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
 import {
   Badge,
@@ -12,6 +14,19 @@ import {
   NoticeMark,
   RecessedCard,
 } from '../ui';
+import { formatProposedDate } from './EventsTable';
+
+export interface EventDetailProps {
+  role: Role;
+  onNavigate: (screen: Screen) => void;
+  /**
+   * The current status of the event request. When `'submitted'`, organiser
+   * actions are disabled (AC3). Defaults to `undefined` (no restriction).
+   */
+  eventStatus?: string;
+  selectedEventId?: number;
+  accessToken?: string;
+}
 
 /**
  * The full request: facts, status trail, activity log, and the action panel —
@@ -26,17 +41,460 @@ export default function EventDetail({
   role,
   onNavigate,
   eventStatus,
-}: {
-  role: Role;
-  onNavigate: (screen: Screen) => void;
-  /**
-   * The current status of the event request. When `'submitted'`, organiser
-   * actions are disabled (AC3). Defaults to `undefined` (no restriction).
-   */
-  eventStatus?: string;
-}) {
-  const event = currentEvent(role);
+  selectedEventId,
+  accessToken,
+}: EventDetailProps) {
+  const isOrganiser = role === 'Event Organiser';
   const isCoordinator = role === 'Event Coordinator';
+
+  const [detail, setDetail] = useState<EventRequestDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!isOrganiser || !selectedEventId || !accessToken) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setNotFound(false);
+
+    fetchOwnEventDetail(selectedEventId, accessToken)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setDetail(result.request);
+        } else if (result.kind === 'not_found') {
+          setNotFound(true);
+        } else if (result.kind === 'unauthorized') {
+          setError('Your session has expired. Please sign in again.');
+        } else if (result.kind === 'unavailable') {
+          setError('Event request details are temporarily unavailable. Please try again later.');
+        } else {
+          setError(result.message || 'Failed to load event details.');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Event request details are temporarily unavailable. Please try again later.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOrganiser, selectedEventId, accessToken, reloadKey]);
+
+  if (isOrganiser && selectedEventId && accessToken) {
+    if (loading) {
+      return (
+        <div
+          role="status"
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            color: color.silver,
+            fontSize: '15px',
+          }}
+        >
+          Loading event details…
+        </div>
+      );
+    }
+
+    if (notFound) {
+      return (
+        <Card style={{ gap: '20px', alignItems: 'flex-start' }}>
+          <NoticeMark size={24} />
+          <h2 style={{ margin: 0, fontSize: '24px', color: color.platinum }}>
+            Event request not found
+          </h2>
+          <p style={{ margin: 0, color: color.silver }}>
+            No event request found for this account. It may have been deleted or belongs to
+            another organiser.
+          </p>
+          <button
+            type="button"
+            onClick={() => onNavigate('events')}
+            style={{
+              background: color.kelp,
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: radius.sm,
+              padding: '10px 18px',
+              color: color.platinum,
+              fontSize: '14px',
+              cursor: 'pointer',
+            }}
+          >
+            Back to events
+          </button>
+        </Card>
+      );
+    }
+
+    if (error) {
+      return (
+        <Notice style={{ flexDirection: 'column', gap: '12px', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <NoticeMark size={20} />
+            <span role="alert" style={{ fontSize: '15px', color: color.platinum }}>
+              {error}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              style={{
+                background: color.kelp,
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: radius.sm,
+                padding: '8px 16px',
+                color: color.platinum,
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('events')}
+              style={{
+                background: 'none',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: radius.sm,
+                padding: '8px 16px',
+                color: color.silver,
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              Back to events
+            </button>
+          </div>
+        </Notice>
+      );
+    }
+
+    if (detail) {
+      const badge = badgeStyle(detail.status);
+      const isLocked = !detail.waitingOnMe;
+      const isRejected = detail.status.toLowerCase() === 'rejected';
+
+      const facts = [
+        { label: 'Organisation', value: detail.organisation || '—' },
+        { label: 'Proposed date', value: formatProposedDate(detail.proposedDate) },
+        {
+          label: 'Expected attendance',
+          value: detail.expectedAttendance !== null ? String(detail.expectedAttendance) : '—',
+        },
+        { label: 'Venue requirements', value: detail.venueRequirements || 'None specified' },
+        { label: 'Coordinator', value: detail.coordinatorName || 'Unassigned' },
+        { label: 'Accessibility needs', value: detail.accessibilityNeeds || 'None specified' },
+        {
+          label: 'Equipment requirements',
+          value: detail.equipmentRequirements || 'None specified',
+        },
+        { label: 'Registration required', value: detail.registrationNeeded ? 'Yes' : 'No' },
+      ];
+
+      return (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
+            gap: '20px',
+            alignItems: 'start',
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <Card style={{ gap: '24px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <Badge bg={badge.badgeBg} fg={badge.badgeFg}>
+                    {detail.status}
+                  </Badge>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      letterSpacing: '0.15em',
+                      textTransform: 'uppercase',
+                      color: color.slate,
+                    }}
+                  >
+                    #{detail.eventId}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('events')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: color.silver,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ← Back to events
+                </button>
+              </div>
+
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: '36px',
+                  fontWeight: 500,
+                  lineHeight: 1,
+                  color: color.platinum,
+                }}
+              >
+                {detail.name || 'Untitled event'}
+              </h2>
+
+              <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver }}>
+                {detail.purpose || 'No purpose specified'}
+              </p>
+
+              {detail.description ? (
+                <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5, color: color.mist }}>
+                  {detail.description}
+                </p>
+              ) : null}
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))',
+                  gap: '20px',
+                }}
+              >
+                {facts.map((f) => (
+                  <Fact key={f.label} label={f.label} value={f.value} />
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {STATUS_TRAIL.map((stage, i) => {
+                  const style = statusTrailStyle(i);
+                  return (
+                    <Badge key={stage} bg={style.bg} fg={style.fg}>
+                      {stage}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {isRejected ? (
+              <Notice style={{ flexDirection: 'row', gap: '16px', alignItems: 'flex-start' }}>
+                <NoticeMark size={26} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span style={{ fontSize: '16px', color: color.platinum }}>
+                    Request returned for revision
+                  </span>
+                  <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
+                    This request was returned by your coordinator. Please review the details, make
+                    necessary amendments, and resubmit.
+                  </span>
+                </div>
+              </Notice>
+            ) : null}
+
+            <RecessedCard style={{ gap: '24px' }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '24px',
+                  fontWeight: 500,
+                  letterSpacing: '-0.02em',
+                  color: color.platinum,
+                }}
+              >
+                Activity
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {ACTIVITY.map((entry) => (
+                  <div key={entry.when} style={{ display: 'flex', gap: '16px' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        flex: 'none',
+                      }}
+                    >
+                      <Dot tone={entry.dot} />
+                      <div
+                        style={{ flex: 1, width: '1px', background: 'rgba(255,255,255,0.12)' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          letterSpacing: '0.15em',
+                          textTransform: 'uppercase',
+                          color: color.slate,
+                        }}
+                      >
+                        {entry.when} · {entry.who}
+                      </span>
+                      <span style={{ fontSize: '15px', lineHeight: 1.4, color: color.mist }}>
+                        {entry.text}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </RecessedCard>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <Card style={{ gap: '18px' }}>
+              <Eyebrow>Your options</Eyebrow>
+
+              {isLocked ? (
+                <>
+                  <Notice
+                    style={{
+                      flexDirection: 'row',
+                      gap: '14px',
+                      alignItems: 'flex-start',
+                      padding: '16px 20px',
+                    }}
+                  >
+                    <NoticeMark size={20} />
+                    <span
+                      role="status"
+                      aria-label="Editing disabled: request submitted"
+                      style={{ fontSize: '14px', lineHeight: 1.43, color: color.mist }}
+                    >
+                      This request has been submitted and is now with your coordinator. Direct
+                      editing is locked — use <strong>Request a change</strong> if an amendment is
+                      needed.
+                    </span>
+                  </Notice>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('change')}
+                    style={{
+                      textAlign: 'left',
+                      background: color.deep,
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      borderRadius: radius.sm,
+                      padding: '14px 18px',
+                      color: color.platinum,
+                      fontSize: '14px',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Request a change
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('form')}
+                    style={{
+                      textAlign: 'left',
+                      background: 'rgba(203,255,252,0.16)',
+                      border: '1px solid rgba(203,255,252,0.5)',
+                      borderRadius: radius.sm,
+                      padding: '14px 18px',
+                      color: color.mist,
+                      fontSize: '14px',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Edit request
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('change')}
+                    style={{
+                      textAlign: 'left',
+                      background: color.deep,
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      borderRadius: radius.sm,
+                      padding: '14px 18px',
+                      color: color.platinum,
+                      fontSize: '14px',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Request a change
+                  </button>
+                </>
+              )}
+
+              <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>
+                {isLocked
+                  ? 'Your coordinator will be in touch if clarification is needed.'
+                  : 'You can edit and resubmit this request while it is with you.'}
+              </span>
+            </Card>
+
+            <RecessedCard style={{ gap: '18px' }}>
+              <Eyebrow>Confirmed arrangements</Eyebrow>
+              {ARRANGEMENTS.map((row) => (
+                <div
+                  key={row.label}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '14px',
+                    paddingBottom: '12px',
+                    borderBottom: rule.faint,
+                  }}
+                >
+                  <span style={{ fontSize: '15px', color: color.platinum }}>{row.label}</span>
+                  <span
+                    style={{
+                      fontSize: '13px',
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      color: row.fg,
+                    }}
+                  >
+                    {row.state}
+                  </span>
+                </div>
+              ))}
+            </RecessedCard>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // Fallback to mock data for other roles or unselected event
+  const event = currentEvent(role);
   /** AC3: organisers cannot edit a submitted request until reviewed. */
   const isSubmitted = eventStatus?.toLowerCase() === 'submitted';
   const facts = [
@@ -127,9 +585,8 @@ export default function EventDetail({
                 Capacity check: expected 180 guests, Kelp Room holds 120
               </span>
               <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
-                Pick a larger venue or lower expected attendance before requesting the
-                booking. Atrium Hall (320) and Deepwater Auditorium (500) are free on
-                this date.
+                Pick a larger venue or lower expected attendance before requesting the booking. Atrium
+                Hall (320) and Deepwater Auditorium (500) are free on this date.
               </span>
             </div>
           </Notice>
@@ -236,9 +693,8 @@ export default function EventDetail({
                 aria-label="Editing disabled: request submitted"
                 style={{ fontSize: '14px', lineHeight: 1.43, color: color.mist }}
               >
-                This request has been submitted and is now with your coordinator.
-                Direct editing is locked — use <strong>Request a change</strong> if
-                an amendment is needed.
+                This request has been submitted and is now with your coordinator. Direct editing is
+                locked — use <strong>Request a change</strong> if an amendment is needed.
               </span>
             </Notice>
           ) : (
