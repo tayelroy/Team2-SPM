@@ -52,8 +52,15 @@ Auth + Postgres, npm workspaces.
    project's URL and anon key (and, if you need admin-only operations,
    the service role key — never expose this one to the client).
 2. `npm ci` at the repo root.
-3. `npm run dev` — starts the backend on `:5000` and the frontend on `:5173`
-   together; Vite proxies `/api/*` requests to the backend.
+3. Start both at once, or each separately in its own terminal:
+   - **Both together:** `npm run dev` — runs the backend on `:5000` and the
+     frontend on `:5173` concurrently; Vite proxies `/api/*` requests to the
+     backend, so you only ever open the frontend URL.
+   - **Server only:** `npm run dev --prefix server` (or `cd server && npm run dev`)
+     — starts the Express API on `:5000`, reading `server/.env`.
+   - **Client only:** `npm run dev --prefix client` (or `cd client && npm run dev`)
+     — starts the Vite dev server on `:5173`. It expects the server already
+     running on `:5000` for any `/api/*` call to work.
 4. Open `http://localhost:5173`.
 
 ### Sign in
