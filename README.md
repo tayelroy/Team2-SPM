@@ -117,7 +117,10 @@ independently of what the UI shows.
 ### As Technical Support Staff
 
 Role changes aren't exposed in a screen yet — call
-`PATCH /api/users/:userId/role` directly with the new role.
+`PATCH /api/users/:userId/role` directly with a bearer token and a JSON
+body like `{"role": "Attendee"}`. The role must be Title Case exactly as
+shown in the roles table above (e.g. `"Event Organiser"`) — lowercase or
+snake_case is rejected.
 
 ## Getting started (build, test, coverage)
 
