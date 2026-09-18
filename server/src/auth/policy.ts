@@ -22,6 +22,14 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.submit': ['event_organiser'],
   // SG2-31: Event Organisers and Event Coordinators can view event requests.
   'event_request.view': ['event_organiser', 'event_coordinator'],
+  // SG2-32 (minimal slice of SG2-31): an organiser can see and delete their
+  // own event requests. Ownership itself is enforced per-row in the handler
+  // (fetchOwnEventRequest / listOwnEventRequests), not by this role grant.
+  'event_request.read': ['event_organiser'],
+  'event_request.delete': ['event_organiser'],
+  // SG2-29: an organiser can edit their own request's fields while it is
+  // still a draft.
+  'event_request.update': ['event_organiser'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff']

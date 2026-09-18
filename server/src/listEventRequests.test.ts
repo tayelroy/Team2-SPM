@@ -292,6 +292,8 @@ describe('Authorisation wiring for event_request.view (SG2-31)', () => {
       (_req, res) => {
         res.status(200).json({ listReached: true });
       },
+      undefined,
+      undefined,
       (_req, res) => {
         res.status(200).json({ detailReached: true });
       }

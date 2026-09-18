@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import type { Role, Screen } from './mock/types';
 import { clearSession, loadSession, saveSession } from './auth/session';
 import type { StoredSession } from './auth/session';
+import type { EventRequestDraft } from './api/eventRequests';
 import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import BookingApproval from './screens/BookingApproval';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
+import DraftRequests from './screens/DraftRequests';
 import EquipmentDesk from './screens/EquipmentDesk';
 import EventDetail from './screens/EventDetail';
 import EventsTable from './screens/EventsTable';
@@ -49,6 +51,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
   const [logoutState, setLogoutState] = useState<'pending' | 'failed' | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>(undefined);
+  // The draft "My drafts" → Edit currently has open, if any (SG2-29).
+  const [editingRequest, setEditingRequest] = useState<EventRequestDraft | null>(null);
 
   // Best-effort background check that a persisted session is still valid.
   // Trusts the cached session for the current render (no loading flash);
@@ -122,7 +126,7 @@ export default function App() {
   const role = session!.user.role as Role;
 
   const body = {
-    dashboard: <Dashboard role={role} onNavigate={setScreen} />,
+    dashboard: <Dashboard role={role} accessToken={session!.accessToken} onNavigate={setScreen} />,
     events: (
       <EventsTable
         role={role}
@@ -143,6 +147,27 @@ export default function App() {
     ),
     form: <RequestForm onSubmit={() => setScreen('detail')} />,
     venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
+    drafts: (
+      <DraftRequests
+        accessToken={session!.accessToken}
+        onEdit={(request) => {
+          setEditingRequest(request);
+          setScreen('editDraft');
+        }}
+      />
+    ),
+    editDraft: editingRequest && (
+      <RequestForm
+        key={editingRequest.event_id}
+        eventId={String(editingRequest.event_id)}
+        initialValues={editingRequest}
+        accessToken={session!.accessToken}
+        onSuccess={() => {
+          setEditingRequest(null);
+          setScreen('drafts');
+        }}
+      />
+    ),
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
     equipment: <EquipmentDesk />,

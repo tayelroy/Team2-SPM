@@ -389,6 +389,135 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
   });
 });
 
+// ─── SG2-29: editing an existing draft ──────────────────────────────────────
+
+describe('Editing an existing draft (SG2-29)', () => {
+  const INITIAL_VALUES = {
+    name: 'Partner Forum',
+    purpose: 'Client briefing',
+    description: 'Two keynotes',
+    proposed_date: '2026-11-04T09:00',
+    expected_attendance: 120,
+    venue_requirements: 'Stage',
+    accessibility_needs: 'Hearing loop',
+    equipment_requirements: 'Lectern',
+    registration_needed: true,
+  };
+
+  function updateResponse(missing: string[] = []) {
+    return new Response(
+      JSON.stringify({ request: { event_id: 7, status: 'draft', ...INITIAL_VALUES }, missingForSubmission: missing }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  test('seeds every field from initialValues, including the numeric one', () => {
+    render(
+      <RequestForm
+        eventId="7"
+        accessToken="test-token"
+        initialValues={INITIAL_VALUES}
+        onSaveDraft={undefined}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(/Event name/i)).toHaveValue('Partner Forum');
+    expect(screen.getByLabelText(/Purpose/i)).toHaveValue('Client briefing');
+    expect(screen.getByLabelText(/Description/i)).toHaveValue('Two keynotes');
+    expect(screen.getByLabelText(/Date/i)).toHaveValue('2026-11-04T09:00');
+    expect(screen.getByLabelText(/Expected attendance/i)).toHaveValue('120');
+    expect(screen.getByLabelText(/Venue requirements/i)).toHaveValue('Stage');
+    expect(screen.getByLabelText('Accessibility needs (optional)')).toHaveValue('Hearing loop');
+    expect(screen.getByLabelText('Equipment requirements')).toHaveValue('Lectern');
+    expect(screen.getByRole('button', { name: 'Registration needed' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('a blank/absent initialValues field seeds as empty, not "null" or "undefined"', () => {
+    render(
+      <RequestForm
+        eventId="7"
+        accessToken="test-token"
+        initialValues={{}}
+        onSaveDraft={undefined}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText(/Event name/i)).toHaveValue('');
+    expect(screen.getByLabelText(/Expected attendance/i)).toHaveValue('');
+  });
+
+  test('"Save draft" calls PATCH on the existing id, not POST', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(updateResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <RequestForm
+        eventId="7"
+        accessToken="test-token"
+        initialValues={INITIAL_VALUES}
+        onSaveDraft={undefined}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Renamed Forum' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(await screen.findByText('Draft 7 saved — ready to submit.')).toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/event-requests/7');
+    expect(init.method).toBe('PATCH');
+    expect(init.headers.Authorization).toBe('Bearer test-token');
+    expect(JSON.parse(init.body).name).toBe('Renamed Forum');
+  });
+
+  test('a failed update shows an error without losing the edited values', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Only a draft event request can be edited.' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    render(
+      <RequestForm
+        eventId="7"
+        accessToken="test-token"
+        initialValues={INITIAL_VALUES}
+        onSaveDraft={undefined}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only a draft request can be edited.');
+    expect(screen.getByLabelText(/Event name/i)).toHaveValue('Partner Forum');
+  });
+
+  test('submitting an edited draft calls the real submit endpoint, not the mockup hand-off', async () => {
+    const onSubmit = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <RequestForm
+        eventId="7"
+        accessToken="test-token"
+        initialValues={INITIAL_VALUES}
+        onSaveDraft={undefined}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/submit', {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer test-token' },
+    });
+  });
+});
+
 // ─── Reconciling SG2-28 + SG2-30: save then submit in one sitting ───────────
 
 describe('save then submit', () => {

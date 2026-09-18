@@ -9,6 +9,9 @@ import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
 import { submitEventRequestHandler } from './events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/list';
+import { createListMyEventRequestsHandler } from './events/listMine';
+import { createDeleteEventDraftHandler } from './events/deleteDraft';
+import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createVenuesRouter } from './venues';
 
 export function createApp(
@@ -21,7 +24,10 @@ export function createApp(
   loginRateLimit: RequestHandler = createLoginRateLimiter(),
   eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal }),
   eventListHandler: RequestHandler = getEventRequestsHandler({ getPrincipal: access.getPrincipal }),
-  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal })
+  deleteEventDraftHandler: RequestHandler = createDeleteEventDraftHandler({ getPrincipal: access.getPrincipal }),
+  updateEventDraftHandler: RequestHandler = createUpdateEventDraftHandler({ getPrincipal: access.getPrincipal }),
+  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal }),
+  listMyEventRequestsHandler: RequestHandler = createListMyEventRequestsHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -53,14 +59,27 @@ export function createApp(
   // SG2-28: raise an event request as a draft.
   const eventRequests = access.protectedRouter();
   eventRequests.post('/', access.requirePermission('event_request.create'), eventDraftHandler);
+  // SG2-31: list and view state of event requests.
+  eventRequests.get('/', access.requirePermission('event_request.view'), eventListHandler);
   // SG2-30: submit a draft event request for review.
   eventRequests.patch(
     '/:eventId/submit',
     access.requirePermission('event_request.submit'),
     eventSubmitHandler
   );
-  // SG2-31: list and view state of event requests.
-  eventRequests.get('/', access.requirePermission('event_request.view'), eventListHandler);
+  // SG2-32: delete a request while it is still a draft.
+  eventRequests.delete(
+    '/:eventId',
+    access.requirePermission('event_request.delete'),
+    deleteEventDraftHandler
+  );
+  // SG2-29: edit a request's own fields while it is still a draft.
+  eventRequests.patch(
+    '/:eventId',
+    access.requirePermission('event_request.update'),
+    updateEventDraftHandler
+  );
+  // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
   app.use('/api/event-requests', eventRequests);
 
