@@ -27,7 +27,7 @@ An npm-workspaces monorepo:
 | Role | What's actually wired up today |
 | --- | --- |
 | Event Organiser | Raise, edit, submit and delete their own event requests; see their own requests and status |
-| Event Coordinator | Authorised to view event requests, but the query is still scoped to the caller's own id — in practice this returns nothing for a real coordinator yet (tracked separately) |
+| Event Coordinator | "All events" and "Review" still show placeholder mock data for this role — not wired to the real API yet. The underlying handler also only scopes by the caller's own id, so it will need fixing before a real coordinator view can use it (tracked separately) |
 | Venue Staff | Create and update the venue catalogue; check venue availability |
 | Technical Support Staff | Change a user's role — the only role that can, currently API-only (no screen for it yet) |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
