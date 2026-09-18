@@ -9,7 +9,6 @@ import { createVenueAvailabilityRouter } from './venues/availability';
 import { createEventDraftHandler } from './events/createDraft';
 import { submitEventRequestHandler } from './events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/list';
-import { createListMyEventRequestsHandler } from './events/listMine';
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createVenuesRouter } from './venues';
@@ -27,8 +26,7 @@ export function createApp(
   eventListHandler: RequestHandler = getEventRequestsHandler({ getPrincipal: access.getPrincipal }),
   deleteEventDraftHandler: RequestHandler = createDeleteEventDraftHandler({ getPrincipal: access.getPrincipal }),
   updateEventDraftHandler: RequestHandler = createUpdateEventDraftHandler({ getPrincipal: access.getPrincipal }),
-  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal }),
-  listMyEventRequestsHandler: RequestHandler = createListMyEventRequestsHandler({ getPrincipal: access.getPrincipal })
+  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 

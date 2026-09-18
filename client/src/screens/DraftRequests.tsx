@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import { Badge, Card, Eyebrow, GhostButton, Notice } from '../ui';
 import { color, rule } from '../theme';
 import { badgeStyle } from '../mock/viewModel';
-import { deleteEventRequestDraft, listMyEventRequests, type EventRequestDraft } from '../api/eventRequests';
+import {
+  deleteEventRequestDraft,
+  fetchEventRequestDraft,
+  listMyEventRequests,
+  type DraftListItem,
+  type EventRequestDraft
+} from '../api/eventRequests';
 
 function formatStatus(status: string): string {
   const spaced = status.replace(/_/g, ' ');
@@ -28,13 +34,15 @@ export default function DraftRequests({
 }
 
 function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (request: EventRequestDraft) => void }) {
-  const [requests, setRequests] = useState<EventRequestDraft[]>([]);
+  const [requests, setRequests] = useState<DraftListItem[]>([]);
   const [loading, setLoading] = useState(Boolean(token));
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState('');
+  const [openingId, setOpeningId] = useState<number | null>(null);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -57,6 +65,18 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
       cancelled = true;
     };
   }, [token, attempt]);
+
+  async function handleEdit(eventId: number) {
+    setEditError('');
+    setOpeningId(eventId);
+    const outcome = await fetchEventRequestDraft(eventId, token!);
+    setOpeningId(null);
+    if (!outcome.ok) {
+      setEditError(outcome.message);
+      return;
+    }
+    onEdit(outcome.request);
+  }
 
   async function confirmDelete(eventId: number) {
     setDeletingId(eventId);
@@ -105,6 +125,11 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
           <p role="alert">{deleteError}</p>
         </Notice>
       )}
+      {editError && (
+        <Notice>
+          <p role="alert">{editError}</p>
+        </Notice>
+      )}
       {requests.map((request) => {
         const { badgeBg, badgeFg } = badgeStyle(request.status);
         return (
@@ -144,7 +169,9 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <GhostButton onClick={() => onEdit(request)}>Edit</GhostButton>
+                  <GhostButton onClick={() => handleEdit(request.event_id)} disabled={openingId === request.event_id}>
+                    {openingId === request.event_id ? 'Opening…' : 'Edit'}
+                  </GhostButton>
                   <GhostButton
                     onClick={() => {
                       setDeleteError('');

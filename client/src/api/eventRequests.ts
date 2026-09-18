@@ -340,8 +340,19 @@ export async function fetchOwnEventDetail(
   };
 }
 
+/**
+ * One row of the "My drafts" list. `GET /api/event-requests` (shared with
+ * SG2-31's fuller list/detail views) only returns this summary shape, not
+ * a full editable record — see fetchEventRequestDraft below for that.
+ */
+export interface DraftListItem {
+  event_id: number;
+  name: string;
+  status: string;
+}
+
 export type ListMyEventRequestsOutcome =
-  | { ok: true; requests: EventRequestDraft[] }
+  | { ok: true; requests: DraftListItem[] }
   | { ok: false; message: string };
 
 /**
@@ -367,7 +378,46 @@ export async function listMyEventRequests(token: string): Promise<ListMyEventReq
 
   const body = await response.json().catch(() => null);
   if (!Array.isArray(body?.requests)) return { ok: false, message: UNAVAILABLE };
-  return { ok: true, requests: body.requests as EventRequestDraft[] };
+  return { ok: true, requests: body.requests as DraftListItem[] };
+}
+
+export type FetchEventRequestDraftOutcome =
+  | { ok: true; request: EventRequestDraft }
+  | { ok: false; message: string };
+
+/**
+ * Fetches the full editable fields of one of the caller's own event
+ * requests. The list view only returns a summary (see listMyEventRequests
+ * above) — opening the edit form needs the complete record, so this is
+ * called on demand when "Edit" is clicked, via the same detail endpoint
+ * SG2-31 added. Maps to `GET /api/event-requests/:eventId`.
+ *
+ * @param eventId Event ID to fetch.
+ * @param token   Bearer access token from the signed-in session.
+ */
+export async function fetchEventRequestDraft(
+  eventId: number | string,
+  token: string
+): Promise<FetchEventRequestDraftOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) return { ok: false, message: 'You are signed out. Sign in again to edit this draft.' };
+    if (response.status === 403) return { ok: false, message: 'Your role cannot view event requests.' };
+    if (response.status === 404) return { ok: false, message: 'This draft no longer exists.' };
+    return { ok: false, message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+  if (!body?.request) return { ok: false, message: UNAVAILABLE };
+  return { ok: true, request: body.request as EventRequestDraft };
 }
 
 export type DeleteEventRequestDraftOutcome = { ok: true } | { ok: false; message: string };
