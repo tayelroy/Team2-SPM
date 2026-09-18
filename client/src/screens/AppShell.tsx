@@ -287,8 +287,10 @@ export default function AppShell({
               {profileOpen && (
                 <div id="profile-options" role="group" aria-label="Profile options"
                   style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                    minWidth: '160px', padding: '8px', background: color.deep,
-                    border: rule.raised, borderRadius: radius.sm }}>
+                    minWidth: '160px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px',
+                    background: color.deep, border: rule.raised, borderRadius: radius.sm }}>
+                  <GhostButton onClick={() => { setProfileOpen(false); onNavigate('profile'); }}
+                    style={{ width: '100%', padding: '10px 16px' }}>My Profile</GhostButton>
                   <GhostButton onClick={onSignOut} style={{ width: '100%', padding: '10px 16px' }}>Logout</GhostButton>
                 </div>
               )}

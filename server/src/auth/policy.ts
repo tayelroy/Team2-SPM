@@ -32,8 +32,20 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.update': ['event_organiser'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
-  'venues.update': ['venue_staff']
+  'venues.update': ['venue_staff'],
+  // SG2-27: every signed-in account manages its own profile.
+  'profile.read': [...ROLES],
+  'profile.update': [...ROLES]
 });
+
+// SG2-27: roles treated as internal to ConnectSphere, who additionally see
+// their department on their profile. event_organiser and attendee represent
+// client-side/external users. Team decision, 2026-09-15.
+export const INTERNAL_ROLES: readonly Role[] = ['event_coordinator', 'venue_staff', 'technical_support_staff'];
+
+export function isInternalRole(role: Role): boolean {
+  return (INTERNAL_ROLES as readonly string[]).includes(role);
+}
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);

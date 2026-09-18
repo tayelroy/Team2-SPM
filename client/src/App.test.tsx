@@ -38,6 +38,10 @@ function mockLoginResponse(role: Role) {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ requests: [{ event_id: 9, status: 'draft', name: 'Draft Forum' }] });
       }
+      if (url === '/api/profile') {
+        return Response.json({ profile: { user_id: 'user-1', name: 'Test User', organisation: 'ConnectSphere Test',
+          phone: null, communication_preferences: [] } });
+      }
       return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role } });
     })
   );
@@ -218,6 +222,15 @@ test('the profile options open, toggle and dismiss with Escape, outside clicks o
   expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
   expect(sessionStorage.getItem('connectsphere.session')).not.toBeNull();
   expect(fetch).not.toHaveBeenCalledWith('/api/auth/logout', expect.anything());
+});
+
+test('My Profile navigates to the profile screen and closes the dropdown', async () => {
+  await signInAs('Event Coordinator');
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+  fireEvent.click(screen.getByRole('button', { name: 'My Profile' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'My profile' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
+  await screen.findByLabelText('Name');
 });
 
 test('profile Logout immediately removes local access and waits for server confirmation', async () => {
