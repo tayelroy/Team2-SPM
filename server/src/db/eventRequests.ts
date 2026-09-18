@@ -41,10 +41,6 @@ export type SubmitEventRequestResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'unavailable'; message: string };
 
-export type ListOwnEventRequestsResult =
-  | { ok: true; requests: EventRequestRecord[] }
-  | { ok: false; reason: 'unavailable'; message: string };
-
 export type DeleteDraftResult =
   | { ok: true }
   | { ok: false; reason: 'unavailable'; message: string };
@@ -254,27 +250,6 @@ export async function submitEventRequest(
     return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
   }
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
-}
-
-/**
- * Lists every event request belonging to the caller (SG2-32's minimal slice
- * of SG2-31 — enough to see and act on your own requests, not the full "see
- * the state of my requests" feature).
- */
-export async function listOwnEventRequests(
-  admin: SupabaseClient,
-  organiserId: string
-): Promise<ListOwnEventRequestsResult> {
-  const { data, error } = await admin
-    .from('events')
-    .select(RETURNED_COLUMNS)
-    .eq('organiser_id', organiserId)
-    .order('event_id', { ascending: false });
-
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
-  }
-  return { ok: true, requests: (data ?? []) as unknown as EventRequestRecord[] };
 }
 
 /**

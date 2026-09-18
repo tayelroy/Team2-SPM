@@ -20,11 +20,18 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function api(requests: unknown[] = []) {
+function api(requests: unknown[] = [], details: Record<number, unknown> = {}) {
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-token' });
     if (url === '/api/event-requests' && (init?.method ?? 'GET') === 'GET') {
       return Response.json({ requests });
+    }
+    const detailMatch = typeof url === 'string' && url.match(/^\/api\/event-requests\/(\d+)$/);
+    if (detailMatch && (init?.method ?? 'GET') === 'GET') {
+      const eventId = Number(detailMatch[1]);
+      const request = details[eventId];
+      if (!request) return new Response(null, { status: 404 });
+      return Response.json({ request });
     }
     if (typeof url === 'string' && url.startsWith('/api/event-requests/') && init?.method === 'DELETE') {
       return new Response(null, { status: 200 });
@@ -37,6 +44,21 @@ function api(requests: unknown[] = []) {
 
 const DRAFT = { event_id: 7, status: 'draft', name: 'Partner Forum' };
 const SUBMITTED = { event_id: 8, status: 'submitted', name: 'Board Offsite' };
+const DRAFT_FULL_RECORD = {
+  event_id: 7,
+  organiser_id: 'user-1',
+  organisation: 'ConnectSphere Test',
+  status: 'draft',
+  name: 'Partner Forum',
+  purpose: 'Client relationship building',
+  description: 'Half-day forum with keynotes and a reception.',
+  proposed_date: '2026-11-04T09:00:00.000Z',
+  expected_attendance: 120,
+  venue_requirements: 'Stage, PA, step-free access',
+  accessibility_needs: 'Hearing loop',
+  equipment_requirements: 'Lectern, 2 radio mics',
+  registration_needed: true
+};
 
 test('no token never loads data', () => {
   const fetch = vi.fn();
@@ -65,13 +87,31 @@ test('lists requests and only offers Edit/Delete on drafts', async () => {
   expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
 });
 
-test('Edit hands the clicked request to onEdit', async () => {
-  api([DRAFT, SUBMITTED]);
+test('Edit fetches the full record (not just the list summary) before handing it to onEdit', async () => {
+  const fetch = api([DRAFT, SUBMITTED], { 7: DRAFT_FULL_RECORD });
+  const detail = deferred<Response>();
+  const onEdit = vi.fn();
+  render(<DraftRequests accessToken="test-token" onEdit={onEdit} />);
+  const editButton = await screen.findByRole('button', { name: 'Edit' });
+  fetch.mockImplementationOnce(() => detail.promise);
+  fireEvent.click(editButton);
+  expect(screen.getByRole('button', { name: 'Opening…' })).toBeDisabled();
+  expect(onEdit).not.toHaveBeenCalled();
+  await act(async () => detail.resolve(Response.json({ request: DRAFT_FULL_RECORD })));
+  expect(onEdit).toHaveBeenCalledOnce();
+  expect(onEdit).toHaveBeenCalledWith(DRAFT_FULL_RECORD);
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/7', {
+    headers: { Authorization: 'Bearer test-token' }
+  });
+});
+
+test('a failed edit fetch shows an error instead of opening a half-blank form', async () => {
+  api([DRAFT]);
   const onEdit = vi.fn();
   render(<DraftRequests accessToken="test-token" onEdit={onEdit} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-  expect(onEdit).toHaveBeenCalledOnce();
-  expect(onEdit).toHaveBeenCalledWith(DRAFT);
+  expect(await screen.findByText('This draft no longer exists.')).toBeInTheDocument();
+  expect(onEdit).not.toHaveBeenCalled();
 });
 
 test('Edit is hidden once a delete confirmation is showing for that draft', async () => {

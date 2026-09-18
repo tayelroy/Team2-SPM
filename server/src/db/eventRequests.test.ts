@@ -7,7 +7,6 @@ import {
   fetchOwnEventRequest,
   fetchOwnEventRequests,
   insertEventRequestDraft,
-  listOwnEventRequests,
   submitEventRequest,
   updateEventRequestDraft
 } from './eventRequests';
@@ -160,38 +159,6 @@ function fakeEventsUpdateDraftClient(
             select: async () => {
               capture?.({ row, eventId: filters.eventId, organiserId: filters.organiserId, status: filters.status });
               return result;
-            }
-          };
-          return chain;
-        }
-      };
-    }
-  } as unknown as SupabaseClient;
-}
-
-function fakeListOwnEventsClient(
-  result: Result,
-  capture?: (filters: { organiserId: unknown; order: { column: unknown; ascending: unknown } }) => void
-): SupabaseClient {
-  return {
-    from(table: string) {
-      assert.equal(table, 'events');
-      return {
-        select: (_columns: string) => {
-          const filters: { organiserId?: unknown } = {};
-          let order: { column: unknown; ascending: unknown } | undefined;
-          const chain = {
-            eq(column: string, value: unknown) {
-              if (column === 'organiser_id') filters.organiserId = value;
-              return chain;
-            },
-            order(column: string, options: { ascending: boolean }) {
-              order = { column, ascending: options.ascending };
-              return chain;
-            },
-            then(resolve: (value: Result) => unknown) {
-              capture?.({ organiserId: filters.organiserId, order: order! });
-              return Promise.resolve(result).then(resolve);
             }
           };
           return chain;
@@ -563,41 +530,6 @@ describe('submitEventRequest', () => {
       if (!result.ok) assert.match(result.message, /not returned/);
     });
   }
-});
-
-describe('listOwnEventRequests', () => {
-  test('scopes to the given organiser, newest first', async () => {
-    let captured: { organiserId: unknown; order: { column: unknown; ascending: unknown } } | undefined;
-    const result = await listOwnEventRequests(
-      fakeListOwnEventsClient(
-        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft' }], error: null },
-        (c) => (captured = c)
-      ),
-      'user-1'
-    );
-    assert.equal(result.ok, true);
-    if (result.ok) assert.equal(result.requests.length, 1);
-    assert.equal(captured?.organiserId, 'user-1');
-    assert.deepEqual(captured?.order, { column: 'event_id', ascending: false });
-  });
-
-  test('returns an empty list rather than failing when the caller has no requests', async () => {
-    const result = await listOwnEventRequests(fakeListOwnEventsClient({ data: [], error: null }), 'user-1');
-    assert.deepEqual(result, { ok: true, requests: [] });
-  });
-
-  test('returns an empty list when the driver returns no data at all', async () => {
-    const result = await listOwnEventRequests(fakeListOwnEventsClient({ data: null, error: null }), 'user-1');
-    assert.deepEqual(result, { ok: true, requests: [] });
-  });
-
-  test('reports unavailable when the query errors', async () => {
-    const result = await listOwnEventRequests(
-      fakeListOwnEventsClient({ data: null, error: { message: 'connection reset' } }),
-      'user-1'
-    );
-    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
-  });
 });
 
 describe('deleteEventRequestDraft', () => {

@@ -38,6 +38,26 @@ function mockLoginResponse(role: Role) {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ requests: [{ event_id: 9, status: 'draft', name: 'Draft Forum' }] });
       }
+      if (url === '/api/event-requests/9') {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
+        return Response.json({
+          request: {
+            event_id: 9,
+            organiser_id: 'user-1',
+            organisation: 'ConnectSphere Test',
+            status: 'draft',
+            name: 'Draft Forum',
+            purpose: null,
+            description: null,
+            proposed_date: null,
+            expected_attendance: null,
+            venue_requirements: null,
+            accessibility_needs: null,
+            equipment_requirements: null,
+            registration_needed: null
+          }
+        });
+      }
       if (url === '/api/profile') {
         return Response.json({ profile: { user_id: 'user-1', name: 'Test User', organisation: 'ConnectSphere Test',
           phone: null, communication_preferences: [] } });
@@ -549,7 +569,7 @@ describe('editing a draft (SG2-29)', () => {
     fireEvent.click(within(header()).getByRole('button', { name: 'My drafts' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
 
-    expect(screen.getByRole('heading', { name: 'Edit draft request' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Edit draft request' })).toBeInTheDocument();
     expect(screen.getByLabelText(/Event name/i)).toHaveValue('Draft Forum');
 
     // AC2: fill the remaining required fields before submit is enabled.
