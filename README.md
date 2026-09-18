@@ -48,11 +48,22 @@ Auth + Postgres, npm workspaces.
 
 ### Run it locally
 
-1. Copy `server/.env.example` to `server/.env` and fill in your Supabase
-   project's URL and anon key (and, if you need admin-only operations,
-   the service role key — never expose this one to the client).
-2. `npm ci` at the repo root.
-3. Start both at once, or each separately in its own terminal:
+1. **Prerequisite:** Node.js 22.22.2 or newer, on the Node 22 LTS line.
+2. Clone the repo: `git clone https://github.com/tayelroy/Team2-SPM.git`
+3. **Database:** create a Supabase project, then apply the migrations in
+   [`supabase/migrations/`](supabase/migrations/) in filename order — either
+   paste each file into the Supabase SQL Editor and run it in order, or
+   `supabase db push` if you have the Supabase CLI linked to the project.
+   That's the only setup a fresh database needs; there's no separate
+   migration-runner script yet. Optionally also run
+   [`supabase/seed_dev.sql`](supabase/seed_dev.sql) by hand for sample venue
+   data.
+4. **Configuration:** copy `server/.env.example` to `server/.env` and fill
+   in your Supabase project's URL and anon key (Project Settings → API),
+   and, if you need admin-only operations, the service role key — never
+   expose this one to the client.
+5. `npm ci` at the repo root.
+6. Start both at once, or each separately in its own terminal:
    - **Both together:** `npm run dev` — runs the backend on `:5000` and the
      frontend on `:5173` concurrently; Vite proxies `/api/*` requests to the
      backend, so you only ever open the frontend URL.
@@ -61,15 +72,27 @@ Auth + Postgres, npm workspaces.
    - **Client only:** `npm run dev --prefix client` (or `cd client && npm run dev`)
      — starts the Vite dev server on `:5173`. It expects the server already
      running on `:5000` for any `/api/*` call to work.
-4. Open `http://localhost:5173`.
+7. Open `http://localhost:5173`.
 
 ### Sign in
 
 There's no public sign-up — accounts are seeded directly rather than
-self-registered, so you'll need an existing login for the role you want to
-test (ask a teammate). From the landing page, click **Open app**, then sign
-in. What you see afterward — the nav, the dashboard, which buttons even
-appear — is scoped to your role, and the backend checks the same permission
+self-registered. Demo logins for each role (all use the same team-shared
+password — ask a teammate for it rather than looking here, since this repo
+is public):
+
+| Role | Demo email |
+| --- | --- |
+| Event Organiser | `event.organiser1@connectsphere.test` |
+| Event Coordinator | `event.coordinator1@connectsphere.test` |
+| Venue Staff | `venue.staff1@connectsphere.test` |
+| Technical Support Staff | `technical.support1@connectsphere.test` |
+| Attendee | `attendee1@connectsphere.test` |
+
+Two more numbered accounts (`2`, `3`) exist per role except Technical
+Support Staff. From the landing page, click **Open app**, then sign in.
+What you see afterward — the nav, the dashboard, which buttons even appear
+— is scoped to your role, and the backend checks the same permission
 independently of what the UI shows.
 
 ### As an Event Organiser
