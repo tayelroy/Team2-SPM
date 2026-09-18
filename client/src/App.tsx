@@ -145,7 +145,12 @@ export default function App() {
         accessToken={session!.accessToken}
       />
     ),
-    form: <RequestForm onSubmit={() => setScreen('detail')} />,
+    form: (
+      <RequestForm
+        accessToken={session!.accessToken}
+        onSubmit={() => setScreen('detail')}
+      />
+    ),
     venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
     drafts: (
       <DraftRequests

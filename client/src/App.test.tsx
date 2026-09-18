@@ -485,6 +485,49 @@ describe('the request form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
     expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
   });
+
+  test('saving a draft and submitting sends the accessToken to the submit endpoint', async () => {
+    await openForm();
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
+    fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '12 Oct 2026' } });
+    fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
+    fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
+    fireEvent.change(screen.getByLabelText(/Description/i), {
+      target: { value: 'A half-day forum with two keynotes and a panel.' },
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url === '/api/event-requests') {
+        return new Response(
+          JSON.stringify({
+            request: { event_id: 42, status: 'draft' },
+            missingForSubmission: [],
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url === '/api/event-requests/42/submit') {
+        return new Response(
+          JSON.stringify({ request: { event_id: 42, status: 'submitted' } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(null, { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText(/Draft 42 saved/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(await screen.findByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/42/submit', {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer test-access-token' },
+    });
+  });
 });
 
 describe('editing a draft (SG2-29)', () => {
