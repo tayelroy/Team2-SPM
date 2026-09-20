@@ -133,10 +133,19 @@ Run `npm test` for tests without coverage, or `npm run test:coverage` for tests
 with the 100% per-file coverage gate. HTML reports are written to `server/coverage/index.html`
 and `client/coverage/index.html`.
 
+For the 14 purposeful browser regression journeys, install Chromium once with
+`npx playwright install chromium`, then run `npm run test:regression`. The tests
+drive the built UI and real API routes against isolated in-memory providers;
+they do not use shared Supabase data. `npm run ci:full` runs the existing build,
+coverage and reviewer gates followed by Playwright. SQL policies run separately
+in GitHub Actions. Browser reports, JSON/JUnit results and failure traces are
+uploaded as the `browser-regression` artifact.
+
 ## Documentation
 
 - [CI setup and validation](docs/ci.md) — SG2-22 acceptance criteria, required branch protection, and Supabase HTTPS configuration
 - [Test audit and course case guide](docs/testing.md) — test-suite breakdown and how automated checks map to 4–5 functional cases per feature
+- [Purposeful regression register](docs/regression.md) — current 22 cases, Playwright scope and historical-case consolidation
 - [Authorisation](docs/authorization.md) — how requests are verified and permission-checked
 - [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API
 

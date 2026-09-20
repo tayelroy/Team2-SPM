@@ -19,6 +19,8 @@ npm run ci
 | `npm test` | Backend, frontend, and security reviewer tests. |
 | `npm run test:coverage` | Tests and application coverage thresholds. |
 | `npm run ci` | Builds followed by tests with coverage. |
+| `npm run test:regression` | Builds then runs 14 Chromium journeys against real API routes with isolated in-memory providers. |
+| `npm run ci:full` | Build, coverage, reviewer and Playwright checks; SQL remains a separate CI job. |
 
 Tests mock Supabase responses and use temporary local HTTP sockets. They do not
 need Supabase credentials or a running database.
@@ -36,7 +38,7 @@ Each merge has its own concurrency group and cannot cancel another merge's run.
 Newer pre-merge updates may cancel older checks for the same pull request.
 
 The workflow exposes separate PR checks: **Build applications**, **Test backend**,
-**Test frontend**, **Test database policies**, and **Test security reviewer**.
+**Test frontend**, **Test browser regression**, **Test database policies**, and **Test security reviewer**.
 They run independently, so a failed build or backend test does not suppress
 frontend or database results. Application jobs use Node 22 and install locked
 dependencies with `npm ci`; the reviewer uses only Node built-ins. Backend and
@@ -50,6 +52,30 @@ Build errors, failing tests, and coverage below the threshold fail the job.
 Repository access is read-only, and application checks use no repository secrets.
 The [AI Security Review workflow](../.github/workflows/ai-security-review.yml)
 runs separately.
+
+## Browser regression
+
+The browser job installs locked dependencies and Chromium, builds both apps,
+type-checks the harness and runs Playwright with one worker and no retries. A
+test failure fails the existing required **Build and test** aggregate. PRs,
+merge queues, manual runs and merged-PR events use the same full browser suite.
+
+The fixture process serves the production React build and real Express routes
+at `127.0.0.1:4173`. It substitutes only external identity and persistence
+providers, resets state before every case, and has no shared Supabase access.
+Its reset endpoint is defined only in `e2e/server.ts`, outside production.
+Passing browser tests establish persistence across reloads within that fixture;
+they do not establish deployed Auth, durable database storage or RLS.
+
+The `browser-regression` artifact contains an HTML report, JSON/JUnit results,
+and traces/screenshots/video for failures, retained for 14 days. Stable IDs in
+test titles map to [the 22-case register](regression.md). Do not create a course
+row for each low-level assertion or copy old Pass statuses into a new execution.
+
+Vercel's existing build gate still runs `npm run ci`; Chromium is installed and
+run by GitHub Actions, not Vercel. Requiring **Build and test** protects the merge,
+but this change does not claim a new Vercel deployment gate or post-deploy smoke
+test. Hosted execution of the modified workflow must be verified after push.
 
 ## Authorisation regression checks
 
@@ -113,9 +139,10 @@ uploads the combined **application-coverage** artifact. Reports are retained for
 cancelled. Missing coverage summaries fail the summary step.
 
 The [Google Sheet test register](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit)
-separates backend, frontend, and database/CI scenarios, with an index of all 343
-automated tests. Spreadsheet results are dated execution records; CI does not
-automatically overwrite them after a PR run.
+separates backend, frontend, and database/CI scenarios. Its current index maps
+22 purposeful cases to their automation and evidence; individual helper tests
+remain in their source suites and coverage reports. Spreadsheet results are
+dated execution records; CI does not automatically overwrite them after a run.
 
 The [14 September hosted verification](testing.md#hosted-verification-of-the-eight-pending-cases)
 records the SQL, successful PR checks, overlapping merge runs, controlled

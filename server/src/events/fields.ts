@@ -80,7 +80,10 @@ const TEXT_FIELDS: TextField[] = [
   'equipment_requirements'
 ];
 
-/** Longest value accepted for any free-text field, to bound stored rows. */
+/** Match event.name VARCHAR(255) and event.expected_attendance INTEGER. */
+const MAX_EVENT_NAME_LENGTH = 255;
+const MAX_ATTENDANCE = 2_147_483_647;
+/** Other free-text fields retain their existing input limit. */
 const MAX_TEXT_LENGTH = 5000;
 
 function readText(value: unknown, field: string, errors: string[]): string | null {
@@ -91,8 +94,11 @@ function readText(value: unknown, field: string, errors: string[]): string | nul
   }
   const trimmed = value.trim();
   if (trimmed.length === 0) return null;
-  if (trimmed.length > MAX_TEXT_LENGTH) {
-    errors.push(`${field} must be ${MAX_TEXT_LENGTH} characters or fewer.`);
+  const maxLength = field === 'name' ? MAX_EVENT_NAME_LENGTH : MAX_TEXT_LENGTH;
+  // PostgreSQL VARCHAR counts Unicode code points, not UTF-16 code units.
+  const length = field === 'name' ? Array.from(trimmed).length : trimmed.length;
+  if (length > maxLength) {
+    errors.push(`${field} must be ${maxLength} characters or fewer.`);
     return null;
   }
   return trimmed;
@@ -106,6 +112,10 @@ function readAttendance(value: unknown, errors: string[]): number | null {
   }
   if (value < 1) {
     errors.push('expected_attendance must be at least 1.');
+    return null;
+  }
+  if (value > MAX_ATTENDANCE) {
+    errors.push(`expected_attendance must be at most ${MAX_ATTENDANCE}.`);
     return null;
   }
   return value;

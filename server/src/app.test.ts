@@ -1,6 +1,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
+import { Router } from 'express';
 import { app, createApp } from './app';
 import {
   checkDatabaseHealth,
@@ -14,6 +15,20 @@ before(() => {
   for (const key of Object.keys(dbConfig) as (keyof typeof dbConfig)[]) {
     dbConfig[key] = undefined;
   }
+});
+
+test('application composition mounts injected service routers without exposing test controls in production', async () => {
+  const availability = Router().get('/availability', (_req, res) => res.json({ service: 'availability' }));
+  const venues = Router().get('/', (_req, res) => res.json({ service: 'venues' }));
+  const profile = Router().get('/', (_req, res) => res.json({ service: 'profile' }));
+  const composed = createApp(undefined, undefined, undefined, undefined, undefined, undefined,
+    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, profile });
+  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/profile', 'profile']]) {
+    const response = await request(composed).get(path);
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { service });
+  }
+  assert.equal((await request(app).post('/__e2e/reset')).status, 404);
 });
 
 describe('Public database readiness', () => {

@@ -135,7 +135,7 @@ describe('AC1 — successful submission', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 200 })),
+      vi.fn().mockImplementation(async () => draftResponse()),
     );
   });
 
@@ -180,16 +180,20 @@ describe('AC1 — successful submission', () => {
 
     const btn = screen.getByRole('button', { name: /Submitting…/i });
     expect(btn).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     resolve(new Response(null, { status: 200 }));
   });
 
-  test('submits immediately in mockup mode when no event id is provided or created', async () => {
+  test('creates a filled request before submitting its new id', async () => {
     const onSuccess = vi.fn();
     render(<RequestForm onSuccess={onSuccess} onSaveDraft={vi.fn()} />);
     fillAllFields();
     fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    const calls = vi.mocked(fetch).mock.calls;
+    expect(calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/12/submit']);
+    expect(JSON.parse(calls[0][1]!.body as string)).toMatchObject({ name: 'Forum 2026', expected_attendance: 180 });
   });
 });
 
@@ -332,6 +336,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     const saving = await screen.findByRole('button', { name: 'Saving…' });
     expect(saving).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
 
     release(draftResponse());
     expect(await screen.findByText(/Draft 12 saved/)).toBeInTheDocument();
@@ -380,12 +385,61 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(alert.querySelector('ul')).toBeNull();
   });
 
-  test('submitting hands off to the caller in mockup mode', () => {
+  test('signed-out submission cannot report success or issue requests', async () => {
+    sessionStorage.clear();
     const onSubmit = vi.fn();
-    render(<RequestForm onSaveDraft={undefined} onSubmit={onSubmit} />);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm onSubmit={onSubmit} />);
     fillAllFields();
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
-    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign in again to submit');
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('signed-out save cannot accidentally create a duplicate of an existing draft', async () => {
+    sessionStorage.clear();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm eventId="12" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign in again to save');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('repeated saves update the created id and preserve clearing fields', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => draftResponse([], 42));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm />);
+    fillAllFields();
+    fireEvent.change(screen.getByLabelText('Accessibility needs (optional)'), { target: { value: 'Hearing loop' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText(/Draft 42 saved/);
+    fireEvent.change(screen.getByLabelText('Accessibility needs (optional)'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/event-requests/42');
+    expect(fetchMock.mock.calls[1][1].method).toBe('PATCH');
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body).not.toHaveProperty('name');
+    expect(body).not.toHaveProperty('accessibility_needs');
+    expect(body).toHaveProperty('purpose', 'Partner briefing');
+  });
+
+  test('a failed save blocks submission and keeps entered values for retry', async () => {
+    const onSuccess = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Invalid date' }), { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm accessToken="test-token" onSuccess={onSuccess} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid date');
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText(/Event name/i)).toHaveValue('Forum 2026');
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled();
   });
 });
 
@@ -495,9 +549,9 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(screen.getByLabelText(/Event name/i)).toHaveValue('Partner Forum');
   });
 
-  test('submitting an edited draft calls the real submit endpoint, not the mockup hand-off', async () => {
+  test('submitting an edited draft persists the latest values before submission', async () => {
     const onSubmit = vi.fn();
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    const fetchMock = vi.fn().mockImplementation(async () => updateResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(
       <RequestForm
@@ -509,8 +563,11 @@ describe('Editing an existing draft (SG2-29)', () => {
       />,
     );
 
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Updated forum' } });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/event-requests/7');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).name).toBe('Updated forum');
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/submit', {
       method: 'PATCH',
       headers: { Authorization: 'Bearer test-token' },
@@ -525,6 +582,7 @@ describe('save then submit', () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
+      .mockImplementationOnce(async () => draftResponse([], 42))
       .mockImplementationOnce(async () => draftResponse([], 42))
       .mockImplementationOnce(async () => new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -543,10 +601,32 @@ describe('save then submit', () => {
     });
   });
 
-  test('an explicit eventId prop still wins over a locally-created one', async () => {
+  test('retrying a failed submission updates the already-created draft', async () => {
+    const onSuccess = vi.fn();
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(async () => draftResponse([], 42))
+      .mockImplementationOnce(async () => new Response(null, { status: 503 }))
+      .mockImplementationOnce(async () => draftResponse([], 42))
+      .mockImplementationOnce(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm accessToken="test-token" onSuccess={onSuccess} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the server');
+    expect(onSuccess).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/event-requests', '/api/event-requests/42/submit',
+      '/api/event-requests/42', '/api/event-requests/42/submit',
+    ]);
+  });
+
+  test('an existing draft keeps its requested id throughout save and submit', async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
+      .mockImplementationOnce(async () => draftResponse([], 42))
       .mockImplementationOnce(async () => draftResponse([], 42))
       .mockImplementationOnce(async () => new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -579,7 +659,7 @@ describe('AC2 — server error banners', () => {
   test('shows a 400 banner listing the missing fields returned by the server', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
+      vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
         new Response(
           JSON.stringify({ missing: ['name', 'description'] }),
           { status: 400 },
@@ -598,7 +678,7 @@ describe('AC2 — server error banners', () => {
   test('preserves an unknown missing-field name from the server', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
+      vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
         new Response(JSON.stringify({ missing: ['custom_requirement'] }), { status: 400 }),
       ),
     );
@@ -612,7 +692,7 @@ describe('AC2 — server error banners', () => {
   test('shows a 409 conflict banner when the request is already submitted', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 409 })),
+      vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(new Response(null, { status: 409 })),
     );
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
@@ -626,7 +706,7 @@ describe('AC2 — server error banners', () => {
   test('shows a 503 unavailable banner when the server is unreachable', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 503 })),
+      vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(new Response(null, { status: 503 })),
     );
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
@@ -640,7 +720,7 @@ describe('AC2 — server error banners', () => {
   test('shows an unavailable banner when fetch throws (network error)', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockRejectedValue(new Error('network down')),
+      vi.fn().mockImplementationOnce(async () => draftResponse()).mockRejectedValue(new Error('network down')),
     );
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
@@ -654,7 +734,7 @@ describe('AC2 — server error banners', () => {
   test('shows the server-provided message for an unexpected error', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
+      vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
         new Response(JSON.stringify({ error: 'Submission window is closed' }), { status: 500 }),
       ),
     );
