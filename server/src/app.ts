@@ -26,7 +26,12 @@ export function createApp(
   eventListHandler: RequestHandler = getEventRequestsHandler({ getPrincipal: access.getPrincipal }),
   deleteEventDraftHandler: RequestHandler = createDeleteEventDraftHandler({ getPrincipal: access.getPrincipal }),
   updateEventDraftHandler: RequestHandler = createUpdateEventDraftHandler({ getPrincipal: access.getPrincipal }),
-  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal })
+  eventDetailHandler: RequestHandler = getEventRequestDetailHandler({ getPrincipal: access.getPrincipal }),
+  routers = {
+    availability: createVenueAvailabilityRouter(access),
+    venues: createVenuesRouter(access),
+    profile: createProfileRouter(access)
+  }
 ) {
   const app = express();
 
@@ -46,7 +51,7 @@ export function createApp(
   app.post('/api/auth/login', loginRateLimit, loginHandler);
   app.post('/api/auth/logout', logoutHandler);
   app.use('/api/auth', access.router);
-  app.use('/api/venues', createVenueAvailabilityRouter(access));
+  app.use('/api/venues', routers.availability);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
@@ -82,10 +87,10 @@ export function createApp(
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
   app.use('/api/event-requests', eventRequests);
 
-  app.use('/api/venues', createVenuesRouter(access));
+  app.use('/api/venues', routers.venues);
 
   // SG2-27: view/update the caller's own profile.
-  app.use('/api/profile', createProfileRouter(access));
+  app.use('/api/profile', routers.profile);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {

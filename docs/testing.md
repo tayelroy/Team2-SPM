@@ -1,5 +1,10 @@
 # Test audit and course case design
 
+> Historical audit notes follow. The current 20 September 2026 register is
+> [Purposeful regression cases](regression.md): 22 scenarios including 14
+> Playwright journeys. Earlier counts and execution records below describe
+> their stated revisions; they are not current results.
+
 Audit date: 9 September 2026. Baseline: `3ca7ddd759e2d832c7dc96a61fd5f0a65a4ff2f5`.
 The course source is the supplied **Week4-TestCases_SoftwareArchitecture.pdf**,
 especially slides 16, 21–23 and 26–36. This guide applies its workflow, happy-path,

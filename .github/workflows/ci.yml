@@ -75,6 +75,35 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  browser-tests:
+    name: Test browser regression
+    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run browser journeys against the real application with isolated storage
+        run: npm run test:regression
+      - name: Upload browser results and failure evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-regression
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
   database-tests:
     name: Test database policies
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
@@ -124,7 +153,7 @@ jobs:
   build-and-test:
     # Preserve the required check name used by existing branch rules.
     name: Build and test
-    needs: [build, application-tests, database-tests, reviewer-tests]
+    needs: [build, application-tests, browser-tests, database-tests, reviewer-tests]
     if: ${{ always() && (github.event.action != 'closed' || github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -149,22 +178,22 @@ jobs:
             }
           '
       - name: Collect backend coverage
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage
           path: server/coverage
       - name: Collect frontend coverage
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: frontend-coverage
           path: client/coverage
       - name: Summarize application coverage
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         run: node .github/scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
       - name: Upload combined coverage reports
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: application-coverage

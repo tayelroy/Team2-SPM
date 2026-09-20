@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { loadSession } from '../auth/session';
 import { createEventRequestDraft, submitEventRequest, updateEventRequestDraft } from '../api/eventRequests';
 import type { EventRequestDraftInput } from '../api/eventRequests';
 import { NEXT_STEPS, REQUIREMENT_CHIPS } from '../mock/data';
@@ -178,11 +179,9 @@ function OptionalTextField({
  * the form seeds its fields from `initialValues` and "Save draft" calls
  * `PATCH /api/event-requests/:eventId` instead of creating a new row.
  *
- * "Submit request" (SG2-30): AC1 — with a resolved event id and an
- * `accessToken`, calls `PATCH /api/event-requests/:eventId/submit` and fires
- * `onSuccess`. Without a resolved id (a fresh, never-saved draft with no
- * `onSaveDraft` override), submission falls back to the prototype hand-off
- * so the mockup / test paths that predate real wiring keep working.
+ * "Submit request" (SG2-30): saves the current form first, creating a draft
+ * if necessary, then submits its persisted id. Only a successful server
+ * submission fires `onSuccess`. Failed submissions retain the saved id for retry.
  * AC2 — the submit button is disabled while any mandatory field is empty;
  * inline errors appear on a blank field once touched; server errors
  * (400/409/503) surface as a visible alert banner.
@@ -208,7 +207,7 @@ export default function RequestForm({
   initialValues?: EventRequestDraftInput;
   /** Bearer token for the signed-in organiser. Required alongside a resolved event id. */
   accessToken?: string;
-  /** Called after a successful submission (or immediately in mockup mode). */
+  /** Called only after the server confirms successful submission. */
   onSuccess?: () => void;
   /**
    * Legacy alias for `onSuccess` — retained so existing callers that pass
@@ -253,7 +252,8 @@ export default function RequestForm({
 
   // When no real required-field data exists yet (fresh form), the submit
   // button is disabled. During an in-flight request it is also disabled.
-  const isSubmitDisabled = emptyFields.length > 0 || submitStatus === 'submitting';
+  const isBusy = submitStatus === 'submitting' || saveState.kind === 'saving';
+  const isSubmitDisabled = emptyFields.length > 0 || isBusy;
 
   function setField(key: RequiredField, value: string) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -267,14 +267,9 @@ export default function RequestForm({
         : current.concat(name),
     );
 
-  /** Blank optional fields are omitted so the server stores null, not an empty string. */
-  async function handleSaveDraft() {
-    if (onSaveDraft) {
-      onSaveDraft();
-      return;
-    }
-
-    setSaveState({ kind: 'saving' });
+  // Both create and update replace the entire draft: omitted blank fields
+  // become null on the server, so clearing a previously saved value persists.
+  async function persistDraft() {
     const attendanceValue = Number(values.expected_attendance);
     const payload = {
       ...(values.name.trim() ? { name: values.name.trim() } : {}),
@@ -290,33 +285,47 @@ export default function RequestForm({
       registration_needed: registrationNeeded,
     };
 
-    // An `eventId` supplied from the start (editing an existing draft) plus
-    // an access token means there's a real row to update; otherwise this is
-    // a fresh draft being created for the first time.
-    const outcome =
-      eventId && accessToken
-        ? await updateEventRequestDraft(eventId, payload, accessToken)
-        : await createEventRequestDraft(payload);
+    const token = accessToken ?? loadSession()?.accessToken;
+    if (!token) {
+      return { ok: false as const, message: 'You are signed out. Sign in again to save this draft.' };
+    }
+    const outcome = effectiveEventId
+      ? await updateEventRequestDraft(effectiveEventId, payload, token)
+      : await createEventRequestDraft(payload);
+    if (outcome.ok && !effectiveEventId) setCreatedEventId(outcome.request.event_id);
+    return outcome;
+  }
 
+  async function handleSaveDraft() {
+    if (onSaveDraft) {
+      onSaveDraft();
+      return;
+    }
+    setSaveState({ kind: 'saving' });
+    const outcome = await persistDraft();
     if (!outcome.ok) {
       setSaveState({ kind: 'error', message: outcome.message, details: outcome.details });
       return;
     }
-    if (!eventId) setCreatedEventId(outcome.request.event_id);
     setSaveState({ kind: 'saved', reference: outcome.request.event_id, missing: outcome.missingForSubmission });
   }
 
   async function handleSubmit() {
-    // Mockup / prototype mode: no resolvable draft to submit against.
-    if (!effectiveEventId || !accessToken) {
-      successCallback?.();
-      return;
-    }
-
     setSubmitStatus('submitting');
     setErrorMessage('');
-
-    const result = await submitEventRequest(effectiveEventId, accessToken);
+    const token = accessToken ?? loadSession()?.accessToken;
+    if (!token) {
+      setSubmitStatus('error');
+      setErrorMessage('You are signed out. Sign in again to submit this request.');
+      return;
+    }
+    const saved = await persistDraft();
+    if (!saved.ok) {
+      setSubmitStatus('error');
+      setErrorMessage(saved.message);
+      return;
+    }
+    const result = await submitEventRequest(effectiveEventId ?? saved.request.event_id, token);
 
     if (result.ok) {
       setSubmitStatus('success');
@@ -587,7 +596,7 @@ export default function RequestForm({
             alignItems: 'center',
           }}
         >
-          <GhostButton onClick={handleSaveDraft} disabled={saveState.kind === 'saving'}>
+          <GhostButton onClick={handleSaveDraft} disabled={isBusy}>
             {saveState.kind === 'saving' ? 'Saving…' : 'Save draft'}
           </GhostButton>
 

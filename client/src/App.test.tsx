@@ -504,8 +504,10 @@ describe('the request form', () => {
     ).toBeInTheDocument();
   });
 
-  test('submitting goes to the event detail', async () => {
+  test('submitting persists a new request before showing event detail', async () => {
     await openForm();
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ request: { event_id: 42, status: 'draft' }, missingForSubmission: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
     // AC2: fill all required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
@@ -516,7 +518,9 @@ describe('the request form', () => {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
-    expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/42/submit']);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
   });
 
   test('saving a draft and submitting sends the accessToken to the submit endpoint', async () => {
@@ -531,7 +535,7 @@ describe('the request form', () => {
     });
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if (url === '/api/event-requests') {
+      if (url === '/api/event-requests' || url === '/api/event-requests/42') {
         return new Response(
           JSON.stringify({
             request: { event_id: 42, status: 'draft' },
@@ -581,7 +585,7 @@ describe('editing a draft (SG2-29)', () => {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
 
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ request: { event_id: 9, status: 'draft' }, missingForSubmission: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
 

@@ -138,6 +138,20 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(response.body.request.status, 'draft');
   });
 
+  test('reports database-limit violations as validation errors before inserting a draft', async () => {
+    let insertCalled = false;
+    const response = await request(buildApp({ captureInsert: () => { insertCalled = true; } }))
+      .post('/api/event-requests')
+      .send({ ...COMPLETE_BODY, name: 'x'.repeat(256), expected_attendance: 2_147_483_648 });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body.details, [
+      'name must be 255 characters or fewer.',
+      'expected_attendance must be at most 2147483647.',
+    ]);
+    assert.equal(insertCalled, false);
+  });
+
   test('rejects malformed values with a message naming the field', async () => {
     const response = await request(buildApp())
       .post('/api/event-requests')
@@ -284,6 +298,40 @@ describe('validateDraftInput', () => {
       assert.equal(result.values.purpose, null);
     }
   });
+
+  for (const [label, character] of [['ASCII', 'x'], ['Unicode supplementary character', '🎉']] as const) {
+    test(`accepts a 255-character ${label} event name after trimming`, () => {
+      const name = character.repeat(255);
+      const result = validateDraftInput({ name: `  ${name}  ` });
+      assert.equal(result.valid, true);
+      if (result.valid) assert.equal(result.values.name, name);
+    });
+
+    test(`rejects a 256-character ${label} event name`, () => {
+      const result = validateDraftInput({ name: character.repeat(256) });
+      assert.equal(result.valid, false);
+      if (!result.valid) assert.deepEqual(result.errors, ['name must be 255 characters or fewer.']);
+    });
+  }
+
+  for (const attendance of [1, 2_147_483_647]) {
+    test(`accepts attendance at the database boundary ${attendance}`, () => {
+      const result = validateDraftInput({ expected_attendance: attendance });
+      assert.equal(result.valid, true);
+      if (result.valid) assert.equal(result.values.expected_attendance, attendance);
+    });
+  }
+
+  for (const [attendance, message] of [
+    [0, 'expected_attendance must be at least 1.'],
+    [2_147_483_648, 'expected_attendance must be at most 2147483647.'],
+  ] as const) {
+    test(`rejects attendance immediately outside the allowed range: ${attendance}`, () => {
+      const result = validateDraftInput({ expected_attendance: attendance });
+      assert.equal(result.valid, false);
+      if (!result.valid) assert.deepEqual(result.errors, [message]);
+    });
+  }
 
   test('normalises a valid date to ISO 8601', () => {
     const result = validateDraftInput({ proposed_date: '2026-11-04T09:00:00Z' });

@@ -63,12 +63,21 @@ export function createLoginRateLimiter(options: { windowMs?: number; limit?: num
  * (AI security review, LOW).
  */
 export async function loginAccount(
-  input: Partial<LoginInput>,
+  input: unknown,
   getClient: () => SupabaseClient | null = getSupabaseClient,
   resolvePrincipal: (token: string) => Promise<Principal> = resolveSupabasePrincipal
 ): Promise<LoginResult> {
-  const email = input.email?.trim();
-  const password = input.password;
+  // HTTP request bodies are untrusted regardless of the TypeScript caller's
+  // type. Reject malformed values before trimming or contacting Auth, using
+  // the same generic response as other invalid credentials.
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return GENERIC_INVALID;
+  }
+  const { email: rawEmail, password } = input as Partial<LoginInput>;
+  if (typeof rawEmail !== 'string' || typeof password !== 'string') {
+    return GENERIC_INVALID;
+  }
+  const email = rawEmail.trim();
   if (!email || !password) {
     return GENERIC_INVALID;
   }

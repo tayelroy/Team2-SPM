@@ -50,6 +50,29 @@ describe('loginAccount', () => {
     assert.equal(called, false);
   });
 
+  test('rejects malformed bodies before reading credential fields or contacting Auth', async () => {
+    let providerCalls = 0;
+    for (const input of [undefined, null, false, 42, 'credentials', []]) {
+      assert.deepEqual(await loginAccount(input, () => {
+        providerCalls++;
+        return fakeClient();
+      }), { outcome: 'invalid_credentials' });
+    }
+    assert.equal(providerCalls, 0);
+  });
+
+  test('trims only the email and preserves the password exactly', async () => {
+    let submitted: unknown;
+    const client = {
+      auth: { signInWithPassword: async (input: unknown) => {
+        submitted = input;
+        return { data: { session: null, user: null }, error: { message: 'Invalid credentials' } };
+      } }
+    } as unknown as SupabaseClient;
+    await loginAccount({ email: '  ada@example.com  ', password: ' password ' }, () => client);
+    assert.deepEqual(submitted, { email: 'ada@example.com', password: ' password ' });
+  });
+
   test('returns a generic error for wrong credentials, same as a nonexistent email', async () => {
     const client = fakeClient(async () => ({
       data: { session: null, user: null },
@@ -105,6 +128,33 @@ describe('loginAccount', () => {
 });
 
 describe('POST /api/auth/login', () => {
+  test('returns generic JSON for malformed credential types without calling the provider', async () => {
+    let providerCalls = 0;
+    const app = buildApp(input => loginAccount(input, () => {
+      providerCalls++;
+      return fakeClient();
+    }));
+    const invalidBodies = [
+      [],
+      {},
+      { email: 'ada@example.com' },
+      { password: 'password' },
+      ...[null, 42, false, [], {}].flatMap(value => [
+        { email: value, password: 'password' },
+        { email: 'ada@example.com', password: value }
+      ]),
+      { email: '   ', password: 'password' },
+      { email: 'ada@example.com', password: '' }
+    ];
+    for (const body of invalidBodies) {
+      const response = await request(app).post('/api/auth/login').send(body);
+      assert.equal(response.status, 401, JSON.stringify(body));
+      assert.match(response.headers['content-type'], /application\/json/);
+      assert.deepEqual(response.body, { error: 'Invalid email or password.' });
+    }
+    assert.equal(providerCalls, 0);
+  });
+
   test('returns 200 with the session on success, and no refresh token', async () => {
     const app = buildApp(async () => ({
       outcome: 'success',
