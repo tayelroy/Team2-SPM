@@ -68,7 +68,7 @@ export async function createEventRequestDraft(
   if (!response.ok) {
     if (response.status === 401) return { ok: false, message: SIGNED_OUT };
     if (response.status === 403) {
-      return { ok: false, message: 'Your role cannot raise event requests.' };
+      return { ok: false, message: typeof body?.error === 'string' ? body.error : 'Your role cannot raise event requests.' };
     }
     return {
       ok: false,
@@ -97,6 +97,7 @@ export interface EventRequestSummary {
   status: string;
   coordinatorId: string | null;
   coordinatorName: string | null;
+  canManage: boolean;
   waitingOnMe: boolean;
 }
 
@@ -116,6 +117,7 @@ export interface EventRequestDetail {
   registrationNeeded: boolean;
   coordinatorId: string | null;
   coordinatorName: string | null;
+  canManage: boolean;
   waitingOnMe: boolean;
 }
 
@@ -160,7 +162,8 @@ function mapEventRequestSummary(raw: Record<string, unknown>): EventRequestSumma
     status,
     coordinatorId: typeof raw.coordinator_id === 'string' ? raw.coordinator_id : null,
     coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
-    waitingOnMe: isWaitingOnOrganiser(status),
+    canManage: raw.can_manage === true,
+    waitingOnMe: raw.can_manage === true && isWaitingOnOrganiser(status),
   };
 }
 
@@ -186,7 +189,8 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     registrationNeeded: Boolean(raw.registration_needed),
     coordinatorId: typeof raw.coordinator_id === 'string' ? raw.coordinator_id : null,
     coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
-    waitingOnMe: isWaitingOnOrganiser(status),
+    canManage: raw.can_manage === true,
+    waitingOnMe: raw.can_manage === true && isWaitingOnOrganiser(status),
   };
 }
 
@@ -236,7 +240,7 @@ export async function submitEventRequest(
 }
 
 /**
- * Fetches all event requests owned by the authenticated organiser (SG2-31).
+ * Fetches event requests in the authenticated organiser's organisation (SG2-31).
  *
  * Supports optional status filtering (e.g., 'draft', 'submitted').
  * When status is 'All' or empty/whitespace, no filter query parameter is sent.
@@ -290,7 +294,7 @@ export async function fetchOwnEventRequests(
 }
 
 /**
- * Fetches full detail for a single event request owned by the caller (SG2-31).
+ * Fetches full detail for a single event request in the caller's organisation (SG2-31).
  *
  * @param eventId  Event ID to look up.
  * @param token    Bearer access token from the signed-in session.
@@ -363,7 +367,7 @@ export type ListMyEventRequestsOutcome =
 export async function listMyEventRequests(token: string): Promise<ListMyEventRequestsOutcome> {
   let response: Response;
   try {
-    response = await fetch('/api/event-requests', {
+    response = await fetch('/api/event-requests?scope=mine', {
       headers: { Authorization: `Bearer ${token}` }
     });
   } catch {

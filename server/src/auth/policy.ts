@@ -20,8 +20,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.create': ['event_organiser'],
   // SG2-30: only the organiser who owns a draft can submit it for review.
   'event_request.submit': ['event_organiser'],
-  // SG2-31: Event Organisers and Event Coordinators can view event requests.
-  'event_request.view': ['event_organiser', 'event_coordinator'],
+  // SG2-26: the organisation event view is restricted to Event Organisers.
+  'event_request.view': ['event_organiser'],
   // SG2-32: an organiser can delete their own event requests. Ownership
   // itself is enforced per-row in the handler (fetchOwnEventRequest) and
   // atomically in the delete query itself, not by this role grant.

@@ -1,68 +1,67 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
 
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-});
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+const requests = [
+  { event_id: 1, name: 'My draft', status: 'draft', can_manage: true },
+  { event_id: 2, name: 'Colleague draft', status: 'draft', can_manage: false },
+  { event_id: 3, name: '', status: 'submitted', can_manage: true, coordinator_name: 'A. Coordinator' },
+];
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((yes) => {
-    resolve = yes;
-  });
-  return { promise, resolve };
-}
-
-// 'Draft' also appears as a mock event card's status badge; the stats grid
-// always renders first in DOM order, so its label is reliably the first match.
-const draftStat = () => screen.getAllByText('Draft')[0].closest('div')!;
-
-test('a non-Event-Organiser role never fetches, and shows the mock Draft figure untouched', () => {
-  const fetch = vi.fn();
+test('organisation dashboard shows real shared events, owned draft count and correct navigation', async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ requests }));
   vi.stubGlobal('fetch', fetch);
-  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
-  expect(fetch).not.toHaveBeenCalled();
+  const onNavigate = vi.fn();
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={onNavigate} />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
+  await screen.findByText('Colleague draft');
+  expect(screen.getByText('My drafts').closest('div')).toHaveTextContent('1');
+  expect(screen.getByText('Organisation events').closest('div')).toHaveTextContent('3');
+  expect(screen.getByText('Waiting on me').closest('div')).toHaveTextContent('1');
+  const shared = screen.getByRole('button', { name: /Colleague draft/ });
+  expect(within(shared).getByText('View only')).toBeInTheDocument();
+  fireEvent.click(shared);
+  expect(onNavigate).toHaveBeenCalledWith('detail', 2);
+  expect(screen.getByText('With coordinator')).toBeInTheDocument();
+  expect(screen.getByText('Untitled event')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
+  expect(onNavigate).toHaveBeenCalledWith('events');
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests', { method: 'GET', headers: { Authorization: 'Bearer token' } });
 });
 
-test('an Event Organiser with no access token never fetches', () => {
-  const fetch = vi.fn();
-  vi.stubGlobal('fetch', fetch);
-  render(<Dashboard role="Event Organiser" onNavigate={vi.fn()} />);
-  expect(fetch).not.toHaveBeenCalled();
-  expect(draftStat()).toHaveTextContent('1');
-});
-
-test('an Event Organiser with a token replaces the mock Draft figure with the real count', async () => {
-  const fetch = vi.fn().mockResolvedValue(
-    Response.json({ requests: [{ event_id: 1, status: 'draft' }, { event_id: 2, status: 'draft' }, { event_id: 3, status: 'submitted' }] })
-  );
-  vi.stubGlobal('fetch', fetch);
-  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
-  expect(draftStat()).toHaveTextContent('1');
-  await waitFor(() => expect(draftStat()).toHaveTextContent('2'));
-  expect(fetch).toHaveBeenCalledWith('/api/event-requests', { headers: { Authorization: 'Bearer token' } });
-});
-
-test('a failed fetch leaves the mock Draft figure in place', async () => {
+test.each([false, true])('unavailable organisation data never falls back to mock events (token %s)', async (hasToken) => {
   const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
   vi.stubGlobal('fetch', fetch);
-  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
-  await act(async () => {
-    await fetch.mock.results[0]!.value;
-  });
-  expect(draftStat()).toHaveTextContent('1');
+  render(<Dashboard role="Event Organiser" accessToken={hasToken ? 'token' : undefined} onNavigate={vi.fn()} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('unavailable');
+  expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
+  expect(screen.getByText('My drafts').closest('div')).toHaveTextContent('—');
 });
 
-test('unmounting before the fetch resolves does not update state', async () => {
-  const load = deferred<Response>();
-  const fetch = vi.fn(() => load.promise);
-  vi.stubGlobal('fetch', fetch);
+test('empty organisation has explicit empty state', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [] })));
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
+  expect(await screen.findByText('No event requests found.')).toBeInTheDocument();
+});
+
+test('unmount ignores pending organisation fetch', async () => {
+  let resolve!: (r: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((yes) => { resolve = yes; })));
   const { unmount } = render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
   unmount();
-  await act(async () => load.resolve(Response.json({ requests: [{ event_id: 1, status: 'draft' }] })));
-  // No assertion needed beyond "this doesn't throw / warn" — the component is
-  // already unmounted, so there is nothing left to query.
+  await act(async () => resolve(Response.json({ requests })));
+});
+
+test('coordinator retains existing operational dashboard and navigation', () => {
+  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  const onNavigate = vi.fn();
+  render(<Dashboard role="Event Coordinator" onNavigate={onNavigate} />);
+  expect(fetch).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: /Product Launch — Tideline/ }));
+  expect(onNavigate).toHaveBeenCalledWith('detail');
+  fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
+  expect(onNavigate).toHaveBeenCalledWith('events');
 });

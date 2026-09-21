@@ -3,49 +3,32 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventDetail from './EventDetail';
+import { ROLES } from '../mock/types';
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
 
-describe('EventDetail with mock data (unselected event or non-organiser roles)', () => {
-  test('an attendee detail view hides the internal capacity warning and approval control', () => {
-    render(<EventDetail role="Attendee" onNavigate={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: 'Quarterly Partner Dinner' })).toBeInTheDocument();
-    expect(screen.queryByText(/Capacity check/)).not.toBeInTheDocument();
+describe('EventDetail access boundaries', () => {
+  test.each(ROLES.filter((role) => role !== 'Event Organiser'))('%s cannot fetch or see event detail', (role) => {
+    const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
+    render(<EventDetail role={role} selectedEventId={101} accessToken="token" onNavigate={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+    expect(fetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
   });
 
-  test('a coordinator gets decision actions, and approving goes to venues', () => {
-    const onNavigate = vi.fn();
-    render(<EventDetail role="Event Coordinator" onNavigate={onNavigate} />);
-    expect(screen.getByText('Review actions')).toBeInTheDocument();
-    expect(screen.getByText(/Capacity check/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
-    expect(onNavigate).toHaveBeenCalledWith('venues');
-  });
-
-  test('an organiser gets amendment actions when not submitted', () => {
+  test('an organiser without a selected request never sees a mock organisation event', () => {
     const onNavigate = vi.fn();
     render(<EventDetail role="Event Organiser" onNavigate={onNavigate} />);
-    expect(screen.getByText('Your options')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit request' }));
-    expect(onNavigate).toHaveBeenCalledWith('form');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Request a change' }));
-    expect(onNavigate).toHaveBeenCalledWith('change');
+    expect(screen.getByText(/Select an event from your organisation/)).toBeInTheDocument();
+    expect(screen.queryByText('Northbridge Investor Forum')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to events' }));
+    expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test('an organiser gets a read-only locked notice when submitted', () => {
-    render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} eventStatus="submitted" />);
-    expect(
-      screen.getByText(/This request has been submitted and is now with your coordinator/),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
-  });
 });
 
 describe('EventDetail for Event Organiser with selected event (API consumption)', () => {
@@ -68,6 +51,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         registrationNeeded: true,
         coordinatorId: 'coord-2',
         coordinatorName: 'Sarah Jenkins',
+        canManage: true,
         waitingOnMe: false,
       },
     });
@@ -103,9 +87,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
 
-    // Click Request a change
-    fireEvent.click(screen.getByRole('button', { name: 'Request a change' }));
-    expect(onNavigate).toHaveBeenCalledWith('change');
+    expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
 
     // Click Back to events
     fireEvent.click(screen.getByRole('button', { name: '← Back to events' }));
@@ -131,6 +113,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         registrationNeeded: false,
         coordinatorId: null,
         coordinatorName: null,
+        canManage: true,
         waitingOnMe: true,
       },
     });
@@ -155,12 +138,9 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     const editBtn = screen.getByRole('button', { name: 'Edit request' });
     expect(editBtn).toBeInTheDocument();
     fireEvent.click(editBtn);
-    expect(onNavigate).toHaveBeenCalledWith('form');
+    expect(onNavigate).toHaveBeenCalledWith('drafts');
 
-    const changeBtn = screen.getByRole('button', { name: 'Request a change' });
-    expect(changeBtn).toBeInTheDocument();
-    fireEvent.click(changeBtn);
-    expect(onNavigate).toHaveBeenCalledWith('change');
+    expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
   });
 
   test('displays rejection notice for rejected request', async () => {
@@ -182,6 +162,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         registrationNeeded: true,
         coordinatorId: 'coord-1',
         coordinatorName: 'A. Vance',
+        canManage: true,
         waitingOnMe: true,
       },
     });
@@ -321,4 +302,21 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     unmount();
     rejectPromise(new Error('unmounted detail rejection'));
   });
+});
+
+test.each(['draft', 'rejected', 'submitted'])('colleague %s detail is strictly view only', async (status) => {
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: {
+    eventId: 77, organiserId: 'colleague', organisation: 'Shared organisation', status,
+    name: 'Colleague event', purpose: 'Shared work', description: '', proposedDate: null,
+    expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+    equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
+    coordinatorName: null, canManage: false, waitingOnMe: false,
+  } });
+  render(<EventDetail role="Event Organiser" accessToken="token" selectedEventId={77} onNavigate={vi.fn()} />);
+  expect(await screen.findByText(/View only. This event/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Request returned for revision')).not.toBeInTheDocument();
+  expect(screen.queryByText('Confirmed arrangements')).not.toBeInTheDocument();
+  expect(screen.queryByText('Activity')).not.toBeInTheDocument();
 });

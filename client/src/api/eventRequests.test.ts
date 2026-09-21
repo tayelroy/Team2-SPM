@@ -105,9 +105,9 @@ describe('createEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: false, message: 'You are signed out. Sign in again to save this draft.' });
   });
 
-  test('explains a 403 in terms of the caller role', async () => {
+  test('explains a 403 without server details in terms of the caller role', async () => {
     signIn();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 403)));
 
     const outcome = await createEventRequestDraft({});
 
@@ -240,6 +240,7 @@ describe('fetchOwnEventRequests', () => {
     const mockEvents = [
       {
         event_id: 101,
+        can_manage: true,
         name: 'Annual Tech Summit',
         proposed_date: '2026-11-20',
         status: 'draft',
@@ -248,6 +249,7 @@ describe('fetchOwnEventRequests', () => {
       },
       {
         event_id: 102,
+        can_manage: true,
         name: 'Leadership Workshop',
         proposed_date: '2026-12-05',
         status: 'submitted',
@@ -275,6 +277,7 @@ describe('fetchOwnEventRequests', () => {
         status: 'draft',
         coordinatorId: null,
         coordinatorName: null,
+        canManage: true,
         waitingOnMe: true,
       },
       {
@@ -284,6 +287,7 @@ describe('fetchOwnEventRequests', () => {
         status: 'submitted',
         coordinatorId: 'coord-uuid-1',
         coordinatorName: 'Jane Doe',
+        canManage: true,
         waitingOnMe: false,
       },
     ];
@@ -358,7 +362,8 @@ describe('fetchOwnEventRequests', () => {
           status: 'draft',
           coordinatorId: null,
           coordinatorName: null,
-          waitingOnMe: true,
+          canManage: false,
+          waitingOnMe: false,
         },
       ],
     });
@@ -420,6 +425,7 @@ describe('fetchOwnEventDetail', () => {
   test('fetches event detail and maps all fields', async () => {
     const rawDetail = {
       event_id: 42,
+      can_manage: true,
       organiser_id: 'org-uuid-99',
       organisation: 'Acme Corp',
       status: 'rejected',
@@ -463,6 +469,7 @@ describe('fetchOwnEventDetail', () => {
       registrationNeeded: true,
       coordinatorId: 'coord-uuid-5',
       coordinatorName: 'Coordinator Jane',
+      canManage: true,
       waitingOnMe: true,
     };
 
@@ -503,6 +510,7 @@ describe('fetchOwnEventDetail', () => {
         registrationNeeded: false,
         coordinatorId: null,
         coordinatorName: null,
+        canManage: false,
         waitingOnMe: false,
       },
     });
@@ -538,7 +546,8 @@ describe('fetchOwnEventDetail', () => {
         registrationNeeded: false,
         coordinatorId: null,
         coordinatorName: null,
-        waitingOnMe: true,
+        canManage: false,
+        waitingOnMe: false,
       },
     });
   });
@@ -650,7 +659,7 @@ describe('listMyEventRequests', () => {
 
     expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/event-requests');
+    expect(url).toBe('/api/event-requests?scope=mine');
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
 
@@ -952,4 +961,20 @@ describe('updateEventRequestDraft', () => {
       details: undefined,
     });
   });
+});
+
+
+test('create draft preserves the missing organisation guidance from the server', async () => {
+  signIn();
+  const message = 'Your account needs a client organisation before you can create event requests. Please contact support.';
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: message }, 403)));
+  expect(await createEventRequestDraft({})).toEqual({ ok: false, message });
+});
+
+test('shared drafts map to view-only without an action for the current organiser', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ requests: [
+    { event_id: 80, name: 'Colleague draft', status: 'draft', can_manage: false },
+  ] }, 200)));
+  const outcome = await fetchOwnEventRequests('colleague-token');
+  expect(outcome).toMatchObject({ ok: true, requests: [{ eventId: 80, canManage: false, waitingOnMe: false }] });
 });

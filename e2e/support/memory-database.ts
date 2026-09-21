@@ -7,6 +7,8 @@ export const TEST_PASSWORD = 'Regression123!';
 export const accounts = [
   { key: 'organiser', email: 'organiser@example.test', role: 'event_organiser' },
   { key: 'organiser2', email: 'organiser2@example.test', role: 'event_organiser' },
+  { key: 'colleague', email: 'colleague@example.test', role: 'event_organiser' },
+  { key: 'unassigned', email: 'unassigned@example.test', role: 'event_organiser' },
   { key: 'coordinator', email: 'coordinator@example.test', role: 'event_coordinator' },
   { key: 'venue', email: 'venue@example.test', role: 'venue_staff' },
   { key: 'support', email: 'support@example.test', role: 'technical_support_staff' },
@@ -45,7 +47,7 @@ export class MemoryDatabase {
     this.tables = {
       users: accounts.map(account => ({
         user_id: `user-${account.key}`, name: `Regression ${account.key}`,
-        organisation: account.key === 'organiser2' ? 'Other Organisation' : 'Regression Organisation',
+        organisation: account.key === 'unassigned' ? null : account.key === 'organiser2' ? 'Other Organisation' : 'Regression Organisation',
         phone: '+6581234567', communication_preferences: ['email'], department: 'Operations'
       })),
       account_roles: accounts.map(account => ({ user_id: `user-${account.key}`, role: account.role })),

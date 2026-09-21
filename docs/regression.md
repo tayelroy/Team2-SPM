@@ -1,7 +1,7 @@
 # Purposeful regression cases
 
-The current register is [`regression-cases.json`](regression-cases.json): **22
-scenarios: 14 browser journeys, 4 supporting backend cases, 2 SQL cases and 2
+The current register is [`regression-cases.json`](regression-cases.json): **26
+scenarios: 17 browser journeys, 4 supporting backend cases, 3 SQL cases and 2
 hosted CI cases**. A scenario groups assertions around one observable outcome;
 it is not a list of every unit test. Positive, negative and boundary partitions
 can share a case when they establish the same rule. Counts are not a coverage
@@ -19,9 +19,9 @@ the register does not automatically write to that Sheet.
 
 | Layer | Purpose and limit |
 | --- | --- |
-| Playwright, 14 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
+| Playwright, 17 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
 | Backend, 4 cases | Existing unit/API suites retain denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
-| PostgreSQL, 2 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
+| PostgreSQL, 3 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
 | Hosted CI, 2 cases | Check the required aggregate and workflow event behavior, including the new browser job. Local script inspection or a past workflow run cannot establish current hosted execution or branch protection. |
 
 Run `npm run test:regression` for the browser journeys after installing Chromium
@@ -92,7 +92,7 @@ prototype/helper rows as redundant.
 Numbers and results in [`testing.md`](testing.md) and dated sections of
 [`ci.md`](ci.md) describe earlier revisions, including the old 36-case register,
 343-test inventory and then-absent browser job. They must not be copied as
-current Pass results. Current runner totals can differ from 22 because each
+current Pass results. Current runner totals can differ from 26 because each
 scenario is supported by multiple lower-level assertions and parameterized
 cases.
 
@@ -132,3 +132,13 @@ uses the same 22 records, with 20 scoped Pass results and 2 Not Executed results
 A [native backup](https://docs.google.com/spreadsheets/d/1ARJ1zCmmhUYmjFdLUaM1SyMhEElS9oUalpjffTbQ9B0/edit)
 preserves the previous workbook before consolidation. The blank template and
 existing tab layout are retained.
+
+## SG2-26 additions
+
+`SG2-26-P01` covers organisation sharing and creator-only actions; `SG2-26-N01`
+covers unrelated and unassigned accounts. `DB-ORG-01` covers direct database
+reads and protected membership. `PW-AUTH-03` remains the logout regression; its
+previous SG2-26 mapping was incorrect.
+
+`SG2-26-N02` checks all four non-organiser roles are denied the organisation
+event API and do not receive My events navigation.

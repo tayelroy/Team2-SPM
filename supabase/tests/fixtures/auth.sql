@@ -17,4 +17,11 @@ $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
 
+-- Reproduce Supabase's default public-schema exposure so feature migrations
+-- must explicitly revoke client access rather than pass with absent grants.
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+
 commit;

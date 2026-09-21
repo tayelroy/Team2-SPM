@@ -127,19 +127,30 @@ export default function App() {
   const role = session!.user.role as Role;
 
   const body = {
-    dashboard: <Dashboard role={role} accessToken={session!.accessToken} onNavigate={setScreen} />,
+    dashboard: (
+      <Dashboard
+        role={role}
+        accessToken={session!.accessToken}
+        onNavigate={(nextScreen, id) => {
+          if (id !== undefined) setSelectedEventId(id);
+          setScreen(nextScreen);
+        }}
+      />
+    ),
     events: (
       <EventsTable
+        key={session!.accessToken}
         role={role}
         accessToken={session!.accessToken}
         onOpenEvent={(id) => {
-          if (id !== undefined) setSelectedEventId(id);
+          setSelectedEventId(id);
           setScreen('detail');
         }}
       />
     ),
     detail: (
       <EventDetail
+        key={`${session!.accessToken}:${selectedEventId}`}
         role={role}
         onNavigate={setScreen}
         selectedEventId={selectedEventId}

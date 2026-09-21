@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import {
   deleteEventRequestDraft,
-  fetchOwnEventRequest,
+  fetchManageableEventRequest,
   type DeleteDraftResult,
   type FetchEventRequestResult
 } from '../db/eventRequests';
@@ -27,7 +27,7 @@ export interface DeleteEventDraftDependencies {
  * DELETE /api/event-requests/:eventId — deletes a draft event request
  * (SG2-32). Only the request's own organiser can delete it, and only while
  * it is still a draft — mirrors submitEventRequestHandler's fetch-then-check
- * shape (SG2-30), reusing fetchOwnEventRequest so a request belonging to
+ * shape (SG2-30), reusing fetchManageableEventRequest so a request belonging to
  * someone else is indistinguishable from one that doesn't exist at all.
  * `deleteEventRequestDraft` itself also filters on the caller's organiser id
  * (not just this pre-check), so ownership holds even if a future caller of
@@ -36,7 +36,7 @@ export interface DeleteEventDraftDependencies {
 export function createDeleteEventDraftHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  fetchOwnRequest = fetchOwnEventRequest,
+  fetchOwnRequest = fetchManageableEventRequest,
   deleteDraft = deleteEventRequestDraft
 }: DeleteEventDraftDependencies): RequestHandler {
   return async (req, res) => {
@@ -63,7 +63,7 @@ export function createDeleteEventDraftHandler({
     if (!existing.ok) {
       if (existing.reason === 'not_found') {
         // Deliberately the same response whether the row belongs to someone
-        // else or does not exist at all — see fetchOwnEventRequest.
+        // else or does not exist at all — see fetchManageableEventRequest.
         res.status(404).json({ error: 'No event request found for this account.' });
         return;
       }

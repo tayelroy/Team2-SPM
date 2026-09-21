@@ -95,7 +95,6 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['form', 'New request'],
     ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
-    ['change', 'Change request'],
   ],
   'Event Coordinator': [
     ['dashboard', 'Dashboard'],
@@ -130,7 +129,7 @@ export const HEAD: Record<
     eyebrow: 'Event Organiser · Meridian Capital',
     title: 'Your events',
     blurb:
-      'Two requests are moving, one is still a draft. Anything waiting on you is marked below.',
+      'Events shared with your organisation. Requests that need your action are marked.',
   },
   'Event Coordinator': {
     eyebrow: 'Event Coordinator · A. Vance',

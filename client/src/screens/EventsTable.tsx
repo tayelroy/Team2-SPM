@@ -2,13 +2,9 @@ import { useEffect, useState } from 'react';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { STATUS_FILTERS } from '../mock/data';
 import type { Role } from '../mock/types';
-import { badgeStyle, eventCards } from '../mock/viewModel';
+import { badgeStyle } from '../mock/viewModel';
 import { color, radius, surface } from '../theme';
 import { Badge, Notice, NoticeMark } from '../ui';
-
-const MOCK_COLUMNS = 'minmax(220px,2.2fr) 1fr 1fr 1fr 40px';
-const ORGANISER_COLUMNS =
-  'minmax(200px,2fr) minmax(120px,1.2fr) minmax(130px,1.2fr) minmax(110px,1fr) minmax(130px,1.2fr) 40px';
 
 /**
  * Formats an ISO 8601 proposed date into readable '12 Oct 2026' string,
@@ -28,7 +24,7 @@ export function formatProposedDate(iso: string | null): string {
 export interface EventsTableProps {
   role: Role;
   accessToken?: string;
-  onOpenEvent: (eventId?: number) => void;
+  onOpenEvent: (eventId: number) => void;
 }
 
 /** Full event list with status filtering. Rows open the detail screen. */
@@ -80,12 +76,12 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
     };
   }, [isOrganiser, accessToken, filter, reloadKey]);
 
-  // For non-organisers, preserve original mock cards display.
-  const mockAll = eventCards(role);
-  const mockRows = filter === 'All' ? mockAll : mockAll.filter((e) => e.status === filter);
+  if (!isOrganiser) {
+    return <Notice><p role="alert">Event requests are available only to Event Organisers.</p></Notice>;
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="organisation-events-view">
       <div
         role="tablist"
         aria-label="Filter events by status"
@@ -116,8 +112,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
         })}
       </div>
 
-      {isOrganiser ? (
-        loading ? (
+      {loading ? (
           <div
             role="status"
             style={{
@@ -171,11 +166,10 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
               : `No ${filter.toLowerCase()} events found.`}
           </div>
         ) : (
-          <div style={{ background: color.kelp, borderRadius: radius.card, overflow: 'hidden' }}>
-            <div
+          <div className="organisation-events" style={{ background: color.kelp, borderRadius: radius.card, overflow: 'hidden' }}>
+            <div className="organisation-events-header"
               style={{
                 display: 'grid',
-                gridTemplateColumns: ORGANISER_COLUMNS,
                 gap: '16px',
                 padding: '18px 28px',
                 background: surface.tableHead,
@@ -204,6 +198,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
               return (
                 <button
                   key={event.eventId}
+                  className="organisation-events-row"
                   type="button"
                   onClick={() => onOpenEvent(event.eventId)}
                   aria-label={`View ${event.name || 'Untitled event'}`}
@@ -211,7 +206,6 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                     width: '100%',
                     textAlign: 'left',
                     display: 'grid',
-                    gridTemplateColumns: ORGANISER_COLUMNS,
                     gap: '16px',
                     alignItems: 'center',
                     padding: '20px 28px',
@@ -249,7 +243,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                   <span
                     style={{
                       fontSize: '14px',
-                      color: event.coordinatorName ? color.silver : color.slate,
+                      color: color.silver,
                     }}
                   >
                     {event.coordinatorName || 'Unassigned'}
@@ -265,8 +259,8 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                         Waiting on you
                       </Badge>
                     ) : (
-                      <span style={{ fontSize: '13px', color: color.slate }}>
-                        With coordinator
+                      <span style={{ fontSize: '13px', color: color.silver }}>
+                        {event.canManage ? 'With coordinator' : 'View only'}
                       </span>
                     )}
                   </span>
@@ -279,91 +273,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                 </button>
               );
             })}
-          </div>
-        )
-      ) : (
-        <div style={{ background: color.kelp, borderRadius: radius.card, overflow: 'hidden' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: MOCK_COLUMNS,
-              gap: '16px',
-              padding: '18px 28px',
-              background: surface.tableHead,
-            }}
-          >
-            {['Event', 'Date', 'Venue', 'Status', ''].map((heading, i) => (
-              <span
-                key={heading || `col-${i}`}
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 500,
-                  letterSpacing: '0.15em',
-                  textTransform: 'uppercase',
-                  color: color.silver,
-                }}
-              >
-                {heading}
-              </span>
-            ))}
-          </div>
-
-          {mockRows.map((event) => (
-            <button
-              key={event.ref}
-              type="button"
-              onClick={() => onOpenEvent()}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                display: 'grid',
-                gridTemplateColumns: MOCK_COLUMNS,
-                gap: '16px',
-                alignItems: 'center',
-                padding: '20px 28px',
-                background: 'none',
-                border: 'none',
-                borderTop: '1px solid rgba(255,255,255,0.07)',
-                cursor: 'pointer',
-              }}
-            >
-              <span
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  minWidth: 0,
-                }}
-              >
-                <span style={{ fontSize: '17px', color: color.platinum }}>{event.name}</span>
-                <span
-                  style={{
-                    fontSize: '12px',
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: color.slate,
-                  }}
-                >
-                  {event.ref} · {event.client}
-                </span>
-              </span>
-              <span style={{ fontSize: '14px', color: color.silver }}>{event.date}</span>
-              <span style={{ fontSize: '14px', color: color.silver }}>{event.venue}</span>
-              <span style={{ justifySelf: 'start' }}>
-                <Badge bg={event.badgeBg} fg={event.badgeFg}>
-                  {event.status}
-                </Badge>
-              </span>
-              <span
-                aria-hidden="true"
-                style={{ justifySelf: 'end', color: color.platinum, fontSize: '14px' }}
-              >
-                ↗
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+          </div>        )}
     </div>
   );
 }

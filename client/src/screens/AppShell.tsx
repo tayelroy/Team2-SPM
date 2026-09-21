@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
-import type { Role, Screen } from '../mock/types';
+import type { Notification, Role, Screen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 
 /** Slide-over notification panel. */
-function NotificationDrawer({ onClose }: { onClose: () => void }) {
+function NotificationDrawer({ onClose, notifications }: { onClose: () => void; notifications: Notification[] }) {
   return (
     <>
       <div
@@ -60,7 +60,8 @@ function NotificationDrawer({ onClose }: { onClose: () => void }) {
             ✕
           </IconButton>
         </div>
-        {NOTIFICATIONS.map((n) => (
+        {notifications.length === 0 ? <p style={{ color: color.silver }}>No notifications available.</p> : null}
+        {notifications.map((n) => (
           <div
             key={n.title}
             style={{
@@ -122,6 +123,7 @@ export default function AppShell({
   const profileRef = useRef<HTMLDivElement>(null);
   const profileButton = useRef<HTMLButtonElement>(null);
   const head = HEAD[role];
+  const notifications = role === 'Event Organiser' ? [] : NOTIFICATIONS;
   const primary = primaryActionFor(role);
 
   useEffect(() => {
@@ -228,7 +230,7 @@ export default function AppShell({
             <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
-              aria-label={`Notifications (${NOTIFICATIONS.length})`}
+              aria-label={`Notifications (${notifications.length})`}
               style={{
                 position: 'relative',
                 background: surface.iconButton,
@@ -257,7 +259,7 @@ export default function AppShell({
                   letterSpacing: '0.04em',
                 }}
               >
-                {NOTIFICATIONS.length}
+                {notifications.length}
               </span>
             </button>
 
@@ -330,7 +332,7 @@ export default function AppShell({
                 color: color.silver,
               }}
             >
-              {head.eyebrow}
+              {role === 'Event Organiser' ? 'Event Organiser' : head.eyebrow}
             </span>
             <h1
               style={{
@@ -361,7 +363,9 @@ export default function AppShell({
                 ? head.blurb
                 : role === 'Event Organiser' && screen === 'events'
                   ? head.blurb
-                  : PAGE_BLURB[screen]}
+                  : role === 'Event Organiser' && screen === 'detail'
+                    ? 'View the event request, current status and coordinator details.'
+                    : PAGE_BLURB[screen]}
             </p>
           </div>
           {/* The primary CTA belongs to the dashboard only. */}
@@ -375,7 +379,7 @@ export default function AppShell({
         {children}
       </main>
 
-      {notifOpen ? <NotificationDrawer onClose={() => setNotifOpen(false)} /> : null}
+      {notifOpen ? <NotificationDrawer notifications={notifications} onClose={() => setNotifOpen(false)} /> : null}
     </div>
   );
 }

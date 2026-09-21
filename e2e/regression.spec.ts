@@ -93,6 +93,76 @@ test('PW-AUTH-03 | logout removes browser access and revokes the fixture session
   expect((await page.request.get('/api/profile', { headers })).status()).toBe(401);
 });
 
+test('SG2-26-P01 | colleagues read the same organisation events with creator-only actions', async ({ page }) => {
+  await signIn(page);
+  const ownEvents = await eventRecords(page);
+  expect(ownEvents.map(event => event.event_id)).toEqual([1]);
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  await signIn(page, 'colleague');
+  expect(await eventRecords(page)).toEqual(ownEvents.map(event => ({ ...event, can_manage: false })));
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
+  await expect(page.getByText('Other organisation draft')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Draft', exact: true }).click();
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+  const headers = await authHeaders(page);
+  expect((await page.request.get('/api/event-requests/1', { headers })).status()).toBe(200);
+  expect((await page.request.patch('/api/event-requests/1', { headers, data: { name: 'Colleague edit' } })).status()).toBe(404);
+  expect((await page.request.patch('/api/event-requests/1/submit', { headers })).status()).toBe(404);
+  expect((await page.request.delete('/api/event-requests/1', { headers })).status()).toBe(404);
+  const mine = await page.request.get('/api/event-requests?scope=mine', { headers });
+  expect((await mine.json()).requests).toEqual([]);
+  await nav(page, 'My drafts');
+  await expect(page.getByRole('heading', { name: 'No event requests yet', exact: true })).toBeVisible();
+  await page.reload();
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
+});
+
+test('SG2-26-N01 | another organisation and an account without membership cannot read events', async ({ page }) => {
+  await signIn(page, 'organiser2');
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Other organisation draft', exact: true })).toBeVisible();
+  await expect(page.getByText('Planning workshop')).toHaveCount(0);
+  const headers = await authHeaders(page);
+  const foreign = await page.request.get('/api/event-requests/1', { headers });
+  const absent = await page.request.get('/api/event-requests/9999', { headers });
+  expect(foreign.status()).toBe(404);
+  expect(absent.status()).toBe(404);
+  expect(await foreign.json()).toEqual(await absent.json());
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  await signIn(page, 'unassigned');
+  await nav(page, 'My events');
+  await expect(page.getByText('No event requests found.', { exact: true })).toBeVisible();
+  expect(await eventRecords(page)).toEqual([]);
+  const unassigned = await authHeaders(page);
+  expect((await page.request.get('/api/event-requests/1', { headers: unassigned })).status()).toBe(404);
+});
+
+test('SG2-26-N02 | only Event Organisers can access organisation event records', async ({ page }) => {
+  for (const account of ['coordinator', 'venue', 'support', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      await expect(page.getByRole('navigation').getByRole('button', { name: 'My events', exact: true })).toHaveCount(0);
+      const headers = await authHeaders(page);
+      for (const endpoint of ['/api/event-requests', '/api/event-requests?scope=mine', '/api/event-requests/1']) {
+        const response = await page.request.get(endpoint, { headers });
+        expect(response.status()).toBe(403);
+        expect(await response.json()).toEqual({ error: 'Access denied' });
+      }
+    });
+  }
+});
+
 test('SG2-42-P01 | staff create edit search and reload persisted venue details', async ({ page }) => {
   await signIn(page, 'venue');
   await nav(page, 'Catalogue');

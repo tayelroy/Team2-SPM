@@ -1,19 +1,9 @@
 import { useEffect, useState } from 'react';
 import { fetchOwnEventDetail, type EventRequestDetail } from '../api/eventRequests';
-import { ACTIVITY, ARRANGEMENTS, STATUS_TRAIL } from '../mock/data';
 import type { Role, Screen } from '../mock/types';
-import { badgeStyle, currentEvent, detailActions, statusTrailStyle } from '../mock/viewModel';
-import { color, radius, rule, surface } from '../theme';
-import {
-  Badge,
-  Card,
-  Dot,
-  Eyebrow,
-  Fact,
-  Notice,
-  NoticeMark,
-  RecessedCard,
-} from '../ui';
+import { badgeStyle } from '../mock/viewModel';
+import { color, radius } from '../theme';
+import { Badge, Card, Notice, NoticeMark } from '../ui';
 import { formatProposedDate } from './EventsTable';
 
 export interface EventDetailProps {
@@ -28,24 +18,14 @@ export interface EventDetailProps {
   accessToken?: string;
 }
 
-/**
- * The full request: facts, status trail, activity log, and the action panel —
- * which is where the role split is sharpest. Coordinators get decision
- * actions; organisers get amendment actions.
- *
- * AC3 (SG2-30): When `eventStatus === 'submitted'`, the organiser action panel
- * is replaced with a read-only notice — direct editing is disabled until the
- * coordinator reviews the request.
- */
+/** Organisation-scoped request detail. All event content comes from the API. */
 export default function EventDetail({
   role,
   onNavigate,
-  eventStatus,
   selectedEventId,
   accessToken,
 }: EventDetailProps) {
   const isOrganiser = role === 'Event Organiser';
-  const isCoordinator = role === 'Event Coordinator';
 
   const [detail, setDetail] = useState<EventRequestDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,7 +75,11 @@ export default function EventDetail({
     };
   }, [isOrganiser, selectedEventId, accessToken, reloadKey]);
 
-  if (isOrganiser && selectedEventId && accessToken) {
+  if (!isOrganiser) {
+    return <Card><p role="alert">Event requests are available only to Event Organisers.</p></Card>;
+  }
+
+  if (selectedEventId && accessToken) {
     if (loading) {
       return (
         <div
@@ -121,7 +105,7 @@ export default function EventDetail({
           </h2>
           <p style={{ margin: 0, color: color.silver }}>
             No event request found for this account. It may have been deleted or belongs to
-            another organiser.
+            another organisation.
           </p>
           <button
             type="button"
@@ -210,553 +194,72 @@ export default function EventDetail({
       ];
 
       return (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
-            gap: '20px',
-            alignItems: 'start',
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <Card style={{ gap: '24px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <Badge bg={badge.badgeBg} fg={badge.badgeFg}>
-                    {detail.status}
-                  </Badge>
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      letterSpacing: '0.15em',
-                      textTransform: 'uppercase',
-                      color: color.slate,
-                    }}
-                  >
-                    #{detail.eventId}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('events')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    color: color.silver,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ← Back to events
-                </button>
-              </div>
-
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: '36px',
-                  fontWeight: 500,
-                  lineHeight: 1,
-                  color: color.platinum,
-                }}
-              >
-                {detail.name || 'Untitled event'}
-              </h2>
-
-              <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver }}>
-                {detail.purpose || 'No purpose specified'}
-              </p>
-
-              {detail.description ? (
-                <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5, color: color.mist }}>
-                  {detail.description}
-                </p>
-              ) : null}
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))',
-                  gap: '20px',
-                }}
-              >
-                {facts.map((f) => (
-                  <Fact key={f.label} label={f.label} value={f.value} />
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {STATUS_TRAIL.map((stage, i) => {
-                  const style = statusTrailStyle(i);
-                  return (
-                    <Badge key={stage} bg={style.bg} fg={style.fg}>
-                      {stage}
-                    </Badge>
-                  );
-                })}
-              </div>
-            </Card>
-
-            {isRejected ? (
-              <Notice style={{ flexDirection: 'row', gap: '16px', alignItems: 'flex-start' }}>
-                <NoticeMark size={26} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '16px', color: color.platinum }}>
-                    Request returned for revision
-                  </span>
-                  <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
-                    This request was returned by your coordinator. Please review the details, make
-                    necessary amendments, and resubmit.
-                  </span>
-                </div>
-              </Notice>
-            ) : null}
-
-            <RecessedCard style={{ gap: '24px' }}>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: '24px',
-                  fontWeight: 500,
-                  letterSpacing: '-0.02em',
-                  color: color.platinum,
-                }}
-              >
-                Activity
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {ACTIVITY.map((entry) => (
-                  <div key={entry.when} style={{ display: 'flex', gap: '16px' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                        flex: 'none',
-                      }}
-                    >
-                      <Dot tone={entry.dot} />
-                      <div
-                        style={{ flex: 1, width: '1px', background: 'rgba(255,255,255,0.12)' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          letterSpacing: '0.15em',
-                          textTransform: 'uppercase',
-                          color: color.slate,
-                        }}
-                      >
-                        {entry.when} · {entry.who}
-                      </span>
-                      <span style={{ fontSize: '15px', lineHeight: 1.4, color: color.mist }}>
-                        {entry.text}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </RecessedCard>
+        <article className="organisation-detail">
+          <div className="organisation-detail-header">
+            <div className="organisation-detail-status">
+              <Badge bg={badge.badgeBg} fg={badge.badgeFg}>{detail.status}</Badge>
+              <span className="organisation-event-ref">#{detail.eventId}</span>
+            </div>
+            <button className="organisation-text-button" type="button" onClick={() => onNavigate('events')}>
+              ← Back to events
+            </button>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <Card style={{ gap: '18px' }}>
-              <Eyebrow>Your options</Eyebrow>
-
-              {isLocked ? (
-                <>
-                  <Notice
-                    style={{
-                      flexDirection: 'row',
-                      gap: '14px',
-                      alignItems: 'flex-start',
-                      padding: '16px 20px',
-                    }}
-                  >
-                    <NoticeMark size={20} />
-                    <span
-                      role="status"
-                      aria-label="Editing disabled: request submitted"
-                      style={{ fontSize: '14px', lineHeight: 1.43, color: color.mist }}
-                    >
-                      This request has been submitted and is now with your coordinator. Direct
-                      editing is locked — use <strong>Request a change</strong> if an amendment is
-                      needed.
-                    </span>
-                  </Notice>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('change')}
-                    style={{
-                      textAlign: 'left',
-                      background: color.deep,
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      borderRadius: radius.sm,
-                      padding: '14px 18px',
-                      color: color.platinum,
-                      fontSize: '14px',
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Request a change
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('form')}
-                    style={{
-                      textAlign: 'left',
-                      background: 'rgba(203,255,252,0.16)',
-                      border: '1px solid rgba(203,255,252,0.5)',
-                      borderRadius: radius.sm,
-                      padding: '14px 18px',
-                      color: color.mist,
-                      fontSize: '14px',
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Edit request
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('change')}
-                    style={{
-                      textAlign: 'left',
-                      background: color.deep,
-                      border: '1px solid rgba(255,255,255,0.14)',
-                      borderRadius: radius.sm,
-                      padding: '14px 18px',
-                      color: color.platinum,
-                      fontSize: '14px',
-                      letterSpacing: '0.04em',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Request a change
-                  </button>
-                </>
-              )}
-
-              <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>
-                {isLocked
+          <section className="organisation-detail-intro">
+            <h2>{detail.name || 'Untitled event'}</h2>
+            <p>{detail.purpose || 'No purpose specified'}</p>
+            {detail.description ? <p className="organisation-detail-description">{detail.description}</p> : null}
+          </section>
+          <dl className="organisation-detail-facts">
+            {facts.map((fact) => (
+              <div key={fact.label}>
+                <dt>{fact.label}</dt>
+                <dd>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <footer className="organisation-detail-footer">
+            <h3>Your options</h3>
+            {!detail.canManage ? (
+              <p role="status" className="organisation-detail-notice">
+                View only. This event is shared with your organisation. Only its creator can edit or submit the request.
+              </p>
+            ) : (
+              <>
+                {isRejected ? (
+                  <div className="organisation-detail-notice">
+                    <strong>Request returned for revision</strong>
+                    <p>This request was returned by your coordinator. Please review the details, make necessary amendments, and resubmit.</p>
+                  </div>
+                ) : null}
+                {isLocked ? (
+                  <p role="status" aria-label="Editing disabled: request submitted" className="organisation-detail-notice">
+                    This request has been submitted and is now with your coordinator. Contact your coordinator if an amendment is needed.
+                  </p>
+                ) : null}
+                <div className="organisation-detail-actions">
+                  {!isLocked ? (
+                    <button className="organisation-button organisation-button-primary" type="button" onClick={() => onNavigate('drafts')}>Edit request</button>
+                  ) : null}
+                </div>
+              </>
+            )}
+            <p className="organisation-detail-hint">
+              {!detail.canManage
+                ? 'Contact the request creator if this event needs updating.'
+                : isLocked
                   ? 'Your coordinator will be in touch if clarification is needed.'
                   : 'You can edit and resubmit this request while it is with you.'}
-              </span>
-            </Card>
-
-            <RecessedCard style={{ gap: '18px' }}>
-              <Eyebrow>Confirmed arrangements</Eyebrow>
-              {ARRANGEMENTS.map((row) => (
-                <div
-                  key={row.label}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '14px',
-                    paddingBottom: '12px',
-                    borderBottom: rule.faint,
-                  }}
-                >
-                  <span style={{ fontSize: '15px', color: color.platinum }}>{row.label}</span>
-                  <span
-                    style={{
-                      fontSize: '13px',
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      color: row.fg,
-                    }}
-                  >
-                    {row.state}
-                  </span>
-                </div>
-              ))}
-            </RecessedCard>
-          </div>
-        </div>
+            </p>
+          </footer>
+        </article>
       );
     }
   }
 
-  // Fallback to mock data for other roles or unselected event
-  const event = currentEvent(role);
-  /** AC3: organisers cannot edit a submitted request until reviewed. */
-  const isSubmitted = eventStatus?.toLowerCase() === 'submitted';
-  const facts = [
-    { label: 'Client', value: event.client },
-    { label: 'Date & time', value: `${event.date} · 10:00–17:00` },
-    { label: 'Expected attendance', value: String(event.attendance) },
-    { label: 'Venue', value: event.venue },
-    { label: 'Coordinator', value: event.coordinator },
-    { label: 'Accessibility', value: 'Step-free, hearing loop' },
-  ];
-
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
-        gap: '20px',
-        alignItems: 'start',
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <Card style={{ gap: '24px' }}>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '10px',
-              alignItems: 'center',
-            }}
-          >
-            <Badge bg={event.badgeBg} fg={event.badgeFg}>
-              {event.status}
-            </Badge>
-            <span
-              style={{
-                fontSize: '10px',
-                letterSpacing: '0.15em',
-                textTransform: 'uppercase',
-                color: color.slate,
-              }}
-            >
-              {event.ref}
-            </span>
-          </div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: '36px',
-              fontWeight: 500,
-              lineHeight: 1,
-              color: color.platinum,
-            }}
-          >
-            {event.name}
-          </h2>
-          <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.4, color: color.silver }}>
-            {event.purpose}
-          </p>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))',
-              gap: '20px',
-            }}
-          >
-            {facts.map((f) => (
-              <Fact key={f.label} label={f.label} value={f.value} />
-            ))}
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {STATUS_TRAIL.map((stage, i) => {
-              const style = statusTrailStyle(i);
-              return (
-                <Badge key={stage} bg={style.bg} fg={style.fg}>
-                  {stage}
-                </Badge>
-              );
-            })}
-          </div>
-        </Card>
-
-        {/* Attendees never see the internal suitability check. */}
-        {role !== 'Attendee' ? (
-          <Notice style={{ flexDirection: 'row', gap: '16px', alignItems: 'flex-start' }}>
-            <NoticeMark size={26} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '16px', color: color.platinum }}>
-                Capacity check: expected 180 guests, Kelp Room holds 120
-              </span>
-              <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.silver }}>
-                Pick a larger venue or lower expected attendance before requesting the booking. Atrium
-                Hall (320) and Deepwater Auditorium (500) are free on this date.
-              </span>
-            </div>
-          </Notice>
-        ) : null}
-
-        <RecessedCard style={{ gap: '24px' }}>
-          <h3
-            style={{
-              margin: 0,
-              fontSize: '24px',
-              fontWeight: 500,
-              letterSpacing: '-0.02em',
-              color: color.platinum,
-            }}
-          >
-            Activity
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {ACTIVITY.map((entry) => (
-              <div key={entry.when} style={{ display: 'flex', gap: '16px' }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '4px',
-                    flex: 'none',
-                  }}
-                >
-                  <Dot tone={entry.dot} />
-                  <div
-                    style={{ flex: 1, width: '1px', background: 'rgba(255,255,255,0.12)' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      letterSpacing: '0.15em',
-                      textTransform: 'uppercase',
-                      color: color.slate,
-                    }}
-                  >
-                    {entry.when} · {entry.who}
-                  </span>
-                  <span style={{ fontSize: '15px', lineHeight: 1.4, color: color.mist }}>
-                    {entry.text}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <input
-              placeholder="Add a comment or clarification…"
-              aria-label="Add a comment or clarification"
-              style={{
-                flex: '1 1 220px',
-                background: surface.fieldOnAbyss,
-                border: rule.control,
-                borderRadius: radius.sm,
-                padding: '13px 14px',
-                color: color.mist,
-                fontSize: '14px',
-                outline: 'none',
-              }}
-            />
-            <button
-              type="button"
-              style={{
-                background: color.kelp,
-                border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: radius.sm,
-                padding: '13px 20px',
-                color: color.platinum,
-                fontSize: '14px',
-                letterSpacing: '0.06em',
-                cursor: 'pointer',
-              }}
-            >
-              Post
-            </button>
-          </div>
-        </RecessedCard>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <Card style={{ gap: '18px' }}>
-          <Eyebrow>{isCoordinator ? 'Review actions' : 'Your options'}</Eyebrow>
-
-          {/* AC3: Organisers cannot directly edit a submitted request. */}
-          {!isCoordinator && isSubmitted ? (
-            <Notice
-              style={{
-                flexDirection: 'row',
-                gap: '14px',
-                alignItems: 'flex-start',
-                padding: '16px 20px',
-              }}
-            >
-              <NoticeMark size={20} />
-              <span
-                role="status"
-                aria-label="Editing disabled: request submitted"
-                style={{ fontSize: '14px', lineHeight: 1.43, color: color.mist }}
-              >
-                This request has been submitted and is now with your coordinator. Direct editing is
-                locked — use <strong>Request a change</strong> if an amendment is needed.
-              </span>
-            </Notice>
-          ) : (
-            detailActions(role).map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                onClick={() => onNavigate(action.screen)}
-                style={{
-                  textAlign: 'left',
-                  background: action.bg,
-                  border: `1px solid ${action.bd}`,
-                  borderRadius: radius.sm,
-                  padding: '14px 18px',
-                  color: action.fg,
-                  fontSize: '14px',
-                  letterSpacing: '0.04em',
-                  cursor: 'pointer',
-                }}
-              >
-                {action.label}
-              </button>
-            ))
-          )}
-
-          <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>
-            {isCoordinator
-              ? 'Approving moves the event into planning and unlocks venue and equipment booking.'
-              : isSubmitted
-                ? 'Your coordinator will be in touch if clarification is needed.'
-                : 'Changes after submission go to your coordinator for review.'}
-          </span>
-        </Card>
-
-        <RecessedCard style={{ gap: '18px' }}>
-          <Eyebrow>Confirmed arrangements</Eyebrow>
-          {ARRANGEMENTS.map((row) => (
-            <div
-              key={row.label}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '14px',
-                paddingBottom: '12px',
-                borderBottom: rule.faint,
-              }}
-            >
-              <span style={{ fontSize: '15px', color: color.platinum }}>{row.label}</span>
-              <span
-                style={{
-                  fontSize: '13px',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  color: row.fg,
-                }}
-              >
-                {row.state}
-              </span>
-            </div>
-          ))}
-        </RecessedCard>
-      </div>
-    </div>
+    <Card>
+      <p>Select an event from your organisation’s events to view its details.</p>
+      <button className="organisation-button" type="button" onClick={() => onNavigate('events')}>Back to events</button>
+    </Card>
   );
 }
