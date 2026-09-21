@@ -2,8 +2,8 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import {
-  fetchOwnEventRequests,
-  fetchOwnEventRequest,
+  fetchOrganisationEventRequests,
+  fetchOrganisationEventRequest,
   type FetchEventRequestsResult,
   type FetchEventRequestResult
 } from '../db/eventRequests';
@@ -19,26 +19,38 @@ export interface GetEventRequestsDependencies {
   fetchRequests?: (
     admin: SupabaseClient,
     organiserId: string,
-    statusFilter?: string
+    statusFilter?: string,
+    scope?: 'organisation' | 'mine'
   ) => Promise<FetchEventRequestsResult>;
 }
 
 /**
  * GET /api/event-requests — lists event requests for the caller (SG2-31).
  *
- * Scoped to the authenticated organiser so multi-tenancy boundaries are
- * preserved. Supports optional `status` filter query parameter.
+ * Organisers read their current organisation; scope=mine additionally limits
+ * the result to their own requests. Only Event Organisers may use this view.
  */
 export function getEventRequestsHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  fetchRequests = fetchOwnEventRequests
+  fetchRequests = fetchOrganisationEventRequests
 }: GetEventRequestsDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
     if (!principal) {
       // Defensive: this handler is mounted behind requireAuth.
       res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (principal.role !== 'event_organiser') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    const scope = req.query.scope ?? 'organisation';
+    if (scope !== 'organisation' && scope !== 'mine') {
+      res.status(400).json({ error: 'Invalid event scope.' });
       return;
     }
 
@@ -64,7 +76,13 @@ export function getEventRequestsHandler({
       return;
     }
 
-    const result = await fetchRequests(admin, principal.userId, statusFilter);
+    let result: FetchEventRequestsResult;
+    try {
+      result = await fetchRequests(admin, principal.userId, statusFilter, scope);
+    } catch {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
     if (!result.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
@@ -78,29 +96,31 @@ export interface GetEventRequestDetailDependencies {
   /** Reads the verified caller established by requireAuth. */
   getPrincipal: (req: Request) => Principal | undefined;
   getAdminClient?: () => SupabaseClient | null;
-  fetchOwnRequest?: (
-    admin: SupabaseClient,
-    eventId: number,
-    organiserId: string
-  ) => Promise<FetchEventRequestResult>;
+  fetchRequest?: typeof fetchOrganisationEventRequest;
+
 }
 
 /**
  * GET /api/event-requests/:eventId — returns full detail for an event request (SG2-31).
  *
- * Scoped to the authenticated organiser so a request belonging to someone else
- * is indistinguishable from one that does not exist at all (404 Not Found).
+ * Organisers read their current organisation. Other organisations are
+ * indistinguishable from missing records (404); write access stays creator-only.
  */
 export function getEventRequestDetailHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  fetchOwnRequest = fetchOwnEventRequest
+  fetchRequest = fetchOrganisationEventRequest
 }: GetEventRequestDetailDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
     if (!principal) {
       // Defensive: this handler is mounted behind requireAuth.
       res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (principal.role !== 'event_organiser') {
+      res.status(403).json({ error: 'Access denied' });
       return;
     }
 
@@ -116,7 +136,13 @@ export function getEventRequestDetailHandler({
       return;
     }
 
-    const result = await fetchOwnRequest(admin, eventId, principal.userId);
+    let result: FetchEventRequestResult;
+    try {
+      result = await fetchRequest(admin, eventId, principal.userId);
+    } catch {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
     if (!result.ok) {
       if (result.reason === 'not_found') {
         res.status(404).json({ error: 'No event request found for this account.' });

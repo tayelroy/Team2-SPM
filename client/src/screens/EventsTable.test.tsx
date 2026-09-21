@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
+import { ROLES } from '../mock/types';
 import EventsTable, { formatProposedDate } from './EventsTable';
 
 afterEach(() => {
@@ -25,22 +26,14 @@ describe('formatProposedDate', () => {
   });
 });
 
-describe('EventsTable for non-organisers (mock fallback)', () => {
-  test('renders mock cards for Event Coordinator and handles filtering and row click', () => {
-    const onOpen = vi.fn();
-    render(<EventsTable role="Event Coordinator" onOpenEvent={onOpen} />);
-
-    expect(screen.getByText('Product Launch — Tideline')).toBeInTheDocument();
-
-    const confirmedFilter = screen.getByRole('button', { name: 'Confirmed' });
-    fireEvent.click(confirmedFilter);
-    expect(confirmedFilter).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Quarterly Partner Dinner')).toBeInTheDocument();
+describe('EventsTable role boundary', () => {
+  test.each(ROLES.filter((role) => role !== 'Event Organiser'))('%s cannot fetch or see organisation events', (role) => {
+    const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests');
+    render(<EventsTable role={role} accessToken="token" onOpenEvent={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+    expect(fetch).not.toHaveBeenCalled();
     expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
-
-    const row = screen.getByRole('button', { name: /Quarterly Partner Dinner/ });
-    fireEvent.click(row);
-    expect(onOpen).toHaveBeenCalledWith();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 });
 
@@ -64,6 +57,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
           status: 'draft',
           coordinatorId: null,
           coordinatorName: null,
+          canManage: true,
           waitingOnMe: true,
         },
         {
@@ -73,6 +67,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
           status: 'submitted',
           coordinatorId: 'coord-1',
           coordinatorName: 'A. Vance',
+          canManage: true,
           waitingOnMe: false,
         },
       ],
@@ -121,6 +116,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
             status: 'draft',
             coordinatorId: null,
             coordinatorName: null,
+            canManage: true,
             waitingOnMe: true,
           },
         ],
@@ -277,4 +273,17 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     unmount();
     rejectPromise(new Error('unmounted rejection'));
   });
+});
+
+test('colleague events remain visible but never show a personal action', async () => {
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({ ok: true, requests: [{
+    eventId: 77, name: 'Colleague event', proposedDate: null, status: 'draft', coordinatorId: null,
+    coordinatorName: null, canManage: false, waitingOnMe: false,
+  }] });
+  const open = vi.fn();
+  render(<EventsTable role="Event Organiser" accessToken="token" onOpenEvent={open} />);
+  expect(await screen.findByText('View only')).toBeInTheDocument();
+  expect(screen.queryByText('Waiting on you')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View Colleague event' }));
+  expect(open).toHaveBeenCalledWith(77);
 });

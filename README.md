@@ -26,8 +26,8 @@ An npm-workspaces monorepo:
 
 | Role | What's actually wired up today |
 | --- | --- |
-| Event Organiser | Raise, edit, submit and delete their own event requests; see their own requests and status |
-| Event Coordinator | "All events" and "Review" still show placeholder mock data for this role — not wired to the real API yet. The underlying handler also only scopes by the caller's own id, so it will need fixing before a real coordinator view can use it (tracked separately) |
+| Event Organiser | Raise, edit, submit and delete their own event requests; view events and status shared by their client organisation |
+| Event Coordinator | Coordinator event review is tracked separately; the organiser event list/detail and their API are not accessible to this role |
 | Venue Staff | Create and update the venue catalogue; check venue availability |
 | Technical Support Staff | Change a user's role — the only role that can, currently API-only (no screen for it yet) |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
@@ -104,9 +104,12 @@ independently of what the UI shows.
 - Once every required field (name, purpose, description, date, expected
   attendance, venue requirements) is filled in, submit it for review from
   the request's own screen.
-- **My events** shows every request you've raised and its current status;
-  anything still waiting on you — a draft, or something sent back — is
-  flagged.
+- **My events** shows requests belonging to your client organisation, including
+  those raised by colleagues. Colleagues' requests are view-only; editing,
+  submission and deletion remain with the creator. Your own drafts and rejected
+  requests are flagged when they need your attention.
+- Organisation membership is provisioned by an administrator; it cannot be changed
+  through your profile. Accounts without an organisation see no events.
 
 ### As Venue Staff
 
@@ -133,7 +136,7 @@ Run `npm test` for tests without coverage, or `npm run test:coverage` for tests
 with the 100% per-file coverage gate. HTML reports are written to `server/coverage/index.html`
 and `client/coverage/index.html`.
 
-For the 14 purposeful browser regression journeys, install Chromium once with
+For the 17 purposeful browser regression journeys, install Chromium once with
 `npx playwright install chromium`, then run `npm run test:regression`. The tests
 drive the built UI and real API routes against isolated in-memory providers;
 they do not use shared Supabase data. `npm run ci:full` runs the existing build,
@@ -145,8 +148,9 @@ uploaded as the `browser-regression` artifact.
 
 - [CI setup and validation](docs/ci.md) — SG2-22 acceptance criteria, required branch protection, and Supabase HTTPS configuration
 - [Test audit and course case guide](docs/testing.md) — test-suite breakdown and how automated checks map to 4–5 functional cases per feature
-- [Purposeful regression register](docs/regression.md) — current 22 cases, Playwright scope and historical-case consolidation
+- [Purposeful regression register](docs/regression.md) — current 26 cases, Playwright scope and historical-case consolidation
 - [Authorisation](docs/authorization.md) — how requests are verified and permission-checked
+- [Organisation event access](docs/organisation-events.md) — SG2-26 behaviour, provisioning and database protection
 - [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API
 
 CI runs the complete regression suite before and after each PR merge.

@@ -749,35 +749,13 @@ describe('AC2 — server error banners', () => {
 // ─── AC3: EventDetail — submitted immutability ───────────────────────────────
 
 describe('AC3 — EventDetail locks organiser actions when submitted', () => {
-  const navigate = vi.fn();
-
-  test('shows action buttons normally for an organiser when status is draft', () => {
-    render(
-      <EventDetail role="Event Organiser" onNavigate={navigate} eventStatus="draft" />,
-    );
-    expect(screen.getByRole('button', { name: 'Edit request' })).toBeInTheDocument();
-  });
-
-  test('replaces action buttons with a locked notice when status is submitted', () => {
-    render(
-      <EventDetail role="Event Organiser" onNavigate={navigate} eventStatus="submitted" />,
-    );
+  test.each(['draft', 'submitted', 'Submitted'])('uses authenticated event data for %s instead of caller status', (status) => {
+    render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} eventStatus={status} />);
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
-    expect(screen.getByRole('status', { name: /Editing disabled/i })).toBeInTheDocument();
-    expect(screen.getByText(/has been submitted and is now with your coordinator/i)).toBeInTheDocument();
+    expect(screen.getByText(/Select an event from your organisation/)).toBeInTheDocument();
   });
-
-  test('coordinator sees action buttons regardless of submitted status', () => {
-    render(
-      <EventDetail role="Event Coordinator" onNavigate={navigate} eventStatus="submitted" />,
-    );
-    expect(screen.getByRole('button', { name: 'Approve request' })).toBeInTheDocument();
-  });
-
-  test('locking notice is case-insensitive to the status string', () => {
-    render(
-      <EventDetail role="Event Organiser" onNavigate={navigate} eventStatus="Submitted" />,
-    );
-    expect(screen.getByRole('status', { name: /Editing disabled/i })).toBeInTheDocument();
+  test('coordinator cannot view organiser request details', () => {
+    render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} eventStatus="submitted" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
   });
 });

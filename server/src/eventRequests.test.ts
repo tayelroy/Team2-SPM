@@ -206,13 +206,13 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(response.status, 503);
   });
 
-  test('returns 409 when the account has no user record to own the draft', async () => {
+  test('returns 403 when the account has no user record to own the draft', async () => {
     const response = await request(
       buildApp({ lookup: { ok: false, reason: 'not_found', message: 'missing' } })
     )
       .post('/api/event-requests')
       .send(COMPLETE_BODY);
-    assert.equal(response.status, 409);
+    assert.equal(response.status, 403);
   });
 
   test('returns 503 when the organisation lookup fails', async () => {

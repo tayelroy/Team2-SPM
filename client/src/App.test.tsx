@@ -7,6 +7,7 @@ import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
 import RequestForm from './screens/RequestForm';
+import ChangeRequest from './screens/ChangeRequest';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
 // this project does not, so unmount between tests explicitly.
@@ -34,15 +35,15 @@ function mockLoginResponse(role: Role) {
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
           facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
       }
-      if (url === '/api/event-requests') {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine')) {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
-        return Response.json({ requests: [{ event_id: 9, status: 'draft', name: 'Draft Forum' }] });
+        return Response.json({ requests: [{ event_id: 9, can_manage: true, status: 'draft', name: 'Draft Forum' }] });
       }
       if (url === '/api/event-requests/9') {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({
           request: {
-            event_id: 9,
+            event_id: 9, can_manage: true,
             organiser_id: 'user-1',
             organisation: 'ConnectSphere Test',
             status: 'draft',
@@ -129,7 +130,7 @@ describe('every role can reach every screen in its navigation', () => {
     'Event Organiser': [
       ['My events', 'Your events'], ['New request', 'Event request'],
       ['My drafts', 'My draft requests'],
-      ['Event detail', 'Event detail'], ['Change request', 'Change request'],
+      ['Event detail', 'Event detail'],
     ],
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
@@ -339,22 +340,11 @@ describe('the events table', () => {
     fireEvent.click(within(header()).getByRole('button', { name: 'All events' }));
   };
 
-  test('filters rows by status', async () => {
+  test('coordinator navigation cannot expose organisation event rows', async () => {
     await openTable();
-    expect(screen.getByText('Product Launch — Tideline')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }));
-    expect(screen.getByText('Quarterly Partner Dinner')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'All' }));
-    expect(screen.getByText('Product Launch — Tideline')).toBeInTheDocument();
-  });
-
-  test('a row opens the event detail', async () => {
-    await openTable();
-    fireEvent.click(screen.getByRole('button', { name: /Board Strategy Offsite/ }));
-    expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 
   test('an organiser can see their events list and drill down into details from dashboard or nav', async () => {
@@ -427,31 +417,27 @@ describe('the events table', () => {
 });
 
 describe('the event detail action panel', () => {
-  test('an attendee detail view hides the internal capacity warning and approval control', () => {
+  test('an attendee is refused organiser event detail', () => {
     render(<EventDetail role="Attendee" onNavigate={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: 'Quarterly Partner Dinner' })).toBeInTheDocument();
-    expect(screen.queryByText(/Capacity check/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+    expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
   });
 
-  test('a coordinator gets decision actions, and approving goes to venues', async () => {
+  test('coordinator review navigation shows no event content or decision actions', async () => {
     await signInAs('Event Coordinator');
     fireEvent.click(within(header()).getByRole('button', { name: 'Review' }));
-    expect(screen.getByText('Review actions')).toBeInTheDocument();
-    expect(screen.getByText(/Capacity check/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
-    expect(screen.getByRole('heading', { name: 'Venue catalogue' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+    expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
   });
 
   test('an organiser gets amendment actions instead', async () => {
     await signInAs('Event Organiser');
-    fireEvent.click(within(header()).getByRole('button', { name: 'Event detail' }));
-    expect(screen.getByText('Your options')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
+    expect(await screen.findByText('Your options')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Request a change' }));
-    expect(screen.getByRole('heading', { name: 'Change request' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
+    expect(within(header()).queryByRole('button', { name: 'Change request' })).not.toBeInTheDocument();
   });
 });
 
@@ -535,7 +521,7 @@ describe('the request form', () => {
     });
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if (url === '/api/event-requests' || url === '/api/event-requests/42') {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine') || url === '/api/event-requests/42') {
         return new Response(
           JSON.stringify({
             request: { event_id: 42, status: 'draft' },
@@ -585,7 +571,7 @@ describe('editing a draft (SG2-29)', () => {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
 
-    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ request: { event_id: 9, status: 'draft' }, missingForSubmission: [] }), { status: 200 }));
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ request: { event_id: 9, can_manage: true, status: 'draft' }, missingForSubmission: [] }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
 
@@ -676,9 +662,8 @@ test('an attendee can withdraw and re-register', async () => {
   ).toBeInTheDocument();
 });
 
-test('change-request categories toggle', async () => {
-  await signInAs('Event Organiser');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Change request' }));
+test('standalone change-request prototype categories toggle', () => {
+  render(<ChangeRequest />);
 
   const selected = screen.getByRole('button', { name: 'Expected attendance' });
   expect(selected).toHaveAttribute('aria-pressed', 'true');
@@ -689,4 +674,15 @@ test('change-request categories toggle', async () => {
   expect(other).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(other);
   expect(other).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('organiser dashboard opens the selected real event and has no mock notifications', async () => {
+  await signInAs('Event Organiser');
+  fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' }));
+  expect(screen.getByText('No notifications available.')).toBeInTheDocument();
+  expect(screen.queryByText('Clarification requested on E-201')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Close notifications' }));
+  fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
+  expect(await screen.findByText('#9')).toBeInTheDocument();
+  expect(screen.getByText('ConnectSphere Test')).toBeInTheDocument();
 });

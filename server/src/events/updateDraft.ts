@@ -2,7 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import {
-  fetchOwnEventRequest,
+  fetchManageableEventRequest,
   updateEventRequestDraft,
   type FetchEventRequestResult,
   type UpdateDraftResult
@@ -33,7 +33,7 @@ export interface UpdateEventDraftDependencies {
  * PATCH /api/event-requests/:eventId — updates a draft's own fields
  * (SG2-29). Only the request's own organiser may edit it, only while it is
  * still a draft — mirrors submitEventRequestHandler / createDeleteEventDraftHandler's
- * fetch-then-check shape, reusing fetchOwnEventRequest so a request
+ * fetch-then-check shape, reusing fetchManageableEventRequest so a request
  * belonging to someone else is indistinguishable from one that doesn't
  * exist at all. `updateEventRequestDraft` itself also filters on the
  * caller's organiser id (not just this pre-check), so ownership holds even
@@ -47,7 +47,7 @@ export interface UpdateEventDraftDependencies {
 export function createUpdateEventDraftHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  fetchOwnRequest = fetchOwnEventRequest,
+  fetchOwnRequest = fetchManageableEventRequest,
   updateDraft = updateEventRequestDraft
 }: UpdateEventDraftDependencies): RequestHandler {
   return async (req, res) => {
@@ -80,7 +80,7 @@ export function createUpdateEventDraftHandler({
     if (!existing.ok) {
       if (existing.reason === 'not_found') {
         // Deliberately the same response whether the row belongs to someone
-        // else or does not exist at all — see fetchOwnEventRequest.
+        // else or does not exist at all — see fetchManageableEventRequest.
         res.status(404).json({ error: 'No event request found for this account.' });
         return;
       }

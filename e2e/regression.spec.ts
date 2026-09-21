@@ -93,6 +93,131 @@ test('PW-AUTH-03 | logout removes browser access and revokes the fixture session
   expect((await page.request.get('/api/profile', { headers })).status()).toBe(401);
 });
 
+test('SG2-26-P01 | colleagues read the same organisation events with creator-only actions', async ({ page }) => {
+  await signIn(page);
+  const ownEvents = await eventRecords(page);
+  expect(ownEvents.map(event => event.event_id)).toEqual([1]);
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  await signIn(page, 'colleague');
+  expect(await eventRecords(page)).toEqual(ownEvents.map(event => ({ ...event, can_manage: false })));
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
+  await expect(page.getByText('Other organisation draft')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Draft', exact: true }).click();
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+  const headers = await authHeaders(page);
+  expect((await page.request.get('/api/event-requests/1', { headers })).status()).toBe(200);
+  expect((await page.request.patch('/api/event-requests/1', { headers, data: { name: 'Colleague edit' } })).status()).toBe(404);
+  expect((await page.request.patch('/api/event-requests/1/submit', { headers })).status()).toBe(404);
+  expect((await page.request.delete('/api/event-requests/1', { headers })).status()).toBe(404);
+  const mine = await page.request.get('/api/event-requests?scope=mine', { headers });
+  expect((await mine.json()).requests).toEqual([]);
+  await nav(page, 'My drafts');
+  await expect(page.getByRole('heading', { name: 'No event requests yet', exact: true })).toBeVisible();
+  await page.reload();
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
+});
+
+test('SG2-26-P02 | saved event changes reach a colleague dashboard list and detail after reload', async ({ page, context }) => {
+  const owner = await context.newPage();
+  try {
+    await signIn(owner);
+    await signIn(page, 'colleague');
+    await expect(page.getByText('Planning workshop', { exact: true })).toBeVisible();
+
+    // Write through the real handler and storage adapter, without mocking a
+    // browser response. The colleague must fetch the new persisted values.
+    const saved = {
+      name: 'Updated organisation planning', purpose: 'Confirm the revised programme',
+      description: 'The organiser saved this update while their colleague was signed in.',
+      proposed_date: '2030-07-16T12:00:00.000Z', expected_attendance: 37,
+      venue_requirements: 'A meeting room with 37 seats', accessibility_needs: 'Step-free entrance',
+      equipment_requirements: 'Two microphones', registration_needed: true,
+    };
+    const updated = await owner.request.patch('/api/event-requests/1', {
+      headers: await authHeaders(owner), data: saved,
+    });
+    expect(updated.status()).toBe(200);
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Your organisation’s events', exact: true })).toBeVisible();
+    await expect(page.getByText(saved.name, { exact: true })).toBeVisible();
+    await expect(page.getByText('Planning workshop', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Other organisation draft', { exact: true })).toHaveCount(0);
+    for (const [label, value] of [['Organisation events', '1'], ['My drafts', '0'], ['Waiting on me', '0']]) {
+      await expect(page.locator('.organisation-summary-stat').filter({ hasText: label }).locator('strong')).toHaveText(value);
+    }
+
+    await nav(page, 'My events');
+    await expect(page.getByRole('button', { name: `View ${saved.name}`, exact: true })).toBeVisible();
+    await expect(page.getByText('16 Jul 2030', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: `View ${saved.name}`, exact: true }).click();
+    await expect(page.getByRole('heading', { name: saved.name, exact: true })).toBeVisible();
+    await expect(page.getByText(saved.purpose, { exact: true })).toBeVisible();
+    await expect(page.getByText(saved.description, { exact: true })).toBeVisible();
+    for (const [label, value] of Object.entries({
+      Organisation: 'Regression Organisation', 'Proposed date': '16 Jul 2030',
+      'Expected attendance': '37', 'Venue requirements': saved.venue_requirements,
+      'Accessibility needs': saved.accessibility_needs, 'Equipment requirements': saved.equipment_requirements,
+      'Registration required': 'Yes', Coordinator: 'Unassigned',
+    })) {
+      await expect(page.locator('dl > div').filter({ has: page.locator('dt').getByText(label, { exact: true }) }).locator('dd')).toHaveText(value);
+    }
+    await expect(page.getByText(/View only\. This event is shared/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+    const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
+    expect(detail.status()).toBe(200);
+    expect((await detail.json()).request).toMatchObject({ ...saved, can_manage: false });
+  } finally {
+    await owner.close();
+  }
+});
+
+test('SG2-26-N01 | another organisation and an account without membership cannot read events', async ({ page }) => {
+  await signIn(page, 'organiser2');
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Other organisation draft', exact: true })).toBeVisible();
+  await expect(page.getByText('Planning workshop')).toHaveCount(0);
+  const headers = await authHeaders(page);
+  const foreign = await page.request.get('/api/event-requests/1', { headers });
+  const absent = await page.request.get('/api/event-requests/9999', { headers });
+  expect(foreign.status()).toBe(404);
+  expect(absent.status()).toBe(404);
+  expect(await foreign.json()).toEqual(await absent.json());
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  await signIn(page, 'unassigned');
+  await nav(page, 'My events');
+  await expect(page.getByText('No event requests found.', { exact: true })).toBeVisible();
+  expect(await eventRecords(page)).toEqual([]);
+  const unassigned = await authHeaders(page);
+  expect((await page.request.get('/api/event-requests/1', { headers: unassigned })).status()).toBe(404);
+});
+
+test('SG2-26-N02 | only Event Organisers can access organisation event records', async ({ page }) => {
+  for (const account of ['coordinator', 'venue', 'support', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      await expect(page.getByRole('navigation').getByRole('button', { name: 'My events', exact: true })).toHaveCount(0);
+      const headers = await authHeaders(page);
+      for (const endpoint of ['/api/event-requests', '/api/event-requests?scope=mine', '/api/event-requests/1']) {
+        const response = await page.request.get(endpoint, { headers });
+        expect(response.status()).toBe(403);
+        expect(await response.json()).toEqual({ error: 'Access denied' });
+      }
+    });
+  }
+});
+
 test('SG2-42-P01 | staff create edit search and reload persisted venue details', async ({ page }) => {
   await signIn(page, 'venue');
   await nav(page, 'Catalogue');

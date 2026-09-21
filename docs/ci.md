@@ -19,7 +19,7 @@ npm run ci
 | `npm test` | Backend, frontend, and security reviewer tests. |
 | `npm run test:coverage` | Tests and application coverage thresholds. |
 | `npm run ci` | Builds followed by tests with coverage. |
-| `npm run test:regression` | Builds then runs 14 Chromium journeys against real API routes with isolated in-memory providers. |
+| `npm run test:regression` | Builds then runs 18 Chromium journeys against real API routes with isolated in-memory providers. |
 | `npm run ci:full` | Build, coverage, reviewer and Playwright checks; SQL remains a separate CI job. |
 
 Tests mock Supabase responses and use temporary local HTTP sockets. They do not
@@ -69,7 +69,7 @@ they do not establish deployed Auth, durable database storage or RLS.
 
 The `browser-regression` artifact contains an HTML report, JSON/JUnit results,
 and traces/screenshots/video for failures, retained for 14 days. Stable IDs in
-test titles map to [the 22-case register](regression.md). Do not create a course
+test titles map to [the 27-case register](regression.md). Do not create a course
 row for each low-level assertion or copy old Pass statuses into a new execution.
 
 Vercel's existing build gate still runs `npm run ci`; Chromium is installed and
@@ -204,3 +204,16 @@ passed all six jobs for `9c00a9081909`. It predates these uncommitted changes;
 the new revision's hosted CI and Vercel deployment must still run after push.
 Current branch-protection settings could not be reread through the connector
 (403); earlier hosted required-check evidence is recorded in [testing.md](testing.md).
+
+
+## Required SG2-26 cases
+
+The browser regression command also validates its JSON results with
+`.github/scripts/regression-gate.mjs`. Organisation sharing (`P01`), fresh
+saved-data display (`P02`), organisation isolation (`N01`) and organiser-only
+access (`N02`) must execute and pass. Skipping or removing one of these cases,
+marking it as an expected failure, or accepting a failed attempt cannot produce
+a successful regression command. This is inherited by the required **Build and
+test** aggregate through **Test browser regression**. No layout checks are required.
+The separate **Test database policies** job must also pass its organisation SQL
+suite. Preview deployment readiness does not substitute for either check.

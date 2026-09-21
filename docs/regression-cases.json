@@ -44,7 +44,7 @@
     "id": "PW-AUTH-03",
     "title": "Logout removes browser access and revokes the fixture session",
     "type": "Negative / state transition",
-    "story": "SG2-26",
+    "story": "Authentication regression (logout; not SG2-26)",
     "purpose": "Verify logout invalidates the current fixture session across browser and API layers.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
     "steps": [
@@ -466,5 +466,113 @@
     "actual": "Updated workflow has not run on GitHub. Local aggregate decision checks passed 16/16 combinations; this does not establish hosted execution or merge blocking.",
     "execution_evidence": "Local inspection only; hosted run URL pending after push.",
     "execution_date": ""
+  },
+  {
+    "id": "SG2-26-P01",
+    "title": "Colleagues share organisation events with creator-only actions",
+    "type": "Positive",
+    "story": "SG2-26",
+    "purpose": "Colleagues share organisation events with creator-only actions",
+    "preconditions": "Isolated test providers for browser cases; disposable PostgreSQL for SQL cases. No shared production data.",
+    "steps": [
+      "Sign in as organiser and record visible events.",
+      "Sign out and sign in as a colleague in the same organisation.",
+      "Open My events, filter Draft, and view the shared event.",
+      "Check My drafts and reload."
+    ],
+    "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
+    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
+    "execution_date": "21 Sep 2026"
+  },
+  {
+    "id": "SG2-26-N01",
+    "title": "Unrelated and unassigned accounts cannot read organisation events",
+    "type": "Negative",
+    "story": "SG2-26",
+    "purpose": "Unrelated and unassigned accounts cannot read organisation events",
+    "preconditions": "Isolated test providers for browser cases; disposable PostgreSQL for SQL cases. No shared production data.",
+    "steps": [
+      "Sign in as an organiser in another organisation.",
+      "Inspect My events and request another organisation’s event directly.",
+      "Compare with a nonexistent event.",
+      "Sign in with no organisation and inspect list and detail."
+    ],
+    "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
+    "expected": "Foreign and absent event reads both return 404; only own-organisation rows appear; missing membership yields no events.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Foreign and absent event reads both return 404; only own-organisation rows appear; missing membership yields no events.",
+    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
+    "execution_date": "21 Sep 2026"
+  },
+  {
+    "id": "DB-ORG-01",
+    "title": "Database organisation isolation and protected membership",
+    "type": "Positive / negative / boundary",
+    "story": "SG2-26",
+    "purpose": "Database organisation isolation and protected membership",
+    "preconditions": "Isolated test providers for browser cases; disposable PostgreSQL for SQL cases. No shared production data.",
+    "steps": [
+      "Apply migrations in order to disposable PostgreSQL.",
+      "Read events as colleagues, unrelated accounts, missing-membership accounts and unrelated roles.",
+      "Check denied direct membership and event writes and service-role access."
+    ],
+    "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
+    "expected": "Only same-organisation event reads are allowed to organisers; direct client writes cannot change membership or bypass the API.",
+    "evidence": "supabase/tests/event_organisation_isolation.sql",
+    "layer": "PostgreSQL policy test",
+    "status": "Pass",
+    "actual": "All five migrations and three SQL regression suites passed; all four non-organiser roles, invalid memberships, unrelated reads and direct client writes are denied.",
+    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 SQL changes; PGlite 0.3.12 / PostgreSQL 17.5; node --input-type=module executes auth fixture, sorted migrations and all three SQL tests; /tmp/sg2-26-database.log. No deployed Supabase execution.",
+    "execution_date": "21 Sep 2026"
+  },
+  {
+    "id": "SG2-26-N02",
+    "title": "Organisation events are restricted to Event Organisers",
+    "type": "Negative / role boundary",
+    "story": "SG2-26",
+    "purpose": "Reject every non-organiser role before accessing organisation event records.",
+    "preconditions": "Production React build and real Express handlers with isolated local identity/database providers.",
+    "steps": [
+      "Sign in as coordinator, venue staff, technical support and attendee in turn.",
+      "Check My events navigation is absent.",
+      "Request event list, scope=mine list, and event detail with each role."
+    ],
+    "data": "coordinator/venue/support/attendee@example.test with isolated fixture accounts",
+    "expected": "All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
+    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
+    "execution_date": "21 Sep 2026"
+  },
+  {
+    "id": "SG2-26-P02",
+    "title": "Saved event changes reach colleague dashboard, list and detail",
+    "type": "Positive / persistence",
+    "story": "SG2-26",
+    "purpose": "Prevent static, stale or unrelated event data from replacing current organisation-scoped API results.",
+    "preconditions": "Built React application and real Express routes with reset isolated identity/database providers; two same-organisation sessions. No hosted Supabase.",
+    "steps": [
+      "Sign in as the event creator and a colleague in separate tabs.",
+      "Read the initial event in the colleague dashboard.",
+      "Update the event through the creator API session.",
+      "Reload the colleague view and check the dashboard counts, list, and every saved detail field."
+    ],
+    "data": "Updated name, purpose, description, date, attendance, venue/accessibility/equipment requirements and registration flag for event 1; foreign event 2 remains excluded.",
+    "expected": "The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
+    "evidence": "e2e/regression.spec.ts; .github/scripts/regression-gate.mjs",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "All saved fields and dashboard counts matched after reload; colleague detail remained read-only; unrelated event absent.",
+    "execution_evidence": "21 Sep 2026; PR #32 head f28ed93 plus test changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated local API; 18/18 passed; /tmp/sg2-26-required-regression.log; /tmp/sg2-26-playwright-results.json.",
+    "execution_date": "21 Sep 2026"
   }
 ]

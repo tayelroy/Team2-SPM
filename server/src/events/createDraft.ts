@@ -10,6 +10,7 @@ import {
 import type { Principal } from '../auth/policy';
 import { missingForSubmission, validateDraftInput, type DraftValues } from './fields';
 
+const MEMBERSHIP_MESSAGE = 'Your account needs a client organisation before you can create event requests. Please contact support.';
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
 
 export interface CreateEventDraftDependencies {
@@ -63,15 +64,15 @@ export function createEventDraftHandler({
     const organiser = await lookupOrganisation(admin, principal.userId);
     if (!organiser.ok) {
       if (organiser.reason === 'not_found') {
-        // Authenticated, but the account has no public.users row to own the
-        // draft. That is an account-provisioning inconsistency rather than a
-        // permission problem, so it is reported separately from 401/403.
-        res.status(409).json({
-          error: 'Your account is not fully set up yet. Please contact support.'
-        });
+        res.status(403).json({ error: MEMBERSHIP_MESSAGE });
         return;
       }
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    if (typeof organiser.organisation !== 'string' || !organiser.organisation.trim()) {
+      res.status(403).json({ error: MEMBERSHIP_MESSAGE });
       return;
     }
 

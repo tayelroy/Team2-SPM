@@ -86,7 +86,7 @@ function buildDetailApp(options: DetailHarnessOptions = {}) {
     getEventRequestDetailHandler({
       getPrincipal: () => ('principal' in options ? options.principal : ORGANISER),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
-      fetchOwnRequest: async (_admin, eventId, organiserId) => {
+      fetchRequest: async (_admin, eventId, organiserId) => {
         options.captureDetail?.(eventId, organiserId);
         return options.detailResult ?? { ok: true, request: SAMPLE_DETAIL };
       }
@@ -319,13 +319,7 @@ describe('Authorisation wiring for event_request.view (SG2-31)', () => {
     assert.equal(response.body.listReached, true);
   });
 
-  test('allows event_coordinator to access GET /api/event-requests', async () => {
-    const response = await request(appForRole('event_coordinator'))
-      .get('/api/event-requests')
-      .set('Authorization', 'Bearer token');
-    assert.equal(response.status, 200);
-    assert.equal(response.body.listReached, true);
-  });
+
 
   test('allows event_organiser to access GET /api/event-requests/:eventId', async () => {
     const response = await request(appForRole('event_organiser'))
@@ -335,15 +329,9 @@ describe('Authorisation wiring for event_request.view (SG2-31)', () => {
     assert.equal(response.body.detailReached, true);
   });
 
-  test('allows event_coordinator to access GET /api/event-requests/:eventId', async () => {
-    const response = await request(appForRole('event_coordinator'))
-      .get('/api/event-requests/101')
-      .set('Authorization', 'Bearer token');
-    assert.equal(response.status, 200);
-    assert.equal(response.body.detailReached, true);
-  });
 
-  for (const role of ['attendee', 'venue_staff', 'technical_support_staff'] as const) {
+
+  for (const role of ['event_coordinator', 'attendee', 'venue_staff', 'technical_support_staff'] as const) {
     test(`denies ${role} without event_request.view permission`, async () => {
       const listRes = await request(appForRole(role))
         .get('/api/event-requests')

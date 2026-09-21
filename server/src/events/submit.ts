@@ -2,7 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import {
-  fetchOwnEventRequest,
+  fetchManageableEventRequest,
   submitEventRequest,
   type FetchEventRequestResult,
   type SubmitEventRequestResult
@@ -41,7 +41,7 @@ const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected']);
 export function submitEventRequestHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  fetchOwnRequest = fetchOwnEventRequest,
+  fetchOwnRequest = fetchManageableEventRequest,
   submitRequest = submitEventRequest
 }: SubmitEventRequestDependencies): RequestHandler {
   return async (req, res) => {
@@ -68,7 +68,7 @@ export function submitEventRequestHandler({
     if (!existing.ok) {
       if (existing.reason === 'not_found') {
         // Deliberately the same response whether the row belongs to someone
-        // else or does not exist at all — see fetchOwnEventRequest.
+        // else or does not exist at all — see fetchManageableEventRequest.
         res.status(404).json({ error: 'No event request found for this account.' });
         return;
       }

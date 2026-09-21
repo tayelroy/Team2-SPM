@@ -3,6 +3,7 @@ import type { DraftValues } from '../events/fields';
 
 /** An event request row as returned to the API caller. */
 export interface EventRequestRecord extends DraftValues {
+  can_manage?: boolean;
   event_id: number;
   organiser_id: string;
   organisation: string | null;
@@ -13,6 +14,7 @@ export interface EventRequestRecord extends DraftValues {
 
 /** An event request row in summary format for list views (SG2-31). */
 export interface EventRequestSummaryRecord {
+  can_manage?: boolean;
   event_id: number;
   name: string;
   proposed_date: string | null;
@@ -144,6 +146,96 @@ export async function insertEventRequestDraft(
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }
 
+/** Shape shared by owner and organisation list reads. */
+function summarizeEventRequest(row: Record<string, unknown>): EventRequestSummaryRecord {
+  return {
+    event_id: Number(row.event_id),
+    name: typeof row.name === 'string' ? row.name : '',
+    proposed_date: typeof row.proposed_date === 'string' ? row.proposed_date : null,
+    status: typeof row.status === 'string' ? row.status : 'draft',
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+}
+
+/**
+ * SG2-26: organisation membership is resolved afresh from trusted user data.
+ * Blank or absent membership never groups unrelated users into a shared tenant.
+ * Preserve the exact stored organisation: trimming is only an absence check.
+ */
+async function readMembership(admin: SupabaseClient, userId: string): Promise<OrganiserLookupResult> {
+  const membership = await fetchOrganiserOrganisation(admin, userId);
+  if (membership.ok && (typeof membership.organisation !== 'string' || !membership.organisation.trim())) {
+    return { ok: false, reason: 'not_found', message: 'No client organisation for this account.' };
+  }
+  return membership;
+}
+
+/** Read colleagues' events without granting permission to change them. */
+export async function fetchOrganisationEventRequests(
+  admin: SupabaseClient,
+  userId: string,
+  statusFilter?: string,
+  scope: 'organisation' | 'mine' = 'organisation'
+): Promise<FetchEventRequestsResult> {
+  const membership = await readMembership(admin, userId);
+  if (!membership.ok) {
+    return membership.reason === 'not_found' ? { ok: true, requests: [] }
+      : { ok: false, reason: 'unavailable', message: membership.message };
+  }
+
+  let query = admin.from('events').select(`organiser_id, ${SUMMARY_COLUMNS}`)
+    .eq('organisation', membership.organisation);
+  if (scope === 'mine') query = query.eq('organiser_id', userId);
+  if (statusFilter) query = query.eq('status', statusFilter);
+  const { data, error } = await query.order('event_id', { ascending: false });
+  if (error) return { ok: false, reason: 'unavailable', message: error.message };
+
+  const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
+  return { ok: true, requests: rows.map(row => ({
+    ...summarizeEventRequest(row),
+    can_manage: row.organiser_id === userId
+  })) };
+}
+
+/** Organisation and event id are both constraints on the database read. */
+export async function fetchOrganisationEventRequest(
+  admin: SupabaseClient,
+  eventId: number,
+  userId: string
+): Promise<FetchEventRequestResult> {
+  const membership = await readMembership(admin, userId);
+  if (!membership.ok) return membership;
+
+  const { data, error } = await admin.from('events').select(DETAIL_COLUMNS)
+    .eq('event_id', eventId).eq('organisation', membership.organisation);
+  if (error) return { ok: false, reason: 'unavailable', message: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'not_found', message: 'No event request found for this account.' };
+  }
+  const row = data[0] as unknown as Record<string, unknown>;
+  return { ok: true, request: {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row),
+    can_manage: row.organiser_id === userId
+  } };
+}
+
+/** Mutation precheck: both current organisation membership and creator ownership. */
+export async function fetchManageableEventRequest(
+  admin: SupabaseClient,
+  eventId: number,
+  userId: string
+): Promise<FetchEventRequestResult> {
+  const result = await fetchOrganisationEventRequest(admin, eventId, userId);
+  if (!result.ok) return result;
+  if (result.request.organiser_id !== userId) {
+    return { ok: false, reason: 'not_found', message: 'No event request found for this account.' };
+  }
+  return result;
+}
+
 /**
  * Reads all event requests belonging to the organiser (SG2-31).
  *
@@ -173,14 +265,7 @@ export async function fetchOwnEventRequests(
   }
 
   const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
-  const requests: EventRequestSummaryRecord[] = rows.map((row) => ({
-    event_id: Number(row.event_id),
-    name: typeof row.name === 'string' ? row.name : '',
-    proposed_date: typeof row.proposed_date === 'string' ? row.proposed_date : null,
-    status: typeof row.status === 'string' ? row.status : 'draft',
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  }));
+  const requests = rows.map(summarizeEventRequest);
 
   return { ok: true, requests };
 }
