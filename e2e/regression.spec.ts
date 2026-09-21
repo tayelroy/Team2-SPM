@@ -124,6 +124,61 @@ test('SG2-26-P01 | colleagues read the same organisation events with creator-onl
   await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
 });
 
+test('SG2-26-P02 | saved event changes reach a colleague dashboard list and detail after reload', async ({ page, context }) => {
+  const owner = await context.newPage();
+  try {
+    await signIn(owner);
+    await signIn(page, 'colleague');
+    await expect(page.getByText('Planning workshop', { exact: true })).toBeVisible();
+
+    // Write through the real handler and storage adapter, without mocking a
+    // browser response. The colleague must fetch the new persisted values.
+    const saved = {
+      name: 'Updated organisation planning', purpose: 'Confirm the revised programme',
+      description: 'The organiser saved this update while their colleague was signed in.',
+      proposed_date: '2030-07-16T12:00:00.000Z', expected_attendance: 37,
+      venue_requirements: 'A meeting room with 37 seats', accessibility_needs: 'Step-free entrance',
+      equipment_requirements: 'Two microphones', registration_needed: true,
+    };
+    const updated = await owner.request.patch('/api/event-requests/1', {
+      headers: await authHeaders(owner), data: saved,
+    });
+    expect(updated.status()).toBe(200);
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Your organisation’s events', exact: true })).toBeVisible();
+    await expect(page.getByText(saved.name, { exact: true })).toBeVisible();
+    await expect(page.getByText('Planning workshop', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Other organisation draft', { exact: true })).toHaveCount(0);
+    for (const [label, value] of [['Organisation events', '1'], ['My drafts', '0'], ['Waiting on me', '0']]) {
+      await expect(page.locator('.organisation-summary-stat').filter({ hasText: label }).locator('strong')).toHaveText(value);
+    }
+
+    await nav(page, 'My events');
+    await expect(page.getByRole('button', { name: `View ${saved.name}`, exact: true })).toBeVisible();
+    await expect(page.getByText('16 Jul 2030', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: `View ${saved.name}`, exact: true }).click();
+    await expect(page.getByRole('heading', { name: saved.name, exact: true })).toBeVisible();
+    await expect(page.getByText(saved.purpose, { exact: true })).toBeVisible();
+    await expect(page.getByText(saved.description, { exact: true })).toBeVisible();
+    for (const [label, value] of Object.entries({
+      Organisation: 'Regression Organisation', 'Proposed date': '16 Jul 2030',
+      'Expected attendance': '37', 'Venue requirements': saved.venue_requirements,
+      'Accessibility needs': saved.accessibility_needs, 'Equipment requirements': saved.equipment_requirements,
+      'Registration required': 'Yes', Coordinator: 'Unassigned',
+    })) {
+      await expect(page.locator('dl > div').filter({ has: page.locator('dt').getByText(label, { exact: true }) }).locator('dd')).toHaveText(value);
+    }
+    await expect(page.getByText(/View only\. This event is shared/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+    const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
+    expect(detail.status()).toBe(200);
+    expect((await detail.json()).request).toMatchObject({ ...saved, can_manage: false });
+  } finally {
+    await owner.close();
+  }
+});
+
 test('SG2-26-N01 | another organisation and an account without membership cannot read events', async ({ page }) => {
   await signIn(page, 'organiser2');
   await nav(page, 'My events');

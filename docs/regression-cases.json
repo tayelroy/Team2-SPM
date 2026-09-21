@@ -552,5 +552,27 @@
     "actual": "All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
     "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
     "execution_date": "21 Sep 2026"
+  },
+  {
+    "id": "SG2-26-P02",
+    "title": "Saved event changes reach colleague dashboard, list and detail",
+    "type": "Positive / persistence",
+    "story": "SG2-26",
+    "purpose": "Prevent static, stale or unrelated event data from replacing current organisation-scoped API results.",
+    "preconditions": "Built React application and real Express routes with reset isolated identity/database providers; two same-organisation sessions. No hosted Supabase.",
+    "steps": [
+      "Sign in as the event creator and a colleague in separate tabs.",
+      "Read the initial event in the colleague dashboard.",
+      "Update the event through the creator API session.",
+      "Reload the colleague view and check the dashboard counts, list, and every saved detail field."
+    ],
+    "data": "Updated name, purpose, description, date, attendance, venue/accessibility/equipment requirements and registration flag for event 1; foreign event 2 remains excluded.",
+    "expected": "The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
+    "evidence": "e2e/regression.spec.ts; .github/scripts/regression-gate.mjs",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "All saved fields and dashboard counts matched after reload; colleague detail remained read-only; unrelated event absent.",
+    "execution_evidence": "21 Sep 2026; PR #32 head f28ed93 plus test changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated local API; 18/18 passed; /tmp/sg2-26-required-regression.log; /tmp/sg2-26-playwright-results.json.",
+    "execution_date": "21 Sep 2026"
   }
 ]
