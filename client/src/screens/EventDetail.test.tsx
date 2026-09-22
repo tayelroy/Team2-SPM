@@ -437,5 +437,44 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
     expect(await screen.findByRole('heading', { name: 'Planning Meeting' })).toBeInTheDocument();
     expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
   });
+
+  test('renders EventDetail smoothly when getEventStage rejects with an exception', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 103,
+        organiserId: 'org-1',
+        organisation: 'Acme Corp',
+        status: 'draft',
+        name: 'Daily Standup',
+        purpose: 'Team alignment',
+        description: '',
+        proposedDate: null,
+        expectedAttendance: null,
+        venueRequirements: null,
+        accessibilityNeeds: null,
+        equipmentRequirements: null,
+        registrationNeeded: false,
+        coordinatorId: null,
+        coordinatorName: null,
+        canManage: true,
+        waitingOnMe: true,
+      },
+    });
+
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockRejectedValue(new Error('Stage service unavailable'));
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={103}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Daily Standup' })).toBeInTheDocument();
+    expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
+  });
 });
 

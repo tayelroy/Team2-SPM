@@ -1070,5 +1070,85 @@ describe('getEventStage (SG2-38)', () => {
       message: 'Could not reach the server. Please try again.',
     });
   });
+
+  test('falls back to default messages when error payload is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Authentication required',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 403)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Access forbidden',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 404)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event not found.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 503)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('handles generic HTTP error responses (500) with and without custom error message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Database crashed' }, 500)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Database crashed',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 500)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event stage (HTTP 500).',
+    });
+  });
+
+  test('handles invalid JSON responses or non-object bodies', async () => {
+    // Non-JSON response causing json() parse to reject and execute catch(() => null)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('<html>Bad Gateway</html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    );
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event stage (HTTP 502).',
+    });
+
+    // 200 OK with null body
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, 200)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+
+    // 200 OK with primitive string body
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse('plain string', 200)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
 });
 
