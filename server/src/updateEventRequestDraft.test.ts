@@ -95,7 +95,8 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.deepEqual(fetched, { eventId: 7, organiserId: 'user-1' });
     assert.equal(updated?.eventId, 7);
     assert.equal(updated?.organiserId, 'user-1');
-    assert.equal((updated?.values as { name: string }).name, 'Partner Forum');
+    assert.deepEqual(updated?.values, COMPLETE_BODY);
+    assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, ...COMPLETE_BODY });
   });
 
   test('an update omitting only accessibility needs is submission-ready', async () => {
@@ -108,7 +109,9 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
   test('reports what is still outstanding for an incomplete update', async () => {
     const response = await request(buildApp()).patch('/api/event-requests/7').send({ name: 'Partner Forum' });
     assert.equal(response.status, 200);
-    assert.ok(response.body.missingForSubmission.includes('purpose'));
+    assert.deepEqual(response.body.missingForSubmission, [
+      'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements'
+    ]);
   });
 
   test('ownership fields in the body are ignored, not trusted', async () => {
@@ -126,12 +129,14 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
   });
 
   test('rejects malformed values with a message naming the field', async () => {
-    const response = await request(buildApp())
+    let writes = 0;
+    const response = await request(buildApp({ captureUpdate: () => { writes++; } }))
       .patch('/api/event-requests/7')
       .send({ name: 42, expected_attendance: -5 });
     assert.equal(response.status, 400);
     assert.ok(response.body.details.some((d: string) => d.includes('name')));
     assert.ok(response.body.details.some((d: string) => d.includes('expected_attendance')));
+    assert.equal(writes, 0);
   });
 
   test('treats an absent request body as an empty update', async () => {
@@ -148,6 +153,10 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     );
     const response = await request(bare).patch('/api/event-requests/7');
     assert.equal(response.status, 200);
+    assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, name: null });
+    assert.deepEqual(response.body.missingForSubmission, [
+      'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements'
+    ]);
   });
 
   test('returns 400 for a non-numeric eventId, without querying the database', async () => {

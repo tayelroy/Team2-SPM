@@ -4,7 +4,7 @@ import express from 'express';
 import request from 'supertest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApp } from './app';
-import { createAuthorization, ROLES } from './auth';
+import { createAuthorization } from './auth';
 import { dbConfig } from './db/config';
 import {
   createAllVenuesAvailabilityHandler,
@@ -14,10 +14,16 @@ import {
   getVenueAvailability
 } from './venues/availability';
 
+// Documented account roles form the oracle, independent of the production list.
+const ACCOUNT_ROLES = [
+  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
+] as const;
+
 const FROM = '2026-10-01T00:00:00.000Z';
 const TO = '2026-10-31T00:00:00.000Z';
 
 type TableResult = { data?: unknown; error?: unknown };
+type QueryCall = { table: string; method: string; args: unknown[] };
 
 /**
  * Minimal stand-in for the PostgREST query builder: chainable on every method
@@ -25,7 +31,7 @@ type TableResult = { data?: unknown; error?: unknown };
  * chain at different methods (single-venue ends in .order(), all-venues ends
  * in .gt() for the booking/unavailability tables).
  */
-function fakeClient(tables: Record<string, TableResult>): SupabaseClient {
+function fakeClient(tables: Record<string, TableResult>, calls: QueryCall[] = []): SupabaseClient {
   return {
     from(table: string) {
       const result = tables[table] ?? { data: [], error: null };
@@ -34,7 +40,10 @@ function fakeClient(tables: Record<string, TableResult>): SupabaseClient {
           Promise.resolve(result).then(resolve, reject)
       };
       for (const method of ['select', 'eq', 'lt', 'gt', 'order']) {
-        builder[method] = () => builder;
+        builder[method] = (...args: unknown[]) => {
+          calls.push({ table, method, args });
+          return builder;
+        };
       }
       return builder;
     }
@@ -43,7 +52,8 @@ function fakeClient(tables: Record<string, TableResult>): SupabaseClient {
 
 // --- getVenueAvailability -------------------------------------------------------
 
-test('merges bookings and unavailability into one list sorted by start', async () => {
+test('queries the chosen venue over the half-open range and merges occupied periods in start order', async () => {
+  const calls: QueryCall[] = [];
   const client = fakeClient({
     venue_bookings: {
       data: [
@@ -58,9 +68,17 @@ test('merges bookings and unavailability into one list sorted by start', async (
       ],
       error: null
     }
-  });
+  }, calls);
 
   const result = await getVenueAvailability(7, FROM, TO, client);
+
+  for (const table of ['venue_bookings', 'venue_unavailability']) {
+    assert.deepEqual(calls.filter(call => call.table === table && ['eq', 'lt', 'gt'].includes(call.method)), [
+      { table, method: 'eq', args: ['venue_id', 7] },
+      { table, method: 'lt', args: ['starts_at', TO] },
+      { table, method: 'gt', args: ['ends_at', FROM] }
+    ]);
+  }
 
   assert.deepEqual(result, {
     outcome: 'ok',
@@ -85,10 +103,13 @@ test('keeps entries that share a start instant', async () => {
   });
 
   const result = await getVenueAvailability('5', FROM, TO, client);
-  assert.equal(result.outcome === 'ok' && result.entries.length, 2);
+  assert.deepEqual(result, { outcome: 'ok', entries: [
+    { start: '2026-10-05T09:00:00.000Z', end: '2026-10-05T10:00:00.000Z', kind: 'booking', label: 'held' },
+    { start: '2026-10-05T09:00:00.000Z', end: '2026-10-05T11:00:00.000Z', kind: 'unavailable', label: 'Deep clean' }
+  ] });
 });
 
-test('returns an empty list when nothing overlaps the range', async () => {
+test('returns an empty list when both queries return null', async () => {
   const client = fakeClient({
     venue_bookings: { data: null, error: null },
     venue_unavailability: { data: null, error: null }
@@ -150,16 +171,26 @@ for (const [from, to] of [[TO, TO], [TO, FROM]]) {
   });
 }
 
-test('rejects a range longer than 366 days', async () => {
+test('accepts exactly 366 days and rejects one millisecond beyond the limit without querying', async () => {
+  const calls: QueryCall[] = [];
+  const client = fakeClient({}, calls);
   assert.deepEqual(
-    await getVenueAvailability('5', '2026-01-01T00:00:00.000Z', '2027-06-01T00:00:00.000Z', fakeClient({})),
+    await getVenueAvailability('5', '2026-01-01T00:00:00.000Z', '2027-01-02T00:00:00.000Z', client),
+    { outcome: 'ok', entries: [] }
+  );
+  assert.ok(calls.length > 0);
+  calls.length = 0;
+  assert.deepEqual(
+    await getVenueAvailability('5', '2026-01-01T00:00:00.000Z', '2027-01-02T00:00:00.001Z', client),
     { outcome: 'invalid', message: 'The date range must not exceed 366 days.' }
   );
+  assert.deepEqual(calls, []);
 });
 
 // --- getAllVenuesAvailability --------------------------------------------------
 
-test('lists every venue in DB order, each with its own sorted entries', async () => {
+test('queries every venue over the chosen range and groups sorted entries by venue', async () => {
+  const calls: QueryCall[] = [];
   const client = fakeClient({
     venues: {
       data: [
@@ -182,9 +213,19 @@ test('lists every venue in DB order, each with its own sorted entries', async ()
       ],
       error: null
     }
-  });
+  }, calls);
 
   const result = await getAllVenuesAvailability(FROM, TO, client);
+
+  assert.deepEqual(calls.filter(call => call.table === 'venues' && call.method === 'order'), [
+    { table: 'venues', method: 'order', args: ['name', { ascending: true }] }
+  ]);
+  for (const table of ['venue_bookings', 'venue_unavailability']) {
+    assert.deepEqual(calls.filter(call => call.table === table && ['eq', 'lt', 'gt'].includes(call.method)), [
+      { table, method: 'lt', args: ['starts_at', TO] },
+      { table, method: 'gt', args: ['ends_at', FROM] }
+    ]);
+  }
 
   assert.deepEqual(result, {
     outcome: 'ok',
@@ -428,8 +469,14 @@ function appAs(role: string) {
   );
 }
 
-test('venues router defaults to the shared authorization instance', () => {
-  assert.equal(typeof createVenueAvailabilityRouter(), 'function');
+test('the default availability router refuses unauthenticated requests to both routes', async () => {
+  const app = express();
+  app.use('/api/venues', createVenueAvailabilityRouter());
+  for (const path of ['/api/venues/availability', '/api/venues/5/availability']) {
+    const response = await request(app).get(path);
+    assert.equal(response.status, 401);
+    assert.deepEqual(response.body, { error: 'Authentication required' });
+  }
 });
 
 test('unauthenticated availability requests are refused', async () => {
@@ -437,7 +484,7 @@ test('unauthenticated availability requests are refused', async () => {
   assert.equal(res.status, 401);
 });
 
-for (const role of ROLES) {
+for (const role of ACCOUNT_ROLES) {
   test(`SG2-44: availability view obeys the policy for ${role}`, async () => {
     const allowed = ['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role);
     mock.method(globalThis, 'fetch', async () => Response.json([]));
@@ -453,7 +500,7 @@ for (const role of ROLES) {
   });
 }
 
-for (const role of ROLES) {
+for (const role of ACCOUNT_ROLES) {
   test(`SG2-44: all-venues availability view obeys the policy for ${role}`, async () => {
     const allowed = ['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role);
     mock.method(globalThis, 'fetch', async () => Response.json([]));

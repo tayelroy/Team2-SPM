@@ -83,8 +83,8 @@ test('a second click while a request is outstanding does not submit again', asyn
   let resolveResponse!: (response: Response) => void;
   const fetchMock = vi.fn().mockReturnValue(new Promise<Response>((resolve) => { resolveResponse = resolve; }));
   vi.stubGlobal('fetch', fetchMock);
-
-  render(<Login onSignIn={vi.fn()} onBack={vi.fn()} />);
+  const onSignIn = vi.fn();
+  render(<Login onSignIn={onSignIn} onBack={vi.fn()} />);
   fillForm();
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
   fireEvent.click(screen.getByRole('button', { name: 'Signing in…' }));
@@ -96,6 +96,8 @@ test('a second click while a request is outstanding does not submit again', asyn
       { status: 200 }
     )
   );
+  await vi.waitFor(() => expect(onSignIn).toHaveBeenCalledOnce());
+  expect(fetchMock).toHaveBeenCalledOnce();
 });
 
 test('the wordmark calls onBack', () => {

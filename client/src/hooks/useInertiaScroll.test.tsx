@@ -171,14 +171,27 @@ test('keeps easing under StrictMode', () => {
 
 test('no-ops without a track child', () => {
   expect(() => render(<Harness withTrack={false} />)).not.toThrow();
+  expect(frames.size).toBe(0);
 });
 
 test('stops the loop and detaches listeners on unmount', () => {
   const removeFromWindow = vi.spyOn(window, 'removeEventListener');
-  const { unmount } = render(<Harness />);
+  const { getByTestId, unmount } = render(<Harness />);
+  const container = getByTestId('container');
+  const track = getByTestId('track');
+  setScrollable(container, track);
+  const removeFromContainer = vi.spyOn(container, 'removeEventListener');
+  fireEvent.wheel(container, { deltaY: 500 });
   tick();
+  const lastTransform = track.style.transform;
   unmount();
 
   expect(cancelAnimationFrame).toHaveBeenCalled();
   expect(removeFromWindow).toHaveBeenCalledWith('resize', expect.any(Function));
+  for (const event of ['wheel', 'touchstart', 'touchmove']) {
+    expect(removeFromContainer).toHaveBeenCalledWith(event, expect.any(Function));
+  }
+  tick();
+  expect(frames.size).toBe(0);
+  expect(track.style.transform).toBe(lastTransform);
 });

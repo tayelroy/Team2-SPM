@@ -101,12 +101,14 @@ describe('updateProfile', () => {
 
   test('writes name, phone and communication_preferences for an external role', async () => {
     let written: Record<string, unknown> | undefined;
+    let target: unknown;
     const result = await updateProfile(
-      fakeUpdateClient({ data: [PROFILE_ROW], error: null }, (row) => (written = row)),
+      fakeUpdateClient({ data: [PROFILE_ROW], error: null }, (row, userId) => { written = row; target = userId; }),
       'user-1',
       UPDATE
     );
-    assert.equal(result.ok, true);
+    assert.deepEqual(result, { ok: true, profile: PROFILE_ROW });
+    assert.equal(target, 'user-1');
     assert.deepEqual(written, {
       name: 'Alex Tan',
       phone: '+65 8123 4567',
@@ -117,11 +119,12 @@ describe('updateProfile', () => {
 
   test('also writes department when the validated update included it', async () => {
     let written: Record<string, unknown> | undefined;
-    await updateProfile(
+    const result = await updateProfile(
       fakeUpdateClient({ data: [{ ...PROFILE_ROW, department: 'Operations' }], error: null }, (row) => (written = row)),
       'user-1',
       { ...UPDATE, department: 'Operations' }
     );
+    assert.deepEqual(result, { ok: true, profile: { ...PROFILE_ROW, department: 'Operations' } });
     assert.equal(written?.department, 'Operations');
   });
 

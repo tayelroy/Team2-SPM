@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { color } from '../theme';
-import { EVENTS } from './data';
 import type { Role } from './types';
 import {
   CALENDAR_LEGEND,
@@ -34,7 +33,9 @@ describe('badgeStyle', () => {
   });
 
   test('matching is case-insensitive', () => {
-    expect(badgeStyle('confirmed')).toEqual(badgeStyle('CONFIRMED'));
+    for (const status of ['confirmed', 'CONFIRMED']) {
+      expect(badgeStyle(status)).toEqual({ badgeBg: color.teal, badgeFg: color.abyss });
+    }
   });
 });
 
@@ -48,19 +49,19 @@ describe('chipStyle', () => {
 describe('scopedEvents', () => {
   test('an organiser only sees their own client', () => {
     const events = scopedEvents('Event Organiser');
-    expect(events.length).toBeGreaterThan(0);
-    expect(events.every((e) => e.client === 'Meridian Capital')).toBe(true);
-    expect(events.length).toBeLessThan(EVENTS.length);
+    expect(events.map((event) => event.ref)).toEqual(['E-205', 'E-201']);
   });
 
   test('an attendee only sees confirmed events', () => {
-    expect(scopedEvents('Attendee').every((e) => e.status === 'Confirmed')).toBe(true);
+    expect(scopedEvents('Attendee').map((event) => event.ref)).toEqual(['E-198']);
   });
 
   test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff'] as Role[])(
     '%s sees every event',
     (role) => {
-      expect(scopedEvents(role)).toHaveLength(EVENTS.length);
+      expect(scopedEvents(role).map((event) => event.ref)).toEqual([
+        'E-205', 'E-201', 'E-198', 'E-190', 'E-186', 'E-181',
+      ]);
     },
   );
 });
@@ -68,10 +69,12 @@ describe('scopedEvents', () => {
 describe('eventCards', () => {
   test('an attendee sees registration framing, not internal status', () => {
     const cards = eventCards('Attendee');
-    expect(cards.every((c) => c.status === 'Registration open')).toBe(true);
-    expect(cards[0].next).toMatch(/registration closes/);
-    // Attendance numbers are internal — the summary line omits them.
-    expect(cards[0].meta).not.toMatch(/expected/);
+    expect(cards).toMatchObject([{
+      ref: 'E-198',
+      status: 'Registration open',
+      next: 'Places available — registration closes a week before',
+      meta: '3 Nov 2026 · The Kelp Room',
+    }]);
   });
 
   test('a coordinator gets the decision they owe on each event', () => {
@@ -102,7 +105,7 @@ describe('eventCards', () => {
 
   test('the summary line carries date, attendance and venue', () => {
     const card = eventCards('Event Coordinator')[0];
-    expect(card.meta).toBe(`${card.date} · ${card.attendance} expected · ${card.venue}`);
+    expect(card.meta).toBe('20 Nov 2026 · 300 expected · —');
   });
 });
 
@@ -114,8 +117,9 @@ describe('currentEvent', () => {
   test('falls back to the first visible event otherwise', () => {
     // E-201 is under review, so it is outside an attendee's confirmed-only scope.
     const event = currentEvent('Attendee');
-    expect(event.ref).not.toBe('E-201');
-    expect(event).toEqual(eventCards('Attendee')[0]);
+    expect(event).toMatchObject({
+      ref: 'E-198', name: 'Quarterly Partner Dinner', status: 'Registration open',
+    });
   });
 });
 
@@ -138,14 +142,12 @@ describe('role-scoped chrome', () => {
 describe('detailActions', () => {
   test('a coordinator gets decision actions', () => {
     const labels = detailActions('Event Coordinator').map((a) => a.label);
-    expect(labels).toContain('Approve request');
-    expect(labels).toContain('Reject with reason');
+    expect(labels).toEqual(['Approve request', 'Request clarification', 'Reject with reason', 'Reassign coordinator']);
   });
 
-  test('everyone else can only amend their own request', () => {
+  test('the organiser prototype offers amendment actions without coordinator decisions', () => {
     const labels = detailActions('Event Organiser').map((a) => a.label);
-    expect(labels).toContain('Edit request');
-    expect(labels).not.toContain('Approve request');
+    expect(labels).toEqual(['Edit request', 'Request a change', 'Cancel event']);
   });
 });
 

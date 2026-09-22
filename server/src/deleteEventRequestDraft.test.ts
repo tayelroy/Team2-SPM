@@ -70,6 +70,7 @@ describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
     ).delete('/api/event-requests/7');
 
     assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { message: 'Draft deleted.' });
     assert.deepEqual(fetched, { eventId: 7, organiserId: 'user-1' });
     assert.deepEqual(deleted, { eventId: 7, organiserId: 'user-1' });
   });

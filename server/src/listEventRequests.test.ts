@@ -96,7 +96,7 @@ function buildDetailApp(options: DetailHarnessOptions = {}) {
 }
 
 describe('GET /api/event-requests (SG2-31)', () => {
-  test('returns 200 with list of requests owned by the authenticated organiser', async () => {
+  test('returns the service list and passes the authenticated organiser as the query identity', async () => {
     let capturedOrganiser: string | undefined;
     let capturedFilter: string | undefined;
 
@@ -205,7 +205,7 @@ describe('GET /api/event-requests (SG2-31)', () => {
 });
 
 describe('GET /api/event-requests/:eventId (SG2-31)', () => {
-  test('returns 200 with request detail for an owned event', async () => {
+  test('returns service detail and passes the event id and authenticated organiser', async () => {
     let capturedEventId: number | undefined;
     let capturedOrganiser: string | undefined;
 

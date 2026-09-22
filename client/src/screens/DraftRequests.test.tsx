@@ -73,7 +73,7 @@ test('shows loading, then the empty state when the caller has no requests', asyn
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading your requests');
   expect(await screen.findByRole('heading', { name: 'No event requests yet' })).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine', { headers: { Authorization: 'Bearer test-token' } });
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine', { method: 'GET', headers: { Authorization: 'Bearer test-token' } });
 });
 
 test('lists requests and only offers Edit/Delete on drafts', async () => {
@@ -101,6 +101,7 @@ test('Edit fetches the full record (not just the list summary) before handing it
   expect(onEdit).toHaveBeenCalledOnce();
   expect(onEdit).toHaveBeenCalledWith(DRAFT_FULL_RECORD);
   expect(fetch).toHaveBeenCalledWith('/api/event-requests/7', {
+    method: 'GET',
     headers: { Authorization: 'Bearer test-token' }
   });
 });

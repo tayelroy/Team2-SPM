@@ -7,6 +7,7 @@ function fakeAdmin(options: {
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
   update?: (payload: any) => Promise<{ data: any; error: { message: string } | null }>;
   delete?: () => Promise<{ error: { message: string } | null }>;
+  captureFilter?: (column: string, userId: string) => void;
 }): SupabaseClient {
   return {
     from(table: string) {
@@ -14,13 +15,17 @@ function fakeAdmin(options: {
       return {
         insert: options.insert ?? (async () => ({ error: null })),
         update: (payload: any) => ({
-          eq: () => ({
-            select: async () =>
-              options.update ? options.update(payload) : { data: [{ user_id: 'target-1' }], error: null }
-          })
+          eq: (column: string, userId: string) => {
+            options.captureFilter?.(column, userId);
+            return { select: async () =>
+              options.update ? options.update(payload) : { data: [{ user_id: 'target-1' }], error: null } };
+          }
         }),
         delete: () => ({
-          eq: async () => (options.delete ? options.delete() : { error: null })
+          eq: async (column: string, userId: string) => {
+            options.captureFilter?.(column, userId);
+            return options.delete ? options.delete() : { error: null };
+          }
         })
       };
     }
@@ -53,7 +58,9 @@ describe('createAccountRole', () => {
 describe('updateAccountRole', () => {
   test('updates the role for an existing user', async () => {
     let updatePayload: any;
+    let filter: unknown;
     const admin = fakeAdmin({
+      captureFilter: (column, userId) => { filter = { column, userId }; },
       update: async (payload) => {
         updatePayload = payload;
         return { data: [{ user_id: 'target-1' }], error: null };
@@ -64,6 +71,7 @@ describe('updateAccountRole', () => {
 
     assert.deepEqual(result, { ok: true });
     assert.deepEqual(updatePayload, { role: 'venue_staff' });
+    assert.deepEqual(filter, { column: 'user_id', userId: 'target-1' });
   });
 
   test('reports user_not_found when no row matches the target user id', async () => {
@@ -80,13 +88,21 @@ describe('updateAccountRole', () => {
 });
 
 describe('deleteAccountRole', () => {
-  test('resolves even when the delete fails (best-effort rollback)', async () => {
-    const admin = fakeAdmin({ delete: async () => ({ error: { message: 'connection reset' } }) });
-    await assert.doesNotReject(() => deleteAccountRole(admin, 'user-123'));
-  });
-
-  test('resolves on success', async () => {
-    const admin = fakeAdmin({});
-    await assert.doesNotReject(() => deleteAccountRole(admin, 'user-123'));
-  });
+  for (const outcome of ['success', 'database error', 'transport rejection'] as const) {
+    test(`attempts cleanup of only the target account and resolves on ${outcome}`, async () => {
+      let deletes = 0;
+      let filter: unknown;
+      const admin = fakeAdmin({
+        captureFilter: (column, userId) => { filter = { column, userId }; },
+        delete: async () => {
+          deletes++;
+          if (outcome === 'transport rejection') throw new Error('connection reset');
+          return { error: outcome === 'database error' ? { message: 'connection reset' } : null };
+        }
+      });
+      await assert.doesNotReject(() => deleteAccountRole(admin, 'user-123'));
+      assert.equal(deletes, 1);
+      assert.deepEqual(filter, { column: 'user_id', userId: 'user-123' });
+    });
+  }
 });

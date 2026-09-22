@@ -42,8 +42,6 @@ export class MemoryDatabase {
       facilities: 'Projector and seating', accessibility_features: 'Step-free access',
       operating_information: '08:00–22:00'
     };
-    const now = new Date();
-    const currentMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 15, 2));
     this.tables = {
       users: accounts.map(account => ({
         user_id: `user-${account.key}`, name: `Regression ${account.key}`,
@@ -58,7 +56,7 @@ export class MemoryDatabase {
       venues: [venue, { ...venue, venue_id: 2, name: 'Quiet Room', capacity: 20 }],
       venue_bookings: [
         { venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z', status: 'confirmed', event_id: 1 },
-        { venue_id: 1, starts_at: currentMonth.toISOString(), ends_at: new Date(currentMonth.getTime() + 7200000).toISOString(), status: 'confirmed', event_id: 1 }
+        { venue_id: 1, starts_at: '2026-09-15T02:00:00.000Z', ends_at: '2026-09-15T04:00:00.000Z', status: 'confirmed', event_id: 1 }
       ],
       venue_unavailability: [
         { venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }

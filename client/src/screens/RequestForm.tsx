@@ -181,7 +181,7 @@ function OptionalTextField({
  *
  * "Submit request" (SG2-30): saves the current form first, creating a draft
  * if necessary, then submits its persisted id. Only a successful server
- * submission fires `onSuccess`. Failed submissions retain the saved id for retry.
+ * submission fires `onSuccess` with that id. Failed submissions retain the saved id for retry.
  * AC2 — the submit button is disabled while any mandatory field is empty;
  * inline errors appear on a blank field once touched; server errors
  * (400/409/503) surface as a visible alert banner.
@@ -207,14 +207,14 @@ export default function RequestForm({
   initialValues?: EventRequestDraftInput;
   /** Bearer token for the signed-in organiser. Required alongside a resolved event id. */
   accessToken?: string;
-  /** Called only after the server confirms successful submission. */
-  onSuccess?: () => void;
+  /** Receives the persisted event id only after the server confirms submission. */
+  onSuccess?: (eventId: number) => void;
   /**
    * Legacy alias for `onSuccess` — retained so existing callers that pass
-   * `onSubmit` (App.tsx and App.test.tsx) continue to work unchanged.
+   * `onSubmit` continue to work; callbacks may ignore the supplied event id.
    * @deprecated Prefer `onSuccess`.
    */
-  onSubmit?: () => void;
+  onSubmit?: (eventId: number) => void;
   /**
    * Overrides "Save draft" entirely when provided, instead of the built-in
    * create/update call.
@@ -325,11 +325,12 @@ export default function RequestForm({
       setErrorMessage(saved.message);
       return;
     }
-    const result = await submitEventRequest(effectiveEventId ?? saved.request.event_id, token);
+    const submittedEventId = effectiveEventId ?? saved.request.event_id;
+    const result = await submitEventRequest(submittedEventId, token);
 
     if (result.ok) {
       setSubmitStatus('success');
-      successCallback?.();
+      successCallback?.(Number(submittedEventId));
       return;
     }
 

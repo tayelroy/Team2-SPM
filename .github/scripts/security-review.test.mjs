@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   COMMENT_MARKER,
   DEFAULT_DIFF_CHUNK_BYTES,
-  DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS,
   FIREWORKS_MODEL,
   FIREWORKS_REASONING_EFFORT,
   MAX_DIFF_CHUNK_BYTES,
@@ -23,38 +22,44 @@ import {
   retryingJsonRequest,
 } from "./security-review.mjs";
 
-test("Fireworks is the default provider and GLM-5.3 Flash is the default model", () => {
+test("default provider configuration preserves the agreed model and cost limits", () => {
   const config = resolveProviderConfig({ FIREWORKS_API_KEY: "test-key" });
   assert.equal(config.provider, "fireworks");
-  assert.equal(config.model, FIREWORKS_MODEL);
+  assert.equal(config.model, "accounts/fireworks/models/glm-5p3-flash");
+  assert.equal(config.apiKey, "test-key");
   assert.equal(DEFAULT_DIFF_CHUNK_BYTES, 75_000);
   assert.equal(MAX_DIFF_CHUNK_BYTES, 100_000);
   assert.equal(FIREWORKS_REASONING_EFFORT, "low");
   assert.equal(MAX_REVIEW_FINDINGS, 20);
   assert.equal(MAX_REVIEW_OUTPUT_TOKENS, 24_000);
-  assert.equal(config.requestTimeoutMs, DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS);
+  assert.equal(config.requestTimeoutMs, 600_000);
 });
 
-test("Fireworks requests use low reasoning and streaming", () => {
-  const payload = buildFireworksPayload({ model: FIREWORKS_MODEL }, "review this diff");
+test("Fireworks requests preserve the selected model and prompt with bounded streaming output", () => {
+  const payload = buildFireworksPayload({ model: "chosen-model" }, "review this diff");
+  assert.equal(payload.model, "chosen-model");
+  assert.deepEqual(payload.messages[1], { role: "user", content: "review this diff" });
   assert.equal(payload.reasoning_effort, "low");
   assert.equal(payload.stream, true);
   assert.deepEqual(payload.stream_options, { include_usage: true });
-  assert.equal(payload.max_completion_tokens, MAX_REVIEW_OUTPUT_TOKENS);
+  assert.equal(payload.max_completion_tokens, 24_000);
+  assert.equal(payload.response_format.type, "json_schema");
 });
 
-test("Fireworks streaming reconstructs structured JSON across network chunks", async () => {
+test("Fireworks streaming reconstructs UTF-8 JSON across network chunks", async () => {
   const wireData = [
-    'data: {"choices":[{"delta":{"content":"{\\"summary\\":\\"ok\\","}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"{\\"summary\\":\\"café ☕\\","}}]}\n\n',
     'data: {"choices":[{"delta":{"content":"\\"findings\\":[]}"},"finish_reason":"stop"}]}\n\n',
     'data: {"choices":[],"usage":{"completion_tokens":12}}\n\n',
     "data: [DONE]\n\n",
   ].join("");
-  const splitAt = [17, 83, 141, wireData.length];
+  const wireBytes = Buffer.from(wireData);
+  // The boundary inside é must not corrupt a multibyte character.
+  const splitAt = [17, wireBytes.indexOf(Buffer.from("é")) + 1, wireBytes.length - 3, wireBytes.length];
   async function* body() {
     let start = 0;
     for (const end of splitAt) {
-      yield Buffer.from(wireData.slice(start, end));
+      yield wireBytes.subarray(start, end);
       start = end;
     }
   }
@@ -63,7 +68,7 @@ test("Fireworks streaming reconstructs structured JSON across network chunks", a
     { body: body() },
     { log() {}, warn() {} },
   );
-  assert.equal(result.choices[0].message.content, '{"summary":"ok","findings":[]}');
+  assert.equal(result.choices[0].message.content, '{"summary":"café ☕","findings":[]}');
   assert.equal(result.choices[0].finish_reason, "stop");
   assert.equal(result.usage.completion_tokens, 12);
 });
@@ -238,10 +243,17 @@ test("normalization drops malformed findings, de-duplicates, and sorts by severi
       { ...base, title: "Critical issue", severity: "critical", line: 20 },
       { ...base, title: "Medium issue", severity: "medium" },
       { ...base, title: "Invalid", severity: "informational" },
+      { ...base, title: "Missing impact", severity: "high", impact: "" },
+      { ...base, title: "Unsupported confidence", severity: "high", confidence: "low" },
+      null,
     ],
   });
 
-  assert.deepEqual(review.findings.map((finding) => finding.severity), ["critical", "medium"]);
+  assert.equal(review.summary, "Two findings");
+  assert.deepEqual(review.findings, [
+    { ...base, title: "Critical issue", severity: "critical", line: 20 },
+    { ...base, title: "Medium issue", severity: "medium" },
+  ]);
 });
 
 test("review keeps 20 globally prioritized findings", () => {
@@ -268,8 +280,10 @@ test("review keeps 20 globally prioritized findings", () => {
 
   const review = normalizeReview({ summary: "Many findings", findings });
   assert.equal(review.findings.length, 20);
+  assert.equal(review.findings[0].title, "Critical issue");
   assert.equal(review.findings[0].severity, "critical");
   assert.equal(review.findings.filter((finding) => finding.severity === "low").length, 19);
+  assert.equal(new Set(review.findings.map((finding) => finding.title)).size, 20);
 });
 
 test("chunk reviews are merged, de-duplicated, and globally prioritized", () => {
@@ -296,7 +310,10 @@ test("chunk reviews are merged, de-duplicated, and globally prioritized", () => 
     }),
   ]);
 
-  assert.deepEqual(review.findings.map((finding) => finding.severity), ["critical", "medium"]);
+  assert.deepEqual(review.findings, [
+    { ...base, title: "Critical issue", severity: "critical", line: 20 },
+    { ...base, title: "Medium issue", severity: "medium" },
+  ]);
   assert.match(review.summary, /complete pull request diff across 2 chunks/);
 });
 
@@ -341,8 +358,13 @@ test("rendered comment fits all 20 detailed findings without truncating the foot
   });
 
   assert.equal(review.findings.length, 20);
-  assert.match(body, /### 20\./);
+  assert.equal((body.match(/^### \d+\./gm) ?? []).length, 20);
+  for (let index = 1; index <= 20; index += 1) {
+    assert.ok(body.includes(`### ${index}. [HIGH] Issue ${index} `), `Finding ${index} must be rendered`);
+    assert.ok(body.includes(`src/contract-${index}.sol:${index}`), `Finding ${index} must retain its location`);
+  }
   assert.ok(body.length < 60_000);
+  assert.match(body, /Reviewed commit `1234567890ab`/);
   assert.match(body, /AI-assisted review can miss vulnerabilities/);
 });
 
