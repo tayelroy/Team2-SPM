@@ -379,15 +379,6 @@ export async function deleteEventRequestDraft(
 }
 
 /**
- * Updates a draft's own fields (SG2-29), but only while it is the caller's
- * own and still a draft — `organiser_id` and `status = 'draft'` are both
- * conditions on the write itself, not just the caller's own pre-check (see
- * deleteEventRequestDraft's comment; the same AI security review flagged
- * the same gap here). If either no longer holds, zero rows come back and
- * this reports unavailable rather than silently editing the wrong request
- * or one that has moved on.
- */
-/**
  * Reads an event request by id, unscoped by organiser (SG2-33/SG2-34).
  *
  * Technical Support Staff act across every organisation, unlike
@@ -467,6 +458,15 @@ export async function assignEventCoordinator(
   return { ok: true, request };
 }
 
+/**
+ * Updates a draft's own fields (SG2-29), but only while it is the caller's
+ * own and still a draft — `organiser_id` and `status = 'draft'` are both
+ * conditions on the write itself, not just the caller's own pre-check (see
+ * deleteEventRequestDraft's comment; the same AI security review flagged
+ * the same gap here). If either no longer holds, zero rows come back and
+ * this reports unavailable rather than silently editing the wrong request
+ * or one that has moved on.
+ */
 export async function updateEventRequestDraft(
   admin: SupabaseClient,
   eventId: number,

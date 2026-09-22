@@ -34,7 +34,6 @@ const SUBMITTED_REQUEST = {
 interface HarnessOptions {
   principal?: Principal | undefined;
   admin?: SupabaseClient | null;
-  body?: Record<string, unknown>;
   fetchResult?: FetchEventRequestResult;
   roleResult?: GetAccountRoleResult;
   assignResult?: AssignCoordinatorResult;
