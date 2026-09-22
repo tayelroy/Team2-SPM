@@ -11,6 +11,7 @@ import { submitEventRequestHandler } from './events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/list';
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
+import { createAssignCoordinatorHandler } from './events/assignCoordinator';
 import { createVenuesRouter } from './venues';
 import { createProfileRouter } from './profile';
 
@@ -31,7 +32,8 @@ export function createApp(
     availability: createVenueAvailabilityRouter(access),
     venues: createVenuesRouter(access),
     profile: createProfileRouter(access)
-  }
+  },
+  assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -85,6 +87,12 @@ export function createApp(
   );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
+  // SG2-33/SG2-34: Technical Support Staff assign or reassign a coordinator.
+  eventRequests.patch(
+    '/:eventId/coordinator',
+    access.requirePermission('event_request.assign_coordinator'),
+    assignCoordinatorHandler
+  );
   app.use('/api/event-requests', eventRequests);
 
   app.use('/api/venues', routers.venues);

@@ -2,7 +2,9 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  assignEventCoordinator,
   deleteEventRequestDraft,
+  fetchEventRequestById,
   fetchOrganiserOrganisation,
   fetchOwnEventRequest,
   fetchOwnEventRequests,
@@ -605,6 +607,119 @@ describe('updateEventRequestDraft', () => {
       );
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
+    });
+  }
+});
+
+describe('fetchEventRequestById', () => {
+  test('returns the request scoped only by event id, unscoped by organiser', async () => {
+    let filters: { eventId: unknown; organiserId: unknown } | undefined;
+    const result = await fetchEventRequestById(
+      fakeEventsSelectClient(
+        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'submitted' }], error: null },
+        (f) => (filters = f)
+      ),
+      7
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.event_id, 7);
+    assert.equal(filters?.eventId, 7);
+    assert.equal(filters?.organiserId, undefined);
+  });
+
+  test('extracts coordinator information from joined relation', async () => {
+    const result = await fetchEventRequestById(
+      fakeEventsSelectClient({
+        data: [
+          {
+            event_id: 101,
+            status: 'submitted',
+            coordinator_id: 'coord-uuid-1',
+            coordinator: { name: 'Sarah Coordinator' }
+          }
+        ],
+        error: null
+      }),
+      101
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.request.coordinator_id, 'coord-uuid-1');
+      assert.equal(result.request.coordinator_name, 'Sarah Coordinator');
+    }
+  });
+
+  test('reports not_found when no row matches the event id', async () => {
+    const result = await fetchEventRequestById(fakeEventsSelectClient({ data: [], error: null }), 7);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'not_found');
+  });
+
+  test('reports unavailable when the query errors', async () => {
+    const result = await fetchEventRequestById(
+      fakeEventsSelectClient({ data: null, error: { message: 'connection reset' } }),
+      7
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.reason, 'unavailable');
+      assert.equal(result.message, 'connection reset');
+    }
+  });
+});
+
+describe('assignEventCoordinator', () => {
+  test('sets coordinator_id, filtered to the event and assignable statuses', async () => {
+    let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
+    const result = await assignEventCoordinator(
+      fakeEventsUpdateClient(
+        {
+          data: [{ event_id: 7, status: 'submitted', coordinator_id: 'coord-1', coordinator: { name: 'Coord One' } }],
+          error: null
+        },
+        (c) => (captured = c)
+      ),
+      7,
+      'coord-1'
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.request.coordinator_id, 'coord-1');
+      assert.equal(result.request.coordinator_name, 'Coord One');
+    }
+    assert.equal(captured?.row.coordinator_id, 'coord-1');
+    assert.equal(captured?.eventId, 7);
+    assert.deepEqual(captured?.status, ['submitted', 'under_review', 'approved', 'planning', 'confirmed']);
+  });
+
+  test('reassigns from one coordinator to another (SG2-34)', async () => {
+    const result = await assignEventCoordinator(
+      fakeEventsUpdateClient({
+        data: [{ event_id: 7, status: 'under_review', coordinator_id: 'coord-new', coordinator: { name: 'New Coord' } }],
+        error: null
+      }),
+      7,
+      'coord-new'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.coordinator_id, 'coord-new');
+  });
+
+  test('reports unavailable when the update errors', async () => {
+    const result = await assignEventCoordinator(
+      fakeEventsUpdateClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      'coord-1'
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`reports not_assignable if the status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
+      const result = await assignEventCoordinator(fakeEventsUpdateClient({ data, error: null }), 7, 'coord-1');
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_assignable');
     });
   }
 });

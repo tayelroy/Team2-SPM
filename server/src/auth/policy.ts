@@ -29,6 +29,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-29: an organiser can edit their own request's fields while it is
   // still a draft.
   'event_request.update': ['event_organiser'],
+  // SG2-33/SG2-34: only Technical Support Staff assign or reassign the
+  // coordinator on a submitted event request — same grant shape as
+  // 'users.role.update'.
+  'event_request.assign_coordinator': ['technical_support_staff'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],

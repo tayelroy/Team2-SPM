@@ -1,12 +1,13 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAccountRole, updateAccountRole, deleteAccountRole } from './accountRoles';
+import { createAccountRole, updateAccountRole, deleteAccountRole, getAccountRole } from './accountRoles';
 
 function fakeAdmin(options: {
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
   update?: (payload: any) => Promise<{ data: any; error: { message: string } | null }>;
   delete?: () => Promise<{ error: { message: string } | null }>;
+  select?: (userId: unknown) => Promise<{ data: any; error: { message: string } | null }>;
 }): SupabaseClient {
   return {
     from(table: string) {
@@ -21,7 +22,19 @@ function fakeAdmin(options: {
         }),
         delete: () => ({
           eq: async () => (options.delete ? options.delete() : { error: null })
-        })
+        }),
+        select: (columns: string) => {
+          assert.equal(columns, 'role');
+          return {
+            eq: (column: string, value: unknown) => {
+              assert.equal(column, 'user_id');
+              return {
+                maybeSingle: async () =>
+                  options.select ? options.select(value) : { data: { role: 'event_coordinator' }, error: null }
+              };
+            }
+          };
+        }
       };
     }
   } as unknown as SupabaseClient;
@@ -88,5 +101,34 @@ describe('deleteAccountRole', () => {
   test('resolves on success', async () => {
     const admin = fakeAdmin({});
     await assert.doesNotReject(() => deleteAccountRole(admin, 'user-123'));
+  });
+});
+
+describe('getAccountRole', () => {
+  test('returns the role for an existing account', async () => {
+    let askedFor: unknown;
+    const admin = fakeAdmin({
+      select: async (userId) => {
+        askedFor = userId;
+        return { data: { role: 'event_coordinator' }, error: null };
+      }
+    });
+
+    const result = await getAccountRole(admin, 'coord-1');
+
+    assert.deepEqual(result, { ok: true, role: 'event_coordinator' });
+    assert.equal(askedFor, 'coord-1');
+  });
+
+  test('reports user_not_found when no row matches', async () => {
+    const admin = fakeAdmin({ select: async () => ({ data: null, error: null }) });
+    const result = await getAccountRole(admin, 'ghost');
+    assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
+  });
+
+  test('surfaces a database error', async () => {
+    const admin = fakeAdmin({ select: async () => ({ data: null, error: { message: 'connection reset' } }) });
+    const result = await getAccountRole(admin, 'coord-1');
+    assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
   });
 });
