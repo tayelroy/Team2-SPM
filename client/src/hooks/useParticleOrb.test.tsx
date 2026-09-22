@@ -27,6 +27,8 @@ let frames: Map<number, FrameRequestCallback>;
 let nextFrameId: number;
 
 beforeEach(() => {
+  vi.useFakeTimers();
+  vi.spyOn(Math, 'random').mockReturnValue(0.5);
   ctx = fakeContext();
   frames = new Map();
   nextFrameId = 0;
@@ -65,6 +67,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 /** Runs the frames queued so far. */
@@ -102,8 +105,10 @@ test('builds the sphere and draws a frame', () => {
 
   tick();
   expect(ctx.clearRect).toHaveBeenCalled();
-  // One arc per particle, and the count scales with the canvas area.
-  expect(ctx.arc.mock.calls.length).toBeGreaterThan(2000);
+  expect(ctx.arc.mock.calls.length).toBeGreaterThan(0);
+  expect(ctx.arc.mock.calls.every(([x, y, radius]) =>
+    Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(radius) && radius > 0,
+  )).toBe(true);
   expect(ctx.fill).toHaveBeenCalled();
 });
 
@@ -112,7 +117,7 @@ test('grows the spacer so the sphere clears the hero copy', () => {
   // The spacer's ref lands after the canvas's, so the height is set by the
   // re-measure the hook schedules for the next frame.
   tick();
-  expect(getByTestId('spacer').style.height).toMatch(/^\d+px$/);
+  expect(parseFloat(getByTestId('spacer').style.height)).toBeGreaterThan(0);
 });
 
 test('renders without a spacer or a reported device scale', () => {
@@ -124,33 +129,44 @@ test('renders without a spacer or a reported device scale', () => {
   expect(ctx.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
 });
 
-test('the pointer pushes particles and a press pulls them back', () => {
-  const { getByTestId } = render(<Harness />);
-  const hero = getByTestId('hero');
-  tick();
-  const restingCalls = ctx.arc.mock.calls.length;
+test('hover repels particles, pressing attracts them, and release/leave reset the force', () => {
+  // Compare the same particle at the same frame in fresh runs. This separates
+  // pointer movement from the sphere's ordinary rotation without copying its physics.
+  function positionAfter(events: string[]) {
+    const { getByTestId, unmount } = render(<Harness />);
+    tick();
+    const [x, y] = ctx.arc.mock.calls.at(-1) as [number, number, number, number, number];
+    for (const event of events) {
+      dispatchPointer(event === 'pointerup' ? window : getByTestId('hero'), event, x - 20, y);
+    }
+    ctx.arc.mockClear();
+    tick();
+    const [nextX, nextY] = ctx.arc.mock.calls.at(-1) as [number, number, number, number, number];
+    unmount();
+    return [nextX, nextY];
+  }
 
-  // Aim at a real particle so the force branch is deterministic regardless of
-  // the sphere's projection and the random particle sizes.
-  const [particleX, particleY] = ctx.arc.mock.calls.at(-1) as [number, number, number, number, number];
-  dispatchPointer(hero, 'pointermove', particleX, particleY);
-  tick();
-  expect(ctx.arc.mock.calls.length).toBeGreaterThan(restingCalls);
-
-  // Pressing inverts the force and widens the reach.
-  dispatchPointer(hero, 'pointerdown', particleX, particleY);
-  tick();
-  dispatchPointer(window, 'pointerup');
-  tick();
-  dispatchPointer(hero, 'pointerleave');
-  expect(() => tick()).not.toThrow();
+  const resting = positionAfter([]);
+  const hovering = positionAfter(['pointermove']);
+  const pressed = positionAfter(['pointerdown']);
+  expect(hovering[0]).toBeGreaterThan(resting[0]);
+  expect(pressed[0]).toBeLessThan(resting[0]);
+  expect(positionAfter(['pointerdown', 'pointerup'])).toEqual(hovering);
+  expect(positionAfter(['pointerdown', 'pointerleave'])).toEqual(resting);
 });
 
 test('rebuilds on resize', () => {
-  render(<Harness />);
-  ctx.setTransform.mockClear();
+  const { getByTestId } = render(<Harness />);
+  vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 400, bottom: 300,
+    width: 400, height: 300, toJSON: () => ({}),
+  });
   fireEvent(window, new Event('resize'));
-  expect(ctx.setTransform).toHaveBeenCalled();
+  expect(getByTestId('orb')).toHaveAttribute('width', '400');
+  expect(getByTestId('orb')).toHaveAttribute('height', '300');
+  ctx.clearRect.mockClear();
+  tick();
+  expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 400, 300);
 });
 
 test('stops the loop and detaches listeners on unmount', () => {
@@ -166,6 +182,10 @@ test('stops the loop and detaches listeners on unmount', () => {
   ctx.clearRect.mockClear();
   tick();
   expect(ctx.clearRect).not.toHaveBeenCalled();
+  ctx.setTransform.mockClear();
+  vi.advanceTimersByTime(300);
+  expect(ctx.setTransform).not.toHaveBeenCalled();
+  expect(frames.size).toBe(0);
 });
 
 test('keeps animating under StrictMode', () => {
@@ -187,6 +207,7 @@ test('no-ops when the host has no 2D context', () => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   expect(() => render(<Harness />)).not.toThrow();
   expect(ctx.setTransform).not.toHaveBeenCalled();
+  expect(frames.size).toBe(0);
 });
 
 test('does not start drawing or schedule work for a detached canvas', () => {

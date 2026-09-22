@@ -47,12 +47,19 @@ test('empty organisation has explicit empty state', async () => {
   expect(await screen.findByText('No event requests found.')).toBeInTheDocument();
 });
 
-test('unmount ignores pending organisation fetch', async () => {
+test('a late response for the previous session cannot replace the current organisation', async () => {
   let resolve!: (r: Response) => void;
-  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((yes) => { resolve = yes; })));
-  const { unmount } = render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
-  unmount();
+  const fetch = vi.fn()
+    .mockImplementationOnce(() => new Promise<Response>((yes) => { resolve = yes; }))
+    .mockResolvedValueOnce(Response.json({ requests: [{ event_id: 9, name: 'Current organisation event', status: 'submitted' }] }));
+  vi.stubGlobal('fetch', fetch);
+  const { rerender } = render(<Dashboard role="Event Organiser" accessToken="old-token" onNavigate={vi.fn()} />);
+  rerender(<Dashboard role="Event Organiser" accessToken="new-token" onNavigate={vi.fn()} />);
+  await screen.findByText('Current organisation event');
   await act(async () => resolve(Response.json({ requests })));
+  expect(screen.getByText('Current organisation event')).toBeInTheDocument();
+  expect(screen.queryByText('My draft')).not.toBeInTheDocument();
+  expect(screen.getByText('Organisation events').closest('div')).toHaveTextContent('1');
 });
 
 test('coordinator retains existing operational dashboard and navigation', () => {

@@ -267,10 +267,9 @@ describe('insertEventRequestDraft', () => {
 
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.event_id, 7);
-    assert.equal(inserted?.organiser_id, 'user-1');
-    assert.equal(inserted?.organisation, 'ConnectSphere Test');
-    assert.equal(inserted?.status, 'draft');
-    assert.equal(inserted?.name, 'Partner Forum');
+    assert.deepEqual(inserted, {
+      organiser_id: 'user-1', organisation: 'ConnectSphere Test', status: 'draft', ...EMPTY_VALUES
+    });
   });
 
   test('reports unavailable when the insert errors', async () => {
@@ -509,7 +508,7 @@ describe('submitEventRequest', () => {
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.status, 'submitted');
-    assert.equal(captured?.row.status, 'submitted');
+    assert.deepEqual(captured?.row, { status: 'submitted' });
     assert.equal(captured?.eventId, 7);
     assert.deepEqual(captured?.status, ['draft', 'rejected']);
   });
@@ -579,7 +578,7 @@ describe('updateEventRequestDraft', () => {
 
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.name, 'Renamed');
-    assert.equal(captured?.row.name, 'Renamed');
+    assert.deepEqual(captured?.row, { ...EMPTY_VALUES, name: 'Renamed' });
     assert.equal(captured?.eventId, 7);
     assert.equal(captured?.organiserId, 'user-1');
     assert.equal(captured?.status, 'draft');

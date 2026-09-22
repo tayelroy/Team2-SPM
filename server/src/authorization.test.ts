@@ -4,8 +4,17 @@ import express from 'express';
 import request from 'supertest';
 import { AuthClient, AuthError } from '@supabase/supabase-js';
 import { createApp } from './app';
-import { AccessError, createAuthorization, Principal, ROLES } from './auth';
+import { AccessError, createAuthorization, Principal, ROLES as SUPPORTED_ROLES } from './auth';
 import { dbConfig } from './db/config';
+
+// Documented account roles form the oracle, independent of the production list.
+const ACCOUNT_ROLES = [
+  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
+] as const;
+
+test('the public role catalogue contains the five documented account roles', () => {
+  assert.deepEqual(SUPPORTED_ROLES, ACCOUNT_ROLES);
+});
 
 const userId = '10000000-0000-4000-8000-000000000001';
 const originalConfig = { ...dbConfig };
@@ -82,7 +91,7 @@ test('duplicate authorization headers are refused', async () => {
   assert.equal(calls(), 0);
 });
 
-for (const role of ROLES) {
+for (const role of ACCOUNT_ROLES) {
   test(`SG2-25: direct HTTP action obeys the policy for ${role}`, async () => {
     const { app, calls } = fixture({ userId, role });
     const res = await request(app).post('/fixture/edit').set('Authorization', 'bearer verified-token')
@@ -266,8 +275,8 @@ test('removing a role grant blocks the next action with the same access token', 
   assert.equal(calls(), 1);
 });
 
-for (const role of ROLES) {
-  test(`default policy grants no action to ${role}`, async () => {
+for (const role of ACCOUNT_ROLES) {
+  test(`default policy denies the unregistered fixture.edit action to ${role}`, async () => {
     const { app, calls } = guardedApp(createAuthorization({
       resolvePrincipal: async () => ({ userId, role })
     }));
@@ -281,10 +290,7 @@ for (const endpoint of ['/auth/v1/user', '/rest/v1/account_roles']) {
     const controller = new AbortController();
     let timedOutRequests = 0;
     mock.method(console, 'error', () => {});
-    const timeout = mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
-      assert.equal(milliseconds, 5000);
-      return controller.signal;
-    });
+    const timeout = mock.method(AbortSignal, 'timeout', () => controller.signal);
     const fetchMock = mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
       const path = new URL(String(input)).pathname;
       if (path === endpoint) {
@@ -306,6 +312,9 @@ for (const endpoint of ['/auth/v1/user', '/rest/v1/account_roles']) {
     assert.ok(timedOutRequests >= 1);
     assert.equal(fetchMock.mock.callCount(), timedOutRequests + (endpoint === '/auth/v1/user' ? 0 : 1));
     assert.equal(timeout.mock.callCount(), fetchMock.mock.callCount());
+    // Assert outside the provider callback: the adapter catches provider exceptions.
+    for (const call of timeout.mock.calls) assert.deepEqual(call.arguments, [5000]);
+    for (const call of fetchMock.mock.calls) assert.equal(call.arguments[1]?.signal, controller.signal);
   });
 }
 
@@ -344,12 +353,15 @@ test('an Auth SDK error without an HTTP status denies access before the action',
 });
 
 test('concurrent requests use separate user tokens and database identities', async () => {
+  let releaseFirst!: () => void;
+  const secondLookupStarted = new Promise<void>(resolve => { releaseFirst = resolve; });
   mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     const token = new Headers(init?.headers).get('authorization')!;
     const id = token === 'Bearer first' ? userId : '20000000-0000-4000-8000-000000000002';
     const url = new URL(String(input));
     if (url.pathname === '/auth/v1/user') {
-      await new Promise(resolve => setTimeout(resolve, token === 'Bearer first' ? 10 : 1));
+      if (token === 'Bearer first') await secondLookupStarted;
+      else releaseFirst();
       return Response.json({ id, aud: 'authenticated' });
     }
     assert.equal(url.searchParams.get('user_id'), `eq.${id}`);
@@ -358,6 +370,8 @@ test('concurrent requests use separate user tokens and database identities', asy
   const app = createApp();
   const [first, second] = await Promise.all(['first', 'second'].map(token =>
     request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`)));
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
   assert.equal(first.body.userId, userId);
   assert.equal(first.body.role, 'event_organiser');
   assert.equal(second.body.userId, '20000000-0000-4000-8000-000000000002');

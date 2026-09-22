@@ -1,9 +1,8 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventDetail from './EventDetail';
-import { ROLES } from '../mock/types';
 
 afterEach(() => {
   cleanup();
@@ -11,7 +10,7 @@ afterEach(() => {
 });
 
 describe('EventDetail access boundaries', () => {
-  test.each(ROLES.filter((role) => role !== 'Event Organiser'))('%s cannot fetch or see event detail', (role) => {
+  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see event detail', (role) => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
     render(<EventDetail role={role} selectedEventId={101} accessToken="token" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
@@ -131,7 +130,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(await screen.findByRole('heading', { name: 'Untitled event' })).toBeInTheDocument();
     expect(screen.getByText('No purpose specified')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
-    expect(screen.getAllByText('None specified').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('None specified')).toHaveLength(3);
     expect(screen.getByText('No')).toBeInTheDocument();
 
     // Editable buttons available
@@ -265,42 +264,31 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test('cleans up cancelled effect on unmount', () => {
-    let resolvePromise!: (val: any) => void;
-    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockImplementation(
-      () => new Promise((resolve) => { resolvePromise = resolve; }),
-    );
+  test.each(['success', 'rejection'] as const)('ignores a stale %s after a different request is selected', async (outcome) => {
+    type Result = Awaited<ReturnType<typeof eventRequestsApi.fetchOwnEventDetail>>;
+    let resolveOld!: (value: Result) => void;
+    let rejectOld!: (error: Error) => void;
+    const oldRequest: eventRequestsApi.EventRequestDetail = {
+      eventId: 101, organiserId: 'org-1', organisation: null, status: 'draft',
+      name: 'Previous request', purpose: '', description: '', proposedDate: null,
+      expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+      equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
+      coordinatorName: null, canManage: true, waitingOnMe: true,
+    };
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
+      .mockImplementationOnce(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }))
+      .mockResolvedValueOnce({ ok: true, request: { ...oldRequest, eventId: 102, name: 'Current request' } });
 
-    const { unmount } = render(
-      <EventDetail
-        role="Event Organiser"
-        selectedEventId={101}
-        accessToken="test-token"
-        onNavigate={vi.fn()}
-      />,
-    );
-
-    unmount();
-    resolvePromise({ ok: true, request: {} as any });
-  });
-
-  test('handles cancelled fetch rejection when unmounted', () => {
-    let rejectPromise!: (err: any) => void;
-    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockImplementation(
-      () => new Promise((_, reject) => { rejectPromise = reject; }),
-    );
-
-    const { unmount } = render(
-      <EventDetail
-        role="Event Organiser"
-        selectedEventId={101}
-        accessToken="test-token"
-        onNavigate={vi.fn()}
-      />,
-    );
-
-    unmount();
-    rejectPromise(new Error('unmounted detail rejection'));
+    const { rerender } = render(<EventDetail role="Event Organiser" selectedEventId={101} accessToken="test-token" onNavigate={vi.fn()} />);
+    rerender(<EventDetail role="Event Organiser" selectedEventId={102} accessToken="test-token" onNavigate={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Current request' });
+    await act(async () => {
+      if (outcome === 'success') resolveOld({ ok: true, request: oldRequest });
+      else rejectOld(new Error('Previous request failed'));
+    });
+    expect(screen.getByRole('heading', { name: 'Current request' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Previous request' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

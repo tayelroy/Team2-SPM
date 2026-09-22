@@ -160,7 +160,10 @@ export default function App() {
     form: (
       <RequestForm
         accessToken={session!.accessToken}
-        onSubmit={() => setScreen('detail')}
+        onSuccess={(eventId) => {
+          setSelectedEventId(eventId);
+          setScreen('detail');
+        }}
       />
     ),
     venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,

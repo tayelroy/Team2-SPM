@@ -28,10 +28,8 @@ export type ProfileUpdateValidation =
 
 const MAX_NAME_LENGTH = 200;
 const MAX_DEPARTMENT_LENGTH = 150;
-const MIN_PHONE_DIGITS = 7;
-const MAX_PHONE_DIGITS = 15;
-/** Digits with optional leading +, spaces, dashes, dots and parentheses for readability. */
-const PHONE_PATTERN = /^\+?[0-9()\-.\s]+$/;
+/** Eight Singapore national digits, optionally preceded by the +65 country code. */
+const SINGAPORE_PHONE_PATTERN = /^(?:\+65)?[0-9]{8}$/;
 
 function readName(value: unknown, errors: string[]): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -54,11 +52,11 @@ function readPhone(value: unknown, errors: string[]): string | null {
   }
   const trimmed = value.trim();
   if (trimmed.length === 0) return null;
-  const digitCount = (trimmed.match(/\d/g) ?? []).length;
-  if (!PHONE_PATTERN.test(trimmed) || digitCount < MIN_PHONE_DIGITS || digitCount > MAX_PHONE_DIGITS) {
-    errors.push(
-      `phone must be a valid phone number (${MIN_PHONE_DIGITS}-${MAX_PHONE_DIGITS} digits, optionally starting with +).`
-    );
+  // Ignore supported readability separators for validation, but preserve the
+  // caller's trimmed formatting when storing their profile.
+  const normalized = trimmed.replace(/[()\-.\s]/g, '');
+  if (!SINGAPORE_PHONE_PATTERN.test(normalized)) {
+    errors.push('phone must be a Singapore number with 8 digits, optionally prefixed with +65.');
     return null;
   }
   return trimmed;
