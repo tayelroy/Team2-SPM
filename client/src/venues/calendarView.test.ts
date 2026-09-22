@@ -30,6 +30,10 @@ test('grid has three leading blanks before October 1 (a Thursday) and covers eve
   ]);
   expect(days[3]).toEqual({ date: '2026-10-01', n: '1', inMonth: true, kind: 'free', items: [] });
   expect(days[33]).toEqual({ date: '2026-10-31', n: '31', inMonth: true, kind: 'free', items: [] });
+  expect(days.filter((day) => day.inMonth).map((day) => day.n)).toEqual(
+    Array.from({ length: 31 }, (_, index) => String(index + 1)),
+  );
+  expect(days[34]).toEqual({ date: null, n: '', inMonth: false, kind: 'free', items: [] });
 });
 
 function venue(name: string, entries: VenueAvailabilitySummary['entries']): VenueAvailabilitySummary {

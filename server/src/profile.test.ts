@@ -2,7 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
-import { createAuthorization, ROLES, type Role } from './auth';
+import { createAuthorization, type Role } from './auth';
 import { createProfileRouter, type ProfileRouterDependencies } from './profile';
 import { isInternalRole, validateProfileUpdate } from './profile/fields';
 import type { ProfileRecord, ProfileResult } from './db/profile';
@@ -44,7 +44,13 @@ function fixture(
 
 describe('GET /api/profile (SG2-27)', () => {
   test("returns the caller's own profile including department for an internal role", async () => {
-    const res = await request(fixture('event_coordinator')).get('/api/profile').set('Authorization', 'Bearer token');
+    let requestedUser: string | undefined;
+    const app = fixture('event_coordinator', { fetch: async (_admin, userId) => {
+      requestedUser = userId;
+      return { ok: true, profile: PROFILE };
+    } });
+    const res = await request(app).get('/api/profile').set('Authorization', 'Bearer token');
+    assert.equal(requestedUser, 'user-1');
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.profile, PROFILE);
   });
@@ -186,13 +192,15 @@ describe('PUT /api/profile (SG2-27)', () => {
 });
 
 describe('profile permission wiring', () => {
-  for (const role of ROLES) {
+  for (const role of ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'] as const) {
     test(`${role} may read and update their own profile`, async () => {
       const app = fixture(role);
       const get = await request(app).get('/api/profile').set('Authorization', 'Bearer token');
-      assert.notEqual(get.status, 403);
+      assert.equal(get.status, 200);
+      assert.equal(get.body.profile.user_id, 'user-1');
       const put = await request(app).put('/api/profile').set('Authorization', 'Bearer token').send(VALID_BODY);
-      assert.notEqual(put.status, 403);
+      assert.equal(put.status, 200);
+      assert.equal(put.body.profile.name, 'Alex Tan');
     });
   }
 });
@@ -244,6 +252,7 @@ describe('validateProfileUpdate', () => {
   test('accepts a name at exactly the length limit', () => {
     const result = validateProfileUpdate({ name: 'A'.repeat(200) }, EXTERNAL);
     assert.equal(result.valid, true);
+    if (result.valid) assert.equal(result.values.name, 'A'.repeat(200));
   });
 
   for (const phone of [undefined, null, '', '   ']) {
@@ -254,33 +263,41 @@ describe('validateProfileUpdate', () => {
     });
   }
 
-  test('accepts a well-formed phone number and trims it', () => {
-    const result = validateProfileUpdate({ name: 'Alex', phone: ' +65 8123 4567 ' }, EXTERNAL);
-    assert.equal(result.valid, true);
-    if (result.valid) assert.equal(result.values.phone, '+65 8123 4567');
-  });
+  for (const [phone, expected] of [
+    ['12345678', '12345678'],
+    [' +65 8123 4567 ', '+65 8123 4567'],
+    [' (6123)-45.67 ', '(6123)-45.67']
+  ]) {
+    test(`accepts a Singapore phone and preserves trimmed formatting: ${phone}`, () => {
+      const result = validateProfileUpdate({ name: 'Alex', phone }, EXTERNAL);
+      assert.equal(result.valid, true);
+      if (result.valid) assert.equal(result.values.phone, expected);
+    });
+  }
 
   test('rejects a non-string phone', () => {
     const result = validateProfileUpdate({ name: 'Alex', phone: 12345678 }, EXTERNAL);
-    assert.equal(result.valid, false);
-    if (!result.valid) assert.match(result.errors[0], /phone must be text/);
+    assert.deepEqual(result, { valid: false, errors: ['phone must be text.'] });
   });
 
-  test('rejects a phone with too few digits', () => {
-    const result = validateProfileUpdate({ name: 'Alex', phone: '12345' }, EXTERNAL);
-    assert.equal(result.valid, false);
-    if (!result.valid) assert.match(result.errors[0], /valid phone number/);
-  });
-
-  test('rejects a phone with too many digits', () => {
-    const result = validateProfileUpdate({ name: 'Alex', phone: '1'.repeat(16) }, EXTERNAL);
-    assert.equal(result.valid, false);
-  });
-
-  test('rejects a phone with disallowed characters', () => {
-    const result = validateProfileUpdate({ name: 'Alex', phone: '8123-4567-CALL' }, EXTERNAL);
-    assert.equal(result.valid, false);
-  });
+  for (const [reason, phone] of [
+    ['seven local digits', '1234567'],
+    ['nine local digits', '123456789'],
+    ['seven national digits after +65', '+65 1234567'],
+    ['nine national digits after +65', '+65 123456789'],
+    ['another country prefix', '+60 12345678'],
+    ['country code without the leading plus', '6581234567'],
+    ['letters among otherwise eight digits', '8123-4567-CALL'],
+    ['unsupported punctuation', '8123/4567']
+  ]) {
+    test(`rejects ${reason}`, () => {
+      const result = validateProfileUpdate({ name: 'Alex', phone }, EXTERNAL);
+      assert.deepEqual(result, {
+        valid: false,
+        errors: ['phone must be a Singapore number with 8 digits, optionally prefixed with +65.']
+      });
+    });
+  }
 
   for (const communication_preferences of [undefined, null]) {
     test(`treats an absent communication_preferences as empty: ${JSON.stringify(communication_preferences)}`, () => {
@@ -297,9 +314,9 @@ describe('validateProfileUpdate', () => {
   });
 
   test('accepts every allowed channel and dedupes repeats', () => {
-    const result = validateProfileUpdate({ name: 'Alex', communication_preferences: ['email', 'sms', 'email'] }, EXTERNAL);
+    const result = validateProfileUpdate({ name: 'Alex', communication_preferences: ['email', 'sms', 'phone_call', 'email'] }, EXTERNAL);
     assert.equal(result.valid, true);
-    if (result.valid) assert.deepEqual(result.values.communication_preferences, ['email', 'sms']);
+    if (result.valid) assert.deepEqual(result.values.communication_preferences, ['email', 'sms', 'phone_call']);
   });
 
   for (const channel of ['carrier_pigeon', 42]) {
@@ -345,6 +362,7 @@ describe('validateProfileUpdate', () => {
   test('accepts a department at exactly the length limit', () => {
     const result = validateProfileUpdate({ name: 'Alex', department: 'D'.repeat(150) }, INTERNAL);
     assert.equal(result.valid, true);
+    if (result.valid) assert.equal(result.values.department, 'D'.repeat(150));
   });
 });
 

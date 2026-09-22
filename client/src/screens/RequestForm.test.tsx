@@ -10,7 +10,8 @@
  *   AC2: Submit button is disabled while mandatory fields are empty; inline
  *        errors appear after a failed submit attempt; server errors
  *        (400/409/503) surface as a visible alert banner.
- *   AC3: EventDetail locks the organiser action panel when `eventStatus === 'submitted'`.
+ *   Submitted-request action restrictions are tested against API data in
+ *   EventDetail.test.tsx.
  *
  * A same-session "Submit request" after a real "Save draft" targets the
  * event id the draft call just returned — see "save then submit" below.
@@ -25,6 +26,7 @@ import RequestForm from './RequestForm';
 const SESSION_KEY = 'connectsphere.session';
 
 beforeEach(() => {
+  vi.clearAllMocks();
   sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify({
@@ -43,7 +45,7 @@ afterEach(() => {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const DEFAULT_PROPS = {
-  eventId: 'evt-abc-123',
+  eventId: '12',
   accessToken: 'test-token',
   onSuccess: vi.fn(),
   onSaveDraft: vi.fn(),
@@ -82,9 +84,11 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
   });
 
-  test('submit button is disabled when only some fields are filled', () => {
+  test.each(['Event name', 'Purpose', 'Date', 'Expected attendance', 'Venue requirements', 'Description'])(
+    'submit stays disabled when %s is the only blank required field', (label) => {
     render(<RequestForm {...DEFAULT_PROPS} />);
-    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum' } });
+    fillAllFields();
+    fireEvent.change(screen.getByLabelText(new RegExp(label, 'i')), { target: { value: '   ' } });
     expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
   });
 
@@ -102,7 +106,7 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     const nameField = screen.getByLabelText(/Event name/i);
     fireEvent.change(nameField, { target: { value: 'x' } });
     fireEvent.change(nameField, { target: { value: '' } });
-    expect(screen.getByText(/required field/i)).toBeInTheDocument();
+    expect(screen.getByText('6 required fields still empty.')).toBeInTheDocument();
   });
 
   test('inline error appears for a touched field left blank', () => {
@@ -148,40 +152,38 @@ describe('AC1 — successful submission', () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
 
     const fetchMock = vi.mocked(globalThis.fetch);
-    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/evt-abc-123/submit', {
+    expect(onSuccess).toHaveBeenCalledWith(12);
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/12/submit', {
       method: 'PATCH',
       headers: { Authorization: 'Bearer test-token' },
     });
   });
 
-  test('shows a loading label while the request is in flight', async () => {
-    let resolve!: (r: Response) => void;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockReturnValue(new Promise<Response>((res) => { resolve = res; })),
-    );
-    render(<RequestForm {...DEFAULT_PROPS} />);
-    fillAllFields();
-    fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
-
-    expect(screen.getByRole('button', { name: /Submitting…/i })).toBeInTheDocument();
-    resolve(new Response(null, { status: 200 }));
-  });
-
-  test('button is disabled during submission to prevent double-click', async () => {
-    let resolve!: (r: Response) => void;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockReturnValue(new Promise<Response>((res) => { resolve = res; })),
-    );
-    render(<RequestForm {...DEFAULT_PROPS} />);
+  test('keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
+    let finishSave!: (response: Response) => void;
+    let finishSubmit!: (response: Response) => void;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishSave = resolve; }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishSubmit = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    const onSuccess = vi.fn();
+    render(<RequestForm {...DEFAULT_PROPS} onSuccess={onSuccess} />);
     fillAllFields();
     fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
 
     const btn = screen.getByRole('button', { name: /Submitting…/i });
     expect(btn).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
-    resolve(new Response(null, { status: 200 }));
+    fireEvent.click(btn);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    finishSave(draftResponse());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(btn).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    finishSubmit(new Response(null, { status: 204 }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test('creates a filled request before submitting its new id', async () => {
@@ -191,6 +193,7 @@ describe('AC1 — successful submission', () => {
     fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(onSuccess).toHaveBeenCalledWith(12);
     const calls = vi.mocked(fetch).mock.calls;
     expect(calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/12/submit']);
     expect(JSON.parse(calls[0][1]!.body as string)).toMatchObject({ name: 'Forum 2026', expected_attendance: 180 });
@@ -746,13 +749,16 @@ describe('AC2 — server error banners', () => {
   });
 });
 
-// ─── AC3: EventDetail — submitted immutability ───────────────────────────────
+// ─── Event detail entry requirements ────────────────────────────────────────
 
-describe('AC3 — EventDetail locks organiser actions when submitted', () => {
-  test.each(['draft', 'submitted', 'Submitted'])('uses authenticated event data for %s instead of caller status', (status) => {
-    render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} eventStatus={status} />);
+describe('EventDetail requires an authenticated selected request', () => {
+  test('a caller-supplied draft status cannot substitute for a selected request', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<EventDetail role="Event Organiser" accessToken="test-token" onNavigate={vi.fn()} eventStatus="draft" />);
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
     expect(screen.getByText(/Select an event from your organisation/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
   test('coordinator cannot view organiser request details', () => {
     render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} eventStatus="submitted" />);

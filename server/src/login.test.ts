@@ -28,11 +28,16 @@ function buildApp(login: (input: unknown) => Promise<LoginResult>) {
 
 describe('loginAccount', () => {
   test('returns a session and the caller role on valid credentials', async () => {
+    let resolvedToken: string | undefined;
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
       () => fakeClient(),
-      async () => ({ userId: 'user-1', role: 'venue_staff' })
+      async token => {
+        resolvedToken = token;
+        return { userId: 'user-1', role: 'venue_staff' };
+      }
     );
+    assert.equal(resolvedToken, 'access-1');
     assert.deepEqual(result, {
       outcome: 'success',
       accessToken: 'access-1',
@@ -73,7 +78,7 @@ describe('loginAccount', () => {
     assert.deepEqual(submitted, { email: 'ada@example.com', password: ' password ' });
   });
 
-  test('returns a generic error for wrong credentials, same as a nonexistent email', async () => {
+  test('maps a provider credential rejection to the generic invalid-credentials result', async () => {
     const client = fakeClient(async () => ({
       data: { session: null, user: null },
       error: { message: 'Invalid login credentials' }
@@ -163,26 +168,28 @@ describe('POST /api/auth/login', () => {
     }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 200);
-    assert.equal(response.body.accessToken, 'a');
-    assert.equal(response.body.refreshToken, undefined);
+    assert.deepEqual(response.body, { accessToken: 'a', user: { userId: '1', email: 'x', role: 'Attendee' } });
   });
 
   test('returns 401 for invalid credentials', async () => {
     const app = buildApp(async () => ({ outcome: 'invalid_credentials' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 401);
+    assert.deepEqual(response.body, { error: 'Invalid email or password.' });
   });
 
   test('returns 403 for an incomplete account', async () => {
     const app = buildApp(async () => ({ outcome: 'incomplete_account' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 403);
+    assert.deepEqual(response.body, { error: 'Your account setup is incomplete. Contact support.' });
   });
 
   test('returns 503 when unavailable', async () => {
     const app = buildApp(async () => ({ outcome: 'unavailable' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 503);
+    assert.deepEqual(response.body, { error: 'Sign-in is temporarily unavailable. Please try again later.' });
   });
 
   test('treats an absent request body as empty input', async () => {
@@ -227,5 +234,7 @@ describe('login rate limiting', () => {
 
     assert.equal((await request(appOne).post('/api/auth/login').send({})).status, 401);
     assert.equal((await request(appTwo).post('/api/auth/login').send({})).status, 401);
+    assert.equal((await request(appOne).post('/api/auth/login').send({})).status, 429);
+    assert.equal((await request(appTwo).post('/api/auth/login').send({})).status, 429);
   });
 });

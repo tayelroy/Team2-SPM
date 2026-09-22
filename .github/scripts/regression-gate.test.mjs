@@ -4,8 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { checkRegressionReport, REQUIRED_REGRESSIONS } from './regression-gate.mjs';
+
+// These are the acceptance contract, not values derived from the gate under test.
+// Otherwise removing an ID from the gate would also remove it from our fixture.
+const ACCEPTANCE_CASE_IDS = ['SG2-26-P01', 'SG2-26-P02', 'SG2-26-N01', 'SG2-26-N02'];
 
 function passingTest(projectName = 'chromium') {
   return { projectName, expectedStatus: 'passed', status: 'expected', results: [{ status: 'passed' }] };
@@ -13,7 +18,7 @@ function passingTest(projectName = 'chromium') {
 
 function passingReport() {
   return {
-    suites: [{ suites: [{ specs: REQUIRED_REGRESSIONS.map((id) => ({
+    suites: [{ suites: [{ specs: ACCEPTANCE_CASE_IDS.map((id) => ({
       title: `${id} | acceptance case`,
       tests: [passingTest()],
     })) }] }],
@@ -26,6 +31,7 @@ function specs(report) {
 }
 
 test('all required acceptance cases must execute and pass', () => {
+  assert.deepEqual(REQUIRED_REGRESSIONS, ACCEPTANCE_CASE_IDS);
   assert.deepEqual(checkRegressionReport(passingReport()), []);
 });
 
@@ -71,7 +77,10 @@ test('a passing project cannot hide a skipped project or duplicate required case
     const skipped = { ...passingTest('firefox'), status: 'skipped', results: [{ status: 'skipped' }] };
     if (duplicateSpec) specs(report).push({ ...specs(report)[0], tests: [skipped] });
     else specs(report)[0].tests.push(skipped);
-    assert.match(checkRegressionReport(report).join('\n'), /SG2-26-P01 \(firefox\)/);
+    const failures = checkRegressionReport(report).join('\n');
+    assert.match(failures, /SG2-26-P01 \(firefox\): outcome must be expected/);
+    assert.match(failures, /SG2-26-P01 \(firefox\): every executed attempt must pass/);
+    assert.doesNotMatch(failures, /chromium/);
   }
 });
 
@@ -85,9 +94,12 @@ test('unexecuted cases and cases with no project results fail', () => {
 });
 
 test('missing report structure and runner errors fail', () => {
-  assert.notDeepEqual(checkRegressionReport(null), []);
-  assert.notDeepEqual(checkRegressionReport({}), []);
-  assert.equal(checkRegressionReport({ suites: [] }).length, REQUIRED_REGRESSIONS.length);
+  for (const report of [null, {}]) {
+    assert.deepEqual(checkRegressionReport(report), ['The Playwright report must contain a suites array.']);
+  }
+  assert.deepEqual(checkRegressionReport({ suites: [] }), ACCEPTANCE_CASE_IDS.map(
+    (id) => `${id}: required regression is missing from the report.`,
+  ));
   const report = passingReport();
   report.errors.push({ message: 'global setup failed' });
   assert.match(checkRegressionReport(report).join('\n'), /runner errors/);
@@ -96,16 +108,25 @@ test('missing report structure and runner errors fail', () => {
 test('CLI exits nonzero for unreadable, malformed or failing reports and zero for passing reports', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sg2-26-gate-'));
   const path = join(directory, 'report.json');
-  const run = () => spawnSync(process.execPath, [new URL('./regression-gate.mjs', import.meta.url).pathname, path], { encoding: 'utf8' });
+  const run = () => spawnSync(process.execPath, [fileURLToPath(new URL('./regression-gate.mjs', import.meta.url)), path], {
+    encoding: 'utf8', timeout: 5_000,
+  });
   try {
-    assert.equal(run().status, 1);
+    const missing = run();
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /Cannot validate required SG2-26 regressions:.*ENOENT/);
     writeFileSync(path, 'invalid json');
-    assert.equal(run().status, 1);
+    const malformed = run();
+    assert.equal(malformed.status, 1);
+    assert.match(malformed.stderr, /Cannot validate required SG2-26 regressions:/);
     writeFileSync(path, JSON.stringify({ suites: [] }));
-    assert.equal(run().status, 1);
+    const failing = run();
+    assert.equal(failing.status, 1);
+    assert.match(failing.stderr, /SG2-26-P01: required regression is missing/);
     writeFileSync(path, JSON.stringify(passingReport()));
     const result = run();
     assert.equal(result.status, 0);
+    assert.equal(result.stderr, '');
     assert.match(result.stdout, /Required SG2-26 regressions passed/);
   } finally {
     rmSync(directory, { recursive: true, force: true });

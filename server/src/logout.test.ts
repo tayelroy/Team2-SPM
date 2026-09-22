@@ -1,9 +1,22 @@
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
 import { AuthError, type SupabaseClient } from '@supabase/supabase-js';
 import { logoutAccount, createLogoutHandler } from './auth/logout';
+import { dbConfig } from './db/config';
+
+const originalConfig = { ...dbConfig };
+beforeEach(() => {
+  dbConfig.supabaseUrl = undefined;
+  dbConfig.supabaseAnonKey = undefined;
+  dbConfig.supabaseServiceRoleKey = undefined;
+  mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected outbound request'); });
+});
+afterEach(() => {
+  mock.restoreAll();
+  Object.assign(dbConfig, originalConfig);
+});
 
 function fakeClient(signOut: SupabaseClient['auth']['admin']['signOut']): SupabaseClient {
   return { auth: { admin: { signOut } } } as unknown as SupabaseClient;
@@ -58,7 +71,8 @@ describe('POST /api/auth/logout failure and unauthenticated contracts', () => {
     })));
     for (const authorization of [undefined, 'Basic invalid', 'Bearer ']) {
       const req = request(app).post('/api/auth/logout');
-      if (authorization !== undefined) req.set('Authorization', authorization).send({ accessToken: 'someone-else' });
+      if (authorization !== undefined) req.set('Authorization', authorization);
+      req.send({ accessToken: 'someone-else' });
       const response = await req;
       assert.equal(response.status, 200);
       assert.equal(response.headers['cache-control'], 'no-store');
@@ -67,7 +81,7 @@ describe('POST /api/auth/logout failure and unauthenticated contracts', () => {
   });
 });
 
-describe('logoutAccount and createLogoutHandler default parameter fallbacks', () => {
+describe('logout with an unconfigured default provider', () => {
   test('logoutAccount returns success when accessToken is null without calling getClient', async () => {
     const result = await logoutAccount(null, () => {
       assert.fail('getClient should not be called when token is null');
@@ -75,13 +89,13 @@ describe('logoutAccount and createLogoutHandler default parameter fallbacks', ()
     assert.deepEqual(result, { outcome: 'success' });
   });
 
-  test('logoutAccount falls back to default getClient parameter when omitted', async () => {
+  test('the default provider reports unconfirmed revocation when no database is configured', async () => {
     // getSupabaseAdminClient returns null in test environment where DB is unconfigured
     const result = await logoutAccount('session-token');
     assert.deepEqual(result, { outcome: 'unavailable' });
   });
 
-  test('createLogoutHandler falls back to default logoutAccount parameter when omitted', async () => {
+  test('the default handler keeps anonymous logout idempotent and reports unavailable authenticated logout', async () => {
     const app = express();
     app.post('/api/auth/logout', createLogoutHandler());
 

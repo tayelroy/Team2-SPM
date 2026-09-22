@@ -13,8 +13,11 @@ afterEach(() => {
 });
 
 describe('saveSession / loadSession / clearSession', () => {
-  test('round-trips a session through storage', () => {
+  test('round-trips a session through tab-scoped storage without persisting it in localStorage', () => {
+    const persistentWrite = vi.spyOn(localStorage, 'setItem');
     saveSession(session);
+    expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!)).toEqual(session);
+    expect(persistentWrite).not.toHaveBeenCalled();
     expect(loadSession()).toEqual(session);
   });
 
@@ -35,10 +38,15 @@ describe('saveSession / loadSession / clearSession', () => {
     expect(() => saveSession(session)).not.toThrow();
   });
 
-  test('loadSession returns null if storage throws or holds malformed JSON', () => {
+  test('loadSession returns null if storage throws', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('storage unavailable');
     });
+    expect(loadSession()).toBeNull();
+  });
+
+  test('loadSession returns null for malformed stored JSON', () => {
+    sessionStorage.setItem('connectsphere.session', '{not-json');
     expect(loadSession()).toBeNull();
   });
 

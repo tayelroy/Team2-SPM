@@ -15,6 +15,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   sessionStorage.clear();
+  vi.useRealTimers();
 });
 
 // jsdom has no canvas implementation; the orb hook is written to no-op when
@@ -124,6 +125,7 @@ test('an attendee lands on the event page rather than a dashboard', async () => 
 });
 
 describe('every role can reach every screen in its navigation', () => {
+  const expectedRoles = ['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const;
   // Keep expected destinations independent of the navigation data under test.
   // A wrong destination or a removed menu item must fail this contract.
   const destinations: Record<Role, [string, string][]> = {
@@ -147,7 +149,10 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
   };
-  test.each(ROLES)('%s', async (role) => {
+  test('the role catalogue contains all five documented roles', () => {
+    expect(ROLES).toEqual(expectedRoles);
+  });
+  test.each(expectedRoles)('%s', async (role) => {
     await signInAs(role);
     for (const [navLabel, heading] of destinations[role]) {
       fireEvent.click(within(header()).getByRole('button', { name: navLabel }));
@@ -434,6 +439,7 @@ describe('the event detail action panel', () => {
     await signInAs('Event Organiser');
     fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
     expect(await screen.findByText('Your options')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit request' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
@@ -490,9 +496,27 @@ describe('the request form', () => {
     ).toBeInTheDocument();
   });
 
-  test('submitting persists a new request before showing event detail', async () => {
-    await openForm();
-    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ request: { event_id: 42, status: 'draft' }, missingForSubmission: [] }), { status: 200 }));
+  test.each([false, true])('submitting opens the saved event details (previous selection: %s)', async (hasPreviousSelection) => {
+    await signInAs('Event Organiser');
+    if (hasPreviousSelection) {
+      fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
+      await screen.findByRole('heading', { name: 'Draft Forum' });
+    }
+    fireEvent.click(within(header()).getByRole('button', { name: 'New request' }));
+    const submitted = {
+      event_id: 42, name: 'Investor Forum 2026', status: 'submitted', organiser_id: 'user-1',
+      purpose: 'Partner briefing', description: 'A half-day forum with two keynotes and a panel.',
+      proposed_date: '2026-10-12T00:00:00.000Z', expected_attendance: 180,
+      venue_requirements: 'Stage + loop', can_manage: true,
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/event-requests' && init?.method === 'POST') {
+        return Response.json({ request: { ...submitted, status: 'draft' }, missingForSubmission: [] }, { status: 201 });
+      }
+      if (url === '/api/event-requests/42/submit' && init?.method === 'PATCH') return new Response(null, { status: 204 });
+      if (url === '/api/event-requests/42' && init?.method === 'GET') return Response.json({ request: submitted });
+      throw new Error(`Unexpected request: ${init?.method} ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
     // AC2: fill all required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
@@ -504,9 +528,15 @@ describe('the request form', () => {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
-    expect(await screen.findByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/42/submit']);
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
+    expect(await screen.findByRole('heading', { name: 'Investor Forum 2026' })).toBeInTheDocument();
+    expect(screen.getByText('submitted', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Partner briefing', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('A half-day forum with two keynotes and a panel.', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Select an event from your organisation/)).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/42/submit', '/api/event-requests/42']);
+    expect(fetchMock.mock.calls[2][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
   });
 
   test('saving a draft and submitting sends the accessToken to the submit endpoint', async () => {
@@ -617,20 +647,21 @@ test('reserving equipment settles the row', async () => {
 });
 
 test('the calendar shows the month grid with real venue availability', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-15T12:00:00.000Z'));
   await signInAs('Venue Staff');
-  const now = new Date();
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(
       Response.json({
-        from: now.toISOString(),
-        to: now.toISOString(),
+        from: '2026-10-01T00:00:00.000Z',
+        to: '2026-11-01T00:00:00.000Z',
         venues: [
           {
             venueId: 1,
             name: 'Atrium Hall',
             entries: [
-              { start: now.toISOString(), end: new Date(now.getTime() + 3_600_000).toISOString(), kind: 'booking', label: 'confirmed' },
+              { start: '2026-10-15T12:00:00.000Z', end: '2026-10-15T13:00:00.000Z', kind: 'booking', label: 'confirmed' },
             ],
           },
         ],

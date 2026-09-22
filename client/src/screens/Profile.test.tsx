@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { saveSession } from '../auth/session';
 import Profile from './Profile';
@@ -102,7 +103,7 @@ test('edits name, phone and toggles a communication preference, then saves', asy
   expect(sent.department).toBeUndefined();
 });
 
-test('shows validation details from the server without saving', async () => {
+test('shows server validation details without reporting a successful save', async () => {
   stubFetch(EXTERNAL_PROFILE);
   vi.stubGlobal(
     'fetch',
@@ -117,6 +118,8 @@ test('shows validation details from the server without saving', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('name is required.');
+  expect(screen.queryByText('Profile updated.')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
 });
 
 test('falls back to placeholders when organisation and phone are unset', async () => {
@@ -170,14 +173,16 @@ test('shows the plain server message when a save failure has no field details', 
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach your profile (HTTP 503).');
 });
 
-test('ignores a profile response that arrives after the screen has unmounted', async () => {
+test('a cancelled StrictMode load cannot overwrite the active profile response', async () => {
   let resolveGet!: (response: Response) => void;
-  vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise<Response>((resolve) => { resolveGet = resolve; })));
+  vi.stubGlobal('fetch', vi.fn()
+    .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveGet = resolve; }))
+    .mockResolvedValueOnce(jsonResponse({ profile: { ...EXTERNAL_PROFILE, name: 'Current profile' } })));
 
-  const { unmount } = render(<Profile />);
-  unmount();
-  resolveGet(new Response(JSON.stringify({ profile: EXTERNAL_PROFILE }), { status: 200 }));
-  await Promise.resolve();
+  render(<StrictMode><Profile /></StrictMode>);
+  expect(await screen.findByLabelText('Name')).toHaveValue('Current profile');
+  await act(async () => resolveGet(jsonResponse({ profile: EXTERNAL_PROFILE })));
+  expect(screen.getByLabelText('Name')).toHaveValue('Current profile');
 });
 
 test('a second click while saving does not submit twice', async () => {
@@ -186,13 +191,14 @@ test('a second click while saving does not submit twice', async () => {
   await screen.findByLabelText('Name');
 
   let resolvePut!: (response: Response) => void;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockReturnValue(new Promise<Response>((resolve) => { resolvePut = resolve; }))
-  );
+  const fetchMock = vi.fn().mockReturnValue(new Promise<Response>((resolve) => { resolvePut = resolve; }));
+  vi.stubGlobal('fetch', fetchMock);
 
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
+  const saving = screen.getByRole('button', { name: 'Saving…' });
+  fireEvent.click(saving);
+  expect(fetchMock).toHaveBeenCalledOnce();
   resolvePut(jsonResponse({ profile: EXTERNAL_PROFILE }));
   await screen.findByText('Profile updated.');
+  expect(fetchMock).toHaveBeenCalledOnce();
 });

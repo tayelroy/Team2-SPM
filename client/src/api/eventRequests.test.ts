@@ -235,6 +235,47 @@ describe('isWaitingOnOrganiser', () => {
   });
 });
 
+describe('shared GET response contracts', () => {
+  // The transport is shared; scope, output shape and unreadable-body policy
+  // remain separate public contracts. Do not replace one reader with another.
+  const readers = [
+    {
+      label: 'organisation summary list',
+      read: () => fetchOwnEventRequests('token-1'),
+      unavailable: { ok: false, kind: 'unavailable' },
+      unreadable: { ok: true, requests: [] },
+    },
+    {
+      label: 'normalised organisation detail',
+      read: () => fetchOwnEventDetail(7, 'token-1'),
+      unavailable: { ok: false, kind: 'unavailable' },
+      unreadable: { ok: false, kind: 'error', message: 'Invalid response format.' },
+    },
+    {
+      label: 'own-request list',
+      read: () => listMyEventRequests('token-1'),
+      unavailable: { ok: false, message: 'Could not reach the server. Please try again.' },
+      unreadable: { ok: false, message: 'Could not reach the server. Please try again.' },
+    },
+    {
+      label: 'raw editable draft',
+      read: () => fetchEventRequestDraft(7, 'token-1'),
+      unavailable: { ok: false, message: 'Could not reach the server. Please try again.' },
+      unreadable: { ok: false, message: 'Could not reach the server. Please try again.' },
+    },
+  ];
+
+  test.each(readers)('$label maps a failed GET to its public unavailable result', async ({ read, unavailable }) => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    await expect(read()).resolves.toEqual(unavailable);
+  });
+
+  test.each(readers)('$label applies its unreadable-success response policy', async ({ read, unreadable }) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{not-json', { status: 200 })));
+    await expect(read()).resolves.toEqual(unreadable);
+  });
+});
+
 describe('fetchOwnEventRequests', () => {
   test('fetches events without filter and maps summary response', async () => {
     const mockEvents = [
@@ -325,25 +366,16 @@ describe('fetchOwnEventRequests', () => {
     },
   );
 
-  test('handles missing or malformed requests payload in 200 response gracefully', async () => {
+  test.each([{}, { requests: null }, { requests: 'not an array' }])('maps a missing or non-array requests payload to an empty list: %j', async (body) => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })),
     );
 
     const result = await fetchOwnEventRequests('token-abc');
     expect(result).toEqual({ ok: true, requests: [] });
   });
 
-  test('handles malformed json in 200 response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response('{not-json', { status: 200 })),
-    );
-
-    const result = await fetchOwnEventRequests('token-abc');
-    expect(result).toEqual({ ok: true, requests: [] });
-  });
 
   test('maps rows with missing fields to safe defaults', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
@@ -383,12 +415,6 @@ describe('fetchOwnEventRequests', () => {
     expect(result).toEqual({ ok: false, kind: 'unavailable' });
   });
 
-  test('maps network failure to unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('connection timeout')));
-
-    const result = await fetchOwnEventRequests('token-abc');
-    expect(result).toEqual({ ok: false, kind: 'unavailable' });
-  });
 
   test('returns error message on unexpected server response', async () => {
     vi.stubGlobal(
@@ -476,7 +502,7 @@ describe('fetchOwnEventDetail', () => {
     expect(result).toEqual({ ok: true, request: expected });
   });
 
-  test('maps event detail with null and missing fields safely', async () => {
+  test('maps event detail with missing optional fields to display defaults', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -566,19 +592,6 @@ describe('fetchOwnEventDetail', () => {
     });
   });
 
-  test('returns error when 200 response contains malformed json', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response('{invalid-json', { status: 200 })),
-    );
-
-    const result = await fetchOwnEventDetail(42, 'token-xyz');
-    expect(result).toEqual({
-      ok: false,
-      kind: 'error',
-      message: 'Invalid response format.',
-    });
-  });
 
   test('maps HTTP 404 to not_found', async () => {
     vi.stubGlobal(
@@ -608,12 +621,6 @@ describe('fetchOwnEventDetail', () => {
     expect(result).toEqual({ ok: false, kind: 'unavailable' });
   });
 
-  test('maps network failure to unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-
-    const result = await fetchOwnEventDetail(42, 'token-xyz');
-    expect(result).toEqual({ ok: false, kind: 'unavailable' });
-  });
 
   test('returns error message on unexpected server error response', async () => {
     vi.stubGlobal(
@@ -660,6 +667,7 @@ describe('listMyEventRequests', () => {
     expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/event-requests?scope=mine');
+    expect(init.method).toBe('GET');
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
 
@@ -681,23 +689,7 @@ describe('listMyEventRequests', () => {
     });
   });
 
-  test('reports a network failure without throwing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
-      ok: false,
-      message: 'Could not reach the server. Please try again.',
-    });
-  });
-
-  test('treats a success status with an unreadable body as a failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
-
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
-      ok: false,
-      message: 'Could not reach the server. Please try again.',
-    });
-  });
 
   test('falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
@@ -735,6 +727,7 @@ describe('fetchEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: true, request: FULL_RECORD });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/api/event-requests/7');
+    expect(init.method).toBe('GET');
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
 
@@ -765,23 +758,7 @@ describe('fetchEventRequestDraft', () => {
     });
   });
 
-  test('reports a network failure without throwing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
-    await expect(fetchEventRequestDraft(7, 'token-1')).resolves.toEqual({
-      ok: false,
-      message: 'Could not reach the server. Please try again.',
-    });
-  });
-
-  test('treats a success status with an unreadable body as a failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
-
-    await expect(fetchEventRequestDraft(7, 'token-1')).resolves.toEqual({
-      ok: false,
-      message: 'Could not reach the server. Please try again.',
-    });
-  });
 
   test('falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
@@ -861,7 +838,7 @@ describe('deleteEventRequestDraft', () => {
 });
 
 describe('updateEventRequestDraft', () => {
-  test('sends the bearer token and the complete field set to the event-scoped route', async () => {
+  test('sends the bearer token and supplied fields to the event-scoped route', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse({ request: { event_id: 7, name: 'Renamed' }, missingForSubmission: ['purpose'] }, 200));

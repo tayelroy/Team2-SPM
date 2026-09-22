@@ -12,14 +12,16 @@ function fakeAdmin(options: {
     from(table: string) {
       if (table === 'roles') {
         return {
-          select: () => ({
-            eq: (_col: string, value: string) => {
+          select: (columns: string) => {
+            assert.equal(columns, 'role_id');
+            return { eq: (column: string, value: string) => {
+              assert.equal(column, 'role_name');
               options.onRoleNameQueried?.(value);
               return {
                 maybeSingle: options.roleLookup ?? (async () => ({ data: { role_id: 5 }, error: null }))
               };
-            }
-          })
+            } };
+          }
         };
       }
       if (table === 'users') {
@@ -87,14 +89,17 @@ describe('createUserRecord', () => {
     assert.equal(insertCalled, false);
   });
 
-  test('fails when the role lookup errors', async () => {
+  test('fails without inserting when the role lookup errors', async () => {
+    let inserts = 0;
     const admin = fakeAdmin({
-      roleLookup: async () => ({ data: null, error: { message: 'connection reset' } })
+      roleLookup: async () => ({ data: null, error: { message: 'connection reset' } }),
+      insert: async () => { inserts++; return { error: null }; }
     });
 
     const result = await createUserRecord(admin, record);
 
-    assert.equal(result.ok, false);
+    assert.deepEqual(result, { ok: false, error: 'Role "Attendee" is not configured.' });
+    assert.equal(inserts, 0);
   });
 
   test('surfaces the database error when the insert fails', async () => {
