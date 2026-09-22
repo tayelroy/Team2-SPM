@@ -31,6 +31,10 @@ function mockLoginResponse(role: Role) {
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
+      if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
+        kind: 'event', item_id: 51, event_id: 51, title: 'Actual review request', event_name: 'Actual review request',
+        status: 'submitted', starts_at: null, ends_at: null, category: 'review', details: { purpose: 'Review this request' },
+      }] });
       if (url === '/api/venues') {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
@@ -319,24 +323,14 @@ test('the dashboard primary action opens the venue catalogue', async () => {
   expect(screen.queryByRole('button', { name: 'Search venues' })).not.toBeInTheDocument();
 });
 
-test('an attention item jumps straight to the screen that resolves it', async () => {
+test('the signed-in coordinator opens the actual selected work item and returns to the queue', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Open: Atrium Hall booking overlaps E-190' }),
-  );
-  expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
-  expect(screen.getByText('Overlaps an existing hold')).toBeInTheDocument();
-});
-
-test('dashboard links open the event list and the selected event detail', async () => {
-  await signInAs('Event Coordinator');
-  fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
-  expect(screen.getByRole('heading', { name: 'All events' })).toBeInTheDocument();
-  fireEvent.click(within(header()).getByRole('button', { name: 'Dashboard' }));
-  fireEvent.click(
-    screen.getByRole('button', { name: /Northbridge Investor Forum/ }),
-  );
-  expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: /Actual review request/ }));
+  expect(await screen.findByRole('heading', { name: 'Actual review request' })).toBeInTheDocument();
+  expect(screen.getByText('Review this request')).toBeVisible();
+  expect(fetch).toHaveBeenCalledWith('/api/work-queue/event/51', { headers: { Authorization: 'Bearer test-access-token' }, cache: 'no-store' });
+  fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
+  expect(await screen.findByRole('button', { name: /Actual review request/ })).toBeVisible();
 });
 
 describe('the events table', () => {

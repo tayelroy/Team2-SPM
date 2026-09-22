@@ -13,6 +13,7 @@ import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createVenuesRouter } from './venues';
 import { createProfileRouter } from './profile';
+import { createWorkQueueRouter } from './workQueue';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -31,7 +32,8 @@ export function createApp(
     availability: createVenueAvailabilityRouter(access),
     venues: createVenuesRouter(access),
     profile: createProfileRouter(access)
-  }
+  },
+  workQueueRouter = createWorkQueueRouter(access)
 ) {
   const app = express();
 
@@ -91,6 +93,7 @@ export function createApp(
 
   // SG2-27: view/update the caller's own profile.
   app.use('/api/profile', routers.profile);
+  app.use('/api/work-queue', workQueueRouter);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {
