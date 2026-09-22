@@ -150,4 +150,19 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
 
     assert.equal(res.status, 503);
   });
+
+  test('returns 401 Unauthorized when principal is missing', async () => {
+    const app = buildApp({ principal: undefined });
+    const res = await request(app).get('/api/event-requests/101/stage');
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, 'Authentication required');
+  });
+
+  test('returns 503 Service Unavailable when admin client is missing', async () => {
+    const app = buildApp({ admin: null });
+    const res = await request(app).get('/api/event-requests/101/stage');
+
+    assert.equal(res.status, 503);
+  });
 });

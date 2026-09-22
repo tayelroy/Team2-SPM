@@ -190,4 +190,91 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stage_key, 'rejected');
     assert.equal(result.waiting_on, null);
   });
+
+  test('unrecognized/custom status hits the default branch with capitalized stage and status key', () => {
+    const input: EventStageInput = {
+      event_id: 11,
+      status: 'on_hold',
+      organiser_id: 'org-123'
+    };
+
+    const result = computeEventStage(input);
+
+    assert.equal(result.stage, 'On_hold');
+    assert.equal(result.stage_key, 'on_hold');
+    assert.equal(result.description, 'Event is currently on_hold.');
+    assert.equal(result.waiting_on, null);
+    assert.equal(result.stepper_steps[0].status, 'current');
+  });
+
+  test('coordinatorPersona defaults to "Event Coordinator" when coordinator_id is present without coordinator_name', () => {
+    // submitted with coordinator_id but no coordinator_name
+    const submittedInput: EventStageInput = {
+      event_id: 12,
+      status: 'submitted',
+      coordinator_id: 'coord-789'
+    };
+    const submittedResult = computeEventStage(submittedInput);
+    assert.deepEqual(submittedResult.waiting_on, {
+      persona: 'Event Coordinator',
+      action: 'Review and assess event request',
+      user_id: 'coord-789'
+    });
+
+    // under_review with coordinator_id but no coordinator_name
+    const underReviewInput: EventStageInput = {
+      event_id: 13,
+      status: 'under_review',
+      coordinator_id: 'coord-789'
+    };
+    const underReviewResult = computeEventStage(underReviewInput);
+    assert.deepEqual(underReviewResult.waiting_on, {
+      persona: 'Event Coordinator',
+      action: 'Review and assess event request',
+      user_id: 'coord-789'
+    });
+
+    // approved with coordinator_id but no coordinator_name
+    const approvedInput: EventStageInput = {
+      event_id: 14,
+      status: 'approved',
+      coordinator_id: 'coord-789'
+    };
+    const approvedResult = computeEventStage(approvedInput);
+    assert.deepEqual(approvedResult.waiting_on, {
+      persona: 'Event Coordinator',
+      action: 'Complete venue suitability check and equipment reservation',
+      user_id: 'coord-789'
+    });
+  });
+
+  test('draft state when organiser_id is undefined returns waiting_on with null user_id', () => {
+    const input: EventStageInput = {
+      event_id: 15,
+      status: 'draft'
+    };
+
+    const result = computeEventStage(input);
+
+    assert.equal(result.stage, 'Draft');
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Event Organiser',
+      action: 'Complete and submit event request',
+      user_id: null
+    });
+  });
+
+  test('handles edge branches: empty status defaults to draft, missing coordinator_id falls back to null user_id', () => {
+    // empty status string
+    const emptyStatusResult = computeEventStage({ event_id: 16, status: '' });
+    assert.equal(emptyStatusResult.stage, 'Draft');
+
+    // under_review without coordinator_id
+    const underReviewNoCoord = computeEventStage({ event_id: 17, status: 'under_review' });
+    assert.equal(underReviewNoCoord.waiting_on?.user_id, null);
+
+    // approved without coordinator_id
+    const approvedNoCoord = computeEventStage({ event_id: 18, status: 'approved' });
+    assert.equal(approvedNoCoord.waiting_on?.user_id, null);
+  });
 });

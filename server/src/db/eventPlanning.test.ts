@@ -95,6 +95,143 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'Database query failed' });
   });
 
+  test('fetchEventPlanningRecord extracts coordinator name from array relation', async () => {
+    const fakeClient = {
+      from() {
+        return {
+          select() {
+            return {
+              eq: async () => ({
+                data: [{ event_id: 102, coordinator: [{ name: 'Alice Array' }] }],
+                error: null
+              })
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result = await fetchEventPlanningRecord(fakeClient, 102);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.event.coordinator_name, 'Alice Array');
+    }
+  });
+
+  test('fetchEventPlanningRecord extracts coordinator name from object relation', async () => {
+    const fakeClient = {
+      from() {
+        return {
+          select() {
+            return {
+              eq: async () => ({
+                data: [{ event_id: 103, coordinator: { name: 'Bob Object' } }],
+                error: null
+              })
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result = await fetchEventPlanningRecord(fakeClient, 103);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.event.coordinator_name, 'Bob Object');
+    }
+  });
+
+  test('fetchEventPlanningRecord uses coordinator_name fallback when coordinator relation is not present', async () => {
+    const fakeClient = {
+      from() {
+        return {
+          select() {
+            return {
+              eq: async () => ({
+                data: [{ event_id: 104, coordinator_name: 'Charlie Fallback' }],
+                error: null
+              })
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result = await fetchEventPlanningRecord(fakeClient, 104);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.event.coordinator_name, 'Charlie Fallback');
+    }
+  });
+
+  test('fetchEventPlanningRecord handles coordinator without string name and no fallback', async () => {
+    // Array with non-string name
+    const fakeClientArray = {
+      from() {
+        return {
+          select() {
+            return {
+              eq: async () => ({
+                data: [{ event_id: 105, coordinator: [{ name: 123 }] }],
+                error: null
+              })
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result1 = await fetchEventPlanningRecord(fakeClientArray, 105);
+    assert.equal(result1.ok, true);
+    if (result1.ok) {
+      assert.equal(result1.event.coordinator_name, null);
+    }
+
+    // Object with non-string name
+    const fakeClientObject = {
+      from() {
+        return {
+          select() {
+            return {
+              eq: async () => ({
+                data: [{ event_id: 106, coordinator: { name: null } }],
+                error: null
+              })
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result2 = await fetchEventPlanningRecord(fakeClientObject, 106);
+    assert.equal(result2.ok, true);
+    if (result2.ok) {
+      assert.equal(result2.event.coordinator_name, null);
+    }
+
+    // Empty array coordinator with coordinator_name fallback
+    const fakeClientEmptyArray = {
+      from() {
+        return {
+          select() {
+            return {
+              eq: async () => ({
+                data: [{ event_id: 107, coordinator: [], coordinator_name: 'Fallback After Empty Array' }],
+                error: null
+              })
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result3 = await fetchEventPlanningRecord(fakeClientEmptyArray, 107);
+    assert.equal(result3.ok, true);
+    if (result3.ok) {
+      assert.equal(result3.event.coordinator_name, 'Fallback After Empty Array');
+    }
+  });
+
   test('updateEventPlanningFields updates fields and returns updated record', async () => {
     let capturedUpdates: any = null;
     let capturedId: any = null;
@@ -154,6 +291,33 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
       assert.equal(result.event.expected_attendance, 250);
       assert.equal(result.event.arrangements_recheck_needed, true);
       assert.deepEqual(result.event.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
+    }
+  });
+
+  test('updateEventPlanningFields falls back to empty array when outstanding_arrangements is null', async () => {
+    const fakeAdmin = {
+      from() {
+        return {
+          update() {
+            return {
+              eq() {
+                return {
+                  select: async () => ({
+                    data: [{ event_id: 108, outstanding_arrangements: null }],
+                    error: null
+                  })
+                };
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const result = await updateEventPlanningFields(fakeAdmin, 108, { planning_notes: 'note' });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.deepEqual(result.event.outstanding_arrangements, []);
     }
   });
 
