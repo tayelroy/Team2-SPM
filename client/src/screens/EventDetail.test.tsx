@@ -320,3 +320,122 @@ test.each(['draft', 'rejected', 'submitted'])('colleague %s detail is strictly v
   expect(screen.queryByText('Confirmed arrangements')).not.toBeInTheDocument();
   expect(screen.queryByText('Activity')).not.toBeInTheDocument();
 });
+
+describe('EventDetail EventStageTracker integration (SG2-38)', () => {
+  test('renders EventStageTracker with stage API response and displays arrangements recheck banner', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 101,
+        organiserId: 'org-1',
+        organisation: 'Acme Corp',
+        status: 'approved',
+        name: 'Annual Tech Summit',
+        purpose: 'Showcase innovation',
+        description: 'Tech conference',
+        proposedDate: '2026-11-20T08:00:00.000Z',
+        expectedAttendance: 250,
+        venueRequirements: 'Main Auditorium',
+        accessibilityNeeds: null,
+        equipmentRequirements: null,
+        registrationNeeded: true,
+        coordinatorId: 'coord-1',
+        coordinatorName: 'Sarah Jenkins',
+        canManage: true,
+        waitingOnMe: false,
+      },
+    });
+
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: {
+        event_id: 101,
+        raw_status: 'approved',
+        stage: 'Approved — In Planning',
+        stage_key: 'in_planning',
+        description: 'Event approved; coordinator is actively arranging venue and equipment.',
+        waiting_on: {
+          persona: 'Event Coordinator (Sarah Jenkins)',
+          action: 'Complete venue suitability check and equipment reservation',
+        },
+        stepper_steps: [
+          { key: 'draft', label: 'Draft', status: 'completed' },
+          { key: 'submitted', label: 'Submitted', status: 'completed' },
+          { key: 'under_review', label: 'Under Review', status: 'completed' },
+          { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+          { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
+        ],
+        arrangements_recheck_needed: true,
+        outstanding_arrangements: ['venue', 'equipment'],
+      },
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Annual Tech Summit' })).toBeInTheDocument();
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Approved — In Planning');
+    expect(screen.getByText('Event approved; coordinator is actively arranging venue and equipment.')).toBeInTheDocument();
+    expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('Event Coordinator (Sarah Jenkins)');
+    expect(screen.getByTestId('waiting-on-action')).toHaveTextContent('Next step: Complete venue suitability check and equipment reservation');
+
+    // Stepper steps are rendered
+    expect(screen.getByRole('list', { name: 'Lifecycle steps' })).toBeInTheDocument();
+
+    // Recheck banner is visible
+    expect(await screen.findByTestId('arrangements-recheck-banner')).toBeInTheDocument();
+    expect(
+      screen.getByText('Arrangements Outstanding: Venue & Equipment Recheck Needed'),
+    ).toBeInTheDocument();
+  });
+
+  test('renders EventDetail smoothly even if getEventStage fails', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 102,
+        organiserId: 'org-1',
+        organisation: 'Acme Corp',
+        status: 'draft',
+        name: 'Planning Meeting',
+        purpose: 'Internal alignment',
+        description: '',
+        proposedDate: null,
+        expectedAttendance: null,
+        venueRequirements: null,
+        accessibilityNeeds: null,
+        equipmentRequirements: null,
+        registrationNeeded: false,
+        coordinatorId: null,
+        coordinatorName: null,
+        canManage: true,
+        waitingOnMe: true,
+      },
+    });
+
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Service down',
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={102}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Planning Meeting' })).toBeInTheDocument();
+    expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
+  });
+});
+
