@@ -74,7 +74,7 @@ correctly show empty queues.
 | SQL SG2-41-DB01 | Actual migration/view, active/inactive state partitions, decision removal, full detail values, foreign keys, quantities, intervals and client-access restrictions. |
 
 Local validation on 22 September 2026 used Node 22.22.2. `npm run ci` passed:
-494 backend, 423 frontend and 19 reviewer tests, with **100% per-file statements,
+494 backend, 427 frontend and 19 reviewer tests, with **100% per-file statements,
 branches, functions and lines** in both applications. Coverage inclusion and
 thresholds were not weakened and no ignore directives were added.
 
@@ -91,3 +91,7 @@ All six migrations and four SQL suites passed in disposable PGlite 0.5.8 /
 PostgreSQL 18.3. CI also runs the new SQL suite in its native PostgreSQL 17
 service. Local tests do not claim hosted Supabase Auth, deployment or native
 CI execution; no shared Supabase data was touched.
+
+Hosted CI for PR #39 (head `9ab83aa`, 23 September 2026) passed every job,
+including the browser journeys and the SQL suites in native PostgreSQL 17:
+[run 35808277040](https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040).

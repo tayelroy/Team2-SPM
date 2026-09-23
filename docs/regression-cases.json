@@ -14,13 +14,13 @@
       "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
     ],
     "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
-    "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
+    "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; event cards show the client organisation, not a repeated title; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
     "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "The new journey and all 18 existing journeys passed in installed Chrome. Queue screenshots were inspected at 1440×1000 and 390×844; request detail was additionally checked in native Chrome.",
-    "execution_evidence": "22 Sep 2026; SG2-41 local implementation; Node 22.22.2; playwright test --config=/private/tmp/sg2-41.FpI9qe/playwright.config.ts; 19/19 passed; /private/tmp/sg2-41.FpI9qe/regression.json. Required SG2-26 report gate passed.",
-    "execution_date": "22 Sep 2026"
+    "actual": "All 19 browser journeys passed in the hosted Chromium job, including this journey and the SG2-26 report gate.",
+    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test browser regression' job; https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832820.",
+    "execution_date": "23 Sep 2026"
   },
   {
     "id": "SG2-41-DB01",
@@ -40,9 +40,9 @@
     "evidence": "supabase/tests/internal_work_queue.sql; .github/workflows/ci.yml; docs/work-queue.md",
     "layer": "PostgreSQL policy test",
     "status": "Pass",
-    "actual": "All six migrations and all four SQL suites passed in a fresh PGlite database, including the queue view, access restrictions and transaction rollback.",
-    "execution_evidence": "22 Sep 2026; SG2-41 local implementation; PGlite 0.5.8 / PostgreSQL 18.3; /private/tmp/sg2-41.FpI9qe/sql-tests.mjs. Native PostgreSQL 17 CI and hosted Supabase execution are not claimed.",
-    "execution_date": "22 Sep 2026"
+    "actual": "The auth fixture, all six migrations and all four SQL suites passed in the workflow's native PostgreSQL 17 service, including the queue view, access restrictions and transaction rollback.",
+    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test database policies' job (postgres:17); https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832819. Hosted Supabase execution is not claimed.",
+    "execution_date": "23 Sep 2026"
   },
   {
     "id": "PW-AUTH-01",

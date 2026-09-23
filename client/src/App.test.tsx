@@ -183,7 +183,8 @@ test.each([
   expect(screen.queryByRole('group', { name: 'Preview screens' })).not.toBeInTheDocument();
 });
 
-test('the Preview menu toggles and dismisses with Escape, outside clicks or focus', async () => {
+// Outside-click and focus dismissal share useDismissOutside, covered by the profile options test.
+test('the Preview menu toggles and closes with Escape, returning focus', async () => {
   await signInAs('Venue Staff');
   const preview = within(header()).getByRole('button', { name: 'Preview' });
   fireEvent.click(preview);
@@ -191,18 +192,11 @@ test('the Preview menu toggles and dismisses with Escape, outside clicks or focu
   expect(preview).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(preview);
   const option = screen.getByRole('button', { name: 'Booking requests' });
-  fireEvent.pointerDown(option);
   fireEvent.keyDown(option, { key: 'Tab' });
   expect(option).toBeInTheDocument();
   fireEvent.keyDown(option, { key: 'Escape' });
   expect(preview).toHaveFocus();
   expect(preview).toHaveAttribute('aria-expanded', 'false');
-  fireEvent.click(preview);
-  fireEvent.pointerDown(screen.getByRole('main'));
-  expect(preview).toHaveAttribute('aria-expanded', 'false');
-  fireEvent.click(preview);
-  act(() => screen.getByRole('button', { name: 'Dashboard' }).focus());
-  expect(screen.queryByRole('group', { name: 'Preview screens' })).not.toBeInTheDocument();
 });
 
 test('roles without sample-data screens have no Preview menu', async () => {

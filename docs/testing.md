@@ -7,7 +7,7 @@
 
 ## SG2-41 implementation — 22 September 2026
 
-The latest implementation passes 494 backend, 423 frontend, 19 reviewer,
+The latest implementation passes 494 backend, 427 frontend, 19 reviewer,
 13 regression-gate and 19 browser tests, plus all four SQL suites. Both
 application coverage gates remain at 100% for every file and metric.
 The [work queue verification notes](work-queue.md#verification-and-test-responsibilities)

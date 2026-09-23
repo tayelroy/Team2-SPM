@@ -35,7 +35,7 @@ in the production composition root.
 The browser selection follows the user workflows: role login, refused login,
 logout, venue create/edit/search, permissions, capacity/name limits, fresh event
 submission, incomplete draft saving, editing/submitting, confirmed deletion,
-profile save, phone limits and month navigation. Supporting tests retain
+profile save, phone limits, month navigation and internal work queues. Supporting tests retain
 failure and policy behavior that these journeys intentionally do not repeat.
 
 ## Historical 36-to-22 consolidation
@@ -92,7 +92,7 @@ prototype/helper rows as redundant.
 Numbers and results in [`testing.md`](testing.md) and dated sections of
 [`ci.md`](ci.md) describe earlier revisions, including the old 36-case register,
 343-test inventory and then-absent browser job. They must not be copied as
-current Pass results. Current runner totals can differ from 27 because each
+current Pass results. Current runner totals can differ from 29 because each
 scenario is supported by multiple lower-level assertions and parameterized
 cases.
 
@@ -102,7 +102,7 @@ hosted lifecycle/required-check cases remain **Not Executed** until the updated
 workflow is actually run and verified. Browser fixture success does not upgrade
 SQL, deployed Supabase, hosted CI or deployment status.
 
-Known broader gaps are outside these 27 selected scenarios: real deployed
+Known broader gaps are outside these 29 selected scenarios: real deployed
 Auth/database integration, additional browser engines and availability interval-edge
 semantics against PostgreSQL. The approved event-name/attendance limits and
 malformed-login validation fixes are covered by the supporting backend cases.
