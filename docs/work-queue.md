@@ -56,7 +56,9 @@ SG2-41 covers gathering and opening work. Request creation, coordinator
 assignment and approval/rejection mutations remain separate workflows. Their
 future server operations should write the new request tables. The old standalone
 booking-approval and equipment-reservation prototype screens are not connected
-to these queue records. Until real requests are created, those staff dashboards
+to these queue records. Staff reach them only through the nav **Preview** menu,
+which labels them as sample data, so they are not mistaken for the live queue.
+Event cards show the client organisation, not a repeat of the event title. Until real requests are created, those staff dashboards
 correctly show empty queues.
 
 ## Verification and test responsibilities

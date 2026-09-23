@@ -82,6 +82,7 @@ test('SG2-41-P01 | internal users open the exact events and requests waiting on 
   await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
   await expect(page.getByText('Bring partners together to plan sustainable events')).toBeVisible();
   await expect(page.getByText('Keynotes, workshops and an evening reception.')).toBeVisible();
+  await expect(page.getByText('Regression Organisation · Event #41')).toBeVisible();
   if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/event-detail.png`, fullPage: true });
 
   for (const [account, kind, title, group, fact] of [
@@ -115,7 +116,7 @@ test('PW-AUTH-01 | each seeded role reaches its assigned application', async ({ 
     { account: 'organiser', role: 'Event Organiser', action: 'New request' },
     { account: 'coordinator', role: 'Event Coordinator', action: 'Venues' },
     { account: 'venue', role: 'Venue Staff', action: 'Catalogue' },
-    { account: 'support', role: 'Technical Support Staff', action: 'Equipment requests' },
+    { account: 'support', role: 'Technical Support Staff', action: 'Preview' },
     { account: 'attendee', role: 'Attendee', action: 'Event page' },
   ];
   const errors: string[] = [];

@@ -28,6 +28,13 @@ function dateTime(value: string | null) {
   });
 }
 
+/** An event card's title is already the event name, so show its organisation
+ * instead of repeating it. Requests are titled by resource, so name the event. */
+function context(item: WorkItem) {
+  const source = item.kind === 'event' ? item.details.organisation ?? 'Organisation not provided' : item.event_name;
+  return `${source} · Event #${item.event_id}`;
+}
+
 function ItemDetail({ item }: { item: WorkItem }) {
   return <article className="organisation-detail" aria-label={KINDS[item.kind]}>
     <div className="organisation-detail-header">
@@ -36,7 +43,7 @@ function ItemDetail({ item }: { item: WorkItem }) {
     </div>
     <div className="organisation-detail-intro">
       <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
-      <p>{item.event_name} · Event #{item.event_id}</p>
+      <p>{context(item)}</p>
       <p>{dateTime(item.starts_at)}{item.ends_at ? ` – ${dateTime(item.ends_at)}` : ''} (Singapore time)</p>
     </div>
     <dl className="organisation-detail-facts">
@@ -79,7 +86,7 @@ function QueueContent({ role, accessToken, selection, onSelect }: {
               onClick={() => onSelect({ kind: item.kind, item_id: item.item_id })}>
               <span className="work-queue-item-meta"><span className="work-queue-status">{item.status.replace(/_/g, ' ')}</span><span>{KINDS[item.kind]} #{item.item_id}</span></span>
               <strong>{item.title}</strong>
-              <span>{item.event_name} · Event #{item.event_id}</span>
+              <span>{context(item)}</span>
               <span>{dateTime(item.starts_at)} (SGT)</span>
               <span className="work-queue-open">View {KINDS[item.kind].toLowerCase()} <span aria-hidden="true">↗</span></span>
             </button>)}

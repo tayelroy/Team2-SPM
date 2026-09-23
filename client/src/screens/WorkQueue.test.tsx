@@ -12,15 +12,20 @@ const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Lea
 
 test('coordinator queue groups distinct records, opens the exact assignment and refreshes when returning', async () => {
   const assigned = { ...review, item_id: 28, event_id: 28, title: 'Assigned workshop', category: 'assigned', status: 'planning',
-    starts_at: null, details: { registration_needed: false } };
+    starts_at: null, details: { organisation: 'Harbour Trust', registration_needed: false } };
   const fetch = vi.fn(async (url: string) => Response.json({ items: url.endsWith('/event/28') ? [assigned] : [review, assigned] }));
   vi.stubGlobal('fetch', fetch);
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading');
   await screen.findByText('2 items in your work queue');
   expect(within(screen.getByRole('region', { name: 'Awaiting review' })).getByText('Leadership Forum', { selector: 'strong' })).toBeVisible();
+  // Event cards name the organisation rather than repeating the title.
+  expect(screen.getByText('Organisation not provided · Event #12')).toBeVisible();
+  expect(screen.getByText('Harbour Trust · Event #28')).toBeVisible();
+  expect(screen.queryByText('Leadership Forum · Event #12')).not.toBeInTheDocument();
   fireEvent.click(within(screen.getByRole('region', { name: 'My assigned events' })).getByRole('button'));
   expect(await screen.findByRole('heading', { name: 'Assigned workshop' })).toHaveFocus();
+  expect(screen.getByText('Harbour Trust · Event #28')).toBeVisible();
   expect(screen.getByText('No', { exact: true })).toBeVisible();
   expect(screen.getByText(/Date not set/)).toBeVisible();
   expect(fetch).toHaveBeenLastCalledWith('/api/work-queue/event/28', expect.anything());

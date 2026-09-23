@@ -144,11 +144,11 @@ describe('every role can reach every screen in its navigation', () => {
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
     ],
     'Venue Staff': [
-      ['Dashboard', 'Venue desk'], ['Booking requests', 'Booking approval'],
+      ['Dashboard', 'Venue desk'],
       ['Venue Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
     ],
     'Technical Support Staff': [
-      ['Dashboard', 'Equipment desk'], ['Equipment requests', 'Equipment requests'],
+      ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
@@ -164,6 +164,50 @@ describe('every role can reach every screen in its navigation', () => {
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     }
   });
+});
+
+// SG2-41: sample-data prototypes sit behind a Preview menu, apart from the live queue.
+test.each([
+  ['Venue Staff', 'Booking requests', 'Booking approval'],
+  ['Technical Support Staff', 'Equipment requests', 'Equipment requests'],
+] as const)('%s reach sample-data screens only through the Preview menu', async (role, label, heading) => {
+  await signInAs(role);
+  expect(within(header()).queryByRole('button', { name: label })).not.toBeInTheDocument();
+  const preview = within(header()).getByRole('button', { name: 'Preview' });
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(preview);
+  const menu = screen.getByRole('group', { name: 'Preview screens' });
+  expect(menu).toHaveTextContent('Sample data only. Live requests are on your dashboard.');
+  fireEvent.click(within(menu).getByRole('button', { name: label }));
+  expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+  expect(screen.queryByRole('group', { name: 'Preview screens' })).not.toBeInTheDocument();
+});
+
+test('the Preview menu toggles and dismisses with Escape, outside clicks or focus', async () => {
+  await signInAs('Venue Staff');
+  const preview = within(header()).getByRole('button', { name: 'Preview' });
+  fireEvent.click(preview);
+  fireEvent.click(preview);
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(preview);
+  const option = screen.getByRole('button', { name: 'Booking requests' });
+  fireEvent.pointerDown(option);
+  fireEvent.keyDown(option, { key: 'Tab' });
+  expect(option).toBeInTheDocument();
+  fireEvent.keyDown(option, { key: 'Escape' });
+  expect(preview).toHaveFocus();
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(preview);
+  fireEvent.pointerDown(screen.getByRole('main'));
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(preview);
+  act(() => screen.getByRole('button', { name: 'Dashboard' }).focus());
+  expect(screen.queryByRole('group', { name: 'Preview screens' })).not.toBeInTheDocument();
+});
+
+test('roles without sample-data screens have no Preview menu', async () => {
+  await signInAs('Event Coordinator');
+  expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
 });
 
 test('the role shown in the header is a read-only label, not a selector', async () => {
@@ -625,6 +669,7 @@ test('signed-in Venue Staff navigate to the catalogue and open an editor populat
 
 test('reserving equipment settles the row', async () => {
   await signInAs('Technical Support Staff');
+  fireEvent.click(within(header()).getByRole('button', { name: 'Preview' }));
   fireEvent.click(within(header()).getByRole('button', { name: 'Equipment requests' }));
 
   const reserveButtons = screen.getAllByRole('button', { name: 'Reserve' });
