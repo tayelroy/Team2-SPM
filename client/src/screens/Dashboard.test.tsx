@@ -62,13 +62,14 @@ test('a late response for the previous session cannot replace the current organi
   expect(screen.getByText('Organisation events').closest('div')).toHaveTextContent('1');
 });
 
-test('coordinator retains existing operational dashboard and navigation', () => {
+test('attendee retains its prototype event dashboard and navigation', () => {
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
-  render(<Dashboard role="Event Coordinator" onNavigate={onNavigate} />);
+  render(<Dashboard role="Attendee" onNavigate={onNavigate} />);
   expect(fetch).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: /Product Launch — Tideline/ }));
-  expect(onNavigate).toHaveBeenCalledWith('detail');
+  fireEvent.click(screen.getByRole('button', { name: /Registration open.*Quarterly Partner Dinner/ }));
+  expect(onNavigate).toHaveBeenCalledWith('attendee');
   fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
   expect(onNavigate).toHaveBeenCalledWith('events');
+  for (const button of screen.getAllByRole('button', { name: /^Open:/ })) fireEvent.click(button);
 });

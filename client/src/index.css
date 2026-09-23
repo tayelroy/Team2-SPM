@@ -131,6 +131,28 @@ a:hover {
 .organisation-events-view, .organisation-dashboard { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .organisation-events-header, .organisation-events-row { box-sizing: border-box; }
 .organisation-dashboard-event { min-width: 0; }
+.work-queue { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.work-queue-heading, .work-queue-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.work-queue-heading h2 { margin: 0; font-size: 24px; font-weight: 500; }
+.work-queue-summary { margin: 0; color: #bbc7c6; font-size: 14px; }
+.work-queue-groups { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,360px),1fr)); gap: 20px; align-items: start; }
+.work-queue-group { display: flex; flex-direction: column; gap: 16px; padding: 24px; background: #003734; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; min-width: 0; }
+.work-queue-group-heading h3 { margin: 0; font-size: 18px; font-weight: 500; }
+.work-queue-group-heading > span { color: #ed9dbb; font-size: 24px; }
+.work-queue-item { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; padding: 22px; text-align: left; background: #012b29; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; color: #bbc7c6; cursor: pointer; overflow-wrap: anywhere; }
+.work-queue-item:hover { border-color: #cbfffc; background: #01433f; }
+.work-queue-item:focus-visible, .work-queue button:focus-visible { outline: 2px solid #cbfffc; outline-offset: 4px; }
+.work-queue-item strong { font-size: 22px; font-weight: 500; color: #edfffe; }
+.work-queue-item > span { font-size: 13px; line-height: 1.5; }
+.work-queue-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.work-queue-status { padding: 5px 10px; border-radius: 6px; background: rgba(203,255,252,.12); color: #cbfffc; text-transform: capitalize; font-size: 12px; }
+.work-queue-open { display: flex; justify-content: space-between; color: #cbfffc; margin-top: 4px; }
+.work-queue-empty { color: #bbc7c6; line-height: 1.6; }
+@media (max-width: 600px) {
+  .work-queue-heading { flex-wrap: wrap; }
+  .work-queue-group { padding: 18px; }
+  .work-queue-item { padding: 18px; }
+}
 .organisation-detail { background: #003734; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; overflow: hidden; }
 .organisation-detail-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 32px; border-bottom: 1px solid rgba(255,255,255,.1); }
 .organisation-detail-status { display: flex; align-items: center; gap: 12px; }

@@ -106,19 +106,25 @@ export const NAV: Record<Role, [Screen, string][]> = {
   ],
   'Venue Staff': [
     ['dashboard', 'Dashboard'],
-    ['booking', 'Booking requests'],
     ['calendar', 'Venue Availability'],
     ['venues', 'Catalogue'],
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
-    ['equipment', 'Equipment requests'],
     ['calendar', 'Venue Availability'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
     ['attendee', 'Event page'],
   ],
+};
+
+/** Prototype screens still showing sample data. They sit in a "Preview" menu,
+ * apart from the live work queue on the dashboard, so staff do not mistake
+ * them for real pending requests (SG2-41). */
+export const PREVIEW_NAV: Partial<Record<Role, [Screen, string][]>> = {
+  'Venue Staff': [['booking', 'Booking requests']],
+  'Technical Support Staff': [['equipment', 'Equipment requests']],
 };
 
 export const HEAD: Record<
@@ -132,22 +138,22 @@ export const HEAD: Record<
       'Events shared with your organisation. Requests that need your action are marked.',
   },
   'Event Coordinator': {
-    eyebrow: 'Event Coordinator · A. Vance',
+    eyebrow: 'Event Coordinator',
     title: 'Coordination desk',
     blurb:
-      'Requests assigned to you, plus venue and equipment arrangements still outstanding.',
+      'Your review queue and active assigned events, together in one place.',
   },
   'Venue Staff': {
-    eyebrow: 'Venue Staff · Atrium & Harbour',
+    eyebrow: 'Venue Staff',
     title: 'Venue desk',
     blurb:
-      'Booking requests awaiting a decision, with overlaps flagged before you approve.',
+      'Pending venue booking requests for your team. Open a request to see its details.',
   },
   'Technical Support Staff': {
-    eyebrow: 'Technical Support · AV',
+    eyebrow: 'Technical Support Staff',
     title: 'Equipment desk',
     blurb:
-      'Equipment requests to check and reserve. Reservations reduce availability for overlapping events.',
+      'Pending equipment requests for your team. Open a request to see its details.',
   },
   Attendee: {
     eyebrow: 'Attendee · J. Halloran',

@@ -12,6 +12,7 @@ export interface Principal { userId: string; role: Role }
 
 // Actions without an explicit role grant are denied.
 export const PERMISSIONS: PermissionMap = Object.freeze({
+  'work_queue.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.availability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // Only Technical Support Staff may set or change a role (SG2-24).
   'users.role.update': ['technical_support_staff'],
