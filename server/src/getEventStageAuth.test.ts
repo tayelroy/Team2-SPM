@@ -39,6 +39,7 @@ describe('GET /api/event-requests/:eventId/stage authorisation wiring (SG2-38)',
       undefined,
       undefined,
       undefined,
+      undefined,
       (_req, res) => {
         res.status(200).json({ route: 'stage', reached: true });
       }

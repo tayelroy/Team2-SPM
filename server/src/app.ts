@@ -34,8 +34,8 @@ export function createApp(
     venues: createVenuesRouter(access),
     profile: createProfileRouter(access)
   },
+  workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal })
-  workQueueRouter = createWorkQueueRouter(access)
 ) {
   const app = express();
 
