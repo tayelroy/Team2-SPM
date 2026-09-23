@@ -546,6 +546,16 @@ describe('the request form', () => {
         return Response.json({ request: { ...submitted, status: 'draft' }, missingForSubmission: [] }, { status: 201 });
       }
       if (url === '/api/event-requests/42/submit' && init?.method === 'PATCH') return new Response(null, { status: 204 });
+      if (url === '/api/event-requests/42/stage' && init?.method === 'GET') {
+        return Response.json({
+          event_id: 42,
+          stage: 'Submitted',
+          stage_key: 'submitted',
+          description: 'Awaiting coordinator assignment',
+          stepper_steps: [],
+          waiting_on: { persona: 'ConnectSphere Staff', action: 'Assign event coordinator', user_id: null },
+        });
+      }
       if (url === '/api/event-requests/42' && init?.method === 'GET') return Response.json({ request: submitted });
       throw new Error(`Unexpected request: ${init?.method} ${url}`);
     });
@@ -566,8 +576,13 @@ describe('the request form', () => {
     expect(screen.getByText('A half-day forum with two keynotes and a panel.', { exact: true })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Select an event from your organisation/)).not.toBeInTheDocument();
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/42/submit', '/api/event-requests/42']);
-    expect(fetchMock.mock.calls[2][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/event-requests',
+      '/api/event-requests/42/submit',
+      '/api/event-requests/42/stage',
+      '/api/event-requests/42',
+    ]);
+    expect(fetchMock.mock.calls[3][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
   });
 

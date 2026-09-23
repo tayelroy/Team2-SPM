@@ -14,6 +14,7 @@ import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createStartEventReviewHandler } from './events/review';
 import { createVenuesRouter } from './venues';
 import { createProfileRouter } from './profile';
+import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
 
 export function createApp(
@@ -35,6 +36,7 @@ export function createApp(
     profile: createProfileRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
+  eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
   startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
@@ -92,6 +94,12 @@ export function createApp(
     '/:eventId',
     access.requirePermission('event_request.update'),
     updateEventDraftHandler
+  );
+  // SG2-38: see what stage an event has reached.
+  eventRequests.get(
+    '/:eventId/stage',
+    access.requirePermission('event_request.stage.view'),
+    eventStageHandler
   );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);

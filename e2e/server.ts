@@ -61,6 +61,9 @@ const app = createApp(
   getEventRequestDetailHandler(eventDependencies),
   { availability, venues, profile: createProfileRouter(access, { getAdminClient: getClient }) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
+  // SG2-38's stage handler keeps its production default here, as it does on
+  // main; only the review handler below needs the in-memory client.
+  undefined,
   createStartEventReviewHandler(eventDependencies)
 );
 

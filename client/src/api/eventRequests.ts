@@ -503,3 +503,82 @@ export async function updateEventRequestDraft(
     missingForSubmission: (body.missingForSubmission ?? []) as string[]
   };
 }
+
+export interface StepperStep {
+  key: string;
+  label: string;
+  status: 'completed' | 'current' | 'upcoming';
+}
+
+export interface EventWaitingOn {
+  persona: string | null;
+  action: string | null;
+  user_id?: string | null;
+}
+
+export interface EventStageResult {
+  event_id: number;
+  raw_status: string;
+  stage: string;
+  stage_key: string;
+  description: string;
+  waiting_on: EventWaitingOn | null;
+  stepper_steps: StepperStep[];
+  arrangements_recheck_needed: boolean;
+  outstanding_arrangements: string[];
+}
+
+export type GetEventStageOutcome =
+  | { ok: true; stage: EventStageResult }
+  | {
+      ok: false;
+      kind: 'unauthorized' | 'forbidden' | 'not_found' | 'unavailable' | 'error';
+      message: string;
+    };
+
+/**
+ * Retrieves the computed plain-language stage, stepper steps, and waiting-on persona
+ * for an event (SG2-38). Maps to `GET /api/event-requests/:eventId/stage`.
+ */
+export async function getEventStage(
+  eventId: string | number,
+  token: string
+): Promise<GetEventStageOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/stage`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { ok: false, kind: 'unauthorized', message: body?.error ?? 'Authentication required' };
+    }
+    if (response.status === 403) {
+      return { ok: false, kind: 'forbidden', message: body?.error ?? 'Access forbidden' };
+    }
+    if (response.status === 404) {
+      return { ok: false, kind: 'not_found', message: body?.error ?? 'Event not found.' };
+    }
+    if (response.status === 503) {
+      return { ok: false, kind: 'unavailable', message: body?.error ?? UNAVAILABLE };
+    }
+    return {
+      ok: false,
+      kind: 'error',
+      message: body?.error ?? `Failed to fetch event stage (HTTP ${response.status}).`
+    };
+  }
+
+  if (!body || typeof body !== 'object') {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  return { ok: true, stage: body as EventStageResult };
+}
+

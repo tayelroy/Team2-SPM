@@ -9,6 +9,8 @@ import {
   listMyEventRequests,
   submitEventRequest,
   updateEventRequestDraft,
+  getEventStage,
+  type EventStageResult,
   type EventRequestDetail,
   type EventRequestSummary,
 } from './eventRequests';
@@ -955,3 +957,175 @@ test('shared drafts map to view-only without an action for the current organiser
   const outcome = await fetchOwnEventRequests('colleague-token');
   expect(outcome).toMatchObject({ ok: true, requests: [{ eventId: 80, canManage: false, waitingOnMe: false }] });
 });
+
+describe('getEventStage (SG2-38)', () => {
+  test('successfully retrieves stage result with stepper steps and waiting-on party', async () => {
+    const mockStage: EventStageResult = {
+      event_id: 101,
+      raw_status: 'planning',
+      stage: 'Approved — In Planning',
+      stage_key: 'in_planning',
+      description: 'Event approved; coordinator is actively arranging venue and equipment.',
+      waiting_on: {
+        persona: 'Event Coordinator (Elroy Tay)',
+        action: 'Complete venue suitability check and equipment reservation',
+        user_id: 'coord-1',
+      },
+      stepper_steps: [
+        { key: 'draft', label: 'Draft', status: 'completed' },
+        { key: 'submitted', label: 'Submitted', status: 'completed' },
+        { key: 'under_review', label: 'Under Review', status: 'completed' },
+        { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+        { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
+      ],
+      arrangements_recheck_needed: false,
+      outstanding_arrangements: [],
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(mockStage, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const outcome = await getEventStage(101, 'test-token');
+
+    expect(outcome).toEqual({ ok: true, stage: mockStage });
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/101/stage', {
+      headers: { Authorization: 'Bearer test-token' },
+    });
+  });
+
+  test('handles 401 unauthorized', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
+
+    const outcome = await getEventStage(101, 'invalid-token');
+
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Authentication required',
+    });
+  });
+
+  test('handles 403 forbidden', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Attendees are not authorized to view event stages.' }, 403)));
+
+    const outcome = await getEventStage(101, 'attendee-token');
+
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Attendees are not authorized to view event stages.',
+    });
+  });
+
+  test('handles 404 not found', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
+
+    const outcome = await getEventStage(999, 'token-1');
+
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event not found.',
+    });
+  });
+
+  test('handles 503 unavailable and network failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Service down' }, 503)));
+
+    const unavailableOutcome = await getEventStage(101, 'token-1');
+    expect(unavailableOutcome).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Service down',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+    const networkFailOutcome = await getEventStage(101, 'token-1');
+    expect(networkFailOutcome).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('falls back to default messages when error payload is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Authentication required',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 403)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Access forbidden',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 404)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event not found.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 503)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('handles generic HTTP error responses (500) with and without custom error message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Database crashed' }, 500)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Database crashed',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 500)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event stage (HTTP 500).',
+    });
+  });
+
+  test('handles invalid JSON responses or non-object bodies', async () => {
+    // Non-JSON response causing json() parse to reject and execute catch(() => null)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('<html>Bad Gateway</html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    );
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event stage (HTTP 502).',
+    });
+
+    // 200 OK with null body
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, 200)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+
+    // 200 OK with primitive string body
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse('plain string', 200)));
+    expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+});
+

@@ -136,6 +136,8 @@ describe('PATCH /api/event-requests/:eventId/review authorisation wiring', () =>
       undefined,
       undefined,
       undefined,
+      // SG2-38's stage handler sits between the work queue router and this one.
+      undefined,
       (_req, res) => {
         res.status(200).json({ reached: true });
       }
