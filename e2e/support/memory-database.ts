@@ -49,6 +49,9 @@ export class MemoryDatabase {
         phone: '+6581234567', communication_preferences: ['email'], department: 'Operations'
       })),
       account_roles: accounts.map(account => ({ user_id: `user-${account.key}`, role: account.role })),
+      venue_booking_requests: [],
+      equipment_requests: [],
+      equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
       events: [
         { ...draft, event_id: 1, organiser_id: 'user-organiser' },
         { ...draft, event_id: 2, organiser_id: 'user-organiser2', name: 'Other organisation draft', organisation: 'Other Organisation' }
@@ -64,6 +67,46 @@ export class MemoryDatabase {
     };
   }
 
+  seedWorkQueue() {
+    const base = this.tables.events[0];
+    this.tables.events.push(
+      { ...base, event_id: 41, name: 'Sustainability Leadership Forum', status: 'submitted', purpose: 'Bring partners together to plan sustainable events', description: 'Keynotes, workshops and an evening reception.', expected_attendance: 80 },
+      { ...base, event_id: 42, name: 'Partner Innovation Summit', status: 'planning', coordinator_id: 'user-coordinator' },
+      { ...base, event_id: 43, name: 'Another coordinator’s event', status: 'under_review', coordinator_id: 'user-another' },
+      { ...base, event_id: 44, name: 'Completed event', status: 'completed', coordinator_id: 'user-coordinator' },
+    );
+    const request = { request_id: 11, event_id: 41, starts_at: '2030-06-15T02:00:00Z', ends_at: '2030-06-15T10:00:00Z', status: 'pending', notes: 'Set up before guests arrive.' };
+    this.tables.venue_booking_requests.push({ ...request, venue_id: 1 }, { ...request, request_id: 12, venue_id: 2, status: 'approved' });
+    this.tables.equipment_requests.push({ ...request, equipment_id: 1, quantity: 4 }, { ...request, request_id: 12, equipment_id: 1, quantity: 1, status: 'rejected' });
+  }
+
+  /** Test equivalent of the SQL view; SQL policy tests exercise the real view. */
+  private workItems(): Row[] {
+    const active = this.tables.events.filter(event => ['submitted', 'under_review', 'approved', 'planning', 'confirmed'].includes(String(event.status)));
+    const items = active.filter(event => ['submitted', 'under_review'].includes(String(event.status)) || event.coordinator_id !== null).map(event => ({
+      kind: 'event', item_id: event.event_id, event_id: event.event_id, title: event.name || 'Untitled event', event_name: event.name || 'Untitled event',
+      status: event.status, starts_at: event.proposed_date, ends_at: null, audience: 'event_coordinator', assigned_to: event.coordinator_id,
+      category: ['submitted', 'under_review'].includes(String(event.status)) ? 'review' : 'assigned',
+      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed'].map(key => [key, event[key]])),
+    } as Row));
+    for (const [table, kind, resourceTable, resourceKey, audience] of [
+      ['venue_booking_requests', 'venue', 'venues', 'venue_id', 'venue_staff'],
+      ['equipment_requests', 'equipment', 'equipment', 'equipment_id', 'technical_support_staff'],
+    ]) {
+      for (const request of this.tables[table]) {
+        const event = active.find(event => event.event_id === request.event_id);
+        if (request.status !== 'pending' || !event) continue;
+        const resource = this.tables[resourceTable].find(resource => resource[resourceKey] === request[resourceKey])!;
+        items.push({ kind, item_id: request.request_id, event_id: event.event_id, title: resource.name,
+          event_name: event.name || 'Untitled event', status: request.status, starts_at: request.starts_at, ends_at: request.ends_at,
+          audience, assigned_to: null, category: kind, details: kind === 'venue'
+            ? { location: resource.location, capacity: resource.capacity, expected_attendance: event.expected_attendance, venue_requirements: event.venue_requirements, accessibility_needs: event.accessibility_needs, notes: request.notes }
+            : { quantity: request.quantity, equipment_requirements: event.equipment_requirements, notes: request.notes } });
+      }
+    }
+    return items;
+  }
+
   async principal(token: string) {
     const userId = this.sessions.get(token);
     if (!userId) throw new AccessError(401);
@@ -74,6 +117,7 @@ export class MemoryDatabase {
 
   readonly client = {
     from: (table: string) => {
+      if (table === 'internal_work_items') this.tables[table] = this.workItems();
       if (!(table in this.tables)) throw new Error(`Unsupported fixture table: ${table}`);
       return new MemoryQuery(this, table);
     },
@@ -102,11 +146,14 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   private operation: 'read' | 'insert' | 'update' | 'delete' = 'read';
   private values: Row = {};
   private single = false;
+  private window?: [number, number];
   private execution?: Promise<QueryResult>;
 
   constructor(private database: MemoryDatabase, private table: string) {}
   select(columns = '*') { this.columns = columns; return this; }
   eq(key: string, value: unknown) { this.filters.push(row => row[key] === value); return this; }
+  is(key: string, value: null) { this.filters.push(row => row[key] === value); return this; }
+  range(start: number, end: number) { this.window = [start, end]; return this; }
   in(key: string, values: unknown[]) { this.filters.push(row => values.includes(row[key])); return this; }
   lt(key: string, value: string | number) { this.filters.push(row => (row[key] as string | number) < value); return this; }
   gt(key: string, value: string | number) { this.filters.push(row => (row[key] as string | number) > value); return this; }
@@ -140,6 +187,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
       }
       return 0;
     });
+    if (this.window) rows = rows.slice(this.window[0], this.window[1] + 1);
     const projected = rows.map(row => {
       if (this.columns === '*') return structuredClone(row);
       return Object.fromEntries(this.columns.split(',').map(column => {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
 import type { Notification, Role, Screen } from '../mock/types';
-import { navFor, primaryActionFor } from '../mock/viewModel';
+import { navFor, previewNavFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 
@@ -98,6 +98,42 @@ function NotificationDrawer({ onClose, notifications }: { onClose: () => void; n
   );
 }
 
+/** Closes an open menu when a pointer or focus lands outside it. */
+function useDismissOutside(open: boolean, container: RefObject<HTMLDivElement>, setOpen: (open: boolean) => void) {
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = (event: Event) => {
+      if (!container.current!.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('focusin', dismissOutside);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('focusin', dismissOutside);
+    };
+  }, [open, container, setOpen]);
+}
+
+function navItemStyle(active: boolean): CSSProperties {
+  return {
+    background: 'none',
+    border: 'none',
+    padding: '0 0 3px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 400,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: active ? color.platinum : color.silver,
+    borderBottom: `1px solid ${active ? color.accent : 'transparent'}`,
+  };
+}
+
+const menuStyle: CSSProperties = {
+  position: 'absolute', top: 'calc(100% + 8px)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px',
+  background: color.deep, border: rule.raised, borderRadius: radius.sm, zIndex: 1,
+};
+
 /**
  * Chrome shared by every signed-in screen: the sticky header with role-scoped
  * navigation, the page heading block, and the notification drawer. The role
@@ -122,22 +158,16 @@ export default function AppShell({
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const profileButton = useRef<HTMLButtonElement>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const previewButton = useRef<HTMLButtonElement>(null);
   const head = HEAD[role];
   const notifications = role === 'Event Organiser' ? [] : NOTIFICATIONS;
   const primary = primaryActionFor(role);
+  const preview = previewNavFor(role);
 
-  useEffect(() => {
-    if (!profileOpen) return;
-    const dismissOutside = (event: Event) => {
-      if (!profileRef.current!.contains(event.target as Node)) setProfileOpen(false);
-    };
-    document.addEventListener('pointerdown', dismissOutside);
-    document.addEventListener('focusin', dismissOutside);
-    return () => {
-      document.removeEventListener('pointerdown', dismissOutside);
-      document.removeEventListener('focusin', dismissOutside);
-    };
-  }, [profileOpen]);
+  useDismissOutside(profileOpen, profileRef, setProfileOpen);
+  useDismissOutside(previewOpen, previewRef, setPreviewOpen);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -207,23 +237,48 @@ export default function AppShell({
                   type="button"
                   onClick={() => onNavigate(item.screen)}
                   aria-current={active ? 'page' : undefined}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: '0 0 3px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    color: active ? color.platinum : color.silver,
-                    borderBottom: `1px solid ${active ? color.accent : 'transparent'}`,
-                  }}
+                  style={navItemStyle(active)}
                 >
                   {item.label}
                 </button>
               );
             })}
+            {preview.length > 0 && (
+              <div
+                ref={previewRef}
+                // Flex lets the trigger stretch to the row height like its sibling nav buttons.
+                style={{ position: 'relative', display: 'flex' }}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') {
+                    setPreviewOpen(false);
+                    previewButton.current!.focus();
+                  }
+                }}
+              >
+                <button
+                  ref={previewButton}
+                  type="button"
+                  aria-expanded={previewOpen}
+                  aria-controls="preview-options"
+                  onClick={() => setPreviewOpen(open => !open)}
+                  style={navItemStyle(preview.some(item => item.screen === screen))}
+                >
+                  Preview <span aria-hidden="true">▾</span>
+                </button>
+                {previewOpen && (
+                  <div id="preview-options" role="group" aria-label="Preview screens"
+                    style={{ ...menuStyle, left: 0, width: '240px' }}>
+                    {preview.map(item => (
+                      <GhostButton key={item.screen} onClick={() => { setPreviewOpen(false); onNavigate(item.screen); }}
+                        style={{ width: '100%', padding: '10px 16px', textAlign: 'left' }}>{item.label}</GhostButton>
+                    ))}
+                    <p style={{ margin: '4px 8px', fontSize: '12px', lineHeight: 1.4, color: color.silver }}>
+                      Sample data only. Live requests are on your dashboard.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -288,9 +343,7 @@ export default function AppShell({
               </button>
               {profileOpen && (
                 <div id="profile-options" role="group" aria-label="Profile options"
-                  style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                    minWidth: '160px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '4px',
-                    background: color.deep, border: rule.raised, borderRadius: radius.sm }}>
+                  style={{ ...menuStyle, right: 0, minWidth: '160px' }}>
                   <GhostButton onClick={() => { setProfileOpen(false); onNavigate('profile'); }}
                     style={{ width: '100%', padding: '10px 16px' }}>My Profile</GhostButton>
                   <GhostButton onClick={onSignOut} style={{ width: '100%', padding: '10px 16px' }}>Logout</GhostButton>

@@ -1,5 +1,50 @@
 [
   {
+    "id": "SG2-41-P01",
+    "title": "Internal users open the exact events and requests waiting on their role",
+    "type": "Positive / role isolation / responsive",
+    "story": "SG2-41",
+    "purpose": "Prove that the dashboard gathers role-specific work and opens the selected record through the real application routes.",
+    "preconditions": "Built React app and Express API on loopback with disposable identity/storage providers, fresh browser context and fixed clock. No hosted Supabase.",
+    "steps": [
+      "Sign in as coordinator, observe an empty queue, seed disposable pending work and refresh.",
+      "Verify shared review and own assignment groups exclude another coordinator and completed work.",
+      "Check desktop/mobile layout, then open the assignment with the keyboard and the review with a click.",
+      "Sign in as venue and technical support staff; open each pending request and verify its identity, event, time window and stored facts.",
+      "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
+    ],
+    "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
+    "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; event cards show the client organisation, not a repeated title; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
+    "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "All 19 browser journeys passed in the hosted Chromium job, including this journey and the SG2-26 report gate.",
+    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test browser regression' job; https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832820.",
+    "execution_date": "23 Sep 2026"
+  },
+  {
+    "id": "SG2-41-DB01",
+    "title": "Pending work view and request storage enforce queue state and access rules",
+    "type": "Positive / negative / database constraints",
+    "story": "SG2-41",
+    "purpose": "Verify the real SQL migration, queue view, request constraints and direct client-access restrictions independently of browser fixtures.",
+    "preconditions": "Disposable PostgreSQL with auth fixture and all six migrations; transactional test data rolled back after the suite.",
+    "steps": [
+      "Create events in every supported status, shared review records and pending/decided venue and equipment requests.",
+      "Read the service-role view and assert exact event/request identities, categories and stored details.",
+      "Decide requests and cancel an event; verify their work disappears immediately.",
+      "Reject invalid quantities, windows, statuses and references; verify RLS and denial of direct anonymous/authenticated table/view access."
+    ],
+    "data": "Synthetic 941xx event/resource/request IDs and c0000000 fixture identities; no shared data.",
+    "expected": "Only active work appears; facts match storage; invalid records fail constraints; only service_role can access the queue view and request tables.",
+    "evidence": "supabase/tests/internal_work_queue.sql; .github/workflows/ci.yml; docs/work-queue.md",
+    "layer": "PostgreSQL policy test",
+    "status": "Pass",
+    "actual": "The auth fixture, all six migrations and all four SQL suites passed in the workflow's native PostgreSQL 17 service, including the queue view, access restrictions and transaction rollback.",
+    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test database policies' job (postgres:17); https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832819. Hosted Supabase execution is not claimed.",
+    "execution_date": "23 Sep 2026"
+  },
+  {
     "id": "PW-AUTH-01",
     "title": "Each seeded role reaches its assigned application",
     "type": "Positive",

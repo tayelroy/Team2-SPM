@@ -1,7 +1,7 @@
 # Purposeful regression cases
 
-The current register is [`regression-cases.json`](regression-cases.json): **27
-scenarios: 18 browser journeys, 4 supporting backend cases, 3 SQL cases and 2
+The current register is [`regression-cases.json`](regression-cases.json): **29
+scenarios: 19 browser journeys, 4 supporting backend cases, 4 SQL cases and 2
 hosted CI cases**. A scenario groups assertions around one observable outcome;
 it is not a list of every unit test. Positive, negative and boundary partitions
 can share a case when they establish the same rule. Counts are not a coverage
@@ -19,9 +19,9 @@ the register does not automatically write to that Sheet.
 
 | Layer | Purpose and limit |
 | --- | --- |
-| Playwright, 18 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
+| Playwright, 19 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
 | Backend, 4 cases | Existing unit/API suites retain denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
-| PostgreSQL, 3 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
+| PostgreSQL, 4 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
 | Hosted CI, 2 cases | Check the required aggregate and workflow event behavior, including the new browser job. Local script inspection or a past workflow run cannot establish current hosted execution or branch protection. |
 
 Run `npm run test:regression` for the browser journeys after installing Chromium
@@ -35,7 +35,7 @@ in the production composition root.
 The browser selection follows the user workflows: role login, refused login,
 logout, venue create/edit/search, permissions, capacity/name limits, fresh event
 submission, incomplete draft saving, editing/submitting, confirmed deletion,
-profile save, phone limits and month navigation. Supporting tests retain
+profile save, phone limits, month navigation and internal work queues. Supporting tests retain
 failure and policy behavior that these journeys intentionally do not repeat.
 
 ## Historical 36-to-22 consolidation
@@ -92,7 +92,7 @@ prototype/helper rows as redundant.
 Numbers and results in [`testing.md`](testing.md) and dated sections of
 [`ci.md`](ci.md) describe earlier revisions, including the old 36-case register,
 343-test inventory and then-absent browser job. They must not be copied as
-current Pass results. Current runner totals can differ from 27 because each
+current Pass results. Current runner totals can differ from 29 because each
 scenario is supported by multiple lower-level assertions and parameterized
 cases.
 
@@ -102,7 +102,7 @@ hosted lifecycle/required-check cases remain **Not Executed** until the updated
 workflow is actually run and verified. Browser fixture success does not upgrade
 SQL, deployed Supabase, hosted CI or deployment status.
 
-Known broader gaps are outside these 27 selected scenarios: real deployed
+Known broader gaps are outside these 29 selected scenarios: real deployed
 Auth/database integration, additional browser engines and availability interval-edge
 semantics against PostgreSQL. The approved event-name/attendance limits and
 malformed-login validation fixes are covered by the supporting backend cases.

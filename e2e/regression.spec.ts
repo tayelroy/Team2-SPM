@@ -54,12 +54,69 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/reset')).ok()).toBeTruthy();
 });
 
+test('SG2-41-P01 | internal users open the exact events and requests waiting on their role', async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'coordinator');
+  await expect(page.getByText('0 items in your work queue')).toBeVisible();
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByText('2 items in your work queue')).toBeVisible();
+  await expect(page.getByText('Another coordinator’s event')).toHaveCount(0);
+  await expect(page.getByText('Completed event')).toHaveCount(0);
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  await expect(page).toHaveTitle(/ConnectSphere/i);
+  if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/coordinator-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/coordinator-mobile.png`, fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const assignment = page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Partner Innovation Summit/ });
+  await assignment.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Partner Innovation Summit', exact: true })).toBeFocused();
+  await expect(page.getByText('Event request #42', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
+  await expect(page.getByText('Bring partners together to plan sustainable events')).toBeVisible();
+  await expect(page.getByText('Keynotes, workshops and an evening reception.')).toBeVisible();
+  await expect(page.getByText('Regression Organisation · Event #41')).toBeVisible();
+  if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/event-detail.png`, fullPage: true });
+
+  for (const [account, kind, title, group, fact] of [
+    ['venue', 'venue', 'Regression Hall', 'Booking requests awaiting decision', 'Venue capacity'],
+    ['support', 'equipment', 'Wireless microphones', 'Equipment requests awaiting decision', 'Quantity requested'],
+  ]) {
+    await page.getByRole('button', { name: 'Profile', exact: true }).click();
+    await page.getByRole('button', { name: 'Logout', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+    await signIn(page, account);
+    await expect(page.getByText('1 item in your work queue')).toBeVisible();
+    const region = page.getByRole('region', { name: group });
+    await expect(region.getByRole('button')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
+    if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-desktop.png`, fullPage: true });
+    await region.getByRole('button', { name: new RegExp(title) }).click();
+    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByText('Sustainability Leadership Forum · Event #41')).toBeVisible();
+    await expect(page.getByText(/15 Jun 2030, 10:00 – 15 Jun 2030, 18:00/)).toBeVisible();
+    await expect(page.getByText(fact, { exact: true })).toBeVisible();
+    await expect(page.getByText('Set up before guests arrive.')).toBeVisible();
+    const headers = await authHeaders(page);
+    expect((await page.request.get('/api/work-queue/event/41', { headers })).status()).toBe(404);
+    if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-detail.png`, fullPage: true });
+  }
+  expect(errors).toEqual([]);
+});
+
 test('PW-AUTH-01 | each seeded role reaches its assigned application', async ({ page }) => {
   const roles = [
     { account: 'organiser', role: 'Event Organiser', action: 'New request' },
     { account: 'coordinator', role: 'Event Coordinator', action: 'Venues' },
     { account: 'venue', role: 'Venue Staff', action: 'Catalogue' },
-    { account: 'support', role: 'Technical Support Staff', action: 'Equipment requests' },
+    { account: 'support', role: 'Technical Support Staff', action: 'Preview' },
     { account: 'attendee', role: 'Attendee', action: 'Event page' },
   ];
   const errors: string[] = [];

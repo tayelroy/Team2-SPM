@@ -1,9 +1,20 @@
 # Test audit and course case design
 
 > The current register is [Purposeful regression cases](regression.md):
-> 27 scenarios including 18 browser journeys. The 22 September revalidation
+> 29 scenarios including 19 browser journeys. The 22 September revalidation
 > below supersedes earlier test-quality and execution summaries. Older dated
 > sections are historical evidence, not current results.
+
+## SG2-41 implementation — 22 September 2026
+
+The latest implementation passes 494 backend, 427 frontend, 19 reviewer,
+13 regression-gate and 19 browser tests, plus all four SQL suites. Both
+application coverage gates remain at 100% for every file and metric.
+The [work queue verification notes](work-queue.md#verification-and-test-responsibilities)
+explain each test layer's distinct responsibility and the disposable-data
+limits. Two obsolete mock-dashboard navigation tests were replaced with one
+selected-record application workflow; the browser suite adds one combined
+three-role acceptance journey.
 
 ## Revalidation against Week 6 — 22 September 2026
 

@@ -31,6 +31,10 @@ function mockLoginResponse(role: Role) {
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
+      if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
+        kind: 'event', item_id: 51, event_id: 51, title: 'Actual review request', event_name: 'Actual review request',
+        status: 'submitted', starts_at: null, ends_at: null, category: 'review', details: { purpose: 'Review this request' },
+      }] });
       if (url === '/api/venues') {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
@@ -140,11 +144,11 @@ describe('every role can reach every screen in its navigation', () => {
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
     ],
     'Venue Staff': [
-      ['Dashboard', 'Venue desk'], ['Booking requests', 'Booking approval'],
+      ['Dashboard', 'Venue desk'],
       ['Venue Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
     ],
     'Technical Support Staff': [
-      ['Dashboard', 'Equipment desk'], ['Equipment requests', 'Equipment requests'],
+      ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
@@ -160,6 +164,44 @@ describe('every role can reach every screen in its navigation', () => {
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     }
   });
+});
+
+// SG2-41: sample-data prototypes sit behind a Preview menu, apart from the live queue.
+test.each([
+  ['Venue Staff', 'Booking requests', 'Booking approval'],
+  ['Technical Support Staff', 'Equipment requests', 'Equipment requests'],
+] as const)('%s reach sample-data screens only through the Preview menu', async (role, label, heading) => {
+  await signInAs(role);
+  expect(within(header()).queryByRole('button', { name: label })).not.toBeInTheDocument();
+  const preview = within(header()).getByRole('button', { name: 'Preview' });
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(preview);
+  const menu = screen.getByRole('group', { name: 'Preview screens' });
+  expect(menu).toHaveTextContent('Sample data only. Live requests are on your dashboard.');
+  fireEvent.click(within(menu).getByRole('button', { name: label }));
+  expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+  expect(screen.queryByRole('group', { name: 'Preview screens' })).not.toBeInTheDocument();
+});
+
+// Outside-click and focus dismissal share useDismissOutside, covered by the profile options test.
+test('the Preview menu toggles and closes with Escape, returning focus', async () => {
+  await signInAs('Venue Staff');
+  const preview = within(header()).getByRole('button', { name: 'Preview' });
+  fireEvent.click(preview);
+  fireEvent.click(preview);
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(preview);
+  const option = screen.getByRole('button', { name: 'Booking requests' });
+  fireEvent.keyDown(option, { key: 'Tab' });
+  expect(option).toBeInTheDocument();
+  fireEvent.keyDown(option, { key: 'Escape' });
+  expect(preview).toHaveFocus();
+  expect(preview).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('roles without sample-data screens have no Preview menu', async () => {
+  await signInAs('Event Coordinator');
+  expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
 });
 
 test('the role shown in the header is a read-only label, not a selector', async () => {
@@ -319,24 +361,14 @@ test('the dashboard primary action opens the venue catalogue', async () => {
   expect(screen.queryByRole('button', { name: 'Search venues' })).not.toBeInTheDocument();
 });
 
-test('an attention item jumps straight to the screen that resolves it', async () => {
+test('the signed-in coordinator opens the actual selected work item and returns to the queue', async () => {
   await signInAs('Event Coordinator');
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Open: Atrium Hall booking overlaps E-190' }),
-  );
-  expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
-  expect(screen.getByText('Overlaps an existing hold')).toBeInTheDocument();
-});
-
-test('dashboard links open the event list and the selected event detail', async () => {
-  await signInAs('Event Coordinator');
-  fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
-  expect(screen.getByRole('heading', { name: 'All events' })).toBeInTheDocument();
-  fireEvent.click(within(header()).getByRole('button', { name: 'Dashboard' }));
-  fireEvent.click(
-    screen.getByRole('button', { name: /Northbridge Investor Forum/ }),
-  );
-  expect(screen.getByRole('heading', { name: 'Event detail' })).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: /Actual review request/ }));
+  expect(await screen.findByRole('heading', { name: 'Actual review request' })).toBeInTheDocument();
+  expect(screen.getByText('Review this request')).toBeVisible();
+  expect(fetch).toHaveBeenCalledWith('/api/work-queue/event/51', { headers: { Authorization: 'Bearer test-access-token' }, cache: 'no-store' });
+  fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
+  expect(await screen.findByRole('button', { name: /Actual review request/ })).toBeVisible();
 });
 
 describe('the events table', () => {
@@ -631,6 +663,7 @@ test('signed-in Venue Staff navigate to the catalogue and open an editor populat
 
 test('reserving equipment settles the row', async () => {
   await signInAs('Technical Support Staff');
+  fireEvent.click(within(header()).getByRole('button', { name: 'Preview' }));
   fireEvent.click(within(header()).getByRole('button', { name: 'Equipment requests' }));
 
   const reserveButtons = screen.getAllByRole('button', { name: 'Reserve' });

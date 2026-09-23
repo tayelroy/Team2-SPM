@@ -1,26 +1,24 @@
 import { useEffect, useState } from 'react';
-import { PIPELINE, STATS } from '../mock/data';
+import { STATS } from '../mock/data';
 import type { EventCard, Role, Screen } from '../mock/types';
 import {
   actionsFor,
   dashboardListTitle,
   eventCards,
-  showsPipeline,
 } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
 import {
   Badge,
   Card,
   Dot,
-  Eyebrow,
   IconButton,
-  ProgressBar,
   RecessedCard,
   StatFigure,
 } from '../ui';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { badgeStyle } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
+import WorkQueue, { isQueueRole } from './WorkQueue';
 
 /** One event summary in the left-hand list — the whole tile is the trigger. */
 function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) {
@@ -166,9 +164,10 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
 
 export default function Dashboard(props: DashboardProps) {
   if (props.role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
+  if (isQueueRole(props.role)) return <WorkQueue key={`${props.role}:${props.accessToken}`} role={props.role} accessToken={props.accessToken} />;
   const { role, onNavigate } = props;
   const cards = eventCards(role).slice(0, 4);
-  const openEvent = role === 'Attendee' ? 'attendee' : 'detail';
+  const openEvent = 'attendee';
   // Expand the operational summary to the full event table.
   const expandTo = 'events';
 
@@ -290,36 +289,6 @@ export default function Dashboard(props: DashboardProps) {
             </div>
           </RecessedCard>
 
-          {showsPipeline(role) ? (
-            <Card style={{ gap: '14px' }}>
-              <Eyebrow>Where things stand</Eyebrow>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {PIPELINE.map((stage) => (
-                  <div
-                    key={stage.label}
-                    style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                      <span
-                        style={{
-                          fontSize: '13px',
-                          letterSpacing: '0.055em',
-                          textTransform: 'uppercase',
-                          color: color.mist,
-                        }}
-                      >
-                        {stage.label}
-                      </span>
-                      <span style={{ fontSize: '13px', color: color.silver }}>
-                        {stage.count}
-                      </span>
-                    </div>
-                    <ProgressBar pct={stage.pct} />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : null}
         </div>
       </div>
     </div>

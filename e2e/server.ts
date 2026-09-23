@@ -19,6 +19,7 @@ import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '.
 import type { VenueRecord } from '../server/src/venues/fields';
 import { dbConfig } from '../server/src/db';
 import { MemoryDatabase } from './support/memory-database';
+import { createWorkQueueRouter } from '../server/src/workQueue';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -57,7 +58,8 @@ const app = createApp(
   createDeleteEventDraftHandler(eventDependencies),
   createUpdateEventDraftHandler(eventDependencies),
   getEventRequestDetailHandler(eventDependencies),
-  { availability, venues, profile: createProfileRouter(access, { getAdminClient: getClient }) }
+  { availability, venues, profile: createProfileRouter(access, { getAdminClient: getClient }) },
+  createWorkQueueRouter(access, { getAdminClient: getClient })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -69,6 +71,10 @@ app.post('/__e2e/reset', (_req, res) => {
   res.status(204).end();
 });
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
+app.post('/__e2e/work-queue', (_req, res) => {
+  database.seedWorkQueue();
+  res.status(204).end();
+});
 const buildDirectory = path.resolve(__dirname, '../client/dist');
 app.use(express.static(buildDirectory));
 app.get('*', (_req, res) => res.sendFile(path.join(buildDirectory, 'index.html')));

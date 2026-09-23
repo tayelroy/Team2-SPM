@@ -6,7 +6,7 @@
  */
 
 import { color } from '../theme';
-import { ACTIONS, EVENTS, NAV, EQUIPMENT, PRIMARY_ACTION } from './data';
+import { ACTIONS, EVENTS, NAV, EQUIPMENT, PREVIEW_NAV, PRIMARY_ACTION } from './data';
 import type {
   EquipmentRequest,
   EventCard,
@@ -95,6 +95,10 @@ export function currentEvent(role: Role): EventCard {
 
 export function navFor(role: Role): { screen: Screen; label: string }[] {
   return NAV[role].map(([screen, label]) => ({ screen, label }));
+}
+
+export function previewNavFor(role: Role): { screen: Screen; label: string }[] {
+  return (PREVIEW_NAV[role] ?? []).map(([screen, label]) => ({ screen, label }));
 }
 
 export function actionsFor(role: Role) {
