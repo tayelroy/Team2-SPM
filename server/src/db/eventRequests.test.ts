@@ -7,6 +7,7 @@ import {
   fetchOwnEventRequest,
   fetchOwnEventRequests,
   insertEventRequestDraft,
+  startEventReview,
   submitEventRequest,
   updateEventRequestDraft
 } from './eventRequests';
@@ -129,6 +130,50 @@ function fakeEventsUpdateClient(
             },
             select: async () => {
               capture?.({ row, eventId: filters.eventId, status: filters.status });
+              return result;
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+/** Like fakeEventsUpdateClient, but also records the coordinator filter that
+ * keeps one coordinator's review off another's assignment (SG2-35). */
+function fakeEventsReviewClient(
+  result: Result,
+  capture?: (update: {
+    row: Record<string, unknown>;
+    eventId: unknown;
+    coordinatorId: unknown;
+    status: unknown;
+  }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        update: (row: Record<string, unknown>) => {
+          const filters: { eventId?: unknown; coordinatorId?: unknown; status?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
+              if (column === 'coordinator_id') filters.coordinatorId = value;
+              return chain;
+            },
+            in(column: string, value: unknown) {
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            select: async () => {
+              capture?.({
+                row,
+                eventId: filters.eventId,
+                coordinatorId: filters.coordinatorId,
+                status: filters.status
+              });
               return result;
             }
           };
@@ -527,6 +572,61 @@ describe('submitEventRequest', () => {
       const result = await submitEventRequest(fakeEventsUpdateClient({ data, error: null }), 7);
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
+    });
+  }
+});
+
+describe('startEventReview', () => {
+  test('updates status to under_review, filtered to the event, its coordinator and reviewable rows', async () => {
+    let captured:
+      | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
+      | undefined;
+    const result = await startEventReview(
+      fakeEventsReviewClient(
+        {
+          data: [
+            {
+              event_id: 7,
+              organiser_id: 'user-1',
+              status: 'under_review',
+              coordinator_id: 'coordinator-1',
+              coordinator: { name: 'Casey Coordinator' }
+            }
+          ],
+          error: null
+        },
+        (c) => (captured = c)
+      ),
+      7,
+      'coordinator-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.request.status, 'under_review');
+      assert.equal(result.request.coordinator_name, 'Casey Coordinator');
+    }
+    assert.deepEqual(captured?.row, { status: 'under_review' });
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.coordinatorId, 'coordinator-1');
+    assert.deepEqual(captured?.status, ['submitted', 'under_review']);
+  });
+
+  test('reports unavailable when the update errors', async () => {
+    const result = await startEventReview(
+      fakeEventsReviewClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      'coordinator-1'
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+      // A request assigned elsewhere, already decided, or absent must all look
+      // identical so assignments cannot be probed for.
+      const result = await startEventReview(fakeEventsReviewClient({ data, error: null }), 7, 'coordinator-1');
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_found');
     });
   }
 });

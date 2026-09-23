@@ -11,6 +11,7 @@ import { submitEventRequestHandler } from './events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/list';
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
+import { createStartEventReviewHandler } from './events/review';
 import { createVenuesRouter } from './venues';
 import { createProfileRouter } from './profile';
 import { createWorkQueueRouter } from './workQueue';
@@ -33,7 +34,8 @@ export function createApp(
     venues: createVenuesRouter(access),
     profile: createProfileRouter(access)
   },
-  workQueueRouter = createWorkQueueRouter(access)
+  workQueueRouter = createWorkQueueRouter(access),
+  startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -72,6 +74,12 @@ export function createApp(
     '/:eventId/submit',
     access.requirePermission('event_request.submit'),
     eventSubmitHandler
+  );
+  // SG2-35: a coordinator opens a request assigned to them for review.
+  eventRequests.patch(
+    '/:eventId/review',
+    access.requirePermission('event_request.review'),
+    startEventReviewHandler
   );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(
