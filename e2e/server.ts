@@ -13,6 +13,7 @@ import { createUpdateEventDraftHandler } from '../server/src/events/updateDraft'
 import { createDeleteEventDraftHandler } from '../server/src/events/deleteDraft';
 import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
+import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createVenuesRouter } from '../server/src/venues';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
@@ -59,7 +60,8 @@ const app = createApp(
   createUpdateEventDraftHandler(eventDependencies),
   getEventRequestDetailHandler(eventDependencies),
   { availability, venues, profile: createProfileRouter(access, { getAdminClient: getClient }) },
-  createWorkQueueRouter(access, { getAdminClient: getClient })
+  createWorkQueueRouter(access, { getAdminClient: getClient }),
+  createStartEventReviewHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -73,6 +75,10 @@ app.post('/__e2e/reset', (_req, res) => {
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
 app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
+  res.status(204).end();
+});
+app.post('/__e2e/assigned-review', (_req, res) => {
+  database.seedAssignedReview();
   res.status(204).end();
 });
 const buildDirectory = path.resolve(__dirname, '../client/dist');

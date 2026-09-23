@@ -80,6 +80,15 @@ export class MemoryDatabase {
     this.tables.equipment_requests.push({ ...request, equipment_id: 1, quantity: 4 }, { ...request, request_id: 12, equipment_id: 1, quantity: 1, status: 'rejected' });
   }
 
+  /** SG2-35: a submitted request already assigned to the signed-in coordinator.
+   * Seeded separately from seedWorkQueue so its queue counts stay unchanged. */
+  seedAssignedReview() {
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 51, name: 'Assigned Review Forum', status: 'submitted',
+      coordinator_id: 'user-coordinator', purpose: 'Decide whether the forum proceeds',
+    });
+  }
+
   /** Test equivalent of the SQL view; SQL policy tests exercise the real view. */
   private workItems(): Row[] {
     const active = this.tables.events.filter(event => ['submitted', 'under_review', 'approved', 'planning', 'confirmed'].includes(String(event.status)));
