@@ -77,6 +77,7 @@ test('list returns the venue\'s current layouts and PUT replaces them wholesale'
 
 test('non-array and malformed inputs are rejected by the validator', () => {
   for (const input of [null, undefined, {}, 'bad', 1, true]) assert.equal(validateVenueLayouts(input), null);
+  for (const item of [null, undefined, 'classroom', 1, true, []]) assert.equal(validateVenueLayouts([item]), null, `malformed entry: ${JSON.stringify(item)}`);
   assert.equal(validateVenueLayouts([{ layout: 'unknown' }]), null);
   assert.equal(validateVenueLayouts([classroom, classroom]), null, 'duplicate layouts rejected');
   assert.equal(validateVenueLayouts([{ layout: 'other' }]), null, 'other requires a description');
