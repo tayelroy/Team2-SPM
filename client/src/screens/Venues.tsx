@@ -3,6 +3,7 @@ import { can, loadAccess, type Access } from '../auth/access';
 import { Card, Eyebrow, Fact, GhostButton, GradientButton, Notice, RecessedCard } from '../ui';
 import { color, rule } from '../theme';
 import VenueForm, { inputStyle } from '../venues/VenueForm';
+import { VenueLayoutError, describeLayouts, fetchVenueLayouts, saveVenueLayouts, type VenueLayout, type VenueLayoutValues } from '../venues/layoutsApi';
 import { VenueError, venueRequest, type Venue, type VenueValues } from '../venues/api';
 
 /** Use the signed-in token and server permissions to load and maintain records. */
@@ -19,6 +20,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Venue | null | undefined>(undefined);
+  const [layoutsByVenue, setLayoutsByVenue] = useState<Record<number, VenueLayout[]>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -42,8 +44,16 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
           venueRequest(token!, controller.signal),
         ]);
         if (controller.signal.aborted) return;
+        // Fetched alongside the catalogue, under the same loading state, so no
+        // per-card "Loading…" flicker appears once the page is shown.
+        const layouts = can(identity, 'venues.layouts.read')
+          ? await Promise.all((data.venues as Venue[]).map((venue: Venue) =>
+              fetchVenueLayouts(token!, controller.signal, venue.venue_id).catch(() => [] as VenueLayout[])))
+          : [];
+        if (controller.signal.aborted) return;
         setAccess(identity);
         setVenues(data.venues);
+        setLayoutsByVenue(Object.fromEntries((data.venues as Venue[]).map((venue: Venue, index: number) => [venue.venue_id, layouts[index] ?? []])));
       } catch (failure) {
         if (!controller.signal.aborted) setError(failure instanceof VenueError ? failure.message : 'Unable to load venues. Please try again.');
       } finally {
@@ -56,7 +66,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
 
   useEffect(() => () => { pending.current?.abort(); }, []);
 
-  async function save(values: VenueValues) {
+  async function save(values: VenueValues, layoutValues?: VenueLayoutValues[]) {
     if (pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
@@ -66,16 +76,22 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
       const { venue } = await venueRequest(token!, controller.signal, values, editing?.venue_id);
       if (controller.signal.aborted) return;
       setVenues(current => [...current.filter(item => item.venue_id !== venue.venue_id), venue]);
+      if (layoutValues !== undefined) {
+        const layouts = await saveVenueLayouts(token!, controller.signal, venue.venue_id, layoutValues);
+        if (controller.signal.aborted) return;
+        setLayoutsByVenue(current => ({ ...current, [venue.venue_id]: layouts }));
+      }
       setSaved(`${venue.name} saved. The catalogue is up to date.`);
       setEditing(undefined);
     } catch (failure) {
       if (controller.signal.aborted) return;
-      if (failure instanceof VenueError && [401, 403].includes(failure.status)) {
+      if ((failure instanceof VenueError || failure instanceof VenueLayoutError) && [401, 403].includes(failure.status)) {
         setAccess(null);
         setVenues([]);
         setEditing(undefined);
       }
-      setError(failure instanceof VenueError ? failure.message : 'Unable to save venue. Your changes are still in the form. Please try again.');
+      setError(failure instanceof VenueError || failure instanceof VenueLayoutError ? failure.message
+        : 'Unable to save venue. Your changes are still in the form. Please try again.');
     } finally {
       pending.current = null;
       if (!controller.signal.aborted) setSaving(false);
@@ -85,7 +101,9 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
   if (!token) return <Notice><Eyebrow>Sign in required</Eyebrow><span>Sign in with your account to view venue records.</span></Notice>;
   if (loading) return <p role="status">Loading venue catalogue…</p>;
   if (!access) return <Notice><p role="alert">{error}</p><GhostButton onClick={() => setAttempt(n => n + 1)}>Retry</GhostButton></Notice>;
-  if (editing !== undefined) return <VenueForm venue={editing} saving={saving} error={error} onSave={save}
+  if (editing !== undefined) return <VenueForm venue={editing}
+    layouts={editing && can(access, 'venues.layouts.update') ? layoutsByVenue[editing.venue_id] ?? [] : undefined}
+    saving={saving} error={error} onSave={save}
     onCancel={() => { setEditing(undefined); setError(''); }} />;
 
   const search = query.trim().toLowerCase();
@@ -124,6 +142,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
             <Fact label="Facilities" value={venue.facilities ?? 'Not recorded'} />
             <Fact label="Accessibility" value={venue.accessibility_features ?? 'Not recorded'} />
             <Fact label="Operating information" value={venue.operating_information ?? 'Not recorded'} />
+            {can(access, 'venues.layouts.read') ? <Fact label="Supported layouts" value={describeLayouts(layoutsByVenue[venue.venue_id] ?? [])} /> : null}
           </div>
           <div style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {can(access, 'venues.update') ? <GhostButton onClick={() => { setSaved(''); setEditing(venue); }}>Edit {venue.name}</GhostButton> : null}
