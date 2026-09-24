@@ -13,8 +13,9 @@ export interface VenueLayoutStore {
   replace(venueId: number, layouts: VenueLayoutValues[]): Promise<VenueLayoutRecord[] | null>;
 }
 
-/** Use the existing table and caller token. Routes enforce permissions;
- * database RLS adds protection only when separately configured by the team. */
+/** Use the caller's own token, so row level security policies on
+ * venue_layouts (see the SG2-43 migration) enforce the same read/write split
+ * as the route permission checks, rather than relying on the route alone. */
 export function createVenueLayoutStore(token: string): VenueLayoutStore {
   const { supabaseUrl: url, supabaseAnonKey: key } = dbConfig;
   if (!url || !key || new URL(url).protocol !== 'https:') throw new AccessError(503);
