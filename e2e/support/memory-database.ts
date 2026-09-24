@@ -63,7 +63,8 @@ export class MemoryDatabase {
       ],
       venue_unavailability: [
         { venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }
-      ]
+      ],
+      venue_layouts: []
     };
   }
 
@@ -153,7 +154,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   private orders: { key: string; ascending: boolean }[] = [];
   private columns = '*';
   private operation: 'read' | 'insert' | 'update' | 'delete' = 'read';
-  private values: Row = {};
+  private values: Row | Row[] = {};
   private single = false;
   private window?: [number, number];
   private execution?: Promise<QueryResult>;
@@ -169,7 +170,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   order(key: string, options: { ascending?: boolean } = {}) {
     this.orders.push({ key, ascending: options.ascending !== false }); return this;
   }
-  insert(values: Row) { this.operation = 'insert'; this.values = values; return this; }
+  insert(values: Row | Row[]) { this.operation = 'insert'; this.values = values; return this; }
   update(values: Row) { this.operation = 'update'; this.values = values; return this; }
   delete() { this.operation = 'delete'; return this; }
   maybeSingle() { this.single = true; return this; }
@@ -178,13 +179,17 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     const table = this.database.tables[this.table];
     let rows = table.filter(row => this.filters.every(filter => filter(row)));
     if (this.operation === 'insert') {
-      const row = structuredClone(this.values);
+      const incoming = Array.isArray(this.values) ? this.values : [this.values];
       const id = { events: 'event_id', venues: 'venue_id' }[this.table];
-      if (id) row[id] = Math.max(0, ...table.map(row => Number(row[id]))) + 1;
-      table.push(row);
-      rows = [row];
+      let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
+      rows = incoming.map(value => {
+        const row = structuredClone(value);
+        if (id) row[id] = nextId++;
+        table.push(row);
+        return row;
+      });
     } else if (this.operation === 'update') {
-      rows.forEach(row => Object.assign(row, structuredClone(this.values)));
+      rows.forEach(row => Object.assign(row, structuredClone(this.values as Row)));
     } else if (this.operation === 'delete') {
       this.database.tables[this.table] = table.filter(row => !rows.includes(row));
     }
