@@ -506,3 +506,41 @@ test('SG2-44-P01 | calendar renders fixture availability and changes its request
   await expect(page.getByRole('heading', { name: 'July 2030', exact: true })).toBeVisible();
   await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toHaveCount(0);
 });
+
+test('SG2-35-P01 | opening an assigned submitted request moves it to under review', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/assigned-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+
+  const queue = page.getByRole('region', { name: 'Awaiting review' });
+  await queue.getByRole('button', { name: /Assigned Review Forum/ }).click();
+
+  // Opening it is the review: the organiser sees under_review without the
+  // coordinator pressing anything further.
+  await expect(page.getByRole('heading', { name: 'Assigned Review Forum' })).toBeVisible();
+  await expect(page.getByText('under review')).toBeVisible();
+  await expect(page.getByText('Decide whether the forum proceeds')).toBeVisible();
+
+  // The transition is persisted, not just reflected in the open screen.
+  const detail = await page.request.get('/api/work-queue/event/51', { headers: await authHeaders(page) });
+  expect(detail.ok()).toBeTruthy();
+  expect((await detail.json()).items[0].status).toBe('under_review');
+});
+
+test('SG2-35-N01 | a request awaiting assignment is readable but never enters review', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
+  await expect(page.getByText(/Awaiting assignment/)).toBeVisible();
+  await expect(page.getByText('submitted')).toBeVisible();
+
+  // Assignment belongs to Technical Support Staff (SG2-33); reviewing an
+  // unassigned request is refused even when called directly.
+  const headers = await authHeaders(page);
+  expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404);
+  const detail = await page.request.get('/api/work-queue/event/41', { headers });
+  expect((await detail.json()).items[0].status).toBe('submitted');
+});

@@ -30,6 +30,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-29: an organiser can edit their own request's fields while it is
   // still a draft.
   'event_request.update': ['event_organiser'],
+  // SG2-35: a coordinator opens a request for review. Which request is
+  // enforced per-row by the assignment made in SG2-33, not by this grant.
+  'event_request.review': ['event_coordinator'],
   // SG2-38: see what stage an event has reached
   'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.read': ['venue_staff', 'event_coordinator'],

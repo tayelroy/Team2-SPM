@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchWorkQueue, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
+import { fetchWorkQueue, startEventReview, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 
 const GROUPS = {
@@ -35,12 +35,40 @@ function context(item: WorkItem) {
   return `${source} · Event #${item.event_id}`;
 }
 
-function ItemDetail({ item }: { item: WorkItem }) {
+/** SG2-35: opening a submitted request assigned to this coordinator is itself
+ * the act of reviewing it, so the status moves to under_review here rather
+ * than behind a separate button — the organiser sees it is being looked at.
+ * Requests awaiting assignment are readable but never transition: only
+ * Technical Support Staff assign a coordinator (SG2-33). */
+function useOpenedForReview(item: WorkItem, accessToken?: string | null) {
+  const [status, setStatus] = useState(item.status);
+  const [error, setError] = useState('');
+  const opensReview = item.kind === 'event' && item.assigned_to_me && item.status === 'submitted';
+
+  useEffect(() => {
+    if (!opensReview) return;
+    let cancelled = false;
+    startEventReview(item.event_id, accessToken).then(result => {
+      if (cancelled) return;
+      if (result.ok) setStatus(result.status);
+      else setError(result.error);
+    });
+    return () => { cancelled = true; };
+  }, [opensReview, item.event_id, accessToken]);
+
+  return { status, error };
+}
+
+function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: string | null }) {
+  const { status, error } = useOpenedForReview(item, accessToken);
   return <article className="organisation-detail" aria-label={KINDS[item.kind]}>
     <div className="organisation-detail-header">
       <span>{KINDS[item.kind]} #{item.item_id}</span>
-      <span className="work-queue-status">{item.status.replace(/_/g, ' ')}</span>
+      <span className="work-queue-status">{status.replace(/_/g, ' ')}</span>
     </div>
+    {error && <p role="alert" className="work-queue-empty">{error}</p>}
+    {item.kind === 'event' && !item.assigned_to_me &&
+      <p className="work-queue-empty">Awaiting assignment. Technical Support Staff assign a coordinator before it can be reviewed.</p>}
     <div className="organisation-detail-intro">
       <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
       <p>{context(item)}</p>
@@ -72,7 +100,7 @@ function QueueContent({ role, accessToken, selection, onSelect }: {
 
   if (!result) return <p role="status">Loading your work queue…</p>;
   if (!result.ok) return <p role="alert">{result.error}</p>;
-  if (selection) return <ItemDetail item={result.items[0]} />;
+  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} />;
 
   return <>
     <p className="work-queue-summary" role="status">{result.items.length} {result.items.length === 1 ? 'item' : 'items'} in your work queue</p>

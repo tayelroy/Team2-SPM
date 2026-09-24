@@ -9,7 +9,8 @@ import { createWorkQueueRouter } from './workQueue';
 import type { fetchWorkQueue, WorkItem } from './db/workQueue';
 
 const item: WorkItem = { kind: 'event', item_id: 42, event_id: 42, title: 'Forum', event_name: 'Forum',
-  status: 'submitted', starts_at: null, ends_at: null, category: 'review', details: { purpose: 'Planning' } };
+  status: 'submitted', starts_at: null, ends_at: null, category: 'review', assigned_to_me: false,
+  details: { purpose: 'Planning' } };
 
 function fixture(role: Role = 'event_coordinator', fetchItems: typeof fetchWorkQueue = async () => [item], admin: SupabaseClient | null = {} as SupabaseClient) {
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'verified-user', role }) });

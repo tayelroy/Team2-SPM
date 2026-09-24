@@ -27,6 +27,11 @@ function fixture(rows: Record<string, unknown>[], failure?: 'error' | 'null') {
   return { client, calls };
 }
 
+/** SG2-35 flags which rows the caller may act on: only their own assignments.
+ * Shared rows stay readable but are never reviewable. */
+const mine = (row: Record<string, unknown>) => ({ ...row, assigned_to_me: true });
+const shared = (row: Record<string, unknown>) => ({ ...row, assigned_to_me: false });
+
 test('coordinator list and detail include shared reviews and own assignments, never another coordinator or role', async () => {
   const rows = [
     { kind: 'event', item_id: 1, audience: 'event_coordinator', assigned_to: null },
@@ -36,12 +41,12 @@ test('coordinator list and detail include shared reviews and own assignments, ne
   ];
   const { client, calls } = fixture(rows);
   const principal = { userId: 'coordinator-1', role: 'event_coordinator' as const };
-  assert.deepEqual(await fetchWorkQueue(client, principal), rows.slice(0, 2));
+  assert.deepEqual(await fetchWorkQueue(client, principal), [shared(rows[0]), mine(rows[1])]);
   assert.deepEqual(calls, [
     [[['audience', 'event_coordinator'], ['assigned_to', null]], 0, 999],
     [[['audience', 'event_coordinator'], ['assigned_to', 'coordinator-1']], 0, 999],
   ]);
-  assert.deepEqual(await fetchWorkQueue(client, principal, { kind: 'event', item_id: 2 }), [rows[1]]);
+  assert.deepEqual(await fetchWorkQueue(client, principal, { kind: 'event', item_id: 2 }), [mine(rows[1])]);
   for (const selection of [{ kind: 'event' as const, item_id: 3 }, { kind: 'venue' as const, item_id: 1 }]) {
     assert.deepEqual(await fetchWorkQueue(client, principal, selection), []);
   }
@@ -50,7 +55,7 @@ test('coordinator list and detail include shared reviews and own assignments, ne
 test('staff queries use verified role and return all pages, including an empty queue', async () => {
   const rows = Array.from({ length: 1001 }, (_, index) => ({ kind: 'venue', item_id: index + 1, audience: 'venue_staff', assigned_to: null }));
   const { client, calls } = fixture(rows);
-  assert.deepEqual(await fetchWorkQueue(client, { userId: 'staff', role: 'venue_staff' }), rows);
+  assert.deepEqual(await fetchWorkQueue(client, { userId: 'staff', role: 'venue_staff' }), rows.map(shared));
   assert.deepEqual(calls.map(call => call.slice(1)), [[0, 999], [1000, 1999]]);
   assert.deepEqual(await fetchWorkQueue(client, { userId: 'staff', role: 'technical_support_staff' }), []);
 });
