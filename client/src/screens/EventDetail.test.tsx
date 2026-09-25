@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventDetail from './EventDetail';
@@ -52,6 +52,8 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         coordinatorName: 'Sarah Jenkins',
         canManage: true,
         waitingOnMe: false,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
 
@@ -114,6 +116,8 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         coordinatorName: null,
         canManage: true,
         waitingOnMe: true,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
 
@@ -163,6 +167,8 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         coordinatorName: 'A. Vance',
         canManage: true,
         waitingOnMe: true,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
 
@@ -273,7 +279,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
       name: 'Previous request', purpose: '', description: '', proposedDate: null,
       expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
       equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
-      coordinatorName: null, canManage: true, waitingOnMe: true,
+      coordinatorName: null, canManage: true, waitingOnMe: true, decisionReason: null, decidedAt: null,
     };
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
       .mockImplementationOnce(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }))
@@ -298,7 +304,7 @@ test.each(['draft', 'rejected', 'submitted'])('colleague %s detail is strictly v
     name: 'Colleague event', purpose: 'Shared work', description: '', proposedDate: null,
     expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
     equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
-    coordinatorName: null, canManage: false, waitingOnMe: false,
+    coordinatorName: null, canManage: false, waitingOnMe: false, decisionReason: null, decidedAt: null,
   } });
   render(<EventDetail role="Event Organiser" accessToken="token" selectedEventId={77} onNavigate={vi.fn()} />);
   expect(await screen.findByText(/View only. This event/)).toBeInTheDocument();
@@ -331,6 +337,8 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         coordinatorName: 'Sarah Jenkins',
         canManage: true,
         waitingOnMe: false,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
 
@@ -404,6 +412,8 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         coordinatorName: null,
         canManage: true,
         waitingOnMe: true,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
 
@@ -447,6 +457,8 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         coordinatorName: null,
         canManage: true,
         waitingOnMe: true,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
 
@@ -466,3 +478,38 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
   });
 });
 
+
+test('a rejected request shows the organiser why it was rejected (SG2-37)', async () => {
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+    ok: true,
+    request: {
+      eventId: 101, organiserId: 'org-1', organisation: 'Acme Corp', status: 'rejected',
+      name: 'Annual Gala', purpose: 'Celebrate', description: '', proposedDate: null,
+      expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+      equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
+      coordinatorName: 'Jane Doe', canManage: true, waitingOnMe: true,
+      decisionReason: 'Clashes with the AGM on the same evening.',
+      decidedAt: '2026-09-25T02:00:00.000Z',
+    },
+  });
+  render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={101} accessToken="token" />);
+  const why = await screen.findByRole('region', { name: 'Why this request was rejected' });
+  expect(within(why).getByText('Clashes with the AGM on the same evening.')).toBeVisible();
+});
+
+test('a rejection recorded without a stored reason shows no empty explanation (SG2-37)', async () => {
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+    ok: true,
+    request: {
+      eventId: 102, organiserId: 'org-1', organisation: 'Acme Corp', status: 'rejected',
+      name: 'Annual Gala', purpose: 'Celebrate', description: '', proposedDate: null,
+      expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+      equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
+      coordinatorName: 'Jane Doe', canManage: true, waitingOnMe: true,
+      decisionReason: null, decidedAt: null,
+    },
+  });
+  render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={102} accessToken="token" />);
+  await screen.findByRole('heading', { name: 'Annual Gala' });
+  expect(screen.queryByRole('region', { name: 'Why this request was rejected' })).not.toBeInTheDocument();
+});

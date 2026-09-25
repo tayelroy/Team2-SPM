@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchWorkQueue, startEventReview, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
+import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 
 const GROUPS = {
@@ -56,11 +56,47 @@ function useOpenedForReview(item: WorkItem, accessToken?: string | null) {
     return () => { cancelled = true; };
   }, [opensReview, item.event_id, accessToken]);
 
-  return { status, error };
+  return { status, error, setStatus };
+}
+
+/** SG2-37: the coordinator reviewing a request decides its outcome. A
+ * rejection must say why, so the organiser knows what to change before
+ * resubmitting; approval may add a note but does not need one. */
+function DecisionPanel({ eventId, accessToken, onDecided }: {
+  eventId: number;
+  accessToken?: string | null;
+  onDecided: (status: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [pending, setPending] = useState<Decision | null>(null);
+  const [error, setError] = useState('');
+
+  async function decide(decision: Decision) {
+    setError('');
+    setPending(decision);
+    const result = await decideEventRequest(eventId, decision, reason, accessToken);
+    setPending(null);
+    if (result.ok) onDecided(result.status);
+    else setError(result.error);
+  }
+
+  return <section className="work-queue-decision" aria-label="Decide this request">
+    <label htmlFor={`decision-reason-${eventId}`}>Reason (required to reject)</label>
+    <textarea id={`decision-reason-${eventId}`} value={reason} rows={3}
+      onChange={event => setReason(event.target.value)} />
+    {error && <p role="alert" className="work-queue-empty">{error}</p>}
+    <div className="work-queue-decision-actions">
+      <button type="button" className="organisation-button" disabled={pending !== null}
+        onClick={() => decide('approved')}>{pending === 'approved' ? 'Approving…' : 'Approve'}</button>
+      <button type="button" className="organisation-button" disabled={pending !== null}
+        onClick={() => decide('rejected')}>{pending === 'rejected' ? 'Rejecting…' : 'Reject'}</button>
+    </div>
+  </section>;
 }
 
 function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: string | null }) {
-  const { status, error } = useOpenedForReview(item, accessToken);
+  const { status, error, setStatus } = useOpenedForReview(item, accessToken);
+  const canDecide = item.kind === 'event' && item.assigned_to_me && status === 'under_review';
   return <article className="organisation-detail" aria-label={KINDS[item.kind]}>
     <div className="organisation-detail-header">
       <span>{KINDS[item.kind]} #{item.item_id}</span>
@@ -80,6 +116,7 @@ function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: strin
         return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
       })}
     </dl>
+    {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
   </article>;
 }
 

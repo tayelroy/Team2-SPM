@@ -254,6 +254,14 @@ export default function EventDetail({
             <p>{detail.purpose || 'No purpose specified'}</p>
             {detail.description ? <p className="organisation-detail-description">{detail.description}</p> : null}
           </section>
+          {/* SG2-37: a rejection always explains itself, so the organiser can
+              see what to change before resubmitting. */}
+          {isRejected && detail.decisionReason ? (
+            <section className="organisation-detail-intro" aria-label="Why this request was rejected">
+              <h3>Why this was rejected</h3>
+              <p className="organisation-detail-description">{detail.decisionReason}</p>
+            </section>
+          ) : null}
           <dl className="organisation-detail-facts">
             {facts.map((fact) => (
               <div key={fact.label}>

@@ -119,6 +119,9 @@ export interface EventRequestDetail {
   coordinatorName: string | null;
   canManage: boolean;
   waitingOnMe: boolean;
+  /** Why the coordinator rejected it, and when they decided (SG2-37). */
+  decisionReason: string | null;
+  decidedAt: string | null;
 }
 
 export type SubmitResult =
@@ -191,6 +194,8 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
     canManage: raw.can_manage === true,
     waitingOnMe: raw.can_manage === true && isWaitingOnOrganiser(status),
+    decisionReason: typeof raw.decision_reason === 'string' ? raw.decision_reason : null,
+    decidedAt: typeof raw.decided_at === 'string' ? raw.decided_at : null,
   };
 }
 

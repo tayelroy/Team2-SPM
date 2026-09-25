@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { fetchWorkQueue, startEventReview } from './workQueue';
+import { decideEventRequest, fetchWorkQueue, startEventReview } from './workQueue';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -72,4 +72,57 @@ test.each(['offline', 'invalid-json', 'null', 'missing-items', 'missing-detail',
       { items: scenario === 'ambiguous-detail' ? [{}, {}] : [] });
   }));
   expect(await fetchWorkQueue('token', { kind: 'event', item_id: 1 })).toEqual({ ok: false, error: 'Your work queue is temporarily unavailable. Please try again.' });
+});
+
+test('a decision patches the request and returns its new status', async () => {
+  const fetch = vi.fn(async () => Response.json({ request: { event_id: 7, status: 'approved' } }));
+  vi.stubGlobal('fetch', fetch);
+  expect(await decideEventRequest(7, 'approved', '', 'token')).toEqual({ ok: true, status: 'approved' });
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/7/decision', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer token' },
+    body: JSON.stringify({ decision: 'approved', reason: '' }),
+  });
+});
+
+test('a rejection sends the reason the organiser will read', async () => {
+  const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ request: { event_id: 7, status: 'rejected' } }));
+  vi.stubGlobal('fetch', fetch);
+  expect(await decideEventRequest(7, 'rejected', 'Clashes with the AGM.', 'token')).toEqual({ ok: true, status: 'rejected' });
+  expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ decision: 'rejected', reason: 'Clashes with the AGM.' });
+});
+
+test('deciding without credentials does not send a request', async () => {
+  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  expect(await decideEventRequest(7, 'approved', '', null)).toEqual({ ok: false, error: 'Sign in again to decide this request.' });
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test('a refused decision explains what the server objected to', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'A reason is required when rejecting an event request.' }, { status: 400 })));
+  expect(await decideEventRequest(7, 'rejected', '', 'token')).toEqual({
+    ok: false, error: 'A reason is required when rejecting an event request.',
+  });
+});
+
+test('a 400 without a readable body still reports a usable message', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>', { status: 400 })));
+  expect(await decideEventRequest(7, 'rejected', '', 'token')).toEqual({ ok: false, error: 'That decision was not accepted.' });
+});
+
+test.each([401, 403, 404, 503])('a decision rejected with HTTP %s explains what to do next', async status => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status })));
+  expect(await decideEventRequest(7, 'approved', '', 'token')).toEqual({ ok: false, error: status === 401 || status === 403
+    ? 'Your account cannot decide this request. Sign in again.'
+    : status === 404 ? 'This request is no longer under review by you.'
+      : 'Could not record the decision. Please try again.' });
+});
+
+test.each(['offline', 'invalid-json', 'missing-request', 'missing-status'])('a %s decision response never reports success', async scenario => {
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (scenario === 'offline') throw new TypeError('Offline');
+    if (scenario === 'invalid-json') return new Response('<html>error</html>');
+    return Response.json(scenario === 'missing-request' ? {} : { request: { event_id: 7 } });
+  }));
+  expect(await decideEventRequest(7, 'approved', '', 'token')).toEqual({ ok: false, error: 'Could not record the decision. Please try again.' });
 });
