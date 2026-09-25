@@ -544,3 +544,74 @@ test('SG2-35-N01 | a request awaiting assignment is readable but never enters re
   const detail = await page.request.get('/api/work-queue/event/41', { headers });
   expect((await detail.json()).items[0].status).toBe('submitted');
 });
+
+test('SG2-37-P01 | approving a request under review records the outcome and its decider', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Decision Forum' })).toBeVisible();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(page.getByText('approved')).toBeVisible();
+
+  // The decision persisted rather than only showing on the open screen. A
+  // coordinator reads it back through their own queue: the organiser event
+  // endpoints are restricted to Event Organisers (SG2-26).
+  const headers = await authHeaders(page);
+  const item = await page.request.get('/api/work-queue/event/52', { headers });
+  expect((await item.json()).items[0].status).toBe('approved');
+});
+
+test('SG2-37-P02 | rejecting requires a reason and shows it to the organiser', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+
+  // A rejection without a reason is refused rather than recorded silently.
+  await page.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('reason is required');
+  await expect(page.getByText('under review')).toBeVisible();
+
+  await page.getByLabel(/Reason/).fill('Clashes with the AGM on the same evening.');
+  await page.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(page.getByText('rejected')).toBeVisible();
+
+  // AC2 in full: the organiser who raised it is told why, in their own view.
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  await signIn(page, 'organiser');
+
+  const headers = await authHeaders(page);
+  const detail = await page.request.get('/api/event-requests/52', { headers });
+  const decided = (await detail.json()).request;
+  expect(decided.status).toBe('rejected');
+  expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.');
+
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: /Decision Forum/ }).click();
+  await expect(page.getByRole('region', { name: 'Why this request was rejected' }))
+    .toContainText('Clashes with the AGM on the same evening.');
+});
+
+test('SG2-37-N01 | a request another coordinator is reviewing cannot be decided', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
+  const headers = await authHeaders(page);
+
+  // Event 43 is under review by a different coordinator.
+  const refused = await page.request.patch('/api/event-requests/43/decision', {
+    headers, data: { decision: 'approved' },
+  });
+  expect(refused.status()).toBe(404);
+
+  // Event 41 is submitted but unassigned, so it is not under anyone's review.
+  const unassigned = await page.request.patch('/api/event-requests/41/decision', {
+    headers, data: { decision: 'approved' },
+  });
+  expect(unassigned.status()).toBe(404);
+});

@@ -14,6 +14,7 @@ import { createDeleteEventDraftHandler } from '../server/src/events/deleteDraft'
 import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
+import { createDecideEventRequestHandler } from '../server/src/events/decide';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
 import { createProfileRouter } from '../server/src/profile';
@@ -81,7 +82,8 @@ const app = createApp(
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.
   undefined,
-  createStartEventReviewHandler(eventDependencies)
+  createStartEventReviewHandler(eventDependencies),
+  createDecideEventRequestHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -99,6 +101,10 @@ app.post('/__e2e/work-queue', (_req, res) => {
 });
 app.post('/__e2e/assigned-review', (_req, res) => {
   database.seedAssignedReview();
+  res.status(204).end();
+});
+app.post('/__e2e/under-review', (_req, res) => {
+  database.seedUnderReview();
   res.status(204).end();
 });
 const buildDirectory = path.resolve(__dirname, '../client/dist');
