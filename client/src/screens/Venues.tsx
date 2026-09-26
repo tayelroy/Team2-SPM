@@ -3,6 +3,7 @@ import { can, loadAccess, type Access } from '../auth/access';
 import { Card, Eyebrow, Fact, GhostButton, GradientButton, Notice, RecessedCard } from '../ui';
 import { color, rule } from '../theme';
 import VenueForm, { inputStyle } from '../venues/VenueForm';
+import VenueBlocks from '../venues/VenueBlocks';
 import { VenueLayoutError, describeLayouts, fetchVenueLayouts, saveVenueLayouts, type VenueLayout, type VenueLayoutValues } from '../venues/layoutsApi';
 import { VenueError, venueRequest, type Venue, type VenueValues } from '../venues/api';
 
@@ -20,6 +21,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Venue | null | undefined>(undefined);
+  const [blocking, setBlocking] = useState<Venue | undefined>(undefined);
   const [layoutsByVenue, setLayoutsByVenue] = useState<Record<number, VenueLayout[]>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
@@ -101,6 +103,8 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
   if (!token) return <Notice><Eyebrow>Sign in required</Eyebrow><span>Sign in with your account to view venue records.</span></Notice>;
   if (loading) return <p role="status">Loading venue catalogue…</p>;
   if (!access) return <Notice><p role="alert">{error}</p><GhostButton onClick={() => setAttempt(n => n + 1)}>Retry</GhostButton></Notice>;
+  if (blocking) return <VenueBlocks token={token} venue={blocking} onClose={() => setBlocking(undefined)}
+    onAccessLost={message => { setAccess(null); setVenues([]); setBlocking(undefined); setError(message); }} />;
   if (editing !== undefined) return <VenueForm venue={editing}
     layouts={editing && can(access, 'venues.layouts.update') ? layoutsByVenue[editing.venue_id] ?? [] : undefined}
     saving={saving} error={error} onSave={save}
@@ -146,6 +150,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
           </div>
           <div style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {can(access, 'venues.update') ? <GhostButton onClick={() => { setSaved(''); setEditing(venue); }}>Edit {venue.name}</GhostButton> : null}
+            {can(access, 'venues.blocks.manage') ? <GhostButton onClick={() => { setSaved(''); setBlocking(venue); }}>Block {venue.name}</GhostButton> : null}
             {access.role === 'event_coordinator' ? <GhostButton onClick={onBook}>Request {venue.name}</GhostButton> : null}
           </div>
         </Card>)}

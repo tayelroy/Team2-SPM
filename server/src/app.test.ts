@@ -21,10 +21,11 @@ test('application composition mounts injected service routers without exposing t
   const availability = Router().get('/availability', (_req, res) => res.json({ service: 'availability' }));
   const venues = Router().get('/', (_req, res) => res.json({ service: 'venues' }));
   const layouts = Router().get('/1/layouts', (_req, res) => res.json({ service: 'layouts' }));
+  const blocks = Router().get('/1/blocks', (_req, res) => res.json({ service: 'blocks' }));
   const profile = Router().get('/', (_req, res) => res.json({ service: 'profile' }));
   const composed = createApp(undefined, undefined, undefined, undefined, undefined, undefined,
-    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, profile });
-  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/profile', 'profile']]) {
+    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, blocks, profile });
+  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/blocks', 'blocks'], ['/api/profile', 'profile']]) {
     const response = await request(composed).get(path);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { service });
