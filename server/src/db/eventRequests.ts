@@ -55,6 +55,10 @@ export type AssignCoordinatorResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'not_assignable' | 'unavailable'; message: string };
 
+export type StartReviewResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
+
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
@@ -339,6 +343,54 @@ export async function submitEventRequest(
     return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
   }
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
+}
+
+/**
+ * Statuses a coordinator may open for review (SG2-35). `under_review` is
+ * included so returning to a review already in progress is idempotent rather
+ * than an error — reopening your own open review is ordinary behaviour.
+ */
+const REVIEWABLE_STATUSES = ['submitted', 'under_review'];
+
+/**
+ * Moves a request assigned to this coordinator to `under_review` (SG2-35).
+ *
+ * `coordinator_id` is a condition on the write itself rather than a
+ * pre-check, matching the atomic-ownership shape the SG2-32 IDOR review
+ * established: a request assigned to a different coordinator cannot be
+ * touched by event id alone, even if a future caller skips the lookup.
+ * Assignment is made by Technical Support Staff (SG2-33), never claimed
+ * here, so an unassigned request matches zero rows and stays untouched.
+ */
+export async function startEventReview(
+  admin: SupabaseClient,
+  eventId: number,
+  coordinatorId: string
+): Promise<StartReviewResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update({ status: 'under_review' })
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .in('status', REVIEWABLE_STATUSES)
+    .select(DETAIL_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    // Deliberately one reason for "not assigned to you", "not in a reviewable
+    // status" and "does not exist": a coordinator must not be able to probe
+    // for another coordinator's assignments by comparing responses.
+    return { ok: false, reason: 'not_found', message: 'No reviewable event request is assigned to this account.' };
+  }
+  const row = data[0] as unknown as Record<string, unknown>;
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request };
 }
 
 /**

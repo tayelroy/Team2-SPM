@@ -144,8 +144,24 @@ begin
   insert into public.events (organiser_id, organisation, name) values
     ('b0000000-0000-4000-8000-000000000001', 'Example A', 'Service-created event')
     returning event_id into created_id;
+  if created_id is null or not exists (
+    select 1 from public.events
+    where event_id = created_id
+      and organiser_id = 'b0000000-0000-4000-8000-000000000001'
+      and organisation = 'Example A'
+      and name = 'Service-created event'
+  ) then
+    raise exception 'The API service role must persist the new event';
+  end if;
   update public.events set name = 'Service-updated event' where event_id = created_id;
+  if (select name from public.events where event_id = created_id)
+      is distinct from 'Service-updated event' then
+    raise exception 'The API service role must persist event updates';
+  end if;
   delete from public.events where event_id = created_id;
+  if exists (select 1 from public.events where event_id = created_id) then
+    raise exception 'The API service role must remove deleted events';
+  end if;
   update public.users set organisation = 'Example B'
     where user_id = 'b0000000-0000-4000-8000-000000000001';
 end $$;

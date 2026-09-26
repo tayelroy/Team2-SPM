@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { Card, Eyebrow, GhostButton, RecessedCard } from '../ui';
 import { color, gradient, label, radius, rule, surface } from '../theme';
 import type { Venue, VenueValues } from './api';
+import { LAYOUT_LABELS, LAYOUTS } from './layoutsApi';
+import type { Layout, VenueLayout, VenueLayoutValues } from './layoutsApi';
 
 const FIELDS = [
   ['name', 'Venue name', 'e.g. Atrium Hall'],
@@ -18,11 +20,16 @@ export const inputStyle = {
   borderRadius: radius.sm, padding: '13px 14px', color: color.mist, fontSize: '14px', lineHeight: 1.5
 };
 
-export default function VenueForm({ venue, saving, error, onSave, onCancel }: {
+export default function VenueForm({ venue, layouts, saving, error, onSave, onCancel }: {
   venue: Venue | null;
+  /** The venue's current supported layouts (SG2-43). Only passed — and only
+   * then is the layouts section shown — when editing an existing venue and
+   * the caller may manage them; omitted entirely while creating a venue,
+   * since layouts need a venue id that does not exist yet. */
+  layouts?: VenueLayout[];
   saving: boolean;
   error: string;
-  onSave: (values: VenueValues) => void;
+  onSave: (values: VenueValues, layouts?: VenueLayoutValues[]) => void;
   onCancel: () => void;
 }) {
   const [values, setValues] = useState(() => venue ? {
@@ -31,20 +38,41 @@ export default function VenueForm({ venue, saving, error, onSave, onCancel }: {
     operating_information: venue.operating_information ?? ''
   } : EMPTY);
   const [invalid, setInvalid] = useState(false);
+  const [selectedLayouts, setSelectedLayouts] = useState<Set<Layout>>(() => new Set((layouts ?? []).map(item => item.layout)));
+  const [otherDescription, setOtherDescription] = useState(() => layouts?.find(item => item.layout === 'other')?.other_description ?? '');
+  const [layoutsInvalid, setLayoutsInvalid] = useState(false);
+
+  function toggleLayout(layout: Layout) {
+    setSelectedLayouts(current => {
+      const next = new Set(current);
+      if (next.has(layout)) next.delete(layout); else next.add(layout);
+      return next;
+    });
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     if (saving) return;
     const capacity = Number(values.capacity);
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 2147483647 ||
-        FIELDS.some(([key]) => !values[key].trim()) || Array.from(values.name.trim()).length > 255) {
-      setInvalid(true);
+    const venueInvalid = !Number.isInteger(capacity) || capacity < 1 || capacity > 2147483647 ||
+      FIELDS.some(([key]) => !values[key].trim()) || Array.from(values.name.trim()).length > 255;
+    const otherNeedsDescription = layouts !== undefined && selectedLayouts.has('other') &&
+      (!otherDescription.trim() || Array.from(otherDescription.trim()).length > 255);
+    setInvalid(venueInvalid);
+    setLayoutsInvalid(otherNeedsDescription);
+    if (venueInvalid || otherNeedsDescription) return;
+    const venueValues: VenueValues = { name: values.name.trim(), location: values.location.trim(), capacity,
+      facilities: values.facilities.trim(), accessibility_features: values.accessibility_features.trim(),
+      operating_information: values.operating_information.trim() };
+    if (layouts === undefined) {
+      onSave(venueValues);
       return;
     }
-    setInvalid(false);
-    onSave({ name: values.name.trim(), location: values.location.trim(), capacity,
-      facilities: values.facilities.trim(), accessibility_features: values.accessibility_features.trim(),
-      operating_information: values.operating_information.trim() });
+    const layoutValues: VenueLayoutValues[] = Array.from(selectedLayouts).map(layout =>
+      layout === 'other' ? { layout, other_description: otherDescription.trim() } : { layout });
+    onSave(venueValues, layoutValues);
   }
+
   return (
     <div className="venue-editor">
       <Card padding="clamp(20px, 4vw, 36px)" style={{ gap: '24px', minWidth: 0 }}>
@@ -78,6 +106,36 @@ export default function VenueForm({ venue, saving, error, onSave, onCancel }: {
               All fields are required. If a feature is not available, record “None”.
             </p>
             {invalid ? <p role="alert">Complete every field, keep the name within 255 characters and enter a positive whole-number capacity.</p> : null}
+            {layouts !== undefined ? (
+              <div style={{ marginTop: '28px', paddingTop: '24px', borderTop: rule.edge, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <Eyebrow>Supported layouts</Eyebrow>
+                  <p style={{ margin: '8px 0 0', color: color.silver, fontSize: '13px', lineHeight: 1.5 }}>
+                    Select every layout this venue supports. A venue that does not support a required layout will not be offered as a match when one is requested.
+                  </p>
+                </div>
+                {LAYOUTS.map(layout => (
+                  <div key={layout} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: color.mist, fontSize: '14px' }}>
+                      <input type="checkbox" checked={selectedLayouts.has(layout)} onChange={() => toggleLayout(layout)} />
+                      {LAYOUT_LABELS[layout]}
+                    </label>
+                    {layout === 'other' && selectedLayouts.has('other') ? (
+                      <input
+                        type="text"
+                        aria-label="Describe the other layout"
+                        required
+                        value={otherDescription}
+                        placeholder="Describe this layout"
+                        style={{ ...inputStyle, marginLeft: '26px', width: 'auto' }}
+                        onChange={e => setOtherDescription(e.target.value)}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+                {layoutsInvalid ? <p role="alert">Describe the "Other" layout in 255 characters or fewer.</p> : null}
+              </div>
+            ) : null}
             {error ? <p role="alert">{error}</p> : null}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '24px' }}>
               <button type="submit" style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',

@@ -13,12 +13,16 @@ import { createUpdateEventDraftHandler } from '../server/src/events/updateDraft'
 import { createDeleteEventDraftHandler } from '../server/src/events/deleteDraft';
 import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
+import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createVenuesRouter } from '../server/src/venues';
+import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
+import type { VenueLayoutRecord } from '../server/src/venues/layoutFields';
 import { dbConfig } from '../server/src/db';
 import { MemoryDatabase } from './support/memory-database';
+import { createWorkQueueRouter } from '../server/src/workQueue';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -43,6 +47,21 @@ const venues = createVenuesRouter(access, () => ({
     return result.data as VenueRecord | null;
   }
 }));
+const layouts = createVenueLayoutsRouter(access, () => ({
+  async list(venueId) {
+    const result = await database.client.from('venue_layouts').select('layout,other_description').eq('venue_id', venueId).order('layout');
+    return result.data as VenueLayoutRecord[];
+  },
+  async replace(venueId, values) {
+    const venueResult = await database.client.from('venues').select('venue_id').eq('venue_id', venueId).maybeSingle();
+    if (!venueResult.data) return null;
+    await database.client.from('venue_layouts').delete().eq('venue_id', venueId);
+    if (values.length === 0) return [];
+    const rows = values.map(item => ({ venue_id: venueId, layout: item.layout, other_description: item.other_description ?? null }));
+    const result = await database.client.from('venue_layouts').insert(rows).select('layout,other_description');
+    return result.data as VenueLayoutRecord[];
+  }
+}));
 const rateLimiter = createLoginRateLimiter() as RequestHandler & { resetKey(key: string): void };
 const app = createApp(
   async () => ({ provider: 'Supabase' as const, configured: false, supabase: { configured: false, status: 'unconfigured' as const } }),
@@ -57,7 +76,12 @@ const app = createApp(
   createDeleteEventDraftHandler(eventDependencies),
   createUpdateEventDraftHandler(eventDependencies),
   getEventRequestDetailHandler(eventDependencies),
-  { availability, venues, profile: createProfileRouter(access, { getAdminClient: getClient }) }
+  { availability, venues, layouts, profile: createProfileRouter(access, { getAdminClient: getClient }) },
+  createWorkQueueRouter(access, { getAdminClient: getClient }),
+  // SG2-38's stage handler keeps its production default here, as it does on
+  // main; only the review handler below needs the in-memory client.
+  undefined,
+  createStartEventReviewHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -69,6 +93,14 @@ app.post('/__e2e/reset', (_req, res) => {
   res.status(204).end();
 });
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
+app.post('/__e2e/work-queue', (_req, res) => {
+  database.seedWorkQueue();
+  res.status(204).end();
+});
+app.post('/__e2e/assigned-review', (_req, res) => {
+  database.seedAssignedReview();
+  res.status(204).end();
+});
 const buildDirectory = path.resolve(__dirname, '../client/dist');
 app.use(express.static(buildDirectory));
 app.get('*', (_req, res) => res.sendFile(path.join(buildDirectory, 'index.html')));

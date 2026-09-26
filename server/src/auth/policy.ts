@@ -12,6 +12,7 @@ export interface Principal { userId: string; role: Role }
 
 // Actions without an explicit role grant are denied.
 export const PERMISSIONS: PermissionMap = Object.freeze({
+  'work_queue.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.availability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // Only Technical Support Staff may set or change a role (SG2-24).
   'users.role.update': ['technical_support_staff'],
@@ -33,9 +34,18 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // coordinator on a submitted event request — same grant shape as
   // 'users.role.update'.
   'event_request.assign_coordinator': ['technical_support_staff'],
+  // SG2-35: a coordinator opens a request for review. Which request is
+  // enforced per-row by the assignment made in SG2-33, not by this grant.
+  'event_request.review': ['event_coordinator'],
+  // SG2-38: see what stage an event has reached
+  'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],
+  // SG2-43: layouts a venue supports are shown wherever venue details are
+  // shown, but only Venue Staff record them.
+  'venues.layouts.read': ['venue_staff', 'event_coordinator'],
+  'venues.layouts.update': ['venue_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

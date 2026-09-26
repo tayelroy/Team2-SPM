@@ -12,8 +12,12 @@ import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createAssignCoordinatorHandler } from './events/assignCoordinator';
+import { createStartEventReviewHandler } from './events/review';
 import { createVenuesRouter } from './venues';
+import { createVenueLayoutsRouter } from './venues/layouts';
 import { createProfileRouter } from './profile';
+import { createGetEventStageHandler } from './events/getStage';
+import { createWorkQueueRouter } from './workQueue';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -31,8 +35,12 @@ export function createApp(
   routers = {
     availability: createVenueAvailabilityRouter(access),
     venues: createVenuesRouter(access),
+    layouts: createVenueLayoutsRouter(access),
     profile: createProfileRouter(access)
   },
+  workQueueRouter = createWorkQueueRouter(access),
+  eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
+  startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal }),
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
@@ -73,6 +81,12 @@ export function createApp(
     access.requirePermission('event_request.submit'),
     eventSubmitHandler
   );
+  // SG2-35: a coordinator opens a request assigned to them for review.
+  eventRequests.patch(
+    '/:eventId/review',
+    access.requirePermission('event_request.review'),
+    startEventReviewHandler
+  );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(
     '/:eventId',
@@ -85,6 +99,12 @@ export function createApp(
     access.requirePermission('event_request.update'),
     updateEventDraftHandler
   );
+  // SG2-38: see what stage an event has reached.
+  eventRequests.get(
+    '/:eventId/stage',
+    access.requirePermission('event_request.stage.view'),
+    eventStageHandler
+  );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
   // SG2-33/SG2-34: Technical Support Staff assign or reassign a coordinator.
@@ -96,9 +116,11 @@ export function createApp(
   app.use('/api/event-requests', eventRequests);
 
   app.use('/api/venues', routers.venues);
+  app.use('/api/venues', routers.layouts);
 
   // SG2-27: view/update the caller's own profile.
   app.use('/api/profile', routers.profile);
+  app.use('/api/work-queue', workQueueRouter);
 
   // Base health check endpoint (satisfies Acceptance Criterion 2)
   app.get(['/health', '/api/health'], (_req: Request, res: Response) => {

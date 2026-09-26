@@ -1,9 +1,8 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventDetail from './EventDetail';
-import { ROLES } from '../mock/types';
 
 afterEach(() => {
   cleanup();
@@ -11,7 +10,7 @@ afterEach(() => {
 });
 
 describe('EventDetail access boundaries', () => {
-  test.each(ROLES.filter((role) => role !== 'Event Organiser'))('%s cannot fetch or see event detail', (role) => {
+  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see event detail', (role) => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
     render(<EventDetail role={role} selectedEventId={101} accessToken="token" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
@@ -131,7 +130,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(await screen.findByRole('heading', { name: 'Untitled event' })).toBeInTheDocument();
     expect(screen.getByText('No purpose specified')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
-    expect(screen.getAllByText('None specified').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('None specified')).toHaveLength(3);
     expect(screen.getByText('No')).toBeInTheDocument();
 
     // Editable buttons available
@@ -265,42 +264,31 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test('cleans up cancelled effect on unmount', () => {
-    let resolvePromise!: (val: any) => void;
-    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockImplementation(
-      () => new Promise((resolve) => { resolvePromise = resolve; }),
-    );
+  test.each(['success', 'rejection'] as const)('ignores a stale %s after a different request is selected', async (outcome) => {
+    type Result = Awaited<ReturnType<typeof eventRequestsApi.fetchOwnEventDetail>>;
+    let resolveOld!: (value: Result) => void;
+    let rejectOld!: (error: Error) => void;
+    const oldRequest: eventRequestsApi.EventRequestDetail = {
+      eventId: 101, organiserId: 'org-1', organisation: null, status: 'draft',
+      name: 'Previous request', purpose: '', description: '', proposedDate: null,
+      expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+      equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
+      coordinatorName: null, canManage: true, waitingOnMe: true,
+    };
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
+      .mockImplementationOnce(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }))
+      .mockResolvedValueOnce({ ok: true, request: { ...oldRequest, eventId: 102, name: 'Current request' } });
 
-    const { unmount } = render(
-      <EventDetail
-        role="Event Organiser"
-        selectedEventId={101}
-        accessToken="test-token"
-        onNavigate={vi.fn()}
-      />,
-    );
-
-    unmount();
-    resolvePromise({ ok: true, request: {} as any });
-  });
-
-  test('handles cancelled fetch rejection when unmounted', () => {
-    let rejectPromise!: (err: any) => void;
-    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockImplementation(
-      () => new Promise((_, reject) => { rejectPromise = reject; }),
-    );
-
-    const { unmount } = render(
-      <EventDetail
-        role="Event Organiser"
-        selectedEventId={101}
-        accessToken="test-token"
-        onNavigate={vi.fn()}
-      />,
-    );
-
-    unmount();
-    rejectPromise(new Error('unmounted detail rejection'));
+    const { rerender } = render(<EventDetail role="Event Organiser" selectedEventId={101} accessToken="test-token" onNavigate={vi.fn()} />);
+    rerender(<EventDetail role="Event Organiser" selectedEventId={102} accessToken="test-token" onNavigate={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Current request' });
+    await act(async () => {
+      if (outcome === 'success') resolveOld({ ok: true, request: oldRequest });
+      else rejectOld(new Error('Previous request failed'));
+    });
+    expect(screen.getByRole('heading', { name: 'Current request' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Previous request' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
@@ -320,3 +308,161 @@ test.each(['draft', 'rejected', 'submitted'])('colleague %s detail is strictly v
   expect(screen.queryByText('Confirmed arrangements')).not.toBeInTheDocument();
   expect(screen.queryByText('Activity')).not.toBeInTheDocument();
 });
+
+describe('EventDetail EventStageTracker integration (SG2-38)', () => {
+  test('renders EventStageTracker with stage API response and displays arrangements recheck banner', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 101,
+        organiserId: 'org-1',
+        organisation: 'Acme Corp',
+        status: 'approved',
+        name: 'Annual Tech Summit',
+        purpose: 'Showcase innovation',
+        description: 'Tech conference',
+        proposedDate: '2026-11-20T08:00:00.000Z',
+        expectedAttendance: 250,
+        venueRequirements: 'Main Auditorium',
+        accessibilityNeeds: null,
+        equipmentRequirements: null,
+        registrationNeeded: true,
+        coordinatorId: 'coord-1',
+        coordinatorName: 'Sarah Jenkins',
+        canManage: true,
+        waitingOnMe: false,
+      },
+    });
+
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: {
+        event_id: 101,
+        raw_status: 'approved',
+        stage: 'Approved — In Planning',
+        stage_key: 'in_planning',
+        description: 'Event approved; coordinator is actively arranging venue and equipment.',
+        waiting_on: {
+          persona: 'Event Coordinator (Sarah Jenkins)',
+          action: 'Complete venue suitability check and equipment reservation',
+        },
+        stepper_steps: [
+          { key: 'draft', label: 'Draft', status: 'completed' },
+          { key: 'submitted', label: 'Submitted', status: 'completed' },
+          { key: 'under_review', label: 'Under Review', status: 'completed' },
+          { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+          { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
+        ],
+        arrangements_recheck_needed: true,
+        outstanding_arrangements: ['venue', 'equipment'],
+      },
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Annual Tech Summit' })).toBeInTheDocument();
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Approved — In Planning');
+    expect(screen.getByText('Event approved; coordinator is actively arranging venue and equipment.')).toBeInTheDocument();
+    expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('Event Coordinator (Sarah Jenkins)');
+    expect(screen.getByTestId('waiting-on-action')).toHaveTextContent('Next step: Complete venue suitability check and equipment reservation');
+
+    // Stepper steps are rendered
+    expect(screen.getByRole('list', { name: 'Lifecycle steps' })).toBeInTheDocument();
+
+    // Recheck banner is visible
+    expect(await screen.findByTestId('arrangements-recheck-banner')).toBeInTheDocument();
+    expect(
+      screen.getByText('Arrangements Outstanding: Venue & Equipment Recheck Needed'),
+    ).toBeInTheDocument();
+  });
+
+  test('renders EventDetail smoothly even if getEventStage fails', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 102,
+        organiserId: 'org-1',
+        organisation: 'Acme Corp',
+        status: 'draft',
+        name: 'Planning Meeting',
+        purpose: 'Internal alignment',
+        description: '',
+        proposedDate: null,
+        expectedAttendance: null,
+        venueRequirements: null,
+        accessibilityNeeds: null,
+        equipmentRequirements: null,
+        registrationNeeded: false,
+        coordinatorId: null,
+        coordinatorName: null,
+        canManage: true,
+        waitingOnMe: true,
+      },
+    });
+
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Service down',
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={102}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Planning Meeting' })).toBeInTheDocument();
+    expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
+  });
+
+  test('renders EventDetail smoothly when getEventStage rejects with an exception', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 103,
+        organiserId: 'org-1',
+        organisation: 'Acme Corp',
+        status: 'draft',
+        name: 'Daily Standup',
+        purpose: 'Team alignment',
+        description: '',
+        proposedDate: null,
+        expectedAttendance: null,
+        venueRequirements: null,
+        accessibilityNeeds: null,
+        equipmentRequirements: null,
+        registrationNeeded: false,
+        coordinatorId: null,
+        coordinatorName: null,
+        canManage: true,
+        waitingOnMe: true,
+      },
+    });
+
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockRejectedValue(new Error('Stage service unavailable'));
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={103}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Daily Standup' })).toBeInTheDocument();
+    expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
+  });
+});
+

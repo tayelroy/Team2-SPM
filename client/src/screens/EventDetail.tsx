@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { fetchOwnEventDetail, type EventRequestDetail } from '../api/eventRequests';
+import {
+  fetchOwnEventDetail,
+  getEventStage,
+  type EventRequestDetail,
+  type EventStageResult
+} from '../api/eventRequests';
+import EventStageTracker from '../components/EventStageTracker';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -28,6 +34,7 @@ export default function EventDetail({
   const isOrganiser = role === 'Event Organiser';
 
   const [detail, setDetail] = useState<EventRequestDetail | null>(null);
+  const [stage, setStage] = useState<EventStageResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -43,6 +50,16 @@ export default function EventDetail({
     setLoading(true);
     setError(null);
     setNotFound(false);
+
+    getEventStage(selectedEventId, accessToken)
+      .then((stageResult) => {
+        if (!cancelled && stageResult.ok) {
+          setStage(stageResult.stage);
+        }
+      })
+      .catch(() => {
+        // Stage error does not prevent event details from displaying
+      });
 
     fetchOwnEventDetail(selectedEventId, accessToken)
       .then((result) => {
@@ -204,6 +221,34 @@ export default function EventDetail({
               ← Back to events
             </button>
           </div>
+
+          {stage && (
+            <div style={{ margin: '20px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <EventStageTracker stage={stage} />
+              {stage.arrangements_recheck_needed && (
+                <Notice
+                  data-testid="arrangements-recheck-banner"
+                  style={{
+                    borderColor: 'rgba(255, 180, 0, 0.4)',
+                    background: 'rgba(255, 180, 0, 0.08)',
+                  }}
+                >
+                  <NoticeMark size={18} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <strong style={{ color: '#fde047', fontSize: '14px' }}>
+                      Arrangements Outstanding: Venue & Equipment Recheck Needed
+                    </strong>
+                    <span style={{ color: color.mist, fontSize: '13px' }}>
+                      Changes have been made that affect existing venue, equipment, or registration
+                      arrangements. These arrangements remain outstanding until verified by the
+                      coordinator.
+                    </span>
+                  </div>
+                </Notice>
+              )}
+            </div>
+          )}
+
           <section className="organisation-detail-intro">
             <h2>{detail.name || 'Untitled event'}</h2>
             <p>{detail.purpose || 'No purpose specified'}</p>

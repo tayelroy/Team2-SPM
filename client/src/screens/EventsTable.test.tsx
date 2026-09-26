@@ -1,8 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
-import { ROLES } from '../mock/types';
 import EventsTable, { formatProposedDate } from './EventsTable';
 
 afterEach(() => {
@@ -27,7 +26,7 @@ describe('formatProposedDate', () => {
 });
 
 describe('EventsTable role boundary', () => {
-  test.each(ROLES.filter((role) => role !== 'Event Organiser'))('%s cannot fetch or see organisation events', (role) => {
+  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see organisation events', (role) => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests');
     render(<EventsTable role={role} accessToken="token" onOpenEvent={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
@@ -238,40 +237,29 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     );
   });
 
-  test('cleans up cancelled effect on unmount', async () => {
-    let resolvePromise!: (val: any) => void;
-    vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockImplementation(
-      () => new Promise((resolve) => { resolvePromise = resolve; }),
-    );
+  test.each(['success', 'rejection'] as const)('ignores a stale %s from the previous status filter', async (outcome) => {
+    type Result = Awaited<ReturnType<typeof eventRequestsApi.fetchOwnEventRequests>>;
+    let resolveOld!: (value: Result) => void;
+    let rejectOld!: (error: Error) => void;
+    const current: eventRequestsApi.EventRequestSummary = {
+      eventId: 102, name: 'Current draft', proposedDate: null, status: 'draft',
+      coordinatorId: null, coordinatorName: null, canManage: true, waitingOnMe: true,
+    };
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests')
+      .mockImplementationOnce(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }))
+      .mockResolvedValueOnce({ ok: true, requests: [current] });
 
-    const { unmount } = render(
-      <EventsTable
-        role="Event Organiser"
-        accessToken="test-token"
-        onOpenEvent={vi.fn()}
-      />,
-    );
-
-    unmount();
-    resolvePromise({ ok: true, requests: [] });
-  });
-
-  test('handles cancelled fetch rejection when unmounted', () => {
-    let rejectPromise!: (err: any) => void;
-    vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockImplementation(
-      () => new Promise((_, reject) => { rejectPromise = reject; }),
-    );
-
-    const { unmount } = render(
-      <EventsTable
-        role="Event Organiser"
-        accessToken="test-token"
-        onOpenEvent={vi.fn()}
-      />,
-    );
-
-    unmount();
-    rejectPromise(new Error('unmounted rejection'));
+    render(<EventsTable role="Event Organiser" accessToken="test-token" onOpenEvent={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Draft' }));
+    await screen.findByText('Current draft');
+    await act(async () => {
+      if (outcome === 'success') resolveOld({ ok: true, requests: [{ ...current, eventId: 101, name: 'Previous result' }] });
+      else rejectOld(new Error('Previous filter failed'));
+    });
+    expect(screen.getByText('Current draft')).toBeInTheDocument();
+    expect(screen.queryByText('Previous result')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Draft' })).toHaveAttribute('aria-pressed', 'true');
   });
 });
 

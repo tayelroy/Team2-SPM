@@ -2,14 +2,15 @@ import '@testing-library/jest-dom/vitest';
 import { act, screen } from '@testing-library/react';
 import ReactDOM from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const roots: Root[] = [];
 
 // jsdom has no canvas implementation; the landing page's orb hook no-ops
 // without a 2D context, and stubbing this keeps the console clean.
-beforeAll(() => {
+beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  sessionStorage.clear();
 });
 
 beforeEach(() => {
@@ -28,6 +29,8 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
+  sessionStorage.clear();
+  window.history.replaceState(null, '', '/');
 });
 
 test('the home route renders the landing hero', async () => {

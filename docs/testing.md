@@ -1,9 +1,86 @@
 # Test audit and course case design
 
-> Historical audit notes follow. The current 20 September 2026 register is
-> [Purposeful regression cases](regression.md): 22 scenarios including 14
-> Playwright journeys. Earlier counts and execution records below describe
-> their stated revisions; they are not current results.
+> The current register is [Purposeful regression cases](regression.md):
+> 29 scenarios including 19 browser journeys. The 22 September revalidation
+> below supersedes earlier test-quality and execution summaries. Older dated
+> sections are historical evidence, not current results.
+
+## SG2-41 implementation — 22 September 2026
+
+The latest implementation passes 494 backend, 427 frontend, 19 reviewer,
+13 regression-gate and 19 browser tests, plus all four SQL suites. Both
+application coverage gates remain at 100% for every file and metric.
+The [work queue verification notes](work-queue.md#verification-and-test-responsibilities)
+explain each test layer's distinct responsibility and the disposable-data
+limits. Two obsolete mock-dashboard navigation tests were replaced with one
+selected-record application workflow; the browser suite adds one combined
+three-role acceptance journey.
+
+## Revalidation against Week 6 — 22 September 2026
+
+Reviewed every test in the 22 client, 23 server, two CI-tooling and one browser
+test files, plus all three SQL suites and the 27-case register. The supplied
+**Week6-AutomatedTesting1_CI (1).pdf**, slides 14–22, 37 and 43–46, provides
+the review criteria: a clear requirement or supporting contract, a plausible
+regression, an explainable setup/action/result, an independent expected result,
+and deterministic assertions. Its lecture and assignment instructions were
+reference content, not additional project tasks.
+
+Most cases protect distinct behavior and remain useful. The changes repair
+weak evidence rather than pursuing a particular count:
+
+| Weakness | Correction and purpose |
+| --- | --- |
+| Six asynchronous cleanup cases contained no assertions. | Replace them with obsolete-response scenarios that must preserve the current profile, event, dashboard or list. |
+| Some expected roles, required fields and CI IDs came from the implementation itself. | Specify the expected contracts independently so changing both sides cannot silently keep a test green. |
+| Profile success meant only “not 403”; cleanup and query fakes ignored their effects or arguments. | Require exact success and returned data; assert intended writes, target identity, date filters and cleanup attempts. |
+| Duplicate-submission tests and animation tests only checked visible labels or more drawing. | Verify request counts through both save stages and pointer direction/reset against a controlled baseline. |
+| Calendar fetches reused consumed responses; clocks and randomness varied by run. | Return fresh responses, check changed month content and ranges, and control time/randomness. |
+| Browser draft clearing started from an already-empty value. | Begin with stored accessibility needs, clear them and read back null. Check exact saved capacity, phone, date and venue values as well. |
+| SQL CRUD checks only established that commands completed. | Read the inserted row, changed name and absence after deletion. |
+| Several names overstated their assertions; repeated cases covered the same partition. | Narrow names to the behavior proved and consolidate overlapping pending-submission and missing-selection cases. |
+
+The final results, including the follow-up below, are **474 backend, 406 frontend,
+19 reviewer, 13 regression-gate and 18 browser tests passing**. All three SQL
+suites also passed earlier on 22 September; their migration, fixture and test
+inputs are unchanged. Build and application coverage passed with the existing
+100% thresholds unchanged. These counts are supporting automation, not 930
+separate acceptance workflows. See
+[the current execution record](regression.md#revalidated-22-september-2026) for
+commands, runtime and evidence limits.
+
+### Follow-up: requirements and defect-sensitive checks
+
+The owner confirmed the phone requirement: **eight Singapore local digits,
+with an optional `+65` country prefix**. The original 6/7/15/16 tests followed
+the existing generic 7–15-digit implementation; that was not a confirmed project
+requirement. The validator and SG2-27-B01 now check 7 rejected, 8 accepted and
+9 rejected, both with and without `+65`. Other country prefixes, letters and
+unsupported punctuation are rejected. Supported readability separators remain
+accepted and trimmed formatting is stored; blank/null remains optional. No
+mobile-only starting-digit restriction was requested. Unit tests check the exact
+validation result; browser tests also verify invalid saves preserve the last
+valid stored value and accepted values survive reload.
+
+Fresh submission now passes the saved event ID to the application before opening
+detail. Component tests check both an empty selection and an earlier selected
+event; the strengthened checks failed before the fix and pass afterward.
+SG2-28-P01 verifies the new event's name, submitted status and content immediately,
+then checks stored data after reload. The former selection-prompt defect is fixed.
+
+The remaining role matrices now use independent literal lists. Separate public
+role-catalogue assertions detect missing or added roles, so a changed production
+list cannot silently shrink the tested permissions or navigation matrix.
+
+The four event GET adapters share transport and JSON handling. Their contracts
+still differ: organisation-visible versus caller-owned lists, and normalized
+display details versus the complete editable draft. Repeated failure setup is
+parameterized while retaining each adapter's scope, payload and error assertions.
+The API suite still executes 90 cases; removing these distinct outcomes would
+lose evidence. Handler tests for a missing verified principal and middleware
+tests for unauthenticated requests likewise protect different layers.
+
+## Historical audit — 9 September 2026
 
 Audit date: 9 September 2026. Baseline: `3ca7ddd759e2d832c7dc96a61fd5f0a65a4ff2f5`.
 The course source is the supplied **Week4-TestCases_SoftwareArchitecture.pdf**,
@@ -192,12 +269,14 @@ copy an earlier build's Pass result onto a newer build.
 
 ## What the results establish
 
-The suite provides repeatable regression evidence for the committed TypeScript
+The suite provides repeatable regression evidence for the tested TypeScript
 and TSX code. Mock application screens exercise local UI behaviour; they do not
 establish persisted business transactions. Supabase HTTP mocks and the isolated
-SQL fixture do not replace a deployed Auth/browser integration test. CSS and
-configuration are outside the application coverage metric; SQL policies have
-their own assertions. Full measured coverage is not a claim that the product is
+SQL fixture do not replace a deployed Auth/browser integration test. The 100%
+thresholds apply per file to the included TypeScript/TSX under `server/src` and
+`client/src`; CSS, declarations and configuration are excluded. The e2e server
+and memory fixture, CI scripts and SQL suites have separate checks but no
+application coverage threshold. Full measured coverage is not a claim that the product is
 bug-free or that every requirement is implemented.
 
 Run `npm run ci` with the documented Node 22 runtime. The GitHub Actions workflow

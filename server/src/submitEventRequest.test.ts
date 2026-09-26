@@ -24,7 +24,7 @@ const COMPLETE_DRAFT = {
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
-  accessibility_needs: null,
+  accessibility_needs: 'Hearing loop',
   equipment_requirements: null,
   registration_needed: true
 };
@@ -71,7 +71,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     ).patch('/api/event-requests/7/submit');
 
     assert.equal(response.status, 200);
-    assert.equal(response.body.request.status, 'submitted');
+    assert.deepEqual(response.body.request, { ...COMPLETE_DRAFT, status: 'submitted' });
     assert.deepEqual(fetched, { eventId: 7, organiserId: 'user-1' });
     assert.equal(submitted, 7);
   });
@@ -109,17 +109,27 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
   });
 
   test('returns 409 when the request is already submitted', async () => {
+    let writes = 0;
     const response = await request(
-      buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'submitted' } } })
+      buildApp({
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'submitted' } },
+        captureSubmit: () => { writes++; }
+      })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 409);
+    assert.equal(writes, 0);
   });
 
   test('returns 409 for a status that is neither draft nor rejected', async () => {
+    let writes = 0;
     const response = await request(
-      buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'under_review' } } })
+      buildApp({
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'under_review' } },
+        captureSubmit: () => { writes++; }
+      })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 409);
+    assert.equal(writes, 0);
   });
 
   test('resubmits a rejected request owned by the caller', async () => {
@@ -137,8 +147,10 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
   });
 
   test('returns 400 and lists outstanding fields for an incomplete draft', async () => {
+    let writes = 0;
     const response = await request(
       buildApp({
+        captureSubmit: () => { writes++; },
         fetchResult: {
           ok: true,
           request: { ...COMPLETE_DRAFT, name: null, purpose: '' }
@@ -148,11 +160,14 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body.missing, ['name', 'purpose']);
+    assert.equal(writes, 0);
   });
 
   test('returns 400 and lists description when it is blank', async () => {
+    let writes = 0;
     const response = await request(
       buildApp({
+        captureSubmit: () => { writes++; },
         fetchResult: {
           ok: true,
           request: { ...COMPLETE_DRAFT, description: null }
@@ -162,6 +177,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
 
     assert.equal(response.status, 400);
     assert.deepEqual(response.body.missing, ['description']);
+    assert.equal(writes, 0);
   });
 
   test('a draft omitting only accessibility needs is submission-ready', async () => {

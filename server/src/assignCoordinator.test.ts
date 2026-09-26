@@ -243,6 +243,9 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
       undefined,
       undefined,
       undefined,
+      undefined,
+      undefined,
+      undefined,
       (_req, res) => {
         res.status(200).json({ reached: true });
       }

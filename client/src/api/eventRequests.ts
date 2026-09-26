@@ -239,6 +239,23 @@ export async function submitEventRequest(
   return { ok: false, kind: 'error', message: data.error ?? 'Submission failed. Please try again.' };
 }
 
+/** Shared GET transport. Callers retain their own scope and failure messages. */
+async function getEventRequestResponse(url: string, token: string): Promise<Response | null> {
+  try {
+    return await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Keep unreadable JSON separate from each caller's payload-shape policy. */
+function readEventRequestJson<T>(response: Response, fallback: T) {
+  return response.json().catch(() => fallback);
+}
+
 /**
  * Fetches event requests in the authenticated organiser's organisation (SG2-31).
  *
@@ -260,18 +277,11 @@ export async function fetchOwnEventRequests(
     }
   }
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    return { ok: false, kind: 'unavailable' };
-  }
+  const response = await getEventRequestResponse(url, token);
+  if (!response) return { ok: false, kind: 'unavailable' };
 
   if (response.ok) {
-    const data = await response.json().catch(() => ({}));
+    const data = await readEventRequestJson(response, {});
     const rawList = Array.isArray(data.requests) ? data.requests : [];
     const requests: EventRequestSummary[] = rawList.map(mapEventRequestSummary);
     return { ok: true, requests };
@@ -285,7 +295,7 @@ export async function fetchOwnEventRequests(
     return { ok: false, kind: 'unavailable' };
   }
 
-  const data = await response.json().catch(() => ({}));
+  const data = await readEventRequestJson(response, {});
   return {
     ok: false,
     kind: 'error',
@@ -303,18 +313,11 @@ export async function fetchOwnEventDetail(
   eventId: number | string,
   token: string,
 ): Promise<FetchEventDetailResult> {
-  let response: Response;
-  try {
-    response = await fetch(`/api/event-requests/${eventId}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    return { ok: false, kind: 'unavailable' };
-  }
+  const response = await getEventRequestResponse(`/api/event-requests/${eventId}`, token);
+  if (!response) return { ok: false, kind: 'unavailable' };
 
   if (response.ok) {
-    const data = await response.json().catch(() => ({}));
+    const data = await readEventRequestJson(response, {});
     if (!data.request || typeof data.request !== 'object') {
       return { ok: false, kind: 'error', message: 'Invalid response format.' };
     }
@@ -336,7 +339,7 @@ export async function fetchOwnEventDetail(
     return { ok: false, kind: 'unavailable' };
   }
 
-  const data = await response.json().catch(() => ({}));
+  const data = await readEventRequestJson(response, {});
   return {
     ok: false,
     kind: 'error',
@@ -365,14 +368,8 @@ export type ListMyEventRequestsOutcome =
  * @param token Bearer access token from the signed-in session.
  */
 export async function listMyEventRequests(token: string): Promise<ListMyEventRequestsOutcome> {
-  let response: Response;
-  try {
-    response = await fetch('/api/event-requests?scope=mine', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-  } catch {
-    return { ok: false, message: UNAVAILABLE };
-  }
+  const response = await getEventRequestResponse('/api/event-requests?scope=mine', token);
+  if (!response) return { ok: false, message: UNAVAILABLE };
 
   if (!response.ok) {
     if (response.status === 401) return { ok: false, message: 'You are signed out. Sign in again to see your requests.' };
@@ -380,7 +377,7 @@ export async function listMyEventRequests(token: string): Promise<ListMyEventReq
     return { ok: false, message: UNAVAILABLE };
   }
 
-  const body = await response.json().catch(() => null);
+  const body = await readEventRequestJson(response, null);
   if (!Array.isArray(body?.requests)) return { ok: false, message: UNAVAILABLE };
   return { ok: true, requests: body.requests as DraftListItem[] };
 }
@@ -403,14 +400,8 @@ export async function fetchEventRequestDraft(
   eventId: number | string,
   token: string
 ): Promise<FetchEventRequestDraftOutcome> {
-  let response: Response;
-  try {
-    response = await fetch(`/api/event-requests/${eventId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-  } catch {
-    return { ok: false, message: UNAVAILABLE };
-  }
+  const response = await getEventRequestResponse(`/api/event-requests/${eventId}`, token);
+  if (!response) return { ok: false, message: UNAVAILABLE };
 
   if (!response.ok) {
     if (response.status === 401) return { ok: false, message: 'You are signed out. Sign in again to edit this draft.' };
@@ -419,7 +410,7 @@ export async function fetchEventRequestDraft(
     return { ok: false, message: UNAVAILABLE };
   }
 
-  const body = await response.json().catch(() => null);
+  const body = await readEventRequestJson(response, null);
   if (!body?.request) return { ok: false, message: UNAVAILABLE };
   return { ok: true, request: body.request as EventRequestDraft };
 }
@@ -512,3 +503,82 @@ export async function updateEventRequestDraft(
     missingForSubmission: (body.missingForSubmission ?? []) as string[]
   };
 }
+
+export interface StepperStep {
+  key: string;
+  label: string;
+  status: 'completed' | 'current' | 'upcoming';
+}
+
+export interface EventWaitingOn {
+  persona: string | null;
+  action: string | null;
+  user_id?: string | null;
+}
+
+export interface EventStageResult {
+  event_id: number;
+  raw_status: string;
+  stage: string;
+  stage_key: string;
+  description: string;
+  waiting_on: EventWaitingOn | null;
+  stepper_steps: StepperStep[];
+  arrangements_recheck_needed: boolean;
+  outstanding_arrangements: string[];
+}
+
+export type GetEventStageOutcome =
+  | { ok: true; stage: EventStageResult }
+  | {
+      ok: false;
+      kind: 'unauthorized' | 'forbidden' | 'not_found' | 'unavailable' | 'error';
+      message: string;
+    };
+
+/**
+ * Retrieves the computed plain-language stage, stepper steps, and waiting-on persona
+ * for an event (SG2-38). Maps to `GET /api/event-requests/:eventId/stage`.
+ */
+export async function getEventStage(
+  eventId: string | number,
+  token: string
+): Promise<GetEventStageOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/stage`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { ok: false, kind: 'unauthorized', message: body?.error ?? 'Authentication required' };
+    }
+    if (response.status === 403) {
+      return { ok: false, kind: 'forbidden', message: body?.error ?? 'Access forbidden' };
+    }
+    if (response.status === 404) {
+      return { ok: false, kind: 'not_found', message: body?.error ?? 'Event not found.' };
+    }
+    if (response.status === 503) {
+      return { ok: false, kind: 'unavailable', message: body?.error ?? UNAVAILABLE };
+    }
+    return {
+      ok: false,
+      kind: 'error',
+      message: body?.error ?? `Failed to fetch event stage (HTTP ${response.status}).`
+    };
+  }
+
+  if (!body || typeof body !== 'object') {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  return { ok: true, stage: body as EventStageResult };
+}
+

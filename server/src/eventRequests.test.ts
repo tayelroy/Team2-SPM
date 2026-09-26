@@ -9,15 +9,18 @@ import type { Role } from './auth/policy';
 import { dbConfig } from './db/config';
 import { createEventDraftHandler } from './events/createDraft';
 import {
-  SUBMISSION_REQUIRED_FIELDS,
   missingForSubmission,
   validateDraftInput,
   isEventStatus,
-  EVENT_STATUSES,
   type DraftValues
 } from './events/fields';
 import type { CreateDraftResult, OrganiserLookupResult } from './db/eventRequests';
 import type { Principal } from './auth/policy';
+
+// README's submission requirements are the oracle, independent of the validator.
+const REQUIRED_FOR_SUBMISSION = [
+  'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements'
+];
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
 
@@ -94,6 +97,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
 
   test('a complete draft reports nothing outstanding for submission', async () => {
     const response = await request(buildApp()).post('/api/event-requests').send(COMPLETE_BODY);
+    assert.equal(response.status, 201);
     assert.deepEqual(response.body.missingForSubmission, []);
   });
 
@@ -103,7 +107,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     // SG2-28: incompleteness must not block creating a draft.
     assert.equal(response.status, 201);
     assert.equal(response.body.request.status, 'draft');
-    assert.deepEqual(response.body.missingForSubmission, [...SUBMISSION_REQUIRED_FIELDS]);
+    assert.deepEqual(response.body.missingForSubmission, REQUIRED_FOR_SUBMISSION);
   });
 
   test('a draft omitting only accessibility needs is submission-ready', async () => {
@@ -189,7 +193,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
 
     const response = await request(bare).post('/api/event-requests');
     assert.equal(response.status, 201);
-    assert.deepEqual(response.body.missingForSubmission, [...SUBMISSION_REQUIRED_FIELDS]);
+    assert.deepEqual(response.body.missingForSubmission, REQUIRED_FOR_SUBMISSION);
   });
 
   test('returns 401 when no verified principal is present', async () => {
@@ -350,6 +354,7 @@ describe('validateDraftInput', () => {
     if (result.valid) {
       assert.equal(result.values.name, null);
       assert.equal(result.values.expected_attendance, null);
+      assert.equal(result.values.proposed_date, null);
       assert.equal(result.values.registration_needed, null);
     }
   });
@@ -380,6 +385,7 @@ describe('validateDraftInput', () => {
   test('accepts free text at exactly the length limit', () => {
     const result = validateDraftInput({ description: 'x'.repeat(5000) });
     assert.equal(result.valid, true);
+    if (result.valid) assert.equal(result.values.description, 'x'.repeat(5000));
   });
 
   for (const body of [null, 'a string', ['an', 'array'], 42]) {
@@ -396,21 +402,25 @@ describe('missingForSubmission', () => {
     const missing = missingForSubmission({
       name: null,
       purpose: '',
-      description: 'Half-day forum with keynotes and a reception.',
+      // description is deliberately omitted to exercise undefined.
       proposed_date: '2026-11-04T09:00:00.000Z',
       expected_attendance: 10,
       venue_requirements: 'Stage'
     });
-    assert.deepEqual(missing, ['name', 'purpose']);
+    assert.deepEqual(missing, ['name', 'purpose', 'description']);
   });
 
-  test('does not require accessibility needs', () => {
-    assert.equal(SUBMISSION_REQUIRED_FIELDS.includes('accessibility_needs'), false);
+  test('optional accessibility, equipment and registration fields do not block submission', () => {
+    assert.deepEqual(missingForSubmission({
+      name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session',
+      proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
+    }), []);
   });
 });
 
 describe('isEventStatus', () => {
-  for (const status of EVENT_STATUSES) {
+  // The public.event_status database enum is the independent contract.
+  for (const status of ['draft', 'submitted', 'under_review', 'approved', 'planning', 'confirmed', 'completed', 'cancelled', 'rejected']) {
     test(`recognises valid status: ${status}`, () => {
       assert.equal(isEventStatus(status), true);
     });

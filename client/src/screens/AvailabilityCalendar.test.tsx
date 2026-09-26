@@ -78,7 +78,7 @@ test('shows an error message when the request fails', async () => {
 });
 
 test('the month dropdown jumps directly to the chosen month', async () => {
-  const fetchMock = vi.fn().mockResolvedValue(Response.json({ from: '', to: '', venues: [] }));
+  const fetchMock = vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] }));
   vi.stubGlobal('fetch', fetchMock);
 
   render(<AvailabilityCalendar />);
@@ -92,7 +92,7 @@ test('the month dropdown jumps directly to the chosen month', async () => {
 });
 
 test('the year dropdown jumps directly to the chosen year, keeping the same month', async () => {
-  const fetchMock = vi.fn().mockResolvedValue(Response.json({ from: '', to: '', venues: [] }));
+  const fetchMock = vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] }));
   vi.stubGlobal('fetch', fetchMock);
 
   render(<AvailabilityCalendar />);
@@ -106,7 +106,7 @@ test('the year dropdown jumps directly to the chosen year, keeping the same mont
 });
 
 test('the dropdowns stay in sync with the arrows', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ from: '', to: '', venues: [] })));
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] })));
   render(<AvailabilityCalendar />);
   await screen.findByRole('heading', { name: 'October 2026' });
 
@@ -118,7 +118,7 @@ test('the dropdowns stay in sync with the arrows', async () => {
 });
 
 test('the year dropdown extends to cover a year reached only via the arrows', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ from: '', to: '', venues: [] })));
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] })));
   render(<AvailabilityCalendar />);
   await screen.findByRole('heading', { name: 'October 2026' });
 
@@ -139,20 +139,34 @@ test('the year dropdown extends to cover a year reached only via the arrows', as
 });
 
 test('moving to the next month re-fetches a new date range', async () => {
-  const fetchMock = vi.fn().mockResolvedValue(Response.json({ from: '', to: '', venues: [] }));
+  const fetchMock = vi.fn().mockImplementation((url: string) => {
+    const range = new URL(url, 'http://localhost').searchParams;
+    const from = range.get('from')!;
+    const to = range.get('to')!;
+    return Response.json({ from, to, venues: [{
+      venueId: 1, name: 'Atrium', entries: [{
+        start: from, end: new Date(Date.parse(from) + 3_600_000).toISOString(),
+        kind: 'booking', label: `Booked ${from.slice(0, 7)}`,
+      }],
+    }] });
+  });
   vi.stubGlobal('fetch', fetchMock);
 
   render(<AvailabilityCalendar />);
-  await screen.findByRole('heading', { name: 'October 2026' });
+  await screen.findByText('Atrium · Booked 2026-10');
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  expect(String(fetchMock.mock.calls[0][0])).toContain(encodeURIComponent('2026-10-01T00:00:00.000Z'));
+  expect(String(fetchMock.mock.calls[0][0])).toBe('/api/venues/availability?from=2026-10-01T00%3A00%3A00.000Z&to=2026-11-01T00%3A00%3A00.000Z');
 
   fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
-  await screen.findByRole('heading', { name: 'November 2026' });
+  await screen.findByText('Atrium · Booked 2026-11');
+  expect(screen.getByRole('heading', { name: 'November 2026' })).toBeInTheDocument();
+  expect(screen.queryByText('Atrium · Booked 2026-10')).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2026-11-01T00:00:00.000Z'));
+  expect(String(fetchMock.mock.calls[1][0])).toBe('/api/venues/availability?from=2026-11-01T00%3A00%3A00.000Z&to=2026-12-01T00%3A00%3A00.000Z');
 
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
-  await screen.findByRole('heading', { name: 'October 2026' });
+  await screen.findByText('Atrium · Booked 2026-10');
+  expect(screen.getByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
+  expect(screen.queryByText('Atrium · Booked 2026-11')).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(3);
 });

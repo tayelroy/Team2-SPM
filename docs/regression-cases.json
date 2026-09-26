@@ -1,23 +1,68 @@
 [
   {
+    "id": "SG2-41-P01",
+    "title": "Internal users open the exact events and requests waiting on their role",
+    "type": "Positive / role isolation / responsive",
+    "story": "SG2-41",
+    "purpose": "Prove that the dashboard gathers role-specific work and opens the selected record through the real application routes.",
+    "preconditions": "Built React app and Express API on loopback with disposable identity/storage providers, fresh browser context and fixed clock. No hosted Supabase.",
+    "steps": [
+      "Sign in as coordinator, observe an empty queue, seed disposable pending work and refresh.",
+      "Verify shared review and own assignment groups exclude another coordinator and completed work.",
+      "Check desktop/mobile layout, then open the assignment with the keyboard and the review with a click.",
+      "Sign in as venue and technical support staff; open each pending request and verify its identity, event, time window and stored facts.",
+      "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
+    ],
+    "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
+    "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; event cards show the client organisation, not a repeated title; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
+    "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "All 19 browser journeys passed in the hosted Chromium job, including this journey and the SG2-26 report gate.",
+    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test browser regression' job; https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832820.",
+    "execution_date": "23 Sep 2026"
+  },
+  {
+    "id": "SG2-41-DB01",
+    "title": "Pending work view and request storage enforce queue state and access rules",
+    "type": "Positive / negative / database constraints",
+    "story": "SG2-41",
+    "purpose": "Verify the real SQL migration, queue view, request constraints and direct client-access restrictions independently of browser fixtures.",
+    "preconditions": "Disposable PostgreSQL with auth fixture and all six migrations; transactional test data rolled back after the suite.",
+    "steps": [
+      "Create events in every supported status, shared review records and pending/decided venue and equipment requests.",
+      "Read the service-role view and assert exact event/request identities, categories and stored details.",
+      "Decide requests and cancel an event; verify their work disappears immediately.",
+      "Reject invalid quantities, windows, statuses and references; verify RLS and denial of direct anonymous/authenticated table/view access."
+    ],
+    "data": "Synthetic 941xx event/resource/request IDs and c0000000 fixture identities; no shared data.",
+    "expected": "Only active work appears; facts match storage; invalid records fail constraints; only service_role can access the queue view and request tables.",
+    "evidence": "supabase/tests/internal_work_queue.sql; .github/workflows/ci.yml; docs/work-queue.md",
+    "layer": "PostgreSQL policy test",
+    "status": "Pass",
+    "actual": "The auth fixture, all six migrations and all four SQL suites passed in the workflow's native PostgreSQL 17 service, including the queue view, access restrictions and transaction rollback.",
+    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test database policies' job (postgres:17); https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832819. Hosted Supabase execution is not claimed.",
+    "execution_date": "23 Sep 2026"
+  },
+  {
     "id": "PW-AUTH-01",
     "title": "Each seeded role reaches its assigned application",
     "type": "Positive",
     "story": "SG2-23; SG2-24; SG2-25",
     "purpose": "Catch login-to-application wiring and runtime regressions across all five roles.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Open the app and sign in as each fixture account in a cleared browser session.",
-      "Check role banner, navigation, page title and absence of page errors."
+      "Check the matching role banner and a named role-specific navigation action, page title and absence of page errors."
     ],
     "data": "organiser/coordinator/venue/support/attendee@example.test; password Regression123!",
-    "expected": "Each role signs in, sees its matching role banner and navigation, and produces no page error or Vite overlay.",
+    "expected": "Each role signs in, sees its matching role banner and named action (New request, Venues, Catalogue, Equipment requests or Event page), and produces no page error or Vite overlay.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Each role signs in, sees its matching role banner and navigation, and produces no page error or Vite overlay.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Each role signs in, sees its matching role banner and named action (New request, Venues, Catalogue, Equipment requests or Event page), and produces no page error or Vite overlay.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "PW-AUTH-02",
@@ -25,7 +70,7 @@
     "type": "Negative",
     "story": "SG2-23",
     "purpose": "Keep failed authentication from creating a browser session or exposing application navigation.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Open sign in.",
       "Submit an existing fixture email with the wrong password.",
@@ -36,9 +81,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. An error alert is visible; navigation is absent; connectsphere.session is absent.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. An error alert is visible; navigation is absent; connectsphere.session is absent.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "PW-AUTH-03",
@@ -46,7 +91,7 @@
     "type": "Negative / state transition",
     "story": "Authentication regression (logout; not SG2-26)",
     "purpose": "Verify logout invalidates the current fixture session across browser and API layers.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in and retain the current bearer token.",
       "Use Profile > Logout, then reload.",
@@ -57,9 +102,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Public landing screen returns; navigation stays absent after reload; retained token receives 401. This proves fixture revocation, not deployed Supabase revocation.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Public landing screen returns; navigation stays absent after reload; retained token receives 401. This proves fixture revocation, not deployed Supabase revocation.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-42-P01",
@@ -67,7 +112,7 @@
     "type": "Positive",
     "story": "SG2-42",
     "purpose": "Exercise one complete venue maintenance journey, including reading back changed data.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff and open Catalogue.",
       "Create Browser Hall with all required fields.",
@@ -79,9 +124,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-42-N01",
@@ -89,7 +134,7 @@
     "type": "Negative",
     "story": "SG2-42; SG2-25",
     "purpose": "Verify the permission decision at both the visible control and protected API.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Event Coordinator and open Venues.",
       "Check that Add venue is absent.",
@@ -101,9 +146,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Coordinator can read but cannot write: 403 for create/update; 401 without credentials; the fixture list remains at its two seeded venues.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Coordinator can read but cannot write: 403 for create/update; 401 without credentials; the fixture list remains at its two seeded venues.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-42-B01",
@@ -111,20 +156,21 @@
     "type": "Boundary",
     "story": "SG2-42",
     "purpose": "Catch off-by-one errors at the implemented integer capacity limits.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff and open Add venue for each capacity.",
       "Submit a valid venue with the selected capacity.",
-      "For rejected values, inspect native field validity and send the same value to the fixture API."
+      "For rejected values, inspect native field validity and send the same value to the fixture API.",
+      "Read back the catalogue and confirm exactly two additions with capacities 1 and 2147483647."
     ],
     "data": "Capacity 0, 1, 2147483647, 2147483648",
-    "expected": "1 and 2147483647 create visible venues; 0 and 2147483648 fail browser validity and receive API 400.",
+    "expected": "1 and 2147483647 create visible venues with those exact stored capacities; 0 and 2147483648 fail browser validity and receive API 400. The fixture contains its two seeds plus exactly two accepted additions.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. 1 and 2147483647 create visible venues; 0 and 2147483648 fail browser validity and receive API 400.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. 1 and 2147483647 create visible venues with those exact stored capacities; 0 and 2147483648 fail browser validity and receive API 400. The fixture contains its two seeds plus exactly two accepted additions.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-42-B02",
@@ -132,7 +178,7 @@
     "type": "Boundary",
     "story": "SG2-42",
     "purpose": "Check the venue-name limit without silently truncating or saving an invalid record.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Enter a 256-character venue name and submit.",
       "Verify the error and repeat that invalid request through the fixture API.",
@@ -143,31 +189,32 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. 256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. 256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-28-P01",
-    "title": "Submit a fresh request and verify saved data and status",
+    "title": "Submit a fresh request and immediately display its saved details",
     "type": "Positive",
     "story": "SG2-28; SG2-30",
-    "purpose": "Catch broken create-to-submit wiring and missing field persistence.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "purpose": "Catch broken create-to-submit wiring, stale or missing event selection, and missing field persistence.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Sign in as Event Organiser and open New request.",
-      "Fill the required event fields and submit.",
+      "Sign in as Event Organiser, open My events and select Planning workshop.",
+      "Open New request, fill the required event fields and submit.",
+      "Immediately check Browser workshop details, submitted status, purpose and description; check the selection prompt and edit action are absent.",
       "Check submitted status through the fixture API.",
-      "Reload, open My drafts and read the event detail."
+      "Reload, open My drafts and verify the new event is listed; read its API detail and check all saved fields."
     ],
     "data": "Browser workshop; Team planning; Review the release plan; 2030-06-15T09:00:00Z; attendance 25; Projector",
-    "expected": "The request is listed after reload with submitted status; API detail retains name, purpose, description and attendance in fixture storage.",
+    "expected": "The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. The request is listed after reload with submitted status; API detail retains name, purpose, description and attendance in fixture storage.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-28-B01",
@@ -175,7 +222,7 @@
     "type": "Boundary / negative",
     "story": "SG2-28; SG2-29; SG2-30",
     "purpose": "Separate incomplete draft saving from submission and prevent repeated saves creating duplicate records.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Open New request with no fields and verify Submit request is disabled.",
       "Save the empty draft, name it Partial draft and save again.",
@@ -186,30 +233,31 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-29-P01",
     "title": "Editing then submitting preserves the latest field values",
     "type": "Positive",
     "story": "SG2-29; SG2-30",
-    "purpose": "Detect submitting stale data or incorrectly treating optional accessibility needs as required.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "purpose": "Detect stale submitted values and failure to clear a previously stored optional field.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
+      "Set event 1 accessibility needs to Step-free entrance through the creator API session; verify that value appears before clearing it.",
       "Open the seeded Planning workshop draft.",
       "Rename it Revised workshop and clear Accessibility needs.",
       "Submit, reload and fetch event detail."
     ],
-    "data": "Event 1; Revised workshop; empty optional accessibility needs",
-    "expected": "Latest name is visible and stored; event 1 has submitted status and null accessibility_needs in fixture storage.",
+    "data": "Seeded complete event 1 with Step-free entrance; change name to Revised workshop and clear accessibility needs.",
+    "expected": "Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Latest name is visible and stored; event 1 has submitted status and null accessibility_needs in fixture storage.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-32-P01",
@@ -217,7 +265,7 @@
     "type": "Positive / negative",
     "story": "SG2-32",
     "purpose": "Verify cancellation preserves a draft and confirmation removes it.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Open My drafts and select Delete for the seeded draft.",
       "Cancel and verify the API still returns event 1.",
@@ -228,9 +276,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Cancel leaves the draft intact; confirmation removes it; the empty state is visible after reload in the same running fixture.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Cancel leaves the draft intact; confirmation removes it; the empty state is visible after reload in the same running fixture.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-27-P01",
@@ -238,7 +286,7 @@
     "type": "Positive",
     "story": "SG2-27",
     "purpose": "Check profile update/readback and the external-role field rule in one user journey.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Organiser and open My Profile.",
       "Check Department is absent; update name, phone and SMS preference.",
@@ -249,30 +297,31 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Success status appears; new name, phone and SMS choice remain after page reload in fixture storage; Department is absent.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Success status appears; new name, phone and SMS choice remain after page reload in fixture storage; Department is absent.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-27-B01",
-    "title": "Profile phone enforces the 7-to-15 digit boundary",
+    "title": "Profile phone accepts eight Singapore digits with optional +65",
     "type": "Boundary",
     "story": "SG2-27",
-    "purpose": "Exercise accepted boundary values and adjacent invalid values through the profile form and real validation handler.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "purpose": "Enforce the owner-confirmed Singapore phone rule and prevent invalid updates from replacing the last valid stored number.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Open the organiser profile.",
-      "For each phone length, enter that many digits and save.",
-      "Check PUT response status and visible feedback."
+      "Sign in as Event Organiser and open Profile.",
+      "Save each listed local and country-prefixed number; check the PUT status and exact success or validation message.",
+      "After every attempt, read the profile API and check the accepted value is stored or the last valid value is preserved.",
+      "Reload and reopen Profile; check the last accepted formatted number remains."
     ],
-    "data": "1 repeated 6, 7, 15 and 16 times",
-    "expected": "7 and 15 digits return 200 with success feedback; 6 and 16 return 400 with an alert.",
+    "data": "9123456; 91234567; 912345678; +65 6123 4567; +65 9123456; +65 912345678; +61 41234567. Initial stored phone: +6581234567.",
+    "expected": "Eight local digits, including the +65-prefixed formatted example, return 200 and Profile updated. Seven/nine local digits with or without +65, and a different country prefix, return 400 with the Singapore eight-digit validation alert and preserve the last valid stored phone. +65 6123 4567 remains after reload.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. 7 and 15 digits return 200 with success feedback; 6 and 16 return 400 with an alert.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. Eight local digits, including the +65-prefixed formatted example, return 200 and Profile updated. Seven/nine local digits with or without +65, and a different country prefix, return 400 with the Singapore eight-digit validation alert and preserve the last valid stored phone. +65 6123 4567 remains after reload.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-44-P01",
@@ -280,7 +329,7 @@
     "type": "Positive",
     "story": "SG2-44",
     "purpose": "Verify the calendar reads the availability endpoint and requests the selected month.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Chromium installed.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff and open Venue Availability.",
       "Jump to June 2030 and inspect the month and seeded venue.",
@@ -291,9 +340,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. June shows Regression Hall, its confirmed booking and maintenance label. Next month requests July successfully and the June maintenance label disappears. Uses fixture availability, not live Supabase.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; Chromium 153; test-results/regression.json; 14/14 browser cases.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current browser assertions passed. June shows Regression Hall, its confirmed booking and maintenance label. Next month requests July successfully and the June maintenance label disappears. Uses fixture availability, not live Supabase.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "BE-AUTH-01",
@@ -312,9 +361,9 @@
     "evidence": "server/src/authorization.test.ts; server/src/login.test.ts",
     "layer": "Backend API/provider-fixture tests",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Requests are denied with their defined 401/403/503 response; generic messages hide provider detail; guarded-action tests record no denied side effects. These simulate credential rejection, not elapsed real-token expiry. Invalid login field types return the generic 401 response without calling the identity provider.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; 431/431 backend tests.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current backend assertions passed. Requests are denied with their defined 401/403/503 response; generic messages hide provider detail; guarded-action tests record no denied side effects. These simulate credential rejection, not elapsed real-token expiry. Invalid login field types return the generic 401 response without calling the identity provider.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "BE-AUTH-02",
@@ -333,9 +382,9 @@
     "evidence": "server/src/authorization.test.ts",
     "layer": "Backend API/provider-fixture tests",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Identity reports attendee and no fixture permission; next action returns 403; side-effect count remains one. The database role response changes in a provider mock.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; 431/431 backend tests.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current backend assertions passed. Identity reports attendee and no fixture permission; next action returns 403; side-effect count remains one. The database role response changes in a provider mock.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "BE-EVENT-01",
@@ -356,9 +405,9 @@
     "evidence": "server/src/eventRequests.test.ts; server/src/submitEventRequest.test.ts",
     "layer": "Backend API/unit tests",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Incomplete drafts save while submission-required fields are reported. Description 5000 is accepted and 5001 rejected. Event names accept 255 Unicode code points and reject 256. Attendance accepts 1 and 2147483647; 0 and 2147483648 receive 400 before insert.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; 431/431 backend tests.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current backend assertions passed. Incomplete drafts save while submission-required fields are reported. Description 5000 is accepted and 5001 rejected. Event names accept 255 Unicode code points and reject 256. Attendance accepts 1 and 2147483647; 0 and 2147483648 receive 400 before insert.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "BE-PERSIST-01",
@@ -377,9 +426,9 @@
     "evidence": "server/src/profile.test.ts; server/src/eventRequests.test.ts; server/src/updateEventRequestDraft.test.ts; server/src/submitEventRequest.test.ts; server/src/venues.test.ts",
     "layer": "Backend API/store-fixture tests",
     "status": "Pass",
-    "actual": "Automated assertions passed for this case. Unavailable/erroring stores produce defined safe failures without raw database details; missing venue update is 404 and an insert returning no row is 503; handlers do not report successful persistence.",
-    "execution_evidence": "20 Sep 2026; npm run ci:full; Node 22.21.0; base 0ea5d34a216f98bdafde91df0ac101ed9f5df404 + local changes; /tmp/team2-approved-final-ci.log; 431/431 backend tests.",
-    "execution_date": "20 Sep 2026"
+    "actual": "Current backend assertions passed. Unavailable/erroring stores produce defined safe failures without raw database details; missing venue update is 404 and an insert returning no row is 503; handlers do not report successful persistence.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "DB-ROLE-01",
@@ -387,7 +436,7 @@
     "type": "Positive / negative / integrity",
     "story": "SG2-24; SG2-25",
     "purpose": "Exercise SQL grants, row isolation and constraints independently of TypeScript mocks.",
-    "preconditions": "Disposable PostgreSQL 17 with supabase/tests/fixtures/auth.sql and all committed migrations applied in filename order; never the deployed Supabase project.",
+    "preconditions": "Fresh in-memory PGlite 0.3.12 / PostgreSQL 17.5 database; supabase/tests/fixtures/auth.sql followed by all five migrations in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Run account_roles.sql with ON_ERROR_STOP=1.",
       "Check authenticated self-read, other-user isolation, blocked caller writes and anonymous access.",
@@ -399,9 +448,9 @@
     "evidence": "supabase/tests/account_roles.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Existing hosted PostgreSQL run completed this SQL script with ON_ERROR_STOP=1 and ROLLBACK. SQL, auth fixture and migration files are unchanged from the tested revision; not rerun locally.",
-    "execution_evidence": "https://github.com/tayelroy/Team2-SPM/actions/runs/35371407367/job/105686001947; checkout 0ea5d34a216f98bdafde91df0ac101ed9f5df404; 18 Sep 2026 16:56 UTC (19 Sep 00:56 SGT).",
-    "execution_date": "19 Sep 2026 (SGT; retained hosted evidence)"
+    "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "DB-AVAIL-01",
@@ -409,7 +458,7 @@
     "type": "Positive / negative / integrity",
     "story": "SG2-44",
     "purpose": "Test booking/unavailability visibility and storage constraints that memory fixtures cannot establish.",
-    "preconditions": "Disposable PostgreSQL 17 with supabase/tests/fixtures/auth.sql and all committed migrations applied in filename order; never the deployed Supabase project.",
+    "preconditions": "Fresh in-memory PGlite 0.3.12 / PostgreSQL 17.5 database; supabase/tests/fixtures/auth.sql followed by all five migrations in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Run venue_availability.sql with ON_ERROR_STOP=1.",
       "Read as coordinator, attendee, organiser and anonymous fixture identities; try ordinary direct booking insertion.",
@@ -421,9 +470,9 @@
     "evidence": "supabase/tests/venue_availability.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Existing hosted PostgreSQL run completed this SQL script with ON_ERROR_STOP=1 and ROLLBACK. SQL, auth fixture and migration files are unchanged from the tested revision; not rerun locally.",
-    "execution_evidence": "https://github.com/tayelroy/Team2-SPM/actions/runs/35371407367/job/105686001947; checkout 0ea5d34a216f98bdafde91df0ac101ed9f5df404; 18 Sep 2026 16:56 UTC (19 Sep 00:56 SGT).",
-    "execution_date": "19 Sep 2026 (SGT; retained hosted evidence)"
+    "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "CI-REG-01",
@@ -442,8 +491,8 @@
     "evidence": ".github/workflows/ci.yml",
     "layer": "Hosted GitHub Actions / repository rule",
     "status": "Not Executed",
-    "actual": "Updated workflow has not run on GitHub. Local aggregate decision checks passed 16/16 combinations; this does not establish hosted execution or merge blocking.",
-    "execution_evidence": "Local inspection only; hosted run URL pending after push.",
+    "actual": "Hosted execution, lifecycle and repository merge-blocking behavior were not re-executed or verified in this local review. Passing local tooling tests do not establish these outcomes.",
+    "execution_evidence": "22 Sep 2026 local review only; no current hosted run evidence collected.",
     "execution_date": ""
   },
   {
@@ -463,8 +512,8 @@
     "evidence": ".github/workflows/ci.yml",
     "layer": "Hosted GitHub Actions lifecycle",
     "status": "Not Executed",
-    "actual": "Updated workflow has not run on GitHub. Local aggregate decision checks passed 16/16 combinations; this does not establish hosted execution or merge blocking.",
-    "execution_evidence": "Local inspection only; hosted run URL pending after push.",
+    "actual": "Hosted execution, lifecycle and repository merge-blocking behavior were not re-executed or verified in this local review. Passing local tooling tests do not establish these outcomes.",
+    "execution_evidence": "22 Sep 2026 local review only; no current hosted run evidence collected.",
     "execution_date": ""
   },
   {
@@ -472,8 +521,8 @@
     "title": "Colleagues share organisation events with creator-only actions",
     "type": "Positive",
     "story": "SG2-26",
-    "purpose": "Colleagues share organisation events with creator-only actions",
-    "preconditions": "Isolated test providers for browser cases; disposable PostgreSQL for SQL cases. No shared production data.",
+    "purpose": "Catch missing same-organisation events and incorrectly offered management actions on a colleague-owned request.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as organiser and record visible events.",
       "Sign out and sign in as a colleague in the same organisation.",
@@ -485,17 +534,17 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
-    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
-    "execution_date": "21 Sep 2026"
+    "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-26-N01",
     "title": "Unrelated and unassigned accounts cannot read organisation events",
     "type": "Negative",
     "story": "SG2-26",
-    "purpose": "Unrelated and unassigned accounts cannot read organisation events",
-    "preconditions": "Isolated test providers for browser cases; disposable PostgreSQL for SQL cases. No shared production data.",
+    "purpose": "Catch organisation list/detail responses that include foreign events or treat missing membership as unrestricted access.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as an organiser in another organisation.",
       "Inspect My events and request another organisation’s event directly.",
@@ -507,30 +556,31 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Foreign and absent event reads both return 404; only own-organisation rows appear; missing membership yields no events.",
-    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
-    "execution_date": "21 Sep 2026"
+    "actual": "Current browser assertions passed. Foreign and absent event reads both return 404; only own-organisation rows appear; missing membership yields no events.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "DB-ORG-01",
     "title": "Database organisation isolation and protected membership",
     "type": "Positive / negative / boundary",
     "story": "SG2-26",
-    "purpose": "Database organisation isolation and protected membership",
-    "preconditions": "Isolated test providers for browser cases; disposable PostgreSQL for SQL cases. No shared production data.",
+    "purpose": "Verify organisation isolation and protected membership in SQL, and confirm that the service role can persist, update and delete an event.",
+    "preconditions": "Fresh in-memory PGlite 0.3.12 / PostgreSQL 17.5 database; supabase/tests/fixtures/auth.sql followed by all five migrations in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Apply migrations in order to disposable PostgreSQL.",
       "Read events as colleagues, unrelated accounts, missing-membership accounts and unrelated roles.",
-      "Check denied direct membership and event writes and service-role access."
+      "Check denied direct membership and event writes and service-role access.",
+      "Read back the service-created event, verify the updated name, then confirm the deleted row is absent; roll back the fixture transaction."
     ],
     "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
-    "expected": "Only same-organisation event reads are allowed to organisers; direct client writes cannot change membership or bypass the API.",
+    "expected": "Organisers read only same-organisation events; direct client writes cannot change membership or bypass the API. The service-role insertion persists the expected owner, organisation and name; update stores the new name; deletion removes the row.",
     "evidence": "supabase/tests/event_organisation_isolation.sql",
     "layer": "PostgreSQL policy test",
     "status": "Pass",
-    "actual": "All five migrations and three SQL regression suites passed; all four non-organiser roles, invalid memberships, unrelated reads and direct client writes are denied.",
-    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 SQL changes; PGlite 0.3.12 / PostgreSQL 17.5; node --input-type=module executes auth fixture, sorted migrations and all three SQL tests; /tmp/sg2-26-database.log. No deployed Supabase execution.",
-    "execution_date": "21 Sep 2026"
+    "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-26-N02",
@@ -538,7 +588,7 @@
     "type": "Negative / role boundary",
     "story": "SG2-26",
     "purpose": "Reject every non-organiser role before accessing organisation event records.",
-    "preconditions": "Production React build and real Express handlers with isolated local identity/database providers.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, venue staff, technical support and attendee in turn.",
       "Check My events navigation is absent.",
@@ -549,9 +599,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
-    "execution_evidence": "21 Sep 2026; base f1c0cfd + SG2-26 organiser-only/layout working-tree changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated API at 127.0.0.1:4173, video disabled (local ffmpeg absent); 17/17 browser cases; /tmp/sg2-26-playwright-results.json. Visual QA at 1440x1000, 768x1024 and 390x844: aligned fields, no page overflow/console errors; /tmp/sg2-26-spacing-visual.log. Native Chrome inspected.",
-    "execution_date": "21 Sep 2026"
+    "actual": "Current browser assertions passed. All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   },
   {
     "id": "SG2-26-P02",
@@ -559,7 +609,7 @@
     "type": "Positive / persistence",
     "story": "SG2-26",
     "purpose": "Prevent static, stale or unrelated event data from replacing current organisation-scoped API results.",
-    "preconditions": "Built React application and real Express routes with reset isolated identity/database providers; two same-organisation sessions. No hosted Supabase.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as the event creator and a colleague in separate tabs.",
       "Read the initial event in the colleague dashboard.",
@@ -571,8 +621,8 @@
     "evidence": "e2e/regression.spec.ts; .github/scripts/regression-gate.mjs",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "All saved fields and dashboard counts matched after reload; colleague detail remained read-only; unrelated event absent.",
-    "execution_evidence": "21 Sep 2026; PR #32 head f28ed93 plus test changes; npm exec -- playwright test --config /tmp/sg2-26.playwright.config.ts; installed Chrome, isolated local API; 18/18 passed; /tmp/sg2-26-required-regression.log; /tmp/sg2-26-playwright-results.json.",
-    "execution_date": "21 Sep 2026"
+    "actual": "Current browser assertions passed. The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
+    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+    "execution_date": "22 Sep 2026"
   }
 ]

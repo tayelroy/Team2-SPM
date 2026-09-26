@@ -390,9 +390,11 @@ export function StatFigure({
 export function Notice({
   children,
   style,
-}: WithChildren & { style?: CSSProperties }) {
+  ...rest
+}: WithChildren & { style?: CSSProperties } & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      {...rest}
       style={{
         border: surface.noticeEdge,
         background: surface.notice,

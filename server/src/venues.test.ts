@@ -2,11 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
-import { AccessError, createAuthorization, ROLES, type Role } from './auth';
+import { AccessError, createAuthorization, type Role } from './auth';
 import { createApp } from './app';
 import { createVenuesRouter } from './venues';
 import { validateVenue, type VenueRecord } from './venues/fields';
 import type { VenueStore } from './db/venues';
+
+// Documented account roles form the oracle, independent of the production list.
+const ACCOUNT_ROLES = [
+  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
+] as const;
 
 const values = { name: 'Atrium', location: 'Level 1', capacity: 100, facilities: 'Stage', accessibility_features: 'Lift', operating_information: '09:00–18:00' };
 function fixture(role: Role = 'venue_staff', override?: VenueStore) {
@@ -33,7 +38,7 @@ function fixture(role: Role = 'venue_staff', override?: VenueStore) {
   return { app, writes: () => writes };
 }
 
-for (const role of ROLES) test(`SG2-42: only venue staff can write (${role})`, async () => {
+for (const role of ACCOUNT_ROLES) test(`SG2-42: only venue staff can write (${role})`, async () => {
   const { app, writes } = fixture(role);
   for (const method of ['post', 'put'] as const) {
     const res = await request(app)[method](`/api/venues${method === 'put' ? '/1' : ''}`)

@@ -5,6 +5,8 @@ const venueValues = { name: 'Browser Hall', location: 'North Wing', capacity: 10
   facilities: 'Projector', accessibility_features: 'Lift', operating_information: '09:00–18:00' };
 
 async function signIn(page: Page, account = 'organiser') {
+  // Keep the calendar's year options independent of the machine's date.
+  await page.clock.setFixedTime('2026-09-22T04:00:00.000Z');
   await page.goto('/');
   await page.getByRole('button', { name: 'Open app', exact: true }).click();
   await page.getByLabel('Email', { exact: true }).fill(`${account}@example.test`);
@@ -52,18 +54,80 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/reset')).ok()).toBeTruthy();
 });
 
-test('PW-AUTH-01 | each seeded role reaches its assigned application', async ({ page }) => {
-  const roles = { organiser: 'Event Organiser', coordinator: 'Event Coordinator', venue: 'Venue Staff',
-    support: 'Technical Support Staff', attendee: 'Attendee' };
+test('SG2-41-P01 | internal users open the exact events and requests waiting on their role', async ({ page, request }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  for (const [account, role] of Object.entries(roles)) {
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await signIn(page, 'coordinator');
+  await expect(page.getByText('0 items in your work queue')).toBeVisible();
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByText('2 items in your work queue')).toBeVisible();
+  await expect(page.getByText('Another coordinator’s event')).toHaveCount(0);
+  await expect(page.getByText('Completed event')).toHaveCount(0);
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  await expect(page).toHaveTitle(/ConnectSphere/i);
+  if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/coordinator-desktop.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/coordinator-mobile.png`, fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const assignment = page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Partner Innovation Summit/ });
+  await assignment.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Partner Innovation Summit', exact: true })).toBeFocused();
+  await expect(page.getByText('Event request #42', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
+  await expect(page.getByText('Bring partners together to plan sustainable events')).toBeVisible();
+  await expect(page.getByText('Keynotes, workshops and an evening reception.')).toBeVisible();
+  await expect(page.getByText('Regression Organisation · Event #41')).toBeVisible();
+  if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/event-detail.png`, fullPage: true });
+
+  for (const [account, kind, title, group, fact] of [
+    ['venue', 'venue', 'Regression Hall', 'Booking requests awaiting decision', 'Venue capacity'],
+    ['support', 'equipment', 'Wireless microphones', 'Equipment requests awaiting decision', 'Quantity requested'],
+  ]) {
+    await page.getByRole('button', { name: 'Profile', exact: true }).click();
+    await page.getByRole('button', { name: 'Logout', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+    await signIn(page, account);
+    await expect(page.getByText('1 item in your work queue')).toBeVisible();
+    const region = page.getByRole('region', { name: group });
+    await expect(region.getByRole('button')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
+    if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-desktop.png`, fullPage: true });
+    await region.getByRole('button', { name: new RegExp(title) }).click();
+    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByText('Sustainability Leadership Forum · Event #41')).toBeVisible();
+    await expect(page.getByText(/15 Jun 2030, 10:00 – 15 Jun 2030, 18:00/)).toBeVisible();
+    await expect(page.getByText(fact, { exact: true })).toBeVisible();
+    await expect(page.getByText('Set up before guests arrive.')).toBeVisible();
+    const headers = await authHeaders(page);
+    expect((await page.request.get('/api/work-queue/event/41', { headers })).status()).toBe(404);
+    if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-detail.png`, fullPage: true });
+  }
+  expect(errors).toEqual([]);
+});
+
+test('PW-AUTH-01 | each seeded role reaches its assigned application', async ({ page }) => {
+  const roles = [
+    { account: 'organiser', role: 'Event Organiser', action: 'New request' },
+    { account: 'coordinator', role: 'Event Coordinator', action: 'Venues' },
+    { account: 'venue', role: 'Venue Staff', action: 'Catalogue' },
+    { account: 'support', role: 'Technical Support Staff', action: 'Preview' },
+    { account: 'attendee', role: 'Attendee', action: 'Event page' },
+  ];
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  for (const { account, role, action } of roles) {
     await test.step(role, async () => {
       await page.goto('/');
       await page.evaluate(() => sessionStorage.clear());
       await signIn(page, account);
       await expect(page.getByRole('banner')).toContainText(role);
-      await expect(page.getByRole('navigation').getByRole('button').first()).toBeVisible();
+      await expect(page.getByRole('navigation').getByRole('button', { name: action, exact: true })).toBeVisible();
       await expect(page).toHaveTitle(/ConnectSphere/i);
       await expect(page.locator('vite-error-overlay')).toHaveCount(0);
     });
@@ -271,6 +335,14 @@ test('SG2-42-B01 | venue capacity accepts exact bounds and rejects adjacent valu
       }
     });
   }
+  const saved = await page.request.get('/api/venues', { headers });
+  expect(saved.status()).toBe(200);
+  const venues = (await saved.json()).venues;
+  expect(venues).toHaveLength(4); // two seeds and exactly two accepted boundaries
+  expect(venues).toEqual(expect.arrayContaining([
+    expect.objectContaining({ name: 'Capacity 1', capacity: 1 }),
+    expect.objectContaining({ name: 'Capacity 2147483647', capacity: 2147483647 }),
+  ]));
 });
 
 test('SG2-42-B02 | venue names accept 255 characters and refuse 256 without writes', async ({ page }) => {
@@ -290,17 +362,30 @@ test('SG2-42-B02 | venue names accept 255 characters and refuse 256 without writ
 
 test('SG2-28-P01 | submit a fresh request and verify its saved data and status', async ({ page }) => {
   await signIn(page);
+  // A new submission must replace an earlier selected event as well.
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
   await nav(page, 'New request');
   await fillEvent(page);
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
+  await expect(page.getByText('submitted', { exact: true })).toBeVisible();
+  await expect(page.getByText('Team planning', { exact: true })).toBeVisible();
+  await expect(page.getByText('Review the release plan', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Select an event from your organisation/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+  await test.info().attach('submitted-event-detail', { body: await page.screenshot(), contentType: 'image/png' });
   await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('submitted');
   await page.reload();
   await nav(page, 'My drafts');
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
   const record = (await eventRecords(page)).find(row => row.name === 'Browser workshop')!;
   const detail = await page.request.get(`/api/event-requests/${record.event_id}`, { headers: await authHeaders(page) });
+  expect(detail.status()).toBe(200);
   expect((await detail.json()).request).toMatchObject({ name: 'Browser workshop', purpose: 'Team planning',
-    description: 'Review the release plan', expected_attendance: 25, status: 'submitted' });
+    description: 'Review the release plan', proposed_date: '2030-06-15T09:00:00.000Z',
+    expected_attendance: 25, venue_requirements: 'Projector', status: 'submitted' });
 });
 
 test('SG2-28-B01 | an empty draft saves once but cannot be submitted', async ({ page }) => {
@@ -321,15 +406,26 @@ test('SG2-28-B01 | an empty draft saves once but cannot be submitted', async ({ 
 
 test('SG2-29-P01 | editing then submitting preserves the latest field values', async ({ page }) => {
   await signIn(page);
+  // Clearing a value must start with something stored; clearing an already-null
+  // field would also pass if the edit never persisted at all.
+  const headers = await authHeaders(page);
+  const initial = await page.request.get('/api/event-requests/1', { headers });
+  expect(initial.status()).toBe(200);
+  const seed = await page.request.patch('/api/event-requests/1', {
+    headers, data: { ...(await initial.json()).request, accessibility_needs: 'Step-free entrance' },
+  });
+  expect(seed.status()).toBe(200);
   await nav(page, 'My drafts');
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByLabel(/^Event name/)).toHaveValue('Planning workshop');
+  await expect(page.getByLabel('Accessibility needs (optional)', { exact: true })).toHaveValue('Step-free entrance');
   await page.getByLabel(/^Event name/).fill('Revised workshop');
   await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Revised workshop', exact: true })).toBeVisible();
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
+  expect(detail.status()).toBe(200);
   expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'submitted', accessibility_needs: null });
 });
 
@@ -363,21 +459,40 @@ test('SG2-27-P01 | profile changes persist and external users have no department
   await expect(page.getByLabel('SMS', { exact: true })).toBeChecked();
 });
 
-test('SG2-27-B01 | profile phone enforces the 7-to-15 digit boundary', async ({ page }) => {
+test('SG2-27-B01 | profile phone accepts eight Singapore digits with optional +65', async ({ page }) => {
   await signIn(page);
   await profile(page);
-  for (const digits of [6, 7, 15, 16]) {
-    await test.step(`${digits} digits`, async () => {
+  const headers = await authHeaders(page);
+  for (const { label, phone, status, savedPhone } of [
+    { label: '7 local digits', phone: '9123456', status: 400, savedPhone: '+6581234567' },
+    { label: '8 local digits', phone: '91234567', status: 200, savedPhone: '91234567' },
+    { label: '9 local digits', phone: '912345678', status: 400, savedPhone: '91234567' },
+    { label: '8 digits with +65 and spaces', phone: '+65 6123 4567', status: 200, savedPhone: '+65 6123 4567' },
+    { label: '7 digits with +65', phone: '+65 9123456', status: 400, savedPhone: '+65 6123 4567' },
+    { label: '9 digits with +65', phone: '+65 912345678', status: 400, savedPhone: '+65 6123 4567' },
+    { label: 'a different country prefix', phone: '+61 41234567', status: 400, savedPhone: '+65 6123 4567' },
+  ]) {
+    await test.step(label, async () => {
       const response = page.waitForResponse(r => r.url().endsWith('/api/profile') && r.request().method() === 'PUT');
-      await page.getByLabel('Phone', { exact: true }).fill('1'.repeat(digits));
+      await page.getByLabel('Phone', { exact: true }).fill(phone);
       await page.getByRole('button', { name: 'Save changes', exact: true }).click();
-      expect((await response).status()).toBe(digits === 6 || digits === 16 ? 400 : 200);
-      await expect(page.getByRole(digits === 6 || digits === 16 ? 'alert' : 'status')).toBeVisible();
+      expect((await response).status()).toBe(status);
+      if (status === 400) {
+        await expect(page.getByRole('alert')).toHaveText('phone must be a Singapore number with 8 digits, optionally prefixed with +65.');
+      } else {
+        await expect(page.getByRole('status')).toHaveText('Profile updated.');
+      }
+      const stored = await page.request.get('/api/profile', { headers });
+      expect(stored.status()).toBe(200);
+      expect((await stored.json()).profile.phone).toBe(savedPhone);
     });
   }
+  await page.reload();
+  await profile(page);
+  await expect(page.getByLabel('Phone', { exact: true })).toHaveValue('+65 6123 4567');
 });
 
-test('SG2-44-P01 | calendar renders real availability and changes its requested month', async ({ page }) => {
+test('SG2-44-P01 | calendar renders fixture availability and changes its requested month', async ({ page }) => {
   await signIn(page, 'venue');
   await nav(page, 'Venue Availability');
   await page.getByLabel('Jump to year').selectOption('2030');
@@ -390,4 +505,42 @@ test('SG2-44-P01 | calendar renders real availability and changes its requested 
   expect((await next).ok()).toBeTruthy();
   await expect(page.getByRole('heading', { name: 'July 2030', exact: true })).toBeVisible();
   await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toHaveCount(0);
+});
+
+test('SG2-35-P01 | opening an assigned submitted request moves it to under review', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/assigned-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+
+  const queue = page.getByRole('region', { name: 'Awaiting review' });
+  await queue.getByRole('button', { name: /Assigned Review Forum/ }).click();
+
+  // Opening it is the review: the organiser sees under_review without the
+  // coordinator pressing anything further.
+  await expect(page.getByRole('heading', { name: 'Assigned Review Forum' })).toBeVisible();
+  await expect(page.getByText('under review')).toBeVisible();
+  await expect(page.getByText('Decide whether the forum proceeds')).toBeVisible();
+
+  // The transition is persisted, not just reflected in the open screen.
+  const detail = await page.request.get('/api/work-queue/event/51', { headers: await authHeaders(page) });
+  expect(detail.ok()).toBeTruthy();
+  expect((await detail.json()).items[0].status).toBe('under_review');
+});
+
+test('SG2-35-N01 | a request awaiting assignment is readable but never enters review', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
+  await expect(page.getByText(/Awaiting assignment/)).toBeVisible();
+  await expect(page.getByText('submitted')).toBeVisible();
+
+  // Assignment belongs to Technical Support Staff (SG2-33); reviewing an
+  // unassigned request is refused even when called directly.
+  const headers = await authHeaders(page);
+  expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404);
+  const detail = await page.request.get('/api/work-queue/event/41', { headers });
+  expect((await detail.json()).items[0].status).toBe('submitted');
 });

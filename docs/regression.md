@@ -1,7 +1,7 @@
 # Purposeful regression cases
 
-The current register is [`regression-cases.json`](regression-cases.json): **27
-scenarios: 18 browser journeys, 4 supporting backend cases, 3 SQL cases and 2
+The current register is [`regression-cases.json`](regression-cases.json): **29
+scenarios: 19 browser journeys, 4 supporting backend cases, 4 SQL cases and 2
 hosted CI cases**. A scenario groups assertions around one observable outcome;
 it is not a list of every unit test. Positive, negative and boundary partitions
 can share a case when they establish the same rule. Counts are not a coverage
@@ -19,9 +19,9 @@ the register does not automatically write to that Sheet.
 
 | Layer | Purpose and limit |
 | --- | --- |
-| Playwright, 18 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
+| Playwright, 19 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
 | Backend, 4 cases | Existing unit/API suites retain denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
-| PostgreSQL, 3 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
+| PostgreSQL, 4 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
 | Hosted CI, 2 cases | Check the required aggregate and workflow event behavior, including the new browser job. Local script inspection or a past workflow run cannot establish current hosted execution or branch protection. |
 
 Run `npm run test:regression` for the browser journeys after installing Chromium
@@ -35,7 +35,7 @@ in the production composition root.
 The browser selection follows the user workflows: role login, refused login,
 logout, venue create/edit/search, permissions, capacity/name limits, fresh event
 submission, incomplete draft saving, editing/submitting, confirmed deletion,
-profile save, phone limits and month navigation. Supporting tests retain
+profile save, phone limits, month navigation and internal work queues. Supporting tests retain
 failure and policy behavior that these journeys intentionally do not repeat.
 
 ## Historical 36-to-22 consolidation
@@ -92,7 +92,7 @@ prototype/helper rows as redundant.
 Numbers and results in [`testing.md`](testing.md) and dated sections of
 [`ci.md`](ci.md) describe earlier revisions, including the old 36-case register,
 343-test inventory and then-absent browser job. They must not be copied as
-current Pass results. Current runner totals can differ from 27 because each
+current Pass results. Current runner totals can differ from 29 because each
 scenario is supported by multiple lower-level assertions and parameterized
 cases.
 
@@ -102,12 +102,70 @@ hosted lifecycle/required-check cases remain **Not Executed** until the updated
 workflow is actually run and verified. Browser fixture success does not upgrade
 SQL, deployed Supabase, hosted CI or deployment status.
 
-Known broader gaps are outside these 27 selected scenarios: real deployed
+Known broader gaps are outside these 29 selected scenarios: real deployed
 Auth/database integration, additional browser engines and availability interval-edge
 semantics against PostgreSQL. The approved event-name/attendance limits and
 malformed-login validation fixes are covered by the supporting backend cases.
 A passing register is evidence for its stated scope, not complete
 proof of every project requirement.
+
+## Revalidated 22 September 2026
+
+Reviewed the purpose, setup and observable outcome of all 27 records against
+their current automation. Strengthened the supporting tests using the Week 6
+criteria described in [the test audit](testing.md#revalidation-against-week-6--22-september-2026).
+The register records passing local evidence for 25 executable scenarios;
+the two hosted CI scenarios remain **Not Executed** in this review. Browser and
+application results below include the Singapore phone and submission fixes;
+the SQL results retain the earlier passing run with unchanged inputs.
+
+| Check | Verified result and environment |
+| --- | --- |
+| Build, backend and reviewer | `npm run ci`, Node 22.22.2: build passes; 474 backend and 19 reviewer tests pass. Log: `/tmp/team2-fable-followup/final-ci.log`. |
+| Frontend | 406 tests pass in the same final `npm run ci` run, including both new-submission selection cases and the independent role catalogue. |
+| Application coverage | Both applications retain 100% statements, branches, functions and lines under the existing per-file thresholds. Scope remains the included `server/src` and `client/src` TypeScript/TSX; no thresholds or exclusions were relaxed. |
+| Browser | All 18 journeys pass, plus the four required SG2-26 report entries pass the gate. Node 22.22.2, installed Chrome, `http://127.0.0.1:4173`, resettable identity/storage fixtures; browser dates fixed at 22 September 2026. E2e TypeScript check passes. |
+| Gate tooling | All 13 gate tests pass on Node 22.22.2. Log: `/tmp/team2-fable-followup/gate-tests.log`. Together with the reviewer this is 32 tooling tests. |
+| SQL | Auth fixture, all five migrations and all three SQL suites passed earlier on 22 September in a fresh in-memory PGlite 0.3.12 / PostgreSQL 17.5 database. All nine input hashes still match that run; SQL was not rerun for this follow-up. Log: `/tmp/team2-sql-revalidation.log`. |
+
+Tested base: `2aee8b8aa09e7ddcdb295804fde308799fbec856` plus these local code,
+test, fixture and register changes. These final application and browser results
+supersede the initial 466-backend/404-frontend revalidation.
+Total final automation: **930 tests plus three SQL suites**. SQL assertions are
+not added to the unit/browser test count.
+
+The Browser plugin was unavailable. The existing Playwright tests ran using a
+temporary configuration at `/tmp/team2-fable-followup/playwright.config.ts`,
+installed Chrome and video disabled; no browser dependency was installed.
+It retains the repository's journeys, single worker, zero retries and loopback
+fixture. JSON/JUnit and failure artifacts are under
+`/tmp/team2-fable-followup/`; tracked generated reports were not changed.
+
+**Requirement corrected:** SG2-27-B01 follows the owner's confirmed Singapore
+rule: eight local digits with optional `+65`. It rejects 7/9 local digits and
+other country prefixes, checks the exact validation alert, verifies invalid
+writes preserve the last valid value, and checks persistence after reload.
+The former generic 7–15-digit rule came from the implementation, not the owner.
+
+**Submission defect fixed:** the app now selects the newly submitted event ID
+before opening detail. SG2-28-P01 first selects another event, then verifies
+the newly submitted event's title, status and content immediately, with no
+selection prompt or edit control. It also retains list/API readback after reload.
+The final browser report includes the `submitted-event-detail` screenshot.
+Component tests cover both previously empty and populated selections and failed
+before the fix. The initial diagnostic screenshot remains historical evidence
+under `/tmp/team2-test-revalidation/submission-destination.png`.
+
+The three temporary tooling mutations (removed required case, changed default
+model, lost UTF-8 decoder state) all caused assertion failures. This is focused
+evidence that those oracles reject wrong results, not a project mutation score.
+
+No deployed Supabase or hosted GitHub Actions run was performed. PGlite is not
+the workflow's native PostgreSQL container. Remaining SQL coverage gaps include
+equal start/end intervals, all internal-role positive availability reads and
+the complete availability write-operation matrix. Prototype/helper tests retain
+their limited local purpose. The course spreadsheet was not updated by this
+local revalidation.
 
 ## Verified 20 September 2026
 
