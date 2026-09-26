@@ -51,6 +51,10 @@ export type UpdateDraftResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'unavailable'; message: string };
 
+export type AssignCoordinatorResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'not_found' | 'not_assignable' | 'unavailable'; message: string };
+
 export type StartReviewResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
@@ -424,6 +428,86 @@ export async function deleteEventRequestDraft(
     return { ok: false, reason: 'unavailable', message: 'The draft was not deleted; its status may have changed.' };
   }
   return { ok: true };
+}
+
+/**
+ * Reads an event request by id, unscoped by organiser (SG2-33/SG2-34).
+ *
+ * Technical Support Staff act across every organisation, unlike
+ * fetchOwnEventRequest's organiser-scoped lookup — there is no owning
+ * caller to scope this to.
+ */
+export async function fetchEventRequestById(
+  admin: SupabaseClient,
+  eventId: number
+): Promise<FetchEventRequestResult> {
+  const { data, error } = await admin.from('events').select(DETAIL_COLUMNS).eq('event_id', eventId);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, reason: 'not_found', message: 'No event request found with that id.' };
+  }
+  const row = data[0] as unknown as Record<string, unknown>;
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request };
+}
+
+/** Statuses a request may have its coordinator assigned or reassigned in (SG2-33/SG2-34). */
+export const COORDINATOR_ASSIGNABLE_STATUSES = [
+  'submitted',
+  'under_review',
+  'approved',
+  'planning',
+  'confirmed'
+];
+
+/**
+ * Sets (SG2-33) or changes (SG2-34) an event request's coordinator.
+ *
+ * One function serves both tickets — assign-or-reassign is the same write,
+ * whether `coordinator_id` was previously null or held a different
+ * coordinator. `status` is repeated as a condition on the write itself
+ * (not just a pre-check in the handler), matching the IDOR-hardening
+ * pattern already used by deleteEventRequestDraft/updateEventRequestDraft:
+ * if the request has moved to a non-assignable status by the time this
+ * runs, zero rows come back rather than silently assigning a draft or a
+ * closed-out request.
+ */
+export async function assignEventCoordinator(
+  admin: SupabaseClient,
+  eventId: number,
+  coordinatorId: string
+): Promise<AssignCoordinatorResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update({ coordinator_id: coordinatorId })
+    .eq('event_id', eventId)
+    .in('status', COORDINATOR_ASSIGNABLE_STATUSES)
+    .select(DETAIL_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      reason: 'not_assignable',
+      message: 'This event request cannot have a coordinator assigned in its current status.'
+    };
+  }
+  const row = data[0] as unknown as Record<string, unknown>;
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request };
 }
 
 /**
