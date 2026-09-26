@@ -544,3 +544,75 @@ test('SG2-35-N01 | a request awaiting assignment is readable but never enters re
   const detail = await page.request.get('/api/work-queue/event/41', { headers });
   expect((await detail.json()).items[0].status).toBe('submitted');
 });
+
+test('SG2-45-P01 | staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
+  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
+  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
+  await page.getByLabel('Reason', { exact: true }).fill('Carpet replacement');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
+  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
+
+  // AC1: the block is recorded and shown as unavailable for that period.
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toBeVisible();
+
+  // AC3: removing it makes the venue available for that period again.
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Block removed');
+  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
+  const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
+  expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
+  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+});
+
+test('SG2-45-N01 | a confirmed booking cannot be blocked and other roles cannot block', async ({ page }) => {
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  // Seeded confirmed booking #1 for event 1 runs 02:00–04:00 UTC on 15 June 2030.
+  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-14T00:00');
+  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-16T00:00');
+  await page.getByLabel('Reason', { exact: true }).fill('Deep clean');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('already holds a confirmed booking: booking #1 for event 1');
+  await expect(page.getByRole('listitem', { name: 'Deep clean' })).toHaveCount(0);
+  const staffHeaders = await authHeaders(page);
+  const refused = await page.request.post('/api/venues/1/blocks', { headers: staffHeaders,
+    data: { starts_at: '2030-06-15T03:00:00Z', ends_at: '2030-06-15T05:00:00Z', reason: 'Deep clean' } });
+  expect(refused.status()).toBe(409);
+  expect((await refused.json()).booking).toMatchObject({ booking_id: 1, event_id: 1 });
+
+  const block = { starts_at: '2030-07-01T00:00:00Z', ends_at: '2030-07-02T00:00:00Z', reason: 'Not allowed' };
+  for (const account of ['coordinator', 'support', 'organiser', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const headers = await authHeaders(page);
+      expect((await page.request.post('/api/venues/1/blocks', { headers, data: block })).status()).toBe(403);
+      expect((await page.request.delete('/api/venues/1/blocks/1', { headers })).status()).toBe(403);
+      expect((await page.request.get('/api/venues/1/blocks', { headers })).status()).toBe(403);
+      if (account === 'coordinator') {
+        await nav(page, 'Venues');
+        await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Block Regression Hall', exact: true })).toHaveCount(0);
+      }
+    });
+  }
+  expect((await page.request.post('/api/venues/1/blocks', { data: block })).status()).toBe(401);
+  const remaining = await page.request.get('/api/venues/1/blocks', { headers: staffHeaders });
+  expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance']);
+});
