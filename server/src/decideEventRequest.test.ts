@@ -233,7 +233,7 @@ describe('PATCH /api/event-requests/:eventId/decision authorisation wiring', () 
   });
 
   /** Uses the real PERMISSIONS policy; the decision handler itself is stubbed.
-   * The handler is createApp's 17th parameter, after SG2-35's review handler. */
+   * The handler is createApp's 18th parameter, after SG2-33's assign handler. */
   const appForRole = (role: Role) =>
     createApp(
       undefined,
@@ -251,6 +251,8 @@ describe('PATCH /api/event-requests/:eventId/decision authorisation wiring', () 
       undefined,
       undefined,
       undefined,
+      undefined,
+      // SG2-33's assign-coordinator handler sits immediately before this one.
       undefined,
       (_req, res) => {
         res.status(200).json({ reached: true });

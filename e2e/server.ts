@@ -83,6 +83,8 @@ const app = createApp(
   // main; only the review handler below needs the in-memory client.
   undefined,
   createStartEventReviewHandler(eventDependencies),
+  // SG2-33's assign handler keeps its production default here, as on main.
+  undefined,
   createDecideEventRequestHandler(eventDependencies)
 );
 
