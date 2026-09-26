@@ -136,3 +136,145 @@ test('a late result for the previous account cannot replace the new account queu
   expect(screen.queryByText('Leadership Forum')).not.toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Booking requests awaiting decision' })).toBeVisible();
 });
+
+test('coordinator can open and close the event planning drawer from item detail', async () => {
+  const assigned: WorkItem = {
+    ...review,
+    item_id: 28,
+    event_id: 28,
+    title: 'Assigned workshop',
+    category: 'assigned',
+    status: 'planning',
+    assigned_to_me: true,
+    starts_at: '2030-06-15T02:00:00Z',
+    details: {
+      organisation: 'Harbour Trust',
+      registration_needed: true,
+      expected_attendance: 50,
+      venue_requirements: 'Hall A',
+      equipment_requirements: 'Projector',
+      accessibility_needs: 'Wheelchair access',
+      registration_capacity: 100,
+      registration_opens_at: '2030-05-01T00:00:00Z',
+      registration_closes_at: '2030-06-01T00:00:00Z',
+      planning_notes: 'Priority VIP',
+    },
+  };
+  const fetch = vi.fn(async (url: string) =>
+    Response.json({ items: url.endsWith('/event/28') ? [assigned] : [assigned] })
+  );
+  vi.stubGlobal('fetch', fetch);
+
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  await screen.findByText('1 item in your work queue');
+  fireEvent.click(screen.getByRole('button', { name: /Assigned workshop/ }));
+
+  expect(await screen.findByRole('heading', { name: 'Assigned workshop' })).toBeInTheDocument();
+  const editBtn = screen.getByRole('button', { name: 'Edit Planning Information' });
+  expect(editBtn).toBeVisible();
+
+  fireEvent.click(editBtn);
+  const drawer = await screen.findByRole('dialog', { name: 'Event Planning Details' });
+  expect(drawer).toBeInTheDocument();
+
+  const closeBtn = screen.getByRole('button', { name: 'Close planning drawer' });
+  fireEvent.click(closeBtn);
+  expect(screen.queryByRole('dialog', { name: 'Event Planning Details' })).not.toBeInTheDocument();
+});
+
+test('saving updates in event planning drawer updates item status and facts via onSuccess', async () => {
+  const assigned: WorkItem = {
+    ...review,
+    item_id: 28,
+    event_id: 28,
+    title: 'Assigned workshop',
+    category: 'assigned',
+    status: 'planning',
+    assigned_to_me: true,
+    starts_at: '2030-06-15T02:00:00Z',
+    details: {
+      organisation: 'Harbour Trust',
+      registration_needed: false,
+    },
+  };
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === 'PATCH' && url.includes('/planning')) {
+      return Response.json({
+        event: {
+          event_id: 28,
+          status: 'planning_in_progress',
+          proposed_date: '2030-07-20T04:00:00.000Z',
+          expected_attendance: 120,
+          venue_requirements: 'Grand Ballroom',
+          equipment_requirements: 'PA System',
+          accessibility_needs: 'Elevator access',
+          registration_needed: true,
+          registration_capacity: 200,
+          registration_opens_at: '2030-06-01T00:00:00.000Z',
+          registration_closes_at: '2030-07-01T00:00:00.000Z',
+          planning_notes: 'Catering requested',
+          arrangements_recheck_needed: true,
+          outstanding_arrangements: ['venue_recheck'],
+        },
+      });
+    }
+    return Response.json({ items: [assigned] });
+  });
+  vi.stubGlobal('fetch', fetch);
+
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  await screen.findByText('1 item in your work queue');
+  fireEvent.click(screen.getByRole('button', { name: /Assigned workshop/ }));
+
+  expect(await screen.findByRole('heading', { name: 'Assigned workshop' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
+
+  await screen.findByRole('dialog', { name: 'Event Planning Details' });
+
+  const saveBtn = screen.getByRole('button', { name: 'Save Planning Details' });
+  fireEvent.click(saveBtn);
+
+  await expect(screen.findByText('planning in progress')).resolves.toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Event Planning Details' })).not.toBeInTheDocument();
+  expect(screen.getByText('120')).toBeVisible();
+  expect(screen.getByText('Grand Ballroom')).toBeVisible();
+  expect(screen.getByText('PA System')).toBeVisible();
+});
+
+test('Edit Planning Information button is hidden for terminal statuses and unassigned events', async () => {
+  const cancelled: WorkItem = {
+    ...review,
+    item_id: 31,
+    event_id: 31,
+    title: 'Cancelled Gala',
+    status: 'cancelled',
+    assigned_to_me: true,
+  };
+  const unassigned: WorkItem = {
+    ...review,
+    item_id: 32,
+    event_id: 32,
+    title: 'Unassigned Gala',
+    status: 'submitted',
+    assigned_to_me: false,
+  };
+  const fetch = vi.fn(async (url: string) => {
+    if (url.endsWith('/event/31')) return Response.json({ items: [cancelled] });
+    if (url.endsWith('/event/32')) return Response.json({ items: [unassigned] });
+    return Response.json({ items: [cancelled, unassigned] });
+  });
+  vi.stubGlobal('fetch', fetch);
+
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  await screen.findByText('2 items in your work queue');
+
+  fireEvent.click(screen.getByRole('button', { name: /Cancelled Gala/ }));
+  expect(await screen.findByRole('heading', { name: 'Cancelled Gala' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
+  await screen.findByText('2 items in your work queue');
+  fireEvent.click(screen.getByRole('button', { name: /Unassigned Gala/ }));
+  expect(await screen.findByRole('heading', { name: 'Unassigned Gala' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+});

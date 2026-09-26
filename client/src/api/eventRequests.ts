@@ -582,3 +582,173 @@ export async function getEventStage(
   return { ok: true, stage: body as EventStageResult };
 }
 
+export interface PlanningUpdatePayload {
+  expected_attendance?: number | null;
+  proposed_date?: string | null;
+  venue_requirements?: string | null;
+  equipment_requirements?: string | null;
+  accessibility_needs?: string | null;
+  registration_needed?: boolean | null;
+  registration_capacity?: number | null;
+  registration_opens_at?: string | null;
+  registration_closes_at?: string | null;
+  planning_notes?: string | null;
+  confirm_impact?: boolean;
+}
+
+export type PlanningUpdateInput = PlanningUpdatePayload;
+
+export interface PlanningEventRecord {
+  event_id: number;
+  name?: string;
+  status: string;
+  expected_attendance: number | null;
+  proposed_date: string | null;
+  venue_requirements: string | null;
+  equipment_requirements: string | null;
+  accessibility_needs: string | null;
+  registration_needed: boolean;
+  registration_capacity: number | null;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+  planning_notes: string | null;
+  arrangements_recheck_needed: boolean;
+  outstanding_arrangements: string[];
+  [key: string]: unknown;
+}
+
+export type UpdateEventPlanningResult =
+  | {
+      ok: true;
+      event: PlanningEventRecord;
+      arrangements_recheck_needed: boolean;
+      outstanding_arrangements: string[];
+    }
+  | {
+      ok: false;
+      kind: 'confirmation_required';
+      affected_arrangements: string[];
+      impact_notes: string[];
+      message: string;
+    }
+  | {
+      ok: false;
+      kind:
+        | 'validation'
+        | 'conflict'
+        | 'unauthorized'
+        | 'forbidden'
+        | 'not_found'
+        | 'unavailable'
+        | 'error';
+      message: string;
+      details?: string[];
+    };
+
+export type PlanningUpdateResult = UpdateEventPlanningResult;
+
+/**
+ * Updates event planning information for an event coordinated by the caller (SG2-39).
+ * Maps to `PATCH /api/event-requests/:eventId/planning`.
+ *
+ * @param eventId ID of the event request to update.
+ * @param payload Planning field values to update and optional confirm_impact flag.
+ * @param token   Bearer access token from the signed-in coordinator session.
+ */
+export async function updateEventPlanning(
+  eventId: number | string,
+  payload: PlanningUpdatePayload,
+  token: string
+): Promise<UpdateEventPlanningResult> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/planning`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 409 && body?.requires_confirmation) {
+      return {
+        ok: false,
+        kind: 'confirmation_required',
+        affected_arrangements: Array.isArray(body?.affected_arrangements)
+          ? body.affected_arrangements
+          : [],
+        impact_notes: Array.isArray(body?.impact_notes) ? body.impact_notes : [],
+        message: body?.error ?? 'Arrangements require rechecking.'
+      };
+    }
+    if (response.status === 409) {
+      return {
+        ok: false,
+        kind: 'conflict',
+        message: body?.error ?? 'Cannot update planning information for this event.'
+      };
+    }
+    if (response.status === 400) {
+      return {
+        ok: false,
+        kind: 'validation',
+        message: body?.error ?? 'Invalid planning details.',
+        details: Array.isArray(body?.details) ? body.details : undefined
+      };
+    }
+    if (response.status === 401) {
+      return {
+        ok: false,
+        kind: 'unauthorized',
+        message: body?.error ?? 'Authentication required'
+      };
+    }
+    if (response.status === 403) {
+      return {
+        ok: false,
+        kind: 'forbidden',
+        message: body?.error ?? 'Access denied'
+      };
+    }
+    if (response.status === 404) {
+      return {
+        ok: false,
+        kind: 'not_found',
+        message: body?.error ?? 'Event request not found.'
+      };
+    }
+    if (response.status === 503) {
+      return {
+        ok: false,
+        kind: 'unavailable',
+        message: body?.error ?? UNAVAILABLE
+      };
+    }
+    return {
+      ok: false,
+      kind: 'error',
+      message: body?.error ?? `Failed to update planning details (HTTP ${response.status}).`
+    };
+  }
+
+  if (!body || typeof body !== 'object' || !body.event) {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  return {
+    ok: true,
+    event: body.event as PlanningEventRecord,
+    arrangements_recheck_needed: Boolean(body.arrangements_recheck_needed),
+    outstanding_arrangements: Array.isArray(body.outstanding_arrangements)
+      ? body.outstanding_arrangements
+      : []
+  };
+}
+

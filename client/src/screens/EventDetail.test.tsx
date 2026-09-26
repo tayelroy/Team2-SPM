@@ -10,13 +10,20 @@ afterEach(() => {
 });
 
 describe('EventDetail access boundaries', () => {
-  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see event detail', (role) => {
+  test.each(['Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see event detail', (role) => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
     render(<EventDetail role={role} selectedEventId={101} accessToken="token" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
     expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
+  });
+
+  test('Event Coordinator without selected request cannot see event detail', () => {
+    const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
+    render(<EventDetail role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   test('an organiser without a selected request never sees a mock organisation event', () => {
@@ -463,6 +470,327 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
 
     expect(await screen.findByRole('heading', { name: 'Daily Standup' })).toBeInTheDocument();
     expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
+  });
+});
+
+describe('EventDetail coordinator planning integration (SG2-39)', () => {
+  const baseDetail: eventRequestsApi.EventRequestDetail = {
+    eventId: 101,
+    organiserId: 'org-1',
+    organisation: 'Acme Corp',
+    status: 'under_review',
+    name: 'Leadership Retreat',
+    purpose: 'Executive leadership alignment',
+    description: 'Two-day retreat focusing on strategic vision.',
+    proposedDate: '2026-11-20T08:00:00.000Z',
+    expectedAttendance: 45,
+    venueRequirements: 'Private hall',
+    accessibilityNeeds: 'Step-free access',
+    equipmentRequirements: 'Projector',
+    registrationNeeded: true,
+    coordinatorId: 'coord-1',
+    coordinatorName: 'Sarah Jenkins',
+    canManage: false,
+    waitingOnMe: false,
+  };
+
+  const baseStage: eventRequestsApi.EventStageResult = {
+    event_id: 101,
+    raw_status: 'under_review',
+    stage: 'Under Review',
+    stage_key: 'under_review',
+    description: 'Under review by coordinator',
+    waiting_on: null,
+    stepper_steps: [],
+    arrangements_recheck_needed: false,
+    outstanding_arrangements: [],
+  };
+
+  test('assigned Event Coordinator sees "Edit Planning Information" button on non-terminal event', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseDetail,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: baseStage,
+    });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        currentUserId="coord-1"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Planning Information' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Update event planning information, dates, attendance, and requirements.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
+  });
+
+  test('clicking "Edit Planning Information" opens EventPlanningDrawer and executes impact warning modal flow (AC 2)', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseDetail,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: baseStage,
+    });
+
+    const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning')
+      .mockResolvedValueOnce({
+        ok: false,
+        kind: 'confirmation_required',
+        affected_arrangements: ['venue_recheck', 'equipment_recheck'],
+        impact_notes: ['Attendance increased from 45 to 150. Existing venue suitability and equipment requirements must be rechecked.'],
+        message: 'Arrangements require rechecking.',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        arrangements_recheck_needed: true,
+        outstanding_arrangements: ['venue_recheck', 'equipment_recheck'],
+        event: {
+          event_id: 101,
+          status: 'planning',
+          expected_attendance: 150,
+          proposed_date: '2026-11-20T08:00:00.000Z',
+          venue_requirements: 'Private hall',
+          equipment_requirements: 'Projector',
+          accessibility_needs: 'Step-free access',
+          registration_needed: true,
+          registration_capacity: null,
+          registration_opens_at: null,
+          registration_closes_at: null,
+          planning_notes: null,
+          arrangements_recheck_needed: true,
+          outstanding_arrangements: ['venue_recheck', 'equipment_recheck'],
+        },
+      });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        currentUserId="coord-1"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+
+    // Open drawer
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
+    expect(await screen.findByRole('dialog', { name: 'Event Planning Details' })).toBeInTheDocument();
+
+    // Change attendance
+    const attendanceInput = screen.getByLabelText(/Expected Attendance/i);
+    fireEvent.change(attendanceInput, { target: { value: '150' } });
+
+    // Attempt save -> triggers confirmation required (AC 2)
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+
+    expect(await screen.findByTestId('impact-confirmation-banner')).toBeInTheDocument();
+    expect(screen.getByText('Arrangements Require Rechecking')).toBeInTheDocument();
+    expect(screen.getByText('Venue Suitability Recheck')).toBeInTheDocument();
+    expect(screen.getByText('Equipment Recheck')).toBeInTheDocument();
+    expect(screen.getByText(/Attendance increased from 45 to 150/)).toBeInTheDocument();
+
+    // Confirm & Save
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & Save Changes' }));
+
+    expect(await screen.findByText('150')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    expect(updateSpy).toHaveBeenLastCalledWith(
+      101,
+      expect.objectContaining({
+        expected_attendance: 150,
+        confirm_impact: true,
+      }),
+      'test-token',
+    );
+  });
+
+  test('Event Coordinator on terminal event (completed, cancelled, rejected) cannot edit planning (AC 5)', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        ...baseDetail,
+        status: 'completed',
+      },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: {
+        ...baseStage,
+        raw_status: 'completed',
+        stage: 'Completed',
+      },
+    });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        currentUserId="coord-1"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+    expect(screen.getByText('Planning details cannot be modified for terminal events.')).toBeInTheDocument();
+  });
+
+  test('Event Coordinator not assigned to event does not see "Edit Planning Information" button', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        ...baseDetail,
+        coordinatorId: 'coord-different',
+      },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: baseStage,
+    });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        currentUserId="coord-1"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+    expect(screen.getByText('Awaiting assignment to coordinator.')).toBeInTheDocument();
+  });
+
+  test('unassigned coordinator event (coordinatorId null) does not show "Edit Planning Information" button', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        ...baseDetail,
+        coordinatorId: null,
+      },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: baseStage,
+    });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        currentUserId="coord-1"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+    expect(screen.getByText('Awaiting assignment to coordinator.')).toBeInTheDocument();
+  });
+
+  test('Event Organiser does not see "Edit Planning Information" button', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseDetail,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: baseStage,
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+  });
+
+  test('displays outstanding arrangements tags when stage contains custom or registration arrangements (AC 3)', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseDetail,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: {
+        ...baseStage,
+        arrangements_recheck_needed: true,
+        outstanding_arrangements: ['venue_recheck', 'registration_recheck', 'custom_arrangement'],
+      },
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByTestId('arrangements-recheck-banner')).toBeInTheDocument();
+    const tags = screen.getByTestId('outstanding-arrangements-tags');
+    expect(tags).toBeInTheDocument();
+    expect(screen.getByText('Venue Suitability Recheck')).toBeInTheDocument();
+    expect(screen.getByText('Registration Capacity Recheck')).toBeInTheDocument();
+    expect(screen.getByText('custom_arrangement')).toBeInTheDocument();
+  });
+
+  test('resolves coordinator identity from loadSession when currentUserId prop is omitted', async () => {
+    sessionStorage.setItem(
+      'connectsphere.session',
+      JSON.stringify({
+        accessToken: 'stored-token',
+        user: { userId: 'coord-1', email: 'coord@test.com', role: 'Event Coordinator' },
+      }),
+    );
+
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseDetail,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: baseStage,
+    });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Leadership Retreat' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Planning Information' })).toBeInTheDocument();
+    sessionStorage.clear();
   });
 });
 

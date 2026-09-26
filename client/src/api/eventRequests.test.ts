@@ -10,9 +10,12 @@ import {
   submitEventRequest,
   updateEventRequestDraft,
   getEventStage,
+  updateEventPlanning,
   type EventStageResult,
   type EventRequestDetail,
   type EventRequestSummary,
+  type PlanningUpdatePayload,
+  type PlanningEventRecord,
 } from './eventRequests';
 
 const SESSION_KEY = 'connectsphere.session';
@@ -1122,6 +1125,361 @@ describe('getEventStage (SG2-38)', () => {
     // 200 OK with primitive string body
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse('plain string', 200)));
     expect(await getEventStage(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+});
+
+describe('updateEventPlanning (SG2-39)', () => {
+  const mockPayload: PlanningUpdatePayload = {
+    expected_attendance: 200,
+    proposed_date: '2026-11-15T09:00:00.000Z',
+    venue_requirements: 'Large Hall',
+    equipment_requirements: 'Projector',
+    accessibility_needs: 'Wheelchair ramp',
+    registration_needed: true,
+    registration_capacity: 200,
+    registration_opens_at: '2026-10-01T00:00:00.000Z',
+    registration_closes_at: '2026-11-10T23:59:59.000Z',
+    planning_notes: 'All catering set',
+    confirm_impact: false,
+  };
+
+  const mockRecord: PlanningEventRecord = {
+    event_id: 42,
+    name: 'Tech Conference',
+    status: 'planning',
+    expected_attendance: 200,
+    proposed_date: '2026-11-15T09:00:00.000Z',
+    venue_requirements: 'Large Hall',
+    equipment_requirements: 'Projector',
+    accessibility_needs: 'Wheelchair ramp',
+    registration_needed: true,
+    registration_capacity: 200,
+    registration_opens_at: '2026-10-01T00:00:00.000Z',
+    registration_closes_at: '2026-11-10T23:59:59.000Z',
+    planning_notes: 'All catering set',
+    arrangements_recheck_needed: true,
+    outstanding_arrangements: ['venue_recheck'],
+  };
+
+  test('successfully sends PATCH request and returns updated planning record', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          event: mockRecord,
+          arrangements_recheck_needed: true,
+          outstanding_arrangements: ['venue_recheck'],
+        },
+        200,
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const outcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+
+    expect(outcome).toEqual({
+      ok: true,
+      event: mockRecord,
+      arrangements_recheck_needed: true,
+      outstanding_arrangements: ['venue_recheck'],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/42/planning', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer coord-token',
+      },
+      body: JSON.stringify(mockPayload),
+    });
+  });
+
+  test('defaults outstanding_arrangements to empty array when omitted in 200 response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            event: mockRecord,
+            arrangements_recheck_needed: false,
+          },
+          200,
+        ),
+      ),
+    );
+
+    const outcome = await updateEventPlanning(42, {}, 'coord-token');
+    expect(outcome).toEqual({
+      ok: true,
+      event: mockRecord,
+      arrangements_recheck_needed: false,
+      outstanding_arrangements: [],
+    });
+  });
+
+  test('handles 409 conflict when confirmation is required (arrangement impact)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: 'Arrangements require rechecking.',
+            requires_confirmation: true,
+            affected_arrangements: ['venue_recheck', 'equipment_recheck'],
+            impact_notes: ['Proposed date changed.'],
+          },
+          409,
+        ),
+      ),
+    );
+
+    const outcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'confirmation_required',
+      affected_arrangements: ['venue_recheck', 'equipment_recheck'],
+      impact_notes: ['Proposed date changed.'],
+      message: 'Arrangements require rechecking.',
+    });
+  });
+
+  test('handles 409 confirmation required with missing lists and error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            requires_confirmation: true,
+          },
+          409,
+        ),
+      ),
+    );
+
+    const outcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'confirmation_required',
+      affected_arrangements: [],
+      impact_notes: [],
+      message: 'Arrangements require rechecking.',
+    });
+  });
+
+  test('handles 409 conflict without confirmation required (terminal status)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: 'Cannot update planning information for a cancelled event.',
+          },
+          409,
+        ),
+      ),
+    );
+
+    const outcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'conflict',
+      message: 'Cannot update planning information for a cancelled event.',
+    });
+
+    // Fallback when error string is missing
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 409)));
+    const fallbackOutcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(fallbackOutcome).toEqual({
+      ok: false,
+      kind: 'conflict',
+      message: 'Cannot update planning information for this event.',
+    });
+  });
+
+  test('handles 400 validation error with and without details', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: 'Invalid planning details',
+            details: ['registration_closes_at must be after registration_opens_at.'],
+          },
+          400,
+        ),
+      ),
+    );
+
+    const outcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'validation',
+      message: 'Invalid planning details',
+      details: ['registration_closes_at must be after registration_opens_at.'],
+    });
+
+    // Without details
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          {
+            error: 'eventId must be a positive integer.',
+          },
+          400,
+        ),
+      ),
+    );
+    const noDetailsOutcome = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(noDetailsOutcome).toEqual({
+      ok: false,
+      kind: 'validation',
+      message: 'eventId must be a positive integer.',
+      details: undefined,
+    });
+
+    // Without message
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 400)));
+    const fallbackValidation = await updateEventPlanning(42, mockPayload, 'coord-token');
+    expect(fallbackValidation).toEqual({
+      ok: false,
+      kind: 'validation',
+      message: 'Invalid planning details.',
+      details: undefined,
+    });
+  });
+
+  test('handles 401 unauthorized with custom and fallback messages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ error: 'Token expired' }, 401)),
+    );
+    expect(await updateEventPlanning(42, mockPayload, 'bad-token')).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Token expired',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
+    expect(await updateEventPlanning(42, mockPayload, 'bad-token')).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Authentication required',
+    });
+  });
+
+  test('handles 403 forbidden with custom and fallback messages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: 'Only assigned coordinator can update.' }, 403),
+      ),
+    );
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Only assigned coordinator can update.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 403)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Access denied',
+    });
+  });
+
+  test('handles 404 not found with custom and fallback messages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: 'Event request does not exist.' }, 404),
+      ),
+    );
+    expect(await updateEventPlanning(999, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event request does not exist.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 404)));
+    expect(await updateEventPlanning(999, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event request not found.',
+    });
+  });
+
+  test('handles 503 unavailable with custom and fallback messages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ error: 'DB down' }, 503)),
+    );
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'DB down',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 503)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('handles unexpected HTTP error (e.g. 500) with custom and fallback messages', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ error: 'Fatal error' }, 500)),
+    );
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Fatal error',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 500)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to update planning details (HTTP 500).',
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('<html>Bad Gateway</html>', { status: 502 })),
+    );
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to update planning details (HTTP 502).',
+    });
+  });
+
+  test('handles network failure (fetch rejected)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection lost')));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('handles 200 OK with empty or malformed body or missing event', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, 200)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 200)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
       ok: false,
       kind: 'unavailable',
       message: 'Could not reach the server. Please try again.',
