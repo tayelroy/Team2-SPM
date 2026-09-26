@@ -888,6 +888,7 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
       undefined,
       undefined,
       undefined,
+      undefined,
       (_req, res) => {
         res.status(200).json({ reached: true });
       }

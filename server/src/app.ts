@@ -41,6 +41,7 @@ export function createApp(
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
+  startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal }),
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
   updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal })
 ) {
