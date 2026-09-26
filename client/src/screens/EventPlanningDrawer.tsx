@@ -36,7 +36,7 @@ export interface EventPlanningDrawerProps {
   onClose: () => void;
   eventId: number;
   initialValues?: EventPlanningInitialValues;
-  accessToken?: string;
+  accessToken?: string | null;
   onSuccess?: (event: PlanningEventRecord) => void;
 }
 

@@ -5,6 +5,8 @@ import {
   type EventRequestDetail,
   type EventStageResult
 } from '../api/eventRequests';
+import EventPlanningDrawer from './EventPlanningDrawer';
+import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle } from '../mock/viewModel';
@@ -22,7 +24,17 @@ export interface EventDetailProps {
   eventStatus?: string;
   selectedEventId?: number;
   accessToken?: string;
+  currentUserId?: string;
 }
+
+const ARRANGEMENT_LABELS: Record<string, string> = {
+  venue_recheck: 'Venue Suitability Recheck',
+  equipment_recheck: 'Equipment Recheck',
+  registration_recheck: 'Registration Capacity Recheck',
+  venue: 'Venue Suitability Recheck',
+  equipment: 'Equipment Recheck',
+  registration: 'Registration Capacity Recheck',
+};
 
 /** Organisation-scoped request detail. All event content comes from the API. */
 export default function EventDetail({
@@ -30,8 +42,11 @@ export default function EventDetail({
   onNavigate,
   selectedEventId,
   accessToken,
+  currentUserId,
 }: EventDetailProps) {
   const isOrganiser = role === 'Event Organiser';
+  const isCoordinator = role === 'Event Coordinator';
+  const isAuthorizedRole = isOrganiser || (isCoordinator && Boolean(selectedEventId));
 
   const [detail, setDetail] = useState<EventRequestDetail | null>(null);
   const [stage, setStage] = useState<EventStageResult | null>(null);
@@ -39,9 +54,10 @@ export default function EventDetail({
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [isPlanningDrawerOpen, setIsPlanningDrawerOpen] = useState(false);
 
   useEffect(() => {
-    if (!isOrganiser || !selectedEventId || !accessToken) {
+    if (!isAuthorizedRole || !selectedEventId || !accessToken) {
       setLoading(false);
       return;
     }
@@ -90,9 +106,9 @@ export default function EventDetail({
     return () => {
       cancelled = true;
     };
-  }, [isOrganiser, selectedEventId, accessToken, reloadKey]);
+  }, [isAuthorizedRole, selectedEventId, accessToken, reloadKey]);
 
-  if (!isOrganiser) {
+  if (!isAuthorizedRole) {
     return <Card><p role="alert">Event requests are available only to Event Organisers.</p></Card>;
   }
 
@@ -192,6 +208,17 @@ export default function EventDetail({
       const badge = badgeStyle(detail.status);
       const isLocked = !detail.waitingOnMe;
       const isRejected = detail.status.toLowerCase() === 'rejected';
+      const isTerminal = ['cancelled', 'completed', 'rejected'].includes(detail.status.toLowerCase());
+
+      const session = loadSession();
+      const resolvedUserId = currentUserId ?? session?.user?.userId;
+      const isAssignedCoordinator =
+        isCoordinator &&
+        Boolean(
+          detail.coordinatorId &&
+            (!resolvedUserId || detail.coordinatorId === resolvedUserId),
+        );
+      const canEditPlanning = isAssignedCoordinator && !isTerminal;
 
       const facts = [
         { label: 'Organisation', value: detail.organisation || '—' },
@@ -243,6 +270,23 @@ export default function EventDetail({
                       arrangements. These arrangements remain outstanding until verified by the
                       coordinator.
                     </span>
+                    {stage.outstanding_arrangements && stage.outstanding_arrangements.length > 0 && (
+                      <div
+                        data-testid="outstanding-arrangements-tags"
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}
+                      >
+                        {stage.outstanding_arrangements.map((arr) => (
+                          <Badge
+                            key={arr}
+                            bg="rgba(255, 180, 0, 0.2)"
+                            fg="#fde047"
+                            size={10}
+                          >
+                            {ARRANGEMENT_LABELS[arr] ?? arr}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </Notice>
               )}
@@ -264,38 +308,83 @@ export default function EventDetail({
           </dl>
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
-            {!detail.canManage ? (
+            {!detail.canManage && !isCoordinator ? (
               <p role="status" className="organisation-detail-notice">
                 View only. This event is shared with your organisation. Only its creator can edit or submit the request.
               </p>
             ) : (
               <>
-                {isRejected ? (
+                {isRejected && isOrganiser ? (
                   <div className="organisation-detail-notice">
                     <strong>Request returned for revision</strong>
                     <p>This request was returned by your coordinator. Please review the details, make necessary amendments, and resubmit.</p>
                   </div>
                 ) : null}
-                {isLocked ? (
+                {isLocked && isOrganiser ? (
                   <p role="status" aria-label="Editing disabled: request submitted" className="organisation-detail-notice">
                     This request has been submitted and is now with your coordinator. Contact your coordinator if an amendment is needed.
                   </p>
                 ) : null}
                 <div className="organisation-detail-actions">
-                  {!isLocked ? (
+                  {!isLocked && isOrganiser ? (
                     <button className="organisation-button organisation-button-primary" type="button" onClick={() => onNavigate('drafts')}>Edit request</button>
+                  ) : null}
+                  {canEditPlanning ? (
+                    <button
+                      className="organisation-button organisation-button-primary"
+                      type="button"
+                      onClick={() => setIsPlanningDrawerOpen(true)}
+                    >
+                      Edit Planning Information
+                    </button>
                   ) : null}
                 </div>
               </>
             )}
             <p className="organisation-detail-hint">
-              {!detail.canManage
-                ? 'Contact the request creator if this event needs updating.'
-                : isLocked
-                  ? 'Your coordinator will be in touch if clarification is needed.'
-                  : 'You can edit and resubmit this request while it is with you.'}
+              {isCoordinator
+                ? canEditPlanning
+                  ? 'Update event planning information, dates, attendance, and requirements.'
+                  : isTerminal
+                    ? 'Planning details cannot be modified for terminal events.'
+                    : 'Awaiting assignment to coordinator.'
+                : !detail.canManage
+                  ? 'Contact the request creator if this event needs updating.'
+                  : isLocked
+                    ? 'Your coordinator will be in touch if clarification is needed.'
+                    : 'You can edit and resubmit this request while it is with you.'}
             </p>
           </footer>
+          {canEditPlanning && (
+            <EventPlanningDrawer
+              isOpen={isPlanningDrawerOpen}
+              onClose={() => setIsPlanningDrawerOpen(false)}
+              eventId={detail.eventId}
+              accessToken={accessToken}
+              initialValues={{
+                proposed_date: detail.proposedDate,
+                expected_attendance: detail.expectedAttendance,
+                venue_requirements: detail.venueRequirements,
+                equipment_requirements: detail.equipmentRequirements,
+                accessibility_needs: detail.accessibilityNeeds,
+                registration_needed: detail.registrationNeeded,
+                status: detail.status,
+              }}
+              onSuccess={(updatedEvent) => {
+                setDetail({
+                  ...detail,
+                  status: updatedEvent.status,
+                  expectedAttendance: updatedEvent.expected_attendance,
+                  proposedDate: updatedEvent.proposed_date,
+                  venueRequirements: updatedEvent.venue_requirements,
+                  equipmentRequirements: updatedEvent.equipment_requirements,
+                  accessibilityNeeds: updatedEvent.accessibility_needs,
+                  registrationNeeded: updatedEvent.registration_needed,
+                });
+                setReloadKey((k) => k + 1);
+              }}
+            />
+          )}
         </article>
       );
     }

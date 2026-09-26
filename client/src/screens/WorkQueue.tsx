@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchWorkQueue, startEventReview, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
+import EventPlanningDrawer from './EventPlanningDrawer';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
@@ -61,26 +62,88 @@ function useOpenedForReview(item: WorkItem, accessToken?: string | null) {
 
 function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: string | null }) {
   const { status, error } = useOpenedForReview(item, accessToken);
-  return <article className="organisation-detail" aria-label={KINDS[item.kind]}>
-    <div className="organisation-detail-header">
-      <span>{KINDS[item.kind]} #{item.item_id}</span>
-      <span className="work-queue-status">{status.replace(/_/g, ' ')}</span>
-    </div>
-    {error && <p role="alert" className="work-queue-empty">{error}</p>}
-    {item.kind === 'event' && !item.assigned_to_me &&
-      <p className="work-queue-empty">Awaiting assignment. Technical Support Staff assign a coordinator before it can be reviewed.</p>}
-    <div className="organisation-detail-intro">
-      <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
-      <p>{context(item)}</p>
-      <p>{dateTime(item.starts_at)}{item.ends_at ? ` – ${dateTime(item.ends_at)}` : ''} (Singapore time)</p>
-    </div>
-    <dl className="organisation-detail-facts">
-      {Object.entries(DETAIL_LABELS).filter(([key]) => key in item.details).map(([key, label]) => {
-        const value = item.details[key];
-        return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
-      })}
-    </dl>
-  </article>;
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(status);
+  const [currentDetails, setCurrentDetails] = useState(item.details);
+  const [startsAt, setStartsAt] = useState(item.starts_at);
+
+  useEffect(() => {
+    setCurrentStatus(status);
+  }, [status]);
+
+  const isTerminal = ['cancelled', 'completed', 'rejected'].includes(currentStatus.toLowerCase());
+  const canEditPlanning = item.kind === 'event' && item.assigned_to_me && !isTerminal;
+
+  return (
+    <article className="organisation-detail" aria-label={KINDS[item.kind]}>
+      <div className="organisation-detail-header">
+        <span>{KINDS[item.kind]} #{item.item_id}</span>
+        <span className="work-queue-status">{currentStatus.replace(/_/g, ' ')}</span>
+      </div>
+      {error && <p role="alert" className="work-queue-empty">{error}</p>}
+      {item.kind === 'event' && !item.assigned_to_me &&
+        <p className="work-queue-empty">Awaiting assignment. Technical Support Staff assign a coordinator before it can be reviewed.</p>}
+      <div className="organisation-detail-intro">
+        <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
+        <p>{context(item)}</p>
+        <p>{dateTime(startsAt)}{item.ends_at ? ` – ${dateTime(item.ends_at)}` : ''} (Singapore time)</p>
+      </div>
+      <dl className="organisation-detail-facts">
+        {Object.entries(DETAIL_LABELS).filter(([key]) => key in currentDetails).map(([key, label]) => {
+          const value = currentDetails[key];
+          return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
+        })}
+      </dl>
+      {canEditPlanning && (
+        <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+          <button
+            type="button"
+            className="organisation-button organisation-button-primary"
+            onClick={() => setDrawerOpen(true)}
+          >
+            Edit Planning Information
+          </button>
+        </div>
+      )}
+      {canEditPlanning && (
+        <EventPlanningDrawer
+          isOpen={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          eventId={item.event_id}
+          accessToken={accessToken}
+          initialValues={{
+            proposed_date: startsAt,
+            expected_attendance: currentDetails.expected_attendance as number | null | undefined,
+            venue_requirements: currentDetails.venue_requirements as string | null | undefined,
+            equipment_requirements: currentDetails.equipment_requirements as string | null | undefined,
+            accessibility_needs: currentDetails.accessibility_needs as string | null | undefined,
+            registration_needed: Boolean(currentDetails.registration_needed),
+            registration_capacity: currentDetails.registration_capacity as number | null | undefined,
+            registration_opens_at: currentDetails.registration_opens_at as string | null | undefined,
+            registration_closes_at: currentDetails.registration_closes_at as string | null | undefined,
+            planning_notes: currentDetails.planning_notes as string | null | undefined,
+            status: currentStatus,
+          }}
+          onSuccess={(updatedEvent) => {
+            setCurrentStatus(updatedEvent.status);
+            setStartsAt(updatedEvent.proposed_date);
+            setCurrentDetails((prev) => ({
+              ...prev,
+              expected_attendance: updatedEvent.expected_attendance,
+              venue_requirements: updatedEvent.venue_requirements,
+              equipment_requirements: updatedEvent.equipment_requirements,
+              accessibility_needs: updatedEvent.accessibility_needs,
+              registration_needed: updatedEvent.registration_needed,
+              registration_capacity: updatedEvent.registration_capacity,
+              registration_opens_at: updatedEvent.registration_opens_at,
+              registration_closes_at: updatedEvent.registration_closes_at,
+              planning_notes: updatedEvent.planning_notes,
+            }));
+          }}
+        />
+      )}
+    </article>
+  );
 }
 
 function QueueContent({ role, accessToken, selection, onSelect }: {
