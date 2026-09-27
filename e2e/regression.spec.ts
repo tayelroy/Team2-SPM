@@ -179,10 +179,10 @@ test('SG2-26-P01 | colleagues read the same organisation events with creator-onl
   expect((await page.request.patch('/api/event-requests/1', { headers, data: { name: 'Colleague edit' } })).status()).toBe(404);
   expect((await page.request.patch('/api/event-requests/1/submit', { headers })).status()).toBe(404);
   expect((await page.request.delete('/api/event-requests/1', { headers })).status()).toBe(404);
-  const mine = await page.request.get('/api/event-requests?scope=mine', { headers });
+  const mine = await page.request.get('/api/event-requests?scope=mine&status=draft', { headers });
   expect((await mine.json()).requests).toEqual([]);
   await nav(page, 'My drafts');
-  await expect(page.getByRole('heading', { name: 'No event requests yet', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
   await page.reload();
   await nav(page, 'My events');
   await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
@@ -273,7 +273,7 @@ test('SG2-26-N02 | only Event Organisers can access organisation event records',
       await signIn(page, account);
       await expect(page.getByRole('navigation').getByRole('button', { name: 'My events', exact: true })).toHaveCount(0);
       const headers = await authHeaders(page);
-      for (const endpoint of ['/api/event-requests', '/api/event-requests?scope=mine', '/api/event-requests/1']) {
+      for (const endpoint of ['/api/event-requests', '/api/event-requests?scope=mine&status=draft', '/api/event-requests/1']) {
         const response = await page.request.get(endpoint, { headers });
         expect(response.status()).toBe(403);
         expect(await response.json()).toEqual({ error: 'Access denied' });
@@ -379,6 +379,10 @@ test('SG2-28-P01 | submit a fresh request and verify its saved data and status',
   await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('submitted');
   await page.reload();
   await nav(page, 'My drafts');
+  await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toHaveCount(0);
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Browser workshop', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
   const record = (await eventRecords(page)).find(row => row.name === 'Browser workshop')!;
   const detail = await page.request.get(`/api/event-requests/${record.event_id}`, { headers: await authHeaders(page) });
@@ -422,6 +426,9 @@ test('SG2-29-P01 | editing then submitting preserves the latest field values', a
   await page.getByLabel(/^Event name/).fill('Revised workshop');
   await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Revised workshop', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Revised workshop', exact: true })).toBeVisible();
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
@@ -429,9 +436,15 @@ test('SG2-29-P01 | editing then submitting preserves the latest field values', a
   expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'submitted', accessibility_needs: null });
 });
 
-test('SG2-32-P01 | draft deletion requires confirmation and survives reload', async ({ page }) => {
+test('SG2-32-P01 | My drafts excludes non-drafts and confirmed deletion survives reload', async ({ page, request }) => {
+  // Reuse the existing mixed-status fixture: the owner has one draft plus
+  // submitted, planning, under-review and completed requests.
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
   await signIn(page);
+  await expect(page.locator('.organisation-summary-stat').filter({ hasText: 'My drafts' }).locator('strong')).toHaveText('1');
   await nav(page, 'My drafts');
+  await expect(page.getByRole('region', { name: 'My draft requests' }).getByRole('heading')).toHaveText(['Planning workshop']);
+  await expect(page.getByText('Other organisation draft')).toHaveCount(0);
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect((await eventRecords(page)).some(r => r.event_id === 1)).toBeTruthy();
@@ -439,8 +452,12 @@ test('SG2-32-P01 | draft deletion requires confirmation and survives reload', as
   await page.getByRole('button', { name: 'Confirm delete', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toHaveCount(0);
   await page.reload();
+  await expect(page.locator('.organisation-summary-stat').filter({ hasText: 'My drafts' }).locator('strong')).toHaveText('0');
   await nav(page, 'My drafts');
-  await expect(page.getByRole('heading', { name: 'No event requests yet', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
+  // Non-drafts were hidden, not deleted: all four still appear in My events.
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: /^View / })).toHaveCount(4);
 });
 
 test('SG2-27-P01 | profile changes persist and external users have no department field', async ({ page }) => {

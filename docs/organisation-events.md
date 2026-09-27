@@ -10,7 +10,8 @@ cached browser value cannot select the organisation to read.
 - `GET /api/event-requests` lists events with the exact same nonblank
   `organisation` value as the caller's `public.users` row. Status filters retain
   that boundary. `scope=mine` further restricts the list to the creator and is
-  used by **My drafts**.
+  combined with `status=draft` by **My drafts**. Non-draft requests stay in
+  **My events**; they are not shown in the draft list or its count.
 - `GET /api/event-requests/:eventId` applies the same organisation boundary.
   Unrelated and nonexistent events both return 404. Missing, null or blank
   membership returns an empty list and 404 for details.

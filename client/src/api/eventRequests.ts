@@ -358,17 +358,17 @@ export interface DraftListItem {
   status: string;
 }
 
-export type ListMyEventRequestsOutcome =
+export type ListMyDraftRequestsOutcome =
   | { ok: true; requests: DraftListItem[] }
   | { ok: false; message: string };
 
 /**
- * Lists the caller's own event requests (SG2-32's minimal slice of SG2-31).
+ * Lists only the caller's own drafts, within their current organisation (SG2-32).
  *
  * @param token Bearer access token from the signed-in session.
  */
-export async function listMyEventRequests(token: string): Promise<ListMyEventRequestsOutcome> {
-  const response = await getEventRequestResponse('/api/event-requests?scope=mine', token);
+export async function listMyDraftRequests(token: string): Promise<ListMyDraftRequestsOutcome> {
+  const response = await getEventRequestResponse('/api/event-requests?scope=mine&status=draft', token);
   if (!response) return { ok: false, message: UNAVAILABLE };
 
   if (!response.ok) {
@@ -388,7 +388,7 @@ export type FetchEventRequestDraftOutcome =
 
 /**
  * Fetches the full editable fields of one of the caller's own event
- * requests. The list view only returns a summary (see listMyEventRequests
+ * requests. The list view only returns a summary (see listMyDraftRequests
  * above) — opening the edit form needs the complete record, so this is
  * called on demand when "Edit" is clicked, via the same detail endpoint
  * SG2-31 added. Maps to `GET /api/event-requests/:eventId`.
@@ -581,4 +581,3 @@ export async function getEventStage(
 
   return { ok: true, stage: body as EventStageResult };
 }
-
