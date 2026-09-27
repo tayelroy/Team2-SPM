@@ -8,9 +8,12 @@ insert into public.users (user_id, name, role_id) values
   ('c0000000-0000-4000-8000-000000000002', 'Queue coordinator', 2);
 insert into public.venues (venue_id, name, location, capacity) values (94101, 'Queue Hall', 'Level 2', 120);
 insert into public.equipment (equipment_id, name, quantity_total) values (94101, 'Queue microphones', 10);
-insert into public.events (event_id, organiser_id, coordinator_id, name, status, expected_attendance, description, registration_needed)
+insert into public.events (event_id, organiser_id, coordinator_id, name, status, expected_attendance, description, registration_needed, decision_reason)
 select 94100 + n, 'c0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000002',
-  'Event ' || n, state::public.event_status, 80, 'Full event description', true
+  'Event ' || n, state::public.event_status, 80, 'Full event description', true,
+  -- SG2-37: a rejected event must record why it was rejected
+  -- (events_rejection_requires_reason), so the fixture supplies one.
+  case when state = 'rejected' then 'Rejected during fixture setup' end
 from (values (1, 'draft'), (2, 'submitted'), (3, 'under_review'), (4, 'approved'), (5, 'planning'),
   (6, 'confirmed'), (7, 'completed'), (8, 'cancelled'), (9, 'rejected')) states(n, state);
 insert into public.events (event_id, organiser_id, name, status) values
