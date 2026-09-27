@@ -23,7 +23,7 @@ function deferred<T>() {
 function api(requests: unknown[] = [], details: Record<number, unknown> = {}) {
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-token' });
-    if (url === '/api/event-requests?scope=mine' && (init?.method ?? 'GET') === 'GET') {
+    if (url === '/api/event-requests?scope=mine&status=draft' && (init?.method ?? 'GET') === 'GET') {
       return Response.json({ requests });
     }
     const detailMatch = typeof url === 'string' && url.match(/^\/api\/event-requests\/(\d+)$/);
@@ -68,15 +68,16 @@ test('no token never loads data', () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test('shows loading, then the empty state when the caller has no requests', async () => {
+test('shows loading, then the draft-specific empty state when no drafts are returned', async () => {
   const fetch = api([]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading your requests');
-  expect(await screen.findByRole('heading', { name: 'No event requests yet' })).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine', { method: 'GET', headers: { Authorization: 'Bearer test-token' } });
+  expect(await screen.findByRole('heading', { name: 'No draft requests' })).toBeInTheDocument();
+  expect(screen.getByText(/Submitted requests are listed in My events/)).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine&status=draft', { method: 'GET', headers: { Authorization: 'Bearer test-token' } });
 });
 
-test('lists requests and only offers Edit/Delete on drafts', async () => {
+test('keeps Edit/Delete disabled for non-draft rows even if a stale response includes them', async () => {
   api([DRAFT, SUBMITTED]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
@@ -172,7 +173,7 @@ test('clicking Delete on a different draft clears an existing delete error', asy
   // delete"/"Cancel", not "Delete") — starting a fresh delete on DRAFT_TWO is
   // the only remaining "Delete" button, and should clear the stale error.
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
-    if (url === '/api/event-requests?scope=mine' && (init?.method ?? 'GET') === 'GET') {
+    if (url === '/api/event-requests?scope=mine&status=draft' && (init?.method ?? 'GET') === 'GET') {
       return Response.json({ requests: [DRAFT, DRAFT_TWO] });
     }
     if (url === '/api/event-requests/7' && init?.method === 'DELETE') {

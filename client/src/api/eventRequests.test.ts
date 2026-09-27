@@ -6,7 +6,7 @@ import {
   fetchOwnEventDetail,
   fetchOwnEventRequests,
   isWaitingOnOrganiser,
-  listMyEventRequests,
+  listMyDraftRequests,
   submitEventRequest,
   updateEventRequestDraft,
   getEventStage,
@@ -255,7 +255,7 @@ describe('shared GET response contracts', () => {
     },
     {
       label: 'own-request list',
-      read: () => listMyEventRequests('token-1'),
+      read: () => listMyDraftRequests('token-1'),
       unavailable: { ok: false, message: 'Could not reach the server. Please try again.' },
       unreadable: { ok: false, message: 'Could not reach the server. Please try again.' },
     },
@@ -665,18 +665,18 @@ describe('fetchOwnEventDetail', () => {
   });
 });
 
-describe('listMyEventRequests', () => {
-  test('sends the bearer token and returns the requests', async () => {
+describe('listMyDraftRequests', () => {
+  test('requests only the caller’s drafts with the bearer token', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse({ requests: [{ event_id: 7, status: 'draft' }] }, 200));
     vi.stubGlobal('fetch', fetchMock);
 
-    const outcome = await listMyEventRequests('token-1');
+    const outcome = await listMyDraftRequests('token-1');
 
     expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/event-requests?scope=mine');
+    expect(url).toBe('/api/event-requests?scope=mine&status=draft');
     expect(init.method).toBe('GET');
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
@@ -684,7 +684,7 @@ describe('listMyEventRequests', () => {
   test('maps 401 to a signed-out message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
       ok: false,
       message: 'You are signed out. Sign in again to see your requests.',
     });
@@ -693,7 +693,7 @@ describe('listMyEventRequests', () => {
   test('explains a 403 in terms of the caller role', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
       ok: false,
       message: 'Your role cannot view event requests.',
     });
@@ -704,7 +704,7 @@ describe('listMyEventRequests', () => {
   test('falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
       ok: false,
       message: 'Could not reach the server. Please try again.',
     });
@@ -1136,4 +1136,3 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 });
-

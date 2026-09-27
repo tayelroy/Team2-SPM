@@ -624,5 +624,71 @@
     "actual": "Current browser assertions passed. The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
     "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
     "execution_date": "22 Sep 2026"
+  },
+  {
+    "id": "SG2-45-P01",
+    "title": "Staff block a free period, see it on the calendar, then remove it",
+    "type": "Positive",
+    "story": "SG2-45",
+    "purpose": "Verify AC1 and AC3: a block with a reason is recorded, shown as unavailable on the availability calendar, and removing it frees the period.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
+      "Block 20 June 2030 09:00–17:00 with reason Carpet replacement.",
+      "Open Venue Availability for June 2030 and inspect the calendar.",
+      "Return to the block screen, remove the block, and re-check the API and calendar."
+    ],
+    "data": "Seeded Regression Hall with its existing Scheduled maintenance block; 20 June 2030",
+    "expected": "The new block is listed and appears as Regression Hall · Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Current browser assertions passed as expected.",
+    "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
+    "execution_date": "26 Sep 2026"
+  },
+  {
+    "id": "SG2-45-N01",
+    "title": "A confirmed booking cannot be blocked and other roles cannot block",
+    "type": "Negative / role isolation",
+    "story": "SG2-45",
+    "purpose": "Verify AC2 and the Venue Staff-only permission for blocking and removing blocks.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as Venue Staff and try to block 14–16 June 2030, which covers confirmed booking #1.",
+      "Repeat the overlapping block through the API.",
+      "Sign in as coordinator, technical support, organiser and attendee; try to list, create and remove blocks through the API; check the coordinator catalogue has no block control.",
+      "Call the create endpoint without credentials."
+    ],
+    "data": "Seeded confirmed booking #1 for event 1 on 15 June 2030 02:00–04:00 UTC; all fixture roles",
+    "expected": "The UI and API refuse the block with 409 and identify booking #1 for event 1; other roles receive 403, unauthenticated calls 401; no block is written.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Current browser assertions passed as expected.",
+    "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
+    "execution_date": "26 Sep 2026"
+  },
+  {
+    "id": "DB-BLOCK-01",
+    "title": "Venue block SQL policies and confirmed-booking trigger hold",
+    "type": "Positive / negative / integrity",
+    "story": "SG2-45",
+    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff and that no caller can block a confirmed booking.",
+    "preconditions": "Disposable postgres:17 container; supabase/tests/fixtures/auth.sql followed by every migration in filename order. No shared database or deployed Supabase.",
+    "steps": [
+      "Run venue_blocks.sql with ON_ERROR_STOP=1.",
+      "As Venue Staff, block free, held and touching periods, attempt a confirmed overlap, remove blocks, attempt an update.",
+      "As every other role and anonymously, attempt direct inserts and deletes.",
+      "As the privileged owner, attempt a confirmed overlap by insert and by update; roll back."
+    ],
+    "data": "Venue 900; one confirmed and one held booking; one seeded block; one account per role",
+    "expected": "Only Venue Staff insert and delete; updates are not granted; other roles and anonymous callers cannot write; any confirmed overlap raises exclusion_violation regardless of caller.",
+    "evidence": "supabase/tests/venue_blocks.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "All migrations and all six SQL suites passed in the order used by ci.yml. Weakening the insert policy, the delete policy, or dropping the trigger each made this suite fail as expected.",
+    "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; Docker postgres:17; ci.yml database-tests steps reproduced locally.",
+    "execution_date": "26 Sep 2026"
   }
 ]

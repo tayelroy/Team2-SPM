@@ -16,6 +16,7 @@ import { createStartEventReviewHandler } from './events/review';
 import { createDecideEventRequestHandler } from './events/decide';
 import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
+import { createVenueBlocksRouter } from './venues/blocks';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
@@ -37,6 +38,7 @@ export function createApp(
     availability: createVenueAvailabilityRouter(access),
     venues: createVenuesRouter(access),
     layouts: createVenueLayoutsRouter(access),
+    blocks: createVenueBlocksRouter(access),
     profile: createProfileRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
@@ -125,6 +127,7 @@ export function createApp(
 
   app.use('/api/venues', routers.venues);
   app.use('/api/venues', routers.layouts);
+  app.use('/api/venues', routers.blocks);
 
   // SG2-27: view/update the caller's own profile.
   app.use('/api/profile', routers.profile);
