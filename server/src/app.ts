@@ -13,6 +13,7 @@ import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createAssignCoordinatorHandler } from './events/assignCoordinator';
 import { createStartEventReviewHandler } from './events/review';
+import { createDecideEventRequestHandler } from './events/decide';
 import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
 import { createVenueBlocksRouter } from './venues/blocks';
@@ -43,7 +44,8 @@ export function createApp(
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
   startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal }),
-  assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal })
+  assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
+  decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -88,6 +90,12 @@ export function createApp(
     '/:eventId/review',
     access.requirePermission('event_request.review'),
     startEventReviewHandler
+  );
+  // SG2-37: the coordinator reviewing a request approves or rejects it.
+  eventRequests.patch(
+    '/:eventId/decision',
+    access.requirePermission('event_request.decide'),
+    decideEventRequestHandler
   );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(

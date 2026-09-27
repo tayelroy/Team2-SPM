@@ -83,6 +83,15 @@ export class MemoryDatabase {
 
   /** SG2-35: a submitted request already assigned to the signed-in coordinator.
    * Seeded separately from seedWorkQueue so its queue counts stay unchanged. */
+  /** SG2-37: a request this coordinator is already reviewing, ready to decide. */
+  seedUnderReview() {
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 52, name: 'Decision Forum', status: 'under_review',
+      coordinator_id: 'user-coordinator', purpose: 'Decide whether the forum proceeds',
+      decided_by: null, decided_at: null, decision_reason: null,
+    });
+  }
+
   seedAssignedReview() {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 51, name: 'Assigned Review Forum', status: 'submitted',

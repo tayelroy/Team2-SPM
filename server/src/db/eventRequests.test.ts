@@ -8,6 +8,7 @@ import {
   fetchOrganiserOrganisation,
   fetchOwnEventRequest,
   fetchOwnEventRequests,
+  decideEventRequest,
   insertEventRequestDraft,
   startEventReview,
   submitEventRequest,
@@ -144,6 +145,47 @@ function fakeEventsUpdateClient(
 
 /** Like fakeEventsUpdateClient, but also records the coordinator filter that
  * keeps one coordinator's review off another's assignment (SG2-35). */
+/** Records the decision payload plus the coordinator and under_review guards
+ * that keep one coordinator off another's assignment (SG2-37). */
+function fakeEventsDecisionClient(
+  result: Result,
+  capture?: (update: {
+    row: Record<string, unknown>;
+    eventId: unknown;
+    coordinatorId: unknown;
+    status: unknown;
+  }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        update: (row: Record<string, unknown>) => {
+          const filters: { eventId?: unknown; coordinatorId?: unknown; status?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
+              if (column === 'coordinator_id') filters.coordinatorId = value;
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            select: async () => {
+              capture?.({
+                row,
+                eventId: filters.eventId,
+                coordinatorId: filters.coordinatorId,
+                status: filters.status
+              });
+              return result;
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
 function fakeEventsReviewClient(
   result: Result,
   capture?: (update: {
@@ -627,6 +669,88 @@ describe('startEventReview', () => {
       // A request assigned elsewhere, already decided, or absent must all look
       // identical so assignments cannot be probed for.
       const result = await startEventReview(fakeEventsReviewClient({ data, error: null }), 7, 'coordinator-1');
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_found');
+    });
+  }
+});
+
+describe('decideEventRequest', () => {
+  test('records the outcome, decider and time, filtered to a request this coordinator is reviewing', async () => {
+    let captured:
+      | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
+      | undefined;
+    const before = Date.now();
+    const result = await decideEventRequest(
+      fakeEventsDecisionClient(
+        {
+          data: [
+            {
+              event_id: 7,
+              organiser_id: 'user-1',
+              status: 'approved',
+              coordinator_id: 'coordinator-1',
+              coordinator: { name: 'Casey Coordinator' }
+            }
+          ],
+          error: null
+        },
+        (c) => (captured = c)
+      ),
+      7,
+      'coordinator-1',
+      'approved',
+      null
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.coordinator_name, 'Casey Coordinator');
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.coordinatorId, 'coordinator-1');
+    // Only a request already under review may be decided.
+    assert.equal(captured?.status, 'under_review');
+    assert.equal(captured?.row.status, 'approved');
+    assert.equal(captured?.row.decided_by, 'coordinator-1');
+    assert.equal(captured?.row.decision_reason, null);
+    // AC3: when the decision happened is recorded, not left to the caller.
+    const decidedAt = Date.parse(String(captured?.row.decided_at));
+    assert.ok(decidedAt >= before && decidedAt <= Date.now());
+  });
+
+  test('stores the rejection reason alongside the outcome', async () => {
+    let captured: { row: Record<string, unknown> } | undefined;
+    await decideEventRequest(
+      fakeEventsDecisionClient({ data: [{ event_id: 7, status: 'rejected' }], error: null }, (c) => (captured = c)),
+      7,
+      'coordinator-1',
+      'rejected',
+      'Date clashes with the AGM.'
+    );
+    assert.equal(captured?.row.status, 'rejected');
+    assert.equal(captured?.row.decision_reason, 'Date clashes with the AGM.');
+  });
+
+  test('reports unavailable when the update errors', async () => {
+    const result = await decideEventRequest(
+      fakeEventsDecisionClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      'coordinator-1',
+      'approved',
+      null
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+      // Assigned elsewhere, already decided, or absent must look identical.
+      const result = await decideEventRequest(
+        fakeEventsDecisionClient({ data, error: null }),
+        7,
+        'coordinator-1',
+        'approved',
+        null
+      );
       assert.equal(result.ok, false);
       if (!result.ok) assert.equal(result.reason, 'not_found');
     });

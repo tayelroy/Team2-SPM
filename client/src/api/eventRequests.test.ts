@@ -468,6 +468,8 @@ describe('fetchOwnEventDetail', () => {
       registration_needed: true,
       coordinator_id: 'coord-uuid-5',
       coordinator_name: 'Coordinator Jane',
+      decided_at: '2026-09-25T02:00:00.000Z',
+      decision_reason: 'Clashes with the AGM.',
     };
 
     const fetchMock = vi.fn().mockResolvedValue(
@@ -499,6 +501,8 @@ describe('fetchOwnEventDetail', () => {
       coordinatorName: 'Coordinator Jane',
       canManage: true,
       waitingOnMe: true,
+      decisionReason: 'Clashes with the AGM.',
+      decidedAt: '2026-09-25T02:00:00.000Z',
     };
 
     expect(result).toEqual({ ok: true, request: expected });
@@ -540,6 +544,8 @@ describe('fetchOwnEventDetail', () => {
         coordinatorName: null,
         canManage: false,
         waitingOnMe: false,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
   });
@@ -576,6 +582,8 @@ describe('fetchOwnEventDetail', () => {
         coordinatorName: null,
         canManage: false,
         waitingOnMe: false,
+        decisionReason: null,
+        decidedAt: null,
       },
     });
   });
