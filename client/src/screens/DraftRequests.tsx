@@ -5,7 +5,7 @@ import { badgeStyle } from '../mock/viewModel';
 import {
   deleteEventRequestDraft,
   fetchEventRequestDraft,
-  listMyEventRequests,
+  listMyDraftRequests,
   type DraftListItem,
   type EventRequestDraft
 } from '../api/eventRequests';
@@ -50,7 +50,7 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
     setLoading(true);
     setError('');
     async function load() {
-      const outcome = await listMyEventRequests(token!);
+      const outcome = await listMyDraftRequests(token!);
       if (cancelled) return;
       if (!outcome.ok) {
         setError(outcome.message);
@@ -112,8 +112,8 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
   if (requests.length === 0) {
     return (
       <Card style={{ gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500 }}>No event requests yet</h2>
-        <p style={{ margin: 0, color: color.silver }}>Drafts you save will appear here.</p>
+        <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500 }}>No draft requests</h2>
+        <p style={{ margin: 0, color: color.silver }}>Drafts you save will appear here. Submitted requests are listed in My events.</p>
       </Card>
     );
   }

@@ -40,7 +40,7 @@ function mockLoginResponse(role: Role) {
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
           facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
       }
-      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine')) {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine&status=draft')) {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ requests: [{ event_id: 9, can_manage: true, status: 'draft', name: 'Draft Forum' }] });
       }
@@ -598,7 +598,7 @@ describe('the request form', () => {
     });
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine') || url === '/api/event-requests/42') {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine&status=draft') || url === '/api/event-requests/42') {
         return new Response(
           JSON.stringify({
             request: { event_id: 42, status: 'draft' },
