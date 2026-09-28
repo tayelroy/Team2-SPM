@@ -209,3 +209,27 @@ test('a request not assigned to me offers no decision at all (SG2-37)', async ()
   await screen.findByRole('heading', { name: 'Leadership Forum' });
   expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
 });
+
+test('an approved assigned event offers venue search pre-filled from the event (SG2-46)', async () => {
+  decisionApi();
+  const onFindVenues = vi.fn();
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={onFindVenues} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  const approve = await screen.findByRole('button', { name: 'Approve' });
+  expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
+  fireEvent.click(approve);
+  fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
+  expect(onFindVenues).toHaveBeenCalledWith(expect.objectContaining({
+    eventId: underReview.event_id, eventName: underReview.title,
+    values: expect.objectContaining({ from: '2030-06-15T00:00', until: '2030-06-15T23:59' })
+  }));
+});
+
+test('an approved event that is not assigned to the coordinator has no venue search button', async () => {
+  const approved = { ...review, status: 'approved', assigned_to_me: false };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [approved] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
+});

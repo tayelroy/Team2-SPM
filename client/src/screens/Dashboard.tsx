@@ -18,7 +18,7 @@ import {
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { badgeStyle } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
-import WorkQueue, { isQueueRole } from './WorkQueue';
+import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
 
 /** One event summary in the left-hand list — the whole tile is the trigger. */
 function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) {
@@ -88,6 +88,8 @@ interface DashboardProps {
   role: Role;
   accessToken?: string | null;
   onNavigate: (screen: Screen, eventId?: number) => void;
+  /** SG2-46: open venue search pre-filled from an approved event. */
+  onFindVenues?: FindVenues;
 }
 
 function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
@@ -164,7 +166,7 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
 
 export default function Dashboard(props: DashboardProps) {
   if (props.role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
-  if (isQueueRole(props.role)) return <WorkQueue key={`${props.role}:${props.accessToken}`} role={props.role} accessToken={props.accessToken} />;
+  if (isQueueRole(props.role)) return <WorkQueue key={`${props.role}:${props.accessToken}`} role={props.role} accessToken={props.accessToken} onFindVenues={props.onFindVenues} />;
   const { role, onNavigate } = props;
   const cards = eventCards(role).slice(0, 4);
   const openEvent = 'attendee';

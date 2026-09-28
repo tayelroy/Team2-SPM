@@ -101,6 +101,7 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['events', 'All events'],
     ['detail', 'Review'],
     ['venues', 'Venues'],
+    ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
     ['equipment', 'Equipment'],
   ],
@@ -179,6 +180,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   editDraft: 'Edit draft request',
   profile: 'My profile',
   assign: 'Assign coordinators',
+  search: 'Find venues',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -202,6 +204,8 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   profile: 'View and update your contact details and communication preferences.',
   assign:
     'Give each submitted request a named coordinator, or hand it to someone else when plans change.',
+  search:
+    'Venues that meet every criterion and are free for the whole period. Blocked or confirmed-booked venues are left out.',
 };
 
 export const STATS: Record<Role, Stat[]> = {

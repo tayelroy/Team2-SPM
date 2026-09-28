@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
+import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
@@ -94,7 +95,9 @@ function DecisionPanel({ eventId, accessToken, onDecided }: {
   </section>;
 }
 
-function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: string | null }) {
+export type FindVenues = (prefill: VenueSearchPrefill) => void;
+
+function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
   const { status, error, setStatus } = useOpenedForReview(item, accessToken);
   const canDecide = item.kind === 'event' && item.assigned_to_me && status === 'under_review';
   return <article className="organisation-detail" aria-label={KINDS[item.kind]}>
@@ -117,14 +120,18 @@ function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: strin
       })}
     </dl>
     {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
+    {item.kind === 'event' && item.assigned_to_me && status === 'approved' && onFindVenues &&
+      <button type="button" className="organisation-button organisation-button-primary"
+        onClick={() => onFindVenues(prefillFromEvent(item))}>Find venues for this event</button>}
   </article>;
 }
 
-function QueueContent({ role, accessToken, selection, onSelect }: {
+function QueueContent({ role, accessToken, selection, onSelect, onFindVenues }: {
   role: InternalRole;
   accessToken?: string | null;
   selection: WorkSelection | null;
   onSelect: (selection: WorkSelection) => void;
+  onFindVenues?: FindVenues;
 }) {
   const [result, setResult] = useState<QueueResult | null>(null);
   useEffect(() => {
@@ -137,7 +144,7 @@ function QueueContent({ role, accessToken, selection, onSelect }: {
 
   if (!result) return <p role="status">Loading your work queue…</p>;
   if (!result.ok) return <p role="alert">{result.error}</p>;
-  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} />;
+  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
 
   return <>
     <p className="work-queue-summary" role="status">{result.items.length} {result.items.length === 1 ? 'item' : 'items'} in your work queue</p>
@@ -163,7 +170,7 @@ function QueueContent({ role, accessToken, selection, onSelect }: {
 
 /** The parent keys this view by signed-in identity so neither a selection nor
  * an in-flight result can carry over to another account. */
-export default function WorkQueue({ role, accessToken }: { role: InternalRole; accessToken?: string | null }) {
+export default function WorkQueue({ role, accessToken, onFindVenues }: { role: InternalRole; accessToken?: string | null; onFindVenues?: FindVenues }) {
   const [selection, setSelection] = useState<WorkSelection | null>(null);
   const [revision, setRevision] = useState(0);
   return <div className="work-queue">
@@ -172,6 +179,6 @@ export default function WorkQueue({ role, accessToken }: { role: InternalRole; a
       <button type="button" className="organisation-button" onClick={() => setRevision(value => value + 1)}>Refresh</button>
     </div>
     <QueueContent key={`${selection?.kind}:${selection?.item_id}:${revision}`} role={role}
-      accessToken={accessToken} selection={selection} onSelect={setSelection} />
+      accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues} />
   </div>;
 }

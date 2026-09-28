@@ -19,6 +19,8 @@ import Login from './screens/Login';
 import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
 import Venues from './screens/Venues';
+import VenueSearch from './screens/VenueSearch';
+import type { VenueSearchPrefill } from './venues/searchPrefill';
 import { GhostButton } from './ui';
 
 /** The screen a signed-in user of a given role opens on. */
@@ -55,6 +57,8 @@ export default function App() {
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>(undefined);
   // The draft "My drafts" → Edit currently has open, if any (SG2-29).
   const [editingRequest, setEditingRequest] = useState<EventRequestDraft | null>(null);
+  // The approved event venue search was opened from, if any (SG2-46).
+  const [venuePrefill, setVenuePrefill] = useState<VenueSearchPrefill | null>(null);
 
   // Best-effort background check that a persisted session is still valid.
   // Trusts the cached session for the current render (no loading flash);
@@ -136,6 +140,10 @@ export default function App() {
           if (id !== undefined) setSelectedEventId(id);
           setScreen(nextScreen);
         }}
+        onFindVenues={(prefill) => {
+          setVenuePrefill(prefill);
+          setScreen('search');
+        }}
       />
     ),
     events: (
@@ -195,11 +203,17 @@ export default function App() {
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
     profile: <Profile />,
-    assign: <CoordinatorAssignment accessToken={session!.accessToken} />
+    assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
+    search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
+      accessToken={session!.accessToken} prefill={venuePrefill} />
   }[screen];
 
   return (
-    <AppShell role={role} screen={screen} onNavigate={setScreen} onSignOut={handleSignOut}>
+    <AppShell role={role} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
+      // Menu navigation opens venue search blank, not for the last event.
+      setVenuePrefill(null);
+      setScreen(nextScreen);
+    }}>
       {body}
     </AppShell>
   );
