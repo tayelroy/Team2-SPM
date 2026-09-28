@@ -690,5 +690,48 @@
     "actual": "All migrations and all six SQL suites passed in the order used by ci.yml. Weakening the insert policy, the delete policy, or dropping the trigger each made this suite fail as expected.",
     "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; Docker postgres:17; ci.yml database-tests steps reproduced locally.",
     "execution_date": "26 Sep 2026"
+  },
+  {
+    "id": "SG2-46-P01",
+    "title": "An approved event opens a pre-filled venue search that leaves out busy venues",
+    "type": "Positive",
+    "story": "SG2-46",
+    "purpose": "Verify AC1–AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as coordinator, seed a request under review, approve it and choose Find venues for this event.",
+      "Inspect the pre-filled period, attendance and accessibility note, and the results.",
+      "Search 16 June (seeded block) and 17 June (free) 2030.",
+      "Search for 500 guests."
+    ],
+    "data": "Event 52 (15 June 2030, 20 guests, no accessibility needs); Regression Hall with a confirmed booking on 15 June and a block on 16 June; Quiet Room (capacity 20)",
+    "expected": "15 June is pre-filled as the whole Singapore day with 20 guests; only Quiet Room is returned on 15 and 16 June; both venues on 17 June; 500 guests shows No venues match with the searched criteria.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Current browser assertions passed as expected.",
+    "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
+    "execution_date": "28 Sep 2026"
+  },
+  {
+    "id": "SG2-46-N01",
+    "title": "Only coordinators can search venues",
+    "type": "Negative / role isolation",
+    "story": "SG2-46",
+    "purpose": "Verify the venues.search permission in the menu and on the API.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as venue staff, technical support, organiser and attendee; check the menu and call the search API.",
+      "Call the search API without credentials.",
+      "Sign in as coordinator, open Find venues from the menu and call the API."
+    ],
+    "data": "All fixture roles; 17 June 2030",
+    "expected": "Other roles have no Find venues menu item and receive 403; unauthenticated calls receive 401; the coordinator opens a blank search and the API returns both free venues.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Current browser assertions passed as expected.",
+    "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
+    "execution_date": "28 Sep 2026"
   }
 ]

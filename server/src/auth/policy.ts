@@ -49,6 +49,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // shown, but only Venue Staff record them.
   'venues.layouts.read': ['venue_staff', 'event_coordinator'],
   'venues.layouts.update': ['venue_staff'],
+  // SG2-46: coordinators narrow the venues down to those that could host an
+  // event they are planning.
+  'venues.search': ['event_coordinator'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   // SG2-27: every signed-in account manages its own profile.
