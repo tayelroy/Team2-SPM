@@ -6,6 +6,7 @@ import type { EventRequestDraft } from './api/eventRequests';
 import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
+import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import BookingApproval from './screens/BookingApproval';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
@@ -193,7 +194,8 @@ export default function App() {
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
-    profile: <Profile />
+    profile: <Profile />,
+    assign: <CoordinatorAssignment accessToken={session!.accessToken} />
   }[screen];
 
   return (

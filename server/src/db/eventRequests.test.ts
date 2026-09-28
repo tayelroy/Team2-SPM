@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   assignEventCoordinator,
   deleteEventRequestDraft,
+  fetchAssignableRequests,
   fetchEventRequestById,
   fetchOrganiserOrganisation,
   fetchOwnEventRequest,
@@ -945,4 +946,121 @@ describe('assignEventCoordinator', () => {
       if (!result.ok) assert.equal(result.reason, 'not_assignable');
     });
   }
+});
+
+describe('coordinator contact on a single request (SG2-33 AC3)', () => {
+  async function phoneFor(coordinator: unknown) {
+    const result = await fetchOwnEventRequest(
+      fakeEventsSelectClient({
+        data: [{ event_id: 1, organiser_id: 'user-1', status: 'submitted', coordinator }],
+        error: null
+      }),
+      1,
+      'user-1'
+    );
+    assert.equal(result.ok, true);
+    return result.ok ? result.request.coordinator_phone : undefined;
+  }
+
+  test('returns the phone from an object relation', async () => {
+    assert.equal(await phoneFor({ name: 'Sarah', phone: '+65 9123 4567' }), '+65 9123 4567');
+  });
+
+  test('returns the phone from an array relation', async () => {
+    assert.equal(await phoneFor([{ name: 'Sarah', phone: '+65 9123 4567' }]), '+65 9123 4567');
+  });
+
+  test('reports null when the coordinator has no usable phone', async () => {
+    assert.equal(await phoneFor({ name: 'Sarah', phone: null }), null);
+    assert.equal(await phoneFor({ name: 'Sarah', phone: '   ' }), null);
+  });
+
+  test('reports null when no coordinator is assigned', async () => {
+    assert.equal(await phoneFor(null), null);
+  });
+});
+
+describe('fetchAssignableRequests', () => {
+  function fakeAssignableClient(result: Result, capture?: (statuses: unknown) => void): SupabaseClient {
+    return {
+      from(table: string) {
+        assert.equal(table, 'events');
+        return {
+          select: () => ({
+            in: (column: string, statuses: unknown) => {
+              assert.equal(column, 'status');
+              capture?.(statuses);
+              return {
+                order: async (column: string, options: unknown) => {
+                  assert.equal(column, 'event_id');
+                  assert.deepEqual(options, { ascending: false });
+                  return result;
+                }
+              };
+            }
+          })
+        };
+      }
+    } as unknown as SupabaseClient;
+  }
+
+  test('lists requests in an assignable status with their current coordinator', async () => {
+    let statuses: unknown;
+    const result = await fetchAssignableRequests(
+      fakeAssignableClient(
+        {
+          data: [
+            {
+              event_id: 9,
+              name: 'Partner Forum',
+              organisation: 'Acme',
+              status: 'submitted',
+              coordinator_id: 'coord-1',
+              coordinator: { name: 'Sarah' }
+            },
+            { event_id: 8, name: null, organisation: null, status: null, coordinator_id: null, coordinator: null }
+          ],
+          error: null
+        },
+        (s) => (statuses = s)
+      )
+    );
+
+    assert.deepEqual(statuses, ['submitted', 'under_review', 'approved', 'planning', 'confirmed']);
+    assert.deepEqual(result, {
+      ok: true,
+      requests: [
+        {
+          event_id: 9,
+          name: 'Partner Forum',
+          organisation: 'Acme',
+          status: 'submitted',
+          coordinator_id: 'coord-1',
+          coordinator_name: 'Sarah'
+        },
+        {
+          event_id: 8,
+          name: '',
+          organisation: null,
+          status: 'submitted',
+          coordinator_id: null,
+          coordinator_name: null
+        }
+      ]
+    });
+  });
+
+  test('returns an empty list when the query returns no data', async () => {
+    assert.deepEqual(await fetchAssignableRequests(fakeAssignableClient({ data: null, error: null })), {
+      ok: true,
+      requests: []
+    });
+  });
+
+  test('reports unavailable when the query errors', async () => {
+    assert.deepEqual(
+      await fetchAssignableRequests(fakeAssignableClient({ data: null, error: { message: 'boom' } })),
+      { ok: false, reason: 'unavailable', message: 'boom' }
+    );
+  });
 });
