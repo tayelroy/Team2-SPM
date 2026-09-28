@@ -704,3 +704,66 @@ test('SG2-45-N01 | a confirmed booking cannot be blocked and other roles cannot 
   const remaining = await page.request.get('/api/venues/1/blocks', { headers: staffHeaders });
   expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance']);
 });
+
+test('SG2-46-P01 | an approved event opens a pre-filled venue search that leaves out busy venues', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Decision Forum/ }).click();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await page.getByRole('button', { name: 'Find venues for this event', exact: true }).click();
+
+  // AC1: the whole Singapore day of 15 June 2030 and 20 guests, straight from the event.
+  await expect(page.getByText('For: Decision Forum (#52)', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('From (Singapore time)')).toHaveValue('2030-06-15T00:00');
+  await expect(page.getByLabel('Until (Singapore time)')).toHaveValue('2030-06-15T23:59');
+  await expect(page.getByLabel('Attendance', { exact: true })).toHaveValue('20');
+  // AC3: this event has no accessibility needs, so accessibility is not matched.
+  await expect(page.getByText(/No accessibility needs were specified/)).toBeVisible();
+  // AC2: Regression Hall holds a confirmed booking that day, so only Quiet Room fits.
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quiet Room', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toHaveCount(0);
+
+  // The seeded SG2-45 block keeps Regression Hall out on 16 June too.
+  await page.getByLabel('From (Singapore time)').fill('2030-06-16T00:00');
+  await page.getByLabel('Until (Singapore time)').fill('2030-06-16T23:59');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toHaveCount(0);
+
+  // A free day returns both.
+  await page.getByLabel('From (Singapore time)').fill('2030-06-17T00:00');
+  await page.getByLabel('Until (Singapore time)').fill('2030-06-17T23:59');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(/^2 venues available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toBeVisible();
+
+  // AC4: nothing fits 500 guests; say so and show what was searched.
+  await page.getByLabel('Attendance', { exact: true }).fill('500');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No venues match', exact: true })).toBeVisible();
+  await expect(page.getByText(/^Searched: .*500\+ people$/)).toBeVisible();
+});
+
+test('SG2-46-N01 | only coordinators can search venues', async ({ page }) => {
+  const query = `/api/venues/search?from=${encodeURIComponent('2030-06-17T00:00:00Z')}&to=${encodeURIComponent('2030-06-17T12:00:00Z')}`;
+  for (const account of ['venue', 'support', 'organiser', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      await expect(page.getByRole('navigation').getByRole('button', { name: 'Find venues', exact: true })).toHaveCount(0);
+      expect((await page.request.get(query, { headers: await authHeaders(page) })).status()).toBe(403);
+    });
+  }
+  expect((await page.request.get(query)).status()).toBe(401);
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  await nav(page, 'Find venues');
+  await expect(page.getByText('Search venues', { exact: true })).toBeVisible();
+  const allowed = await page.request.get(query, { headers: await authHeaders(page) });
+  expect(allowed.status()).toBe(200);
+  expect((await allowed.json()).venues.map((venue: { name: string }) => venue.name)).toEqual(['Quiet Room', 'Regression Hall']);
+});
