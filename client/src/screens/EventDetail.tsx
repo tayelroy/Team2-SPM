@@ -202,6 +202,9 @@ export default function EventDetail({
         },
         { label: 'Venue requirements', value: detail.venueRequirements || 'None specified' },
         { label: 'Coordinator', value: detail.coordinatorName || 'Unassigned' },
+        ...(detail.coordinatorName
+          ? [{ label: 'Coordinator contact', value: detail.coordinatorPhone || 'No phone number on file' }]
+          : []),
         { label: 'Accessibility needs', value: detail.accessibilityNeeds || 'None specified' },
         {
           label: 'Equipment requirements',

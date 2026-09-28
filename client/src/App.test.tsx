@@ -149,6 +149,7 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
+      ['Assign coordinators', 'Assign coordinators'],
       ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],

@@ -117,6 +117,8 @@ export interface EventRequestDetail {
   registrationNeeded: boolean;
   coordinatorId: string | null;
   coordinatorName: string | null;
+  /** How to reach the coordinator (SG2-33); null when none is on file. */
+  coordinatorPhone?: string | null;
   canManage: boolean;
   waitingOnMe: boolean;
   /** Why the coordinator rejected it, and when they decided (SG2-37). */
@@ -192,6 +194,7 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     registrationNeeded: Boolean(raw.registration_needed),
     coordinatorId: typeof raw.coordinator_id === 'string' ? raw.coordinator_id : null,
     coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
+    coordinatorPhone: typeof raw.coordinator_phone === 'string' ? raw.coordinator_phone : null,
     canManage: raw.can_manage === true,
     waitingOnMe: raw.can_manage === true && isWaitingOnOrganiser(status),
     decisionReason: typeof raw.decision_reason === 'string' ? raw.decision_reason : null,
@@ -585,4 +588,92 @@ export async function getEventStage(
   }
 
   return { ok: true, stage: body as EventStageResult };
+}
+
+/** A request Technical Support Staff can assign a coordinator to (SG2-33/34). */
+export interface AssignableRequest {
+  eventId: number;
+  name: string;
+  organisation: string | null;
+  status: string;
+  coordinatorId: string | null;
+  coordinatorName: string | null;
+}
+
+export interface CoordinatorOption {
+  userId: string;
+  name: string;
+}
+
+export type FetchAssignableResult =
+  | { ok: true; requests: AssignableRequest[]; coordinators: CoordinatorOption[] }
+  | { ok: false; kind: 'unauthorized' | 'unavailable' };
+
+/**
+ * Loads the requests that can take a coordinator plus the coordinators to
+ * choose from (SG2-33/34). Maps to `GET /api/event-requests/assignable`,
+ * which only Technical Support Staff may call.
+ */
+export async function fetchAssignable(token: string): Promise<FetchAssignableResult> {
+  const response = await getEventRequestResponse('/api/event-requests/assignable', token);
+  if (!response) return { ok: false, kind: 'unavailable' };
+  if (response.status === 401 || response.status === 403) return { ok: false, kind: 'unauthorized' };
+  if (!response.ok) return { ok: false, kind: 'unavailable' };
+
+  const data = await readEventRequestJson(response, {} as Record<string, unknown>);
+  if (!Array.isArray(data.requests) || !Array.isArray(data.coordinators)) {
+    return { ok: false, kind: 'unavailable' };
+  }
+  return {
+    ok: true,
+    requests: (data.requests as Record<string, unknown>[]).map((raw) => ({
+      eventId: Number(raw.event_id) || 0,
+      name: typeof raw.name === 'string' ? raw.name : '',
+      organisation: typeof raw.organisation === 'string' ? raw.organisation : null,
+      status: typeof raw.status === 'string' ? raw.status : 'submitted',
+      coordinatorId: typeof raw.coordinator_id === 'string' ? raw.coordinator_id : null,
+      coordinatorName: typeof raw.coordinator_name === 'string' ? raw.coordinator_name : null,
+    })),
+    coordinators: (data.coordinators as Record<string, unknown>[]).map((raw) => ({
+      userId: typeof raw.user_id === 'string' ? raw.user_id : '',
+      name: typeof raw.name === 'string' ? raw.name : '',
+    })),
+  };
+}
+
+export type AssignCoordinatorOutcome = { ok: true } | { ok: false; message: string };
+
+/**
+ * Assigns (SG2-33) or reassigns (SG2-34) an event's coordinator. Maps to
+ * `PATCH /api/event-requests/:eventId/coordinator`.
+ */
+export async function assignCoordinator(
+  eventId: number,
+  coordinatorId: string,
+  token: string,
+): Promise<AssignCoordinatorOutcome> {
+  const unavailable = { ok: false, message: 'Could not save the assignment. Please try again.' } as const;
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/coordinator`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ coordinatorId }),
+    });
+  } catch {
+    return unavailable;
+  }
+
+  if (response.ok) return { ok: true };
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, message: 'Only Technical Support Staff can assign a coordinator. Sign in again.' };
+  }
+  if (response.status === 400 || response.status === 404 || response.status === 409) {
+    const data = await readEventRequestJson(response, {} as Record<string, unknown>);
+    return {
+      ok: false,
+      message: typeof data.error === 'string' ? data.error : 'That assignment was not accepted.',
+    };
+  }
+  return unavailable;
 }

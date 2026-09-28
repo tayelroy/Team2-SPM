@@ -12,6 +12,7 @@ import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createAssignCoordinatorHandler } from './events/assignCoordinator';
+import { createListAssignableHandler } from './events/listAssignable';
 import { createStartEventReviewHandler } from './events/review';
 import { createDecideEventRequestHandler } from './events/decide';
 import { createVenuesRouter } from './venues';
@@ -45,7 +46,8 @@ export function createApp(
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
   startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal }),
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
-  decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal })
+  decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal }),
+  listAssignableHandler: RequestHandler = createListAssignableHandler()
 ) {
   const app = express();
 
@@ -114,6 +116,13 @@ export function createApp(
     '/:eventId/stage',
     access.requirePermission('event_request.stage.view'),
     eventStageHandler
+  );
+  // SG2-33/SG2-34: what Technical Support Staff pick from when assigning. Must
+  // be registered before '/:eventId', which would otherwise capture it.
+  eventRequests.get(
+    '/assignable',
+    access.requirePermission('event_request.assign_coordinator'),
+    listAssignableHandler
   );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);

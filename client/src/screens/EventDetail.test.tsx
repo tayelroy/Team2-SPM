@@ -50,6 +50,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         registrationNeeded: true,
         coordinatorId: 'coord-2',
         coordinatorName: 'Sarah Jenkins',
+        coordinatorPhone: '+65 9123 4567',
         canManage: true,
         waitingOnMe: false,
         decisionReason: null,
@@ -78,6 +79,9 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(screen.getByText('45')).toBeInTheDocument();
     expect(screen.getByText('Private hall with breakout areas')).toBeInTheDocument();
     expect(screen.getByText('Sarah Jenkins')).toBeInTheDocument();
+    // SG2-33 AC3: the organiser can see how to contact their coordinator.
+    expect(screen.getByText('Coordinator contact')).toBeInTheDocument();
+    expect(screen.getByText('+65 9123 4567')).toBeInTheDocument();
     expect(screen.getByText('Step-free access')).toBeInTheDocument();
     expect(screen.getByText('Projector and 4 microphones')).toBeInTheDocument();
     expect(screen.getByText('Yes')).toBeInTheDocument();
@@ -93,6 +97,22 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     // Click Back to events
     fireEvent.click(screen.getByRole('button', { name: '← Back to events' }));
     expect(onNavigate).toHaveBeenCalledWith('events');
+  });
+
+  test('says when the coordinator has no phone number on file (SG2-33 AC3)', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 102, organiserId: 'org-1', organisation: 'Acme Corp', status: 'under_review',
+        name: 'Offsite', purpose: 'p', description: 'd', proposedDate: null, expectedAttendance: null,
+        venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null,
+        registrationNeeded: false, coordinatorId: 'coord-2', coordinatorName: 'Sarah Jenkins',
+        coordinatorPhone: null, canManage: true, waitingOnMe: false, decisionReason: null, decidedAt: null,
+      },
+    });
+    render(<EventDetail role="Event Organiser" selectedEventId={102} accessToken="t" onNavigate={vi.fn()} />);
+
+    expect(await screen.findByText('No phone number on file')).toBeInTheDocument();
   });
 
   test('displays draft event with action buttons and handles missing optional attributes', async () => {
@@ -134,6 +154,8 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(await screen.findByRole('heading', { name: 'Untitled event' })).toBeInTheDocument();
     expect(screen.getByText('No purpose specified')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
+    // No coordinator, so there is no one to contact yet.
+    expect(screen.queryByText('Coordinator contact')).not.toBeInTheDocument();
     expect(screen.getAllByText('None specified')).toHaveLength(3);
     expect(screen.getByText('No')).toBeInTheDocument();
 
