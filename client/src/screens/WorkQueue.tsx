@@ -121,8 +121,12 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
     </dl>
     {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
     {item.kind === 'event' && item.assigned_to_me && status === 'approved' && onFindVenues &&
-      <button type="button" className="organisation-button organisation-button-primary"
-        onClick={() => onFindVenues(prefillFromEvent(item))}>Find venues for this event</button>}
+      <footer className="organisation-detail-footer">
+        <h3>Next step</h3>
+        <p className="organisation-detail-hint">Find venues that fit this event and are free on its date.</p>
+        <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
+          onClick={() => onFindVenues(prefillFromEvent(item))}>Find venues for this event</button>
+      </footer>}
   </article>;
 }
 
