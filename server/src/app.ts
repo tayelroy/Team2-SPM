@@ -22,6 +22,7 @@ import { createVenueSearchRouter } from './venues/search';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
+import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -49,7 +50,8 @@ export function createApp(
   startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal }),
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
   decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal }),
-  listAssignableHandler: RequestHandler = createListAssignableHandler()
+  listAssignableHandler: RequestHandler = createListAssignableHandler(),
+  updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -96,6 +98,12 @@ export function createApp(
     '/:eventId/review',
     access.requirePermission('event_request.review'),
     startEventReviewHandler
+  );
+  // SG2-39: coordinator updates event information during planning.
+  eventRequests.patch(
+    '/:eventId/planning',
+    access.requirePermission('event_request.planning.update'),
+    updateEventPlanningHandler
   );
   // SG2-37: the coordinator reviewing a request approves or rejects it.
   eventRequests.patch(
