@@ -58,11 +58,11 @@ export class MemoryDatabase {
       ],
       venues: [venue, { ...venue, venue_id: 2, name: 'Quiet Room', capacity: 20 }],
       venue_bookings: [
-        { venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z', status: 'confirmed', event_id: 1 },
-        { venue_id: 1, starts_at: '2026-09-15T02:00:00.000Z', ends_at: '2026-09-15T04:00:00.000Z', status: 'confirmed', event_id: 1 }
+        { booking_id: 1, venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z', status: 'confirmed', event_id: 1 },
+        { booking_id: 2, venue_id: 1, starts_at: '2026-09-15T02:00:00.000Z', ends_at: '2026-09-15T04:00:00.000Z', status: 'confirmed', event_id: 1 }
       ],
       venue_unavailability: [
-        { venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }
+        { unavailability_id: 1, venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }
       ],
       venue_layouts: []
     };
@@ -83,6 +83,15 @@ export class MemoryDatabase {
 
   /** SG2-35: a submitted request already assigned to the signed-in coordinator.
    * Seeded separately from seedWorkQueue so its queue counts stay unchanged. */
+  /** SG2-37: a request this coordinator is already reviewing, ready to decide. */
+  seedUnderReview() {
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 52, name: 'Decision Forum', status: 'under_review',
+      coordinator_id: 'user-coordinator', purpose: 'Decide whether the forum proceeds',
+      decided_by: null, decided_at: null, decision_reason: null,
+    });
+  }
+
   seedAssignedReview() {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 51, name: 'Assigned Review Forum', status: 'submitted',
@@ -180,7 +189,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     let rows = table.filter(row => this.filters.every(filter => filter(row)));
     if (this.operation === 'insert') {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
-      const id = { events: 'event_id', venues: 'venue_id' }[this.table];
+      const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id' }[this.table];
       let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
       rows = incoming.map(value => {
         const row = structuredClone(value);

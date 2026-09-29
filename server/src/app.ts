@@ -12,9 +12,13 @@ import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/
 import { createDeleteEventDraftHandler } from './events/deleteDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
 import { createAssignCoordinatorHandler } from './events/assignCoordinator';
+import { createListAssignableHandler } from './events/listAssignable';
 import { createStartEventReviewHandler } from './events/review';
+import { createDecideEventRequestHandler } from './events/decide';
 import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
+import { createVenueBlocksRouter } from './venues/blocks';
+import { createVenueSearchRouter } from './venues/search';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
@@ -37,12 +41,16 @@ export function createApp(
     availability: createVenueAvailabilityRouter(access),
     venues: createVenuesRouter(access),
     layouts: createVenueLayoutsRouter(access),
+    blocks: createVenueBlocksRouter(access),
+    search: createVenueSearchRouter(access),
     profile: createProfileRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
   startEventReviewHandler: RequestHandler = createStartEventReviewHandler({ getPrincipal: access.getPrincipal }),
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
+  decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal }),
+  listAssignableHandler: RequestHandler = createListAssignableHandler(),
   updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
@@ -64,6 +72,8 @@ export function createApp(
   app.post('/api/auth/logout', logoutHandler);
   app.use('/api/auth', access.router);
   app.use('/api/venues', routers.availability);
+  // SG2-46: coordinators search for venues that fit an event.
+  app.use('/api/venues', routers.search);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
@@ -95,6 +105,12 @@ export function createApp(
     access.requirePermission('event_request.planning.update'),
     updateEventPlanningHandler
   );
+  // SG2-37: the coordinator reviewing a request approves or rejects it.
+  eventRequests.patch(
+    '/:eventId/decision',
+    access.requirePermission('event_request.decide'),
+    decideEventRequestHandler
+  );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(
     '/:eventId',
@@ -113,6 +129,13 @@ export function createApp(
     access.requirePermission('event_request.stage.view'),
     eventStageHandler
   );
+  // SG2-33/SG2-34: what Technical Support Staff pick from when assigning. Must
+  // be registered before '/:eventId', which would otherwise capture it.
+  eventRequests.get(
+    '/assignable',
+    access.requirePermission('event_request.assign_coordinator'),
+    listAssignableHandler
+  );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
   // SG2-33/SG2-34: Technical Support Staff assign or reassign a coordinator.
@@ -125,6 +148,7 @@ export function createApp(
 
   app.use('/api/venues', routers.venues);
   app.use('/api/venues', routers.layouts);
+  app.use('/api/venues', routers.blocks);
 
   // SG2-27: view/update the caller's own profile.
   app.use('/api/profile', routers.profile);

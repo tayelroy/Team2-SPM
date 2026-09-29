@@ -40,7 +40,7 @@ function mockLoginResponse(role: Role) {
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
           facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
       }
-      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine')) {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine&status=draft')) {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ requests: [{ event_id: 9, can_manage: true, status: 'draft', name: 'Draft Forum' }] });
       }
@@ -140,7 +140,7 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
-      ['Review', 'Event detail'], ['Venues', 'Venue catalogue'],
+      ['Review', 'Event detail'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
     ],
     'Venue Staff': [
@@ -149,6 +149,7 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
+      ['Assign coordinators', 'Assign coordinators'],
       ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
@@ -598,7 +599,7 @@ describe('the request form', () => {
     });
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine') || url === '/api/event-requests/42') {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine&status=draft') || url === '/api/event-requests/42') {
         return new Response(
           JSON.stringify({
             request: { event_id: 42, status: 'draft' },
@@ -764,4 +765,32 @@ test('organiser dashboard opens the selected real event and has no mock notifica
   fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
   expect(await screen.findByText('#9')).toBeInTheDocument();
   expect(screen.getByText('ConnectSphere Test')).toBeInTheDocument();
+});
+
+// SG2-46: an approved event opens venue search pre-filled; the menu opens it blank.
+test('a coordinator opens venue search from an approved event, and from the menu without it', async () => {
+  const approved = { kind: 'event', item_id: 10, event_id: 10, title: 'Approved Forum', event_name: 'Approved Forum',
+    status: 'approved', starts_at: '2030-06-15T02:00:00.000Z', ends_at: null, category: 'assigned', assigned_to_me: true,
+    details: { expected_attendance: 40, accessibility_needs: null } };
+  const fetch = vi.fn(async (url: string) => {
+    if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: 'event_coordinator', permissions: ['venues.search'] });
+    if (url.startsWith('/api/work-queue')) return Response.json({ items: [approved] });
+    if (url.startsWith('/api/venues/search')) return Response.json({ venues: [] });
+    return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role: 'Event Coordinator' } });
+  });
+  vi.stubGlobal('fetch', fetch);
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  fireEvent.click(await screen.findByRole('button', { name: /Approved Forum/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'Find venues' })).toBeInTheDocument();
+  expect(screen.getByText('For: Approved Forum (#10)')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'No venues match' })).toBeInTheDocument();
+  expect(fetch.mock.calls.some(([url]) => String(url).includes('attendance=40'))).toBe(true);
+  fireEvent.click(within(header()).getByRole('button', { name: 'Find venues' }));
+  expect(screen.getByText('Search venues')).toBeInTheDocument();
+  expect(screen.getByLabelText('Attendance')).toHaveValue(null);
 });

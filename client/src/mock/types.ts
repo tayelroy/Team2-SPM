@@ -25,7 +25,9 @@ export type Screen =
   | 'change'
   | 'drafts'
   | 'editDraft'
-  | 'profile';
+  | 'profile'
+  | 'assign'
+  | 'search';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;

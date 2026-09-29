@@ -68,3 +68,37 @@ export async function deleteAccountRole(admin: SupabaseClient, userId: string): 
     () => undefined
   );
 }
+
+export interface CoordinatorOption {
+  user_id: string;
+  name: string;
+}
+
+export type ListCoordinatorsResult =
+  | { ok: true; coordinators: CoordinatorOption[] }
+  | { ok: false; error: string };
+
+/**
+ * Lists the accounts that can be chosen as a coordinator (SG2-33/SG2-34):
+ * everyone whose authoritative role is `event_coordinator`, with the name
+ * from their profile row. Sorted by name so the picker order is stable.
+ */
+export async function listCoordinators(admin: SupabaseClient): Promise<ListCoordinatorsResult> {
+  const roles = await admin.from('account_roles').select('user_id').eq('role', 'event_coordinator');
+  if (roles.error) {
+    return { ok: false, error: roles.error.message };
+  }
+  const ids = ((roles.data as { user_id: string }[] | null) ?? []).map(row => row.user_id);
+  if (ids.length === 0) {
+    return { ok: true, coordinators: [] };
+  }
+
+  const users = await admin.from('users').select('user_id, name').in('user_id', ids);
+  if (users.error) {
+    return { ok: false, error: users.error.message };
+  }
+  const coordinators = ((users.data as CoordinatorOption[] | null) ?? [])
+    .map(({ user_id, name }) => ({ user_id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { ok: true, coordinators };
+}

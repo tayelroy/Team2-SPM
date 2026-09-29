@@ -15,6 +15,46 @@ export interface WorkItem {
 
 export type StartReviewResult = { ok: true; status: string } | { ok: false; error: string };
 
+export type Decision = 'approved' | 'rejected';
+export type DecisionResult = { ok: true; status: string } | { ok: false; error: string };
+
+/**
+ * Approves or rejects a request this coordinator is reviewing (SG2-37). Maps
+ * to `PATCH /api/event-requests/:eventId/decision`. A rejection must carry a
+ * reason; the server rejects one without.
+ */
+export async function decideEventRequest(
+  eventId: number,
+  decision: Decision,
+  reason: string,
+  token: string | null | undefined,
+): Promise<DecisionResult> {
+  if (!token) return { ok: false, error: 'Sign in again to decide this request.' };
+  try {
+    const response = await fetch(`/api/event-requests/${eventId}/decision`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ decision, reason }),
+    });
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, error: 'Your account cannot decide this request. Sign in again.' };
+    }
+    if (response.status === 404) {
+      return { ok: false, error: 'This request is no longer under review by you.' };
+    }
+    if (response.status === 400) {
+      const body = await response.json().catch(() => null);
+      return { ok: false, error: typeof body?.error === 'string' ? body.error : 'That decision was not accepted.' };
+    }
+    if (!response.ok) throw new Error('Unavailable');
+    const data = await response.json();
+    if (typeof data?.request?.status !== 'string') throw new Error('Invalid response');
+    return { ok: true, status: data.request.status };
+  } catch {
+    return { ok: false, error: 'Could not record the decision. Please try again.' };
+  }
+}
+
 /**
  * Opens a request assigned to this coordinator for review (SG2-35), moving it
  * to `under_review` so the organiser can see it is being looked at. Maps to

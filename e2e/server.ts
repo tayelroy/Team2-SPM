@@ -14,12 +14,16 @@ import { createDeleteEventDraftHandler } from '../server/src/events/deleteDraft'
 import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
+import { createDecideEventRequestHandler } from '../server/src/events/decide';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
+import { createVenueBlocksRouter } from '../server/src/venues/blocks';
+import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
 import type { VenueLayoutRecord } from '../server/src/venues/layoutFields';
+import type { BookingConflict, VenueBlockRecord } from '../server/src/venues/blockFields';
 import { dbConfig } from '../server/src/db';
 import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
@@ -62,7 +66,28 @@ const layouts = createVenueLayoutsRouter(access, () => ({
     return result.data as VenueLayoutRecord[];
   }
 }));
-const rateLimiter = createLoginRateLimiter() as RequestHandler & { resetKey(key: string): void };
+const BLOCK_COLUMNS = 'unavailability_id,starts_at,ends_at,reason';
+const blocks = createVenueBlocksRouter(access, () => ({
+  async list(venueId, now) {
+    const result = await database.client.from('venue_unavailability').select(BLOCK_COLUMNS).eq('venue_id', venueId).gt('ends_at', now).order('starts_at');
+    return result.data as VenueBlockRecord[];
+  },
+  async create(venueId, values) {
+    const venueResult = await database.client.from('venues').select('venue_id').eq('venue_id', venueId).maybeSingle();
+    if (!venueResult.data) return { outcome: 'missing' };
+    const conflicts = await database.client.from('venue_bookings').select('booking_id,event_id,starts_at,ends_at')
+      .eq('venue_id', venueId).eq('status', 'confirmed').lt('starts_at', values.ends_at).gt('ends_at', values.starts_at).order('starts_at').range(0, 0);
+    const booking = (conflicts.data as BookingConflict[])[0];
+    if (booking) return { outcome: 'conflict', booking };
+    const result = await database.client.from('venue_unavailability').insert({ venue_id: venueId, ...values }).select(BLOCK_COLUMNS).maybeSingle();
+    return { outcome: 'created', block: result.data as VenueBlockRecord };
+  },
+  async remove(venueId, blockId) {
+    const result = await database.client.from('venue_unavailability').delete().eq('venue_id', venueId).eq('unavailability_id', blockId).select('unavailability_id');
+    return (result.data as unknown[]).length > 0;
+  }
+}));
+const rateLimiter =createLoginRateLimiter() as RequestHandler & { resetKey(key: string): void };
 const app = createApp(
   async () => ({ provider: 'Supabase' as const, configured: false, supabase: { configured: false, status: 'unconfigured' as const } }),
   access,
@@ -76,12 +101,15 @@ const app = createApp(
   createDeleteEventDraftHandler(eventDependencies),
   createUpdateEventDraftHandler(eventDependencies),
   getEventRequestDetailHandler(eventDependencies),
-  { availability, venues, layouts, profile: createProfileRouter(access, { getAdminClient: getClient }) },
+  { availability, venues, layouts, blocks, search: createVenueSearchRouter(access, createVenueSearchHandler(undefined, getClient)), profile: createProfileRouter(access, { getAdminClient: getClient }) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.
   undefined,
-  createStartEventReviewHandler(eventDependencies)
+  createStartEventReviewHandler(eventDependencies),
+  // SG2-33's assign handler keeps its production default here, as on main.
+  undefined,
+  createDecideEventRequestHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -99,6 +127,10 @@ app.post('/__e2e/work-queue', (_req, res) => {
 });
 app.post('/__e2e/assigned-review', (_req, res) => {
   database.seedAssignedReview();
+  res.status(204).end();
+});
+app.post('/__e2e/under-review', (_req, res) => {
+  database.seedUnderReview();
   res.status(204).end();
 });
 const buildDirectory = path.resolve(__dirname, '../client/dist');

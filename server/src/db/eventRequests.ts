@@ -10,6 +10,11 @@ export interface EventRequestRecord extends DraftValues {
   status: string;
   coordinator_id?: string | null;
   coordinator_name?: string | null;
+  /** How to reach the coordinator (SG2-33 AC3); only on single-request reads. */
+  coordinator_phone?: string | null;
+  /** Who decided, when, and why it was rejected (SG2-37). */
+  decided_at?: string | null;
+  decision_reason?: string | null;
 }
 
 /** An event request row in summary format for list views (SG2-31). */
@@ -59,6 +64,10 @@ export type StartReviewResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
 
+export type DecideEventRequestResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
+
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
@@ -73,7 +82,9 @@ const SUMMARY_COLUMNS =
 const DETAIL_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
   'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
-  'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name)';
+  'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
+  // SG2-37: the organiser sees the outcome and, for a rejection, why.
+  'decided_at, decision_reason';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {
@@ -89,6 +100,12 @@ function extractCoordinatorName(row: Record<string, unknown>): string | null {
     return row.coordinator_name;
   }
   return null;
+}
+
+function extractCoordinatorPhone(row: Record<string, unknown>): string | null {
+  const joined = Array.isArray(row.coordinator) ? row.coordinator[0] : row.coordinator;
+  const phone = (joined as Record<string, unknown> | null | undefined)?.phone;
+  return typeof phone === 'string' && phone.trim() ? phone : null;
 }
 
 function extractCoordinatorId(row: Record<string, unknown>): string | null {
@@ -226,6 +243,7 @@ export async function fetchOrganisationEventRequest(
     ...(row as unknown as EventRequestRecord),
     coordinator_id: extractCoordinatorId(row),
     coordinator_name: extractCoordinatorName(row),
+    coordinator_phone: extractCoordinatorPhone(row),
     can_manage: row.organiser_id === userId
   } };
 }
@@ -307,7 +325,8 @@ export async function fetchOwnEventRequest(
   const request: EventRequestRecord = {
     ...(row as unknown as EventRequestRecord),
     coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
+    coordinator_name: extractCoordinatorName(row),
+    coordinator_phone: extractCoordinatorPhone(row)
   };
   return { ok: true, request };
 }
@@ -383,6 +402,58 @@ export async function startEventReview(
     // status" and "does not exist": a coordinator must not be able to probe
     // for another coordinator's assignments by comparing responses.
     return { ok: false, reason: 'not_found', message: 'No reviewable event request is assigned to this account.' };
+  }
+  const row = data[0] as unknown as Record<string, unknown>;
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request };
+}
+
+/**
+ * Records a coordinator's approval or rejection (SG2-37).
+ *
+ * Only a request this coordinator is actively reviewing can be decided, so
+ * `coordinator_id` and `status = 'under_review'` are both conditions on the
+ * write itself rather than pre-checks — the atomic-ownership shape from
+ * SG2-32/SG2-35. That also settles a race: two coordinators cannot record
+ * conflicting decisions, because whichever update lands second matches zero
+ * rows once the status has moved on.
+ *
+ * `decided_by` and `decided_at` are written for every decision, not just
+ * rejections, so no outcome is ever anonymous (AC3). The reason is the
+ * caller's responsibility to require for rejections; the database enforces
+ * it too (see events_rejection_requires_reason).
+ */
+export async function decideEventRequest(
+  admin: SupabaseClient,
+  eventId: number,
+  coordinatorId: string,
+  decision: 'approved' | 'rejected',
+  reason: string | null
+): Promise<DecideEventRequestResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update({
+      status: decision,
+      decided_by: coordinatorId,
+      decided_at: new Date().toISOString(),
+      decision_reason: reason
+    })
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .eq('status', 'under_review')
+    .select(DETAIL_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    // One answer for "not yours", "not under review" and "does not exist", so
+    // another coordinator's assignments cannot be probed for.
+    return { ok: false, reason: 'not_found', message: 'No event request under review is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
   const request: EventRequestRecord = {
@@ -540,4 +611,47 @@ export async function updateEventRequestDraft(
     return { ok: false, reason: 'unavailable', message: 'The draft was not returned after update.' };
   }
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
+}
+
+/** A request Technical Support Staff can assign or reassign (SG2-33/34). */
+export interface AssignableRequestRecord {
+  event_id: number;
+  name: string;
+  organisation: string | null;
+  status: string;
+  coordinator_id: string | null;
+  coordinator_name: string | null;
+}
+
+export type FetchAssignableRequestsResult =
+  | { ok: true; requests: AssignableRequestRecord[] }
+  | { ok: false; reason: 'unavailable'; message: string };
+
+/**
+ * Lists every request in a status a coordinator can be assigned to, across
+ * all organisations — Technical Support Staff act on the whole platform, so
+ * this is deliberately not organisation-scoped. Newest first.
+ */
+export async function fetchAssignableRequests(admin: SupabaseClient): Promise<FetchAssignableRequestsResult> {
+  const { data, error } = await admin
+    .from('events')
+    .select('event_id, name, organisation, status, coordinator_id, coordinator:users!coordinator_id(name)')
+    .in('status', COORDINATOR_ASSIGNABLE_STATUSES)
+    .order('event_id', { ascending: false });
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
+  return {
+    ok: true,
+    requests: rows.map(row => ({
+      event_id: Number(row.event_id),
+      name: typeof row.name === 'string' ? row.name : '',
+      organisation: typeof row.organisation === 'string' ? row.organisation : null,
+      status: typeof row.status === 'string' ? row.status : 'submitted',
+      coordinator_id: extractCoordinatorId(row),
+      coordinator_name: extractCoordinatorName(row)
+    }))
+  };
 }

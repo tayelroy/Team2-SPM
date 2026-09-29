@@ -179,10 +179,10 @@ test('SG2-26-P01 | colleagues read the same organisation events with creator-onl
   expect((await page.request.patch('/api/event-requests/1', { headers, data: { name: 'Colleague edit' } })).status()).toBe(404);
   expect((await page.request.patch('/api/event-requests/1/submit', { headers })).status()).toBe(404);
   expect((await page.request.delete('/api/event-requests/1', { headers })).status()).toBe(404);
-  const mine = await page.request.get('/api/event-requests?scope=mine', { headers });
+  const mine = await page.request.get('/api/event-requests?scope=mine&status=draft', { headers });
   expect((await mine.json()).requests).toEqual([]);
   await nav(page, 'My drafts');
-  await expect(page.getByRole('heading', { name: 'No event requests yet', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
   await page.reload();
   await nav(page, 'My events');
   await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toBeVisible();
@@ -273,7 +273,7 @@ test('SG2-26-N02 | only Event Organisers can access organisation event records',
       await signIn(page, account);
       await expect(page.getByRole('navigation').getByRole('button', { name: 'My events', exact: true })).toHaveCount(0);
       const headers = await authHeaders(page);
-      for (const endpoint of ['/api/event-requests', '/api/event-requests?scope=mine', '/api/event-requests/1']) {
+      for (const endpoint of ['/api/event-requests', '/api/event-requests?scope=mine&status=draft', '/api/event-requests/1']) {
         const response = await page.request.get(endpoint, { headers });
         expect(response.status()).toBe(403);
         expect(await response.json()).toEqual({ error: 'Access denied' });
@@ -379,6 +379,10 @@ test('SG2-28-P01 | submit a fresh request and verify its saved data and status',
   await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('submitted');
   await page.reload();
   await nav(page, 'My drafts');
+  await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toHaveCount(0);
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Browser workshop', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
   const record = (await eventRecords(page)).find(row => row.name === 'Browser workshop')!;
   const detail = await page.request.get(`/api/event-requests/${record.event_id}`, { headers: await authHeaders(page) });
@@ -422,6 +426,9 @@ test('SG2-29-P01 | editing then submitting preserves the latest field values', a
   await page.getByLabel(/^Event name/).fill('Revised workshop');
   await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Revised workshop', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Revised workshop', exact: true })).toBeVisible();
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
@@ -429,9 +436,15 @@ test('SG2-29-P01 | editing then submitting preserves the latest field values', a
   expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'submitted', accessibility_needs: null });
 });
 
-test('SG2-32-P01 | draft deletion requires confirmation and survives reload', async ({ page }) => {
+test('SG2-32-P01 | My drafts excludes non-drafts and confirmed deletion survives reload', async ({ page, request }) => {
+  // Reuse the existing mixed-status fixture: the owner has one draft plus
+  // submitted, planning, under-review and completed requests.
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
   await signIn(page);
+  await expect(page.locator('.organisation-summary-stat').filter({ hasText: 'My drafts' }).locator('strong')).toHaveText('1');
   await nav(page, 'My drafts');
+  await expect(page.getByRole('region', { name: 'My draft requests' }).getByRole('heading')).toHaveText(['Planning workshop']);
+  await expect(page.getByText('Other organisation draft')).toHaveCount(0);
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect((await eventRecords(page)).some(r => r.event_id === 1)).toBeTruthy();
@@ -439,8 +452,12 @@ test('SG2-32-P01 | draft deletion requires confirmation and survives reload', as
   await page.getByRole('button', { name: 'Confirm delete', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toHaveCount(0);
   await page.reload();
+  await expect(page.locator('.organisation-summary-stat').filter({ hasText: 'My drafts' }).locator('strong')).toHaveText('0');
   await nav(page, 'My drafts');
-  await expect(page.getByRole('heading', { name: 'No event requests yet', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
+  // Non-drafts were hidden, not deleted: all four still appear in My events.
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: /^View / })).toHaveCount(4);
 });
 
 test('SG2-27-P01 | profile changes persist and external users have no department field', async ({ page }) => {
@@ -543,4 +560,210 @@ test('SG2-35-N01 | a request awaiting assignment is readable but never enters re
   expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404);
   const detail = await page.request.get('/api/work-queue/event/41', { headers });
   expect((await detail.json()).items[0].status).toBe('submitted');
+});
+
+test('SG2-37-P01 | approving a request under review records the outcome and its decider', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Decision Forum' })).toBeVisible();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(page.getByText('approved')).toBeVisible();
+
+  // The decision persisted rather than only showing on the open screen. A
+  // coordinator reads it back through their own queue: the organiser event
+  // endpoints are restricted to Event Organisers (SG2-26).
+  const headers = await authHeaders(page);
+  const item = await page.request.get('/api/work-queue/event/52', { headers });
+  expect((await item.json()).items[0].status).toBe('approved');
+});
+
+test('SG2-37-P02 | rejecting requires a reason and shows it to the organiser', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+
+  // A rejection without a reason is refused rather than recorded silently.
+  await page.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('reason is required');
+  await expect(page.getByText('under review')).toBeVisible();
+
+  await page.getByLabel(/Reason/).fill('Clashes with the AGM on the same evening.');
+  await page.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(page.getByText('rejected')).toBeVisible();
+
+  // AC2 in full: the organiser who raised it is told why, in their own view.
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+  await signIn(page, 'organiser');
+
+  const headers = await authHeaders(page);
+  const detail = await page.request.get('/api/event-requests/52', { headers });
+  const decided = (await detail.json()).request;
+  expect(decided.status).toBe('rejected');
+  expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.');
+
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: /Decision Forum/ }).click();
+  await expect(page.getByRole('region', { name: 'Why this request was rejected' }))
+    .toContainText('Clashes with the AGM on the same evening.');
+});
+
+test('SG2-37-N01 | a request another coordinator is reviewing cannot be decided', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/work-queue')).ok()).toBeTruthy();
+  const headers = await authHeaders(page);
+
+  // Event 43 is under review by a different coordinator.
+  const refused = await page.request.patch('/api/event-requests/43/decision', {
+    headers, data: { decision: 'approved' },
+  });
+  expect(refused.status()).toBe(404);
+
+  // Event 41 is submitted but unassigned, so it is not under anyone's review.
+  const unassigned = await page.request.patch('/api/event-requests/41/decision', {
+    headers, data: { decision: 'approved' },
+  });
+  expect(unassigned.status()).toBe(404);
+});
+
+test('SG2-45-P01 | staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
+  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
+  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
+  await page.getByLabel('Reason', { exact: true }).fill('Carpet replacement');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
+  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
+
+  // AC1: the block is recorded and shown as unavailable for that period.
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toBeVisible();
+
+  // AC3: removing it makes the venue available for that period again.
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Block removed');
+  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
+  const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
+  expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
+  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+});
+
+test('SG2-45-N01 | a confirmed booking cannot be blocked and other roles cannot block', async ({ page }) => {
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  // Seeded confirmed booking #1 for event 1 runs 02:00–04:00 UTC on 15 June 2030.
+  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-14T00:00');
+  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-16T00:00');
+  await page.getByLabel('Reason', { exact: true }).fill('Deep clean');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('already holds a confirmed booking: booking #1 for event 1');
+  await expect(page.getByRole('listitem', { name: 'Deep clean' })).toHaveCount(0);
+  const staffHeaders = await authHeaders(page);
+  const refused = await page.request.post('/api/venues/1/blocks', { headers: staffHeaders,
+    data: { starts_at: '2030-06-15T03:00:00Z', ends_at: '2030-06-15T05:00:00Z', reason: 'Deep clean' } });
+  expect(refused.status()).toBe(409);
+  expect((await refused.json()).booking).toMatchObject({ booking_id: 1, event_id: 1 });
+
+  const block = { starts_at: '2030-07-01T00:00:00Z', ends_at: '2030-07-02T00:00:00Z', reason: 'Not allowed' };
+  for (const account of ['coordinator', 'support', 'organiser', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const headers = await authHeaders(page);
+      expect((await page.request.post('/api/venues/1/blocks', { headers, data: block })).status()).toBe(403);
+      expect((await page.request.delete('/api/venues/1/blocks/1', { headers })).status()).toBe(403);
+      expect((await page.request.get('/api/venues/1/blocks', { headers })).status()).toBe(403);
+      if (account === 'coordinator') {
+        await nav(page, 'Venues');
+        await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Block Regression Hall', exact: true })).toHaveCount(0);
+      }
+    });
+  }
+  expect((await page.request.post('/api/venues/1/blocks', { data: block })).status()).toBe(401);
+  const remaining = await page.request.get('/api/venues/1/blocks', { headers: staffHeaders });
+  expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance']);
+});
+
+test('SG2-46-P01 | an approved event opens a pre-filled venue search that leaves out busy venues', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Decision Forum/ }).click();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await page.getByRole('button', { name: 'Find venues for this event', exact: true }).click();
+
+  // AC1: the whole Singapore day of 15 June 2030 and 20 guests, straight from the event.
+  await expect(page.getByText('For: Decision Forum (#52)', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('From (Singapore time)')).toHaveValue('2030-06-15T00:00');
+  await expect(page.getByLabel('Until (Singapore time)')).toHaveValue('2030-06-15T23:59');
+  await expect(page.getByLabel('Attendance', { exact: true })).toHaveValue('20');
+  // AC3: this event has no accessibility needs, so accessibility is not matched.
+  await expect(page.getByText(/No accessibility needs were specified/)).toBeVisible();
+  // AC2: Regression Hall holds a confirmed booking that day, so only Quiet Room fits.
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quiet Room', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toHaveCount(0);
+
+  // The seeded SG2-45 block keeps Regression Hall out on 16 June too.
+  await page.getByLabel('From (Singapore time)').fill('2030-06-16T00:00');
+  await page.getByLabel('Until (Singapore time)').fill('2030-06-16T23:59');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toHaveCount(0);
+
+  // A free day returns both.
+  await page.getByLabel('From (Singapore time)').fill('2030-06-17T00:00');
+  await page.getByLabel('Until (Singapore time)').fill('2030-06-17T23:59');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(/^2 venues available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toBeVisible();
+
+  // AC4: nothing fits 500 guests; say so and show what was searched.
+  await page.getByLabel('Attendance', { exact: true }).fill('500');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No venues match', exact: true })).toBeVisible();
+  await expect(page.getByText(/^Searched: .*500\+ people$/)).toBeVisible();
+});
+
+test('SG2-46-N01 | only coordinators can search venues', async ({ page }) => {
+  const query = `/api/venues/search?from=${encodeURIComponent('2030-06-17T00:00:00Z')}&to=${encodeURIComponent('2030-06-17T12:00:00Z')}`;
+  for (const account of ['venue', 'support', 'organiser', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      await expect(page.getByRole('navigation').getByRole('button', { name: 'Find venues', exact: true })).toHaveCount(0);
+      expect((await page.request.get(query, { headers: await authHeaders(page) })).status()).toBe(403);
+    });
+  }
+  expect((await page.request.get(query)).status()).toBe(401);
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  await nav(page, 'Find venues');
+  await expect(page.getByText('Search venues', { exact: true })).toBeVisible();
+  const allowed = await page.request.get(query, { headers: await authHeaders(page) });
+  expect(allowed.status()).toBe(200);
+  expect((await allowed.json()).venues.map((venue: { name: string }) => venue.name)).toEqual(['Quiet Room', 'Regression Hall']);
 });

@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   createEventRequestDraft,
   deleteEventRequestDraft,
+  assignCoordinator,
+  fetchAssignable,
   fetchEventRequestDraft,
   fetchOwnEventDetail,
   fetchOwnEventRequests,
   isWaitingOnOrganiser,
-  listMyEventRequests,
+  listMyDraftRequests,
   submitEventRequest,
   updateEventRequestDraft,
   getEventStage,
@@ -258,7 +260,7 @@ describe('shared GET response contracts', () => {
     },
     {
       label: 'own-request list',
-      read: () => listMyEventRequests('token-1'),
+      read: () => listMyDraftRequests('token-1'),
       unavailable: { ok: false, message: 'Could not reach the server. Please try again.' },
       unreadable: { ok: false, message: 'Could not reach the server. Please try again.' },
     },
@@ -471,6 +473,9 @@ describe('fetchOwnEventDetail', () => {
       registration_needed: true,
       coordinator_id: 'coord-uuid-5',
       coordinator_name: 'Coordinator Jane',
+      coordinator_phone: '+65 9123 4567',
+      decided_at: '2026-09-25T02:00:00.000Z',
+      decision_reason: 'Clashes with the AGM.',
     };
 
     const fetchMock = vi.fn().mockResolvedValue(
@@ -502,6 +507,9 @@ describe('fetchOwnEventDetail', () => {
       coordinatorName: 'Coordinator Jane',
       canManage: true,
       waitingOnMe: true,
+      decisionReason: 'Clashes with the AGM.',
+      coordinatorPhone: '+65 9123 4567',
+      decidedAt: '2026-09-25T02:00:00.000Z',
     };
 
     expect(result).toEqual({ ok: true, request: expected });
@@ -543,6 +551,9 @@ describe('fetchOwnEventDetail', () => {
         coordinatorName: null,
         canManage: false,
         waitingOnMe: false,
+        decisionReason: null,
+        coordinatorPhone: null,
+        decidedAt: null,
       },
     });
   });
@@ -579,6 +590,9 @@ describe('fetchOwnEventDetail', () => {
         coordinatorName: null,
         canManage: false,
         waitingOnMe: false,
+        decisionReason: null,
+        coordinatorPhone: null,
+        decidedAt: null,
       },
     });
   });
@@ -660,18 +674,18 @@ describe('fetchOwnEventDetail', () => {
   });
 });
 
-describe('listMyEventRequests', () => {
-  test('sends the bearer token and returns the requests', async () => {
+describe('listMyDraftRequests', () => {
+  test('requests only the caller’s drafts with the bearer token', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse({ requests: [{ event_id: 7, status: 'draft' }] }, 200));
     vi.stubGlobal('fetch', fetchMock);
 
-    const outcome = await listMyEventRequests('token-1');
+    const outcome = await listMyDraftRequests('token-1');
 
     expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/event-requests?scope=mine');
+    expect(url).toBe('/api/event-requests?scope=mine&status=draft');
     expect(init.method).toBe('GET');
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
@@ -679,7 +693,7 @@ describe('listMyEventRequests', () => {
   test('maps 401 to a signed-out message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
       ok: false,
       message: 'You are signed out. Sign in again to see your requests.',
     });
@@ -688,7 +702,7 @@ describe('listMyEventRequests', () => {
   test('explains a 403 in terms of the caller role', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
       ok: false,
       message: 'Your role cannot view event requests.',
     });
@@ -699,7 +713,7 @@ describe('listMyEventRequests', () => {
   test('falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
-    await expect(listMyEventRequests('token-1')).resolves.toEqual({
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
       ok: false,
       message: 'Could not reach the server. Please try again.',
     });
@@ -1487,3 +1501,91 @@ describe('updateEventPlanning (SG2-39)', () => {
   });
 });
 
+describe('fetchAssignable (SG2-33/34)', () => {
+  const body = {
+    requests: [
+      { event_id: 7, name: 'Forum', organisation: 'Acme', status: 'approved', coordinator_id: 'c1', coordinator_name: 'Sarah' },
+      { event_id: 'x', name: null, organisation: null, status: null, coordinator_id: null, coordinator_name: null },
+    ],
+    coordinators: [{ user_id: 'c1', name: 'Sarah' }, { user_id: null, name: null }],
+  };
+
+  test('calls the assignable endpoint with the bearer token and maps the rows', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(body));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await fetchAssignable('tok');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/assignable', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer tok' },
+    });
+    expect(result).toEqual({
+      ok: true,
+      requests: [
+        { eventId: 7, name: 'Forum', organisation: 'Acme', status: 'approved', coordinatorId: 'c1', coordinatorName: 'Sarah' },
+        { eventId: 0, name: '', organisation: null, status: 'submitted', coordinatorId: null, coordinatorName: null },
+      ],
+      coordinators: [{ userId: 'c1', name: 'Sarah' }, { userId: '', name: '' }],
+    });
+  });
+
+  test.each([401, 403])('reports unauthorized on %i', async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
+    expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unauthorized' });
+  });
+
+  test('reports unavailable on a server error, a network failure or a malformed body', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+    expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unavailable' });
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unavailable' });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [] })));
+    expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unavailable' });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not json', { status: 200 })));
+    expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unavailable' });
+  });
+});
+
+describe('assignCoordinator (SG2-33/34)', () => {
+  test('patches the coordinator endpoint with the chosen coordinator', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: {} }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/coordinator', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
+      body: JSON.stringify({ coordinatorId: 'c1' }),
+    });
+  });
+
+  test.each([401, 403])('tells the user only Technical Support can assign on %i', async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({
+      ok: false,
+      message: 'Only Technical Support Staff can assign a coordinator. Sign in again.',
+    });
+  });
+
+  test.each([400, 404, 409])("relays the server's reason on %i", async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'Not assignable.' }, { status })));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: false, message: 'Not assignable.' });
+  });
+
+  test('falls back to a generic message when a rejection carries no reason', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 409 })));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: false, message: 'That assignment was not accepted.' });
+  });
+
+  test('reports a retryable failure for a server error or a network failure', async () => {
+    const retry = { ok: false, message: 'Could not save the assignment. Please try again.' };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual(retry);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual(retry);
+  });
+});

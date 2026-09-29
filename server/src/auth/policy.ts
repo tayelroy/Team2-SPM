@@ -39,6 +39,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.review': ['event_coordinator'],
   // SG2-39: coordinator updates event information during planning.
   'event_request.planning.update': ['event_coordinator'],
+  // SG2-37: the reviewing coordinator decides the outcome. Which request is
+  // enforced per-row by the assignment, not by this grant.
+  'event_request.decide': ['event_coordinator'],
   // SG2-38: see what stage an event has reached
   'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.read': ['venue_staff', 'event_coordinator'],
@@ -48,6 +51,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // shown, but only Venue Staff record them.
   'venues.layouts.read': ['venue_staff', 'event_coordinator'],
   'venues.layouts.update': ['venue_staff'],
+  // SG2-46: coordinators narrow the venues down to those that could host an
+  // event they are planning.
+  'venues.search': ['event_coordinator'],
+  // SG2-45: only Venue Staff block a venue from use or remove a block.
+  'venues.blocks.manage': ['venue_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

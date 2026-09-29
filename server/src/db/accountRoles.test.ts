@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAccountRole, updateAccountRole, deleteAccountRole, getAccountRole } from './accountRoles';
+import { createAccountRole, updateAccountRole, deleteAccountRole, getAccountRole, listCoordinators } from './accountRoles';
 
 function fakeAdmin(options: {
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
@@ -146,5 +146,83 @@ describe('getAccountRole', () => {
     const admin = fakeAdmin({ select: async () => ({ data: null, error: { message: 'connection reset' } }) });
     const result = await getAccountRole(admin, 'coord-1');
     assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
+  });
+});
+
+describe('listCoordinators', () => {
+  type Step = { data: any; error: { message: string } | null };
+
+  function fakeListAdmin(roles: Step, users: Step, capture?: (ids: unknown) => void): SupabaseClient {
+    return {
+      from(table: string) {
+        if (table === 'account_roles') {
+          return {
+            select: (columns: string) => {
+              assert.equal(columns, 'user_id');
+              return {
+                eq: async (column: string, value: string) => {
+                  assert.deepEqual([column, value], ['role', 'event_coordinator']);
+                  return roles;
+                }
+              };
+            }
+          };
+        }
+        assert.equal(table, 'users');
+        return {
+          select: (columns: string) => {
+            assert.equal(columns, 'user_id, name');
+            return {
+              in: async (column: string, ids: unknown) => {
+                assert.equal(column, 'user_id');
+                capture?.(ids);
+                return users;
+              }
+            };
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+  }
+
+  test('returns coordinators with their names, sorted by name', async () => {
+    let asked: unknown;
+    const result = await listCoordinators(
+      fakeListAdmin(
+        { data: [{ user_id: 'b' }, { user_id: 'a' }], error: null },
+        { data: [{ user_id: 'b', name: 'Zed', extra: 1 }, { user_id: 'a', name: 'Amy' }], error: null },
+        (ids) => (asked = ids)
+      )
+    );
+    assert.deepEqual(asked, ['b', 'a']);
+    assert.deepEqual(result, {
+      ok: true,
+      coordinators: [
+        { user_id: 'a', name: 'Amy' },
+        { user_id: 'b', name: 'Zed' }
+      ]
+    });
+  });
+
+  test('returns an empty list, without a second query, when nobody holds the role', async () => {
+    const admin = fakeListAdmin({ data: [], error: null }, { data: null, error: { message: 'must not run' } });
+    assert.deepEqual(await listCoordinators(admin), { ok: true, coordinators: [] });
+    const nullRoles = fakeListAdmin({ data: null, error: null }, { data: null, error: { message: 'must not run' } });
+    assert.deepEqual(await listCoordinators(nullRoles), { ok: true, coordinators: [] });
+  });
+
+  test('returns an empty list when no profile rows come back', async () => {
+    const admin = fakeListAdmin({ data: [{ user_id: 'a' }], error: null }, { data: null, error: null });
+    assert.deepEqual(await listCoordinators(admin), { ok: true, coordinators: [] });
+  });
+
+  test('surfaces a role lookup error', async () => {
+    const admin = fakeListAdmin({ data: null, error: { message: 'roles down' } }, { data: [], error: null });
+    assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'roles down' });
+  });
+
+  test('surfaces a profile lookup error', async () => {
+    const admin = fakeListAdmin({ data: [{ user_id: 'a' }], error: null }, { data: null, error: { message: 'users down' } });
+    assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'users down' });
   });
 });

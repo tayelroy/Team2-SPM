@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { fetchWorkQueue, startEventReview, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
+import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
+import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
@@ -57,11 +58,48 @@ function useOpenedForReview(item: WorkItem, accessToken?: string | null) {
     return () => { cancelled = true; };
   }, [opensReview, item.event_id, accessToken]);
 
-  return { status, error };
+  return { status, error, setStatus };
 }
 
-function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: string | null }) {
-  const { status, error } = useOpenedForReview(item, accessToken);
+/** SG2-37: the coordinator reviewing a request decides its outcome. A
+ * rejection must say why, so the organiser knows what to change before
+ * resubmitting; approval may add a note but does not need one. */
+function DecisionPanel({ eventId, accessToken, onDecided }: {
+  eventId: number;
+  accessToken?: string | null;
+  onDecided: (status: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [pending, setPending] = useState<Decision | null>(null);
+  const [error, setError] = useState('');
+
+  async function decide(decision: Decision) {
+    setError('');
+    setPending(decision);
+    const result = await decideEventRequest(eventId, decision, reason, accessToken);
+    setPending(null);
+    if (result.ok) onDecided(result.status);
+    else setError(result.error);
+  }
+
+  return <section className="work-queue-decision" aria-label="Decide this request">
+    <label htmlFor={`decision-reason-${eventId}`}>Reason (required to reject)</label>
+    <textarea id={`decision-reason-${eventId}`} value={reason} rows={3}
+      onChange={event => setReason(event.target.value)} />
+    {error && <p role="alert" className="work-queue-empty">{error}</p>}
+    <div className="work-queue-decision-actions">
+      <button type="button" className="organisation-button" disabled={pending !== null}
+        onClick={() => decide('approved')}>{pending === 'approved' ? 'Approving…' : 'Approve'}</button>
+      <button type="button" className="organisation-button" disabled={pending !== null}
+        onClick={() => decide('rejected')}>{pending === 'rejected' ? 'Rejecting…' : 'Reject'}</button>
+    </div>
+  </section>;
+}
+
+export type FindVenues = (prefill: VenueSearchPrefill) => void;
+
+function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
+  const { status, error, setStatus } = useOpenedForReview(item, accessToken);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   const [currentDetails, setCurrentDetails] = useState(item.details);
@@ -73,6 +111,7 @@ function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: strin
 
   const isTerminal = ['cancelled', 'completed', 'rejected'].includes(currentStatus.toLowerCase());
   const canEditPlanning = item.kind === 'event' && item.assigned_to_me && !isTerminal;
+  const canDecide = item.kind === 'event' && item.assigned_to_me && currentStatus === 'under_review';
 
   return (
     <article className="organisation-detail" aria-label={KINDS[item.kind]}>
@@ -94,6 +133,7 @@ function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: strin
           return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
         })}
       </dl>
+      {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canEditPlanning && (
         <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
           <button
@@ -104,6 +144,14 @@ function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: strin
             Edit Planning Information
           </button>
         </div>
+      )}
+      {item.kind === 'event' && item.assigned_to_me && currentStatus === 'approved' && onFindVenues && (
+        <footer className="organisation-detail-footer">
+          <h3>Next step</h3>
+          <p className="organisation-detail-hint">Find venues that fit this event and are free on its date.</p>
+          <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
+            onClick={() => onFindVenues(prefillFromEvent({ ...item, starts_at: startsAt, details: currentDetails }))}>Find venues for this event</button>
+        </footer>
       )}
       {canEditPlanning && (
         <EventPlanningDrawer
@@ -146,11 +194,12 @@ function ItemDetail({ item, accessToken }: { item: WorkItem; accessToken?: strin
   );
 }
 
-function QueueContent({ role, accessToken, selection, onSelect }: {
+function QueueContent({ role, accessToken, selection, onSelect, onFindVenues }: {
   role: InternalRole;
   accessToken?: string | null;
   selection: WorkSelection | null;
   onSelect: (selection: WorkSelection) => void;
+  onFindVenues?: FindVenues;
 }) {
   const [result, setResult] = useState<QueueResult | null>(null);
   useEffect(() => {
@@ -163,7 +212,7 @@ function QueueContent({ role, accessToken, selection, onSelect }: {
 
   if (!result) return <p role="status">Loading your work queue…</p>;
   if (!result.ok) return <p role="alert">{result.error}</p>;
-  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} />;
+  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
 
   return <>
     <p className="work-queue-summary" role="status">{result.items.length} {result.items.length === 1 ? 'item' : 'items'} in your work queue</p>
@@ -189,7 +238,7 @@ function QueueContent({ role, accessToken, selection, onSelect }: {
 
 /** The parent keys this view by signed-in identity so neither a selection nor
  * an in-flight result can carry over to another account. */
-export default function WorkQueue({ role, accessToken }: { role: InternalRole; accessToken?: string | null }) {
+export default function WorkQueue({ role, accessToken, onFindVenues }: { role: InternalRole; accessToken?: string | null; onFindVenues?: FindVenues }) {
   const [selection, setSelection] = useState<WorkSelection | null>(null);
   const [revision, setRevision] = useState(0);
   return <div className="work-queue">
@@ -198,6 +247,6 @@ export default function WorkQueue({ role, accessToken }: { role: InternalRole; a
       <button type="button" className="organisation-button" onClick={() => setRevision(value => value + 1)}>Refresh</button>
     </div>
     <QueueContent key={`${selection?.kind}:${selection?.item_id}:${revision}`} role={role}
-      accessToken={accessToken} selection={selection} onSelect={setSelection} />
+      accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues} />
   </div>;
 }
