@@ -49,8 +49,13 @@ const BASE_EVENT: EventPlanningRecord = {
 };
 
 describe('validatePlanningUpdateInput (AC 4)', () => {
-  test('rejects non-object request bodies', () => {
+  test('rejects non-object request bodies across various data types', () => {
+    // null, undefined, primitives, arrays, symbols, and functions
     assert.deepEqual(validatePlanningUpdateInput(null), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput(undefined), {
       valid: false,
       errors: ['Request body must be a JSON object.']
     });
@@ -58,13 +63,101 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
       valid: false,
       errors: ['Request body must be a JSON object.']
     });
+    assert.deepEqual(validatePlanningUpdateInput(12345), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput(0), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput(true), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput(false), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
     assert.deepEqual(validatePlanningUpdateInput([1, 2, 3]), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput([]), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput(Symbol('invalid')), {
+      valid: false,
+      errors: ['Request body must be a JSON object.']
+    });
+    assert.deepEqual(validatePlanningUpdateInput(() => {}), {
       valid: false,
       errors: ['Request body must be a JSON object.']
     });
   });
 
-  test('validates expected_attendance', () => {
+  test('validates fields against invalid and mixed data types', () => {
+    // expected_attendance: boolean, array, object
+    for (const badType of [true, false, [100], { count: 100 }]) {
+      const res = validatePlanningUpdateInput({ expected_attendance: badType });
+      assert.equal(res.valid, false);
+      if (!res.valid) {
+        assert.deepEqual(res.errors, ['expected_attendance must be a whole number.']);
+      }
+    }
+
+    // proposed_date: number, boolean, array, object
+    for (const badType of [12345, true, ['2026-11-20'], { date: '2026-11-20' }]) {
+      const res = validatePlanningUpdateInput({ proposed_date: badType });
+      assert.equal(res.valid, false);
+      if (!res.valid) {
+        assert.deepEqual(res.errors, ['proposed_date must be an ISO 8601 date-time string.']);
+      }
+    }
+
+    // text fields: number, boolean, array, object
+    for (const field of ['venue_requirements', 'equipment_requirements', 'accessibility_needs', 'planning_notes'] as const) {
+      for (const badType of [123, true, ['hall'], { note: 'hall' }]) {
+        const res = validatePlanningUpdateInput({ [field]: badType });
+        assert.equal(res.valid, false);
+        if (!res.valid) {
+          assert.deepEqual(res.errors, [`${field} must be text.`]);
+        }
+      }
+    }
+
+    // registration_needed: string, number, array, object
+    for (const badType of ['true', 1, [true], { needed: true }]) {
+      const res = validatePlanningUpdateInput({ registration_needed: badType });
+      assert.equal(res.valid, false);
+      if (!res.valid) {
+        assert.deepEqual(res.errors, ['registration_needed must be true or false.']);
+      }
+    }
+
+    // registration_capacity: boolean, array, object
+    for (const badType of [true, [50], { cap: 50 }]) {
+      const res = validatePlanningUpdateInput({ registration_capacity: badType });
+      assert.equal(res.valid, false);
+      if (!res.valid) {
+        assert.deepEqual(res.errors, ['registration_capacity must be a whole number.']);
+      }
+    }
+
+    // registration dates: number, boolean, array, object
+    for (const field of ['registration_opens_at', 'registration_closes_at'] as const) {
+      for (const badType of [12345, false, ['2026-10-01'], {}]) {
+        const res = validatePlanningUpdateInput({ [field]: badType });
+        assert.equal(res.valid, false);
+        if (!res.valid) {
+          assert.deepEqual(res.errors, [`${field} must be an ISO 8601 date-time string.`]);
+        }
+      }
+    }
+  });
+
+  test('validates expected_attendance including boundaries', () => {
     // null is allowed
     assert.equal(validatePlanningUpdateInput({ expected_attendance: null }).valid, true);
 
@@ -81,31 +174,72 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
       assert.deepEqual(floatAtt.errors, ['expected_attendance must be a whole number.']);
     }
 
-    // less than 1
+    // Boundary test lower: 0 and negative (invalid)
     const zeroAtt = validatePlanningUpdateInput({ expected_attendance: 0 });
     assert.equal(zeroAtt.valid, false);
     if (!zeroAtt.valid) {
       assert.deepEqual(zeroAtt.errors, ['expected_attendance must be at least 1.']);
     }
 
-    const negAtt = validatePlanningUpdateInput({ expected_attendance: -5 });
+    const negAtt = validatePlanningUpdateInput({ expected_attendance: -1 });
     assert.equal(negAtt.valid, false);
     if (!negAtt.valid) {
       assert.deepEqual(negAtt.errors, ['expected_attendance must be at least 1.']);
     }
 
-    // overflow
-    const overAtt = validatePlanningUpdateInput({ expected_attendance: 3_000_000_000 });
-    assert.equal(overAtt.valid, false);
-    if (!overAtt.valid) {
-      assert.deepEqual(overAtt.errors, ['expected_attendance must be at most 2147483647.']);
+    const negLargeAtt = validatePlanningUpdateInput({ expected_attendance: -500 });
+    assert.equal(negLargeAtt.valid, false);
+    if (!negLargeAtt.valid) {
+      assert.deepEqual(negLargeAtt.errors, ['expected_attendance must be at least 1.']);
     }
 
-    // valid integer
+    // Boundary test lower: 1 (valid minimum whole number)
+    const minValidAtt = validatePlanningUpdateInput({ expected_attendance: 1 });
+    assert.equal(minValidAtt.valid, true);
+    if (minValidAtt.valid) {
+      assert.equal(minValidAtt.values.expected_attendance, 1);
+    }
+
+    // Boundary test lower: 2 (just above minimum)
+    const justAboveMinAtt = validatePlanningUpdateInput({ expected_attendance: 2 });
+    assert.equal(justAboveMinAtt.valid, true);
+    if (justAboveMinAtt.valid) {
+      assert.equal(justAboveMinAtt.values.expected_attendance, 2);
+    }
+
+    // Mid-range valid integer
     const validAtt = validatePlanningUpdateInput({ expected_attendance: 250 });
     assert.equal(validAtt.valid, true);
     if (validAtt.valid) {
       assert.equal(validAtt.values.expected_attendance, 250);
+    }
+
+    // Boundary test upper: MAX_ATTENDANCE - 1 (2147483646, valid)
+    const justBelowMaxAtt = validatePlanningUpdateInput({ expected_attendance: 2_147_483_646 });
+    assert.equal(justBelowMaxAtt.valid, true);
+    if (justBelowMaxAtt.valid) {
+      assert.equal(justBelowMaxAtt.values.expected_attendance, 2_147_483_646);
+    }
+
+    // Boundary test upper: MAX_ATTENDANCE (2147483647, valid maximum)
+    const maxValidAtt = validatePlanningUpdateInput({ expected_attendance: 2_147_483_647 });
+    assert.equal(maxValidAtt.valid, true);
+    if (maxValidAtt.valid) {
+      assert.equal(maxValidAtt.values.expected_attendance, 2_147_483_647);
+    }
+
+    // Boundary test upper: MAX_ATTENDANCE + 1 (2147483648, invalid)
+    const justOverMaxAtt = validatePlanningUpdateInput({ expected_attendance: 2_147_483_648 });
+    assert.equal(justOverMaxAtt.valid, false);
+    if (!justOverMaxAtt.valid) {
+      assert.deepEqual(justOverMaxAtt.errors, ['expected_attendance must be at most 2147483647.']);
+    }
+
+    // Extreme overflow
+    const overAtt = validatePlanningUpdateInput({ expected_attendance: 3_000_000_000 });
+    assert.equal(overAtt.valid, false);
+    if (!overAtt.valid) {
+      assert.deepEqual(overAtt.errors, ['expected_attendance must be at most 2147483647.']);
     }
   });
 
@@ -137,7 +271,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('validates free-text fields and text length limits', () => {
+  test('validates free-text fields and text length limits including boundaries', () => {
     for (const field of ['venue_requirements', 'equipment_requirements', 'accessibility_needs', 'planning_notes'] as const) {
       // null is allowed
       assert.equal(validatePlanningUpdateInput({ [field]: null }).valid, true);
@@ -149,18 +283,69 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
         assert.deepEqual(nonString.errors, [`${field} must be text.`]);
       }
 
-      // over limit
+      // Boundary: 0 characters / empty string -> maps to null
+      const emptyRes = validatePlanningUpdateInput({ [field]: '' });
+      assert.equal(emptyRes.valid, true);
+      if (emptyRes.valid) {
+        assert.equal(emptyRes.values[field], null);
+      }
+
+      // Boundary: whitespace only -> maps to null
+      const blank = validatePlanningUpdateInput({ [field]: '   ' });
+      assert.equal(blank.valid, true);
+      if (blank.valid) {
+        assert.equal(blank.values[field], null);
+      }
+
+      // Boundary: 1 character (lower boundary)
+      const oneChar = validatePlanningUpdateInput({ [field]: 'a' });
+      assert.equal(oneChar.valid, true);
+      if (oneChar.valid) {
+        assert.equal(oneChar.values[field], 'a');
+      }
+
+      // Boundary: 1 character with surrounding whitespace
+      const oneCharPadded = validatePlanningUpdateInput({ [field]: '  a  ' });
+      assert.equal(oneCharPadded.valid, true);
+      if (oneCharPadded.valid) {
+        assert.equal(oneCharPadded.values[field], 'a');
+      }
+
+      // Boundary: 4999 characters (just below limit)
+      const justBelowLimit = validatePlanningUpdateInput({ [field]: 'x'.repeat(4999) });
+      assert.equal(justBelowLimit.valid, true);
+      if (justBelowLimit.valid) {
+        assert.equal(justBelowLimit.values[field]?.length, 4999);
+      }
+
+      // Boundary: 5000 characters (exact upper boundary)
+      const maxLimit = validatePlanningUpdateInput({ [field]: 'x'.repeat(5000) });
+      assert.equal(maxLimit.valid, true);
+      if (maxLimit.valid) {
+        assert.equal(maxLimit.values[field], 'x'.repeat(5000));
+        assert.equal(maxLimit.values[field]?.length, 5000);
+      }
+
+      // Boundary: 5000 characters with surrounding whitespace (trims to 5000)
+      const maxLimitPadded = validatePlanningUpdateInput({ [field]: '  ' + 'x'.repeat(5000) + '  ' });
+      assert.equal(maxLimitPadded.valid, true);
+      if (maxLimitPadded.valid) {
+        assert.equal(maxLimitPadded.values[field], 'x'.repeat(5000));
+        assert.equal(maxLimitPadded.values[field]?.length, 5000);
+      }
+
+      // Boundary: 5001 characters (just above limit, invalid)
       const tooLong = validatePlanningUpdateInput({ [field]: 'x'.repeat(5001) });
       assert.equal(tooLong.valid, false);
       if (!tooLong.valid) {
         assert.deepEqual(tooLong.errors, [`${field} must be 5000 characters or fewer.`]);
       }
 
-      // empty / whitespace maps to null
-      const blank = validatePlanningUpdateInput({ [field]: '   ' });
-      assert.equal(blank.valid, true);
-      if (blank.valid) {
-        assert.equal(blank.values[field], null);
+      // Boundary: 5001 characters with surrounding whitespace (trims to 5001, invalid)
+      const tooLongPadded = validatePlanningUpdateInput({ [field]: '  ' + 'x'.repeat(5001) + '  ' });
+      assert.equal(tooLongPadded.valid, false);
+      if (!tooLongPadded.valid) {
+        assert.deepEqual(tooLongPadded.errors, [`${field} must be 5000 characters or fewer.`]);
       }
 
       // valid string trimmed
@@ -190,7 +375,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     if (validFalse.valid) assert.equal(validFalse.values.registration_needed, false);
   });
 
-  test('validates registration_capacity', () => {
+  test('validates registration_capacity including boundaries', () => {
     assert.equal(validatePlanningUpdateInput({ registration_capacity: null }).valid, true);
 
     const nonNum = validatePlanningUpdateInput({ registration_capacity: '100' });
@@ -205,28 +390,72 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
       assert.deepEqual(floatCap.errors, ['registration_capacity must be a whole number.']);
     }
 
+    // Boundary test lower: 0 and negative (invalid)
     const zeroCap = validatePlanningUpdateInput({ registration_capacity: 0 });
     assert.equal(zeroCap.valid, false);
     if (!zeroCap.valid) {
       assert.deepEqual(zeroCap.errors, ['registration_capacity must be a positive integer.']);
     }
 
-    const negCap = validatePlanningUpdateInput({ registration_capacity: -10 });
+    const negCap = validatePlanningUpdateInput({ registration_capacity: -1 });
     assert.equal(negCap.valid, false);
     if (!negCap.valid) {
       assert.deepEqual(negCap.errors, ['registration_capacity must be a positive integer.']);
     }
 
-    const overCap = validatePlanningUpdateInput({ registration_capacity: 3_000_000_000 });
-    assert.equal(overCap.valid, false);
-    if (!overCap.valid) {
-      assert.deepEqual(overCap.errors, ['registration_capacity must be at most 2147483647.']);
+    const negLargeCap = validatePlanningUpdateInput({ registration_capacity: -500 });
+    assert.equal(negLargeCap.valid, false);
+    if (!negLargeCap.valid) {
+      assert.deepEqual(negLargeCap.errors, ['registration_capacity must be a positive integer.']);
     }
 
+    // Boundary test lower: 1 (valid minimum positive integer)
+    const minValidCap = validatePlanningUpdateInput({ registration_capacity: 1 });
+    assert.equal(minValidCap.valid, true);
+    if (minValidCap.valid) {
+      assert.equal(minValidCap.values.registration_capacity, 1);
+    }
+
+    // Boundary test lower: 2 (just above minimum)
+    const justAboveMinCap = validatePlanningUpdateInput({ registration_capacity: 2 });
+    assert.equal(justAboveMinCap.valid, true);
+    if (justAboveMinCap.valid) {
+      assert.equal(justAboveMinCap.values.registration_capacity, 2);
+    }
+
+    // Mid-range valid integer
     const validCap = validatePlanningUpdateInput({ registration_capacity: 150 });
     assert.equal(validCap.valid, true);
     if (validCap.valid) {
       assert.equal(validCap.values.registration_capacity, 150);
+    }
+
+    // Boundary test upper: MAX_ATTENDANCE - 1 (2147483646, valid)
+    const justBelowMaxCap = validatePlanningUpdateInput({ registration_capacity: 2_147_483_646 });
+    assert.equal(justBelowMaxCap.valid, true);
+    if (justBelowMaxCap.valid) {
+      assert.equal(justBelowMaxCap.values.registration_capacity, 2_147_483_646);
+    }
+
+    // Boundary test upper: MAX_ATTENDANCE (2147483647, valid maximum)
+    const maxValidCap = validatePlanningUpdateInput({ registration_capacity: 2_147_483_647 });
+    assert.equal(maxValidCap.valid, true);
+    if (maxValidCap.valid) {
+      assert.equal(maxValidCap.values.registration_capacity, 2_147_483_647);
+    }
+
+    // Boundary test upper: MAX_ATTENDANCE + 1 (2147483648, invalid)
+    const justOverMaxCap = validatePlanningUpdateInput({ registration_capacity: 2_147_483_648 });
+    assert.equal(justOverMaxCap.valid, false);
+    if (!justOverMaxCap.valid) {
+      assert.deepEqual(justOverMaxCap.errors, ['registration_capacity must be at most 2147483647.']);
+    }
+
+    // Extreme overflow
+    const overCap = validatePlanningUpdateInput({ registration_capacity: 3_000_000_000 });
+    assert.equal(overCap.valid, false);
+    if (!overCap.valid) {
+      assert.deepEqual(overCap.errors, ['registration_capacity must be at most 2147483647.']);
     }
   });
 
@@ -504,11 +733,23 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
 interface HandlerHarnessOptions {
   principal?: Principal | undefined;
   admin?: SupabaseClient | null;
+  expectedEventId?: number;
   fetchResult?: FetchEventPlanningResult;
   updateResult?: UpdateEventPlanningResult;
   insertAuditResult?: InsertAuditLogsResult;
+  captureFetchEventId?: (eventId: number) => void;
+  captureUpdateEventId?: (eventId: number) => void;
   captureUpdateFields?: (fields: UpdatePlanningFieldsInput) => void;
   captureAuditEntries?: (entries: InsertAuditLogInput[]) => void;
+  fetchPlanningRecord?: (
+    client: SupabaseClient,
+    eventId: number
+  ) => Promise<FetchEventPlanningResult>;
+  updatePlanningFields?: (
+    admin: SupabaseClient,
+    eventId: number,
+    fields: UpdatePlanningFieldsInput
+  ) => Promise<UpdateEventPlanningResult>;
 }
 
 function buildApp(options: HandlerHarnessOptions = {}) {
@@ -519,15 +760,39 @@ function buildApp(options: HandlerHarnessOptions = {}) {
     createUpdateEventPlanningHandler({
       getPrincipal: () => ('principal' in options ? options.principal : COORDINATOR),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
-      fetchPlanningRecord: async () => options.fetchResult ?? { ok: true, event: { ...BASE_EVENT } },
-      updatePlanningFields: async (_admin, _eventId, fields) => {
+      fetchPlanningRecord: async (client, eventId) => {
+        options.captureFetchEventId?.(eventId);
+        if (options.fetchPlanningRecord) {
+          return options.fetchPlanningRecord(client, eventId);
+        }
+        if (options.fetchResult) {
+          return options.fetchResult;
+        }
+        const expectedId = options.expectedEventId ?? BASE_EVENT.event_id;
+        if (eventId !== expectedId) {
+          return { ok: false, reason: 'not_found', message: `Event ${eventId} not found.` };
+        }
+        return { ok: true, event: { ...BASE_EVENT, event_id: eventId } };
+      },
+      updatePlanningFields: async (admin, eventId, fields) => {
+        options.captureUpdateEventId?.(eventId);
         options.captureUpdateFields?.(fields);
-        return (
-          options.updateResult ?? {
-            ok: true,
-            event: { ...BASE_EVENT, ...fields }
-          }
-        );
+        if (options.updatePlanningFields) {
+          return options.updatePlanningFields(admin, eventId, fields);
+        }
+        if (options.updateResult) {
+          return options.updateResult;
+        }
+        const expectedId = options.expectedEventId ?? BASE_EVENT.event_id;
+        if (eventId !== expectedId) {
+          return { ok: false, reason: 'not_found', message: `Event ${eventId} not found.` };
+        }
+        // Base the returned updated event on the fetched event to preserve current status and existing fields
+        const currentEvent = options.fetchResult?.ok ? options.fetchResult.event : BASE_EVENT;
+        return {
+          ok: true,
+          event: { ...currentEvent, ...fields, event_id: eventId }
+        };
       },
       insertAudit: async (_admin, entries) => {
         options.captureAuditEntries?.(entries);
@@ -560,6 +825,28 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       assert.deepEqual(response.body, { error: 'eventId must be a positive integer.' });
     });
   }
+
+  test('harness validates eventId and returns 404 when request targets a non-existent or wrong event ID', async () => {
+    let capturedFetchId: number | undefined;
+    let updateCalled = false;
+    let auditCalled = false;
+
+    const response = await request(
+      buildApp({
+        captureFetchEventId: (id) => (capturedFetchId = id),
+        captureUpdateFields: () => (updateCalled = true),
+        captureAuditEntries: () => (auditCalled = true)
+      })
+    )
+      .patch('/api/event-requests/999/planning')
+      .send({ planning_notes: 'Notes for wrong event' });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(response.body, { error: 'Event request not found.' });
+    assert.equal(capturedFetchId, 999);
+    assert.equal(updateCalled, false);
+    assert.equal(auditCalled, false);
+  });
 
   test('returns 400 when input validation fails', async () => {
     const response = await request(buildApp())
@@ -615,31 +902,44 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(response.status, 503);
   });
 
-  test('returns 403 when caller is not the assigned coordinator', async () => {
+  test('returns 403 when caller is not the assigned coordinator and asserts zero update or audit calls', async () => {
+    let updateCalled = false;
+    let auditCalled = false;
+
     const response = await request(
       buildApp({
         fetchResult: {
           ok: true,
           event: { ...BASE_EVENT, coordinator_id: OTHER_COORDINATOR_ID }
-        }
+        },
+        captureUpdateFields: () => (updateCalled = true),
+        captureAuditEntries: () => (auditCalled = true)
       })
     )
       .patch('/api/event-requests/10/planning')
-      .send({});
+      .send({ planning_notes: 'Unauthorized change attempt' });
+
     assert.equal(response.status, 403);
     assert.deepEqual(response.body, {
       error: 'Only the assigned event coordinator can update planning details.'
     });
+    assert.equal(updateCalled, false);
+    assert.equal(auditCalled, false);
   });
 
-  test('AC 5: refuses update on cancelled, completed, and rejected events with 409', async () => {
+  test('AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
     for (const status of ['cancelled', 'completed', 'rejected']) {
+      let updateCalled = false;
+      let auditCalled = false;
+
       const response = await request(
         buildApp({
           fetchResult: {
             ok: true,
             event: { ...BASE_EVENT, status }
-          }
+          },
+          captureUpdateFields: () => (updateCalled = true),
+          captureAuditEntries: () => (auditCalled = true)
         })
       )
         .patch('/api/event-requests/10/planning')
@@ -649,6 +949,8 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       assert.deepEqual(response.body, {
         error: `Cannot update planning information for a ${status} event.`
       });
+      assert.equal(updateCalled, false);
+      assert.equal(auditCalled, false);
     }
   });
 
@@ -696,11 +998,15 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
   });
 
   test('AC 1, AC 2 & AC 3: saves with confirm_impact: true, sets arrangements_recheck_needed, transitions to planning, and persists audit logs', async () => {
+    let capturedFetchEventId: number | undefined;
+    let capturedUpdateEventId: number | undefined;
     let capturedFields: UpdatePlanningFieldsInput | undefined;
     let capturedAudit: InsertAuditLogInput[] | undefined;
 
     const response = await request(
       buildApp({
+        captureFetchEventId: (id) => (capturedFetchEventId = id),
+        captureUpdateEventId: (id) => (capturedUpdateEventId = id),
         captureUpdateFields: (fields) => (capturedFields = fields),
         captureAuditEntries: (entries) => (capturedAudit = entries)
       })
@@ -712,6 +1018,9 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       });
 
     assert.equal(response.status, 200);
+    assert.equal(capturedFetchEventId, 10);
+    assert.equal(capturedUpdateEventId, 10);
+    assert.equal(response.body.event.event_id, 10);
     assert.equal(response.body.arrangements_recheck_needed, true);
     assert.deepEqual(response.body.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
 
@@ -785,6 +1094,8 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       });
 
     assert.equal(response.status, 200);
+    assert.equal(response.body.event.status, 'planning');
+    assert.equal(response.body.event.planning_notes, 'Another note');
     assert.ok(capturedFields);
     assert.equal(capturedFields.status, undefined);
   });
@@ -830,16 +1141,35 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(unavailRes.status, 503);
   });
 
-  test('handles insertAudit failure with 503', async () => {
-    const auditFailRes = await request(
-      buildApp({
-        insertAuditResult: { ok: false, reason: 'unavailable', message: 'Audit insert failed' }
-      })
-    )
+  test('handles insertAudit failure with 503 and verifies event state after failed audit write', async () => {
+    let capturedFields: UpdatePlanningFieldsInput | undefined;
+    let storedEvent: EventPlanningRecord = { ...BASE_EVENT };
+
+    const app = buildApp({
+      fetchResult: { ok: true, event: storedEvent },
+      updatePlanningFields: async (_admin, _eventId, fields) => {
+        capturedFields = fields;
+        storedEvent = { ...storedEvent, ...fields };
+        return { ok: true, event: storedEvent };
+      },
+      insertAuditResult: { ok: false, reason: 'unavailable', message: 'Audit insert failed' }
+    });
+
+    const auditFailRes = await request(app)
       .patch('/api/event-requests/10/planning')
-      .send({ planning_notes: 'Notes' });
+      .send({ planning_notes: 'Notes after audit fail test' });
 
     assert.equal(auditFailRes.status, 503);
+    assert.deepEqual(auditFailRes.body, {
+      error: 'Event requests are temporarily unavailable. Please try again later.'
+    });
+
+    // Verify the event's state: the planning fields were updated in storage before the audit write failed
+    assert.ok(capturedFields);
+    assert.equal(capturedFields.planning_notes, 'Notes after audit fail test');
+    assert.equal(capturedFields.status, 'planning');
+    assert.equal(storedEvent.planning_notes, 'Notes after audit fail test');
+    assert.equal(storedEvent.status, 'planning');
   });
 });
 
