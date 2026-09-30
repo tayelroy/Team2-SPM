@@ -375,3 +375,22 @@ test('an approved event that is not assigned to the coordinator has no venue sea
   await screen.findByRole('heading', { name: 'Leadership Forum' });
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
+
+test('coordinator can open change history drawer from event item detail (SG2-40)', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [review] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+
+  const historyBtn = screen.getByRole('button', { name: 'View Change History' });
+  expect(historyBtn).toBeInTheDocument();
+
+  // Drawer not open yet
+  expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+
+  // Open drawer
+  fireEvent.click(historyBtn);
+  expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+});
+
+
