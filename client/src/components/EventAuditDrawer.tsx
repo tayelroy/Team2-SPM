@@ -233,7 +233,7 @@ export function EventAuditDrawer({
               color: color.silver,
               fontSize: '14px',
               border: rule.faint,
-              borderRadius: radius.md,
+              borderRadius: radius.sm,
               background: surface.fieldOnAbyss,
             }}
           >
@@ -251,7 +251,7 @@ export function EventAuditDrawer({
                 style={{
                   background: surface.fieldOnAbyss,
                   border: rule.control,
-                  borderRadius: radius.md,
+                  borderRadius: radius.sm,
                   padding: '16px',
                   display: 'flex',
                   flexDirection: 'column',
