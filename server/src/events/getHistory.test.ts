@@ -37,7 +37,13 @@ const BASE_EVENT_REQUEST: EventRequestRecord = {
   status: 'planning',
   expected_attendance: 200,
   coordinator_id: COORDINATOR_ID,
-  coordinator_name: 'Alex Coordinator'
+  coordinator_name: 'Alex Coordinator',
+  purpose: 'Annual gathering',
+  description: 'A great tech summit',
+  venue_requirements: 'Large hall with projector',
+  accessibility_needs: 'Wheelchair ramp',
+  equipment_requirements: '2 mics, 1 projector',
+  registration_needed: true
 };
 
 const SAMPLE_LOGS: EventAuditLogRecord[] = [

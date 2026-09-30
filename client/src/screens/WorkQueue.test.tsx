@@ -391,6 +391,11 @@ test('coordinator can open change history drawer from event item detail (SG2-40)
   // Open drawer
   fireEvent.click(historyBtn);
   expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+
+  // Close drawer
+  const closeBtn = screen.getByRole('button', { name: /close change history/i });
+  fireEvent.click(closeBtn);
+  expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
 });
 
 

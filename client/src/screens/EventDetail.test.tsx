@@ -970,5 +970,39 @@ describe('EventDetail change history integration (SG2-40)', () => {
 
     expect(screen.queryByRole('button', { name: /view change history/i })).not.toBeInTheDocument();
   });
+
+  test('renders "View Change History" for Organiser when canManage is false and closes drawer properly', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        ...baseRequest,
+        canManage: false,
+      },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+      ok: true,
+      history: [],
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />
+    );
+
+    const historyBtn = await screen.findByRole('button', { name: /view change history/i });
+    expect(historyBtn).toBeInTheDocument();
+
+    fireEvent.click(historyBtn);
+    expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+
+    const closeBtn = screen.getByRole('button', { name: /close change history/i });
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+  });
 });
+
 

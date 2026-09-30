@@ -26,6 +26,16 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
     new_value: 'Auditorium with stage lighting',
     created_at: '2026-09-25T14:00:00.000Z',
   },
+  {
+    log_id: 100,
+    event_id: 42,
+    actor_id: 'coord-uuid-1',
+    actor_name: 'Sarah Coordinator',
+    field_name: 'accessibility_needs',
+    old_value: 'Wheelchair ramp',
+    new_value: null,
+    created_at: '2026-09-25T13:30:00.000Z',
+  },
 ];
 
 describe('EventAuditDrawer Component (SG2-40)', () => {
@@ -147,6 +157,27 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
+    test('does not call onClose when a key other than Escape is pressed', async () => {
+      const handleClose = vi.fn();
+      vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+        ok: true,
+        history: [],
+      });
+
+      render(
+        <EventAuditDrawer
+          isOpen={true}
+          onClose={handleClose}
+          eventId={42}
+          eventName="Tech Symposium"
+          accessToken="token-1"
+        />
+      );
+
+      fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Tab', code: 'Tab' });
+      expect(handleClose).not.toHaveBeenCalled();
+    });
+
     test('calls onClose when clicking outside backdrop', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
@@ -260,7 +291,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText('Sarah Coordinator').length).toBe(2);
+        expect(screen.getAllByText('Sarah Coordinator').length).toBe(3);
       });
 
       // Entry 1: expected_attendance
@@ -270,8 +301,45 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
 
       // Entry 2: venue_requirements (with null old value)
       expect(screen.getByText('Venue Requirements')).toBeInTheDocument();
-      expect(screen.getByText('(empty)')).toBeInTheDocument();
+      expect(screen.getAllByText('(empty)').length).toBe(2);
       expect(screen.getByText('Auditorium with stage lighting')).toBeInTheDocument();
+
+      // Entry 3: accessibility_needs (with null new value)
+      expect(screen.getByText('Accessibility Needs')).toBeInTheDocument();
+      expect(screen.getByText('Wheelchair ramp')).toBeInTheDocument();
+    });
+
+    test('displays signed-out error if no token is available', async () => {
+      render(
+        <EventAuditDrawer
+          isOpen={true}
+          onClose={vi.fn()}
+          eventId={42}
+          accessToken={null}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('You are signed out. Sign in again to view change history.');
+      });
+    });
+
+    test('handles unexpected fetch exception gracefully', async () => {
+      vi.spyOn(eventRequestsApi, 'getEventHistory').mockRejectedValue(new Error('Network error'));
+
+      render(
+        <EventAuditDrawer
+          isOpen={true}
+          onClose={vi.fn()}
+          eventId={42}
+          accessToken="token-1"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Could not reach the server. Please try again.');
+      });
     });
   });
 });
+
