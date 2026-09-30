@@ -42,6 +42,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-37: the reviewing coordinator decides the outcome. Which request is
   // enforced per-row by the assignment, not by this grant.
   'event_request.decide': ['event_coordinator'],
+  // SG2-36: the two participants in a clarification exchange — the assigned
+  // coordinator and the organiser who raised it. Which request is enforced
+  // per-row in the handler, not by this grant.
+  'event_request.clarify': ['event_coordinator', 'event_organiser'],
   // SG2-38: see what stage an event has reached
   'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.read': ['venue_staff', 'event_coordinator'],

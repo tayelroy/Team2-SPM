@@ -12,6 +12,11 @@ import { missingForSubmission, validateDraftInput, type DraftValues } from './fi
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
 
+/** Statuses an organiser may still edit their own request in. `draft` is the
+ * original case (SG2-29); `needs_clarification` is SG2-36's, where the
+ * coordinator has asked a question and expects an amended resubmission. */
+const EDITABLE_STATUSES = new Set(['draft', 'needs_clarification']);
+
 export interface UpdateEventDraftDependencies {
   /** Reads the verified caller established by requireAuth. */
   getPrincipal: (req: Request) => Principal | undefined;
@@ -88,8 +93,8 @@ export function createUpdateEventDraftHandler({
       return;
     }
 
-    if (existing.request.status !== 'draft') {
-      res.status(409).json({ error: 'Only a draft event request can be edited.' });
+    if (!EDITABLE_STATUSES.has(existing.request.status)) {
+      res.status(409).json({ error: 'Only a draft or returned event request can be edited.' });
       return;
     }
 

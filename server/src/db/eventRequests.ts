@@ -64,6 +64,10 @@ export type StartReviewResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
 
+export type RequestClarificationResult =
+  | { ok: true; request: EventRequestRecord }
+  | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
+
 export type DecideEventRequestResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
@@ -332,7 +336,11 @@ export async function fetchOwnEventRequest(
 }
 
 /** Statuses a row may transition from when submitted (SG2-30). */
-const SUBMITTABLE_STATUSES = ['draft', 'rejected'];
+const SUBMITTABLE_STATUSES = ['draft', 'rejected', 'needs_clarification'];
+
+/** Statuses an organiser may still edit in (SG2-29, widened by SG2-36 so a
+ * request returned with a question can be amended before resubmission). */
+const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
 
 /**
  * Transitions an event request from `draft` or `rejected` to `submitted`
@@ -442,6 +450,50 @@ export async function decideEventRequest(
       decided_at: new Date().toISOString(),
       decision_reason: reason
     })
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .eq('status', 'under_review')
+    .select(DETAIL_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  if (!data || data.length === 0) {
+    // One answer for "not yours", "not under review" and "does not exist", so
+    // another coordinator's assignments cannot be probed for.
+    return { ok: false, reason: 'not_found', message: 'No event request under review is assigned to this account.' };
+  }
+  const row = data[0] as unknown as Record<string, unknown>;
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request };
+}
+
+/**
+ * Returns a request to its organiser with a question (SG2-36).
+ *
+ * Only the coordinator actively reviewing a request may return it, so
+ * `coordinator_id` and `status = 'under_review'` are both conditions on the
+ * write itself rather than pre-checks — the atomic-ownership shape from
+ * SG2-32/SG2-35/SG2-37. Two coordinators therefore cannot both park the same
+ * request, and a request already decided cannot be pulled back.
+ *
+ * `needs_clarification` is a distinct status rather than a reuse of
+ * `rejected`: the request is still live and the organiser is expected to
+ * amend and resubmit it, which SG2-29's edit and SG2-30's submit both allow
+ * from this status.
+ */
+export async function requestClarification(
+  admin: SupabaseClient,
+  eventId: number,
+  coordinatorId: string
+): Promise<RequestClarificationResult> {
+  const { data, error } = await admin
+    .from('events')
+    .update({ status: 'needs_clarification' })
     .eq('event_id', eventId)
     .eq('coordinator_id', coordinatorId)
     .eq('status', 'under_review')
@@ -601,7 +653,7 @@ export async function updateEventRequestDraft(
     .update(values)
     .eq('event_id', eventId)
     .eq('organiser_id', organiserId)
-    .eq('status', 'draft')
+    .in('status', EDITABLE_STATUSES)
     .select(RETURNED_COLUMNS);
 
   if (error) {

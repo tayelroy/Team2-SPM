@@ -15,6 +15,7 @@ import { createAssignCoordinatorHandler } from './events/assignCoordinator';
 import { createListAssignableHandler } from './events/listAssignable';
 import { createStartEventReviewHandler } from './events/review';
 import { createDecideEventRequestHandler } from './events/decide';
+import { createAddClarificationHandler, createListClarificationsHandler } from './events/clarifications';
 import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
 import { createVenueBlocksRouter } from './venues/blocks';
@@ -51,7 +52,9 @@ export function createApp(
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
   decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal }),
   listAssignableHandler: RequestHandler = createListAssignableHandler(),
-  updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal })
+  updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal }),
+  listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
+  addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -104,6 +107,17 @@ export function createApp(
     '/:eventId/planning',
     access.requirePermission('event_request.planning.update'),
     updateEventPlanningHandler
+  );
+  // SG2-36: the coordinator and organiser exchange clarifying questions.
+  eventRequests.get(
+    '/:eventId/clarifications',
+    access.requirePermission('event_request.clarify'),
+    listClarificationsHandler
+  );
+  eventRequests.post(
+    '/:eventId/clarifications',
+    access.requirePermission('event_request.clarify'),
+    addClarificationHandler
   );
   // SG2-37: the coordinator reviewing a request approves or rejects it.
   eventRequests.patch(
