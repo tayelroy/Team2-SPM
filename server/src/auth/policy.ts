@@ -44,6 +44,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.decide': ['event_coordinator'],
   // SG2-38: see what stage an event has reached
   'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
+  // SG2-40: see who changed what on an event
+  'event_request.history.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],

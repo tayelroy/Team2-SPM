@@ -375,3 +375,44 @@ test('an approved event that is not assigned to the coordinator has no venue sea
   await screen.findByRole('heading', { name: 'Leadership Forum' });
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
+
+test('[NORMAL] coordinator can open change history drawer from event item detail (SG2-40)', async () => {
+  const historyEntry = {
+    log_id: 5, event_id: 12, actor_id: 'coord-9', actor_name: 'Priya Coordinator',
+    field_name: 'expected_attendance', old_value: '50', new_value: '80',
+    created_at: '2026-09-20T10:00:00.000Z',
+  };
+  const fetch = vi.fn(async (url: string) => url.endsWith('/history')
+    ? Response.json({ event_id: 12, history: [historyEntry] })
+    : Response.json({ items: [review] }));
+  vi.stubGlobal('fetch', fetch);
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+
+  const historyBtn = screen.getByRole('button', { name: 'View Change History' });
+  expect(historyBtn).toBeInTheDocument();
+
+  // Drawer not open yet
+  expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+
+  // Open drawer
+  fireEvent.click(historyBtn);
+  expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+
+  // Valid history response is fetched with the correct URL and auth header, and renders the record.
+  await screen.findByText('Priya Coordinator');
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/12/history', {
+    headers: { Authorization: 'Bearer token' },
+  });
+  expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
+  expect(screen.getByText('50')).toBeInTheDocument();
+  expect(screen.getByText('80')).toBeInTheDocument();
+
+  // Close drawer
+  const closeBtn = screen.getByRole('button', { name: /close change history/i });
+  fireEvent.click(closeBtn);
+  expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+});
+
+

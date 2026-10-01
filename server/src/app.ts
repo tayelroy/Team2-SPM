@@ -23,6 +23,7 @@ import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
+import { createGetEventHistoryHandler } from './events/getHistory';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -51,7 +52,8 @@ export function createApp(
   assignCoordinatorHandler: RequestHandler = createAssignCoordinatorHandler({ getPrincipal: access.getPrincipal }),
   decideEventRequestHandler: RequestHandler = createDecideEventRequestHandler({ getPrincipal: access.getPrincipal }),
   listAssignableHandler: RequestHandler = createListAssignableHandler(),
-  updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal })
+  updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal }),
+  getEventHistoryHandler: RequestHandler = createGetEventHistoryHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -128,6 +130,12 @@ export function createApp(
     '/:eventId/stage',
     access.requirePermission('event_request.stage.view'),
     eventStageHandler
+  );
+  // SG2-40: see who changed what on an event request.
+  eventRequests.get(
+    '/:eventId/history',
+    access.requirePermission('event_request.history.view'),
+    getEventHistoryHandler
   );
   // SG2-33/SG2-34: what Technical Support Staff pick from when assigning. Must
   // be registered before '/:eventId', which would otherwise capture it.
