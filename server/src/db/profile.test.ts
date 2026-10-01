@@ -57,7 +57,7 @@ function fakeUpdateClient(
 }
 
 describe('fetchProfile', () => {
-  test('returns the profile for the given user', async () => {
+  test('[NORMAL] [SG2-27:AC1] returns the profile for the given user', async () => {
     let askedFor: unknown;
     const result = await fetchProfile(
       fakeSelectClient({ data: [PROFILE_ROW], error: null }, (v) => (askedFor = v)),
@@ -67,19 +67,19 @@ describe('fetchProfile', () => {
     assert.equal(askedFor, 'user-1');
   });
 
-  test('reports not_found when the user has no record', async () => {
+  test('[FAILURE] [SG2-27:AC1] reports not_found when the user has no record', async () => {
     const result = await fetchProfile(fakeSelectClient({ data: [], error: null }), 'ghost');
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports not_found when the driver returns no data at all', async () => {
+  test('[FAILURE] [SG2-27:AC1] reports not_found when the driver returns no data at all', async () => {
     const result = await fetchProfile(fakeSelectClient({ data: null, error: null }), 'ghost');
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-27:AC1] reports unavailable when the query errors', async () => {
     const result = await fetchProfile(
       fakeSelectClient({ data: null, error: { message: 'connection reset' } }),
       'user-1'
@@ -99,7 +99,7 @@ describe('updateProfile', () => {
     communication_preferences: ['email']
   };
 
-  test('writes name, phone and communication_preferences for an external role', async () => {
+  test('[NORMAL] [SG2-27:AC2] writes name, phone and communication_preferences for an external role', async () => {
     let written: Record<string, unknown> | undefined;
     let target: unknown;
     const result = await updateProfile(
@@ -117,7 +117,7 @@ describe('updateProfile', () => {
     assert.equal('department' in (written ?? {}), false);
   });
 
-  test('also writes department when the validated update included it', async () => {
+  test('[NORMAL] [SG2-27:AC4] also writes department when the validated update included it', async () => {
     let written: Record<string, unknown> | undefined;
     const result = await updateProfile(
       fakeUpdateClient({ data: [{ ...PROFILE_ROW, department: 'Operations' }], error: null }, (row) => (written = row)),
@@ -128,19 +128,19 @@ describe('updateProfile', () => {
     assert.equal(written?.department, 'Operations');
   });
 
-  test('reports not_found when the user has no record', async () => {
+  test('[FAILURE] [SG2-27:AC2] reports not_found when the user has no record', async () => {
     const result = await updateProfile(fakeUpdateClient({ data: [], error: null }), 'ghost', UPDATE);
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports not_found when the driver returns no data at all', async () => {
+  test('[FAILURE] [SG2-27:AC2] reports not_found when the driver returns no data at all', async () => {
     const result = await updateProfile(fakeUpdateClient({ data: null, error: null }), 'ghost', UPDATE);
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-27:AC2] reports unavailable when the update errors', async () => {
     const result = await updateProfile(
       fakeUpdateClient({ data: null, error: { message: 'violates check constraint' } }),
       'user-1',

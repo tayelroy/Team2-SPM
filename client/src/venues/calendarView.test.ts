@@ -4,7 +4,7 @@ import type { VenueAvailabilitySummary } from './availability';
 
 const OCT_2026 = new Date(Date.UTC(2026, 9, 15));
 
-test('monthRange returns the UTC bounds and label of the containing month', () => {
+test('[NORMAL] [SG2-44:AC1] monthRange returns the UTC bounds and label of the containing month', () => {
   expect(monthRange(OCT_2026)).toEqual({
     from: '2026-10-01T00:00:00.000Z',
     to: '2026-11-01T00:00:00.000Z',
@@ -14,13 +14,13 @@ test('monthRange returns the UTC bounds and label of the containing month', () =
   });
 });
 
-test('monthRange rolls over into the next year at December', () => {
+test('[BOUNDARY] [SG2-44:AC1] monthRange rolls over into the next year at December', () => {
   const result = monthRange(new Date(Date.UTC(2026, 11, 25)));
   expect(result.to).toBe('2027-01-01T00:00:00.000Z');
   expect(result.label).toBe('December 2026');
 });
 
-test('grid has three leading blanks before October 1 (a Thursday) and covers every day', () => {
+test('[BOUNDARY] [SG2-44:AC1] grid has three leading blanks before October 1 (a Thursday) and covers every day', () => {
   const days = buildCalendarDays(OCT_2026, []);
   expect(days).toHaveLength(35);
   expect(days.slice(0, 3)).toEqual([
@@ -40,7 +40,7 @@ function venue(name: string, entries: VenueAvailabilitySummary['entries']): Venu
   return { venueId: 1, name, entries };
 }
 
-test('a multi-day booking marks every day it overlaps and no others', () => {
+test('[NORMAL] [SG2-44:AC1] a multi-day booking marks every day it overlaps and no others', () => {
   const venues = [
     venue('Atrium', [
       { start: '2026-10-01T09:00:00.000Z', end: '2026-10-03T09:00:00.000Z', kind: 'booking', label: 'confirmed' }
@@ -54,7 +54,7 @@ test('a multi-day booking marks every day it overlaps and no others', () => {
   expect(byDate['2026-10-01'].items).toEqual(['Atrium · confirmed']);
 });
 
-test('an entry ending exactly at midnight does not spill into the next day', () => {
+test('[BOUNDARY] [SG2-44:AC1] an entry ending exactly at midnight does not spill into the next day', () => {
   const venues = [
     venue('Atrium', [
       { start: '2026-10-05T09:00:00.000Z', end: '2026-10-06T00:00:00.000Z', kind: 'booking', label: 'held' }
@@ -65,7 +65,7 @@ test('an entry ending exactly at midnight does not spill into the next day', () 
   expect(byDate['2026-10-06'].kind).toBe('free');
 });
 
-test('an entry starting exactly at midnight belongs to that day, not the previous one', () => {
+test('[BOUNDARY] [SG2-44:AC1] an entry starting exactly at midnight belongs to that day, not the previous one', () => {
   const venues = [
     venue('Atrium', [
       { start: '2026-10-06T00:00:00.000Z', end: '2026-10-06T09:00:00.000Z', kind: 'unavailable', label: 'Maintenance' }
@@ -76,7 +76,7 @@ test('an entry starting exactly at midnight belongs to that day, not the previou
   expect(byDate['2026-10-06'].kind).toBe('unavailable');
 });
 
-test('a day with both a booking and an unavailability is mixed', () => {
+test('[NORMAL] [SG2-44:AC1] a day with both a booking and an unavailability is mixed', () => {
   const venues = [
     venue('Atrium', [{ start: '2026-10-10T09:00:00.000Z', end: '2026-10-10T12:00:00.000Z', kind: 'booking', label: 'held' }]),
     venue('Rooftop', [{ start: '2026-10-10T00:00:00.000Z', end: '2026-10-11T00:00:00.000Z', kind: 'unavailable', label: 'Closed' }])
@@ -86,7 +86,7 @@ test('a day with both a booking and an unavailability is mixed', () => {
   expect(byDate['2026-10-10'].items).toEqual(['Atrium · held', 'Rooftop · Closed']);
 });
 
-test('more than three entries on one day are capped with a "+N more" marker', () => {
+test('[BOUNDARY] [SG2-44:AC1] more than three entries on one day are capped with a "+N more" marker', () => {
   const entries = Array.from({ length: 5 }, (_, i) => ({
     start: '2026-10-12T00:00:00.000Z',
     end: '2026-10-12T01:00:00.000Z',

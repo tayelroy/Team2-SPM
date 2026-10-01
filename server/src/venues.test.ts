@@ -38,7 +38,7 @@ function fixture(role: Role = 'venue_staff', override?: VenueStore) {
   return { app, writes: () => writes };
 }
 
-for (const role of ACCOUNT_ROLES) test(`SG2-42: only venue staff can write (${role})`, async () => {
+for (const role of ACCOUNT_ROLES) test(`${role === 'venue_staff' ? '[NORMAL]' : role === 'event_coordinator' ? '[NORMAL] [FAILURE]' : '[FAILURE]'} [SG2-42:AC3] SG2-42: only venue staff can write (${role})`, async () => {
   const { app, writes } = fixture(role);
   for (const method of ['post', 'put'] as const) {
     const res = await request(app)[method](`/api/venues${method === 'put' ? '/1' : ''}`)
@@ -50,18 +50,18 @@ for (const role of ACCOUNT_ROLES) test(`SG2-42: only venue staff can write (${ro
     ['venue_staff', 'event_coordinator'].includes(role) ? 200 : 403);
 });
 
-test('the production app protects all venue routes without credentials', async () => {
+test('[FAILURE] [SG2-25:AC3] [SG2-42:AC3] the production app protects all venue routes without credentials', async () => {
   for (const method of ['get', 'post', 'put'] as const) {
     const response = await request(createApp())[method](`/api/venues${method === 'put' ? '/1' : ''}`).send(values);
     assert.equal(response.status, 401);
   }
 });
 
-test('non-record inputs are rejected by the validator', () => {
+test('[FAILURE] [SG2-42:AC1] non-record inputs are rejected by the validator', () => {
   for (const input of [null, undefined, [], 'bad', 1, true]) assert.equal(validateVenue(input), null);
 });
 
-test('POST and PUT reject missing, blank, mistyped and out-of-range fields without writing', async () => {
+test('[BOUNDARY] [FAILURE] [SG2-42:AC1] POST and PUT reject missing, blank, mistyped and out-of-range fields without writing', async () => {
   const { app, writes } = fixture();
   // The required fields come from the story, independently of the implementation's field list.
   const textFields = ['name', 'location', 'facilities', 'accessibility_features', 'operating_information'];
@@ -79,7 +79,7 @@ test('POST and PUT reject missing, blank, mistyped and out-of-range fields witho
   }
 });
 
-test('POST and PUT accept exact capacity/name limits and trim every text field', async () => {
+test('[BOUNDARY] [SG2-42:AC1] POST and PUT accept exact capacity/name limits and trim every text field', async () => {
   const { app, writes } = fixture();
   for (const [method, capacity, name] of [
     ['post', 1, 'A'], ['put', 2147483647, '🏛'.repeat(255)]
@@ -96,7 +96,7 @@ test('POST and PUT accept exact capacity/name limits and trim every text field',
   assert.equal(writes(), 2);
 });
 
-test('invalid IDs never write; an in-range missing ID returns 404, not validation failure', async () => {
+test('[BOUNDARY] [SG2-42:AC1] invalid IDs never write; an in-range missing ID returns 404, not validation failure', async () => {
   const { app, writes } = fixture();
   for (const id of ['0', '-1', '01', '1.5', '1e2', 'abc', '2147483648']) {
     assert.equal((await request(app).put(`/api/venues/${id}`).set('Authorization', 'Bearer valid-token').send(values)).status, 400);
@@ -106,14 +106,14 @@ test('invalid IDs never write; an in-range missing ID returns 404, not validatio
   assert.equal(writes(), 1);
 });
 
-test('missing update and insert without returned row do not report success', async () => {
+test('[FAILURE] [SG2-42:AC1] missing update and insert without returned row do not report success', async () => {
   const { app } = fixture('venue_staff', { list: async () => [], save: async () => null });
   assert.equal((await request(app).put('/api/venues/8').set('Authorization', 'Bearer valid-token').send(values)).status, 404);
   assert.equal((await request(app).post('/api/venues').set('Authorization', 'Bearer valid-token').send(values)).status, 503);
 });
 
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET')]) {
-  test(`database failures fail closed: ${error.message}`, async () => {
+  test(`[FAILURE] [SG2-42:AC1] database failures fail closed: ${error.message}`, async () => {
     const { app } = fixture('venue_staff', { list: async () => { throw error; }, save: async () => { throw error; } });
     for (const method of ['get', 'post', 'put'] as const) {
       const res = await request(app)[method](`/api/venues${method === 'put' ? '/1' : ''}`)

@@ -55,7 +55,7 @@ function fixture(role: Role = 'venue_staff', override?: VenueBlockStore) {
 
 const auth = { Authorization: 'Bearer valid-token' };
 
-for (const role of ACCOUNT_ROLES) test(`SG2-45: only venue staff can list, create or remove blocks (${role})`, async () => {
+for (const role of ACCOUNT_ROLES) test(`${role === 'venue_staff' ? '[NORMAL]' : '[FAILURE]'} [SG2-25:AC1] [SG2-45:AC1] [SG2-45:AC3] SG2-45: only venue staff can list, create or remove blocks (${role})`, async () => {
   const { app, calls } = fixture(role);
   const allowed = role === 'venue_staff';
   assert.equal((await request(app).get('/api/venues/1/blocks').set(auth)).status, allowed ? 200 : 403);
@@ -64,14 +64,14 @@ for (const role of ACCOUNT_ROLES) test(`SG2-45: only venue staff can list, creat
   assert.deepEqual(calls, allowed ? ['list', 'create', 'remove'] : []);
 });
 
-test('the production app protects every block route without credentials', async () => {
+test('[FAILURE] [SG2-25:AC3] [SG2-45:AC1] the production app protects every block route without credentials', async () => {
   const app = createApp();
   assert.equal((await request(app).get('/api/venues/1/blocks')).status, 401);
   assert.equal((await request(app).post('/api/venues/1/blocks').send(period)).status, 401);
   assert.equal((await request(app).delete('/api/venues/1/blocks/1')).status, 401);
 });
 
-test('AC1: blocking a free period records it with its reason and lists it as upcoming', async () => {
+test('[NORMAL] [SG2-45:AC1] AC1: blocking a free period records it with its reason and lists it as upcoming', async () => {
   const { app, listed } = fixture();
   const created = await request(app).post('/api/venues/1/blocks').set(auth).send(period);
   assert.equal(created.status, 201);
@@ -82,7 +82,7 @@ test('AC1: blocking a free period records it with its reason and lists it as upc
   assert.deepEqual(listed, [new Date(NOW).toISOString()]);
 });
 
-test('AC2: a period holding a confirmed booking is refused and the booking is identified', async () => {
+test('[CONFLICT] [SG2-45:AC2] AC2: a period holding a confirmed booking is refused and the booking is identified', async () => {
   const { app } = fixture();
   const response = await request(app).post('/api/venues/1/blocks').set(auth)
     .send({ ...period, starts_at: '2026-10-02T11:00:00Z', ends_at: '2026-10-02T13:00:00Z' });
@@ -91,7 +91,7 @@ test('AC2: a period holding a confirmed booking is refused and the booking is id
   assert.deepEqual((await request(app).get('/api/venues/1/blocks').set(auth)).body, { blocks: [] });
 });
 
-test('AC3: removing a block frees the period; removing it again is 404', async () => {
+test('[CONFLICT] [SG2-45:AC3] AC3: removing a block frees the period; removing it again is 404', async () => {
   const { app } = fixture();
   await request(app).post('/api/venues/1/blocks').set(auth).send(period);
   assert.equal((await request(app).delete('/api/venues/1/blocks/1').set(auth)).status, 204);
@@ -101,14 +101,14 @@ test('AC3: removing a block frees the period; removing it again is 404', async (
   assert.deepEqual(again.body, { error: 'Block not found.' });
 });
 
-test('a block for a missing venue returns 404', async () => {
+test('[FAILURE] [SG2-45:AC1] a block for a missing venue returns 404', async () => {
   const { app } = fixture();
   const response = await request(app).post('/api/venues/999/blocks').set(auth).send(period);
   assert.equal(response.status, 404);
   assert.deepEqual(response.body, { error: 'Venue not found.' });
 });
 
-test('invalid venue and block IDs are rejected before reaching the store', async () => {
+test('[BOUNDARY] [SG2-45:AC1] invalid venue and block IDs are rejected before reaching the store', async () => {
   const { app, calls } = fixture();
   for (const id of ['0', '-1', '01', '1.5', 'abc', '2147483648']) {
     const list = await request(app).get(`/api/venues/${id}/blocks`).set(auth);
@@ -125,7 +125,7 @@ test('invalid venue and block IDs are rejected before reaching the store', async
   assert.deepEqual(calls, []);
 });
 
-test('POST rejects invalid block bodies without writing', async () => {
+test('[FAILURE] [SG2-45:AC1] POST rejects invalid block bodies without writing', async () => {
   const { app, calls } = fixture();
   for (const body of [{}, { ...period, reason: ' ' }, { ...period, ends_at: period.starts_at }, { ...period, ends_at: '2026-09-25T00:00:00Z', starts_at: '2026-09-24T00:00:00Z' }]) {
     const response = await request(app).post('/api/venues/1/blocks').set(auth).send(body);
@@ -135,7 +135,8 @@ test('POST rejects invalid block bodies without writing', async () => {
   assert.deepEqual(calls, []);
 });
 
-test('validateVenueBlock normalises a valid block and rejects malformed input', () => {
+test('[BOUNDARY] [NORMAL] [FAILURE] [SG2-45:AC1] validateVenueBlock normalises a valid block and rejects malformed input', (t) => {
+  t.mock.method(Date, 'now', () => NOW);
   for (const input of [null, undefined, 'bad', 1, [], true]) assert.equal(validateVenueBlock(input, NOW), null);
   for (const [key, value] of [['starts_at', ''], ['starts_at', 'not a date'], ['starts_at', 5], ['ends_at', undefined], ['reason', 5], ['reason', undefined], ['reason', '   ']] as const) {
     assert.equal(validateVenueBlock({ ...period, [key]: value }, NOW), null, `${key}=${String(value)}`);
@@ -150,11 +151,20 @@ test('validateVenueBlock normalises a valid block and rejects malformed input', 
     { starts_at: '2026-09-25T01:00:00.000Z', ends_at: '2026-10-01T09:00:00.000Z', reason: 'Deep clean' },
     'a block already under way is allowed and times are normalised to UTC'
   );
-  assert.ok(validateVenueBlock({ ...period, ends_at: '2099-01-01T00:00:00Z' }), 'default clock accepts a future period');
+  assert.deepEqual(validateVenueBlock(period), period, 'the default clock uses the fixed test instant');
+});
+
+test('[BOUNDARY] [SG2-45:AC1] a block must end at least one millisecond after the current instant', () => {
+  const starts_at = '2026-09-25T23:59:59.998Z';
+  assert.equal(validateVenueBlock({ ...period, starts_at, ends_at: '2026-09-25T23:59:59.999Z' }, NOW), null);
+  assert.equal(validateVenueBlock({ ...period, starts_at, ends_at: '2026-09-26T00:00:00.000Z' }, NOW), null);
+  assert.deepEqual(validateVenueBlock({ ...period, starts_at, ends_at: '2026-09-26T00:00:00.001Z' }, NOW), {
+    starts_at, ends_at: '2026-09-26T00:00:00.001Z', reason: 'Carpet replacement'
+  });
 });
 
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET')]) {
-  test(`database failures fail closed: ${error.message}`, async () => {
+  test(`[FAILURE] [SG2-45:AC1] database failures fail closed: ${error.message}`, async () => {
     const failing = async () => { throw error; };
     const { app } = fixture('venue_staff', { list: failing, create: failing, remove: failing });
     const expected = error instanceof AccessError ? error.status : 503;

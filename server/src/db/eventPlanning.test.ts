@@ -8,7 +8,7 @@ import {
 } from './eventPlanning';
 
 describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
-  test('fetchEventPlanningRecord retrieves and parses planning details', async () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord retrieves and parses planning details', async () => {
     let capturedTable = '';
     let capturedId: any = null;
 
@@ -61,7 +61,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('fetchEventPlanningRecord returns not_found when event does not exist', async () => {
+  test('[FAILURE] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord returns not_found when event does not exist', async () => {
     const fakeClient = {
       from() {
         return {
@@ -78,7 +78,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     assert.deepEqual(result, { ok: false, reason: 'not_found', message: 'Event not found.' });
   });
 
-  test('fetchEventPlanningRecord returns unavailable on error', async () => {
+  test('[FAILURE] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord returns unavailable on error', async () => {
     const fakeClient = {
       from() {
         return {
@@ -95,7 +95,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'Database query failed' });
   });
 
-  test('fetchEventPlanningRecord extracts coordinator name from array relation', async () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord extracts coordinator name from array relation', async () => {
     const fakeClient = {
       from() {
         return {
@@ -118,7 +118,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('fetchEventPlanningRecord extracts coordinator name from object relation', async () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord extracts coordinator name from object relation', async () => {
     const fakeClient = {
       from() {
         return {
@@ -141,7 +141,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('fetchEventPlanningRecord uses coordinator_name fallback when coordinator relation is not present', async () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord uses coordinator_name fallback when coordinator relation is not present', async () => {
     const fakeClient = {
       from() {
         return {
@@ -164,7 +164,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('fetchEventPlanningRecord handles coordinator without string name and no fallback', async () => {
+  test('[FAILURE] [SG2-38:AC1] [SG2-39:AC1] fetchEventPlanningRecord handles coordinator without string name and no fallback', async () => {
     // Array with non-string name
     const fakeClientArray = {
       from() {
@@ -232,7 +232,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('updateEventPlanningFields updates fields and returns updated record', async () => {
+  test('[NORMAL] [SG2-39:AC1] [SG2-39:AC4] updateEventPlanningFields updates fields and returns updated record', async () => {
     let capturedUpdates: any = null;
     let capturedId: any = null;
 
@@ -294,7 +294,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('updateEventPlanningFields falls back to empty array when outstanding_arrangements is null', async () => {
+  test('[BOUNDARY] [SG2-39:AC3] updateEventPlanningFields falls back to empty array when outstanding_arrangements is null', async () => {
     const fakeAdmin = {
       from() {
         return {
@@ -321,7 +321,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('updateEventPlanningFields returns not_found if no rows matched', async () => {
+  test('[FAILURE] [SG2-39:AC1] updateEventPlanningFields returns not_found if no rows matched', async () => {
     const fakeAdmin = {
       from() {
         return {
@@ -342,7 +342,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     assert.deepEqual(result, { ok: false, reason: 'not_found', message: 'Event not found.' });
   });
 
-  test('updateEventPlanningFields returns unavailable on database error', async () => {
+  test('[FAILURE] [SG2-39:AC1] updateEventPlanningFields returns unavailable on database error', async () => {
     const fakeAdmin = {
       from() {
         return {

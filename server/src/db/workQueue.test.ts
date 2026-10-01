@@ -32,7 +32,7 @@ function fixture(rows: Record<string, unknown>[], failure?: 'error' | 'null') {
 const mine = (row: Record<string, unknown>) => ({ ...row, assigned_to_me: true });
 const shared = (row: Record<string, unknown>) => ({ ...row, assigned_to_me: false });
 
-test('coordinator list and detail include shared reviews and own assignments, never another coordinator or role', async () => {
+test('[NORMAL] [SG2-41:AC1] [SG2-41:AC4] [SG2-35:AC3] coordinator list and detail include shared reviews and own assignments, never another coordinator or role', async () => {
   const rows = [
     { kind: 'event', item_id: 1, audience: 'event_coordinator', assigned_to: null },
     { kind: 'event', item_id: 2, audience: 'event_coordinator', assigned_to: 'coordinator-1' },
@@ -52,7 +52,7 @@ test('coordinator list and detail include shared reviews and own assignments, ne
   }
 });
 
-test('staff queries use verified role and return all pages, including an empty queue', async () => {
+test('[BOUNDARY] [SG2-41:AC2] [SG2-41:AC3] staff queries use verified role and return all pages, including an empty queue', async () => {
   const rows = Array.from({ length: 1001 }, (_, index) => ({ kind: 'venue', item_id: index + 1, audience: 'venue_staff', assigned_to: null }));
   const { client, calls } = fixture(rows);
   assert.deepEqual(await fetchWorkQueue(client, { userId: 'staff', role: 'venue_staff' }), rows.map(shared));
@@ -60,8 +60,22 @@ test('staff queries use verified role and return all pages, including an empty q
   assert.deepEqual(await fetchWorkQueue(client, { userId: 'staff', role: 'technical_support_staff' }), []);
 });
 
+for (const count of [999, 1000, 1001]) {
+  test(`[BOUNDARY] [SG2-41:AC2] reads ${count} items without dropping or duplicating the page edge`, async () => {
+    const rows = Array.from({ length: count }, (_, index) => ({ kind: 'venue', item_id: index + 1, audience: 'venue_staff', assigned_to: null }));
+    const { client, calls } = fixture(rows);
+    const result = await fetchWorkQueue(client, { userId: 'staff', role: 'venue_staff' });
+    assert.equal(result.length, count);
+    assert.equal(new Set(result.map(item => item.item_id)).size, count);
+    assert.equal(result[0].item_id, 1);
+    assert.equal(result.at(-1)!.item_id, count);
+    assert.deepEqual(calls.map(call => call.slice(1)), count === 999 ? [[0, 999]] : [[0, 999], [1000, 1999]]);
+    assert.ok(result.every(item => item.assigned_to_me === false));
+  });
+}
+
 for (const failure of ['error', 'null'] as const) {
-  test(`database ${failure} fails the queue instead of returning a misleading empty result`, async () => {
+  test(`[FAILURE] [SG2-41:AC1] database ${failure} fails the queue instead of returning a misleading empty result`, async () => {
     await assert.rejects(fetchWorkQueue(fixture([], failure).client, { userId: 'staff', role: 'venue_staff' }),
       { message: 'Work queue unavailable' });
   });

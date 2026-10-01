@@ -1,6 +1,8 @@
+vi.hoisted(() => vi.stubEnv('TZ', 'UTC'));
+
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventPlanningDrawer, {
   formatForDateTimeInput,
@@ -21,24 +23,23 @@ function setMockSession(token = 'valid-token') {
 }
 
 describe('Helper functions', () => {
-  test('formatForDateTimeInput formats dates and handles falsy/invalid inputs', () => {
+  test('[FAILURE] [SG2-39:planning-date] formatForDateTimeInput formats dates and handles falsy/invalid inputs', () => {
     expect(formatForDateTimeInput(null)).toBe('');
     expect(formatForDateTimeInput(undefined)).toBe('');
     expect(formatForDateTimeInput('')).toBe('');
     expect(formatForDateTimeInput('not-a-date')).toBe('');
 
     const formatted = formatForDateTimeInput('2026-11-15T09:30:00.000Z');
-    expect(formatted).toMatch(/^2026-11-\d{2}T\d{2}:30$/);
+    expect(formatted).toBe('2026-11-15T09:30');
   });
 
-  test('toIsoOrNull converts non-empty strings and returns null for invalid/empty', () => {
+  test('[FAILURE] [SG2-39:planning-date] toIsoOrNull converts non-empty strings and returns null for invalid/empty', () => {
     expect(toIsoOrNull('')).toBeNull();
     expect(toIsoOrNull('   ')).toBeNull();
     expect(toIsoOrNull('invalid-date')).toBeNull();
 
     const iso = toIsoOrNull('2026-11-15T10:00');
-    expect(iso).toBeTruthy();
-    expect(new Date(iso!).toISOString()).toBe(iso);
+    expect(iso).toBe('2026-11-15T10:00:00.000Z');
   });
 
   describe('validatePlanningForm', () => {
@@ -55,11 +56,11 @@ describe('Helper functions', () => {
       planningNotes: 'Internal note',
     };
 
-    test('returns empty array when form values are valid', () => {
+    test('[NORMAL] [SG2-39:planning-validation] returns empty array when form values are valid', () => {
       expect(validatePlanningForm(baseValid)).toEqual([]);
     });
 
-    test('validates proposedDate format when provided', () => {
+    test('[FAILURE] [SG2-39:planning-validation] validates proposedDate format when provided', () => {
       const errors = validatePlanningForm({
         ...baseValid,
         proposedDate: 'not-a-valid-date',
@@ -67,7 +68,7 @@ describe('Helper functions', () => {
       expect(errors).toContain('Proposed date must be a valid date and time.');
     });
 
-    test('validates expectedAttendance boundary conditions', () => {
+    test('[BOUNDARY] [SG2-39:planning-validation] validates expectedAttendance boundary conditions', () => {
       expect(
         validatePlanningForm({ ...baseValid, expectedAttendance: '0' }),
       ).toContain('Expected attendance must be a positive whole number.');
@@ -85,7 +86,21 @@ describe('Helper functions', () => {
       ).toContain('Expected attendance must be at most 2147483647.');
     });
 
-    test('validates text field length limits', () => {
+    test.each(['1', '2147483647'])('[BOUNDARY] [SG2-39:AC4] accepts the exact inclusive attendance and registration capacity limit %s', (limit) => {
+      expect(validatePlanningForm({ ...baseValid, expectedAttendance: limit,
+        registrationNeeded: true, registrationCapacity: limit,
+        registrationOpensAt: '2026-11-10T10:00', registrationClosesAt: '2026-11-10T10:01',
+      })).toEqual([]);
+    });
+
+    test('[BOUNDARY] [SG2-39:planning-validation] accepts 5000 characters in each planning text field', () => {
+      const text = 'a'.repeat(5000);
+      expect(validatePlanningForm({ ...baseValid, venueRequirements: text,
+        equipmentRequirements: text, accessibilityNeeds: text, planningNotes: text,
+      })).toEqual([]);
+    });
+
+    test('[BOUNDARY] [SG2-39:planning-validation] validates text field length limits', () => {
       const longText = 'a'.repeat(5001);
       const errors = validatePlanningForm({
         ...baseValid,
@@ -101,7 +116,7 @@ describe('Helper functions', () => {
       expect(errors).toContain('Planning notes must be 5000 characters or fewer.');
     });
 
-    test('validates registration parameters when registration is needed', () => {
+    test('[BOUNDARY] [SG2-39:AC4] validates registration parameters when registration is needed', () => {
       const regInvalid = {
         ...baseValid,
         registrationNeeded: true,
@@ -142,7 +157,7 @@ describe('Helper functions', () => {
       expect(equalWindow).toContain('Registration closing time must be after opening time.');
     });
 
-    test('ignores registration fields when registrationNeeded is false', () => {
+    test('[NORMAL] [SG2-39:AC4] ignores registration fields when registrationNeeded is false', () => {
       const errors = validatePlanningForm({
         ...baseValid,
         registrationNeeded: false,
@@ -167,7 +182,7 @@ describe('EventPlanningDrawer Component', () => {
     sessionStorage.clear();
   });
 
-  test('renders nothing when isOpen is false', () => {
+  test('[BOUNDARY] [SG2-39:AC1] renders nothing when isOpen is false', () => {
     const { container } = render(
       <EventPlanningDrawer
         isOpen={false}
@@ -178,7 +193,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  test('renders drawer with initial values populated', () => {
+  test('[NORMAL] [SG2-39:AC1] renders drawer with initial values populated', () => {
     render(
       <EventPlanningDrawer
         isOpen={true}
@@ -220,7 +235,7 @@ describe('EventPlanningDrawer Component', () => {
     expect((screen.getByLabelText('Registration Capacity') as HTMLInputElement).value).toBe('150');
   });
 
-  test('renders with empty initial values and defaults', () => {
+  test('[BOUNDARY] [SG2-39:AC1] renders with empty initial values and defaults', () => {
     render(
       <EventPlanningDrawer
         isOpen={true}
@@ -235,7 +250,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(screen.queryByLabelText('Registration Capacity')).toBeNull();
   });
 
-  test('toggles registration needed section and updates state', () => {
+  test('[NORMAL] [SG2-39:AC1] toggles registration needed section and updates state', () => {
     render(
       <EventPlanningDrawer
         isOpen={true}
@@ -255,7 +270,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(screen.queryByLabelText('Registration Capacity')).toBeNull();
   });
 
-  test('calls onClose when backdrop or close button is clicked', () => {
+  test('[NORMAL] [SG2-39:AC1] calls onClose when backdrop or close button is clicked', () => {
     const handleClose = vi.fn();
     render(
       <EventPlanningDrawer
@@ -275,7 +290,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(handleClose).toHaveBeenCalledTimes(3);
   });
 
-  test('calls onClose when Escape key is pressed in the dialog', () => {
+  test('[NORMAL] [SG2-39:AC1] calls onClose when Escape key is pressed in the dialog', () => {
     const handleClose = vi.fn();
     render(
       <EventPlanningDrawer
@@ -293,7 +308,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  test('displays terminal status notice and disables editing (AC 5)', () => {
+  test('[CONFLICT] [SG2-39:AC5] displays terminal status notice and disables editing (AC 5)', () => {
     render(
       <EventPlanningDrawer
         isOpen={true}
@@ -317,7 +332,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(screen.getByText('Registration Disabled')).toBeDefined();
   });
 
-  test('shows client-side validation errors when invalid inputs are saved', async () => {
+  test('[FAILURE] [SG2-39:planning-validation] shows client-side validation errors when invalid inputs are saved', async () => {
     const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning');
 
     render(
@@ -340,7 +355,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  test('handles signed-out user when token is missing', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles signed-out user when token is missing', async () => {
     sessionStorage.clear();
 
     render(
@@ -359,7 +374,7 @@ describe('EventPlanningDrawer Component', () => {
     ).toBeDefined();
   });
 
-  test('successfully submits form and triggers onSuccess and onClose', async () => {
+  test('[NORMAL] [SG2-39:AC1] successfully submits form and triggers onSuccess and onClose', async () => {
     const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
       ok: true,
       event: {
@@ -449,7 +464,30 @@ describe('EventPlanningDrawer Component', () => {
     });
   });
 
-  test('handles arrangement impact confirmation handshake (AC 2)', async () => {
+  test('[CONFLICT] [SG2-39:duplicate-save] a second save while planning is being saved sends one update', async () => {
+    let finish!: (result: Awaited<ReturnType<typeof eventRequestsApi.updateEventPlanning>>) => void;
+    const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning')
+      .mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const onSuccess = vi.fn();
+    const onClose = vi.fn();
+    render(<EventPlanningDrawer eventId={42} accessToken="custom-token" onSuccess={onSuccess} onClose={onClose} />);
+    fireEvent.change(screen.getByLabelText('Expected Attendance'), { target: { value: '150' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    const saving = screen.getByRole('button', { name: 'Saving…' });
+    expect(saving).toBeDisabled();
+    fireEvent.click(saving);
+    expect(updateSpy).toHaveBeenCalledOnce();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => finish({ ok: false, kind: 'unavailable', message: 'Please try again.' }));
+    expect(screen.getByText('Please try again.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Planning Details' })).toBeEnabled();
+    expect(updateSpy).toHaveBeenCalledOnce();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  test('[CONFLICT] [SG2-39:AC2] handles arrangement impact confirmation handshake (AC 2)', async () => {
     const updateSpy = vi
       .spyOn(eventRequestsApi, 'updateEventPlanning')
       .mockResolvedValueOnce({
@@ -536,7 +574,7 @@ describe('EventPlanningDrawer Component', () => {
     });
   });
 
-  test('handles server validation errors with details array', async () => {
+  test('[FAILURE] [SG2-39:planning-validation] handles server validation errors with details array', async () => {
     vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
       ok: false,
       kind: 'validation',
@@ -563,7 +601,7 @@ describe('EventPlanningDrawer Component', () => {
     });
   });
 
-  test('handles general server errors (conflict, forbidden, etc.)', async () => {
+  test('[CONFLICT] [SG2-39:AC5] a refused planning transition keeps the drawer open', async () => {
     vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
       ok: false,
       kind: 'conflict',
@@ -588,3 +626,5 @@ describe('EventPlanningDrawer Component', () => {
     });
   });
 });
+
+afterAll(() => vi.unstubAllEnvs());

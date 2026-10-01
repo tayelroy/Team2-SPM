@@ -11,7 +11,7 @@ beforeEach(() => {
 });
 afterEach(() => { mock.restoreAll(); Object.assign(dbConfig, original); });
 
-test('SG2-43: replace deletes the venue\'s rows then inserts the new set, after confirming the venue exists', async () => {
+test('[NORMAL] [SG2-43:AC1] SG2-43: replace deletes the venue\'s rows then inserts the new set, after confirming the venue exists', async () => {
   const calls: { method: string; pathname: string; body?: unknown }[] = [];
   mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     const url = new URL(String(input));
@@ -35,7 +35,7 @@ test('SG2-43: replace deletes the venue\'s rows then inserts the new set, after 
   ]);
 });
 
-test('replace with an empty set deletes existing rows and returns without inserting', async () => {
+test('[BOUNDARY] [SG2-43:AC1] replace with an empty set deletes existing rows and returns without inserting', async () => {
   const calls: string[] = [];
   mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     const url = new URL(String(input));
@@ -48,7 +48,7 @@ test('replace with an empty set deletes existing rows and returns without insert
   assert.deepEqual(calls, ['GET', 'DELETE']);
 });
 
-test('replace returns null and never writes when the venue does not exist', async () => {
+test('[FAILURE] [SG2-43:AC1] replace returns null and never writes when the venue does not exist', async () => {
   const calls: string[] = [];
   mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     calls.push(init?.method ?? 'GET');
@@ -59,7 +59,7 @@ test('replace returns null and never writes when the venue does not exist', asyn
   assert.deepEqual(calls, ['GET']);
 });
 
-for (const status of [401, 403, 500]) test(`database error ${status} is mapped to a safe response`, async () => {
+for (const status of [401, 403, 500]) test(`[FAILURE] [SG2-43:AC1] [SG2-43:AC2] database error ${status} is mapped to a safe response`, async () => {
   mock.method(globalThis, 'fetch', async () => Response.json({ message: 'SECRET' }, { status }));
   const store = createVenueLayoutStore('token');
   await assert.rejects(store.list(1), { status: status === 500 ? 503 : status });
@@ -67,7 +67,7 @@ for (const status of [401, 403, 500]) test(`database error ${status} is mapped t
 });
 
 for (const config of [{ supabaseUrl: undefined }, { supabaseAnonKey: undefined }, { supabaseUrl: 'http://example.com' }]) {
-  test(`configuration never falls back to admin: ${Object.entries(config).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`, () => {
+  test(`[FAILURE] [SG2-43:AC1] configuration never falls back to admin: ${Object.entries(config).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`, () => {
     Object.assign(dbConfig, config);
     assert.throws(() => createVenueLayoutStore('token'), { status: 503 });
   });

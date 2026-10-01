@@ -33,7 +33,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
-test('the home route renders the landing hero', async () => {
+test('[NORMAL] [SG2-20:entry-route] the home route renders the landing hero', async () => {
   window.history.replaceState(null, '', '/');
   await act(async () => { await import('./main'); });
   expect(
@@ -43,7 +43,7 @@ test('the home route renders the landing hero', async () => {
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
-test('the ?screen=login entry point opens straight on sign in', async () => {
+test('[NORMAL] [SG2-20:entry-route] the ?screen=login entry point opens straight on sign in', async () => {
   window.history.replaceState(null, '', '/?screen=login');
   await act(async () => { await import('./main'); });
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
@@ -52,7 +52,7 @@ test('the ?screen=login entry point opens straight on sign in', async () => {
   ).not.toBeInTheDocument();
 });
 
-test('the healthcheck route renders the API health result', async () => {
+test('[NORMAL] [SG2-20:entry-route] the healthcheck route renders the API health result', async () => {
   window.history.replaceState(null, '', '/healthcheck');
   vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response('{"status":"ok"}')));
   await act(async () => { await import('./main'); });

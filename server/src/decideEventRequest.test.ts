@@ -58,7 +58,21 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
-  test('approves a request under review, recording the deciding coordinator', async () => {
+  test('[BOUNDARY] [SG2-37:AC1] decisions accept event id one and refuse zero before writing', async () => {
+    const decisions: number[] = [];
+    const app = buildApp({ decideResult: { ok: true, request: { ...DECIDED_REQUEST, event_id: 1 } },
+      captureDecide: eventId => { decisions.push(eventId); } });
+    const refused = await request(app).patch('/api/event-requests/0/decision').send({ decision: 'approved' });
+    assert.equal(refused.status, 400);
+    assert.deepEqual(refused.body, { error: 'eventId must be a positive integer.' });
+    assert.deepEqual(decisions, []);
+    const accepted = await request(app).patch('/api/event-requests/1/decision').send({ decision: 'approved' });
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.request.event_id, 1);
+    assert.deepEqual(decisions, [1]);
+  });
+
+  test('[NORMAL] [SG2-37:AC1] approves a request under review, recording the deciding coordinator', async () => {
     let decided: { eventId: number; coordinatorId: string; decision: Decision; reason: string | null } | undefined;
     const response = await request(
       buildApp({
@@ -79,7 +93,7 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     });
   });
 
-  test('an approval may carry a reason, trimmed before it is stored', async () => {
+  test('[NORMAL] [SG2-37:AC1] an approval may carry a reason, trimmed before it is stored', async () => {
     let decided: { reason: string | null } | undefined;
     const response = await request(
       buildApp({ captureDecide: (_e, _c, _d, reason) => (decided = { reason }) })
@@ -91,7 +105,7 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.equal(decided?.reason, 'Budget already signed off.');
   });
 
-  test('rejects a request with the reason the organiser will read', async () => {
+  test('[NORMAL] [SG2-37:AC2] rejects a request with the reason the organiser will read', async () => {
     let decided: { decision: Decision; reason: string | null } | undefined;
     const response = await request(
       buildApp({
@@ -115,7 +129,7 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     ['blank', { decision: 'rejected', reason: '   ' }],
     ['null', { decision: 'rejected', reason: null }]
   ] as const) {
-    test(`refuses a rejection whose reason is ${label}, without touching the database`, async () => {
+    test(`[FAILURE] [SG2-37:AC2] refuses a rejection whose reason is ${label}, without touching the database`, async () => {
       let called = false;
       const response = await request(buildApp({ captureDecide: () => (called = true) }))
         .patch('/api/event-requests/7/decision')
@@ -133,14 +147,14 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     ['a non-string decision', { decision: 7 }],
     ['a status that is not a decision', { decision: 'under_review' }]
   ] as const) {
-    test(`returns 400 for ${label}`, async () => {
+    test(`[FAILURE] [SG2-37:AC1] returns 400 for ${label}`, async () => {
       const response = await request(buildApp()).patch('/api/event-requests/7/decision').send(body);
       assert.equal(response.status, 400);
       assert.match(response.body.error, /approved or rejected/);
     });
   }
 
-  test('returns 400 when the reason is not text', async () => {
+  test('[FAILURE] [SG2-37:AC2] returns 400 when the reason is not text', async () => {
     const response = await request(buildApp())
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'rejected', reason: 42 });
@@ -148,15 +162,30 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.match(response.body.error, /must be text/);
   });
 
-  test('returns 400 when the reason is longer than the field allows', async () => {
-    const response = await request(buildApp())
+  test('[BOUNDARY] [SG2-37:AC2] returns 400 when the reason is longer than the field allows', async () => {
+    let decisions = 0;
+    const response = await request(buildApp({ captureDecide: () => { decisions++; } }))
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'rejected', reason: 'x'.repeat(5001) });
     assert.equal(response.status, 400);
     assert.match(response.body.error, /5000 characters or fewer/);
+    assert.equal(decisions, 0);
   });
 
-  test('treats an absent request body as a missing decision', async () => {
+  test('[BOUNDARY] [SG2-37:AC2] a 5000-character rejection reason is stored intact', async () => {
+    let reason: string | null | undefined;
+    const response = await request(buildApp({
+      captureDecide: (_e, _c, _d, value) => { reason = value; },
+      decideResult: { ok: true, request: { ...DECIDED_REQUEST, status: 'rejected', decision_reason: 'x'.repeat(5000) } }
+    }))
+      .patch('/api/event-requests/7/decision')
+      .send({ decision: 'rejected', reason: 'x'.repeat(5000) });
+    assert.equal(response.status, 200);
+    assert.equal(reason, 'x'.repeat(5000));
+    assert.equal(response.body.request.decision_reason, 'x'.repeat(5000));
+  });
+
+  test('[FAILURE] [SG2-37:AC1] treats an absent request body as a missing decision', async () => {
     // No express.json() here, so req.body is undefined rather than {}.
     const bare = express();
     bare.patch(
@@ -171,7 +200,7 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.equal(response.status, 400);
   });
 
-  test('returns 400 for a non-numeric eventId, without touching the database', async () => {
+  test('[FAILURE] [SG2-37:AC1] returns 400 for a non-numeric eventId, without touching the database', async () => {
     let called = false;
     const response = await request(buildApp({ captureDecide: () => (called = true) }))
       .patch('/api/event-requests/not-a-number/decision')
@@ -180,21 +209,21 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.equal(called, false);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-37:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined }))
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'approved' });
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-37:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null }))
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'approved' });
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the request is not under review by this coordinator', async () => {
+  test('[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] returns 404 when the request is not under review by this coordinator', async () => {
     const response = await request(
       buildApp({ decideResult: { ok: false, reason: 'not_found', message: 'missing' } })
     )
@@ -203,7 +232,7 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the database error when the decision fails', async () => {
+  test('[FAILURE] [SG2-37:AC1] returns 503 without leaking the database error when the decision fails', async () => {
     const response = await request(
       buildApp({ decideResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -259,20 +288,20 @@ describe('PATCH /api/event-requests/:eventId/decision authorisation wiring', () 
       }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-37:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_coordinator')).patch('/api/event-requests/7/decision');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies an Event Organiser, who cannot decide their own request', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-37:AC1] denies an Event Organiser, who cannot decide their own request', async () => {
     const response = await request(appForRole('event_organiser'))
       .patch('/api/event-requests/7/decision')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 403);
   });
 
-  test('lets an Event Coordinator reach the decision handler', async () => {
+  test('[NORMAL] [SG2-37:AC1] lets an Event Coordinator reach the decision handler', async () => {
     const response = await request(appForRole('event_coordinator'))
       .patch('/api/event-requests/7/decision')
       .set('Authorization', 'Bearer token');

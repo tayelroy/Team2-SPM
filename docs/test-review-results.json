@@ -1,0 +1,52 @@
+{
+  "reviewedBy": "LIM JUN WEI",
+  "reviewDate": "2026-10-01",
+  "sourceFiles": 85,
+  "methodDeclarations": 1138,
+  "sqlAssertionContracts": 154,
+  "runs": {
+    "build_and_coverage": {
+      "command": "npm run ci",
+      "status": "Pass",
+      "serverCases": 780,
+      "clientCases": 624,
+      "reviewerToolCases": 19,
+      "inventoryGuardCases": 9,
+      "coverage": {
+        "serverFiles": 48,
+        "clientFiles": 44,
+        "perFileMetrics": {
+          "statements": 100,
+          "branches": 100,
+          "functions": 100,
+          "lines": 100
+        }
+      }
+    },
+    "browser": {
+      "command": "npm run test:e2e",
+      "status": "Pass",
+      "journeys": 28,
+      "reportGateCases": 13,
+      "environment": "Production app build and Express routes on loopback; reset memory providers; isolated Playwright Chromium; no retries."
+    },
+    "sql": {
+      "status": "Pass",
+      "suites": 7,
+      "assertionContracts": 154,
+      "environment": "Disposable PostgreSQL 17.4, auth fixture and all migrations; rollback; container removed."
+    }
+  },
+  "localRuntime": "Node 24.10.0; npm 11.6.1",
+  "hostedEvidence": "See the current PR checks for the immutable pushed head and Node 22/PostgreSQL 17 run.",
+  "limits": [
+    "Independent peer review outstanding",
+    "Historical test-first TDD not reconstructed",
+    "No configured linter",
+    "No deployed Supabase/staging validation",
+    "Assignment history incomplete: SG2-33/34 AC4",
+    "History API/UI not mounted: SG2-40",
+    "Event save followed by audit insert is not atomic: SG2-39",
+    "Current branch protection/team access not independently revalidated"
+  ]
+}

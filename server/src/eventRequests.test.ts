@@ -80,7 +80,7 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('POST /api/event-requests (SG2-28)', () => {
-  test('creates a draft owned by the caller and their organisation', async () => {
+  test('[NORMAL] [SG2-28:AC1] [SG2-28:AC3] creates a draft owned by the caller and their organisation', async () => {
     let captured: { organiserId: string; organisation: string | null } | undefined;
     const response = await request(buildApp({ captureInsert: (d) => (captured = d) }))
       .post('/api/event-requests')
@@ -95,13 +95,13 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(captured?.organisation, 'ConnectSphere Test');
   });
 
-  test('a complete draft reports nothing outstanding for submission', async () => {
+  test('[NORMAL] [SG2-28:AC4] a complete draft reports nothing outstanding for submission', async () => {
     const response = await request(buildApp()).post('/api/event-requests').send(COMPLETE_BODY);
     assert.equal(response.status, 201);
     assert.deepEqual(response.body.missingForSubmission, []);
   });
 
-  test('an empty draft is accepted and names what is still needed to submit', async () => {
+  test('[BOUNDARY] [SG2-28:AC4] an empty draft is accepted and names what is still needed to submit', async () => {
     const response = await request(buildApp()).post('/api/event-requests').send({});
 
     // SG2-28: incompleteness must not block creating a draft.
@@ -110,7 +110,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.deepEqual(response.body.missingForSubmission, REQUIRED_FOR_SUBMISSION);
   });
 
-  test('a draft omitting only accessibility needs is submission-ready', async () => {
+  test('[NORMAL] [SG2-28:AC2] a draft omitting only accessibility needs is submission-ready', async () => {
     const { accessibility_needs, ...withoutAccessibility } = COMPLETE_BODY;
     const response = await request(buildApp())
       .post('/api/event-requests')
@@ -120,7 +120,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.deepEqual(response.body.missingForSubmission, []);
   });
 
-  test('ownership fields in the body are ignored, not trusted', async () => {
+  test('[FAILURE] [SG2-28:AC3] [SG2-25:AC2] ownership fields in the body are ignored, not trusted', async () => {
     let captured: { organiserId: string; organisation: string | null; values: DraftValues } | undefined;
     const response = await request(buildApp({ captureInsert: (d) => (captured = d) }))
       .post('/api/event-requests')
@@ -142,7 +142,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(response.body.request.status, 'draft');
   });
 
-  test('reports database-limit violations as validation errors before inserting a draft', async () => {
+  test('[BOUNDARY] [SG2-28:AC1] reports database-limit violations as validation errors before inserting a draft', async () => {
     let insertCalled = false;
     const response = await request(buildApp({ captureInsert: () => { insertCalled = true; } }))
       .post('/api/event-requests')
@@ -156,7 +156,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(insertCalled, false);
   });
 
-  test('rejects malformed values with a message naming the field', async () => {
+  test('[FAILURE] [SG2-28:AC1] rejects malformed values with a message naming the field', async () => {
     const response = await request(buildApp())
       .post('/api/event-requests')
       .send({ name: 42, expected_attendance: -5, proposed_date: 'not-a-date', registration_needed: 'yes' });
@@ -169,7 +169,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.ok(response.body.details.some((d: string) => d.includes('registration_needed')));
   });
 
-  test('treats an absent request body as an empty draft', async () => {
+  test('[BOUNDARY] [SG2-28:AC4] treats an absent request body as an empty draft', async () => {
     // No express.json() here, so req.body is undefined rather than {}.
     const bare = express();
     bare.post(
@@ -196,21 +196,21 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.deepEqual(response.body.missingForSubmission, REQUIRED_FOR_SUBMISSION);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-28:AC3] [SG2-25:AC3] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined }))
       .post('/api/event-requests')
       .send(COMPLETE_BODY);
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-28:AC3] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null }))
       .post('/api/event-requests')
       .send(COMPLETE_BODY);
     assert.equal(response.status, 503);
   });
 
-  test('returns 403 when the account has no user record to own the draft', async () => {
+  test('[FAILURE] [SG2-28:AC3] returns 403 when the account has no user record to own the draft', async () => {
     const response = await request(
       buildApp({ lookup: { ok: false, reason: 'not_found', message: 'missing' } })
     )
@@ -219,7 +219,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(response.status, 403);
   });
 
-  test('returns 503 when the organisation lookup fails', async () => {
+  test('[FAILURE] [SG2-28:AC3] returns 503 when the organisation lookup fails', async () => {
     const response = await request(
       buildApp({ lookup: { ok: false, reason: 'unavailable', message: 'boom' } })
     )
@@ -228,7 +228,7 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.equal(response.status, 503);
   });
 
-  test('returns 503 without leaking the database error when the insert fails', async () => {
+  test('[FAILURE] [SG2-28:AC3] returns 503 without leaking the database error when the insert fails', async () => {
     const response = await request(
       buildApp({ insert: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -269,13 +269,13 @@ describe('POST /api/event-requests authorisation wiring', () => {
       (_req, res) => { res.status(201).json({ reached: true }); }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-28:AC3] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_organiser')).post('/api/event-requests').send({});
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies a role without the create permission', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-28:AC3] denies a role without the create permission', async () => {
     const response = await request(appForRole('attendee'))
       .post('/api/event-requests')
       .set('Authorization', 'Bearer token')
@@ -283,7 +283,7 @@ describe('POST /api/event-requests authorisation wiring', () => {
     assert.equal(response.status, 403);
   });
 
-  test('lets an Event Organiser reach the draft handler', async () => {
+  test('[NORMAL] [SG2-28:AC3] lets an Event Organiser reach the draft handler', async () => {
     const response = await request(appForRole('event_organiser'))
       .post('/api/event-requests')
       .set('Authorization', 'Bearer token')
@@ -294,7 +294,7 @@ describe('POST /api/event-requests authorisation wiring', () => {
 });
 
 describe('validateDraftInput', () => {
-  test('trims text and normalises blanks to null', () => {
+  test('[NORMAL] [SG2-28:AC1] trims text and normalises blanks to null', () => {
     const result = validateDraftInput({ name: '  Forum  ', purpose: '   ' });
     assert.equal(result.valid, true);
     if (result.valid) {
@@ -304,14 +304,14 @@ describe('validateDraftInput', () => {
   });
 
   for (const [label, character] of [['ASCII', 'x'], ['Unicode supplementary character', '🎉']] as const) {
-    test(`accepts a 255-character ${label} event name after trimming`, () => {
+    test(`[BOUNDARY] [SG2-28:AC1] accepts a 255-character ${label} event name after trimming`, () => {
       const name = character.repeat(255);
       const result = validateDraftInput({ name: `  ${name}  ` });
       assert.equal(result.valid, true);
       if (result.valid) assert.equal(result.values.name, name);
     });
 
-    test(`rejects a 256-character ${label} event name`, () => {
+    test(`[BOUNDARY] [SG2-28:AC1] rejects a 256-character ${label} event name`, () => {
       const result = validateDraftInput({ name: character.repeat(256) });
       assert.equal(result.valid, false);
       if (!result.valid) assert.deepEqual(result.errors, ['name must be 255 characters or fewer.']);
@@ -319,7 +319,7 @@ describe('validateDraftInput', () => {
   }
 
   for (const attendance of [1, 2_147_483_647]) {
-    test(`accepts attendance at the database boundary ${attendance}`, () => {
+    test(`[BOUNDARY] [SG2-28:AC1] accepts attendance at the database boundary ${attendance}`, () => {
       const result = validateDraftInput({ expected_attendance: attendance });
       assert.equal(result.valid, true);
       if (result.valid) assert.equal(result.values.expected_attendance, attendance);
@@ -330,20 +330,20 @@ describe('validateDraftInput', () => {
     [0, 'expected_attendance must be at least 1.'],
     [2_147_483_648, 'expected_attendance must be at most 2147483647.'],
   ] as const) {
-    test(`rejects attendance immediately outside the allowed range: ${attendance}`, () => {
+    test(`[BOUNDARY] [SG2-28:AC1] rejects attendance immediately outside the allowed range: ${attendance}`, () => {
       const result = validateDraftInput({ expected_attendance: attendance });
       assert.equal(result.valid, false);
       if (!result.valid) assert.deepEqual(result.errors, [message]);
     });
   }
 
-  test('normalises a valid date to ISO 8601', () => {
+  test('[NORMAL] [SG2-28:AC1] normalises a valid date to ISO 8601', () => {
     const result = validateDraftInput({ proposed_date: '2026-11-04T09:00:00Z' });
     assert.equal(result.valid, true);
     if (result.valid) assert.equal(result.values.proposed_date, '2026-11-04T09:00:00.000Z');
   });
 
-  test('accepts explicit nulls as "not provided"', () => {
+  test('[BOUNDARY] [SG2-28:AC4] accepts explicit nulls as "not provided"', () => {
     const result = validateDraftInput({
       name: null,
       expected_attendance: null,
@@ -359,37 +359,37 @@ describe('validateDraftInput', () => {
     }
   });
 
-  test('accepts registration_needed set to false', () => {
+  test('[NORMAL] [SG2-28:AC1] accepts registration_needed set to false', () => {
     const result = validateDraftInput({ registration_needed: false });
     assert.equal(result.valid, true);
     if (result.valid) assert.equal(result.values.registration_needed, false);
   });
 
-  test('rejects a non-integer attendance', () => {
+  test('[FAILURE] [SG2-28:AC1] rejects a non-integer attendance', () => {
     const result = validateDraftInput({ expected_attendance: 12.5 });
     assert.equal(result.valid, false);
     if (!result.valid) assert.match(result.errors[0], /whole number/);
   });
 
-  test('rejects an empty proposed_date string', () => {
+  test('[FAILURE] [SG2-28:AC1] rejects an empty proposed_date string', () => {
     const result = validateDraftInput({ proposed_date: '   ' });
     assert.equal(result.valid, false);
   });
 
-  test('rejects free text beyond the length limit', () => {
+  test('[BOUNDARY] [SG2-28:AC1] rejects free text beyond the length limit', () => {
     const result = validateDraftInput({ description: 'x'.repeat(5001) });
     assert.equal(result.valid, false);
     if (!result.valid) assert.match(result.errors[0], /5000 characters/);
   });
 
-  test('accepts free text at exactly the length limit', () => {
+  test('[BOUNDARY] [SG2-28:AC1] accepts free text at exactly the length limit', () => {
     const result = validateDraftInput({ description: 'x'.repeat(5000) });
     assert.equal(result.valid, true);
     if (result.valid) assert.equal(result.values.description, 'x'.repeat(5000));
   });
 
   for (const body of [null, 'a string', ['an', 'array'], 42]) {
-    test(`rejects a non-object body: ${JSON.stringify(body)}`, () => {
+    test(`[FAILURE] [SG2-28:AC1] rejects a non-object body: ${JSON.stringify(body)}`, () => {
       const result = validateDraftInput(body);
       assert.equal(result.valid, false);
       if (!result.valid) assert.match(result.errors[0], /JSON object/);
@@ -398,7 +398,7 @@ describe('validateDraftInput', () => {
 });
 
 describe('missingForSubmission', () => {
-  test('treats null, undefined and empty string as missing', () => {
+  test('[BOUNDARY] [SG2-28:AC4] [SG2-30:AC2] treats null, undefined and empty string as missing', () => {
     const missing = missingForSubmission({
       name: null,
       purpose: '',
@@ -410,7 +410,7 @@ describe('missingForSubmission', () => {
     assert.deepEqual(missing, ['name', 'purpose', 'description']);
   });
 
-  test('optional accessibility, equipment and registration fields do not block submission', () => {
+  test('[NORMAL] [SG2-28:AC2] [SG2-30:AC2] optional accessibility, equipment and registration fields do not block submission', () => {
     assert.deepEqual(missingForSubmission({
       name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session',
       proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
@@ -421,13 +421,13 @@ describe('missingForSubmission', () => {
 describe('isEventStatus', () => {
   // The public.event_status database enum is the independent contract.
   for (const status of ['draft', 'submitted', 'under_review', 'approved', 'planning', 'confirmed', 'completed', 'cancelled', 'rejected']) {
-    test(`recognises valid status: ${status}`, () => {
+    test(`[NORMAL] [SG2-31:AC2] recognises valid status: ${status}`, () => {
       assert.equal(isEventStatus(status), true);
     });
   }
 
   for (const invalid of ['not_a_status', '', 123, null, undefined, {}, []]) {
-    test(`rejects invalid value: ${JSON.stringify(invalid)}`, () => {
+    test(`[FAILURE] [SG2-31:AC2] rejects invalid value: ${JSON.stringify(invalid)}`, () => {
       assert.equal(isEventStatus(invalid), false);
     });
   }

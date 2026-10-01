@@ -99,7 +99,7 @@ function Harness({ withSpacer = true }: { withSpacer?: boolean }) {
   );
 }
 
-test('builds the sphere and draws a frame', () => {
+test('[NORMAL] [SG2-20:orb-interaction] builds the sphere and draws a frame', () => {
   render(<Harness />);
   expect(ctx.setTransform).toHaveBeenCalled();
 
@@ -112,7 +112,7 @@ test('builds the sphere and draws a frame', () => {
   expect(ctx.fill).toHaveBeenCalled();
 });
 
-test('grows the spacer so the sphere clears the hero copy', () => {
+test('[NORMAL] [SG2-20:orb-interaction] grows the spacer so the sphere clears the hero copy', () => {
   const { getByTestId } = render(<Harness />);
   // The spacer's ref lands after the canvas's, so the height is set by the
   // re-measure the hook schedules for the next frame.
@@ -120,7 +120,7 @@ test('grows the spacer so the sphere clears the hero copy', () => {
   expect(parseFloat(getByTestId('spacer').style.height)).toBeGreaterThan(0);
 });
 
-test('renders without a spacer or a reported device scale', () => {
+test('[BOUNDARY] [SG2-20:orb-interaction] renders without a spacer or a reported device scale', () => {
   vi.stubGlobal('devicePixelRatio', undefined);
   const { getByTestId } = render(<Harness withSpacer={false} />);
   expect(() => tick()).not.toThrow();
@@ -129,7 +129,7 @@ test('renders without a spacer or a reported device scale', () => {
   expect(ctx.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
 });
 
-test('hover repels particles, pressing attracts them, and release/leave reset the force', () => {
+test('[NORMAL] [SG2-20:orb-interaction] hover repels particles, pressing attracts them, and release/leave reset the force', () => {
   // Compare the same particle at the same frame in fresh runs. This separates
   // pointer movement from the sphere's ordinary rotation without copying its physics.
   function positionAfter(events: string[]) {
@@ -155,7 +155,7 @@ test('hover repels particles, pressing attracts them, and release/leave reset th
   expect(positionAfter(['pointerdown', 'pointerleave'])).toEqual(resting);
 });
 
-test('rebuilds on resize', () => {
+test('[NORMAL] [SG2-20:orb-interaction] rebuilds on resize', () => {
   const { getByTestId } = render(<Harness />);
   vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockReturnValue({
     x: 0, y: 0, top: 0, left: 0, right: 400, bottom: 300,
@@ -169,7 +169,7 @@ test('rebuilds on resize', () => {
   expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 400, 300);
 });
 
-test('stops the loop and detaches listeners on unmount', () => {
+test('[CONFLICT] [SG2-20:orb-interaction] stops the loop and detaches listeners on unmount', () => {
   const removeFromWindow = vi.spyOn(window, 'removeEventListener');
   const { unmount } = render(<Harness />);
   tick();
@@ -188,7 +188,7 @@ test('stops the loop and detaches listeners on unmount', () => {
   expect(frames.size).toBe(0);
 });
 
-test('keeps animating under StrictMode', () => {
+test('[CONFLICT] [SG2-20:orb-interaction] keeps animating under StrictMode', () => {
   // StrictMode double-invokes effects but not callback refs, so teardown must
   // not live in an effect cleanup — that would stop the loop on the simulated
   // unmount with nothing left to restart it.
@@ -203,14 +203,14 @@ test('keeps animating under StrictMode', () => {
   expect(ctx.clearRect).toHaveBeenCalled();
 });
 
-test('no-ops when the host has no 2D context', () => {
+test('[FAILURE] [SG2-20:orb-interaction] no-ops when the host has no 2D context', () => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   expect(() => render(<Harness />)).not.toThrow();
   expect(ctx.setTransform).not.toHaveBeenCalled();
   expect(frames.size).toBe(0);
 });
 
-test('does not start drawing or schedule work for a detached canvas', () => {
+test('[FAILURE] [SG2-20:orb-interaction] does not start drawing or schedule work for a detached canvas', () => {
   const { result } = renderHook(() => useParticleOrb());
   result.current.canvasRef(document.createElement('canvas'));
   expect(ctx.setTransform).not.toHaveBeenCalled();

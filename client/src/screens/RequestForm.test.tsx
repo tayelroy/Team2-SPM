@@ -79,26 +79,26 @@ function sentDraftBody(fetchMock: ReturnType<typeof vi.fn>) {
 // ─── AC2: Submit button disabled state ──────────────────────────────────────
 
 describe('AC2 — submit button disabled until all fields are filled', () => {
-  test('submit button is disabled when the form is empty', () => {
+  test('[BOUNDARY] [SG2-30:AC2] submit button is disabled when the form is empty', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
   });
 
   test.each(['Event name', 'Purpose', 'Date', 'Expected attendance', 'Venue requirements', 'Description'])(
-    'submit stays disabled when %s is the only blank required field', (label) => {
+    '[BOUNDARY] [SG2-30:AC2] submit stays disabled when %s is the only blank required field', (label) => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
     fireEvent.change(screen.getByLabelText(new RegExp(label, 'i')), { target: { value: '   ' } });
     expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
   });
 
-  test('submit button becomes enabled when all required fields are filled', () => {
+  test('[NORMAL] [SG2-30:AC2] submit button becomes enabled when all required fields are filled', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
     expect(screen.getByRole('button', { name: /Submit request/i })).not.toBeDisabled();
   });
 
-  test('shows a count of empty required fields after first interaction', () => {
+  test('[BOUNDARY] [SG2-30:AC2] shows a count of empty required fields after first interaction', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     // Initially shows the default hint (no interaction yet).
     expect(screen.getByText('You can save and finish this later.')).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     expect(screen.getByText('6 required fields still empty.')).toBeInTheDocument();
   });
 
-  test('inline error appears for a touched field left blank', () => {
+  test('[FAILURE] [SG2-30:AC2] inline error appears for a touched field left blank', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     // Touch and clear the event name field.
     const nameField = screen.getByLabelText(/Event name/i);
@@ -118,7 +118,7 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     expect(screen.getByText('Event name is required')).toBeInTheDocument();
   });
 
-  test('shows inline errors for the description and venue fields when cleared', () => {
+  test('[FAILURE] [SG2-30:AC2] shows inline errors for the description and venue fields when cleared', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
 
     const description = screen.getByLabelText(/Description/i);
@@ -143,7 +143,7 @@ describe('AC1 — successful submission', () => {
     );
   });
 
-  test('calls the submit endpoint with the correct method, URL, and token', async () => {
+  test('[NORMAL] [SG2-30:AC1] calls the submit endpoint with the correct method, URL, and token', async () => {
     const onSuccess = vi.fn();
     render(<RequestForm {...DEFAULT_PROPS} onSuccess={onSuccess} />);
     fillAllFields();
@@ -159,7 +159,7 @@ describe('AC1 — successful submission', () => {
     });
   });
 
-  test('keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
+  test('[CONFLICT] [SG2-30:duplicate-submit] keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
     let finishSave!: (response: Response) => void;
     let finishSubmit!: (response: Response) => void;
     const fetchMock = vi.fn()
@@ -186,7 +186,7 @@ describe('AC1 — successful submission', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  test('creates a filled request before submitting its new id', async () => {
+  test('[NORMAL] [SG2-30:AC1] creates a filled request before submitting its new id', async () => {
     const onSuccess = vi.fn();
     render(<RequestForm onSuccess={onSuccess} onSaveDraft={vi.fn()} />);
     fillAllFields();
@@ -201,7 +201,7 @@ describe('AC1 — successful submission', () => {
 });
 
 describe('draft and presentation callbacks', () => {
-  test('fires the save-draft callback when provided', () => {
+  test('[NORMAL] [SG2-28:AC4] fires the save-draft callback when provided', () => {
     const onSaveDraft = vi.fn();
     render(<RequestForm {...DEFAULT_PROPS} onSaveDraft={onSaveDraft} />);
 
@@ -209,7 +209,7 @@ describe('draft and presentation callbacks', () => {
     expect(onSaveDraft).toHaveBeenCalledOnce();
   });
 
-  test('saves a real draft and shows the server confirmation when no callback is given', async () => {
+  test('[NORMAL] [SG2-28:AC4] saves a real draft and shows the server confirmation when no callback is given', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(draftResponse()));
     render(<RequestForm {...DEFAULT_PROPS} onSaveDraft={undefined} />);
 
@@ -218,13 +218,13 @@ describe('draft and presentation callbacks', () => {
     expect(await screen.findByText('Draft 12 saved — ready to submit.')).toBeInTheDocument();
   });
 
-  test('hides the suitability warning when conflicts are disabled', () => {
+  test('[NORMAL] [SG2-20:prototype-suitability] hides the suitability warning when conflicts are disabled', () => {
     render(<RequestForm {...DEFAULT_PROPS} showConflicts={false} />);
 
     expect(screen.queryByText(/180 expected attendance rules out/i)).not.toBeInTheDocument();
   });
 
-  test('toggles requirement chips on and off', () => {
+  test('[NORMAL] [SG2-20:prototype-requirements] toggles requirement chips on and off', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     const chip = screen.getByRole('button', { name: 'Hearing loop' });
 
@@ -239,7 +239,7 @@ describe('draft and presentation callbacks', () => {
 // ─── SG2-28: real "Save draft" behaviour ────────────────────────────────────
 
 describe('Save draft (SG2-28, no onSaveDraft override)', () => {
-  test('sends every filled field, trimmed, and omits the blank ones', async () => {
+  test('[NORMAL] [SG2-28:AC1] sends every filled field, trimmed, and omits the blank ones', async () => {
     const fetchMock = vi.fn().mockResolvedValue(draftResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
@@ -268,7 +268,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(body.registration_needed).toBe(false);
   });
 
-  test('toggles the registration chip into the payload', async () => {
+  test('[NORMAL] [SG2-28:AC1] toggles the registration chip into the payload', async () => {
     const fetchMock = vi.fn().mockResolvedValue(draftResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
@@ -283,7 +283,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(sentDraftBody(fetchMock).registration_needed).toBe(true);
   });
 
-  test('records accessibility needs when provided', async () => {
+  test('[NORMAL] [SG2-28:AC2] records accessibility needs when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(draftResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
@@ -297,7 +297,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(sentDraftBody(fetchMock).accessibility_needs).toBe('Hearing loop');
   });
 
-  test('drops a non-numeric attendance rather than sending it', async () => {
+  test('[FAILURE] [SG2-28:AC4] drops a non-numeric attendance rather than sending it', async () => {
     const fetchMock = vi.fn().mockResolvedValue(draftResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
@@ -309,7 +309,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect('expected_attendance' in sentDraftBody(fetchMock)).toBe(false);
   });
 
-  test('an empty draft still saves and lists what submission still needs', async () => {
+  test('[BOUNDARY] [SG2-28:AC4] an empty draft still saves and lists what submission still needs', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(draftResponse(['name', 'purpose', 'proposed_date'], 5)));
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
@@ -321,7 +321,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     ).toBeInTheDocument();
   });
 
-  test('shows an unrecognised outstanding field under its raw name', async () => {
+  test('[BOUNDARY] [SG2-28:AC4] shows an unrecognised outstanding field under its raw name', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(draftResponse(['surprise_field'], 6)));
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
@@ -331,7 +331,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     ).toBeInTheDocument();
   });
 
-  test('disables the save button while the request is in flight', async () => {
+  test('[CONFLICT] [SG2-28:duplicate-save] disables the save button while the request is in flight', async () => {
     let release!: (response: Response) => void;
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
@@ -345,7 +345,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(await screen.findByText(/Draft 12 saved/)).toBeInTheDocument();
   });
 
-  test('a second click while saving does not save twice', async () => {
+  test('[CONFLICT] [SG2-28:duplicate-save] a second click while saving does not save twice', async () => {
     let release!: (response: Response) => void;
     const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve; }));
     vi.stubGlobal('fetch', fetchMock);
@@ -358,7 +358,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     await screen.findByText(/Draft 12 saved/);
   });
 
-  test('shows the server validation details when the draft is rejected', async () => {
+  test('[FAILURE] [SG2-28:AC4] shows the server validation details when the draft is rejected', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -377,7 +377,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(alert).toHaveTextContent('name must be text.');
   });
 
-  test('shows a bare error when the failure carries no details', async () => {
+  test('[FAILURE] [SG2-28:draft-errors] shows a bare error when the failure carries no details', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
@@ -388,7 +388,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(alert.querySelector('ul')).toBeNull();
   });
 
-  test('signed-out submission cannot report success or issue requests', async () => {
+  test('[FAILURE] [SG2-25:AC3] signed-out submission cannot report success or issue requests', async () => {
     sessionStorage.clear();
     const onSubmit = vi.fn();
     const fetchMock = vi.fn();
@@ -401,7 +401,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test('signed-out save cannot accidentally create a duplicate of an existing draft', async () => {
+  test('[FAILURE] [SG2-25:AC3] signed-out save cannot accidentally create a duplicate of an existing draft', async () => {
     sessionStorage.clear();
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -411,7 +411,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test('repeated saves update the created id and preserve clearing fields', async () => {
+  test('[NORMAL] [SG2-29:AC1] repeated saves update the created id and preserve clearing fields', async () => {
     const fetchMock = vi.fn().mockImplementation(async () => draftResponse([], 42));
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm />);
@@ -431,7 +431,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(body).toHaveProperty('purpose', 'Partner briefing');
   });
 
-  test('a failed save blocks submission and keeps entered values for retry', async () => {
+  test('[FAILURE] [SG2-30:persist-before-submit] a failed save blocks submission and keeps entered values for retry', async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Invalid date' }), { status: 400 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -468,7 +468,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     );
   }
 
-  test('seeds every field from initialValues, including the numeric one', () => {
+  test('[NORMAL] [SG2-29:AC2] seeds every field from initialValues, including the numeric one', () => {
     render(
       <RequestForm
         eventId="7"
@@ -489,7 +489,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(screen.getByRole('button', { name: 'Registration needed' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('a blank/absent initialValues field seeds as empty, not "null" or "undefined"', () => {
+  test('[BOUNDARY] [SG2-29:AC2] a blank/absent initialValues field seeds as empty, not "null" or "undefined"', () => {
     render(
       <RequestForm
         eventId="7"
@@ -503,7 +503,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(screen.getByLabelText(/Expected attendance/i)).toHaveValue('');
   });
 
-  test('"Save draft" calls PATCH on the existing id, not POST', async () => {
+  test('[NORMAL] [SG2-29:AC1] "Save draft" calls PATCH on the existing id, not POST', async () => {
     const fetchMock = vi.fn().mockResolvedValue(updateResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(
@@ -527,7 +527,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(JSON.parse(init.body).name).toBe('Renamed Forum');
   });
 
-  test('a failed update shows an error without losing the edited values', async () => {
+  test('[CONFLICT] [SG2-30:AC3] a failed update shows an error without losing the edited values', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -552,7 +552,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(screen.getByLabelText(/Event name/i)).toHaveValue('Partner Forum');
   });
 
-  test('submitting an edited draft persists the latest values before submission', async () => {
+  test('[NORMAL] [SG2-29:AC1] [SG2-30:AC1] submitting an edited draft persists the latest values before submission', async () => {
     const onSubmit = vi.fn();
     const fetchMock = vi.fn().mockImplementation(async () => updateResponse());
     vi.stubGlobal('fetch', fetchMock);
@@ -581,7 +581,7 @@ describe('Editing an existing draft (SG2-29)', () => {
 // ─── Reconciling SG2-28 + SG2-30: save then submit in one sitting ───────────
 
 describe('save then submit', () => {
-  test('a real "Submit" after a real "Save draft" targets the id the draft call returned', async () => {
+  test('[NORMAL] [SG2-28:AC3] [SG2-30:AC1] a real "Submit" after a real "Save draft" targets the id the draft call returned', async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
@@ -604,7 +604,7 @@ describe('save then submit', () => {
     });
   });
 
-  test('retrying a failed submission updates the already-created draft', async () => {
+  test('[FAILURE] [SG2-30:submission-retry] retrying a failed submission updates the already-created draft', async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi.fn()
       .mockImplementationOnce(async () => draftResponse([], 42))
@@ -625,7 +625,7 @@ describe('save then submit', () => {
     ]);
   });
 
-  test('an existing draft keeps its requested id throughout save and submit', async () => {
+  test('[NORMAL] [SG2-29:AC1] [SG2-30:AC1] an existing draft keeps its requested id throughout save and submit', async () => {
     const onSuccess = vi.fn();
     const fetchMock = vi
       .fn()
@@ -659,7 +659,7 @@ describe('save then submit', () => {
 // ─── AC2: Server error banners ───────────────────────────────────────────────
 
 describe('AC2 — server error banners', () => {
-  test('shows a 400 banner listing the missing fields returned by the server', async () => {
+  test('[FAILURE] [SG2-30:AC2] shows a 400 banner listing the missing fields returned by the server', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
@@ -678,7 +678,7 @@ describe('AC2 — server error banners', () => {
     ).toBeInTheDocument();
   });
 
-  test('preserves an unknown missing-field name from the server', async () => {
+  test('[FAILURE] [SG2-30:AC2] preserves an unknown missing-field name from the server', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
@@ -692,7 +692,7 @@ describe('AC2 — server error banners', () => {
     expect(await screen.findByText(/custom_requirement/)).toBeInTheDocument();
   });
 
-  test('shows a 409 conflict banner when the request is already submitted', async () => {
+  test('[CONFLICT] [SG2-30:submitted-state] shows a 409 conflict banner when the request is already submitted', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(new Response(null, { status: 409 })),
@@ -706,7 +706,7 @@ describe('AC2 — server error banners', () => {
     ).toBeInTheDocument();
   });
 
-  test('shows a 503 unavailable banner when the server is unreachable', async () => {
+  test('[FAILURE] [SG2-30:submission-errors] shows a 503 unavailable banner when the server is unreachable', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(new Response(null, { status: 503 })),
@@ -720,7 +720,7 @@ describe('AC2 — server error banners', () => {
     ).toBeInTheDocument();
   });
 
-  test('shows an unavailable banner when fetch throws (network error)', async () => {
+  test('[FAILURE] [SG2-30:submission-errors] shows an unavailable banner when fetch throws (network error)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementationOnce(async () => draftResponse()).mockRejectedValue(new Error('network down')),
@@ -734,7 +734,7 @@ describe('AC2 — server error banners', () => {
     ).toBeInTheDocument();
   });
 
-  test('shows the server-provided message for an unexpected error', async () => {
+  test('[FAILURE] [SG2-30:submission-errors] shows the server-provided message for an unexpected error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
@@ -752,7 +752,7 @@ describe('AC2 — server error banners', () => {
 // ─── Event detail entry requirements ────────────────────────────────────────
 
 describe('EventDetail requires an authenticated selected request', () => {
-  test('a caller-supplied draft status cannot substitute for a selected request', () => {
+  test('[FAILURE] [SG2-26:AC1] a caller-supplied draft status cannot substitute for a selected request', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     render(<EventDetail role="Event Organiser" accessToken="test-token" onNavigate={vi.fn()} eventStatus="draft" />);
@@ -760,7 +760,7 @@ describe('EventDetail requires an authenticated selected request', () => {
     expect(screen.getByText(/Select an event from your organisation/)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  test('coordinator cannot view organiser request details', () => {
+  test('[FAILURE] [SG2-26:AC2] coordinator cannot view organiser request details', () => {
     render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} eventStatus="submitted" />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
   });

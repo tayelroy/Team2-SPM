@@ -7,10 +7,11 @@ import EventDetail from './EventDetail';
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  sessionStorage.clear();
 });
 
 describe('EventDetail access boundaries', () => {
-  test.each(['Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see event detail', (role) => {
+  test.each(['Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('[FAILURE] [SG2-26:AC2] %s cannot fetch or see event detail', (role) => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
     render(<EventDetail role={role} selectedEventId={101} accessToken="token" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
@@ -19,14 +20,14 @@ describe('EventDetail access boundaries', () => {
     expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
   });
 
-  test('Event Coordinator without selected request cannot see event detail', () => {
+  test('[FAILURE] [SG2-26:AC2] Event Coordinator without selected request cannot see event detail', () => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail');
     render(<EventDetail role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  test('an organiser without a selected request never sees a mock organisation event', () => {
+  test('[BOUNDARY] [SG2-26:AC1] an organiser without a selected request never sees a mock organisation event', () => {
     const onNavigate = vi.fn();
     render(<EventDetail role="Event Organiser" onNavigate={onNavigate} />);
     expect(screen.getByText(/Select an event from your organisation/)).toBeInTheDocument();
@@ -38,7 +39,7 @@ describe('EventDetail access boundaries', () => {
 });
 
 describe('EventDetail for Event Organiser with selected event (API consumption)', () => {
-  test('TC-SG2-31-04: loads and displays full event details for selectedEventId', async () => {
+  test('[NORMAL] [SG2-31:AC3] [SG2-33:AC3] TC-SG2-31-04: loads and displays full event details for selectedEventId', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -106,7 +107,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test('says when the coordinator has no phone number on file (SG2-33 AC3)', async () => {
+  test('[BOUNDARY] [SG2-33:AC3] says when the coordinator has no phone number on file (SG2-33 AC3)', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -122,7 +123,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(await screen.findByText('No phone number on file')).toBeInTheDocument();
   });
 
-  test('displays draft event with action buttons and handles missing optional attributes', async () => {
+  test('[BOUNDARY] [SG2-29:AC2] displays draft event with action buttons and handles missing optional attributes', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -175,7 +176,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
   });
 
-  test('displays rejection notice for rejected request', async () => {
+  test('[NORMAL] [SG2-31:AC4] displays rejection notice for rejected request', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -217,7 +218,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(screen.getByRole('button', { name: 'Edit request' })).toBeInTheDocument();
   });
 
-  test('handles 404 not_found with return button', async () => {
+  test('[FAILURE] [SG2-26:AC1] handles 404 not_found with return button', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: false,
       kind: 'not_found',
@@ -238,7 +239,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test('handles unauthorized error and unavailable error with retry and back buttons', async () => {
+  test('[FAILURE] [SG2-26:AC1] handles unauthorized error and unavailable error with retry and back buttons', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
       .mockResolvedValueOnce({
         ok: false,
@@ -299,7 +300,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test.each(['success', 'rejection'] as const)('ignores a stale %s after a different request is selected', async (outcome) => {
+  test.each(['success', 'rejection'] as const)('[CONFLICT] [SG2-26:selected-request] ignores a stale %s after a different request is selected', async (outcome) => {
     type Result = Awaited<ReturnType<typeof eventRequestsApi.fetchOwnEventDetail>>;
     let resolveOld!: (value: Result) => void;
     let rejectOld!: (error: Error) => void;
@@ -327,7 +328,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
   });
 });
 
-test.each(['draft', 'rejected', 'submitted'])('colleague %s detail is strictly view only', async (status) => {
+test.each(['draft', 'rejected', 'submitted'])('[FAILURE] [SG2-26:AC3] colleague %s detail is strictly view only', async (status) => {
   vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: {
     eventId: 77, organiserId: 'colleague', organisation: 'Shared organisation', status,
     name: 'Colleague event', purpose: 'Shared work', description: '', proposedDate: null,
@@ -345,7 +346,7 @@ test.each(['draft', 'rejected', 'submitted'])('colleague %s detail is strictly v
 });
 
 describe('EventDetail EventStageTracker integration (SG2-38)', () => {
-  test('renders EventStageTracker with stage API response and displays arrangements recheck banner', async () => {
+  test('[NORMAL] [SG2-38:AC1] renders EventStageTracker with stage API response and displays arrangements recheck banner', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -420,7 +421,7 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
     ).toBeInTheDocument();
   });
 
-  test('renders EventDetail smoothly even if getEventStage fails', async () => {
+  test('[FAILURE] [SG2-38:stage-errors] renders EventDetail smoothly even if getEventStage fails', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -465,7 +466,7 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
     expect(screen.queryByTestId('stage-badge')).not.toBeInTheDocument();
   });
 
-  test('renders EventDetail smoothly when getEventStage rejects with an exception', async () => {
+  test('[FAILURE] [SG2-38:stage-errors] renders EventDetail smoothly when getEventStage rejects with an exception', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -542,7 +543,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     outstanding_arrangements: [],
   };
 
-  test('assigned Event Coordinator sees "Edit Planning Information" button on non-terminal event', async () => {
+  test('[NORMAL] [SG2-39:AC1] assigned Event Coordinator sees "Edit Planning Information" button on non-terminal event', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: baseDetail,
@@ -570,7 +571,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
   });
 
-  test('clicking "Edit Planning Information" opens EventPlanningDrawer and executes impact warning modal flow (AC 2)', async () => {
+  test('[CONFLICT] [SG2-39:AC2] clicking "Edit Planning Information" opens EventPlanningDrawer and executes impact warning modal flow (AC 2)', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: baseDetail,
@@ -655,19 +656,19 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     );
   });
 
-  test('Event Coordinator on terminal event (completed, cancelled, rejected) cannot edit planning (AC 5)', async () => {
+  test.each(['completed', 'cancelled', 'rejected'])('[CONFLICT] [SG2-39:AC5] a %s event cannot be edited by its coordinator', async (status) => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
         ...baseDetail,
-        status: 'completed',
+        status,
       },
     });
     vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
       ok: true,
       stage: {
         ...baseStage,
-        raw_status: 'completed',
+        raw_status: status,
         stage: 'Completed',
       },
     });
@@ -687,7 +688,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.getByText('Planning details cannot be modified for terminal events.')).toBeInTheDocument();
   });
 
-  test('Event Coordinator not assigned to event does not see "Edit Planning Information" button', async () => {
+  test('[FAILURE] [SG2-39:AC1] Event Coordinator not assigned to event does not see "Edit Planning Information" button', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -715,7 +716,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.getByText('Awaiting assignment to coordinator.')).toBeInTheDocument();
   });
 
-  test('unassigned coordinator event (coordinatorId null) does not show "Edit Planning Information" button', async () => {
+  test('[FAILURE] [SG2-39:AC1] unassigned coordinator event (coordinatorId null) does not show "Edit Planning Information" button', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -743,7 +744,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.getByText('Awaiting assignment to coordinator.')).toBeInTheDocument();
   });
 
-  test('Event Organiser does not see "Edit Planning Information" button', async () => {
+  test('[FAILURE] [SG2-39:AC1] Event Organiser does not see "Edit Planning Information" button', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: baseDetail,
@@ -766,7 +767,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
   });
 
-  test('displays outstanding arrangements tags when stage contains custom or registration arrangements (AC 3)', async () => {
+  test('[NORMAL] [SG2-39:AC3] displays outstanding arrangements tags when stage contains custom or registration arrangements (AC 3)', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: baseDetail,
@@ -797,7 +798,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.getByText('custom_arrangement')).toBeInTheDocument();
   });
 
-  test('resolves coordinator identity from loadSession when currentUserId prop is omitted', async () => {
+  test('[NORMAL] [SG2-39:AC1] resolves coordinator identity from loadSession when currentUserId prop is omitted', async () => {
     sessionStorage.setItem(
       'connectsphere.session',
       JSON.stringify({
@@ -830,7 +831,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
   });
 });
 
-test('a rejected request shows the organiser why it was rejected (SG2-37)', async () => {
+test('[NORMAL] [SG2-37:AC2] a rejected request shows the organiser why it was rejected (SG2-37)', async () => {
   vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
     ok: true,
     request: {
@@ -848,7 +849,7 @@ test('a rejected request shows the organiser why it was rejected (SG2-37)', asyn
   expect(within(why).getByText('Clashes with the AGM on the same evening.')).toBeVisible();
 });
 
-test('a rejection recorded without a stored reason shows no empty explanation (SG2-37)', async () => {
+test('[BOUNDARY] [SG2-37:legacy-rejection] a rejection recorded without a stored reason shows no empty explanation (SG2-37)', async () => {
   vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
     ok: true,
     request: {

@@ -12,7 +12,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test('fetchProfile reports signed-out without calling the server when there is no session', async () => {
+test('[FAILURE] [SG2-27:AC1] fetchProfile reports signed-out without calling the server when there is no session', async () => {
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
 
@@ -21,7 +21,7 @@ test('fetchProfile reports signed-out without calling the server when there is n
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('fetchProfile sends the bearer token and returns the profile', async () => {
+test('[NORMAL] [SG2-27:AC1] fetchProfile sends the bearer token and returns the profile', async () => {
   saveSession(SESSION);
   const profile = { user_id: 'user-1', name: 'Alex', organisation: null, phone: null, communication_preferences: [] };
   const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ profile }), { status: 200 }));
@@ -36,7 +36,7 @@ test('fetchProfile sends the bearer token and returns the profile', async () => 
   });
 });
 
-test('fetchProfile maps 401 to a signed-out message', async () => {
+test('[FAILURE] [SG2-27:AC1] fetchProfile maps 401 to a signed-out message', async () => {
   saveSession(SESSION);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'nope' }), { status: 401 })));
 
@@ -44,7 +44,7 @@ test('fetchProfile maps 401 to a signed-out message', async () => {
   expect(outcome).toEqual({ ok: false, message: 'You are signed out. Sign in again to see your profile.' });
 });
 
-test('fetchProfile maps 403 to a role message', async () => {
+test('[FAILURE] [SG2-27:AC1] fetchProfile maps 403 to a role message', async () => {
   saveSession(SESSION);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'nope' }), { status: 403 })));
 
@@ -52,7 +52,7 @@ test('fetchProfile maps 403 to a role message', async () => {
   expect(outcome).toEqual({ ok: false, message: 'Your role cannot access a profile.' });
 });
 
-test('fetchProfile surfaces the server error and details for other failures', async () => {
+test('[FAILURE] [SG2-27:AC3] fetchProfile surfaces the server error and details for other failures', async () => {
   saveSession(SESSION);
   vi.stubGlobal(
     'fetch',
@@ -63,7 +63,7 @@ test('fetchProfile surfaces the server error and details for other failures', as
   expect(outcome).toEqual({ ok: false, message: 'Invalid profile details', details: ['name is required.'] });
 });
 
-test('fetchProfile falls back to a status message when the error body is unreadable', async () => {
+test('[FAILURE] [SG2-27:AC1] fetchProfile falls back to a status message when the error body is unreadable', async () => {
   saveSession(SESSION);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>gateway unavailable</html>', { status: 502 })));
 
@@ -71,7 +71,7 @@ test('fetchProfile falls back to a status message when the error body is unreada
   expect(outcome).toEqual({ ok: false, message: 'Could not reach your profile (HTTP 502).' });
 });
 
-test('fetchProfile reports failure when a success response has no profile', async () => {
+test('[FAILURE] [SG2-27:AC1] fetchProfile reports failure when a success response has no profile', async () => {
   saveSession(SESSION);
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })));
 
@@ -79,7 +79,7 @@ test('fetchProfile reports failure when a success response has no profile', asyn
   expect(outcome).toEqual({ ok: false, message: 'The server did not return a profile.' });
 });
 
-test('fetchProfile reports a generic message when the network is unreachable', async () => {
+test('[FAILURE] [SG2-27:AC1] fetchProfile reports a generic message when the network is unreachable', async () => {
   saveSession(SESSION);
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
@@ -87,7 +87,7 @@ test('fetchProfile reports a generic message when the network is unreachable', a
   expect(outcome).toEqual({ ok: false, message: 'Could not reach the server. Please try again.' });
 });
 
-test('updateProfile sends a PUT with the given fields and returns the updated profile', async () => {
+test('[NORMAL] [SG2-27:AC2] updateProfile sends a PUT with the given fields and returns the updated profile', async () => {
   saveSession(SESSION);
   const profile = {
     user_id: 'user-1',
@@ -110,7 +110,7 @@ test('updateProfile sends a PUT with the given fields and returns the updated pr
   });
 });
 
-test('updateProfile reports signed-out without calling the server when there is no session', async () => {
+test('[FAILURE] [SG2-27:AC2] updateProfile reports signed-out without calling the server when there is no session', async () => {
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
 

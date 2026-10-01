@@ -73,7 +73,7 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
-  test('returns 200 with computed stage and waiting-on for owning organiser', async () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] returns 200 with computed stage and waiting-on for owning organiser', async () => {
     const app = buildApp({ principal: ORGANISER });
     const res = await request(app).get('/api/event-requests/101/stage');
 
@@ -86,11 +86,16 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
       action: 'Complete venue suitability check and equipment reservation',
       user_id: '20000000-0000-4000-8000-000000000002'
     });
-    assert.equal(Array.isArray(res.body.stepper_steps), true);
-    assert.equal(res.body.stepper_steps[3].status, 'current');
+    assert.deepEqual(res.body.stepper_steps, [
+      { key: 'draft', label: 'Draft', status: 'completed' },
+      { key: 'submitted', label: 'Submitted', status: 'completed' },
+      { key: 'under_review', label: 'Under Review', status: 'completed' },
+      { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+      { key: 'confirmed', label: 'Confirmed', status: 'upcoming' }
+    ]);
   });
 
-  test('returns 200 for internal coordinator', async () => {
+  test('[NORMAL] [SG2-38:AC1] returns 200 for internal coordinator', async () => {
     const app = buildApp({ principal: COORDINATOR });
     const res = await request(app).get('/api/event-requests/101/stage');
 
@@ -98,7 +103,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.equal(res.body.stage, 'Approved — In Planning');
   });
 
-  test('returns 200 for venue staff', async () => {
+  test('[NORMAL] [SG2-38:AC1] returns 200 for venue staff', async () => {
     const app = buildApp({ principal: VENUE_STAFF });
     const res = await request(app).get('/api/event-requests/101/stage');
 
@@ -106,7 +111,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.equal(res.body.stage, 'Approved — In Planning');
   });
 
-  test('returns 403 Forbidden for attendee', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-38:AC1] returns 403 Forbidden for attendee', async () => {
     const app = buildApp({ principal: ATTENDEE });
     const res = await request(app).get('/api/event-requests/101/stage');
 
@@ -114,7 +119,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.ok(res.body.error.toLowerCase().includes('authorized'));
   });
 
-  test('returns 403 Forbidden for unrelated organiser', async () => {
+  test('[FAILURE] [SG2-26:AC2] [SG2-38:AC1] returns 403 Forbidden for unrelated organiser', async () => {
     const app = buildApp({ principal: UNRELATED_ORGANISER });
     const res = await request(app).get('/api/event-requests/101/stage');
 
@@ -122,7 +127,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.ok(res.body.error.toLowerCase().includes('authorized'));
   });
 
-  test('returns 400 Bad Request for invalid event ID parameter', async () => {
+  test('[FAILURE] [SG2-38:AC1] returns 400 Bad Request for invalid event ID parameter', async () => {
     const app = buildApp({ principal: ORGANISER });
     const res = await request(app).get('/api/event-requests/invalid/stage');
 
@@ -130,7 +135,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.ok(res.body.error.includes('positive integer'));
   });
 
-  test('returns 404 Not Found when event record does not exist', async () => {
+  test('[FAILURE] [SG2-38:AC1] returns 404 Not Found when event record does not exist', async () => {
     const app = buildApp({
       principal: ORGANISER,
       fetchResult: { ok: false, reason: 'not_found', message: 'Event not found.' }
@@ -141,7 +146,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.equal(res.body.error, 'Event not found.');
   });
 
-  test('returns 503 Service Unavailable when database query fails', async () => {
+  test('[FAILURE] [SG2-38:AC1] returns 503 Service Unavailable when database query fails', async () => {
     const app = buildApp({
       principal: ORGANISER,
       fetchResult: { ok: false, reason: 'unavailable', message: 'DB connection timeout' }
@@ -149,9 +154,10 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     const res = await request(app).get('/api/event-requests/101/stage');
 
     assert.equal(res.status, 503);
+    assert.deepEqual(res.body, { error: 'Event stage service is temporarily unavailable. Please try again later.' });
   });
 
-  test('returns 401 Unauthorized when principal is missing', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-38:AC1] returns 401 Unauthorized when principal is missing', async () => {
     const app = buildApp({ principal: undefined });
     const res = await request(app).get('/api/event-requests/101/stage');
 
@@ -159,10 +165,11 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.equal(res.body.error, 'Authentication required');
   });
 
-  test('returns 503 Service Unavailable when admin client is missing', async () => {
+  test('[FAILURE] [SG2-38:AC1] returns 503 Service Unavailable when admin client is missing', async () => {
     const app = buildApp({ admin: null });
     const res = await request(app).get('/api/event-requests/101/stage');
 
     assert.equal(res.status, 503);
+    assert.deepEqual(res.body, { error: 'Event stage service is temporarily unavailable. Please try again later.' });
   });
 });

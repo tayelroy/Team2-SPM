@@ -34,7 +34,7 @@ function stubFetch(respond: (call: Call) => Response) {
   return calls;
 }
 
-test('SG2-45: list reads the venue\'s blocks that have not yet ended, earliest first', async () => {
+test('[NORMAL] [SG2-45:AC1] SG2-45: list reads the venue\'s blocks that have not yet ended, earliest first', async () => {
   const calls = stubFetch(() => Response.json([block]));
   assert.deepEqual(await createVenueBlockStore('staff-token').list(1, '2026-09-26T00:00:00.000Z'), [block]);
   assert.equal(calls[0].pathname, '/rest/v1/venue_unavailability');
@@ -44,7 +44,7 @@ test('SG2-45: list reads the venue\'s blocks that have not yet ended, earliest f
   assert.equal(calls[0].params.get('order'), 'starts_at.asc');
 });
 
-test('create confirms the venue, finds no confirmed overlap, then inserts the block', async () => {
+test('[NORMAL] [SG2-45:AC1] create confirms the venue, finds no confirmed overlap, then inserts the block', async () => {
   const calls = stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
     if (call.pathname === '/rest/v1/venue_bookings') return Response.json([]);
@@ -62,19 +62,19 @@ test('create confirms the venue, finds no confirmed overlap, then inserts the bl
   assert.deepEqual(calls[2].body, { venue_id: 1, ...values });
 });
 
-test('create refuses a period overlapping a confirmed booking without inserting', async () => {
+test('[CONFLICT] [SG2-45:AC2] create refuses a period overlapping a confirmed booking without inserting', async () => {
   const calls = stubFetch(call => call.pathname === '/rest/v1/venues' ? Response.json({ venue_id: 1 }) : Response.json([booking]));
   assert.deepEqual(await createVenueBlockStore('staff-token').create(1, values), { outcome: 'conflict', booking });
   assert.equal(calls.length, 2);
 });
 
-test('create returns missing and never writes when the venue does not exist', async () => {
+test('[FAILURE] [SG2-45:AC1] create returns missing and never writes when the venue does not exist', async () => {
   const calls = stubFetch(() => Response.json(null));
   assert.deepEqual(await createVenueBlockStore('staff-token').create(999, values), { outcome: 'missing' });
   assert.equal(calls.length, 1);
 });
 
-test('a booking confirmed between the check and the insert is named from the database trigger\'s refusal', async () => {
+test('[CONFLICT] [SG2-45:AC2] a booking confirmed between the check and the insert is named from the database trigger\'s refusal', async () => {
   let bookingReads = 0;
   stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
@@ -84,7 +84,7 @@ test('a booking confirmed between the check and the insert is named from the dat
   assert.deepEqual(await createVenueBlockStore('staff-token').create(1, values), { outcome: 'conflict', booking });
 });
 
-test('a trigger refusal whose booking can no longer be found fails closed', async () => {
+test('[CONFLICT] [SG2-45:AC2] a trigger refusal whose booking can no longer be found fails closed', async () => {
   stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
     if (call.pathname === '/rest/v1/venue_bookings') return Response.json([]);
@@ -93,7 +93,7 @@ test('a trigger refusal whose booking can no longer be found fails closed', asyn
   await assert.rejects(createVenueBlockStore('staff-token').create(1, values), { status: 503 });
 });
 
-test('remove deletes only that venue\'s block and reports whether one was removed', async () => {
+test('[NORMAL] [SG2-45:AC3] remove deletes only that venue\'s block and reports whether one was removed', async () => {
   const calls = stubFetch(() => Response.json([{ unavailability_id: 4 }]));
   assert.equal(await createVenueBlockStore('staff-token').remove(1, 4), true);
   assert.equal(calls[0].method, 'DELETE');
@@ -104,7 +104,7 @@ test('remove deletes only that venue\'s block and reports whether one was remove
   assert.equal(await createVenueBlockStore('staff-token').remove(1, 4), false);
 });
 
-for (const status of [401, 403, 500]) test(`database error ${status} is mapped to a safe response`, async () => {
+for (const status of [401, 403, 500]) test(`[FAILURE] [SG2-45:AC1] database error ${status} is mapped to a safe response`, async () => {
   mock.method(globalThis, 'fetch', async () => Response.json({ message: 'SECRET' }, { status }));
   const store = createVenueBlockStore('token');
   const expected = { status: status === 500 ? 503 : status };
@@ -113,7 +113,7 @@ for (const status of [401, 403, 500]) test(`database error ${status} is mapped t
   await assert.rejects(store.remove(1, 4), expected);
 });
 
-test('an insert refused by row level security is mapped to 403, not treated as a booking conflict', async () => {
+test('[FAILURE] [SG2-25:AC2] [SG2-45:AC1] an insert refused by row level security is mapped to 403, not treated as a booking conflict', async () => {
   const calls = stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
     if (call.pathname === '/rest/v1/venue_bookings') return Response.json([]);
@@ -123,7 +123,7 @@ test('an insert refused by row level security is mapped to 403, not treated as a
   assert.equal(calls.length, 3);
 });
 
-test('an error while checking for a confirmed booking is mapped to a safe response', async () => {
+test('[FAILURE] [SG2-45:AC2] an error while checking for a confirmed booking is mapped to a safe response', async () => {
   stubFetch(call => call.pathname === '/rest/v1/venues'
     ? Response.json({ venue_id: 1 })
     : Response.json({ message: 'SECRET' }, { status: 500 }));
@@ -131,7 +131,7 @@ test('an error while checking for a confirmed booking is mapped to a safe respon
 });
 
 for (const config of [{ supabaseUrl: undefined }, { supabaseAnonKey: undefined }, { supabaseUrl: 'http://example.com' }]) {
-  test(`configuration never falls back to admin: ${Object.entries(config).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`, () => {
+  test(`[FAILURE] [SG2-45:AC1] configuration never falls back to admin: ${Object.entries(config).map(([key, value]) => `${key}=${String(value)}`).join(', ')}`, () => {
     Object.assign(dbConfig, config);
     assert.throws(() => createVenueBlockStore('token'), { status: 503 });
   });
