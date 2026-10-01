@@ -132,6 +132,10 @@ app.post('/__e2e/assigned-review', (_req, res) => {
   database.seedAssignedReview();
   res.status(204).end();
 });
+app.post('/__e2e/venue-suitability', (_req, res) => {
+  database.seedVenueSuitability();
+  res.status(204).end();
+});
 app.post('/__e2e/under-review', (_req, res) => {
   database.seedUnderReview();
   res.status(204).end();

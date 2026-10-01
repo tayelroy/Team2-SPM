@@ -767,3 +767,72 @@ test('SG2-46-N01 | only coordinators can search venues', async ({ page }) => {
   expect(allowed.status()).toBe(200);
   expect((await allowed.json()).venues.map((venue: { name: string }) => venue.name)).toEqual(['Quiet Room', 'Regression Hall']);
 });
+
+test('SG2-47-P01 | a coordinator sees which venues do not fit an approved event and why', async ({ page, request }) => {
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Suitability Forum/ }).click();
+  await page.getByRole('button', { name: 'Find venues for this event', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Grand Ballroom', exact: true })).toBeVisible();
+
+  const unfit = page.getByRole('region', { name: 'Venues that do not fit Suitability Forum' });
+  await expect(unfit.getByRole('heading', { name: '3 of 4 venues do not fit Suitability Forum', exact: true })).toBeVisible();
+  await expect(unfit.getByRole('heading', { name: 'Grand Ballroom', exact: true })).toHaveCount(0);
+  // AC1: too small, with the reason.
+  const theatre = unfit.locator('.venue-grid > *').filter({ has: page.getByRole('heading', { name: 'Lecture Theatre', exact: true }) });
+  await expect(theatre.getByText("Expected attendance of 150 is above this venue's capacity of 120.", { exact: true })).toBeVisible();
+  await expect(theatre.getByText(/^Can be booked only once .* approve a capacity exception\.$/)).toBeVisible();
+  // AC2 and AC4: the missing facility and accessibility feature are named; booking is blocked.
+  const hall = unfit.locator('.venue-grid > *').filter({ has: page.getByRole('heading', { name: 'Regression Hall', exact: true }) });
+  await expect(hall.getByText('Missing required facility: stage.', { exact: true })).toBeVisible();
+  await expect(hall.getByText('Missing accessibility feature: hearing loop.', { exact: true })).toBeVisible();
+  await expect(hall.getByText('Cannot be booked: no exception is permitted for a missing facility.', { exact: true })).toBeVisible();
+});
+
+test('SG2-47-P02 | venue staff approve a capacity exception without approving the booking', async ({ page, request }) => {
+  await signIn(page, 'venue');
+  expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Booking requests awaiting decision' }).getByRole('button', { name: /Lecture Theatre/ }).click();
+  const panel = page.getByRole('region', { name: 'Venue suitability' });
+  await expect(panel.getByText("Expected attendance of 150 is above this venue's capacity of 120.", { exact: true })).toBeVisible();
+  await expect(panel.getByText(/does not approve the booking/)).toBeVisible();
+  await panel.getByRole('button', { name: 'Approve capacity exception', exact: true }).click();
+  // AC3: the approval and approver are recorded against the request.
+  await expect(panel.getByText(/^Capacity exception for 150 people approved by Regression venue \(Venue Staff\) on /)).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Approve capacity exception', exact: true })).toHaveCount(0);
+
+  // AC5: the booking request is still pending and still waiting for Venue Staff.
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  await expect(queue.getByRole('button', { name: /Lecture Theatre/ })).toContainText('pending');
+  const fit = await page.request.get('/api/venue-booking-requests/21/suitability', { headers: await authHeaders(page) });
+  expect(await fit.json()).toMatchObject({ request: { status: 'pending' }, booking: 'allowed',
+    exceptions: [{ approver_role: 'venue_staff', approved_by: 'user-venue', expected_attendance: 150 }] });
+});
+
+test('SG2-47-N01 | a missing facility cannot be excepted, and coordinators cannot approve exceptions', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
+  await signIn(page, 'venue');
+  await page.getByRole('region', { name: 'Booking requests awaiting decision' }).getByRole('button', { name: /Regression Hall/ }).click();
+  const panel = page.getByRole('region', { name: 'Venue suitability' });
+  await expect(panel.getByText('Cannot be booked: no exception is permitted for a missing facility.', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Approve capacity exception', exact: true })).toHaveCount(0);
+  const blocked = await page.request.post('/api/venue-booking-requests/22/capacity-exception', { headers: await authHeaders(page) });
+  expect(blocked.status()).toBe(409);
+  expect((await blocked.json()).error).toMatch(/Missing required facility: stage\. No exception is permitted/);
+
+  // Acknowledging the warning is all a coordinator can do; another organiser's event is not found.
+  for (const [account, status] of [['coordinator', 403], ['attendee', 403], ['organiser2', 404]] as const) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const response = await page.request.post('/api/venue-booking-requests/21/capacity-exception', { headers: await authHeaders(page) });
+      expect(response.status()).toBe(status);
+    });
+  }
+  expect((await page.request.post('/api/venue-booking-requests/21/capacity-exception')).status()).toBe(401);
+});
