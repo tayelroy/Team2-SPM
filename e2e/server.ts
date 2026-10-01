@@ -19,6 +19,7 @@ import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
 import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
+import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -101,7 +102,9 @@ const app = createApp(
   createDeleteEventDraftHandler(eventDependencies),
   createUpdateEventDraftHandler(eventDependencies),
   getEventRequestDetailHandler(eventDependencies),
-  { availability, venues, layouts, blocks, search: createVenueSearchRouter(access, createVenueSearchHandler(undefined, getClient)), profile: createProfileRouter(access, { getAdminClient: getClient }) },
+  { availability, venues, layouts, blocks, search: createVenueSearchRouter(access, createVenueSearchHandler(undefined, getClient)), profile: createProfileRouter(access, { getAdminClient: getClient }),
+    suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
+    bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.

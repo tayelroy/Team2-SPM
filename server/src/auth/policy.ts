@@ -56,6 +56,14 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-46: coordinators narrow the venues down to those that could host an
   // event they are planning.
   'venues.search': ['event_coordinator'],
+  // SG2-47: everyone involved in booking a venue for an event sees why the
+  // venue does or does not fit it. Which events a coordinator or organiser
+  // may see is enforced per-row by the handler.
+  'venues.suitability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_organiser'],
+  // SG2-47 AC3: a capacity exception is approved by Venue Staff, Technical
+  // Support Staff or the event's own organiser (enforced per-row). Never a
+  // coordinator: acknowledging the warning does not approve an exception.
+  'venue_booking.capacity_exception.approve': ['venue_staff', 'technical_support_staff', 'event_organiser'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   // SG2-27: every signed-in account manages its own profile.

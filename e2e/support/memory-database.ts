@@ -50,6 +50,7 @@ export class MemoryDatabase {
       })),
       account_roles: accounts.map(account => ({ user_id: `user-${account.key}`, role: account.role })),
       venue_booking_requests: [],
+      venue_capacity_exceptions: [],
       equipment_requests: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
       events: [
@@ -189,7 +190,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     let rows = table.filter(row => this.filters.every(filter => filter(row)));
     if (this.operation === 'insert') {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
-      const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id' }[this.table];
+      const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id', venue_capacity_exceptions: 'exception_id' }[this.table];
       let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
       rows = incoming.map(value => {
         const row = structuredClone(value);
