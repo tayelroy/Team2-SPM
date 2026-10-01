@@ -60,7 +60,7 @@ function fakeInsertClient(result: Result, capture?: (row: Record<string, unknown
 }
 
 describe('fetchClarifications', () => {
-  test('reads one event thread oldest first so it reads as a conversation', async () => {
+  test('[NORMAL] [SG2-36:AC3] reads one event thread oldest first so it reads as a conversation', async () => {
     let captured: { eventId: unknown; orders: string[] } | undefined;
     const result = await fetchClarifications(
       fakeSelectClient({ data: [{ ...ROW, sender: { name: 'Casey Coordinator' } }], error: null }, (c) => (captured = c)),
@@ -81,7 +81,7 @@ describe('fetchClarifications', () => {
     ['a flat sender_name', undefined, 'Flat Name'],
     ['no sender at all', undefined, null]
   ] as const) {
-    test(`resolves the sender from ${label}`, async () => {
+    test(`[BOUNDARY] [SG2-36:AC3] resolves the sender from ${label}`, async () => {
       const row: Record<string, unknown> = { ...ROW };
       if (sender) row.sender = sender;
       if (label === 'a flat sender_name') row.sender_name = 'Flat Name';
@@ -91,12 +91,12 @@ describe('fetchClarifications', () => {
     });
   }
 
-  test('an empty thread is a success, not a failure', async () => {
+  test('[BOUNDARY] [SG2-36:AC3] an empty thread is a success, not a failure', async () => {
     const result = await fetchClarifications(fakeSelectClient({ data: null, error: null }), 7);
     assert.deepEqual(result, { ok: true, clarifications: [] });
   });
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-36:AC3] reports unavailable when the query errors', async () => {
     const result = await fetchClarifications(
       fakeSelectClient({ data: null, error: { message: 'connection reset' } }),
       7
@@ -106,7 +106,7 @@ describe('fetchClarifications', () => {
 });
 
 describe('insertClarification', () => {
-  test('appends the message against the event and its sender', async () => {
+  test('[NORMAL] [SG2-36:AC1] appends the message against the event and its sender', async () => {
     let captured: Record<string, unknown> | undefined;
     const result = await insertClarification(
       fakeInsertClient({ data: [ROW], error: null }, (row) => (captured = row)),
@@ -123,7 +123,7 @@ describe('insertClarification', () => {
     });
   });
 
-  test('reports unavailable when the insert errors', async () => {
+  test('[FAILURE] [SG2-36:AC1] reports unavailable when the insert errors', async () => {
     const result = await insertClarification(
       fakeInsertClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -134,7 +134,7 @@ describe('insertClarification', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable when the insert returns ${JSON.stringify(data)}`, async () => {
+    test(`[FAILURE] [SG2-36:AC1] reports unavailable when the insert returns ${JSON.stringify(data)}`, async () => {
       const result = await insertClarification(fakeInsertClient({ data, error: null }), 7, 'coordinator-1', 'hello');
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);

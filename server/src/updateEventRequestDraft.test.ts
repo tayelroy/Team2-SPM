@@ -199,6 +199,20 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
+  test('[NORMAL] [SG2-36:AC2] amends a request returned for clarification', async () => {
+    let updated = false;
+    const response = await request(
+      buildApp({
+        fetchResult: { ok: true, request: { ...DRAFT_REQUEST, status: 'needs_clarification' } },
+        captureUpdate: () => (updated = true)
+      })
+    )
+      .patch('/api/event-requests/7')
+      .send(COMPLETE_BODY);
+    assert.equal(response.status, 200);
+    assert.equal(updated, true);
+  });
+
   test('returns 409 when the request has already been submitted', async () => {
     let updateCalled = false;
     const response = await request(

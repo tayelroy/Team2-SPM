@@ -4,11 +4,13 @@ import {
   deleteEventRequestDraft,
   assignCoordinator,
   fetchAssignable,
+  fetchClarifications,
   fetchEventRequestDraft,
   fetchOwnEventDetail,
   fetchOwnEventRequests,
   isWaitingOnOrganiser,
   listMyDraftRequests,
+  postClarification,
   submitEventRequest,
   updateEventRequestDraft,
   getEventStage,
@@ -685,9 +687,26 @@ describe('listMyDraftRequests', () => {
 
     expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/event-requests?scope=mine&status=draft');
+    expect(url).toBe('/api/event-requests?scope=mine');
     expect(init.method).toBe('GET');
     expect(init.headers.Authorization).toBe('Bearer token-1');
+  });
+
+  test('[CONFLICT] [SG2-36:AC2] keeps drafts and returned requests but drops ones already with staff', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      requests: [
+        { event_id: 1, status: 'draft' },
+        { event_id: 2, status: 'submitted' },
+        { event_id: 3, status: 'needs_clarification' },
+        { event_id: 4, status: 'under_review' },
+        { event_id: 5, status: 'rejected' },
+      ],
+    }, 200)));
+
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
+      ok: true,
+      requests: [{ event_id: 1, status: 'draft' }, { event_id: 3, status: 'needs_clarification' }],
+    });
   });
 
   test('maps 401 to a signed-out message', async () => {
@@ -1587,5 +1606,115 @@ describe('assignCoordinator (SG2-33/34)', () => {
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual(retry);
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual(retry);
+  });
+});
+
+describe('isWaitingOnOrganiser for returned requests', () => {
+  test('[NORMAL] [SG2-36:AC1] a request returned for clarification is waiting on the organiser', () => {
+    expect(isWaitingOnOrganiser('needs_clarification')).toBe(true);
+    expect(isWaitingOnOrganiser('under_review')).toBe(false);
+  });
+});
+
+describe('fetchClarifications', () => {
+  const message = {
+    clarification_id: 1, event_id: 42, sender_id: 'c1', sender_name: 'Casey Coordinator',
+    message: 'Which date is firm?', created_at: '2026-09-30T02:00:00.000Z',
+  };
+
+  test('[NORMAL] [SG2-36:AC3] reads the thread and status with the bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ clarifications: [message], status: 'needs_clarification' }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({
+      ok: true, clarifications: [message], status: 'needs_clarification',
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/event-requests/42/clarifications');
+    expect(init.headers.Authorization).toBe('Bearer token-1');
+  });
+
+  test.each([
+    [401, 'You are signed out. Sign in again to see this conversation.'],
+    [403, 'Your role cannot take part in this conversation.'],
+    [404, 'This request is not one you are part of.'],
+    [503, 'Could not reach the server. Please try again.'],
+  ])('[FAILURE] [SG2-36:AC3] explains a %i when reading the thread', async (status, text) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'x' }, status)));
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({ ok: false, message: text });
+  });
+
+  test('[FAILURE] [SG2-36:AC3] reports the server unreachable when the network fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test.each([
+    [{ status: 'submitted' }],
+    [{ clarifications: [] }],
+  ])('[BOUNDARY] [SG2-36:AC3] rejects a malformed thread body %j', async body => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(body, 200)));
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+});
+
+describe('postClarification', () => {
+  const message = {
+    clarification_id: 2, event_id: 42, sender_id: 'c1', sender_name: 'Casey Coordinator',
+    message: 'Which date is firm?', created_at: '2026-09-30T02:00:00.000Z',
+  };
+
+  test('[NORMAL] [SG2-36:AC1] posts the message as JSON and returns the new status', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ clarification: message, status: 'needs_clarification' }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(postClarification(42, 'Which date is firm?', 'token-1')).resolves.toEqual({
+      ok: true, clarification: message, status: 'needs_clarification',
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/event-requests/42/clarifications');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer token-1' });
+    expect(JSON.parse(init.body)).toEqual({ message: 'Which date is firm?' });
+  });
+
+  test('[BOUNDARY] [SG2-36:AC1] surfaces the server validation message for a blank message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'A message is required.' }, 400)));
+
+    await expect(postClarification(42, '  ', 'token-1')).resolves.toEqual({ ok: false, message: 'A message is required.' });
+  });
+
+  test.each([
+    [400, null, 'Could not reach the server. Please try again.'],
+    [404, { error: 'Not found' }, 'This request is not one you are part of.'],
+  ])('[FAILURE] [SG2-36:AC1] maps a %i without a usable error to a fixed message', async (status, body, text) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      body === null ? new Response(null, { status }) : jsonResponse(body, status),
+    ));
+
+    await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({ ok: false, message: text });
+  });
+
+  test('[FAILURE] [SG2-36:AC1] reports the server unreachable when the network fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+
+    await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('[BOUNDARY] [SG2-36:AC1] rejects a success body without the posted message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 'needs_clarification' }, 201)));
+
+    await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
   });
 });

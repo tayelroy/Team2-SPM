@@ -8,6 +8,7 @@ import {
 import EventPlanningDrawer from './EventPlanningDrawer';
 import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
+import ClarificationThread from '../components/ClarificationThread';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -208,6 +209,8 @@ export default function EventDetail({
       const badge = badgeStyle(detail.status);
       const isLocked = !detail.waitingOnMe;
       const isRejected = detail.status.toLowerCase() === 'rejected';
+      // SG2-36: the coordinator has asked a question and is waiting on the organiser.
+      const needsClarification = detail.status.toLowerCase() === 'needs_clarification';
       const isTerminal = ['cancelled', 'completed', 'rejected'].includes(detail.status.toLowerCase());
 
       const session = loadSession();
@@ -309,6 +312,14 @@ export default function EventDetail({
               <p className="organisation-detail-description">{detail.decisionReason}</p>
             </section>
           ) : null}
+          {isOrganiser && detail.canManage && detail.status.toLowerCase() !== 'draft' && accessToken ? (
+            <ClarificationThread
+              eventId={detail.eventId}
+              accessToken={accessToken}
+              canPost={needsClarification}
+              prompt="Answer your coordinator"
+            />
+          ) : null}
           <dl className="organisation-detail-facts">
             {facts.map((fact) => (
               <div key={fact.label}>
@@ -325,6 +336,12 @@ export default function EventDetail({
               </p>
             ) : (
               <>
+                {needsClarification && isOrganiser ? (
+                  <div className="organisation-detail-notice" role="status" aria-label="Your coordinator has a question">
+                    <strong>Your coordinator has a question</strong>
+                    <p>Answer it in the conversation above, then edit the request if anything needs changing and resubmit it.</p>
+                  </div>
+                ) : null}
                 {isRejected && isOrganiser ? (
                   <div className="organisation-detail-notice">
                     <strong>Request returned for revision</strong>

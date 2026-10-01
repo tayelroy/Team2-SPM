@@ -32,6 +32,16 @@ test('organisation dashboard shows real shared events, owned draft count and cor
   expect(fetch).toHaveBeenCalledWith('/api/event-requests', { method: 'GET', headers: { Authorization: 'Bearer token' } });
 });
 
+test('[NORMAL] [SG2-36:AC1] a request returned with a question counts as a draft and as waiting on me', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
+    ...requests, { event_id: 4, name: 'Returned forum', status: 'needs_clarification', can_manage: true },
+  ] })));
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
+  await screen.findByText('Returned forum');
+  expect(screen.getByText('My drafts').closest('div')).toHaveTextContent('2');
+  expect(screen.getByText('Waiting on me').closest('div')).toHaveTextContent('2');
+});
+
 test.each([false, true])('unavailable organisation data never falls back to mock events (token %s)', async (hasToken) => {
   const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
   vi.stubGlobal('fetch', fetch);

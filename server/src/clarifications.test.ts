@@ -97,7 +97,7 @@ function getApp(options: HarnessOptions = {}) {
 }
 
 describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
-  test('the assigned coordinator returns the request with a question', async () => {
+  test('[NORMAL] [SG2-36:AC1] the assigned coordinator returns the request with a question', async () => {
     let returned: { eventId: number; coordinatorId: string } | undefined;
     let added: { eventId: number; senderId: string; message: string } | undefined;
     let audited: unknown[] | undefined;
@@ -128,7 +128,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     ]);
   });
 
-  test('the organiser answers without changing the status', async () => {
+  test('[NORMAL] [SG2-36:AC2] the organiser answers without changing the status', async () => {
     let returned = false;
     let audited = false;
     const response = await request(
@@ -148,7 +148,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.equal(audited, false);
   });
 
-  test('a coordinator follow-up after returning it only appends', async () => {
+  test('[NORMAL] [SG2-36:AC3] a coordinator follow-up after returning it only appends', async () => {
     let returned = false;
     const response = await request(
       postApp({
@@ -180,7 +180,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
       undefined
     ]
   ] as const) {
-    test(`returns 404 for ${label}`, async () => {
+    test(`[CONFLICT] [SG2-36:AC1] returns 404 for ${label}`, async () => {
       let added = false;
       const response = await request(
         postApp({ principal, fetchResult, captureAdd: () => (added = true) })
@@ -197,14 +197,14 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     ['a whitespace-only message', { message: '   ' }],
     ['no message at all', {}]
   ] as const) {
-    test(`returns 400 for ${label}`, async () => {
+    test(`[BOUNDARY] [SG2-36:AC1] returns 400 for ${label}`, async () => {
       const response = await request(postApp()).post('/api/event-requests/7/clarifications').send(body);
       assert.equal(response.status, 400);
       assert.match(response.body.error, /message is required/i);
     });
   }
 
-  test('returns 400 when the message is not text', async () => {
+  test('[BOUNDARY] [SG2-36:AC1] returns 400 when the message is not text', async () => {
     const response = await request(postApp())
       .post('/api/event-requests/7/clarifications')
       .send({ message: 42 });
@@ -212,7 +212,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.match(response.body.error, /must be text/);
   });
 
-  test('returns 400 when the message is longer than the field allows', async () => {
+  test('[BOUNDARY] [SG2-36:AC1] returns 400 when the message is longer than the field allows', async () => {
     const response = await request(postApp())
       .post('/api/event-requests/7/clarifications')
       .send({ message: 'x'.repeat(5001) });
@@ -220,7 +220,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.match(response.body.error, /5000 characters or fewer/);
   });
 
-  test('treats an absent body as a missing message', async () => {
+  test('[BOUNDARY] [SG2-36:AC1] treats an absent body as a missing message', async () => {
     // No express.json() here, so req.body is undefined rather than {}.
     const bare = express();
     bare.post('/api/event-requests/:eventId/clarifications', createAddClarificationHandler(deps({}) as never));
@@ -228,28 +228,28 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.equal(response.status, 400);
   });
 
-  test('returns 400 for a non-numeric eventId', async () => {
+  test('[BOUNDARY] [SG2-36:AC1] returns 400 for a non-numeric eventId', async () => {
     const response = await request(postApp())
       .post('/api/event-requests/not-a-number/clarifications')
       .send({ message: 'hello' });
     assert.equal(response.status, 400);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(postApp({ principal: undefined }))
       .post('/api/event-requests/7/clarifications')
       .send({ message: 'hello' });
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(postApp({ admin: null }))
       .post('/api/event-requests/7/clarifications')
       .send({ message: 'hello' });
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the request does not exist', async () => {
+  test('[FAILURE] [SG2-36:AC3] returns 404 when the request does not exist', async () => {
     const response = await request(
       postApp({ fetchResult: { ok: false, reason: 'not_found', message: 'missing' } })
     )
@@ -258,7 +258,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the error when the lookup fails', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 503 without leaking the error when the lookup fails', async () => {
     const response = await request(
       postApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -268,7 +268,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 404 when the request was decided between the read and the write', async () => {
+  test('[CONFLICT] [SG2-36:AC1] returns 404 when the request was decided between the read and the write', async () => {
     const response = await request(
       postApp({ returnResult: { ok: false, reason: 'not_found', message: 'gone' } })
     )
@@ -277,7 +277,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 when the status change itself fails', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 503 when the status change itself fails', async () => {
     const response = await request(
       postApp({ returnResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -287,7 +287,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 503 when the history cannot be recorded', async () => {
+  test('[FAILURE] [SG2-36:AC3] returns 503 when the history cannot be recorded', async () => {
     // A decision nobody can trace is worse than a refused one.
     const response = await request(postApp({ auditOk: false }))
       .post('/api/event-requests/7/clarifications')
@@ -295,7 +295,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.equal(response.status, 503);
   });
 
-  test('returns 503 when the message cannot be stored', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 503 when the message cannot be stored', async () => {
     const response = await request(
       postApp({ addResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -307,7 +307,7 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
 });
 
 describe('GET /api/event-requests/:eventId/clarifications (SG2-36)', () => {
-  test('both participants read the same thread', async () => {
+  test('[NORMAL] [SG2-36:AC3] both participants read the same thread', async () => {
     for (const principal of [COORDINATOR, ORGANISER]) {
       const response = await request(getApp({ principal })).get('/api/event-requests/7/clarifications');
       assert.equal(response.status, 200);
@@ -316,29 +316,29 @@ describe('GET /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     }
   });
 
-  test('returns 404 for someone outside the exchange', async () => {
+  test('[CONFLICT] [SG2-36:AC3] returns 404 for someone outside the exchange', async () => {
     const response = await request(
       getApp({ principal: { userId: 'coordinator-2', role: 'event_coordinator' } })
     ).get('/api/event-requests/7/clarifications');
     assert.equal(response.status, 404);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(getApp({ principal: undefined })).get('/api/event-requests/7/clarifications');
     assert.equal(response.status, 401);
   });
 
-  test('returns 400 for a non-numeric eventId', async () => {
+  test('[BOUNDARY] [SG2-36:AC1] returns 400 for a non-numeric eventId', async () => {
     const response = await request(getApp()).get('/api/event-requests/not-a-number/clarifications');
     assert.equal(response.status, 400);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(getApp({ admin: null })).get('/api/event-requests/7/clarifications');
     assert.equal(response.status, 503);
   });
 
-  test('returns 503 without leaking the error when the lookup fails', async () => {
+  test('[FAILURE] [SG2-36:AC1] returns 503 without leaking the error when the lookup fails', async () => {
     const response = await request(
       getApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).get('/api/event-requests/7/clarifications');
@@ -346,14 +346,14 @@ describe('GET /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 404 when the request does not exist', async () => {
+  test('[FAILURE] [SG2-36:AC3] returns 404 when the request does not exist', async () => {
     const response = await request(
       getApp({ fetchResult: { ok: false, reason: 'not_found', message: 'missing' } })
     ).get('/api/event-requests/7/clarifications');
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 when the thread cannot be read', async () => {
+  test('[FAILURE] [SG2-36:AC3] returns 503 when the thread cannot be read', async () => {
     const response = await request(
       getApp({ threadResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).get('/api/event-requests/7/clarifications');
@@ -397,14 +397,14 @@ describe('clarification authorisation wiring', () => {
     );
   };
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-36:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_coordinator')).get('/api/event-requests/7/clarifications');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
   for (const role of ['event_coordinator', 'event_organiser'] as const) {
-    test(`lets ${role} reach the clarification handlers`, async () => {
+    test(`[NORMAL] [SG2-36:AC1] lets ${role} reach the clarification handlers`, async () => {
       for (const call of [
         request(appForRole(role)).get('/api/event-requests/7/clarifications'),
         request(appForRole(role)).post('/api/event-requests/7/clarifications')
@@ -417,7 +417,7 @@ describe('clarification authorisation wiring', () => {
   }
 
   for (const role of ['venue_staff', 'technical_support_staff', 'attendee'] as const) {
-    test(`denies ${role}, who takes no part in the exchange`, async () => {
+    test(`[CONFLICT] [SG2-36:AC1] denies ${role}, who takes no part in the exchange`, async () => {
       const response = await request(appForRole(role))
         .get('/api/event-requests/7/clarifications')
         .set('Authorization', 'Bearer token');

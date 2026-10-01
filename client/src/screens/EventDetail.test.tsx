@@ -864,3 +864,73 @@ test('a rejection recorded without a stored reason shows no empty explanation (S
   await screen.findByRole('heading', { name: 'Annual Gala' });
   expect(screen.queryByRole('region', { name: 'Why this request was rejected' })).not.toBeInTheDocument();
 });
+
+describe('EventDetail clarification exchange (SG2-36)', () => {
+  const question = {
+    clarification_id: 1, event_id: 103, sender_id: 'coord-1', sender_name: 'Jane Doe',
+    message: 'Is the date firm?', created_at: '2026-09-30T02:00:00.000Z',
+  };
+
+  function showRequest(status: string, waitingOnMe: boolean, canManage = true) {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 103, organiserId: 'org-1', organisation: 'Acme Corp', status,
+        name: 'Annual Gala', purpose: 'Celebrate', description: '', proposedDate: null,
+        expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+        equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
+        coordinatorName: 'Jane Doe', canManage, waitingOnMe, decisionReason: null, decidedAt: null,
+      },
+    });
+  }
+
+  test('[NORMAL] [SG2-36:AC1] a returned request tells the organiser a response is needed and shows the question', async () => {
+    showRequest('needs_clarification', true);
+    vi.spyOn(eventRequestsApi, 'fetchClarifications').mockResolvedValue({ ok: true, clarifications: [question], status: 'needs_clarification' });
+    const onNavigate = vi.fn();
+    render(<EventDetail role="Event Organiser" onNavigate={onNavigate} selectedEventId={103} accessToken="token" />);
+    expect(await screen.findByRole('status', { name: 'Your coordinator has a question' })).toBeVisible();
+    const thread = screen.getByRole('region', { name: 'Clarification conversation' });
+    expect(await within(thread).findByText('Is the date firm?')).toBeVisible();
+    expect(within(thread).getByLabelText('Answer your coordinator')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit request' }));
+    expect(onNavigate).toHaveBeenCalledWith('drafts');
+  });
+
+  test('[NORMAL] [SG2-36:AC2] the organiser answers in the thread', async () => {
+    showRequest('needs_clarification', true);
+    vi.spyOn(eventRequestsApi, 'fetchClarifications').mockResolvedValue({ ok: true, clarifications: [question], status: 'needs_clarification' });
+    const answer = { ...question, clarification_id: 2, sender_id: 'org-1', sender_name: null, message: 'Yes, 12 October.' };
+    const post = vi.spyOn(eventRequestsApi, 'postClarification').mockResolvedValue({ ok: true, clarification: answer, status: 'needs_clarification' });
+    render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={103} accessToken="token" />);
+    const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+    await within(thread).findByText('Is the date firm?');
+    fireEvent.change(within(thread).getByLabelText('Answer your coordinator'), { target: { value: 'Yes, 12 October.' } });
+    fireEvent.click(within(thread).getByRole('button', { name: 'Send' }));
+    expect(await within(thread).findByText('Yes, 12 October.')).toBeVisible();
+    expect(within(thread).getByText('Unknown sender')).toBeVisible();
+    expect(post).toHaveBeenCalledWith(103, 'Yes, 12 October.', 'token');
+  });
+
+  test('[NORMAL] [SG2-36:AC3] after resubmitting, the exchange stays readable but closed', async () => {
+    showRequest('submitted', false);
+    vi.spyOn(eventRequestsApi, 'fetchClarifications').mockResolvedValue({ ok: true, clarifications: [question], status: 'submitted' });
+    render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={103} accessToken="token" />);
+    const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+    expect(await within(thread).findByText('Is the date firm?')).toBeVisible();
+    expect(within(thread).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Your coordinator has a question' })).not.toBeInTheDocument();
+  });
+
+  test.each([
+    ['a draft that was never sent', 'draft', true],
+    ['a colleague’s request', 'needs_clarification', false],
+  ])('[CONFLICT] [SG2-36:AC3] %s has no clarification thread', async (_label, status, canManage) => {
+    showRequest(status, status === 'draft', canManage);
+    const fetchThread = vi.spyOn(eventRequestsApi, 'fetchClarifications');
+    render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={103} accessToken="token" />);
+    await screen.findByRole('heading', { name: 'Annual Gala' });
+    expect(screen.queryByRole('region', { name: 'Clarification conversation' })).not.toBeInTheDocument();
+    expect(fetchThread).not.toHaveBeenCalled();
+  });
+});

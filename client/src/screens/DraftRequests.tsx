@@ -154,6 +154,18 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
                 {formatStatus(request.status)}
               </Badge>
             </div>
+            {/* SG2-36: a request returned with a question is editable and
+                resubmittable, but no longer a draft, so it cannot be deleted. */}
+            {request.status === 'needs_clarification' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                <span style={{ color: color.silver, fontSize: '13px' }}>
+                  Your coordinator has a question. Answer it on the event page, then edit and resubmit.
+                </span>
+                <GhostButton onClick={() => handleEdit(request.event_id)} disabled={openingId === request.event_id}>
+                  {openingId === request.event_id ? 'Opening…' : 'Edit'}
+                </GhostButton>
+              </div>
+            )}
             {request.status === 'draft' &&
               (confirmingId === request.event_id ? (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>

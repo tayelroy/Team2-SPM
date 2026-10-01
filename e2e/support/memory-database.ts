@@ -64,7 +64,9 @@ export class MemoryDatabase {
       venue_unavailability: [
         { unavailability_id: 1, venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }
       ],
-      venue_layouts: []
+      venue_layouts: [],
+      event_clarifications: [],
+      event_audit_logs: []
     };
   }
 
@@ -189,11 +191,13 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     let rows = table.filter(row => this.filters.every(filter => filter(row)));
     if (this.operation === 'insert') {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
-      const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id' }[this.table];
+      const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id',
+        event_clarifications: 'clarification_id', event_audit_logs: 'log_id' }[this.table];
       let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
       rows = incoming.map(value => {
         const row = structuredClone(value);
         if (id) row[id] = nextId++;
+        if (['event_clarifications', 'event_audit_logs'].includes(this.table)) row.created_at ??= new Date().toISOString();
         table.push(row);
         return row;
       });
@@ -218,6 +222,10 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         if (key.startsWith('coordinator:')) {
           const coordinator = this.database.tables.users.find(user => user.user_id === row.coordinator_id);
           return ['coordinator', coordinator ? { name: coordinator.name } : null];
+        }
+        if (key.startsWith('sender:')) {
+          const sender = this.database.tables.users.find(user => user.user_id === row.sender_id);
+          return ['sender', sender ? { name: sender.name } : null];
         }
         return [key, structuredClone(row[key] ?? null)];
       }));

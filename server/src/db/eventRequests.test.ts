@@ -763,7 +763,7 @@ describe('decideEventRequest', () => {
 });
 
 describe('requestClarification', () => {
-  test('returns the request to its organiser, filtered to this coordinator and under review', async () => {
+  test('[NORMAL] [SG2-36:AC1] returns the request to its organiser, filtered to this coordinator and under review', async () => {
     let captured:
       | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
       | undefined;
@@ -784,7 +784,7 @@ describe('requestClarification', () => {
     assert.equal(captured?.status, 'under_review');
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-36:AC1] reports unavailable when the update errors', async () => {
     const result = await requestClarification(
       fakeEventsDecisionClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -794,7 +794,7 @@ describe('requestClarification', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+    test(`[CONFLICT] [SG2-36:AC1] reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
       const result = await requestClarification(fakeEventsDecisionClient({ data, error: null }), 7, 'coordinator-1');
       assert.equal(result.ok, false);
       if (!result.ok) assert.equal(result.reason, 'not_found');

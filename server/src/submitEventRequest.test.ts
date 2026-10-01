@@ -146,6 +146,20 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(submitted, 7);
   });
 
+  test('[NORMAL] [SG2-36:AC2] resubmits a request returned for clarification, sending it back for review', async () => {
+    let submitted: number | undefined;
+    const response = await request(
+      buildApp({
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'needs_clarification' } },
+        captureSubmit: (eventId) => (submitted = eventId)
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'submitted');
+    assert.equal(submitted, 7);
+  });
+
   test('returns 400 and lists outstanding fields for an incomplete draft', async () => {
     let writes = 0;
     const response = await request(
