@@ -108,7 +108,7 @@ export function BookingRequestFit({ accessToken, requestId }: { accessToken?: st
     else setFit(current => ({ ...current!, booking: result.booking, exceptions: [...current!.exceptions, result.exception] }));
   }
 
-  return <footer className="organisation-detail-footer" aria-label="Venue suitability">
+  return <section className="organisation-detail-footer" aria-label="Venue suitability">
     <h3>Venue suitability</h3>
     {!fit && !error && <p className="organisation-detail-hint">Checking how this venue fits the event…</p>}
     {fit && (fit.venue.suitability.suitable
@@ -121,5 +121,5 @@ export function BookingRequestFit({ accessToken, requestId }: { accessToken?: st
       <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
         disabled={approving} onClick={approve}>{approving ? 'Approving…' : 'Approve capacity exception'}</button>
     </>}
-  </footer>;
+  </section>;
 }
