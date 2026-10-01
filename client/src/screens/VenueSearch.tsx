@@ -6,6 +6,7 @@ import { inputStyle } from '../venues/VenueForm';
 import { LAYOUT_LABELS, LAYOUTS, describeLayouts, type Layout } from '../venues/layoutsApi';
 import { EMPTY_SEARCH, VenueSearchError, formatSgt, searchVenues, sgtToIso, type VenueMatch, type VenueSearchValues } from '../venues/searchApi';
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
+import { EventVenueFit } from '../venues/VenueFit';
 
 const TEXT_FIELDS = [
   ['location', 'Location', 'e.g. North Wing'],
@@ -167,6 +168,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
           </>
         )
       ) : null}
+      {/* SG2-47: once a search has run for an event, say which venues do not fit it and why. */}
+      {prefill && searched ? <EventVenueFit accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} /> : null}
     </section>
   );
 }
