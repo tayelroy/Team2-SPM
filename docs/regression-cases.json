@@ -733,5 +733,91 @@
     "actual": "Current browser assertions passed as expected.",
     "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
     "execution_date": "28 Sep 2026"
+  },
+  {
+    "id": "SG2-40-P01",
+    "title": "Change history lists actor, field and old/new values newest-first",
+    "type": "Positive",
+    "story": "SG2-40",
+    "purpose": "Verify AC1 and AC2: the audit trail returns entries ordered newest-first by actor and timestamp, and the drawer renders the humanized field name with its old and new value diff.",
+    "preconditions": "Backend: committed suite with local HTTP/provider/store fakes, no real account or deployed database. Frontend: Vitest + Testing Library with a mocked getEventHistory API.",
+    "steps": [
+      "Backend: seed audit log rows across multiple fields/actors and call fetchEventAuditLogs; confirm the query orders by created_at then log_id descending.",
+      "Frontend: mock getEventHistory to resolve with pre-ordered mock entries and render EventAuditDrawer with isOpen=true.",
+      "Check each entry's actor name, humanized field label, SGT-formatted timestamp and old-to-new diff values, including null old/new values rendered as (empty)."
+    ],
+    "data": "Three mock audit entries for event 42: expected_attendance 100→250, venue_requirements null→'Auditorium with stage lighting', accessibility_needs 'Wheelchair ramp'→null",
+    "expected": "Entries render newest-first with correct actor names, humanized field labels, SGT timestamps and old/new diffs; null values render as (empty).",
+    "evidence": "server/src/db/auditLogs.test.ts; server/src/events/getHistory.test.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "Backend API/unit tests; Frontend component tests",
+    "status": "Pass",
+    "actual": "All EventAuditDrawer.test.tsx (16/16) and getHistory.test.ts assertions passed locally.",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-40-N01",
+    "title": "Attendees and unrelated organisers are blocked from an event's change history",
+    "type": "Negative / RBAC",
+    "story": "SG2-40",
+    "purpose": "Verify AC3: attendees are denied outright and event organisers cannot read the history of events they do not own.",
+    "preconditions": "Backend: committed suite with local HTTP/provider/store fakes, no real account or deployed database.",
+    "steps": [
+      "Call the history handler as an attendee principal and verify it is rejected before any database read.",
+      "Call the history handler as an event_organiser principal whose userId does not match the event's organiser_id and verify 403.",
+      "Call the history handler for a missing eventId and verify 404."
+    ],
+    "data": "Attendee principal; organiser principal mismatched to event.organiser_id; nonexistent eventId",
+    "expected": "Attendees receive 403 before any audit log fetch; mismatched organisers receive 403; missing events receive 404.",
+    "evidence": "server/src/events/getHistory.test.ts",
+    "layer": "Backend API/unit tests",
+    "status": "Pass",
+    "actual": "getHistory.test.ts RBAC and not-found assertions passed locally (22/22 in file; 774/774 in full backend suite).",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-40-F01",
+    "title": "Null actor/values and backend outage show a safe fallback with retry",
+    "type": "Failure / negative",
+    "story": "SG2-40",
+    "purpose": "Verify the drawer and handler degrade safely when the actor name or old/new values are null and when the history service or network is unavailable.",
+    "preconditions": "Backend: committed suite with local HTTP/provider/store fakes. Frontend: Vitest + Testing Library with a mocked getEventHistory API.",
+    "steps": [
+      "Backend: return an audit log row with a null actor_name and confirm the handler falls back to 'Unknown'.",
+      "Backend: simulate an admin client/database failure and confirm the handler returns 503 with the generic unavailable message.",
+      "Frontend: mock getEventHistory to resolve ok:false (4xx/503) and to reject (network error); verify the drawer shows the error notice with a working Retry action, and shows the signed-out message when no token is available.",
+      "Frontend: mock getEventHistory to resolve with an empty history array and verify the empty-state placeholder renders."
+    ],
+    "data": "Audit log row with actor_name=null; simulated admin-client failure; mocked 4xx/503 and rejected fetch outcomes; no accessToken and no session",
+    "expected": "Null actor_name renders as 'Unknown'; backend/database failures return 503 with the generic unavailable message; the drawer shows the error notice with a functioning Retry button, the signed-out message when unauthenticated, and the empty-state placeholder for zero history rows.",
+    "evidence": "server/src/events/getHistory.test.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "Backend API/unit tests; Frontend component tests",
+    "status": "Pass",
+    "actual": "All relevant EventAuditDrawer.test.tsx and getHistory.test.ts failure-path assertions passed locally.",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-40-C01",
+    "title": "[CONFLICT] A stale in-flight fetch is ignored when eventId flips mid-fetch",
+    "type": "Conflict / race condition",
+    "story": "SG2-40",
+    "purpose": "Catch a race condition where switching the drawer's eventId while a slower fetch for the previous event is still in flight would otherwise let the stale response overwrite newer history.",
+    "preconditions": "Frontend: Vitest + Testing Library with a controllable, manually-resolved mocked getEventHistory API so request completion order can be sequenced independently of request start order.",
+    "steps": [
+      "Render EventAuditDrawer open for event 42 and let getEventHistory start an unresolved fetch.",
+      "Rerender the same drawer instance with eventId changed to 99 while the first fetch is still pending, starting a second fetch.",
+      "Resolve the second (event 99) request first and confirm its history renders.",
+      "Resolve the first (event 42, stale) request afterwards and confirm its history is discarded, not applied over the current event's rendered history."
+    ],
+    "data": "Two mocked getEventHistory responses for events 42 and 99, resolved out of start order (99 resolves before 42)",
+    "expected": "Only the latest request's history is ever rendered; a stale response resolving after a newer one must not overwrite the currently displayed history.",
+    "evidence": "client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "Frontend component tests",
+    "status": "Pass",
+    "actual": "Added a monotonically-increasing request-id guard in EventAuditDrawer's fetchHistory so only the response matching the latest request is applied to state; the new '[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch' test (client/src/components/EventAuditDrawer.test.tsx) passed, and EventAuditDrawer.tsx retained 100% statement/branch coverage (16/16 tests in file; 647/647 in full client suite).",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
   }
 ]

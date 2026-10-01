@@ -1,9 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, cleanup, act, within } from '@testing-library/react';
 import { EventAuditDrawer, formatSgtTimestamp, humanizeFieldName } from './EventAuditDrawer';
 import * as eventRequestsApi from '../api/eventRequests';
-import type { EventAuditLogEntry } from '../api/eventRequests';
+import type { EventAuditLogEntry, GetEventHistoryOutcome } from '../api/eventRequests';
 
 const MOCK_ENTRIES: EventAuditLogEntry[] = [
   {
@@ -49,19 +49,19 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   });
 
   describe('helper functions', () => {
-    test('formatSgtTimestamp formats ISO date into SGT representation', () => {
+    test('[NORMAL] formatSgtTimestamp formats ISO date into SGT representation', () => {
       const formatted = formatSgtTimestamp('2026-09-25T14:30:00.000Z');
       expect(formatted).toContain('2026');
       expect(formatted).toContain('22:30');
       expect(formatted).toContain('SGT');
     });
 
-    test('formatSgtTimestamp handles invalid dates gracefully', () => {
+    test('[FAILURE] formatSgtTimestamp handles invalid dates gracefully', () => {
       expect(formatSgtTimestamp('invalid-date')).toBe('Date not available');
       expect(formatSgtTimestamp(null)).toBe('Date not available');
     });
 
-    test('humanizeFieldName translates snake_case fields into user-friendly labels', () => {
+    test('[NORMAL] humanizeFieldName translates snake_case fields into user-friendly labels', () => {
       expect(humanizeFieldName('expected_attendance')).toBe('Expected Attendance');
       expect(humanizeFieldName('proposed_date')).toBe('Proposed Date');
       expect(humanizeFieldName('venue_requirements')).toBe('Venue Requirements');
@@ -78,7 +78,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   });
 
   describe('drawer visibility and accessibility', () => {
-    test('does not render drawer content when isOpen is false', () => {
+    test('[NORMAL] does not render drawer content when isOpen is false', () => {
       render(
         <EventAuditDrawer
           isOpen={false}
@@ -92,7 +92,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    test('renders dialog with accessible title and header when isOpen is true', async () => {
+    test('[NORMAL] renders dialog with accessible title and header when isOpen is true', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: [],
@@ -114,7 +114,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.getByText(/#42/i)).toBeInTheDocument();
     });
 
-    test('calls onClose when close button is clicked', async () => {
+    test('[NORMAL] calls onClose when close button is clicked', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -136,7 +136,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    test('calls onClose when Escape key is pressed', async () => {
+    test('[NORMAL] calls onClose when Escape key is pressed', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -157,7 +157,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    test('does not call onClose when a key other than Escape is pressed', async () => {
+    test('[BOUNDARY] does not call onClose when a key other than Escape is pressed', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -178,7 +178,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).not.toHaveBeenCalled();
     });
 
-    test('calls onClose when clicking outside backdrop', async () => {
+    test('[NORMAL] calls onClose when clicking outside backdrop', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -202,7 +202,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   });
 
   describe('data fetching states', () => {
-    test('renders loading indicator while fetching history', () => {
+    test('[NORMAL] renders loading indicator while fetching history', () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockImplementation(
         () => new Promise(() => {}) // never resolves
       );
@@ -219,7 +219,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.getByRole('status')).toHaveTextContent(/loading change history/i);
     });
 
-    test('displays error notice and retry button when fetching fails', async () => {
+    test('[FAILURE] displays error notice and retry button when fetching fails', async () => {
       const getHistorySpy = vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValueOnce({
         ok: false,
         kind: 'unavailable',
@@ -254,7 +254,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(getHistorySpy).toHaveBeenCalledTimes(2);
     });
 
-    test('displays friendly empty placeholder when event has no history records', async () => {
+    test('[BOUNDARY] displays friendly empty placeholder when event has no history records', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: [],
@@ -274,7 +274,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       });
     });
 
-    test('renders timeline entries with actor names, SGT timestamps, humanized labels, and diffs', async () => {
+    test('[NORMAL] renders timeline entries newest-first with expected SGT timestamps, field labels, and old/new values', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: MOCK_ENTRIES,
@@ -294,22 +294,37 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
         expect(screen.getAllByText('Sarah Coordinator').length).toBe(3);
       });
 
-      // Entry 1: expected_attendance
-      expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
-      expect(screen.getByText('100')).toBeInTheDocument();
-      expect(screen.getByText('250')).toBeInTheDocument();
+      // Rendered entry order must match the newest-first order of MOCK_ENTRIES (log_id 102, 101, 100).
+      const entries = screen.getAllByTestId(/^audit-entry-/);
+      expect(entries.map((entry) => entry.getAttribute('data-testid'))).toEqual([
+        'audit-entry-102',
+        'audit-entry-101',
+        'audit-entry-100',
+      ]);
 
-      // Entry 2: venue_requirements (with null old value)
-      expect(screen.getByText('Venue Requirements')).toBeInTheDocument();
-      expect(screen.getAllByText('(empty)').length).toBe(2);
-      expect(screen.getByText('Auditorium with stage lighting')).toBeInTheDocument();
+      // Entry 1 (log_id 102): expected_attendance, 100 -> 250
+      const entry102 = within(entries[0]);
+      expect(entry102.getByText('Expected Attendance')).toBeInTheDocument();
+      expect(entry102.getByText('25 Sept 2026, 22:30 SGT')).toBeInTheDocument();
+      expect(entry102.getByTestId('diff-old')).toHaveTextContent('100');
+      expect(entry102.getByTestId('diff-new')).toHaveTextContent('250');
 
-      // Entry 3: accessibility_needs (with null new value)
-      expect(screen.getByText('Accessibility Needs')).toBeInTheDocument();
-      expect(screen.getByText('Wheelchair ramp')).toBeInTheDocument();
+      // Entry 2 (log_id 101): venue_requirements, (empty) -> Auditorium with stage lighting
+      const entry101 = within(entries[1]);
+      expect(entry101.getByText('Venue Requirements')).toBeInTheDocument();
+      expect(entry101.getByText('25 Sept 2026, 22:00 SGT')).toBeInTheDocument();
+      expect(entry101.getByTestId('diff-old')).toHaveTextContent('(empty)');
+      expect(entry101.getByTestId('diff-new')).toHaveTextContent('Auditorium with stage lighting');
+
+      // Entry 3 (log_id 100): accessibility_needs, Wheelchair ramp -> (empty)
+      const entry100 = within(entries[2]);
+      expect(entry100.getByText('Accessibility Needs')).toBeInTheDocument();
+      expect(entry100.getByText('25 Sept 2026, 21:30 SGT')).toBeInTheDocument();
+      expect(entry100.getByTestId('diff-old')).toHaveTextContent('Wheelchair ramp');
+      expect(entry100.getByTestId('diff-new')).toHaveTextContent('(empty)');
     });
 
-    test('displays signed-out error if no token is available', async () => {
+    test('[FAILURE] displays signed-out error if no token is available', async () => {
       render(
         <EventAuditDrawer
           isOpen={true}
@@ -324,7 +339,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       });
     });
 
-    test('handles unexpected fetch exception gracefully', async () => {
+    test('[FAILURE] handles unexpected fetch exception gracefully', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockRejectedValue(new Error('Network error'));
 
       render(
@@ -339,6 +354,52 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       await waitFor(() => {
         expect(screen.getByRole('alert')).toHaveTextContent('Could not reach the server. Please try again.');
       });
+    });
+
+    test('[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch', async () => {
+      let resolveFirst!: (value: GetEventHistoryOutcome) => void;
+      let resolveSecond!: (value: GetEventHistoryOutcome) => void;
+
+      vi.spyOn(eventRequestsApi, 'getEventHistory')
+        .mockImplementationOnce(
+          () => new Promise((resolve) => { resolveFirst = resolve; })
+        )
+        .mockImplementationOnce(
+          () => new Promise((resolve) => { resolveSecond = resolve; })
+        );
+
+      const { rerender } = render(
+        <EventAuditDrawer
+          isOpen={true}
+          onClose={vi.fn()}
+          eventId={42}
+          accessToken="token-1"
+        />
+      );
+
+      // Flip to a different event before the first fetch has resolved.
+      rerender(
+        <EventAuditDrawer
+          isOpen={true}
+          onClose={vi.fn()}
+          eventId={99}
+          accessToken="token-1"
+        />
+      );
+
+      // The newer request (for event 99) resolves first.
+      resolveSecond({ ok: true, history: [MOCK_ENTRIES[0]] });
+      await waitFor(() => {
+        expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
+      });
+
+      // The stale request (for event 42) resolves afterwards and must be ignored.
+      await act(async () => {
+        resolveFirst({ ok: true, history: [MOCK_ENTRIES[1]] });
+      });
+
+      expect(screen.queryByText('Venue Requirements')).not.toBeInTheDocument();
+      expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
     });
   });
 });

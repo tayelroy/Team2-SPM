@@ -79,72 +79,77 @@ interface HarnessOptions {
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
   app.use(express.json());
+  const fetchEventRequest = mock.fn(async (_admin: SupabaseClient, eventId: number): Promise<FetchEventRequestResult> => {
+    if (options.eventResult) return options.eventResult;
+    return { ok: true, request: { ...BASE_EVENT_REQUEST, event_id: eventId } };
+  });
+  const fetchAuditLogs = mock.fn(async (_admin: SupabaseClient, _eventId: number): Promise<FetchEventAuditLogsResult> => {
+    if (options.historyResult) return options.historyResult;
+    return { ok: true, logs: SAMPLE_LOGS };
+  });
   app.get(
     '/api/event-requests/:eventId/history',
     createGetEventHistoryHandler({
       getPrincipal: () => ('principal' in options ? options.principal : COORDINATOR),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
-      fetchEventRequest: async (_admin, eventId) => {
-        if (options.eventResult) return options.eventResult;
-        return { ok: true, request: { ...BASE_EVENT_REQUEST, event_id: eventId } };
-      },
-      fetchAuditLogs: async (_admin, _eventId) => {
-        if (options.historyResult) return options.historyResult;
-        return { ok: true, logs: SAMPLE_LOGS };
-      }
+      fetchEventRequest,
+      fetchAuditLogs
     })
   );
-  return app;
+  return { app, fetchEventRequest, fetchAuditLogs };
 }
 
 describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () => {
   describe('RBAC & Access Restriction (AC 3)', () => {
-    test('rejects unauthenticated request with 401', async () => {
-      const app = buildApp({ principal: undefined });
+    test('[FAILURE] rejects unauthenticated request with 401', async () => {
+      const { app } = buildApp({ principal: undefined });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 401);
       assert.match(res.body.error, /authentication required/i);
     });
 
-    test('denies attendee role with 403 Forbidden', async () => {
-      const app = buildApp({ principal: ATTENDEE });
+    test('[FAILURE] denies attendee role with 403 Forbidden and performs zero event or audit reads', async () => {
+      const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ principal: ATTENDEE });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 403);
       assert.equal(res.body.error, 'Attendees are not authorized to view change history.');
+      assert.equal(fetchEventRequest.mock.calls.length, 0);
+      assert.equal(fetchAuditLogs.mock.calls.length, 0);
     });
 
-    test('denies unrelated event organiser with 403 Forbidden', async () => {
-      const app = buildApp({ principal: UNRELATED_ORGANISER });
+    test('[FAILURE] denies unrelated event organiser with 403 Forbidden and performs zero audit reads', async () => {
+      const { app, fetchAuditLogs } = buildApp({ principal: UNRELATED_ORGANISER });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 403);
       assert.equal(res.body.error, 'You are not authorized to view the change history of this event.');
+      assert.equal(fetchAuditLogs.mock.calls.length, 0);
     });
 
-    test('allows owning event organiser to retrieve history with 200', async () => {
-      const app = buildApp({ principal: ORGANISER });
+    test('[NORMAL] allows owning event organiser to retrieve history with 200', async () => {
+      const { app } = buildApp({ principal: ORGANISER });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.equal(res.body.event_id, 101);
       assert.equal(res.body.history.length, 2);
     });
 
-    test('allows event coordinator to retrieve history with 200', async () => {
-      const app = buildApp({ principal: COORDINATOR });
+    test('[NORMAL] allows event coordinator to retrieve history with 200', async () => {
+      const { app } = buildApp({ principal: COORDINATOR });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.equal(res.body.event_id, 101);
       assert.equal(res.body.history.length, 2);
     });
 
-    test('allows venue staff to retrieve history with 200', async () => {
-      const app = buildApp({ principal: VENUE_STAFF });
+    test('[NORMAL] allows venue staff to retrieve history with 200', async () => {
+      const { app } = buildApp({ principal: VENUE_STAFF });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.equal(res.body.event_id, 101);
     });
 
-    test('allows technical support staff to retrieve history with 200', async () => {
-      const app = buildApp({ principal: TECH_SUPPORT });
+    test('[NORMAL] allows technical support staff to retrieve history with 200', async () => {
+      const { app } = buildApp({ principal: TECH_SUPPORT });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.equal(res.body.event_id, 101);
@@ -152,24 +157,24 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
   });
 
   describe('Validation & Error Handling', () => {
-    test('returns 400 for non-integer or negative or invalid eventId', async () => {
+    test('[BOUNDARY] returns 400 for non-integer or negative or invalid eventId', async () => {
       for (const invalidId of ['abc', '0', '-5', '1.5']) {
-        const app = buildApp();
+        const { app } = buildApp();
         const res = await request(app).get(`/api/event-requests/${invalidId}/history`);
         assert.equal(res.status, 400);
         assert.match(res.body.error, /positive integer/i);
       }
     });
 
-    test('returns 503 when admin client is unavailable', async () => {
-      const app = buildApp({ admin: null });
+    test('[FAILURE] returns 503 when admin client is unavailable', async () => {
+      const { app } = buildApp({ admin: null });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 503);
       assert.match(res.body.error, /temporarily unavailable/i);
     });
 
-    test('returns 404 when event request does not exist', async () => {
-      const app = buildApp({
+    test('[FAILURE] returns 404 when event request does not exist', async () => {
+      const { app } = buildApp({
         eventResult: { ok: false, reason: 'not_found', message: 'Not found' }
       });
       const res = await request(app).get('/api/event-requests/999/history');
@@ -177,8 +182,8 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       assert.match(res.body.error, /event not found/i);
     });
 
-    test('returns 503 when fetching event request fails', async () => {
-      const app = buildApp({
+    test('[FAILURE] returns 503 when fetching event request fails', async () => {
+      const { app } = buildApp({
         eventResult: { ok: false, reason: 'unavailable', message: 'DB down' }
       });
       const res = await request(app).get('/api/event-requests/101/history');
@@ -186,8 +191,8 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       assert.match(res.body.error, /temporarily unavailable/i);
     });
 
-    test('returns 503 when fetching audit logs fails', async () => {
-      const app = buildApp({
+    test('[FAILURE] returns 503 when fetching audit logs fails', async () => {
+      const { app } = buildApp({
         historyResult: { ok: false, reason: 'unavailable', message: 'DB error' }
       });
       const res = await request(app).get('/api/event-requests/101/history');
@@ -197,8 +202,8 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
   });
 
   describe('Payload & Ordering (AC 1 & AC 2)', () => {
-    test('returns empty history array when event has no audit logs', async () => {
-      const app = buildApp({
+    test('[BOUNDARY] returns empty history array when event has no audit logs', async () => {
+      const { app } = buildApp({
         historyResult: { ok: true, logs: [] }
       });
       const res = await request(app).get('/api/event-requests/101/history');
@@ -209,8 +214,8 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       });
     });
 
-    test('returns full history in reverse chronological order with resolved actor names and diffs', async () => {
-      const app = buildApp();
+    test('[NORMAL] returns full history in reverse chronological order with resolved actor names and diffs', async () => {
+      const { app } = buildApp();
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.equal(res.body.event_id, 101);
@@ -233,8 +238,8 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       assert.equal(res.body.history[1].created_at, '2026-09-25T14:00:00.000Z');
     });
 
-    test('falls back actor_name to Unknown if actor_name is null', async () => {
-      const app = buildApp({
+    test('[BOUNDARY] falls back actor_name to Unknown if actor_name is null', async () => {
+      const { app } = buildApp({
         historyResult: {
           ok: true,
           logs: [
@@ -275,7 +280,7 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     Object.assign(dbConfig, originalConfig);
   });
 
-  test('policy grants event_request.history.view to organisers and internal staff, excluding attendees', () => {
+  test('[NORMAL] policy grants event_request.history.view to organisers and internal staff, excluding attendees', () => {
     const rolesWithPermission = PERMISSIONS['event_request.history.view'];
     assert.ok(rolesWithPermission, 'event_request.history.view permission must exist');
     assert.deepEqual([...rolesWithPermission].sort(), [
@@ -313,20 +318,20 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
       }
     );
 
-  test('rejects unauthenticated request on app route with 401', async () => {
+  test('[FAILURE] rejects unauthenticated request on app route with 401', async () => {
     const res = await request(appForRole('event_coordinator')).get('/api/event-requests/101/history');
     assert.equal(res.status, 401);
     assert.equal(res.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies attendee role with 403 Forbidden on app route', async () => {
+  test('[FAILURE] denies attendee role with 403 Forbidden on app route', async () => {
     const res = await request(appForRole('attendee'))
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 403);
   });
 
-  test('allows event_coordinator role to reach mounted history handler on app route', async () => {
+  test('[NORMAL] allows event_coordinator role to reach mounted history handler on app route', async () => {
     const res = await request(appForRole('event_coordinator'))
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
@@ -334,7 +339,7 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     assert.equal(res.body.reached, true);
   });
 
-  test('allows event_organiser role to reach mounted history handler on app route', async () => {
+  test('[NORMAL] allows event_organiser role to reach mounted history handler on app route', async () => {
     const res = await request(appForRole('event_organiser'))
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
@@ -342,7 +347,7 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     assert.equal(res.body.reached, true);
   });
 
-  test('allows venue_staff role to reach mounted history handler on app route', async () => {
+  test('[NORMAL] allows venue_staff role to reach mounted history handler on app route', async () => {
     const res = await request(appForRole('venue_staff'))
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
@@ -350,7 +355,7 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     assert.equal(res.body.reached, true);
   });
 
-  test('allows technical_support_staff role to reach mounted history handler on app route', async () => {
+  test('[NORMAL] allows technical_support_staff role to reach mounted history handler on app route', async () => {
     const res = await request(appForRole('technical_support_staff'))
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');

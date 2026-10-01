@@ -1616,7 +1616,7 @@ describe('getEventHistory (SG2-40)', () => {
     },
   ];
 
-  test('successfully retrieves change history with reverse chronological entries', async () => {
+  test('[NORMAL] successfully retrieves change history with reverse chronological entries', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: mockHistory }, 200));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1628,7 +1628,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('handles empty history list', async () => {
+  test('[BOUNDARY] handles empty history list', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: [] }, 200)));
 
     const outcome = await getEventHistory(101, 'test-token');
@@ -1636,7 +1636,7 @@ describe('getEventHistory (SG2-40)', () => {
     expect(outcome).toEqual({ ok: true, history: [] });
   });
 
-  test('handles 401 unauthorized', async () => {
+  test('[FAILURE] handles 401 unauthorized', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     const outcome = await getEventHistory(101, 'invalid-token');
@@ -1648,7 +1648,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('handles 403 forbidden', async () => {
+  test('[FAILURE] handles 403 forbidden', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({ error: 'Attendees are not authorized to view change history.' }, 403)),
@@ -1663,7 +1663,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('handles 404 not found', async () => {
+  test('[FAILURE] handles 404 not found', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
 
     const outcome = await getEventHistory(999, 'token-1');
@@ -1675,7 +1675,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('handles 503 unavailable and network failures', async () => {
+  test('[FAILURE] handles 503 unavailable and network failures', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Service down' }, 503)));
 
     const unavailableOutcome = await getEventHistory(101, 'token-1');
@@ -1694,7 +1694,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('falls back to default messages when error payload is empty', async () => {
+  test('[BOUNDARY] falls back to default messages when error payload is empty', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
     expect(await getEventHistory(101, 'token')).toEqual({
       ok: false,
@@ -1724,7 +1724,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('handles generic HTTP error responses (500)', async () => {
+  test('[FAILURE] handles generic HTTP error responses (500)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Internal failure' }, 500)));
     expect(await getEventHistory(101, 'token')).toEqual({
       ok: false,
@@ -1740,7 +1740,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('handles invalid JSON responses or non-object / non-array bodies', async () => {
+  test('[FAILURE] handles invalid JSON responses or non-object / non-array bodies', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import {
   getEventHistory,
@@ -67,8 +67,10 @@ export function EventAuditDrawer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<EventAuditLogEntry[]>([]);
+  const latestRequestIdRef = useRef(0);
 
   const fetchHistory = useCallback(async () => {
+    const requestId = ++latestRequestIdRef.current;
     const token = accessToken || loadSession()?.accessToken;
     if (!token) {
       setError('You are signed out. Sign in again to view change history.');
@@ -77,18 +79,23 @@ export function EventAuditDrawer({
 
     setLoading(true);
     setError(null);
-    try {
-      const result = await getEventHistory(eventId, token);
-      if (!result.ok) {
-        setError(result.message);
-      } else {
-        setHistory(result.history);
-      }
-    } catch {
+
+    const outcome = await getEventHistory(eventId, token).then(
+      (result) => ({ failed: false as const, result }),
+      () => ({ failed: true as const })
+    );
+
+    // A newer fetch (e.g. eventId flipped mid-fetch) has since started; drop this stale response.
+    if (latestRequestIdRef.current !== requestId) return;
+
+    if (outcome.failed) {
       setError('Could not reach the server. Please try again.');
-    } finally {
-      setLoading(false);
+    } else if (!outcome.result.ok) {
+      setError(outcome.result.message);
+    } else {
+      setHistory(outcome.result.history);
     }
+    setLoading(false);
   }, [eventId, accessToken]);
 
   useEffect(() => {
