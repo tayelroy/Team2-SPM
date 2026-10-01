@@ -37,6 +37,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-35: a coordinator opens a request for review. Which request is
   // enforced per-row by the assignment made in SG2-33, not by this grant.
   'event_request.review': ['event_coordinator'],
+  // SG2-39: coordinator updates event information during planning.
+  'event_request.planning.update': ['event_coordinator'],
   // SG2-37: the reviewing coordinator decides the outcome. Which request is
   // enforced per-row by the assignment, not by this grant.
   'event_request.decide': ['event_coordinator'],
