@@ -565,6 +565,53 @@ test('SG2-35-N01 | [SG2-35:AC3] [CONFLICT] a request awaiting assignment is read
   expect((await detail.json()).items[0].status).toBe('submitted');
 });
 
+test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] an assignment and a reassignment are recorded and the previous coordinator stays in the history', async ({ page, request }) => {
+  expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
+  await signIn(page, 'support');
+  await nav(page, 'Assign coordinators');
+
+  const picker = page.getByLabel('Coordinator for Assignment Forum', { exact: true });
+  await picker.selectOption({ label: 'Regression coordinator' });
+  await page.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(page.getByText('Assigned to Regression coordinator.', { exact: true })).toBeVisible();
+
+  await picker.selectOption({ label: 'Regression second coordinator' });
+  await page.getByRole('button', { name: 'Reassign', exact: true }).click();
+  await expect(page.getByText('Assigned to Regression second coordinator.', { exact: true })).toBeVisible();
+
+  // SG2-33 AC4 / SG2-34 AC4: who made each change and the previous coordinator, newest first.
+  await page.getByRole('button', { name: 'View change history for Assignment Forum', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'Event Change History' });
+  const entries = drawer.getByTestId(/^audit-entry-/);
+  await expect(entries).toHaveCount(2);
+  await expect(entries.nth(0)).toContainText('Regression support');
+  await expect(entries.nth(0)).toContainText('Regression coordinator');
+  await expect(entries.nth(0)).toContainText('Regression second coordinator');
+  await expect(entries.nth(1)).toContainText('(empty)');
+  await expect(entries.nth(1)).toContainText('Regression coordinator');
+
+  // The history is stored, not just rendered: actor and old/new values persist.
+  const history = await page.request.get('/api/event-requests/71/history', { headers: await authHeaders(page) });
+  expect(history.status()).toBe(200);
+  expect((await history.json()).history.map((entry: Record<string, unknown>) =>
+    [entry.actor_id, entry.field_name, entry.old_value, entry.new_value])).toEqual([
+    ['user-support', 'coordinator_id', 'Regression coordinator', 'Regression second coordinator'],
+    ['user-support', 'coordinator_id', null, 'Regression coordinator']
+  ]);
+
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  // SG2-34 AC2: the previous coordinator no longer holds the request.
+  expect((await request.patch('/api/event-requests/71/review', { headers: await tokenFor('coordinator') })).status()).toBe(404);
+  // SG2-34 AC3: the organiser sees the new contact.
+  const detail = await request.get('/api/event-requests/71', { headers: await tokenFor('organiser') });
+  expect(detail.status()).toBe(200);
+  expect((await detail.json()).request.coordinator_name).toBe('Regression second coordinator');
+});
+
 test('SG2-37-P01 | [SG2-37:AC1] [NORMAL] approving a request under review persists the approved outcome', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/under-review')).status()).toBe(204);

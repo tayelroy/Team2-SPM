@@ -15,6 +15,9 @@ import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
+import { createAssignCoordinatorHandler } from '../server/src/events/assignCoordinator';
+import { createListAssignableHandler } from '../server/src/events/listAssignable';
+import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
@@ -111,14 +114,15 @@ const app = createApp(
   // main; only the review handler below needs the in-memory client.
   undefined,
   createStartEventReviewHandler(eventDependencies),
-  // SG2-33's assign handler keeps its production default here, as on main.
-  undefined,
+  // SG2-33/34: assignment, the assignable list and SG2-40's history run
+  // against the in-memory client so the assignment history can be checked
+  // end to end.
+  createAssignCoordinatorHandler(eventDependencies),
   createDecideEventRequestHandler(eventDependencies),
-  // The assignable-list, planning and SG2-40 history handlers keep their
-  // production defaults.
+  createListAssignableHandler({ getAdminClient: getClient }),
+  // The planning handler keeps its production default.
   undefined,
-  undefined,
-  undefined,
+  createGetEventHistoryHandler(eventDependencies),
   // SG2-36's clarification exchange, against the in-memory client.
   createListClarificationsHandler(eventDependencies),
   createAddClarificationHandler(eventDependencies)
@@ -143,6 +147,10 @@ app.post('/__e2e/assigned-review', (_req, res) => {
 });
 app.post('/__e2e/venue-suitability', (_req, res) => {
   database.seedVenueSuitability();
+  res.status(204).end();
+});
+app.post('/__e2e/coordinator-assignment', (_req, res) => {
+  database.seedCoordinatorAssignment();
   res.status(204).end();
 });
 app.post('/__e2e/under-review', (_req, res) => {

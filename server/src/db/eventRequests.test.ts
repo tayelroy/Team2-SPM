@@ -990,11 +990,41 @@ describe('fetchEventRequestById', () => {
   });
 });
 
+/** Records every guard on the coordinator write, including the one on the
+ * current coordinator that keeps a reassignment from overwriting a newer one. */
+function fakeAssignClient(
+  result: Result,
+  capture?: (update: { row: Record<string, unknown>; filters: [string, string, unknown][] }) => void
+): SupabaseClient {
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        update: (row: Record<string, unknown>) => {
+          const filters: [string, string, unknown][] = [];
+          const chain = {
+            eq(column: string, value: unknown) { filters.push(['eq', column, value]); return chain; },
+            is(column: string, value: unknown) { filters.push(['is', column, value]); return chain; },
+            in(column: string, value: unknown) { filters.push(['in', column, value]); return chain; },
+            select: async () => {
+              capture?.({ row, filters });
+              return result;
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+const ASSIGNABLE = ['submitted', 'under_review', 'approved', 'planning', 'confirmed'];
+
 describe('assignEventCoordinator', () => {
-  test('[NORMAL] [SG2-33:AC1] [SG2-33:AC2] sets coordinator_id, filtered to the event and assignable statuses', async () => {
-    let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
+  test('[NORMAL] [SG2-33:AC1] [SG2-33:AC2] sets coordinator_id only while the request is assignable and still unassigned', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
     const result = await assignEventCoordinator(
-      fakeEventsUpdateClient(
+      fakeAssignClient(
         {
           data: [{ event_id: 7, status: 'submitted', coordinator_id: 'coord-1', coordinator: { name: 'Coord One' } }],
           error: null
@@ -1002,7 +1032,8 @@ describe('assignEventCoordinator', () => {
         (c) => (captured = c)
       ),
       7,
-      'coord-1'
+      'coord-1',
+      null
     );
 
     assert.equal(result.ok, true);
@@ -1010,36 +1041,64 @@ describe('assignEventCoordinator', () => {
       assert.equal(result.request.coordinator_id, 'coord-1');
       assert.equal(result.request.coordinator_name, 'Coord One');
     }
-    assert.equal(captured?.row.coordinator_id, 'coord-1');
-    assert.equal(captured?.eventId, 7);
-    assert.deepEqual(captured?.status, ['submitted', 'under_review', 'approved', 'planning', 'confirmed']);
+    assert.deepEqual(captured?.row, { coordinator_id: 'coord-1' });
+    assert.deepEqual(captured?.filters, [
+      ['eq', 'event_id', 7],
+      ['in', 'status', ASSIGNABLE],
+      ['is', 'coordinator_id', null]
+    ]);
   });
 
-  test('[NORMAL] [SG2-34:AC1] [SG2-34:AC2] reassigns from one coordinator to another (SG2-34)', async () => {
+  test('[NORMAL] [SG2-34:AC1] [SG2-34:AC2] reassigns only while the previous coordinator still holds the request', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
     const result = await assignEventCoordinator(
-      fakeEventsUpdateClient({
-        data: [{ event_id: 7, status: 'under_review', coordinator_id: 'coord-new', coordinator: { name: 'New Coord' } }],
-        error: null
-      }),
+      fakeAssignClient(
+        {
+          data: [{ event_id: 7, status: 'under_review', coordinator_id: 'coord-new', coordinator: { name: 'New Coord' } }],
+          error: null
+        },
+        (c) => (captured = c)
+      ),
       7,
-      'coord-new'
+      'coord-new',
+      'coord-old'
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.coordinator_id, 'coord-new');
+    assert.deepEqual(captured?.filters, [
+      ['eq', 'event_id', 7],
+      ['in', 'status', ASSIGNABLE],
+      ['eq', 'coordinator_id', 'coord-old']
+    ]);
+  });
+
+  test('[NORMAL] [SG2-33:AC4] can clear the coordinator again, which is how an unrecorded first assignment is undone', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
+    const result = await assignEventCoordinator(
+      fakeAssignClient({ data: [{ event_id: 7, status: 'submitted', coordinator_id: null }], error: null }, (c) => (captured = c)),
+      7,
+      null,
+      'coord-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.coordinator_id, null);
+    assert.deepEqual(captured?.row, { coordinator_id: null });
+    assert.deepEqual(captured?.filters.at(-1), ['eq', 'coordinator_id', 'coord-1']);
   });
 
   test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] reports unavailable when the update errors', async () => {
     const result = await assignEventCoordinator(
-      fakeEventsUpdateClient({ data: null, error: { message: 'connection reset' } }),
+      fakeAssignClient({ data: null, error: { message: 'connection reset' } }),
       7,
-      'coord-1'
+      'coord-1',
+      null
     );
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
   });
 
   for (const data of [[], null]) {
-    test(`[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] reports not_assignable if the status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
-      const result = await assignEventCoordinator(fakeEventsUpdateClient({ data, error: null }), 7, 'coord-1');
+    test(`[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] reports not_assignable when the status or coordinator moved on, matching ${JSON.stringify(data)} rows`, async () => {
+      const result = await assignEventCoordinator(fakeAssignClient({ data, error: null }), 7, 'coord-1', 'coord-old');
       assert.equal(result.ok, false);
       if (!result.ok) assert.equal(result.reason, 'not_assignable');
     });
