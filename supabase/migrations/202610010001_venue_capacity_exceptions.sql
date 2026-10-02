@@ -20,7 +20,10 @@ create table public.venue_capacity_exceptions (
   venue_capacity integer,
   approved_at timestamptz not null default now()
 );
-create index venue_capacity_exceptions_request_idx on public.venue_capacity_exceptions (request_id);
+-- Two approvers acting at once must not both record the same approval: the
+-- second insert fails here and the API reports it as already approved.
+create unique index venue_capacity_exceptions_request_attendance_idx
+  on public.venue_capacity_exceptions (request_id, expected_attendance);
 
 -- Like venue_booking_requests, only the server writes or reads these, after
 -- checking the caller's role and their relationship to the event. A recorded

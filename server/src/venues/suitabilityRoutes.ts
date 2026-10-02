@@ -147,14 +147,15 @@ export function createBookingRequestSuitabilityRouter(access: ReturnType<typeof 
       respond(409, { error: "The event's expected attendance fits this venue, so no capacity exception is needed." });
       return;
     }
-    if (booking === 'allowed') {
-      respond(409, { error: 'A capacity exception covering this attendance has already been approved.' });
-      return;
-    }
-    const exception = await database.recordException({
+    const exception = booking === 'allowed' ? null : await database.recordException({
       request_id: request.request_id, approved_by: principal.userId, approver_role: principal.role,
       expected_attendance: capacity.expected_attendance, venue_capacity: venue.capacity
     });
+    // Already covered, either before this request or by a concurrent approval.
+    if (!exception) {
+      respond(409, { error: 'A capacity exception covering this attendance has already been approved.' });
+      return;
+    }
     respond(201, { exception, booking: bookingReadiness(suitability, [exception]) });
   }));
 

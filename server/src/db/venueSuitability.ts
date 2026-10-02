@@ -51,7 +51,8 @@ export interface VenueSuitabilityStore {
   request(requestId: number): Promise<BookingRequestRow | null>;
   /** Approvals for the request, earliest first, with the approver's name. */
   exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
-  recordException(values: NewCapacityException): Promise<CapacityExceptionRecord>;
+  /** Null when the same approval was recorded concurrently by someone else. */
+  recordException(values: NewCapacityException): Promise<CapacityExceptionRecord | null>;
 }
 
 const EVENT_COLUMNS = 'event_id,name,organiser_id,coordinator_id,status,expected_attendance,venue_requirements,accessibility_needs';
@@ -101,6 +102,8 @@ export function createVenueSuitabilityStore(admin: SupabaseClient): VenueSuitabi
     },
     async recordException(values) {
       const { data, error } = await admin.from('venue_capacity_exceptions').insert(values).select(EXCEPTION_COLUMNS).maybeSingle();
+      // Unique (request_id, expected_attendance): another approver got there first.
+      if ((error as { code?: string } | null)?.code === '23505') return null;
       check(error || !data);
       return (await withNames([data as Row]))[0];
     }
