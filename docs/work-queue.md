@@ -15,7 +15,10 @@ their existing behavior.
 | Venue Staff | Team-wide `pending` venue booking requests for active events. |
 | Technical Support Staff | Team-wide `pending` equipment requests for active events. |
 
-Draft, completed, cancelled and rejected events do not produce queue work.
+Draft, completed, cancelled and rejected events do not produce queue work. A
+request returned for clarification (`needs_clarification`, SG2-36) is waiting
+on its organiser and reappears in **Awaiting review** once resubmitted; see
+[Clarification exchange](clarifications.md).
 Another coordinator's assigned event is excluded. Decided/cancelled resource
 requests disappear immediately. Queue and detail reads apply the same verified
 role and assignment constraints; client-supplied identity or role cannot widen

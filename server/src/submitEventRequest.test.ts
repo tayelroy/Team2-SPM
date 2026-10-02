@@ -180,6 +180,43 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(submitted, 7);
   });
 
+  test('[FAILURE] [SG2-36:AC2] a returned request emptied while amending cannot be resubmitted', async () => {
+    let writes = 0;
+    const response = await request(
+      buildApp({
+        captureSubmit: () => { writes++; },
+        fetchResult: {
+          ok: true,
+          request: { ...COMPLETE_DRAFT, status: 'needs_clarification', expected_attendance: null }
+        }
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body.missing, ['expected_attendance']);
+    assert.equal(writes, 0);
+  });
+
+  test('[BOUNDARY] [SG2-36:AC2] a returned request missing only optional details can still be resubmitted', async () => {
+    let submitted: number | undefined;
+    const response = await request(
+      buildApp({
+        fetchResult: {
+          ok: true,
+          request: {
+            ...COMPLETE_DRAFT, status: 'needs_clarification',
+            accessibility_needs: null, equipment_requirements: null
+          }
+        },
+        captureSubmit: (eventId) => (submitted = eventId)
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'submitted');
+    assert.equal(submitted, 7);
+  });
+
   test('[FAILURE] [SG2-30:AC2] returns 400 and lists outstanding fields for an incomplete draft', async () => {
     let writes = 0;
     const response = await request(

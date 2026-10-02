@@ -212,6 +212,16 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.match(response.body.error, /must be text/);
   });
 
+  test('[BOUNDARY] [SG2-36:AC1] accepts a message of exactly 5000 characters, measured after trimming', async () => {
+    const stored: string[] = [];
+    const app = postApp({ captureAdd: (_eventId, _senderId, message) => stored.push(message) });
+    for (const message of ['x'.repeat(5000), `  ${'y'.repeat(5000)}  `]) {
+      const response = await request(app).post('/api/event-requests/7/clarifications').send({ message });
+      assert.equal(response.status, 201);
+    }
+    assert.deepEqual(stored.map(message => message.length), [5000, 5000]);
+  });
+
   test('[BOUNDARY] [SG2-36:AC1] returns 400 when the message is longer than the field allows', async () => {
     const response = await request(postApp())
       .post('/api/event-requests/7/clarifications')

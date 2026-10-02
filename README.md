@@ -156,6 +156,7 @@ uploaded as the `browser-regression` artifact.
 - [Organisation event access](docs/organisation-events.md) — SG2-26 behaviour, provisioning and database protection
 - [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
+- [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 
 CI runs the complete regression suite before and after each PR merge.
 
