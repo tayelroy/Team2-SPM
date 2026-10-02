@@ -4,11 +4,13 @@ import {
   deleteEventRequestDraft,
   assignCoordinator,
   fetchAssignable,
+  fetchClarifications,
   fetchEventRequestDraft,
   fetchOwnEventDetail,
   fetchOwnEventRequests,
   isWaitingOnOrganiser,
   listMyDraftRequests,
+  postClarification,
   submitEventRequest,
   updateEventRequestDraft,
   getEventStage,
@@ -51,7 +53,7 @@ afterEach(() => {
 });
 
 describe('createEventRequestDraft', () => {
-  test('refuses to call the API when signed out', async () => {
+  test('[FAILURE] [SG2-28:AC3] refuses to call the API when signed out', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -61,7 +63,7 @@ describe('createEventRequestDraft', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test('sends the bearer token and the supplied fields', async () => {
+  test('[NORMAL] [SG2-28:AC1] sends the bearer token and the supplied fields', async () => {
     signIn();
     const fetchMock = vi
       .fn()
@@ -78,7 +80,7 @@ describe('createEventRequestDraft', () => {
     expect(JSON.parse(init.body)).toEqual({ name: 'Forum', expected_attendance: 20 });
   });
 
-  test('defaults missingForSubmission when the server omits it', async () => {
+  test('[BOUNDARY] [SG2-28:AC4] defaults missingForSubmission when the server omits it', async () => {
     signIn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ request: { event_id: 4 } })));
 
@@ -87,7 +89,7 @@ describe('createEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: true, request: { event_id: 4 }, missingForSubmission: [] });
   });
 
-  test('reports a network failure without throwing', async () => {
+  test('[FAILURE] [SG2-28:AC4] reports a network failure without throwing', async () => {
     signIn();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
@@ -96,7 +98,7 @@ describe('createEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: false, message: 'Could not reach the server. Please try again.' });
   });
 
-  test('treats a success status with an unreadable body as a failure', async () => {
+  test('[FAILURE] [SG2-28:AC4] treats a success status with an unreadable body as a failure', async () => {
     signIn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
 
@@ -105,7 +107,7 @@ describe('createEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: false, message: 'Could not reach the server. Please try again.' });
   });
 
-  test('maps 401 back to a signed-out message', async () => {
+  test('[FAILURE] [SG2-28:AC3] maps 401 back to a signed-out message', async () => {
     signIn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
@@ -114,7 +116,7 @@ describe('createEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: false, message: 'You are signed out. Sign in again to save this draft.' });
   });
 
-  test('explains a 403 without server details in terms of the caller role', async () => {
+  test('[FAILURE] [SG2-28:AC3] explains a 403 without server details in terms of the caller role', async () => {
     signIn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 403)));
 
@@ -123,7 +125,7 @@ describe('createEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: false, message: 'Your role cannot raise event requests.' });
   });
 
-  test('surfaces server validation details on a 400', async () => {
+  test('[FAILURE] [SG2-28:AC4] surfaces server validation details on a 400', async () => {
     signIn();
     vi.stubGlobal(
       'fetch',
@@ -141,7 +143,7 @@ describe('createEventRequestDraft', () => {
     });
   });
 
-  test('falls back to the status code when an error body has no message', async () => {
+  test('[FAILURE] [SG2-28:AC4] falls back to the status code when an error body has no message', async () => {
     signIn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
@@ -152,7 +154,7 @@ describe('createEventRequestDraft', () => {
 });
 
 describe('submitEventRequest', () => {
-  test('returns success and sends the event id and bearer token', async () => {
+  test('[NORMAL] [SG2-30:AC1] returns success and sends the event id and bearer token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -163,7 +165,7 @@ describe('submitEventRequest', () => {
     });
   });
 
-  test('maps a malformed 400 response to an empty missing-field list', async () => {
+  test('[FAILURE] [SG2-30:AC2] maps a malformed 400 response to an empty missing-field list', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response('{not-json', { status: 400 })),
@@ -176,16 +178,17 @@ describe('submitEventRequest', () => {
     });
   });
 
-  test.each([
-    [409, { ok: false, kind: 'conflict' }],
-    [503, { ok: false, kind: 'unavailable' }],
-  ] as const)('maps HTTP %s to the documented result', async (status, expected) => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
-
-    await expect(submitEventRequest('evt-1', 'token-1')).resolves.toEqual(expected);
+  test('[CONFLICT] [SG2-30:submitted-state] reports that an already-submitted request cannot be submitted again', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
+    await expect(submitEventRequest('evt-1', 'token-1')).resolves.toEqual({ ok: false, kind: 'conflict' });
   });
 
-  test('returns the server error message for an unexpected response', async () => {
+  test('[FAILURE] [SG2-30:submission-errors] a service outage offers a retry instead of reporting a submission', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+    await expect(submitEventRequest('evt-1', 'token-1')).resolves.toEqual({ ok: false, kind: 'unavailable' });
+  });
+
+  test('[FAILURE] [SG2-30:submission-errors] returns the server error message for an unexpected response', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -200,7 +203,7 @@ describe('submitEventRequest', () => {
     });
   });
 
-  test('uses the fallback message when an unexpected response has no JSON error', async () => {
+  test('[FAILURE] [SG2-30:submission-errors] uses the fallback message when an unexpected response has no JSON error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response('{not-json', { status: 500 })),
@@ -213,7 +216,7 @@ describe('submitEventRequest', () => {
     });
   });
 
-  test('maps a network failure to unavailable', async () => {
+  test('[FAILURE] [SG2-30:submission-errors] maps a network failure to unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
     await expect(submitEventRequest('evt-1', 'token-1')).resolves.toEqual({
@@ -225,7 +228,7 @@ describe('submitEventRequest', () => {
 
 describe('isWaitingOnOrganiser', () => {
   test.each(['draft', 'Draft', 'DRAFT', 'rejected', 'Rejected', '  rejected  '])(
-    'returns true for organiser actionable status %s',
+    '[NORMAL] [SG2-31:AC4] returns true for organiser actionable status %s',
     (status) => {
       expect(isWaitingOnOrganiser(status)).toBe(true);
     },
@@ -239,7 +242,7 @@ describe('isWaitingOnOrganiser', () => {
     'completed',
     'cancelled',
     'unknown',
-  ])('returns false for coordinator/system status %s', (status) => {
+  ])('[NORMAL] [SG2-31:AC4] returns false for coordinator/system status %s', (status) => {
     expect(isWaitingOnOrganiser(status)).toBe(false);
   });
 });
@@ -274,19 +277,19 @@ describe('shared GET response contracts', () => {
     },
   ];
 
-  test.each(readers)('$label maps a failed GET to its public unavailable result', async ({ read, unavailable }) => {
+  test.each(readers)('[FAILURE] [SG2-26:read-response] $label maps a failed GET to its public unavailable result', async ({ read, unavailable }) => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     await expect(read()).resolves.toEqual(unavailable);
   });
 
-  test.each(readers)('$label applies its unreadable-success response policy', async ({ read, unreadable }) => {
+  test.each(readers)('[FAILURE] [SG2-26:read-response] $label applies its unreadable-success response policy', async ({ read, unreadable }) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{not-json', { status: 200 })));
     await expect(read()).resolves.toEqual(unreadable);
   });
 });
 
 describe('fetchOwnEventRequests', () => {
-  test('fetches events without filter and maps summary response', async () => {
+  test('[NORMAL] [SG2-26:AC1] fetches events without filter and maps summary response', async () => {
     const mockEvents = [
       {
         event_id: 101,
@@ -345,7 +348,7 @@ describe('fetchOwnEventRequests', () => {
     expect(result).toEqual({ ok: true, requests: expected });
   });
 
-  test('applies status query parameter when provided and not "all"', async () => {
+  test('[NORMAL] [SG2-31:AC2] applies status query parameter when provided and not "all"', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ requests: [] }), { status: 200 }),
     );
@@ -360,7 +363,7 @@ describe('fetchOwnEventRequests', () => {
   });
 
   test.each(['All', 'all', '  ', ''])(
-    'omits status query parameter for filter value %s',
+    '[BOUNDARY] [SG2-31:AC2] omits status query parameter for filter value %s',
     async (filter) => {
       const fetchMock = vi.fn().mockResolvedValue(
         new Response(JSON.stringify({ requests: [] }), { status: 200 }),
@@ -375,7 +378,7 @@ describe('fetchOwnEventRequests', () => {
     },
   );
 
-  test.each([{}, { requests: null }, { requests: 'not an array' }])('maps a missing or non-array requests payload to an empty list: %j', async (body) => {
+  test.each([{}, { requests: null }, { requests: 'not an array' }])('[FAILURE] [SG2-26:AC1] maps a missing or non-array requests payload to an empty list: %j', async (body) => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })),
@@ -386,7 +389,7 @@ describe('fetchOwnEventRequests', () => {
   });
 
 
-  test('maps rows with missing fields to safe defaults', async () => {
+  test('[BOUNDARY] [SG2-26:AC1] maps rows with missing fields to safe defaults', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ requests: [{}] }), { status: 200 }),
     );
@@ -410,14 +413,14 @@ describe('fetchOwnEventRequests', () => {
     });
   });
 
-  test.each([401, 403])('maps HTTP %s to unauthorized', async (status) => {
+  test.each([401, 403])('[FAILURE] [SG2-26:AC1] maps HTTP %s to unauthorized', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
 
     const result = await fetchOwnEventRequests('token-abc');
     expect(result).toEqual({ ok: false, kind: 'unauthorized' });
   });
 
-  test('maps HTTP 503 to unavailable', async () => {
+  test('[FAILURE] [SG2-26:AC1] maps HTTP 503 to unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
     const result = await fetchOwnEventRequests('token-abc');
@@ -425,7 +428,7 @@ describe('fetchOwnEventRequests', () => {
   });
 
 
-  test('returns error message on unexpected server response', async () => {
+  test('[FAILURE] [SG2-26:AC1] returns error message on unexpected server response', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -441,7 +444,7 @@ describe('fetchOwnEventRequests', () => {
     });
   });
 
-  test('uses fallback message on unexpected server response without json error', async () => {
+  test('[FAILURE] [SG2-26:AC1] uses fallback message on unexpected server response without json error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response('{not-json', { status: 500 })),
@@ -457,7 +460,7 @@ describe('fetchOwnEventRequests', () => {
 });
 
 describe('fetchOwnEventDetail', () => {
-  test('fetches event detail and maps all fields', async () => {
+  test('[NORMAL] [SG2-26:AC1] fetches event detail and maps all fields', async () => {
     const rawDetail = {
       event_id: 42,
       can_manage: true,
@@ -517,7 +520,7 @@ describe('fetchOwnEventDetail', () => {
     expect(result).toEqual({ ok: true, request: expected });
   });
 
-  test('maps event detail with missing optional fields to display defaults', async () => {
+  test('[BOUNDARY] [SG2-26:AC1] maps event detail with missing optional fields to display defaults', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -560,7 +563,7 @@ describe('fetchOwnEventDetail', () => {
     });
   });
 
-  test('maps completely empty request detail row to safe fallback defaults', async () => {
+  test('[BOUNDARY] [SG2-26:AC1] maps completely empty request detail row to safe fallback defaults', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -599,7 +602,7 @@ describe('fetchOwnEventDetail', () => {
     });
   });
 
-  test('returns error when 200 response contains no request object', async () => {
+  test('[FAILURE] [SG2-26:AC1] returns error when 200 response contains no request object', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200 })),
@@ -614,7 +617,7 @@ describe('fetchOwnEventDetail', () => {
   });
 
 
-  test('maps HTTP 404 to not_found', async () => {
+  test('[FAILURE] [SG2-26:AC1] maps HTTP 404 to not_found', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -628,14 +631,14 @@ describe('fetchOwnEventDetail', () => {
     expect(result).toEqual({ ok: false, kind: 'not_found' });
   });
 
-  test.each([401, 403])('maps HTTP %s to unauthorized', async (status) => {
+  test.each([401, 403])('[FAILURE] [SG2-26:AC1] maps HTTP %s to unauthorized', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
 
     const result = await fetchOwnEventDetail(42, 'token-xyz');
     expect(result).toEqual({ ok: false, kind: 'unauthorized' });
   });
 
-  test('maps HTTP 503 to unavailable', async () => {
+  test('[FAILURE] [SG2-26:AC1] maps HTTP 503 to unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
     const result = await fetchOwnEventDetail(42, 'token-xyz');
@@ -643,7 +646,7 @@ describe('fetchOwnEventDetail', () => {
   });
 
 
-  test('returns error message on unexpected server error response', async () => {
+  test('[FAILURE] [SG2-26:AC1] returns error message on unexpected server error response', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -661,7 +664,7 @@ describe('fetchOwnEventDetail', () => {
     });
   });
 
-  test('uses fallback message on unexpected server error without json error', async () => {
+  test('[FAILURE] [SG2-26:AC1] uses fallback message on unexpected server error without json error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response('{not-json', { status: 500 })),
@@ -677,7 +680,7 @@ describe('fetchOwnEventDetail', () => {
 });
 
 describe('listMyDraftRequests', () => {
-  test('requests only the caller’s drafts with the bearer token', async () => {
+  test('[NORMAL] [SG2-29:AC3] requests only the caller’s drafts with the bearer token', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse({ requests: [{ event_id: 7, status: 'draft' }] }, 200));
@@ -687,12 +690,29 @@ describe('listMyDraftRequests', () => {
 
     expect(outcome).toEqual({ ok: true, requests: [{ event_id: 7, status: 'draft' }] });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('/api/event-requests?scope=mine&status=draft');
+    expect(url).toBe('/api/event-requests?scope=mine');
     expect(init.method).toBe('GET');
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
 
-  test('maps 401 to a signed-out message', async () => {
+  test('[CONFLICT] [SG2-36:AC2] keeps drafts and returned requests but drops ones already with staff', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      requests: [
+        { event_id: 1, status: 'draft' },
+        { event_id: 2, status: 'submitted' },
+        { event_id: 3, status: 'needs_clarification' },
+        { event_id: 4, status: 'under_review' },
+        { event_id: 5, status: 'rejected' },
+      ],
+    }, 200)));
+
+    await expect(listMyDraftRequests('token-1')).resolves.toEqual({
+      ok: true,
+      requests: [{ event_id: 1, status: 'draft' }, { event_id: 3, status: 'needs_clarification' }],
+    });
+  });
+
+  test('[FAILURE] [SG2-29:AC3] maps 401 to a signed-out message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     await expect(listMyDraftRequests('token-1')).resolves.toEqual({
@@ -701,7 +721,7 @@ describe('listMyDraftRequests', () => {
     });
   });
 
-  test('explains a 403 in terms of the caller role', async () => {
+  test('[FAILURE] [SG2-29:AC3] explains a 403 in terms of the caller role', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
 
     await expect(listMyDraftRequests('token-1')).resolves.toEqual({
@@ -712,7 +732,7 @@ describe('listMyDraftRequests', () => {
 
 
 
-  test('falls back to a generic message for an unexpected status', async () => {
+  test('[FAILURE] [SG2-29:AC3] falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
     await expect(listMyDraftRequests('token-1')).resolves.toEqual({
@@ -739,7 +759,7 @@ describe('fetchEventRequestDraft', () => {
     registration_needed: true,
   };
 
-  test('sends the bearer token and returns the full record', async () => {
+  test('[NORMAL] [SG2-29:AC2] sends the bearer token and returns the full record', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ request: FULL_RECORD }, 200));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -752,7 +772,7 @@ describe('fetchEventRequestDraft', () => {
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
 
-  test('maps 401 to a signed-out message', async () => {
+  test('[FAILURE] [SG2-29:AC2] maps 401 to a signed-out message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     await expect(fetchEventRequestDraft(7, 'token-1')).resolves.toEqual({
@@ -761,7 +781,7 @@ describe('fetchEventRequestDraft', () => {
     });
   });
 
-  test('explains a 403 in terms of the caller role', async () => {
+  test('[FAILURE] [SG2-29:AC2] explains a 403 in terms of the caller role', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
 
     await expect(fetchEventRequestDraft(7, 'token-1')).resolves.toEqual({
@@ -770,7 +790,7 @@ describe('fetchEventRequestDraft', () => {
     });
   });
 
-  test('maps 404 to a "no longer exists" message', async () => {
+  test('[FAILURE] [SG2-29:AC2] maps 404 to a "no longer exists" message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'No event request found' }, 404)));
 
     await expect(fetchEventRequestDraft(7, 'token-1')).resolves.toEqual({
@@ -781,7 +801,7 @@ describe('fetchEventRequestDraft', () => {
 
 
 
-  test('falls back to a generic message for an unexpected status', async () => {
+  test('[FAILURE] [SG2-29:AC2] falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
     await expect(fetchEventRequestDraft(7, 'token-1')).resolves.toEqual({
@@ -792,7 +812,7 @@ describe('fetchEventRequestDraft', () => {
 });
 
 describe('deleteEventRequestDraft', () => {
-  test('sends the bearer token to the event-scoped DELETE route', async () => {
+  test('[NORMAL] [SG2-32:AC1] sends the bearer token to the event-scoped DELETE route', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -803,7 +823,7 @@ describe('deleteEventRequestDraft', () => {
     });
   });
 
-  test('maps 401 to a signed-out message', async () => {
+  test('[FAILURE] [SG2-32:AC1] maps 401 to a signed-out message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 
     await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
@@ -812,7 +832,7 @@ describe('deleteEventRequestDraft', () => {
     });
   });
 
-  test('explains a 403 in terms of the caller role', async () => {
+  test('[FAILURE] [SG2-32:AC1] explains a 403 in terms of the caller role', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 403 })));
 
     await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
@@ -821,7 +841,7 @@ describe('deleteEventRequestDraft', () => {
     });
   });
 
-  test('reports a 404 as the draft no longer existing', async () => {
+  test('[FAILURE] [SG2-32:AC1] reports a 404 as the draft no longer existing', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
 
     await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
@@ -830,7 +850,7 @@ describe('deleteEventRequestDraft', () => {
     });
   });
 
-  test('reports a 409 as no longer being a draft', async () => {
+  test('[CONFLICT] [SG2-32:AC2] reports a 409 as no longer being a draft', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 409 })));
 
     await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
@@ -839,7 +859,7 @@ describe('deleteEventRequestDraft', () => {
     });
   });
 
-  test('maps a network failure to a generic unavailable message', async () => {
+  test('[FAILURE] [SG2-32:AC1] maps a network failure to a generic unavailable message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
     await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
@@ -848,7 +868,7 @@ describe('deleteEventRequestDraft', () => {
     });
   });
 
-  test('falls back to a generic message for an unexpected status', async () => {
+  test('[FAILURE] [SG2-32:AC1] falls back to a generic message for an unexpected status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
     await expect(deleteEventRequestDraft('7', 'token-1')).resolves.toEqual({
@@ -859,7 +879,7 @@ describe('deleteEventRequestDraft', () => {
 });
 
 describe('updateEventRequestDraft', () => {
-  test('sends the bearer token and supplied fields to the event-scoped route', async () => {
+  test('[NORMAL] [SG2-29:AC1] sends the bearer token and supplied fields to the event-scoped route', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse({ request: { event_id: 7, name: 'Renamed' }, missingForSubmission: ['purpose'] }, 200));
@@ -875,7 +895,7 @@ describe('updateEventRequestDraft', () => {
     expect(JSON.parse(init.body)).toEqual({ name: 'Renamed' });
   });
 
-  test('defaults missingForSubmission when the server omits it', async () => {
+  test('[BOUNDARY] [SG2-29:AC1] defaults missingForSubmission when the server omits it', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ request: { event_id: 7 } })));
 
     const outcome = await updateEventRequestDraft('7', {}, 'token-1');
@@ -883,7 +903,7 @@ describe('updateEventRequestDraft', () => {
     expect(outcome).toEqual({ ok: true, request: { event_id: 7 }, missingForSubmission: [] });
   });
 
-  test('reports a network failure without throwing', async () => {
+  test('[FAILURE] [SG2-29:AC1] reports a network failure without throwing', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -892,7 +912,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('treats a success status with an unreadable body as a failure', async () => {
+  test('[FAILURE] [SG2-29:AC1] treats a success status with an unreadable body as a failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -901,7 +921,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('maps 401 to a signed-out message', async () => {
+  test('[FAILURE] [SG2-29:AC1] maps 401 to a signed-out message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -910,7 +930,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('explains a 403 in terms of the caller role', async () => {
+  test('[FAILURE] [SG2-29:AC1] explains a 403 in terms of the caller role', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Access denied' }, 403)));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -919,7 +939,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('reports a 404 as the draft no longer existing', async () => {
+  test('[FAILURE] [SG2-29:AC1] reports a 404 as the draft no longer existing', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'No event request found for this account.' }, 404)));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -928,7 +948,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('reports a 409 as no longer being a draft', async () => {
+  test('[CONFLICT] [SG2-30:AC3] reports a 409 as no longer being a draft', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Only a draft event request can be edited.' }, 409)));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -937,7 +957,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('surfaces server validation details on a 400', async () => {
+  test('[FAILURE] [SG2-29:AC1] surfaces server validation details on a 400', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({ error: 'Invalid event request details', details: ['name must be text.'] }, 400)),
@@ -950,7 +970,7 @@ describe('updateEventRequestDraft', () => {
     });
   });
 
-  test('falls back to the status code when an error body has no message', async () => {
+  test('[FAILURE] [SG2-29:AC1] falls back to the status code when an error body has no message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
     await expect(updateEventRequestDraft('7', {}, 'token-1')).resolves.toEqual({
@@ -962,14 +982,14 @@ describe('updateEventRequestDraft', () => {
 });
 
 
-test('create draft preserves the missing organisation guidance from the server', async () => {
+test('[FAILURE] [SG2-28:AC3] create draft preserves the missing organisation guidance from the server', async () => {
   signIn();
   const message = 'Your account needs a client organisation before you can create event requests. Please contact support.';
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: message }, 403)));
   expect(await createEventRequestDraft({})).toEqual({ ok: false, message });
 });
 
-test('shared drafts map to view-only without an action for the current organiser', async () => {
+test('[NORMAL] [SG2-26:AC3] shared drafts map to view-only without an action for the current organiser', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ requests: [
     { event_id: 80, name: 'Colleague draft', status: 'draft', can_manage: false },
   ] }, 200)));
@@ -978,7 +998,7 @@ test('shared drafts map to view-only without an action for the current organiser
 });
 
 describe('getEventStage (SG2-38)', () => {
-  test('successfully retrieves stage result with stepper steps and waiting-on party', async () => {
+  test('[NORMAL] [SG2-38:AC1] successfully retrieves stage result with stepper steps and waiting-on party', async () => {
     const mockStage: EventStageResult = {
       event_id: 101,
       raw_status: 'planning',
@@ -1012,7 +1032,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles 401 unauthorized', async () => {
+  test('[FAILURE] [SG2-38:AC3] handles 401 unauthorized', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     const outcome = await getEventStage(101, 'invalid-token');
@@ -1024,7 +1044,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles 403 forbidden', async () => {
+  test('[FAILURE] [SG2-38:AC3] handles 403 forbidden', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Attendees are not authorized to view event stages.' }, 403)));
 
     const outcome = await getEventStage(101, 'attendee-token');
@@ -1036,7 +1056,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles 404 not found', async () => {
+  test('[FAILURE] [SG2-38:AC1] handles 404 not found', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
 
     const outcome = await getEventStage(999, 'token-1');
@@ -1048,7 +1068,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles 503 unavailable and network failures', async () => {
+  test('[FAILURE] [SG2-38:AC1] handles 503 unavailable and network failures', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Service down' }, 503)));
 
     const unavailableOutcome = await getEventStage(101, 'token-1');
@@ -1067,7 +1087,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('falls back to default messages when error payload is empty', async () => {
+  test('[FAILURE] [SG2-38:AC1] falls back to default messages when error payload is empty', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
     expect(await getEventStage(101, 'token')).toEqual({
       ok: false,
@@ -1097,7 +1117,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles generic HTTP error responses (500) with and without custom error message', async () => {
+  test('[FAILURE] [SG2-38:AC1] handles generic HTTP error responses (500) with and without custom error message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Database crashed' }, 500)));
     expect(await getEventStage(101, 'token')).toEqual({
       ok: false,
@@ -1113,7 +1133,7 @@ describe('getEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles invalid JSON responses or non-object bodies', async () => {
+  test('[FAILURE] [SG2-38:AC1] handles invalid JSON responses or non-object bodies', async () => {
     // Non-JSON response causing json() parse to reject and execute catch(() => null)
     vi.stubGlobal(
       'fetch',
@@ -1181,7 +1201,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     outstanding_arrangements: ['venue_recheck'],
   };
 
-  test('successfully sends PATCH request and returns updated planning record', async () => {
+  test('[NORMAL] [SG2-39:AC1] successfully sends PATCH request and returns updated planning record', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(
         {
@@ -1213,7 +1233,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('defaults outstanding_arrangements to empty array when omitted in 200 response', async () => {
+  test('[BOUNDARY] [SG2-39:AC1] defaults outstanding_arrangements to empty array when omitted in 200 response', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1236,7 +1256,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 409 conflict when confirmation is required (arrangement impact)', async () => {
+  test('[CONFLICT] [SG2-39:AC2] handles 409 conflict when confirmation is required (arrangement impact)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1262,7 +1282,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 409 confirmation required with missing lists and error', async () => {
+  test('[CONFLICT] [SG2-39:AC2] handles 409 confirmation required with missing lists and error', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1285,7 +1305,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 409 conflict without confirmation required (terminal status)', async () => {
+  test('[CONFLICT] [SG2-39:AC5] handles 409 conflict without confirmation required (terminal status)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1315,7 +1335,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 400 validation error with and without details', async () => {
+  test('[FAILURE] [SG2-39:planning-validation] handles 400 validation error with and without details', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1368,7 +1388,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 401 unauthorized with custom and fallback messages', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles 401 unauthorized with custom and fallback messages', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({ error: 'Token expired' }, 401)),
@@ -1387,7 +1407,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 403 forbidden with custom and fallback messages', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles 403 forbidden with custom and fallback messages', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1408,7 +1428,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 404 not found with custom and fallback messages', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles 404 not found with custom and fallback messages', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1429,7 +1449,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 503 unavailable with custom and fallback messages', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles 503 unavailable with custom and fallback messages', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({ error: 'DB down' }, 503)),
@@ -1448,7 +1468,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles unexpected HTTP error (e.g. 500) with custom and fallback messages', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles unexpected HTTP error (e.g. 500) with custom and fallback messages', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(jsonResponse({ error: 'Fatal error' }, 500)),
@@ -1477,7 +1497,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles network failure (fetch rejected)', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles network failure (fetch rejected)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Connection lost')));
     expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
       ok: false,
@@ -1486,7 +1506,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
-  test('handles 200 OK with empty or malformed body or missing event', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles 200 OK with empty or malformed body or missing event', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, 200)));
     expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
       ok: false,
@@ -1512,7 +1532,7 @@ describe('fetchAssignable (SG2-33/34)', () => {
     coordinators: [{ user_id: 'c1', name: 'Sarah' }, { user_id: null, name: null }],
   };
 
-  test('calls the assignable endpoint with the bearer token and maps the rows', async () => {
+  test('[NORMAL] [SG2-33:AC1] calls the assignable endpoint with the bearer token and maps the rows', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(body));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1532,12 +1552,12 @@ describe('fetchAssignable (SG2-33/34)', () => {
     });
   });
 
-  test.each([401, 403])('reports unauthorized on %i', async (status) => {
+  test.each([401, 403])('[FAILURE] [SG2-33:AC1] reports unauthorized on %i', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
     expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unauthorized' });
   });
 
-  test('reports unavailable on a server error, a network failure or a malformed body', async () => {
+  test('[FAILURE] [SG2-33:AC1] reports unavailable on a server error, a network failure or a malformed body', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
     expect(await fetchAssignable('tok')).toEqual({ ok: false, kind: 'unavailable' });
 
@@ -1553,7 +1573,7 @@ describe('fetchAssignable (SG2-33/34)', () => {
 });
 
 describe('assignCoordinator (SG2-33/34)', () => {
-  test('patches the coordinator endpoint with the chosen coordinator', async () => {
+  test('[NORMAL] [SG2-33:AC1] patches the coordinator endpoint with the chosen coordinator', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: {} }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1565,7 +1585,7 @@ describe('assignCoordinator (SG2-33/34)', () => {
     });
   });
 
-  test.each([401, 403])('tells the user only Technical Support can assign on %i', async (status) => {
+  test.each([401, 403])('[FAILURE] [SG2-33:AC1] tells the user only Technical Support can assign on %i', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({
       ok: false,
@@ -1573,17 +1593,22 @@ describe('assignCoordinator (SG2-33/34)', () => {
     });
   });
 
-  test.each([400, 404, 409])("relays the server's reason on %i", async (status) => {
+  test.each([400, 404])("[FAILURE] [SG2-33:AC1] relays the server's reason on %i", async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'Not assignable.' }, { status })));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: false, message: 'Not assignable.' });
   });
 
-  test('falls back to a generic message when a rejection carries no reason', async () => {
+  test('[CONFLICT] [SG2-33:AC1] relays a refusal when the request is no longer assignable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ error: 'Not assignable.' }, { status: 409 })));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: false, message: 'Not assignable.' });
+  });
+
+  test('[CONFLICT] [SG2-33:AC1] falls back to a generic message when a rejection carries no reason', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('nope', { status: 409 })));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: false, message: 'That assignment was not accepted.' });
   });
 
-  test('reports a retryable failure for a server error or a network failure', async () => {
+  test('[FAILURE] [SG2-33:assignment-errors] reports a retryable failure for a server error or a network failure', async () => {
     const retry = { ok: false, message: 'Could not save the assignment. Please try again.' };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual(retry);
@@ -1616,19 +1641,20 @@ describe('getEventHistory (SG2-40)', () => {
     },
   ];
 
-  test('[NORMAL] successfully retrieves change history with reverse chronological entries', async () => {
+  test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] preserves the server history order, actors, timestamps and old/new values', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: mockHistory }, 200));
     vi.stubGlobal('fetch', fetchMock);
 
     const outcome = await getEventHistory(101, 'test-token');
 
     expect(outcome).toEqual({ ok: true, history: mockHistory });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/101/history', {
       headers: { Authorization: 'Bearer test-token' },
     });
   });
 
-  test('[BOUNDARY] handles empty history list', async () => {
+  test('[BOUNDARY] [SG2-40:AC1] handles empty history list', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: [] }, 200)));
 
     const outcome = await getEventHistory(101, 'test-token');
@@ -1636,7 +1662,7 @@ describe('getEventHistory (SG2-40)', () => {
     expect(outcome).toEqual({ ok: true, history: [] });
   });
 
-  test('[FAILURE] handles 401 unauthorized', async () => {
+  test('[FAILURE] [SG2-40:signed-out-history] handles 401 unauthorized', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     const outcome = await getEventHistory(101, 'invalid-token');
@@ -1648,22 +1674,31 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles 403 forbidden', async () => {
+  test.each([
+    {
+      caller: 'an attendee', token: 'attendee-token',
+      message: 'Attendees are not authorized to view change history.',
+    },
+    {
+      caller: 'an unrelated organiser', token: 'other-organiser-token',
+      message: 'You are not authorized to view the change history of this event.',
+    },
+  ])('[FAILURE] [SG2-40:AC3] surfaces history denial for $caller', async ({ token, message }) => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ error: 'Attendees are not authorized to view change history.' }, 403)),
+      vi.fn().mockResolvedValue(jsonResponse({ error: message }, 403)),
     );
 
-    const outcome = await getEventHistory(101, 'attendee-token');
+    const outcome = await getEventHistory(101, token);
 
     expect(outcome).toEqual({
       ok: false,
       kind: 'forbidden',
-      message: 'Attendees are not authorized to view change history.',
+      message,
     });
   });
 
-  test('[FAILURE] handles 404 not found', async () => {
+  test('[FAILURE] [SG2-40:missing-event] handles 404 not found', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
 
     const outcome = await getEventHistory(999, 'token-1');
@@ -1675,7 +1710,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles 503 unavailable and network failures', async () => {
+  test('[FAILURE] [SG2-40:service-failure] handles 503 unavailable and network failures', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Service down' }, 503)));
 
     const unavailableOutcome = await getEventHistory(101, 'token-1');
@@ -1694,7 +1729,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[BOUNDARY] falls back to default messages when error payload is empty', async () => {
+  test('[BOUNDARY] [SG2-40:error-messages] falls back to default messages when error payload is empty', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
     expect(await getEventHistory(101, 'token')).toEqual({
       ok: false,
@@ -1724,7 +1759,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles generic HTTP error responses (500)', async () => {
+  test('[FAILURE] [SG2-40:service-failure] handles generic HTTP error responses (500)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Internal failure' }, 500)));
     expect(await getEventHistory(101, 'token')).toEqual({
       ok: false,
@@ -1740,7 +1775,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles invalid JSON responses or non-object / non-array bodies', async () => {
+  test('[FAILURE] [SG2-40:invalid-history-response] handles invalid JSON responses or non-object / non-array bodies', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1774,3 +1809,112 @@ describe('getEventHistory (SG2-40)', () => {
   });
 });
 
+describe('isWaitingOnOrganiser for returned requests', () => {
+  test('[NORMAL] [SG2-36:AC1] a request returned for clarification is waiting on the organiser', () => {
+    expect(isWaitingOnOrganiser('needs_clarification')).toBe(true);
+    expect(isWaitingOnOrganiser('under_review')).toBe(false);
+  });
+});
+
+describe('fetchClarifications', () => {
+  const message = {
+    clarification_id: 1, event_id: 42, sender_id: 'c1', sender_name: 'Casey Coordinator',
+    message: 'Which date is firm?', created_at: '2026-09-30T02:00:00.000Z',
+  };
+
+  test('[NORMAL] [SG2-36:AC3] reads the thread and status with the bearer token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ clarifications: [message], status: 'needs_clarification' }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({
+      ok: true, clarifications: [message], status: 'needs_clarification',
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/event-requests/42/clarifications');
+    expect(init.headers.Authorization).toBe('Bearer token-1');
+  });
+
+  test.each([
+    [401, 'You are signed out. Sign in again to see this conversation.'],
+    [403, 'Your role cannot take part in this conversation.'],
+    [404, 'This request is not one you are part of.'],
+    [503, 'Could not reach the server. Please try again.'],
+  ])('[FAILURE] [SG2-36:AC3] explains a %i when reading the thread', async (status, text) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'x' }, status)));
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({ ok: false, message: text });
+  });
+
+  test('[FAILURE] [SG2-36:AC3] reports the server unreachable when the network fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test.each([
+    [{ status: 'submitted' }],
+    [{ clarifications: [] }],
+  ])('[BOUNDARY] [SG2-36:AC3] rejects a malformed thread body %j', async body => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(body, 200)));
+
+    await expect(fetchClarifications(42, 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+});
+
+describe('postClarification', () => {
+  const message = {
+    clarification_id: 2, event_id: 42, sender_id: 'c1', sender_name: 'Casey Coordinator',
+    message: 'Which date is firm?', created_at: '2026-09-30T02:00:00.000Z',
+  };
+
+  test('[NORMAL] [SG2-36:AC1] posts the message as JSON and returns the new status', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ clarification: message, status: 'needs_clarification' }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(postClarification(42, 'Which date is firm?', 'token-1')).resolves.toEqual({
+      ok: true, clarification: message, status: 'needs_clarification',
+    });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/event-requests/42/clarifications');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer token-1' });
+    expect(JSON.parse(init.body)).toEqual({ message: 'Which date is firm?' });
+  });
+
+  test('[BOUNDARY] [SG2-36:AC1] surfaces the server validation message for a blank message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'A message is required.' }, 400)));
+
+    await expect(postClarification(42, '  ', 'token-1')).resolves.toEqual({ ok: false, message: 'A message is required.' });
+  });
+
+  test.each([
+    [400, null, 'Could not reach the server. Please try again.'],
+    [404, { error: 'Not found' }, 'This request is not one you are part of.'],
+  ])('[FAILURE] [SG2-36:AC1] maps a %i without a usable error to a fixed message', async (status, body, text) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      body === null ? new Response(null, { status }) : jsonResponse(body, status),
+    ));
+
+    await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({ ok: false, message: text });
+  });
+
+  test('[FAILURE] [SG2-36:AC1] reports the server unreachable when the network fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+
+    await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('[BOUNDARY] [SG2-36:AC1] rejects a success body without the posted message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 'needs_clarification' }, 201)));
+
+    await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({
+      ok: false, message: 'Could not reach the server. Please try again.',
+    });
+  });
+});

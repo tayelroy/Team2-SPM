@@ -25,7 +25,7 @@ export interface SubmitEventRequestDependencies {
 }
 
 /** Statuses a caller may submit from: a fresh draft, or a rejected request being reworked. */
-const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected']);
+const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected', 'needs_clarification']);
 
 /**
  * PATCH /api/event-requests/:eventId/submit — submits a draft for review (SG2-30).

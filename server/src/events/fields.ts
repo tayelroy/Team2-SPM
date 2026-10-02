@@ -190,7 +190,9 @@ export const EVENT_STATUSES = [
   'confirmed',
   'completed',
   'cancelled',
-  'rejected'
+  'rejected',
+  // SG2-36: returned to the organiser with a question; still live.
+  'needs_clarification'
 ] as const;
 
 export type EventStatus = (typeof EVENT_STATUSES)[number];

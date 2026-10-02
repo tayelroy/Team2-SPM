@@ -1,0 +1,357 @@
+{
+  "reviewDate": "2026-10-01",
+  "reviewedBy": "LIM JUN WEI",
+  "source": "Live SPM Jira descriptions read on 1 October 2026. AC numbers are their displayed bullet order; Jira bullets are not separately numbered.",
+  "stories": [
+    {
+      "id": "SG2-19",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-19",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Repository created, with all team members and both instructors granted access",
+        "AC2": "Branch naming and commit conventions documented in the repository",
+        "AC3": "A pull request is required before merging to main, with at least one reviewer",
+        "AC4": "Definition of done agreed and recorded where the whole team can see it"
+      }
+    },
+    {
+      "id": "SG2-20",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-20",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/1",
+        "https://github.com/tayelroy/Team2-SPM/pull/5"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "A developer can clone the repository and start both applications by following the README",
+        "AC2": "The backend exposes a health check that returns success",
+        "AC3": "The frontend can call the backend successfully in local development"
+      }
+    },
+    {
+      "id": "SG2-22",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-22",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/1",
+        "https://github.com/tayelroy/Team2-SPM/pull/31",
+        "https://github.com/tayelroy/Team2-SPM/pull/34"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Pipeline triggers automatically on every pull request",
+        "AC2": "Pipeline builds the application and runs the automated test suite",
+        "AC3": "A failing test blocks the merge",
+        "AC4": "The pipeline result is visible on the pull request"
+      }
+    },
+    {
+      "id": "SG2-23",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-23",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/10",
+        "https://github.com/tayelroy/Team2-SPM/pull/11"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can log in with valid credentials and arrive at the landing page for my role",
+        "AC2": "Invalid credentials are refused, with a message that does not reveal whether the email address exists",
+        "AC3": "Can log out, after which protected pages are no longer reachable without logging in again"
+      }
+    },
+    {
+      "id": "SG2-24",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-24",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/12"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Every account holds exactly one of: Event Organiser, Event Coordinator, Venue Staff, Technical Support Staff, Attendee",
+        "AC2": "Only Technical Support Staff can set or change the role on an account",
+        "AC3": "The role is visible on the user's profile"
+      }
+    },
+    {
+      "id": "SG2-25",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-25",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/8",
+        "https://github.com/tayelroy/Team2-SPM/pull/9",
+        "https://github.com/tayelroy/Team2-SPM/pull/15",
+        "https://github.com/tayelroy/Team2-SPM/pull/17"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "An action attempted outside the user's role is refused",
+        "AC2": "Refusal does not depend on the user simply not seeing the button",
+        "AC3": "Requests from users who are not logged in are refused"
+      }
+    },
+    {
+      "id": "SG2-26",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-26",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/32"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "My events list shows only events belonging to my client organisation",
+        "AC2": "Requesting another organisation's event directly is refused",
+        "AC3": "Colleagues in the same client organisation can see the same events"
+      }
+    },
+    {
+      "id": "SG2-27",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-27",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/4",
+        "https://github.com/tayelroy/Team2-SPM/pull/23",
+        "https://github.com/tayelroy/Team2-SPM/pull/27"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can view my current profile details",
+        "AC2": "Can update name, contact details and communication preferences",
+        "AC3": "Invalid contact details are rejected with a message explaining why",
+        "AC4": "Internal users additionally see their department"
+      }
+    },
+    {
+      "id": "SG2-28",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-28",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/14",
+        "https://github.com/tayelroy/Team2-SPM/pull/18"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can record event name, purpose, description, proposed date and time, expected attendance, venue requirements, accessibility needs, equipment requirements and whether registration is needed",
+        "AC2": "Accessibility needs are optional and can be left blank",
+        "AC3": "A new request is created as a draft against me and my client organisation, without being submitted for review",
+        "AC4": "Fields required for submission are identified, but leaving them incomplete does not prevent creating a draft; completeness is checked when submitting"
+      }
+    },
+    {
+      "id": "SG2-29",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-29",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/24",
+        "https://github.com/tayelroy/Team2-SPM/pull/29"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can save further changes to an existing draft even when information required for submission is still incomplete",
+        "AC2": "Can reopen a draft later with all entered information intact and editable",
+        "AC3": "Drafts are distinguishable from submitted requests in my events list",
+        "AC4": "Drafts do not appear in the Coordinator's review queue"
+      }
+    },
+    {
+      "id": "SG2-30",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-30",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/13",
+        "https://github.com/tayelroy/Team2-SPM/pull/22"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Given a draft with all mandatory information complete, when I submit it, then it becomes visible to ConnectSphere for review and I can see that it has been submitted",
+        "AC2": "Given a draft with mandatory information missing, when I submit it, then submission is refused, the outstanding items are listed, and the request remains a draft",
+        "AC3": "Given a submitted request that has not been returned for clarification, when I try to edit it directly, then editing is refused"
+      }
+    },
+    {
+      "id": "SG2-31",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-31",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/25",
+        "https://github.com/tayelroy/Team2-SPM/pull/26"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "My events list shows each request with its name, proposed date, current state and assigned coordinator once one exists",
+        "AC2": "Can filter the list by state",
+        "AC3": "Selecting an event opens its full details",
+        "AC4": "Where the event is waiting on me, this is apparent from the list"
+      }
+    },
+    {
+      "id": "SG2-32",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-32",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/24",
+        "https://github.com/tayelroy/Team2-SPM/pull/29",
+        "https://github.com/tayelroy/Team2-SPM/pull/46"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can delete a request that is still a draft, after confirming",
+        "AC2": "Deleting is not offered once a request has been submitted"
+      }
+    },
+    {
+      "id": "SG2-33",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-33",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/33",
+        "https://github.com/tayelroy/Team2-SPM/pull/48"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Only Technical Support Staff can assign an Event Coordinator to a submitted request",
+        "AC2": "The assigned coordinator becomes responsible for the event and it appears in their list",
+        "AC3": "I can see who my coordinator is and how to contact them",
+        "AC4": "The assignment is recorded with the user who made it and when"
+      }
+    },
+    {
+      "id": "SG2-34",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-34",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/33",
+        "https://github.com/tayelroy/Team2-SPM/pull/48"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Only Technical Support Staff can reassign an event to another Event Coordinator",
+        "AC2": "The new coordinator gains coordinator rights and the previous one loses them",
+        "AC3": "The Event Organiser can see the new contact",
+        "AC4": "The previous assignment remains visible in the event history"
+      }
+    },
+    {
+      "id": "SG2-35",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-35",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/40"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can open a request assigned to me and view all information the Event Organiser submitted",
+        "AC2": "When I open a submitted request to review it, its status becomes Under Review and is visible to the Event Organiser",
+        "AC3": "Cannot review a request assigned to another Event Coordinator"
+      }
+    },
+    {
+      "id": "SG2-36",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-36",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Given a request assigned to me, when I return it for clarification with a message, then the Event Organiser is notified and can see my questions and that a response is needed",
+        "AC2": "Given a returned request, the Event Organiser can amend and resubmit it, after which it returns to my review queue and I am notified",
+        "AC3": "The clarification exchange remains visible against the event record"
+      }
+    },
+    {
+      "id": "SG2-37",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-37",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/47"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Given a request I am reviewing, when I approve it, then planning activities become available for that event and the Organiser can see it was approved",
+        "AC2": "Given a request I am reviewing, when I reject it, then I must give a reason, the reason is visible to the Organiser, and no venue or equipment can be reserved against the event afterwards",
+        "AC3": "Given any decision, the decision, who made it and when are recorded"
+      }
+    },
+    {
+      "id": "SG2-38",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-38",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/35"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "The event shows a single current state, in language that does not assume knowledge of ConnectSphere's internal process",
+        "AC2": "Where the event is waiting on someone, the event shows who",
+        "AC3": "The state shown is consistent with the actions that have actually been taken on the event"
+      }
+    },
+    {
+      "id": "SG2-39",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-39",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/44"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Given an approved event I coordinate, when I change information on it, then the change is saved and the previous value, my identity and the time are recorded",
+        "AC2": "Given an edit affects existing venue, equipment or registration arrangements, when I save it, then the affected arrangements are identified for rechecking and I am warned before the change takes effect",
+        "AC3": "After saving an edit with affected arrangements, those arrangements are marked outstanding and the event is in Planning until they have been rechecked and settled",
+        "AC4": "While planning an event I coordinate, I can set or update its registration capacity and opening and closing times when registration is needed",
+        "AC5": "Given an event that has been cancelled or completed, when I try to change it, then the change is refused"
+      }
+    },
+    {
+      "id": "SG2-40",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-40",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/50"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "History shows each recorded action with the user and the time, most recent first",
+        "AC2": "For a changed value, the history shows what it was and what it became",
+        "AC3": "Attendees and unrelated Event Organisers cannot see the history"
+      }
+    },
+    {
+      "id": "SG2-41",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-41",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/39"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "As a Coordinator, I see requests awaiting my review and my assigned events",
+        "AC2": "As Venue Staff, I see venue booking requests awaiting my decision",
+        "AC3": "As Technical Support Staff, I see equipment requests awaiting my decision",
+        "AC4": "Selecting an item opens the relevant event or request"
+      }
+    },
+    {
+      "id": "SG2-42",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-42",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/19"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can create and update a venue with location, capacity, facilities, accessibility features and operating information",
+        "AC2": "Updates are reflected in venue search",
+        "AC3": "Users who are not Venue Staff cannot create or edit venues"
+      }
+    },
+    {
+      "id": "SG2-43",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-43",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/41",
+        "https://github.com/tayelroy/Team2-SPM/pull/42",
+        "https://github.com/tayelroy/Team2-SPM/pull/43"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Can record the supported layouts for a venue",
+        "AC2": "Supported layouts are shown on the venue's details",
+        "AC3": "A venue that does not support a required layout is not offered as matching that requirement"
+      }
+    },
+    {
+      "id": "SG2-44",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-44",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/21"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Availability is shown across a chosen date range, reflecting existing bookings and recorded unavailability",
+        "AC2": "Each entry shows what is occupying the venue and when",
+        "AC3": "Attendees and Event Organisers cannot see the internal availability view"
+      }
+    },
+    {
+      "id": "SG2-45",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-45",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/45"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Given a venue with no booking in a period, when I block that period with a reason, then the venue is shown as unavailable then and is not returned by venue search",
+        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified",
+        "AC3": "Given a block I have created, when I remove it, then the venue becomes available for that period again"
+      }
+    },
+    {
+      "id": "SG2-46",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-46",
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/49"
+      ],
+      "acceptanceCriteria": {
+        "AC1": "Opening venue search from an approved event pre-fills the criteria from that event's requirements",
+        "AC2": "Can filter by date, time, attendance, location, capacity, accessibility, layout and facilities, and only venues meeting all applied criteria and free at that time are returned",
+        "AC3": "Accessibility is used as a matching requirement only when accessibility needs have been specified for the event",
+        "AC4": "When nothing matches, this is stated and the current search criteria are shown"
+      }
+    }
+  ]
+}

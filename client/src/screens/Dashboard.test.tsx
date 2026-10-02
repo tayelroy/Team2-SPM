@@ -10,7 +10,7 @@ const requests = [
   { event_id: 3, name: '', status: 'submitted', can_manage: true, coordinator_name: 'A. Coordinator' },
 ];
 
-test('organisation dashboard shows real shared events, owned draft count and correct navigation', async () => {
+test('[NORMAL] [SG2-26:AC1] organisation dashboard shows real shared events, owned draft count and correct navigation', async () => {
   const fetch = vi.fn().mockResolvedValue(Response.json({ requests }));
   vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
@@ -32,7 +32,17 @@ test('organisation dashboard shows real shared events, owned draft count and cor
   expect(fetch).toHaveBeenCalledWith('/api/event-requests', { method: 'GET', headers: { Authorization: 'Bearer token' } });
 });
 
-test.each([false, true])('unavailable organisation data never falls back to mock events (token %s)', async (hasToken) => {
+test('[NORMAL] [SG2-36:AC1] a request returned with a question counts as a draft and as waiting on me', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
+    ...requests, { event_id: 4, name: 'Returned forum', status: 'needs_clarification', can_manage: true },
+  ] })));
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
+  await screen.findByText('Returned forum');
+  expect(screen.getByText('My drafts').closest('div')).toHaveTextContent('2');
+  expect(screen.getByText('Waiting on me').closest('div')).toHaveTextContent('2');
+});
+
+test.each([false, true])('[FAILURE] [SG2-26:AC1] unavailable organisation data never falls back to mock events (token %s)', async (hasToken) => {
   const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
   vi.stubGlobal('fetch', fetch);
   render(<Dashboard role="Event Organiser" accessToken={hasToken ? 'token' : undefined} onNavigate={vi.fn()} />);
@@ -41,13 +51,13 @@ test.each([false, true])('unavailable organisation data never falls back to mock
   expect(screen.getByText('My drafts').closest('div')).toHaveTextContent('—');
 });
 
-test('empty organisation has explicit empty state', async () => {
+test('[BOUNDARY] [SG2-26:AC1] empty organisation has explicit empty state', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [] })));
   render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
   expect(await screen.findByText('No event requests found.')).toBeInTheDocument();
 });
 
-test('a late response for the previous session cannot replace the current organisation', async () => {
+test('[CONFLICT] [SG2-26:session-isolation] a late response for the previous session cannot replace the current organisation', async () => {
   let resolve!: (r: Response) => void;
   const fetch = vi.fn()
     .mockImplementationOnce(() => new Promise<Response>((yes) => { resolve = yes; }))
@@ -62,7 +72,7 @@ test('a late response for the previous session cannot replace the current organi
   expect(screen.getByText('Organisation events').closest('div')).toHaveTextContent('1');
 });
 
-test('attendee retains its prototype event dashboard and navigation', () => {
+test('[NORMAL] [SG2-20:prototype-dashboard] attendee retains its prototype event dashboard and navigation', () => {
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
   render(<Dashboard role="Attendee" onNavigate={onNavigate} />);

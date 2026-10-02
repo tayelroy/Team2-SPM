@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   assignEventCoordinator,
   deleteEventRequestDraft,
@@ -10,6 +10,7 @@ import {
   fetchOwnEventRequest,
   fetchOwnEventRequests,
   decideEventRequest,
+  requestClarification,
   insertEventRequestDraft,
   startEventReview,
   submitEventRequest,
@@ -243,6 +244,9 @@ function fakeEventsUpdateDraftClient(
             eq(column: string, value: unknown) {
               if (column === 'event_id') filters.eventId = value;
               if (column === 'organiser_id') filters.organiserId = value;
+              return chain;
+            },
+            in(column: string, value: unknown) {
               if (column === 'status') filters.status = value;
               return chain;
             },
@@ -300,8 +304,63 @@ const EMPTY_VALUES: DraftValues = {
   registration_needed: null
 };
 
+// Only the external PostgREST boundary is simulated. The real SDK builds each
+// update, and this dataset applies its equality and membership filters.
+function eventDatabase(initial: Record<string, unknown>) {
+  let rows = [{ ...initial }];
+  const client = createClient('https://event-state.test.supabase.co', 'test-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async (input, init) => {
+      const url = new URL(String(input));
+      assert.equal(url.pathname, '/rest/v1/events');
+      const selected = rows.filter(row => [...url.searchParams].every(([column, filter]) => {
+        if (filter.startsWith('eq.')) return String(row[column]) === filter.slice(3);
+        if (filter.startsWith('in.(')) return filter.slice(4, -1).split(',').includes(String(row[column]));
+        return true;
+      }));
+      if (init?.method === 'PATCH') {
+        const patch = JSON.parse(String(init.body));
+        for (const row of selected) Object.assign(row, patch);
+      } else if (init?.method === 'DELETE') {
+        rows = rows.filter(row => !selected.includes(row));
+      }
+      return Response.json(selected);
+    } }
+  });
+  return { client, stored: () => rows.map(row => ({ ...row })) };
+}
+
+test('[CONFLICT] [SG2-35:AC2] an assigned review can be reopened without creating another event', async () => {
+  const db = eventDatabase({ event_id: 7, status: 'submitted', organiser_id: 'user-1', coordinator_id: 'coordinator-1' });
+  const first = await startEventReview(db.client, 7, 'coordinator-1');
+  const reopened = await startEventReview(db.client, 7, 'coordinator-1');
+  assert.equal(first.ok, true);
+  assert.equal(reopened.ok, true);
+  if (reopened.ok) assert.equal(reopened.request.status, 'under_review');
+  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'under_review', organiser_id: 'user-1', coordinator_id: 'coordinator-1' }]);
+});
+
+test('[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] a second decision cannot overwrite a completed review', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-25T02:00:00.000Z') });
+  const db = eventDatabase({ event_id: 7, status: 'under_review', organiser_id: 'user-1', coordinator_id: 'coordinator-1' });
+  assert.equal((await decideEventRequest(db.client, 7, 'coordinator-1', 'approved', null)).ok, true);
+  const again = await decideEventRequest(db.client, 7, 'coordinator-1', 'rejected', 'Changed my mind');
+  assert.equal(again.ok, false);
+  if (!again.ok) assert.equal(again.reason, 'not_found');
+  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'approved', organiser_id: 'user-1', coordinator_id: 'coordinator-1',
+    decided_by: 'coordinator-1', decided_at: '2026-09-25T02:00:00.000Z', decision_reason: null }]);
+});
+
+test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-32:AC2] submission stops stale draft edits and deletes', async () => {
+  const db = eventDatabase({ event_id: 7, status: 'draft', organiser_id: 'user-1', name: 'Original draft' });
+  assert.equal((await submitEventRequest(db.client, 7)).ok, true);
+  assert.equal((await updateEventRequestDraft(db.client, 7, 'user-1', { ...EMPTY_VALUES, name: 'Stale edit' })).ok, false);
+  assert.equal((await deleteEventRequestDraft(db.client, 7, 'user-1')).ok, false);
+  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'submitted', organiser_id: 'user-1', name: 'Original draft' }]);
+});
+
 describe('fetchOrganiserOrganisation', () => {
-  test('returns the organisation for the given user', async () => {
+  test('[NORMAL] [SG2-26:AC1] [SG2-28:AC3] returns the organisation for the given user', async () => {
     let askedFor: unknown;
     const result = await fetchOrganiserOrganisation(
       fakeUsersClient({ data: [{ organisation: 'ConnectSphere Test' }], error: null }, (v) => (askedFor = v)),
@@ -311,7 +370,7 @@ describe('fetchOrganiserOrganisation', () => {
     assert.equal(askedFor, 'user-1');
   });
 
-  test('treats a null organisation as a valid absent value', async () => {
+  test('[BOUNDARY] [SG2-26:AC1] [SG2-28:AC3] treats a null organisation as a valid absent value', async () => {
     const result = await fetchOrganiserOrganisation(
       fakeUsersClient({ data: [{ organisation: null }], error: null }),
       'user-1'
@@ -319,19 +378,19 @@ describe('fetchOrganiserOrganisation', () => {
     assert.deepEqual(result, { ok: true, organisation: null });
   });
 
-  test('reports not_found when the user has no record', async () => {
+  test('[FAILURE] [SG2-26:AC1] [SG2-28:AC3] reports not_found when the user has no record', async () => {
     const result = await fetchOrganiserOrganisation(fakeUsersClient({ data: [], error: null }), 'ghost');
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports not_found when the driver returns no data at all', async () => {
+  test('[FAILURE] [SG2-26:AC1] [SG2-28:AC3] reports not_found when the driver returns no data at all', async () => {
     const result = await fetchOrganiserOrganisation(fakeUsersClient({ data: null, error: null }), 'ghost');
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-26:AC1] [SG2-28:AC3] reports unavailable when the query errors', async () => {
     const result = await fetchOrganiserOrganisation(
       fakeUsersClient({ data: null, error: { message: 'connection reset' } }),
       'user-1'
@@ -345,7 +404,7 @@ describe('fetchOrganiserOrganisation', () => {
 });
 
 describe('insertEventRequestDraft', () => {
-  test('writes server-supplied ownership and an explicit draft status', async () => {
+  test('[NORMAL] [SG2-28:AC1] [SG2-28:AC3] writes server-supplied ownership and an explicit draft status', async () => {
     let inserted: Record<string, unknown> | undefined;
     const result = await insertEventRequestDraft(
       fakeEventsClient(
@@ -362,7 +421,7 @@ describe('insertEventRequestDraft', () => {
     });
   });
 
-  test('reports unavailable when the insert errors', async () => {
+  test('[FAILURE] [SG2-28:AC3] reports unavailable when the insert errors', async () => {
     const result = await insertEventRequestDraft(
       fakeEventsClient({ data: null, error: { message: 'violates foreign key' } }),
       { organiserId: 'user-1', organisation: null, values: EMPTY_VALUES }
@@ -372,7 +431,7 @@ describe('insertEventRequestDraft', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable when the insert returns ${JSON.stringify(data)}`, async () => {
+    test(`[FAILURE] [SG2-28:AC3] reports unavailable when the insert returns ${JSON.stringify(data)}`, async () => {
       const result = await insertEventRequestDraft(fakeEventsClient({ data, error: null }), {
         organiserId: 'user-1',
         organisation: null,
@@ -385,7 +444,7 @@ describe('insertEventRequestDraft', () => {
 });
 
 describe('fetchOwnEventRequest', () => {
-  test('returns the request scoped to the given event and organiser', async () => {
+  test('[NORMAL] [SG2-31:AC3] returns the request scoped to the given event and organiser', async () => {
     let filters: { eventId: unknown; organiserId: unknown } | undefined;
     const result = await fetchOwnEventRequest(
       fakeEventsSelectClient({ data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft' }], error: null }, (f) => (filters = f)),
@@ -401,7 +460,7 @@ describe('fetchOwnEventRequest', () => {
     assert.deepEqual(filters, { eventId: 7, organiserId: 'user-1' });
   });
 
-  test('extracts coordinator information from joined relation', async () => {
+  test('[NORMAL] [SG2-33:AC3] extracts coordinator information from joined relation', async () => {
     const result = await fetchOwnEventRequest(
       fakeEventsSelectClient({
         data: [
@@ -426,13 +485,13 @@ describe('fetchOwnEventRequest', () => {
     }
   });
 
-  test('reports not_found when no row matches the event and organiser', async () => {
+  test('[FAILURE] [SG2-31:AC3] reports not_found when no row matches the event and organiser', async () => {
     const result = await fetchOwnEventRequest(fakeEventsSelectClient({ data: [], error: null }), 7, 'user-1');
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-31:AC3] reports unavailable when the query errors', async () => {
     const result = await fetchOwnEventRequest(
       fakeEventsSelectClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -447,7 +506,7 @@ describe('fetchOwnEventRequest', () => {
 });
 
 describe('fetchOwnEventRequests', () => {
-  test('returns list of event requests with coordinator name extracted from joined object', async () => {
+  test('[NORMAL] [SG2-31:AC1] returns list of event requests with coordinator name extracted from joined object', async () => {
     let capturedFilters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown } | undefined;
     const result = await fetchOwnEventRequests(
       fakeEventsListClient(
@@ -488,7 +547,7 @@ describe('fetchOwnEventRequests', () => {
     assert.deepEqual(capturedFilters?.orderOptions, { ascending: false });
   });
 
-  test('extracts coordinator name when coordinator is an array or coordinator_name string', async () => {
+  test('[NORMAL] [SG2-31:AC1] extracts coordinator name when coordinator is an array or coordinator_name string', async () => {
     const result = await fetchOwnEventRequests(
       fakeEventsListClient({
         data: [
@@ -521,7 +580,7 @@ describe('fetchOwnEventRequests', () => {
     }
   });
 
-  test('handles null/missing coordinator, dates, and non-string fields safely', async () => {
+  test('[FAILURE] [SG2-31:AC1] handles null/missing coordinator, dates, and non-string fields safely', async () => {
     const result = await fetchOwnEventRequests(
       fakeEventsListClient({
         data: [
@@ -552,7 +611,7 @@ describe('fetchOwnEventRequests', () => {
     }
   });
 
-  test('applies status filter when provided', async () => {
+  test('[NORMAL] [SG2-31:AC2] applies status filter when provided', async () => {
     let capturedFilters: { organiserId?: unknown; status?: unknown } | undefined;
     const result = await fetchOwnEventRequests(
       fakeEventsListClient({ data: [], error: null }, (f) => (capturedFilters = f)),
@@ -566,14 +625,14 @@ describe('fetchOwnEventRequests', () => {
   });
 
   for (const data of [[], null]) {
-    test(`returns empty array when data is ${JSON.stringify(data)}`, async () => {
+    test(`[BOUNDARY] [SG2-31:AC1] returns empty array when data is ${JSON.stringify(data)}`, async () => {
       const result = await fetchOwnEventRequests(fakeEventsListClient({ data, error: null }), 'user-1');
       assert.equal(result.ok, true);
       if (result.ok) assert.deepEqual(result.requests, []);
     });
   }
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-31:AC1] reports unavailable when the query errors', async () => {
     const result = await fetchOwnEventRequests(
       fakeEventsListClient({ data: null, error: { message: 'connection failed' } }),
       'user-1'
@@ -587,7 +646,7 @@ describe('fetchOwnEventRequests', () => {
 });
 
 describe('submitEventRequest', () => {
-  test('updates status to submitted, filtered to draft or rejected rows', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] updates status to submitted, filtered to draft, rejected or returned rows', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
     const result = await submitEventRequest(
       fakeEventsUpdateClient(
@@ -600,10 +659,10 @@ describe('submitEventRequest', () => {
     if (result.ok) assert.equal(result.request.status, 'submitted');
     assert.deepEqual(captured?.row, { status: 'submitted' });
     assert.equal(captured?.eventId, 7);
-    assert.deepEqual(captured?.status, ['draft', 'rejected']);
+    assert.deepEqual(captured?.status, ['draft', 'rejected', 'needs_clarification']);
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-30:AC1] reports unavailable when the update errors', async () => {
     const result = await submitEventRequest(
       fakeEventsUpdateClient({ data: null, error: { message: 'connection reset' } }),
       7
@@ -613,7 +672,7 @@ describe('submitEventRequest', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable when the update returns ${JSON.stringify(data)}`, async () => {
+    test(`[CONFLICT] [SG2-30:AC3] reports unavailable when the update returns ${JSON.stringify(data)}`, async () => {
       const result = await submitEventRequest(fakeEventsUpdateClient({ data, error: null }), 7);
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
@@ -622,7 +681,7 @@ describe('submitEventRequest', () => {
 });
 
 describe('startEventReview', () => {
-  test('updates status to under_review, filtered to the event, its coordinator and reviewable rows', async () => {
+  test('[NORMAL] [SG2-35:AC2] [SG2-35:AC3] updates status to under_review, filtered to the event, its coordinator and reviewable rows', async () => {
     let captured:
       | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
       | undefined;
@@ -656,7 +715,7 @@ describe('startEventReview', () => {
     assert.deepEqual(captured?.status, ['submitted', 'under_review']);
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-35:AC2] reports unavailable when the update errors', async () => {
     const result = await startEventReview(
       fakeEventsReviewClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -666,7 +725,7 @@ describe('startEventReview', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+    test(`[CONFLICT] [SG2-35:AC3] reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
       // A request assigned elsewhere, already decided, or absent must all look
       // identical so assignments cannot be probed for.
       const result = await startEventReview(fakeEventsReviewClient({ data, error: null }), 7, 'coordinator-1');
@@ -677,11 +736,11 @@ describe('startEventReview', () => {
 });
 
 describe('decideEventRequest', () => {
-  test('records the outcome, decider and time, filtered to a request this coordinator is reviewing', async () => {
+  test('[NORMAL] [SG2-37:AC3] records the outcome, decider and time, filtered to a request this coordinator is reviewing', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-09-25T02:00:00.000Z') });
     let captured:
       | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
       | undefined;
-    const before = Date.now();
     const result = await decideEventRequest(
       fakeEventsDecisionClient(
         {
@@ -714,11 +773,10 @@ describe('decideEventRequest', () => {
     assert.equal(captured?.row.decided_by, 'coordinator-1');
     assert.equal(captured?.row.decision_reason, null);
     // AC3: when the decision happened is recorded, not left to the caller.
-    const decidedAt = Date.parse(String(captured?.row.decided_at));
-    assert.ok(decidedAt >= before && decidedAt <= Date.now());
+    assert.equal(captured?.row.decided_at, '2026-09-25T02:00:00.000Z');
   });
 
-  test('stores the rejection reason alongside the outcome', async () => {
+  test('[NORMAL] [SG2-37:AC2] stores the rejection reason alongside the outcome', async () => {
     let captured: { row: Record<string, unknown> } | undefined;
     await decideEventRequest(
       fakeEventsDecisionClient({ data: [{ event_id: 7, status: 'rejected' }], error: null }, (c) => (captured = c)),
@@ -731,7 +789,7 @@ describe('decideEventRequest', () => {
     assert.equal(captured?.row.decision_reason, 'Date clashes with the AGM.');
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-37:AC3] reports unavailable when the update errors', async () => {
     const result = await decideEventRequest(
       fakeEventsDecisionClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -743,7 +801,7 @@ describe('decideEventRequest', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+    test(`[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
       // Assigned elsewhere, already decided, or absent must look identical.
       const result = await decideEventRequest(
         fakeEventsDecisionClient({ data, error: null }),
@@ -758,8 +816,48 @@ describe('decideEventRequest', () => {
   }
 });
 
+describe('requestClarification', () => {
+  test('[NORMAL] [SG2-36:AC1] returns the request to its organiser, filtered to this coordinator and under review', async () => {
+    let captured:
+      | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
+      | undefined;
+    const result = await requestClarification(
+      fakeEventsDecisionClient(
+        { data: [{ event_id: 7, status: 'needs_clarification', coordinator_id: 'coordinator-1' }], error: null },
+        (c) => (captured = c)
+      ),
+      7,
+      'coordinator-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.status, 'needs_clarification');
+    assert.deepEqual(captured?.row, { status: 'needs_clarification' });
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.coordinatorId, 'coordinator-1');
+    // Only a request this coordinator is actively reviewing may be parked.
+    assert.equal(captured?.status, 'under_review');
+  });
+
+  test('[FAILURE] [SG2-36:AC1] reports unavailable when the update errors', async () => {
+    const result = await requestClarification(
+      fakeEventsDecisionClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      'coordinator-1'
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`[CONFLICT] [SG2-36:AC1] reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+      const result = await requestClarification(fakeEventsDecisionClient({ data, error: null }), 7, 'coordinator-1');
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_found');
+    });
+  }
+});
+
 describe('deleteEventRequestDraft', () => {
-  test('deletes, filtered to the given event, organiser and draft status', async () => {
+  test('[NORMAL] [SG2-32:AC1] [SG2-32:AC2] deletes, filtered to the given event, organiser and draft status', async () => {
     let captured: { eventId: unknown; organiserId: unknown; status: unknown } | undefined;
     const result = await deleteEventRequestDraft(
       fakeEventsDeleteClient({ data: [{ event_id: 7 }], error: null }, (c) => (captured = c)),
@@ -772,7 +870,7 @@ describe('deleteEventRequestDraft', () => {
     assert.equal(captured?.status, 'draft');
   });
 
-  test('reports unavailable when the delete errors', async () => {
+  test('[FAILURE] [SG2-32:AC1] reports unavailable when the delete errors', async () => {
     const result = await deleteEventRequestDraft(
       fakeEventsDeleteClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -782,7 +880,7 @@ describe('deleteEventRequestDraft', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable if the owner or status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
+    test(`[CONFLICT] [SG2-32:AC2] reports unavailable if the owner or status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
       const result = await deleteEventRequestDraft(fakeEventsDeleteClient({ data, error: null }), 7, 'user-1');
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /status may have changed/);
@@ -791,7 +889,7 @@ describe('deleteEventRequestDraft', () => {
 });
 
 describe('updateEventRequestDraft', () => {
-  test('updates the given fields, filtered to the event, organiser and draft status', async () => {
+  test('[NORMAL] [SG2-29:AC1] [SG2-30:AC3] [SG2-36:AC2] updates the given fields, filtered to the event, organiser and editable statuses', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown; status: unknown } | undefined;
     const result = await updateEventRequestDraft(
       fakeEventsUpdateDraftClient(
@@ -808,10 +906,10 @@ describe('updateEventRequestDraft', () => {
     assert.deepEqual(captured?.row, { ...EMPTY_VALUES, name: 'Renamed' });
     assert.equal(captured?.eventId, 7);
     assert.equal(captured?.organiserId, 'user-1');
-    assert.equal(captured?.status, 'draft');
+    assert.deepEqual(captured?.status, ['draft', 'needs_clarification']);
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-29:AC1] reports unavailable when the update errors', async () => {
     const result = await updateEventRequestDraft(
       fakeEventsUpdateDraftClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -822,7 +920,7 @@ describe('updateEventRequestDraft', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports unavailable if the owner or status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
+    test(`[CONFLICT] [SG2-30:AC3] reports unavailable if the owner or status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
       const result = await updateEventRequestDraft(
         fakeEventsUpdateDraftClient({ data, error: null }),
         7,
@@ -836,7 +934,7 @@ describe('updateEventRequestDraft', () => {
 });
 
 describe('fetchEventRequestById', () => {
-  test('returns the request scoped only by event id, unscoped by organiser', async () => {
+  test('[NORMAL] [SG2-38:AC1] returns the request scoped only by event id, unscoped by organiser', async () => {
     let filters: { eventId: unknown; organiserId: unknown } | undefined;
     const result = await fetchEventRequestById(
       fakeEventsSelectClient(
@@ -851,7 +949,7 @@ describe('fetchEventRequestById', () => {
     assert.equal(filters?.organiserId, undefined);
   });
 
-  test('extracts coordinator information from joined relation', async () => {
+  test('[NORMAL] [SG2-38:AC2] extracts coordinator information from joined relation', async () => {
     const result = await fetchEventRequestById(
       fakeEventsSelectClient({
         data: [
@@ -873,13 +971,13 @@ describe('fetchEventRequestById', () => {
     }
   });
 
-  test('reports not_found when no row matches the event id', async () => {
+  test('[FAILURE] [SG2-38:AC1] reports not_found when no row matches the event id', async () => {
     const result = await fetchEventRequestById(fakeEventsSelectClient({ data: [], error: null }), 7);
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_found');
   });
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-38:AC1] reports unavailable when the query errors', async () => {
     const result = await fetchEventRequestById(
       fakeEventsSelectClient({ data: null, error: { message: 'connection reset' } }),
       7
@@ -893,7 +991,7 @@ describe('fetchEventRequestById', () => {
 });
 
 describe('assignEventCoordinator', () => {
-  test('sets coordinator_id, filtered to the event and assignable statuses', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-33:AC2] sets coordinator_id, filtered to the event and assignable statuses', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
     const result = await assignEventCoordinator(
       fakeEventsUpdateClient(
@@ -917,7 +1015,7 @@ describe('assignEventCoordinator', () => {
     assert.deepEqual(captured?.status, ['submitted', 'under_review', 'approved', 'planning', 'confirmed']);
   });
 
-  test('reassigns from one coordinator to another (SG2-34)', async () => {
+  test('[NORMAL] [SG2-34:AC1] [SG2-34:AC2] reassigns from one coordinator to another (SG2-34)', async () => {
     const result = await assignEventCoordinator(
       fakeEventsUpdateClient({
         data: [{ event_id: 7, status: 'under_review', coordinator_id: 'coord-new', coordinator: { name: 'New Coord' } }],
@@ -930,7 +1028,7 @@ describe('assignEventCoordinator', () => {
     if (result.ok) assert.equal(result.request.coordinator_id, 'coord-new');
   });
 
-  test('reports unavailable when the update errors', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] reports unavailable when the update errors', async () => {
     const result = await assignEventCoordinator(
       fakeEventsUpdateClient({ data: null, error: { message: 'connection reset' } }),
       7,
@@ -940,7 +1038,7 @@ describe('assignEventCoordinator', () => {
   });
 
   for (const data of [[], null]) {
-    test(`reports not_assignable if the status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
+    test(`[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] reports not_assignable if the status no longer matches, matching ${JSON.stringify(data)} rows`, async () => {
       const result = await assignEventCoordinator(fakeEventsUpdateClient({ data, error: null }), 7, 'coord-1');
       assert.equal(result.ok, false);
       if (!result.ok) assert.equal(result.reason, 'not_assignable');
@@ -962,20 +1060,20 @@ describe('coordinator contact on a single request (SG2-33 AC3)', () => {
     return result.ok ? result.request.coordinator_phone : undefined;
   }
 
-  test('returns the phone from an object relation', async () => {
+  test('[NORMAL] [SG2-33:AC3] [SG2-34:AC3] returns the phone from an object relation', async () => {
     assert.equal(await phoneFor({ name: 'Sarah', phone: '+65 9123 4567' }), '+65 9123 4567');
   });
 
-  test('returns the phone from an array relation', async () => {
+  test('[NORMAL] [SG2-33:AC3] [SG2-34:AC3] returns the phone from an array relation', async () => {
     assert.equal(await phoneFor([{ name: 'Sarah', phone: '+65 9123 4567' }]), '+65 9123 4567');
   });
 
-  test('reports null when the coordinator has no usable phone', async () => {
+  test('[BOUNDARY] [SG2-33:AC3] [SG2-34:AC3] reports null when the coordinator has no usable phone', async () => {
     assert.equal(await phoneFor({ name: 'Sarah', phone: null }), null);
     assert.equal(await phoneFor({ name: 'Sarah', phone: '   ' }), null);
   });
 
-  test('reports null when no coordinator is assigned', async () => {
+  test('[BOUNDARY] [SG2-33:AC3] reports null when no coordinator is assigned', async () => {
     assert.equal(await phoneFor(null), null);
   });
 });
@@ -1004,7 +1102,7 @@ describe('fetchAssignableRequests', () => {
     } as unknown as SupabaseClient;
   }
 
-  test('lists requests in an assignable status with their current coordinator', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] lists requests in an assignable status with their current coordinator', async () => {
     let statuses: unknown;
     const result = await fetchAssignableRequests(
       fakeAssignableClient(
@@ -1050,14 +1148,14 @@ describe('fetchAssignableRequests', () => {
     });
   });
 
-  test('returns an empty list when the query returns no data', async () => {
+  test('[BOUNDARY] [SG2-33:AC1] [SG2-34:AC1] returns an empty list when the query returns no data', async () => {
     assert.deepEqual(await fetchAssignableRequests(fakeAssignableClient({ data: null, error: null })), {
       ok: true,
       requests: []
     });
   });
 
-  test('reports unavailable when the query errors', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] reports unavailable when the query errors', async () => {
     assert.deepEqual(
       await fetchAssignableRequests(fakeAssignableClient({ data: null, error: { message: 'boom' } })),
       { ok: false, reason: 'unavailable', message: 'boom' }

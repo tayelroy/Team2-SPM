@@ -39,7 +39,7 @@ function fixture(role: Role = 'venue_staff', override?: VenueLayoutStore) {
   return { app, writes: () => writes };
 }
 
-for (const role of ACCOUNT_ROLES) test(`SG2-43: only venue staff can write layouts (${role})`, async () => {
+for (const role of ACCOUNT_ROLES) test(`${role === 'venue_staff' ? '[NORMAL]' : role === 'event_coordinator' ? '[NORMAL] [FAILURE]' : '[FAILURE]'} [SG2-42:AC3] [SG2-43:AC1] [SG2-43:AC2] SG2-43: only venue staff can write layouts (${role})`, async () => {
   const { app, writes } = fixture(role);
   const write = await request(app).put('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token').send({ layouts: [classroom] });
   assert.equal(write.status, role === 'venue_staff' ? 200 : 403);
@@ -48,14 +48,14 @@ for (const role of ACCOUNT_ROLES) test(`SG2-43: only venue staff can write layou
   assert.equal(read.status, ['venue_staff', 'event_coordinator'].includes(role) ? 200 : 403);
 });
 
-test('the production app protects both layout routes without credentials', async () => {
+test('[FAILURE] [SG2-25:AC3] [SG2-43:AC1] the production app protects both layout routes without credentials', async () => {
   for (const method of ['get', 'put'] as const) {
     const response = await request(createApp())[method]('/api/venues/1/layouts').send({ layouts: [classroom] });
     assert.equal(response.status, 401);
   }
 });
 
-test('list returns the venue\'s current layouts and PUT replaces them wholesale', async () => {
+test('[NORMAL] [SG2-43:AC1] [SG2-43:AC2] list returns the venue\'s current layouts and PUT replaces them wholesale', async () => {
   const { app } = fixture();
   const initial = await request(app).get('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token');
   assert.equal(initial.status, 200);
@@ -75,7 +75,7 @@ test('list returns the venue\'s current layouts and PUT replaces them wholesale'
   assert.deepEqual(cleared.body.layouts, []);
 });
 
-test('non-array and malformed inputs are rejected by the validator', () => {
+test('[BOUNDARY] [NORMAL] [FAILURE] [SG2-43:AC1] non-array and malformed inputs are rejected by the validator', () => {
   for (const input of [null, undefined, {}, 'bad', 1, true]) assert.equal(validateVenueLayouts(input), null);
   for (const item of [null, undefined, 'classroom', 1, true, []]) assert.equal(validateVenueLayouts([item]), null, `malformed entry: ${JSON.stringify(item)}`);
   assert.equal(validateVenueLayouts([{ layout: 'unknown' }]), null);
@@ -88,7 +88,7 @@ test('non-array and malformed inputs are rejected by the validator', () => {
   assert.deepEqual(validateVenueLayouts([]), []);
 });
 
-test('PUT rejects invalid layout bodies without writing', async () => {
+test('[FAILURE] [SG2-43:AC1] PUT rejects invalid layout bodies without writing', async () => {
   const { app, writes } = fixture();
   for (const body of [{}, { layouts: 'nope' }, { layouts: [{ layout: 'unknown' }] }, { layouts: [{ layout: 'other' }] }]) {
     const response = await request(app).put('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token').send(body);
@@ -97,7 +97,31 @@ test('PUT rejects invalid layout bodies without writing', async () => {
   assert.equal(writes(), 0);
 });
 
-test('invalid venue IDs are rejected before reaching the store; an in-range missing venue returns 404', async () => {
+test('[BOUNDARY] [SG2-43:AC1] other layout descriptions accept 255 characters and refuse 256', async () => {
+  const { app, writes } = fixture();
+  const accepted = await request(app).put('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token')
+    .send({ layouts: [{ layout: 'other', other_description: `  ${'🏛'.repeat(255)}  ` }] });
+  assert.equal(accepted.status, 200);
+  assert.deepEqual(accepted.body.layouts, [{ layout: 'other', other_description: '🏛'.repeat(255) }]);
+  const refused = await request(app).put('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token')
+    .send({ layouts: [{ layout: 'other', other_description: '🏛'.repeat(256) }] });
+  assert.equal(refused.status, 400);
+  assert.equal(writes(), 1);
+  const reloaded = await request(app).get('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token');
+  assert.deepEqual(reloaded.body.layouts, [{ layout: 'other', other_description: '🏛'.repeat(255) }]);
+});
+
+test('[FAILURE] [SG2-43:AC1] duplicate layout names cannot replace the saved set', async () => {
+  const { app, writes } = fixture();
+  const response = await request(app).put('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token')
+    .send({ layouts: [other, other] });
+  assert.equal(response.status, 400);
+  assert.equal(writes(), 0);
+  const saved = await request(app).get('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token');
+  assert.deepEqual(saved.body.layouts, [{ layout: 'classroom', other_description: null }]);
+});
+
+test('[BOUNDARY] [SG2-43:AC1] invalid venue IDs are rejected before reaching the store; an in-range missing venue returns 404', async () => {
   const { app, writes } = fixture();
   for (const id of ['0', '-1', '01', '1.5', 'abc', '2147483648']) {
     assert.equal((await request(app).get(`/api/venues/${id}/layouts`).set('Authorization', 'Bearer valid-token')).status, 400);
@@ -109,7 +133,7 @@ test('invalid venue IDs are rejected before reaching the store; an in-range miss
 });
 
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET')]) {
-  test(`database failures fail closed: ${error.message}`, async () => {
+  test(`[FAILURE] [SG2-43:AC1] database failures fail closed: ${error.message}`, async () => {
     const { app } = fixture('venue_staff', { list: async () => { throw error; }, replace: async () => { throw error; } });
     for (const method of ['get', 'put'] as const) {
       const res = await request(app)[method]('/api/venues/1/layouts').set('Authorization', 'Bearer valid-token').send({ layouts: [] });

@@ -8,7 +8,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test('shows loading until the API responds, then displays the health status', async () => {
+test('[NORMAL] [SG2-20:AC2] [SG2-20:AC3] shows loading until the API responds, then displays the health status', async () => {
   let respond!: (response: Response) => void;
   const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { respond = resolve; }));
   vi.stubGlobal('fetch', fetchMock);
@@ -20,25 +20,25 @@ test('shows loading until the API responds, then displays the health status', as
   expect(await screen.findByText('{"status":"ok","service":"ConnectSphere Backend"}')).toBeInTheDocument();
 });
 
-test('shows an HTTP error when the backend is unavailable', async () => {
+test('[FAILURE] [SG2-20:AC2] [SG2-20:AC3] shows an HTTP error when the backend is unavailable', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503, statusText: 'Service Unavailable' })));
   render(<HealthCheck />);
   expect(await screen.findByText('Error: HTTP error: 503 Service Unavailable')).toBeInTheDocument();
 });
 
-test('shows network errors', async () => {
+test('[FAILURE] [SG2-20:AC2] [SG2-20:AC3] shows network errors', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network unavailable')));
   render(<HealthCheck />);
   expect(await screen.findByText('Error: Network unavailable')).toBeInTheDocument();
 });
 
-test('handles failures that are not Error objects', async () => {
+test('[FAILURE] [SG2-20:AC2] [SG2-20:AC3] handles failures that are not Error objects', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue('unstructured rejection'));
   render(<HealthCheck />);
   expect(await screen.findByText('Error: Unknown connection error')).toBeInTheDocument();
 });
 
-test('shows an error when the backend returns malformed JSON', async () => {
+test('[FAILURE] [SG2-20:AC2] [SG2-20:AC3] shows an error when the backend returns malformed JSON', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not-json')));
   render(<HealthCheck />);
   expect(await screen.findByText(/^Error:/)).toBeInTheDocument();

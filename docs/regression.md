@@ -1,5 +1,7 @@
 # Purposeful regression cases
 
+> The current exhaustive method register and execution limits are in [Test case review — 1 October 2026](test-case-review.md) and [test-case-inventory.json](test-case-inventory.json). The scenario register remains [regression-cases.json](regression-cases.json); dated records below are historical.
+
 The current register is [`regression-cases.json`](regression-cases.json): **29
 scenarios: 19 browser journeys, 4 supporting backend cases, 4 SQL cases and 2
 hosted CI cases**. A scenario groups assertions around one observable outcome;

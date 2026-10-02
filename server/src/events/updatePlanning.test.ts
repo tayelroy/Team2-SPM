@@ -13,7 +13,6 @@ import {
   detectArrangementImpact,
   computePlanningDiffs,
   formatAuditValue,
-  AUDITED_PLANNING_FIELDS,
   type UpdateEventPlanningDependencies
 } from './updatePlanning';
 import type {
@@ -23,6 +22,7 @@ import type {
   UpdatePlanningFieldsInput
 } from '../db/eventPlanning';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from '../db/auditLogs';
+import { computeEventStage } from './stageCalculator';
 
 const COORDINATOR_ID = '10000000-0000-4000-8000-000000000001';
 const OTHER_COORDINATOR_ID = '20000000-0000-4000-8000-000000000002';
@@ -49,7 +49,7 @@ const BASE_EVENT: EventPlanningRecord = {
 };
 
 describe('validatePlanningUpdateInput (AC 4)', () => {
-  test('rejects non-object request bodies across various data types', () => {
+  test('[FAILURE] [SG2-39:AC4] rejects non-object request bodies across various data types', () => {
     // null, undefined, primitives, arrays, symbols, and functions
     assert.deepEqual(validatePlanningUpdateInput(null), {
       valid: false,
@@ -97,7 +97,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     });
   });
 
-  test('validates fields against invalid and mixed data types', () => {
+  test('[FAILURE] [SG2-39:AC4] validates fields against invalid and mixed data types', () => {
     // expected_attendance: boolean, array, object
     for (const badType of [true, false, [100], { count: 100 }]) {
       const res = validatePlanningUpdateInput({ expected_attendance: badType });
@@ -157,7 +157,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('validates expected_attendance including boundaries', () => {
+  test('[BOUNDARY] [SG2-39:AC1] validates expected_attendance including boundaries', () => {
     // null is allowed
     assert.equal(validatePlanningUpdateInput({ expected_attendance: null }).valid, true);
 
@@ -243,7 +243,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('validates proposed_date', () => {
+  test('[NORMAL] [FAILURE] [SG2-39:AC1] validates proposed_date', () => {
     assert.equal(validatePlanningUpdateInput({ proposed_date: null }).valid, true);
 
     const nonString = validatePlanningUpdateInput({ proposed_date: 12345 });
@@ -271,7 +271,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('validates free-text fields and text length limits including boundaries', () => {
+  test('[BOUNDARY] [SG2-39:AC1] validates free-text fields and text length limits including boundaries', () => {
     for (const field of ['venue_requirements', 'equipment_requirements', 'accessibility_needs', 'planning_notes'] as const) {
       // null is allowed
       assert.equal(validatePlanningUpdateInput({ [field]: null }).valid, true);
@@ -357,7 +357,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('validates registration_needed', () => {
+  test('[NORMAL] [FAILURE] [SG2-39:AC4] validates registration_needed', () => {
     assert.equal(validatePlanningUpdateInput({ registration_needed: null }).valid, true);
 
     const nonBool = validatePlanningUpdateInput({ registration_needed: 'true' });
@@ -375,7 +375,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     if (validFalse.valid) assert.equal(validFalse.values.registration_needed, false);
   });
 
-  test('validates registration_capacity including boundaries', () => {
+  test('[BOUNDARY] [SG2-39:AC4] validates registration_capacity including boundaries', () => {
     assert.equal(validatePlanningUpdateInput({ registration_capacity: null }).valid, true);
 
     const nonNum = validatePlanningUpdateInput({ registration_capacity: '100' });
@@ -459,7 +459,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('validates registration_opens_at and registration_closes_at', () => {
+  test('[BOUNDARY] [NORMAL] [FAILURE] [SG2-39:AC4] validates registration_opens_at and registration_closes_at', () => {
     assert.equal(validatePlanningUpdateInput({ registration_opens_at: null, registration_closes_at: null }).valid, true);
 
     // opens_at errors
@@ -530,7 +530,7 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     }
   });
 
-  test('parses confirm_impact flag', () => {
+  test('[NORMAL] [SG2-39:AC2] parses confirm_impact flag', () => {
     const withTrue = validatePlanningUpdateInput({ confirm_impact: true });
     assert.equal(withTrue.valid, true);
     if (withTrue.valid) assert.equal(withTrue.confirm_impact, true);
@@ -546,7 +546,24 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
 });
 
 describe('detectArrangementImpact (AC 2)', () => {
-  test('returns no impact when no triggering fields are modified', () => {
+  test('[BOUNDARY] [SG2-39:AC2] one extra attendee or registration place triggers a recheck at the existing capacity', () => {
+    for (const [count, hasImpact, affected] of [
+      [99, false, []], [100, false, []], [101, true, ['venue_recheck', 'equipment_recheck']]
+    ] as const) {
+      const impact = detectArrangementImpact(BASE_EVENT, { expected_attendance: count });
+      assert.equal(impact.has_impact, hasImpact);
+      assert.deepEqual(impact.affected_arrangements, affected);
+    }
+    for (const [count, hasImpact, affected] of [
+      [99, false, []], [100, false, []], [101, true, ['registration_recheck']]
+    ] as const) {
+      const impact = detectArrangementImpact(BASE_EVENT, { registration_capacity: count });
+      assert.equal(impact.has_impact, hasImpact);
+      assert.deepEqual(impact.affected_arrangements, affected);
+    }
+  });
+
+  test('[NORMAL] [SG2-39:AC2] returns no impact when no triggering fields are modified', () => {
     const impact = detectArrangementImpact(BASE_EVENT, {
       planning_notes: 'Updated notes only',
       venue_requirements: 'Added flower bouquet'
@@ -556,7 +573,7 @@ describe('detectArrangementImpact (AC 2)', () => {
     assert.deepEqual(impact.impact_notes, []);
   });
 
-  test('detects date shift when proposed_date changes', () => {
+  test('[NORMAL] [SG2-39:AC2] detects date shift when proposed_date changes', () => {
     // Same date -> no impact
     const same = detectArrangementImpact(BASE_EVENT, {
       proposed_date: '2026-11-15T09:00:00.000Z'
@@ -580,7 +597,7 @@ describe('detectArrangementImpact (AC 2)', () => {
     assert.equal(nullCurrent.has_impact, false);
   });
 
-  test('detects attendance increase', () => {
+  test('[BOUNDARY] [SG2-39:AC2] detects attendance increase', () => {
     // Same or decreased attendance -> no impact
     const same = detectArrangementImpact(BASE_EVENT, { expected_attendance: 100 });
     assert.equal(same.has_impact, false);
@@ -603,7 +620,7 @@ describe('detectArrangementImpact (AC 2)', () => {
     assert.equal(nullCurrent.has_impact, false);
   });
 
-  test('detects registration capacity increase', () => {
+  test('[BOUNDARY] [SG2-39:AC2] detects registration capacity increase', () => {
     // Same or decreased capacity -> no impact
     const same = detectArrangementImpact(BASE_EVENT, { registration_capacity: 100 });
     assert.equal(same.has_impact, false);
@@ -626,7 +643,7 @@ describe('detectArrangementImpact (AC 2)', () => {
     assert.equal(nullCurrent.has_impact, false);
   });
 
-  test('combines and deduplicates multiple impacts', () => {
+  test('[NORMAL] [SG2-39:AC2] [SG2-39:AC3] combines and deduplicates multiple impacts', () => {
     const multi = detectArrangementImpact(BASE_EVENT, {
       proposed_date: '2026-11-20T09:00:00.000Z',
       expected_attendance: 200,
@@ -640,7 +657,7 @@ describe('detectArrangementImpact (AC 2)', () => {
 });
 
 describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
-  test('formatAuditValue formats values or returns null', () => {
+  test('[NORMAL] [SG2-39:AC1] formatAuditValue formats values or returns null', () => {
     assert.equal(formatAuditValue(null), null);
     assert.equal(formatAuditValue(undefined), null);
     assert.equal(formatAuditValue('hello'), 'hello');
@@ -649,7 +666,7 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
     assert.equal(formatAuditValue(false), 'false');
   });
 
-  test('computePlanningDiffs computes field-level differences for updated fields only', () => {
+  test('[NORMAL] [SG2-39:AC1] computePlanningDiffs computes field-level differences for updated fields only', () => {
     const diffs = computePlanningDiffs(
       10,
       COORDINATOR_ID,
@@ -689,7 +706,7 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
     ]);
   });
 
-  test('computePlanningDiffs handles initially null fields transitioning to value', () => {
+  test('[BOUNDARY] [SG2-39:AC1] computePlanningDiffs handles initially null fields transitioning to value', () => {
     const eventWithNulls: EventPlanningRecord = {
       ...BASE_EVENT,
       planning_notes: null,
@@ -724,9 +741,10 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
     ]);
   });
 
-  test('computePlanningDiffs ignores omitted or undefined fields', () => {
+  test('[BOUNDARY] [SG2-39:AC1] computePlanningDiffs ignores omitted or undefined fields', () => {
     const diffs = computePlanningDiffs(10, COORDINATOR_ID, BASE_EVENT, {});
     assert.deepEqual(diffs, []);
+    assert.deepEqual(computePlanningDiffs(10, COORDINATOR_ID, BASE_EVENT, { expected_attendance: undefined, planning_notes: undefined }), []);
   });
 });
 
@@ -804,13 +822,35 @@ function buildApp(options: HandlerHarnessOptions = {}) {
 }
 
 describe('createUpdateEventPlanningHandler business logic and AC verification', () => {
-  test('rejects unauthenticated requests with 401', async () => {
+  test('[NORMAL] [SG2-39:AC4] registration capacity and opening window can be updated while planning', async () => {
+    let saved: UpdatePlanningFieldsInput | undefined;
+    let history: InsertAuditLogInput[] | undefined;
+    const app = buildApp({ fetchResult: { ok: true, event: { ...BASE_EVENT, status: 'planning' } },
+      captureUpdateFields: fields => { saved = fields; }, captureAuditEntries: entries => { history = entries; } });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({
+      registration_capacity: 90, registration_opens_at: '2026-10-02T09:00:00.000Z', registration_closes_at: '2026-10-03T09:00:00.000Z'
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(saved, { registration_capacity: 90,
+      registration_opens_at: '2026-10-02T09:00:00.000Z', registration_closes_at: '2026-10-03T09:00:00.000Z' });
+    assert.equal(response.body.event.status, 'planning');
+    assert.equal(response.body.event.registration_capacity, 90);
+    assert.equal(response.body.event.registration_opens_at, '2026-10-02T09:00:00.000Z');
+    assert.equal(response.body.event.registration_closes_at, '2026-10-03T09:00:00.000Z');
+    assert.deepEqual(history, [
+      { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'registration_capacity', old_value: '100', new_value: '90' },
+      { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'registration_opens_at', old_value: '2026-10-01T09:00:00.000Z', new_value: '2026-10-02T09:00:00.000Z' },
+      { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'registration_closes_at', old_value: '2026-11-01T18:00:00.000Z', new_value: '2026-10-03T09:00:00.000Z' }
+    ]);
+  });
+
+  test('[FAILURE] [SG2-25:AC3] [SG2-39:AC1] rejects unauthenticated requests with 401', async () => {
     const response = await request(buildApp({ principal: undefined })).patch('/api/event-requests/10/planning');
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, { error: 'Authentication required' });
   });
 
-  test('rejects non-coordinator principals with 403', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-39:AC1] rejects non-coordinator principals with 403', async () => {
     const response = await request(
       buildApp({ principal: { userId: COORDINATOR_ID, role: 'event_organiser' } })
     ).patch('/api/event-requests/10/planning');
@@ -819,14 +859,14 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
   });
 
   for (const badId of ['abc', '0', '-5', '1.5']) {
-    test(`rejects invalid eventId (${badId}) with 400`, async () => {
+    test(`${badId === '0' ? '[BOUNDARY]' : '[FAILURE]'} [SG2-39:AC1] rejects invalid eventId (${badId}) with 400`, async () => {
       const response = await request(buildApp()).patch(`/api/event-requests/${badId}/planning`);
       assert.equal(response.status, 400);
       assert.deepEqual(response.body, { error: 'eventId must be a positive integer.' });
     });
   }
 
-  test('harness validates eventId and returns 404 when request targets a non-existent or wrong event ID', async () => {
+  test('[FAILURE] [SG2-39:AC1] a missing event returns 404 without updating planning details or adding history', async () => {
     let capturedFetchId: number | undefined;
     let updateCalled = false;
     let auditCalled = false;
@@ -848,16 +888,19 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(auditCalled, false);
   });
 
-  test('returns 400 when input validation fails', async () => {
-    const response = await request(buildApp())
+  test('[FAILURE] [SG2-39:AC1] returns 400 when input validation fails', async () => {
+    let updates = 0;
+    let audits = 0;
+    const response = await request(buildApp({ captureUpdateFields: () => { updates++; }, captureAuditEntries: () => { audits++; } }))
       .patch('/api/event-requests/10/planning')
       .send({ expected_attendance: -10 });
     assert.equal(response.status, 400);
-    assert.equal(response.body.error, 'Invalid planning details');
-    assert.ok(Array.isArray(response.body.details));
+    assert.deepEqual(response.body, { error: 'Invalid planning details', details: ['expected_attendance must be at least 1.'] });
+    assert.equal(updates, 0);
+    assert.equal(audits, 0);
   });
 
-  test('treats an absent request body as an empty update', async () => {
+  test('[BOUNDARY] [SG2-39:AC1] treats an absent request body as an empty update', async () => {
     // No express.json() here, so req.body is undefined rather than {}.
     const bare = express();
     bare.patch(
@@ -877,13 +920,13 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(response.status, 200);
   });
 
-  test('returns 503 when admin database client is unavailable', async () => {
+  test('[FAILURE] [SG2-39:AC1] returns 503 when admin database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null })).patch('/api/event-requests/10/planning').send({});
     assert.equal(response.status, 503);
     assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
   });
 
-  test('returns 404 when event record is not found', async () => {
+  test('[FAILURE] [SG2-39:AC1] returns 404 when event record is not found', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'Event not found.' } })
     )
@@ -893,7 +936,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.deepEqual(response.body, { error: 'Event request not found.' });
   });
 
-  test('returns 503 when fetching event record fails', async () => {
+  test('[FAILURE] [SG2-39:AC1] returns 503 when fetching event record fails', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'DB down' } })
     )
@@ -902,7 +945,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(response.status, 503);
   });
 
-  test('returns 403 when caller is not the assigned coordinator and asserts zero update or audit calls', async () => {
+  test('[FAILURE] [SG2-39:AC1] [SG2-25:AC1] returns 403 when caller is not the assigned coordinator and asserts zero update or audit calls', async () => {
     let updateCalled = false;
     let auditCalled = false;
 
@@ -927,7 +970,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(auditCalled, false);
   });
 
-  test('AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
+  test('[CONFLICT] [SG2-39:AC5] AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
     for (const status of ['cancelled', 'completed', 'rejected']) {
       let updateCalled = false;
       let auditCalled = false;
@@ -954,7 +997,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     }
   });
 
-  test('cross-validates registration window against existing event dates with 400', async () => {
+  test('[BOUNDARY] [SG2-39:AC4] cross-validates registration window against existing event dates with 400', async () => {
     // Existing opens_at: 2026-10-01T09:00:00.000Z. Updating closes_at to 2026-09-15
     const responseClose = await request(buildApp())
       .patch('/api/event-requests/10/planning')
@@ -976,7 +1019,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     });
   });
 
-  test('AC 2: returns 409 requires_confirmation when arrangement impact detected without confirm_impact', async () => {
+  test('[CONFLICT] [SG2-39:AC2] AC 2: returns 409 requires_confirmation when arrangement impact detected without confirm_impact', async () => {
     let updateCalled = false;
     let auditCalled = false;
 
@@ -992,12 +1035,14 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(response.status, 409);
     assert.equal(response.body.requires_confirmation, true);
     assert.deepEqual(response.body.affected_arrangements, ['venue_recheck', 'equipment_recheck']);
-    assert.ok(Array.isArray(response.body.impact_notes));
+    assert.deepEqual(response.body.impact_notes, [
+      'Expected attendance increased from 100 to 250. Existing venue suitability and equipment requirements must be rechecked.'
+    ]);
     assert.equal(updateCalled, false);
     assert.equal(auditCalled, false);
   });
 
-  test('AC 1, AC 2 & AC 3: saves with confirm_impact: true, sets arrangements_recheck_needed, transitions to planning, and persists audit logs', async () => {
+  test('[NORMAL] [CONFLICT] [SG2-38:AC2] [SG2-38:AC3] [SG2-39:AC1] [SG2-39:AC2] [SG2-39:AC3] an attendance change invalidates arrangements; confirming saves the change and keeps the displayed stage in planning with rechecks outstanding', async () => {
     let capturedFetchEventId: number | undefined;
     let capturedUpdateEventId: number | undefined;
     let capturedFields: UpdatePlanningFieldsInput | undefined;
@@ -1031,6 +1076,23 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.deepEqual(capturedFields.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
     assert.equal(capturedFields.status, 'planning');
 
+    // The stage reads the saved response, including the newly stale arrangements.
+    const stage = computeEventStage(response.body.event);
+    assert.equal(stage.raw_status, 'planning');
+    assert.equal(stage.stage, 'Approved — In Planning');
+    assert.equal(stage.stage_key, 'in_planning');
+    assert.equal(stage.arrangements_recheck_needed, true);
+    assert.deepEqual(stage.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
+    assert.deepEqual(stage.waiting_on, {
+      persona: 'Event Coordinator (Alex Coordinator)',
+      action: 'Complete venue suitability check and equipment reservation',
+      user_id: COORDINATOR_ID
+    });
+    assert.deepEqual(stage.stepper_steps.map(step => [step.key, step.status]), [
+      ['draft', 'completed'], ['submitted', 'completed'], ['under_review', 'completed'],
+      ['in_planning', 'current'], ['confirmed', 'upcoming']
+    ]);
+
     // Check captured audit diffs
     assert.ok(capturedAudit);
     assert.deepEqual(capturedAudit, [
@@ -1044,7 +1106,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     ]);
   });
 
-  test('AC 3: transitions approved event to planning on non-impacting update and persists diffs', async () => {
+  test('[NORMAL] [SG2-39:AC1] [SG2-39:AC3] AC 3: transitions approved event to planning on non-impacting update and persists diffs', async () => {
     let capturedFields: UpdatePlanningFieldsInput | undefined;
     let capturedAudit: InsertAuditLogInput[] | undefined;
 
@@ -1076,7 +1138,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     ]);
   });
 
-  test('preserves existing planning status when event is already in planning without impact', async () => {
+  test('[NORMAL] [SG2-39:AC3] preserves existing planning status when event is already in planning without impact', async () => {
     let capturedFields: UpdatePlanningFieldsInput | undefined;
 
     const response = await request(
@@ -1100,7 +1162,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(capturedFields.status, undefined);
   });
 
-  test('does not insert audit logs when no audited fields changed', async () => {
+  test('[BOUNDARY] [SG2-39:AC1] does not insert audit logs when no audited fields changed', async () => {
     let auditCalled = false;
 
     const response = await request(
@@ -1119,7 +1181,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(auditCalled, false);
   });
 
-  test('handles updatePlanningFields failure', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles updatePlanningFields failure', async () => {
     // not_found
     const notFoundRes = await request(
       buildApp({
@@ -1141,7 +1203,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(unavailRes.status, 503);
   });
 
-  test('handles insertAudit failure with 503 and verifies event state after failed audit write', async () => {
+  test('[FAILURE] [SG2-39:AC1] handles insertAudit failure with 503 and verifies event state after failed audit write', async () => {
     let capturedFields: UpdatePlanningFieldsInput | undefined;
     let storedEvent: EventPlanningRecord = { ...BASE_EVENT };
 
@@ -1191,7 +1253,7 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
     Object.assign(dbConfig, originalConfig);
   });
 
-  test('policy grants event_request.planning.update only to event_coordinator', () => {
+  test('[NORMAL] [FAILURE] [SG2-25:AC1] [SG2-39:AC1] policy grants event_request.planning.update only to event_coordinator', () => {
     assert.deepEqual(PERMISSIONS['event_request.planning.update'], ['event_coordinator']);
     assert.ok(permissionsFor('event_coordinator', PERMISSIONS).includes('event_request.planning.update'));
     assert.ok(!permissionsFor('event_organiser', PERMISSIONS).includes('event_request.planning.update'));
@@ -1226,14 +1288,14 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
       }
     );
 
-  test('rejects unauthenticated request on app route', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-39:AC1] rejects unauthenticated request on app route', async () => {
     const response = await request(appForRole('event_coordinator')).patch('/api/event-requests/10/planning');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
   for (const role of ['event_organiser', 'venue_staff', 'technical_support_staff', 'attendee'] as const) {
-    test(`denies role ${role} with 403 on app route`, async () => {
+    test(`[FAILURE] [SG2-25:AC1] [SG2-39:AC1] denies role ${role} with 403 on app route`, async () => {
       const response = await request(appForRole(role))
         .patch('/api/event-requests/10/planning')
         .set('Authorization', 'Bearer test-token');
@@ -1241,7 +1303,7 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
     });
   }
 
-  test('allows event_coordinator to reach mounted planning handler on app route', async () => {
+  test('[NORMAL] [SG2-39:AC1] allows event_coordinator to reach mounted planning handler on app route', async () => {
     const response = await request(appForRole('event_coordinator'))
       .patch('/api/event-requests/10/planning')
       .set('Authorization', 'Bearer test-token');

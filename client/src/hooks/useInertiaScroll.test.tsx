@@ -79,7 +79,7 @@ function settle(track: HTMLElement) {
   return offsetOf(track);
 }
 
-test('eases the track toward the wheel target', () => {
+test('[NORMAL] [SG2-20:scroll-interaction] eases the track toward the wheel target', () => {
   const { getByTestId } = render(<Harness />);
   const container = getByTestId('container');
   const track = getByTestId('track');
@@ -95,7 +95,7 @@ test('eases the track toward the wheel target', () => {
   expect(settle(track)).toBe(-500);
 });
 
-test('clamps at the top and bottom of the content', () => {
+test('[BOUNDARY] [SG2-20:scroll-interaction] clamps at the top and bottom of the content', () => {
   const { getByTestId } = render(<Harness />);
   const container = getByTestId('container');
   const track = getByTestId('track');
@@ -113,7 +113,7 @@ test('clamps at the top and bottom of the content', () => {
   expect(settle(track)).toBe(-2200);
 });
 
-test('touch dragging scrolls the track', () => {
+test('[NORMAL] [SG2-20:scroll-interaction] touch dragging scrolls the track', () => {
   const { getByTestId } = render(<Harness />);
   const container = getByTestId('container');
   const track = getByTestId('track');
@@ -125,7 +125,7 @@ test('touch dragging scrolls the track', () => {
   expect(settle(track)).toBe(-160);
 });
 
-test('does nothing when the content fits', () => {
+test('[BOUNDARY] [SG2-20:scroll-interaction] does nothing when the content fits', () => {
   const { getByTestId } = render(<Harness />);
   const container = getByTestId('container');
   const track = getByTestId('track');
@@ -138,7 +138,7 @@ test('does nothing when the content fits', () => {
   expect(offsetOf(track)).toBe(0);
 });
 
-test('re-measures on resize', () => {
+test('[NORMAL] [SG2-20:scroll-interaction] re-measures on resize', () => {
   const { getByTestId } = render(<Harness />);
   const container = getByTestId('container');
   const track = getByTestId('track');
@@ -153,7 +153,7 @@ test('re-measures on resize', () => {
   expect(settle(track)).toBe(-400);
 });
 
-test('keeps easing under StrictMode', () => {
+test('[CONFLICT] [SG2-20:scroll-interaction] keeps easing under StrictMode', () => {
   // See the matching note in useParticleOrb.test.tsx — an effect cleanup here
   // would kill the loop on StrictMode's simulated unmount.
   const { getByTestId } = render(
@@ -169,12 +169,12 @@ test('keeps easing under StrictMode', () => {
   expect(settle(track)).toBe(-500);
 });
 
-test('no-ops without a track child', () => {
+test('[FAILURE] [SG2-20:scroll-interaction] no-ops without a track child', () => {
   expect(() => render(<Harness withTrack={false} />)).not.toThrow();
   expect(frames.size).toBe(0);
 });
 
-test('stops the loop and detaches listeners on unmount', () => {
+test('[CONFLICT] [SG2-20:scroll-interaction] stops the loop and detaches listeners on unmount', () => {
   const removeFromWindow = vi.spyOn(window, 'removeEventListener');
   const { getByTestId, unmount } = render(<Harness />);
   const container = getByTestId('container');

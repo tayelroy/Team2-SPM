@@ -47,7 +47,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-test('no token never loads data or exposes write controls', () => {
+test('[FAILURE] [SG2-42:AC3] no token never loads data or exposes write controls', () => {
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
   render(<Venues onBook={vi.fn()} />);
   expect(screen.getByText(/Sign in with your account/)).toBeInTheDocument();
@@ -55,7 +55,7 @@ test('no token never loads data or exposes write controls', () => {
   expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
 });
 
-test('staff creates a venue, searches its saved fields and reloads it from the API', async () => {
+test('[NORMAL] [SG2-42:AC1] staff creates a venue, searches its saved fields and reloads it from the API', async () => {
   const { fetch, unmount } = await open();
   fireEvent.click(screen.getByRole('button', { name: 'Add venue' }));
   fill();
@@ -72,7 +72,7 @@ test('staff creates a venue, searches its saved fields and reloads it from the A
   expect(await screen.findByRole('heading', { name: 'Harbour Room' })).toBeInTheDocument();
 });
 
-test('editing updates search results and does not duplicate the record', async () => {
+test('[NORMAL] [SG2-42:AC1] editing updates search results and does not duplicate the record', async () => {
   const { fetch, unmount } = await open();
   fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
   fill('Discard this edit');
@@ -109,7 +109,7 @@ test('editing updates search results and does not duplicate the record', async (
   expect(screen.queryByRole('heading', { name: 'Atrium Hall' })).not.toBeInTheDocument();
 });
 
-test('coordinators can read and use the existing request link but cannot create/edit', async () => {
+test('[FAILURE] [SG2-42:AC3] coordinators can read and use the existing request link but cannot create/edit', async () => {
   const { book } = await open(coordinator);
   for (const text of ['Atrium Hall', 'North Wing', '100', 'Stage', 'Hearing loop', 'Weekdays, 09:00–18:00']) {
     expect(screen.getByText(text)).toBeInTheDocument();
@@ -120,7 +120,7 @@ test('coordinators can read and use the existing request link but cannot create/
   expect(book).toHaveBeenCalledOnce();
 });
 
-test('cancel discards an unsaved form and the empty state explains there are no venues', async () => {
+test('[BOUNDARY] [SG2-42:AC1] cancel discards an unsaved form and the empty state explains there are no venues', async () => {
   const { fetch } = await open(staff, []);
   expect(screen.getByRole('heading', { name: 'No venues yet' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Add venue' }));
@@ -130,7 +130,7 @@ test('cancel discards an unsaved form and the empty state explains there are no 
   expect(screen.getByLabelText('Venue name')).toHaveValue('');
 });
 
-test('unauthorized roles never see returned venue data or write controls', async () => {
+test('[FAILURE] [SG2-42:AC3] unauthorized roles never see returned venue data or write controls', async () => {
   const fetch = api({ userId: 'attendee', role: 'attendee', permissions: [] });
   render(<Venues accessToken="test-token" onBook={vi.fn()} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('permission');
@@ -139,7 +139,7 @@ test('unauthorized roles never see returned venue data or write controls', async
   expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
 });
 
-test.each(['permissions', 'catalogue'] as const)('loads both requests concurrently and waits for %s when it is slower', async (slower) => {
+test.each(['permissions', 'catalogue'] as const)('[CONFLICT] [SG2-42:AC1] loads both requests concurrently and waits for %s when it is slower', async (slower) => {
   const identity = deferred(); const catalogue = deferred();
   const fetch = vi.fn((url: string) => url === '/api/auth/me' ? identity.promise : catalogue.promise);
   vi.stubGlobal('fetch', fetch);
@@ -161,7 +161,7 @@ test.each(['permissions', 'catalogue'] as const)('loads both requests concurrent
   expect(screen.getByRole('button', { name: 'Add venue' })).toBeInTheDocument();
 });
 
-test.each([401, 403])('a %s catalogue response hides data even when permissions allow reading', async (status) => {
+test.each([401, 403])('[FAILURE] [SG2-42:AC3] a %s catalogue response hides data even when permissions allow reading', async (status) => {
   const fetch = api();
   fetch.mockResolvedValueOnce(Response.json(staff))
     .mockResolvedValueOnce(Response.json({}, { status }));
@@ -171,7 +171,7 @@ test.each([401, 403])('a %s catalogue response hides data even when permissions 
   expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
 });
 
-test('network failure offers retry and recovers', async () => {
+test('[FAILURE] [SG2-42:AC1] network failure offers retry and recovers', async () => {
   const fetch = api(); fetch.mockRejectedValueOnce(new Error('offline'));
   render(<Venues accessToken="test-token" onBook={vi.fn()} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load venues');
@@ -179,7 +179,7 @@ test('network failure offers retry and recovers', async () => {
   expect(await screen.findByRole('heading', { name: 'Atrium Hall' })).toBeInTheDocument();
 });
 
-test('shows loading and ignores a rejected request after unmount', async () => {
+test('[CONFLICT] [SG2-42:catalogue-isolation] shows loading and ignores a rejected request after unmount', async () => {
   const load = deferred(); const fetch = vi.fn((_url: string, _init?: RequestInit) => load.promise); vi.stubGlobal('fetch', fetch);
   const { unmount } = render(<Venues accessToken="token" onBook={vi.fn()} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading venue catalogue');
@@ -191,7 +191,7 @@ test('shows loading and ignores a rejected request after unmount', async () => {
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('a stale successful load cannot restore another user’s catalogue', async () => {
+test('[CONFLICT] [SG2-42:catalogue-isolation] a stale successful load cannot restore another user’s catalogue', async () => {
   const fetch = api(); const load = deferred();
   fetch.mockResolvedValueOnce(Response.json(staff)).mockImplementationOnce(() => load.promise);
   const { rerender } = render(<Venues accessToken="test-token" onBook={vi.fn()} />);
@@ -202,7 +202,7 @@ test('a stale successful load cannot restore another user’s catalogue', async 
 });
 
 describe('saving', () => {
-  test('deduplicates submissions and disables the form while awaiting a save', async () => {
+  test('[CONFLICT] [SG2-42:duplicate-save] deduplicates submissions and disables the form while awaiting a save', async () => {
     const { fetch } = await open(); const save = deferred(); fetch.mockImplementationOnce(() => save.promise);
     fireEvent.click(screen.getByRole('button', { name: 'Add venue' })); fill();
     act(() => {
@@ -221,7 +221,7 @@ describe('saving', () => {
     [400, 'Check the venue details and capacity, then try again.'],
     [404, 'This venue is no longer available. Reload the catalogue.'],
     [503, 'Unable to reach the venue service. Please try again.']
-  ] as const) test(`a ${status} save error retains edits for retry`, async () => {
+  ] as const) test(`[FAILURE] [SG2-42:AC1] a ${status} save error retains edits for retry`, async () => {
     const { fetch } = await open(); fetch.mockResolvedValueOnce(Response.json({}, { status }));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' })); fill();
     fireEvent.submit(screen.getByRole('form'));
@@ -235,7 +235,7 @@ describe('saving', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('saved');
   });
 
-  test('network failures retain unsaved values', async () => {
+  test('[FAILURE] [SG2-42:AC1] network failures retain unsaved values', async () => {
     const { fetch } = await open(); fetch.mockRejectedValueOnce(new Error('offline'));
     fireEvent.click(screen.getByRole('button', { name: 'Add venue' })); fill();
     fireEvent.submit(screen.getByRole('form'));
@@ -251,7 +251,7 @@ describe('saving', () => {
   for (const [status, message] of [
     [401, 'Your session has expired. Sign in again.'],
     [403, 'You no longer have permission to do this.']
-  ] as const) test(`a ${status} write denial removes controls and stale data`, async () => {
+  ] as const) test(`[FAILURE] [SG2-42:AC1] a ${status} write denial removes controls and stale data`, async () => {
     const { fetch } = await open(); fetch.mockResolvedValueOnce(Response.json({}, { status }));
     fireEvent.click(screen.getByRole('button', { name: 'Add venue' })); fill();
     fireEvent.submit(screen.getByRole('form'));
@@ -260,7 +260,7 @@ describe('saving', () => {
     expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
   });
 
-  for (const succeeds of [true, false]) test(`leaving during a save aborts it, ignoring late ${succeeds ? 'success' : 'failure'}`, async () => {
+  for (const succeeds of [true, false]) test(`[CONFLICT] [SG2-42:save-isolation] leaving during a save aborts it, ignoring late ${succeeds ? 'success' : 'failure'}`, async () => {
     const { fetch, rerender } = await open(); const save = deferred(); fetch.mockImplementationOnce(() => save.promise);
     fireEvent.click(screen.getByRole('button', { name: 'Add venue' })); fill(); fireEvent.submit(screen.getByRole('form'));
     const init = fetch.mock.calls[2][1]!;
@@ -271,7 +271,7 @@ describe('saving', () => {
   });
 });
 
-test('form rejects empty/blank fields, capacity underflow/overflow/fractions and overlong names', () => {
+test('[BOUNDARY] [SG2-42:AC1] form rejects empty/blank fields, capacity underflow/overflow/fractions and overlong names', () => {
   const onSave = vi.fn();
   render(<VenueForm venue={null} saving={false} error="" onSave={onSave} onCancel={vi.fn()} />);
   const invalidFields = [
@@ -290,7 +290,7 @@ test('form rejects empty/blank fields, capacity underflow/overflow/fractions and
   }
 });
 
-test('form submits exact inclusive limits, trims every text field and clears validation after correction', () => {
+test('[BOUNDARY] [SG2-42:AC1] form submits exact inclusive limits, trims every text field and clears validation after correction', () => {
   const onSave = vi.fn();
   render(<VenueForm venue={null} saving={false} error="" onSave={onSave} onCancel={vi.fn()} />);
   fireEvent.submit(screen.getByRole('form'));
@@ -308,7 +308,7 @@ test('form submits exact inclusive limits, trims every text field and clears val
   expect(onSave).toHaveBeenCalledTimes(2);
 });
 
-test('existing Supabase records with null fields can be displayed, searched and completed', async () => {
+test('[BOUNDARY] [SG2-42:AC1] existing Supabase records with null fields can be displayed, searched and completed', async () => {
   await open(staff, [{ venue_id: 1, name: 'Legacy hall', location: null, capacity: null,
     facilities: null, accessibility_features: null, operating_information: null }]);
   expect(screen.getAllByText('Not recorded')).toHaveLength(3);

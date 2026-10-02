@@ -60,7 +60,27 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
-  test('submits a complete draft owned by the caller', async () => {
+  test('[BOUNDARY] [SG2-30:AC1] event id zero is refused and the first positive id reaches submission', async () => {
+    const reads: number[] = [];
+    const writes: number[] = [];
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, event_id: 1 } },
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, event_id: 1, status: 'submitted' } },
+      captureFetch: eventId => { reads.push(eventId); }, captureSubmit: eventId => { writes.push(eventId); }
+    });
+    const refused = await request(app).patch('/api/event-requests/0/submit');
+    assert.equal(refused.status, 400);
+    assert.deepEqual(refused.body, { error: 'eventId must be a positive integer.' });
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writes, []);
+    const accepted = await request(app).patch('/api/event-requests/1/submit');
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.request.event_id, 1);
+    assert.deepEqual(reads, [1]);
+    assert.deepEqual(writes, [1]);
+  });
+
+  test('[NORMAL] [SG2-30:AC1] submits a complete draft owned by the caller', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
     let submitted: number | undefined;
     const response = await request(
@@ -76,31 +96,31 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(submitted, 7);
   });
 
-  test('returns 400 for a non-numeric eventId', async () => {
+  test('[FAILURE] [SG2-30:AC1] returns 400 for a non-numeric eventId', async () => {
     const response = await request(buildApp()).patch('/api/event-requests/not-a-number/submit');
     assert.equal(response.status, 400);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-30:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined })).patch(
       '/api/event-requests/7/submit'
     );
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-30:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null })).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the request does not exist or belongs to someone else', async () => {
+  test('[FAILURE] [SG2-30:AC1] returns 404 when the request does not exist or belongs to someone else', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'missing' } })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the database error when the lookup fails', async () => {
+  test('[FAILURE] [SG2-30:AC1] returns 503 without leaking the database error when the lookup fails', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).patch('/api/event-requests/7/submit');
@@ -108,7 +128,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 409 when the request is already submitted', async () => {
+  test('[CONFLICT] [SG2-30:AC3] returns 409 when the request is already submitted', async () => {
     let writes = 0;
     const response = await request(
       buildApp({
@@ -120,7 +140,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('returns 409 for a status that is neither draft nor rejected', async () => {
+  test('[CONFLICT] [SG2-30:AC3] returns 409 for a status that is neither draft nor rejected', async () => {
     let writes = 0;
     const response = await request(
       buildApp({
@@ -132,7 +152,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('resubmits a rejected request owned by the caller', async () => {
+  test('[NORMAL] [SG2-30:AC1] resubmits a rejected request owned by the caller', async () => {
     let submitted: number | undefined;
     const response = await request(
       buildApp({
@@ -146,7 +166,58 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(submitted, 7);
   });
 
-  test('returns 400 and lists outstanding fields for an incomplete draft', async () => {
+  test('[NORMAL] [SG2-36:AC2] resubmits a request returned for clarification, sending it back for review', async () => {
+    let submitted: number | undefined;
+    const response = await request(
+      buildApp({
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'needs_clarification' } },
+        captureSubmit: (eventId) => (submitted = eventId)
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'submitted');
+    assert.equal(submitted, 7);
+  });
+
+  test('[FAILURE] [SG2-36:AC2] a returned request emptied while amending cannot be resubmitted', async () => {
+    let writes = 0;
+    const response = await request(
+      buildApp({
+        captureSubmit: () => { writes++; },
+        fetchResult: {
+          ok: true,
+          request: { ...COMPLETE_DRAFT, status: 'needs_clarification', expected_attendance: null }
+        }
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body.missing, ['expected_attendance']);
+    assert.equal(writes, 0);
+  });
+
+  test('[BOUNDARY] [SG2-36:AC2] a returned request missing only optional details can still be resubmitted', async () => {
+    let submitted: number | undefined;
+    const response = await request(
+      buildApp({
+        fetchResult: {
+          ok: true,
+          request: {
+            ...COMPLETE_DRAFT, status: 'needs_clarification',
+            accessibility_needs: null, equipment_requirements: null
+          }
+        },
+        captureSubmit: (eventId) => (submitted = eventId)
+      })
+    ).patch('/api/event-requests/7/submit');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'submitted');
+    assert.equal(submitted, 7);
+  });
+
+  test('[FAILURE] [SG2-30:AC2] returns 400 and lists outstanding fields for an incomplete draft', async () => {
     let writes = 0;
     const response = await request(
       buildApp({
@@ -163,7 +234,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('returns 400 and lists description when it is blank', async () => {
+  test('[FAILURE] [SG2-30:AC2] returns 400 and lists description when it is blank', async () => {
     let writes = 0;
     const response = await request(
       buildApp({
@@ -180,14 +251,14 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('a draft omitting only accessibility needs is submission-ready', async () => {
+  test('[NORMAL] [SG2-28:AC2] [SG2-30:AC1] a draft omitting only accessibility needs is submission-ready', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, accessibility_needs: null } } })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 200);
   });
 
-  test('returns 503 without leaking the database error when the update fails', async () => {
+  test('[FAILURE] [SG2-30:AC1] returns 503 without leaking the database error when the update fails', async () => {
     const response = await request(
       buildApp({ submitResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).patch('/api/event-requests/7/submit');
@@ -233,20 +304,20 @@ describe('PATCH /api/event-requests/:eventId/submit authorisation wiring', () =>
       }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-30:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_organiser')).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies a role without the submit permission', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-30:AC1] denies a role without the submit permission', async () => {
     const response = await request(appForRole('attendee'))
       .patch('/api/event-requests/7/submit')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 403);
   });
 
-  test('lets an Event Organiser reach the submit handler', async () => {
+  test('[NORMAL] [SG2-30:AC1] lets an Event Organiser reach the submit handler', async () => {
     const response = await request(appForRole('event_organiser'))
       .patch('/api/event-requests/7/submit')
       .set('Authorization', 'Bearer token');

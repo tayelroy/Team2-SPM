@@ -109,6 +109,21 @@ export function computeEventStage(event: EventStageInput): EventStageResult {
       activeStepIndex = 2;
       break;
 
+    case 'needs_clarification':
+      // SG2-36: still at the review step, but the ball is now with the
+      // organiser — the coordinator has asked a question and is waiting for
+      // an answer and an amended resubmission.
+      stage = 'Clarification Needed';
+      stageKey = 'needs_clarification';
+      description = 'The coordinator has asked a question; the organiser needs to answer and resubmit.';
+      waitingOn = {
+        persona: 'Event Organiser',
+        action: 'Answer the coordinator and resubmit the request',
+        user_id: event.organiser_id ?? null
+      };
+      activeStepIndex = 2;
+      break;
+
     case 'approved':
     case 'planning':
       stage = 'Approved — In Planning';

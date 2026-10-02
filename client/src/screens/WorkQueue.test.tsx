@@ -10,7 +10,7 @@ const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Lea
   category: 'review', assigned_to_me: false, details: { purpose: 'Share ideas', description: 'A community forum',
     expected_attendance: 0, accessibility_needs: null, registration_needed: true } };
 
-test('coordinator queue groups distinct records, opens the exact assignment and refreshes when returning', async () => {
+test('[NORMAL] [SG2-41:AC4] coordinator queue groups distinct records, opens the exact assignment and refreshes when returning', async () => {
   const assigned = { ...review, item_id: 28, event_id: 28, title: 'Assigned workshop', category: 'assigned', status: 'planning',
     starts_at: null, details: { organisation: 'Harbour Trust', registration_needed: false } };
   const fetch = vi.fn(async (url: string) => Response.json({ items: url.endsWith('/event/28') ? [assigned] : [review, assigned] }));
@@ -34,7 +34,7 @@ test('coordinator queue groups distinct records, opens the exact assignment and 
   expect(fetch).toHaveBeenCalledTimes(3);
 });
 
-test('event detail preserves complete facts, zero, null and boolean values', async () => {
+test('[BOUNDARY] [SG2-41:AC4] event detail preserves complete facts, zero, null and boolean values', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [review] })));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
@@ -43,7 +43,7 @@ test('event detail preserves complete facts, zero, null and boolean values', asy
   expect(screen.getByText(/15 Jun 2030, 10:00/)).toBeVisible();
 });
 
-test('opening a submitted request assigned to me moves it to under review (SG2-35)', async () => {
+test('[NORMAL] [SG2-35:AC2] opening a submitted request assigned to me moves it to under review (SG2-35)', async () => {
   const submitted = { ...review, status: 'submitted', assigned_to_me: true };
   const fetch = vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'PATCH'
     ? Response.json({ request: { event_id: 12, status: 'under_review' } })
@@ -57,7 +57,7 @@ test('opening a submitted request assigned to me moves it to under review (SG2-3
   });
 });
 
-test('a request awaiting assignment is readable but never transitions (SG2-35)', async () => {
+test('[CONFLICT] [SG2-35:AC3] a request awaiting assignment is readable but never transitions (SG2-35)', async () => {
   const unassigned = { ...review, status: 'submitted', assigned_to_me: false };
   const fetch = vi.fn(async () => Response.json({ items: [unassigned] }));
   vi.stubGlobal('fetch', fetch);
@@ -68,7 +68,7 @@ test('a request awaiting assignment is readable but never transitions (SG2-35)',
   expect(fetch).not.toHaveBeenCalledWith('/api/event-requests/12/review', expect.anything());
 });
 
-test('a review result arriving after leaving the request is ignored (SG2-35)', async () => {
+test('[CONFLICT] [SG2-35:review-isolation] a review result arriving after leaving the request is ignored (SG2-35)', async () => {
   const submitted = { ...review, status: 'submitted', assigned_to_me: true };
   let resolveReview!: (response: Response) => void;
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'PATCH'
@@ -83,7 +83,7 @@ test('a review result arriving after leaving the request is ignored (SG2-35)', a
   expect(screen.queryByText('under review')).not.toBeInTheDocument();
 });
 
-test('a review that cannot be started says so instead of claiming the status changed (SG2-35)', async () => {
+test('[CONFLICT] [SG2-35:AC3] a review that cannot be started says so instead of claiming the status changed (SG2-35)', async () => {
   const submitted = { ...review, status: 'submitted', assigned_to_me: true };
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'PATCH'
     ? new Response(null, { status: 404 }) : Response.json({ items: [submitted] })));
@@ -96,7 +96,7 @@ test('a review that cannot be started says so instead of claiming the status cha
 test.each([
   ['Venue Staff', 'venue', 'Booking requests awaiting decision', 'Atrium Hall', 'Venue booking request'],
   ['Technical Support Staff', 'equipment', 'Equipment requests awaiting decision', 'Wireless microphone', 'Equipment request'],
-] as const)('%s sees request identity, event and the exact time window', async (role, kind, group, title, detailLabel) => {
+] as const)('[NORMAL] [SG2-41:AC4] %s sees request identity, event and the exact time window', async (role, kind, group, title, detailLabel) => {
   const item = { ...review, kind, category: kind, item_id: 7, title, ends_at: '2030-06-15T06:00:00Z', details: { quantity: 2, notes: 'Set up before doors open' } };
   const fetch = vi.fn(async () => Response.json({ items: [item] })); vi.stubGlobal('fetch', fetch);
   render(<Dashboard role={role} accessToken="token" onNavigate={vi.fn()} />);
@@ -111,7 +111,7 @@ test.each([
   expect(fetch).toHaveBeenCalledWith(`/api/work-queue/${kind}/7`, expect.anything());
 });
 
-test('retry replaces an unavailable queue with explicit empty groups, then newly arrived work', async () => {
+test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit empty groups, then newly arrived work', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 }))
     .mockResolvedValueOnce(Response.json({ items: [] })).mockResolvedValueOnce(Response.json({ items: [review] }));
   vi.stubGlobal('fetch', fetch);
@@ -126,7 +126,7 @@ test('retry replaces an unavailable queue with explicit empty groups, then newly
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('a late result for the previous account cannot replace the new account queue', async () => {
+test('[CONFLICT] [SG2-41:session-isolation] a late result for the previous account cannot replace the new account queue', async () => {
   let resolve!: (response: Response) => void;
   vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(() => new Promise<Response>(yes => { resolve = yes; }))
     .mockResolvedValueOnce(Response.json({ items: [] })));
@@ -138,7 +138,7 @@ test('a late result for the previous account cannot replace the new account queu
   expect(screen.getByRole('region', { name: 'Booking requests awaiting decision' })).toBeVisible();
 });
 
-test('coordinator can open and close the event planning drawer from item detail', async () => {
+test('[NORMAL] [SG2-39:AC1] coordinator can open and close the event planning drawer from item detail', async () => {
   const assigned: WorkItem = {
     ...review,
     item_id: 28,
@@ -183,7 +183,7 @@ test('coordinator can open and close the event planning drawer from item detail'
   expect(screen.queryByRole('dialog', { name: 'Event Planning Details' })).not.toBeInTheDocument();
 });
 
-test('saving updates in event planning drawer updates item status and facts via onSuccess', async () => {
+test('[NORMAL] [SG2-39:AC1] saving updates in event planning drawer updates item status and facts via onSuccess', async () => {
   const assigned: WorkItem = {
     ...review,
     item_id: 28,
@@ -242,7 +242,7 @@ test('saving updates in event planning drawer updates item status and facts via 
   expect(screen.getByText('PA System')).toBeVisible();
 });
 
-test('Edit Planning Information button is hidden for terminal statuses and unassigned events', async () => {
+test('[CONFLICT] [SG2-39:AC5] Edit Planning Information button is hidden for terminal statuses and unassigned events', async () => {
   const cancelled: WorkItem = {
     ...review,
     item_id: 31,
@@ -294,6 +294,7 @@ function decisionApi(onDecision?: (body: unknown) => Response) {
     if (typeof url === 'string' && url.endsWith('/decision')) {
       return onDecision ? onDecision(JSON.parse(String(init?.body))) : Response.json({ request: { event_id: 12, status: 'approved' } });
     }
+    if (typeof url === 'string' && url.endsWith('/clarifications')) return Response.json({ clarifications: [], status: 'under_review' });
     return Response.json({ items: [underReview] });
   });
   vi.stubGlobal('fetch', fetch);
@@ -306,7 +307,7 @@ async function openUnderReview() {
   return screen.findByRole('region', { name: 'Decide this request' });
 }
 
-test('approving a request under review records the outcome and shows it (SG2-37)', async () => {
+test('[NORMAL] [SG2-37:AC1] approving a request under review records the outcome and shows it (SG2-37)', async () => {
   const fetch = decisionApi();
   await openUnderReview();
   fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
@@ -314,7 +315,7 @@ test('approving a request under review records the outcome and shows it (SG2-37)
   expect(decisionBody(fetch)).toEqual({ decision: 'approved', reason: '' });
 });
 
-test('rejecting sends the typed reason so the organiser learns why (SG2-37)', async () => {
+test('[NORMAL] [SG2-37:AC2] rejecting sends the typed reason so the organiser learns why (SG2-37)', async () => {
   const fetch = decisionApi(() => Response.json({ request: { event_id: 12, status: 'rejected' } }));
   await openUnderReview();
   fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: 'Clashes with the AGM.' } });
@@ -323,7 +324,7 @@ test('rejecting sends the typed reason so the organiser learns why (SG2-37)', as
   expect(decisionBody(fetch)).toEqual({ decision: 'rejected', reason: 'Clashes with the AGM.' });
 });
 
-test('a refused decision surfaces the reason and leaves the status alone (SG2-37)', async () => {
+test('[FAILURE] [SG2-37:AC2] a refused decision surfaces the reason and leaves the status alone (SG2-37)', async () => {
   decisionApi(() => Response.json({ error: 'A reason is required when rejecting an event request.' }, { status: 400 }));
   await openUnderReview();
   fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
@@ -331,21 +332,27 @@ test('a refused decision surfaces the reason and leaves the status alone (SG2-37
   expect(screen.getByText('under review')).toBeVisible();
 });
 
-test('decision buttons disable while a decision is in flight (SG2-37)', async () => {
+test('[CONFLICT] [SG2-37:duplicate-decision] decision buttons disable while a decision is in flight (SG2-37)', async () => {
   let settle!: (response: Response) => void;
   const pending = new Promise<Response>(resolve => { settle = resolve; });
   const fetch = vi.fn(async (url: string) => typeof url === 'string' && url.endsWith('/decision')
-    ? pending : Response.json({ items: [underReview] }));
+    ? pending
+    : url.endsWith('/clarifications') ? Response.json({ clarifications: [], status: 'under_review' })
+      : Response.json({ items: [underReview] }));
   vi.stubGlobal('fetch', fetch);
   await openUnderReview();
   fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
   expect(screen.getByRole('button', { name: 'Approving…' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Reject' })).toBeDisabled();
+  const reject = screen.getByRole('button', { name: 'Reject' });
+  expect(reject).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Approving…' }));
+  fireEvent.click(reject);
+  expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/decision'))).toHaveLength(1);
   await act(async () => settle(Response.json({ request: { event_id: 12, status: 'approved' } })));
   expect(await screen.findByText('approved')).toBeVisible();
 });
 
-test('a request not assigned to me offers no decision at all (SG2-37)', async () => {
+test('[FAILURE] [SG2-25:AC1] a request not assigned to me offers no decision at all (SG2-37)', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [{ ...underReview, assigned_to_me: false }] })));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
@@ -353,7 +360,7 @@ test('a request not assigned to me offers no decision at all (SG2-37)', async ()
   expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
 });
 
-test('an approved assigned event offers venue search pre-filled from the event (SG2-46)', async () => {
+test('[NORMAL] [SG2-46:AC1] an approved assigned event offers venue search pre-filled from the event (SG2-46)', async () => {
   decisionApi();
   const onFindVenues = vi.fn();
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={onFindVenues} />);
@@ -368,7 +375,7 @@ test('an approved assigned event offers venue search pre-filled from the event (
   }));
 });
 
-test('an approved event that is not assigned to the coordinator has no venue search button', async () => {
+test('[FAILURE] [SG2-46:AC1] an approved event that is not assigned to the coordinator has no venue search button', async () => {
   const approved = { ...review, status: 'approved', assigned_to_me: false };
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [approved] })));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
@@ -377,7 +384,73 @@ test('an approved event that is not assigned to the coordinator has no venue sea
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
 
-test('[NORMAL] coordinator can open change history drawer from event item detail (SG2-40)', async () => {
+/** SG2-36: the reviewing coordinator can ask the organiser instead of deciding. */
+const question = {
+  clarification_id: 1, event_id: 12, sender_id: 'coordinator-1', sender_name: 'Casey Coordinator',
+  message: 'Is the date firm?', created_at: '2030-05-01T02:00:00Z',
+};
+
+function clarificationApi(item: WorkItem, thread: unknown[], onPost: () => Response) {
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/clarifications')) {
+      return init?.method === 'POST' ? onPost() : Response.json({ clarifications: thread, status: item.status });
+    }
+    return Response.json({ items: [item] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
+
+test('[NORMAL] [SG2-36:AC1] asking a question returns the request to the organiser and keeps the question', async () => {
+  const fetch = clarificationApi(underReview, [], () => Response.json({ clarification: question, status: 'needs_clarification' }, { status: 201 }));
+  await openUnderReview();
+  const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+  expect(await within(thread).findByText('No questions have been asked yet.')).toBeVisible();
+  fireEvent.change(within(thread).getByLabelText('Ask the organiser a question'), { target: { value: 'Is the date firm?' } });
+  fireEvent.click(within(thread).getByRole('button', { name: 'Send' }));
+  expect(await screen.findByText('needs clarification')).toBeVisible();
+  expect(within(thread).getByText('Is the date firm?')).toBeVisible();
+  expect(within(thread).getByLabelText('Add a follow-up question')).toHaveValue('');
+  expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
+  const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST');
+  expect(post?.[0]).toBe('/api/event-requests/12/clarifications');
+  expect(JSON.parse(String(post?.[1]?.body))).toEqual({ message: 'Is the date firm?' });
+});
+
+test('[NORMAL] [SG2-36:AC3] a returned request shows the earlier questions and allows a follow-up but no decision', async () => {
+  clarificationApi({ ...underReview, status: 'needs_clarification' }, [question], () => Response.json({}));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+  expect(await within(thread).findByText('Is the date firm?')).toBeVisible();
+  expect(within(thread).getByText('Casey Coordinator')).toBeVisible();
+  expect(within(thread).getByLabelText('Add a follow-up question')).toBeVisible();
+  expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-36:AC1] a refused question shows why and leaves the request under review', async () => {
+  clarificationApi(underReview, [], () => Response.json({ error: 'A message is required.' }, { status: 400 }));
+  await openUnderReview();
+  const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+  await within(thread).findByText('No questions have been asked yet.');
+  fireEvent.click(within(thread).getByRole('button', { name: 'Send' }));
+  expect(await within(thread).findByRole('alert')).toHaveTextContent('A message is required.');
+  expect(screen.getByText('under review')).toBeVisible();
+});
+
+test.each([
+  ['not assigned to me', { ...underReview, assigned_to_me: false }],
+  ['already approved', { ...underReview, status: 'approved' }],
+])('[CONFLICT] [SG2-36:AC1] a request %s offers no clarification thread', async (_label, item) => {
+  const fetch = clarificationApi(item, [], () => Response.json({}));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(screen.queryByRole('region', { name: 'Clarification conversation' })).not.toBeInTheDocument();
+  expect(fetch.mock.calls.some(([url]) => url.endsWith('/clarifications'))).toBe(false);
+});
+
+test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] coordinator opens the selected event history with its actor, timestamp and old/new values', async () => {
   const historyEntry = {
     log_id: 5, event_id: 12, actor_id: 'coord-9', actor_name: 'Priya Coordinator',
     field_name: 'expected_attendance', old_value: '50', new_value: '80',
@@ -406,14 +479,16 @@ test('[NORMAL] coordinator can open change history drawer from event item detail
   expect(fetch).toHaveBeenCalledWith('/api/event-requests/12/history', {
     headers: { Authorization: 'Bearer token' },
   });
-  expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
-  expect(screen.getByText('50')).toBeInTheDocument();
-  expect(screen.getByText('80')).toBeInTheDocument();
+  const entry = within(screen.getByTestId('audit-entry-5'));
+  expect(entry.getByText('Priya Coordinator')).toBeInTheDocument();
+  expect(entry.getByText('Expected Attendance')).toBeInTheDocument();
+  expect(entry.getByText('20 Sept 2026, 18:00 SGT')).toBeInTheDocument();
+  expect(entry.getByTestId('diff-old')).toHaveTextContent(/^50$/);
+  expect(entry.getByTestId('diff-new')).toHaveTextContent(/^80$/);
 
   // Close drawer
   const closeBtn = screen.getByRole('button', { name: /close change history/i });
   fireEvent.click(closeBtn);
   expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
 });
-
 

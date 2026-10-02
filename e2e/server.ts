@@ -15,6 +15,7 @@ import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
+import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
 import { createVenueBlocksRouter } from '../server/src/venues/blocks';
@@ -112,7 +113,15 @@ const app = createApp(
   createStartEventReviewHandler(eventDependencies),
   // SG2-33's assign handler keeps its production default here, as on main.
   undefined,
-  createDecideEventRequestHandler(eventDependencies)
+  createDecideEventRequestHandler(eventDependencies),
+  // The assignable-list, planning and SG2-40 history handlers keep their
+  // production defaults.
+  undefined,
+  undefined,
+  undefined,
+  // SG2-36's clarification exchange, against the in-memory client.
+  createListClarificationsHandler(eventDependencies),
+  createAddClarificationHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not

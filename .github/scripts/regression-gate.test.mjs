@@ -30,38 +30,38 @@ function specs(report) {
   return report.suites[0].suites[0].specs;
 }
 
-test('all required acceptance cases must execute and pass', () => {
+test('[SG2-22:AC3] [NORMAL] all required acceptance cases must execute and pass', () => {
   assert.deepEqual(REQUIRED_REGRESSIONS, ACCEPTANCE_CASE_IDS);
   assert.deepEqual(checkRegressionReport(passingReport()), []);
 });
 
-test('missing cases fail even when all remaining tests pass', () => {
+test('[SG2-22:AC3] [FAILURE] missing cases fail even when all remaining tests pass', () => {
   const report = passingReport();
   specs(report).pop();
   assert.match(checkRegressionReport(report).join('\n'), /SG2-26-N02: required regression is missing/);
 });
 
-test('similar IDs cannot satisfy a required case', () => {
+test('[SG2-22:AC3] [BOUNDARY] similar IDs cannot satisfy a required case', () => {
   const report = passingReport();
   specs(report)[0].title = 'SG2-26-P010 | a different test';
   assert.match(checkRegressionReport(report).join('\n'), /SG2-26-P01: required regression is missing/);
 });
 
 for (const status of ['skipped', 'failed', 'timedOut', 'interrupted']) {
-  test(`a ${status} result fails even if the reported outcome is expected`, () => {
+  test(`[SG2-22:AC3] [FAILURE] a ${status} result fails even if the reported outcome is expected`, () => {
     const report = passingReport();
     specs(report)[0].tests[0].results[0].status = status;
     assert.match(checkRegressionReport(report).join('\n'), /every executed attempt must pass/);
   });
 }
 
-test('test.fail annotations cannot turn a failing acceptance case green', () => {
+test('[SG2-22:AC3] [FAILURE] test.fail annotations cannot turn a failing acceptance case green', () => {
   const report = passingReport();
   Object.assign(specs(report)[0].tests[0], { expectedStatus: 'failed', results: [{ status: 'failed' }] });
   assert.match(checkRegressionReport(report).join('\n'), /expectedStatus must be passed/);
 });
 
-test('flaky cases cannot pass by succeeding on a retry', () => {
+test('[SG2-22:AC3] [CONFLICT] flaky cases cannot pass by succeeding on a retry', () => {
   const report = passingReport();
   Object.assign(specs(report)[0].tests[0], {
     status: 'flaky', results: [{ status: 'failed' }, { status: 'passed' }],
@@ -71,7 +71,7 @@ test('flaky cases cannot pass by succeeding on a retry', () => {
   assert.match(failures, /every executed attempt must pass/);
 });
 
-test('a passing project cannot hide a skipped project or duplicate required case', () => {
+test('[SG2-22:AC3] [FAILURE] a passing project cannot hide a skipped project or duplicate required case', () => {
   for (const duplicateSpec of [false, true]) {
     const report = passingReport();
     const skipped = { ...passingTest('firefox'), status: 'skipped', results: [{ status: 'skipped' }] };
@@ -84,7 +84,7 @@ test('a passing project cannot hide a skipped project or duplicate required case
   }
 });
 
-test('unexecuted cases and cases with no project results fail', () => {
+test('[SG2-22:AC3] [FAILURE] unexecuted cases and cases with no project results fail', () => {
   const report = passingReport();
   specs(report)[0].tests[0].results = [];
   specs(report)[1].tests = [];
@@ -93,7 +93,7 @@ test('unexecuted cases and cases with no project results fail', () => {
   assert.match(failures, /no project test results/);
 });
 
-test('missing report structure and runner errors fail', () => {
+test('[SG2-22:AC3] [FAILURE] missing report structure and runner errors fail', () => {
   for (const report of [null, {}]) {
     assert.deepEqual(checkRegressionReport(report), ['The Playwright report must contain a suites array.']);
   }
@@ -105,7 +105,7 @@ test('missing report structure and runner errors fail', () => {
   assert.match(checkRegressionReport(report).join('\n'), /runner errors/);
 });
 
-test('CLI exits nonzero for unreadable, malformed or failing reports and zero for passing reports', () => {
+test('[SG2-22:AC3] [FAILURE] CLI exits nonzero for unreadable, malformed or failing reports and zero for passing reports', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sg2-26-gate-'));
   const path = join(directory, 'report.json');
   const run = () => spawnSync(process.execPath, [fileURLToPath(new URL('./regression-gate.mjs', import.meta.url)), path], {
