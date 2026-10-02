@@ -1984,6 +1984,122 @@
     }
   },
   {
+    "id": "SG2-47-P01",
+    "title": "A coordinator sees which venues do not fit an approved event and why",
+    "type": "Positive",
+    "story": "SG2-47",
+    "purpose": "Verify AC1, AC2 and AC4: a venue below the expected attendance is flagged with the reason, missing required facilities and (when needs are given) missing accessibility features are named, and what each means for booking is stated.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Booking requests are seeded directly until SG2-48.",
+    "steps": [
+      "Sign in as coordinator, seed the venue suitability fixture and refresh the work queue.",
+      "Open Suitability Forum from My assigned events and choose Find venues for this event.",
+      "Inspect the venues that do not fit the event."
+    ],
+    "data": "Event 61 (approved, 150 guests, needs a stage and a projector, needs a hearing loop); Grand Ballroom (300, fits); Lecture Theatre (120, every facility); Regression Hall (100, projector only, no hearing loop); Quiet Room (20)",
+    "expected": "3 of 4 venues do not fit; Grand Ballroom is not listed; Lecture Theatre states attendance 150 is above capacity 120 and needs a capacity exception; Regression Hall names the missing stage and hearing loop and says it cannot be booked.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "2 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
+        "execution_date": "1 Oct 2026"
+      }
+    ],
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC1",
+      "SG2-47:AC2",
+      "SG2-47:AC4"
+    ],
+    "method_id": "TC-b7ceded9236f"
+  },
+  {
+    "id": "SG2-47-P02",
+    "title": "Venue staff approve a capacity exception without approving the booking",
+    "type": "Positive",
+    "story": "SG2-47",
+    "purpose": "Verify AC3 and AC5: an approved capacity exception records the approver and their role against the booking request, and the request stays pending for Venue Staff to decide.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Booking requests are seeded directly until SG2-48.",
+    "steps": [
+      "Sign in as venue staff, seed the venue suitability fixture and open the Lecture Theatre booking request.",
+      "Approve the capacity exception.",
+      "Return to the work queue, refresh, and read the request's suitability from the API."
+    ],
+    "data": "Booking request 21 (Lecture Theatre, capacity 120) for event 61 (150 guests)",
+    "expected": "The panel states the capacity problem and that approving the exception does not approve the booking; after approval it lists the exception for 150 people approved by Regression venue (Venue Staff) and offers no further approval; the request is still pending in the queue and the API reports booking allowed with the recorded approver.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "2 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
+        "execution_date": "1 Oct 2026"
+      }
+    ],
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC3",
+      "SG2-47:AC5"
+    ],
+    "method_id": "TC-10ecbce02763"
+  },
+  {
+    "id": "SG2-47-N01",
+    "title": "A missing facility cannot be excepted, and coordinators cannot approve exceptions",
+    "type": "Negative / role isolation",
+    "story": "SG2-47",
+    "purpose": "Verify AC2 and AC3: no exception is permitted for a missing required facility, a coordinator acknowledging the warning cannot approve one, and an organiser cannot approve for another organiser's event.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Booking requests are seeded directly until SG2-48.",
+    "steps": [
+      "Seed the venue suitability fixture, sign in as venue staff and open the Regression Hall booking request.",
+      "Try to approve a capacity exception for it through the API.",
+      "Sign in as coordinator, attendee and another organisation's organiser and try to approve the Lecture Theatre exception through the API.",
+      "Try without credentials."
+    ],
+    "data": "Booking request 22 (Regression Hall, no stage) and 21 (Lecture Theatre) for event 61",
+    "expected": "Regression Hall says it cannot be booked and offers no approval; the API answers 409 naming the missing stage; coordinator and attendee receive 403, the other organiser 404 and an unauthenticated call 401.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "2 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
+        "execution_date": "1 Oct 2026"
+      }
+    ],
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC2",
+      "SG2-47:AC3"
+    ],
+    "method_id": "TC-ad0afb3cedb0"
+  },
+  {
     "id": "SG2-40-P01",
     "title": "Change history lists actor, field and old/new values newest-first",
     "type": "Positive",
