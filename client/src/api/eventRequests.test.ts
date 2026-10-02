@@ -1622,19 +1622,20 @@ describe('getEventHistory (SG2-40)', () => {
     },
   ];
 
-  test('[NORMAL] successfully retrieves change history with reverse chronological entries', async () => {
+  test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] preserves the server history order, actors, timestamps and old/new values', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: mockHistory }, 200));
     vi.stubGlobal('fetch', fetchMock);
 
     const outcome = await getEventHistory(101, 'test-token');
 
     expect(outcome).toEqual({ ok: true, history: mockHistory });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/101/history', {
       headers: { Authorization: 'Bearer test-token' },
     });
   });
 
-  test('[BOUNDARY] handles empty history list', async () => {
+  test('[BOUNDARY] [SG2-40:AC1] handles empty history list', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: [] }, 200)));
 
     const outcome = await getEventHistory(101, 'test-token');
@@ -1642,7 +1643,7 @@ describe('getEventHistory (SG2-40)', () => {
     expect(outcome).toEqual({ ok: true, history: [] });
   });
 
-  test('[FAILURE] handles 401 unauthorized', async () => {
+  test('[FAILURE] [SG2-40:signed-out-history] handles 401 unauthorized', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
 
     const outcome = await getEventHistory(101, 'invalid-token');
@@ -1654,22 +1655,31 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles 403 forbidden', async () => {
+  test.each([
+    {
+      caller: 'an attendee', token: 'attendee-token',
+      message: 'Attendees are not authorized to view change history.',
+    },
+    {
+      caller: 'an unrelated organiser', token: 'other-organiser-token',
+      message: 'You are not authorized to view the change history of this event.',
+    },
+  ])('[FAILURE] [SG2-40:AC3] surfaces history denial for $caller', async ({ token, message }) => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ error: 'Attendees are not authorized to view change history.' }, 403)),
+      vi.fn().mockResolvedValue(jsonResponse({ error: message }, 403)),
     );
 
-    const outcome = await getEventHistory(101, 'attendee-token');
+    const outcome = await getEventHistory(101, token);
 
     expect(outcome).toEqual({
       ok: false,
       kind: 'forbidden',
-      message: 'Attendees are not authorized to view change history.',
+      message,
     });
   });
 
-  test('[FAILURE] handles 404 not found', async () => {
+  test('[FAILURE] [SG2-40:missing-event] handles 404 not found', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
 
     const outcome = await getEventHistory(999, 'token-1');
@@ -1681,7 +1691,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles 503 unavailable and network failures', async () => {
+  test('[FAILURE] [SG2-40:service-failure] handles 503 unavailable and network failures', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Service down' }, 503)));
 
     const unavailableOutcome = await getEventHistory(101, 'token-1');
@@ -1700,7 +1710,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[BOUNDARY] falls back to default messages when error payload is empty', async () => {
+  test('[BOUNDARY] [SG2-40:error-messages] falls back to default messages when error payload is empty', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
     expect(await getEventHistory(101, 'token')).toEqual({
       ok: false,
@@ -1730,7 +1740,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles generic HTTP error responses (500)', async () => {
+  test('[FAILURE] [SG2-40:service-failure] handles generic HTTP error responses (500)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Internal failure' }, 500)));
     expect(await getEventHistory(101, 'token')).toEqual({
       ok: false,
@@ -1746,7 +1756,7 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 
-  test('[FAILURE] handles invalid JSON responses or non-object / non-array bodies', async () => {
+  test('[FAILURE] [SG2-40:invalid-history-response] handles invalid JSON responses or non-object / non-array bodies', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -1779,4 +1789,3 @@ describe('getEventHistory (SG2-40)', () => {
     });
   });
 });
-

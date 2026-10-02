@@ -889,12 +889,12 @@ describe('EventDetail change history integration (SG2-40)', () => {
     decidedAt: null,
   };
 
-  test('[NORMAL] renders "View Change History" button for Event Organiser and opens drawer on click', async () => {
+  test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] opens the selected organiser event history with its actor, timestamp and old/new values', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: baseRequest,
     });
-    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+    const getHistory = vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
       ok: true,
       history: [
         {
@@ -924,6 +924,7 @@ describe('EventDetail change history integration (SG2-40)', () => {
 
     // Drawer is closed initially
     expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+    expect(getHistory).not.toHaveBeenCalled();
 
     // Click to open drawer
     fireEvent.click(historyBtn);
@@ -931,14 +932,21 @@ describe('EventDetail change history integration (SG2-40)', () => {
     const dialog = await screen.findByRole('dialog', { name: /change history/i });
     expect(dialog).toBeInTheDocument();
     expect(await screen.findByText('Expected Attendance')).toBeInTheDocument();
+    expect(getHistory).toHaveBeenCalledTimes(1);
+    expect(getHistory).toHaveBeenCalledWith(101, 'test-token');
+    const entry = within(screen.getByTestId('audit-entry-1'));
+    expect(entry.getByText('Sarah Jenkins')).toBeInTheDocument();
+    expect(entry.getByText('25 Sept 2026, 22:30 SGT')).toBeInTheDocument();
+    expect(entry.getByTestId('diff-old')).toHaveTextContent(/^40$/);
+    expect(entry.getByTestId('diff-new')).toHaveTextContent(/^45$/);
   });
 
-  test('[NORMAL] renders "View Change History" button for Event Coordinator and opens drawer on click', async () => {
+  test('[NORMAL] [SG2-40:drawer-visibility] renders "View Change History" button for Event Coordinator and opens drawer on click', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: baseRequest,
     });
-    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+    const getHistory = vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
       ok: true,
       history: [],
     });
@@ -957,9 +965,13 @@ describe('EventDetail change history integration (SG2-40)', () => {
 
     fireEvent.click(historyBtn);
     expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+    expect(await screen.findByText('No change history recorded for this event yet.')).toBeInTheDocument();
+    expect(getHistory).toHaveBeenCalledTimes(1);
+    expect(getHistory).toHaveBeenCalledWith(101, 'test-token');
   });
 
-  test('[FAILURE] does not render "View Change History" for Attendees', () => {
+  test('[FAILURE] [SG2-40:AC3] does not render "View Change History" for Attendees', () => {
+    const getHistory = vi.spyOn(eventRequestsApi, 'getEventHistory');
     render(
       <EventDetail
         role="Attendee"
@@ -970,9 +982,10 @@ describe('EventDetail change history integration (SG2-40)', () => {
     );
 
     expect(screen.queryByRole('button', { name: /view change history/i })).not.toBeInTheDocument();
+    expect(getHistory).not.toHaveBeenCalled();
   });
 
-  test('[BOUNDARY] renders "View Change History" for Organiser when canManage is false and closes drawer properly', async () => {
+  test('[BOUNDARY] [SG2-40:drawer-visibility] renders "View Change History" for Organiser when canManage is false and closes drawer properly', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -1005,5 +1018,4 @@ describe('EventDetail change history integration (SG2-40)', () => {
     expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
   });
 });
-
 

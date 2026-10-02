@@ -1,6 +1,6 @@
 # Test audit and course case design
 
-> The current exhaustive review is [Test case review — 1 October 2026](test-case-review.md): 85 files, 1,138 test declarations and 154 SQL assertion contracts. The dated sections below preserve earlier evidence.
+> The current exhaustive review is [Test case review — 2 October 2026](test-case-review.md): 87 files, 1,191 test declarations and 154 SQL assertion contracts. The dated sections below preserve earlier evidence.
 
 > The current register is [Purposeful regression cases](regression.md):
 > 29 scenarios including 19 browser journeys. The 22 September revalidation

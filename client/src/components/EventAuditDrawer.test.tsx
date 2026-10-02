@@ -19,8 +19,8 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
   {
     log_id: 101,
     event_id: 42,
-    actor_id: 'coord-uuid-1',
-    actor_name: 'Sarah Coordinator',
+    actor_id: 'coord-uuid-2',
+    actor_name: 'Priya Coordinator',
     field_name: 'venue_requirements',
     old_value: null,
     new_value: 'Auditorium with stage lighting',
@@ -29,8 +29,8 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
   {
     log_id: 100,
     event_id: 42,
-    actor_id: 'coord-uuid-1',
-    actor_name: 'Sarah Coordinator',
+    actor_id: 'support-uuid-3',
+    actor_name: 'Daniel Support',
     field_name: 'accessibility_needs',
     old_value: 'Wheelchair ramp',
     new_value: null,
@@ -41,27 +41,27 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
 describe('EventAuditDrawer Component (SG2-40)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionStorage.clear();
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    sessionStorage.clear();
   });
 
   describe('helper functions', () => {
-    test('[NORMAL] formatSgtTimestamp formats ISO date into SGT representation', () => {
+    test('[NORMAL] [SG2-40:AC1] formatSgtTimestamp formats ISO date into SGT representation', () => {
       const formatted = formatSgtTimestamp('2026-09-25T14:30:00.000Z');
-      expect(formatted).toContain('2026');
-      expect(formatted).toContain('22:30');
-      expect(formatted).toContain('SGT');
+      expect(formatted).toBe('25 Sept 2026, 22:30 SGT');
     });
 
-    test('[FAILURE] formatSgtTimestamp handles invalid dates gracefully', () => {
+    test('[FAILURE] [SG2-40:timestamp-fallback] formatSgtTimestamp handles invalid dates gracefully', () => {
       expect(formatSgtTimestamp('invalid-date')).toBe('Date not available');
       expect(formatSgtTimestamp(null)).toBe('Date not available');
     });
 
-    test('[NORMAL] humanizeFieldName translates snake_case fields into user-friendly labels', () => {
+    test('[NORMAL] [SG2-40:AC2] humanizeFieldName translates snake_case fields into user-friendly labels', () => {
       expect(humanizeFieldName('expected_attendance')).toBe('Expected Attendance');
       expect(humanizeFieldName('proposed_date')).toBe('Proposed Date');
       expect(humanizeFieldName('venue_requirements')).toBe('Venue Requirements');
@@ -78,7 +78,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   });
 
   describe('drawer visibility and accessibility', () => {
-    test('[NORMAL] does not render drawer content when isOpen is false', () => {
+    test('[NORMAL] [SG2-40:drawer-visibility] does not render drawer content when isOpen is false', () => {
       render(
         <EventAuditDrawer
           isOpen={false}
@@ -92,7 +92,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    test('[NORMAL] renders dialog with accessible title and header when isOpen is true', async () => {
+    test('[NORMAL] [SG2-40:drawer-visibility] renders dialog with accessible title and header when isOpen is true', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: [],
@@ -114,7 +114,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.getByText(/#42/i)).toBeInTheDocument();
     });
 
-    test('[NORMAL] calls onClose when close button is clicked', async () => {
+    test('[NORMAL] [SG2-40:drawer-visibility] calls onClose when close button is clicked', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -136,7 +136,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    test('[NORMAL] calls onClose when Escape key is pressed', async () => {
+    test('[NORMAL] [SG2-40:drawer-visibility] calls onClose when Escape key is pressed', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -157,7 +157,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    test('[BOUNDARY] does not call onClose when a key other than Escape is pressed', async () => {
+    test('[BOUNDARY] [SG2-40:drawer-visibility] does not call onClose when a key other than Escape is pressed', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -178,7 +178,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(handleClose).not.toHaveBeenCalled();
     });
 
-    test('[NORMAL] calls onClose when clicking outside backdrop', async () => {
+    test('[NORMAL] [SG2-40:drawer-visibility] calls onClose when clicking outside backdrop', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
@@ -202,7 +202,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   });
 
   describe('data fetching states', () => {
-    test('[NORMAL] renders loading indicator while fetching history', () => {
+    test('[NORMAL] [SG2-40:loading-state] renders loading indicator while fetching history', () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockImplementation(
         () => new Promise(() => {}) // never resolves
       );
@@ -219,7 +219,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.getByRole('status')).toHaveTextContent(/loading change history/i);
     });
 
-    test('[FAILURE] displays error notice and retry button when fetching fails', async () => {
+    test('[FAILURE] [SG2-40:error-retry] displays error notice and retry button when fetching fails', async () => {
       const getHistorySpy = vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValueOnce({
         ok: false,
         kind: 'unavailable',
@@ -254,7 +254,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(getHistorySpy).toHaveBeenCalledTimes(2);
     });
 
-    test('[BOUNDARY] displays friendly empty placeholder when event has no history records', async () => {
+    test('[BOUNDARY] [SG2-40:AC1] displays friendly empty placeholder when event has no history records', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: [],
@@ -274,7 +274,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       });
     });
 
-    test('[NORMAL] renders timeline entries newest-first with expected SGT timestamps, field labels, and old/new values', async () => {
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] renders timeline entries newest-first with expected SGT timestamps, field labels, and old/new values', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: MOCK_ENTRIES,
@@ -291,7 +291,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getAllByText('Sarah Coordinator').length).toBe(3);
+        expect(screen.getByTestId('audit-entry-102')).toBeInTheDocument();
       });
 
       // Rendered entry order must match the newest-first order of MOCK_ENTRIES (log_id 102, 101, 100).
@@ -304,6 +304,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
 
       // Entry 1 (log_id 102): expected_attendance, 100 -> 250
       const entry102 = within(entries[0]);
+      expect(entry102.getByText('Sarah Coordinator')).toBeInTheDocument();
       expect(entry102.getByText('Expected Attendance')).toBeInTheDocument();
       expect(entry102.getByText('25 Sept 2026, 22:30 SGT')).toBeInTheDocument();
       expect(entry102.getByTestId('diff-old')).toHaveTextContent('100');
@@ -311,6 +312,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
 
       // Entry 2 (log_id 101): venue_requirements, (empty) -> Auditorium with stage lighting
       const entry101 = within(entries[1]);
+      expect(entry101.getByText('Priya Coordinator')).toBeInTheDocument();
       expect(entry101.getByText('Venue Requirements')).toBeInTheDocument();
       expect(entry101.getByText('25 Sept 2026, 22:00 SGT')).toBeInTheDocument();
       expect(entry101.getByTestId('diff-old')).toHaveTextContent('(empty)');
@@ -318,13 +320,14 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
 
       // Entry 3 (log_id 100): accessibility_needs, Wheelchair ramp -> (empty)
       const entry100 = within(entries[2]);
+      expect(entry100.getByText('Daniel Support')).toBeInTheDocument();
       expect(entry100.getByText('Accessibility Needs')).toBeInTheDocument();
       expect(entry100.getByText('25 Sept 2026, 21:30 SGT')).toBeInTheDocument();
       expect(entry100.getByTestId('diff-old')).toHaveTextContent('Wheelchair ramp');
       expect(entry100.getByTestId('diff-new')).toHaveTextContent('(empty)');
     });
 
-    test('[FAILURE] displays signed-out error if no token is available', async () => {
+    test('[FAILURE] [SG2-40:signed-out-history] displays signed-out error if no token is available', async () => {
       render(
         <EventAuditDrawer
           isOpen={true}
@@ -339,7 +342,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       });
     });
 
-    test('[FAILURE] handles unexpected fetch exception gracefully', async () => {
+    test('[FAILURE] [SG2-40:service-failure] handles unexpected fetch exception gracefully', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockRejectedValue(new Error('Network error'));
 
       render(
@@ -356,11 +359,11 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       });
     });
 
-    test('[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch', async () => {
+    test('[CONFLICT] [SG2-40:history-isolation] ignores a stale fetch response when eventId flips mid-fetch', async () => {
       let resolveFirst!: (value: GetEventHistoryOutcome) => void;
       let resolveSecond!: (value: GetEventHistoryOutcome) => void;
 
-      vi.spyOn(eventRequestsApi, 'getEventHistory')
+      const getHistory = vi.spyOn(eventRequestsApi, 'getEventHistory')
         .mockImplementationOnce(
           () => new Promise((resolve) => { resolveFirst = resolve; })
         )
@@ -387,8 +390,12 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
         />
       );
 
+      expect(getHistory).toHaveBeenCalledTimes(2);
+      expect(getHistory).toHaveBeenNthCalledWith(1, 42, 'token-1');
+      expect(getHistory).toHaveBeenNthCalledWith(2, 99, 'token-1');
+
       // The newer request (for event 99) resolves first.
-      resolveSecond({ ok: true, history: [MOCK_ENTRIES[0]] });
+      resolveSecond({ ok: true, history: [{ ...MOCK_ENTRIES[0], event_id: 99 }] });
       await waitFor(() => {
         expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
       });
@@ -401,6 +408,33 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.queryByText('Venue Requirements')).not.toBeInTheDocument();
       expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
     });
+
+    test('[CONFLICT] [SG2-40:history-isolation] reopening during a pending fetch keeps the refreshed history', async () => {
+      let resolveFirst!: (value: GetEventHistoryOutcome) => void;
+      let resolveSecond!: (value: GetEventHistoryOutcome) => void;
+      const getHistory = vi.spyOn(eventRequestsApi, 'getEventHistory')
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+      const props = { onClose: vi.fn(), eventId: 42, accessToken: 'token-1' };
+      const { rerender } = render(<EventAuditDrawer {...props} isOpen={true} />);
+
+      rerender(<EventAuditDrawer {...props} isOpen={false} />);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      rerender(<EventAuditDrawer {...props} isOpen={true} />);
+      expect(getHistory).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        resolveFirst({ ok: true, history: [MOCK_ENTRIES[0]] });
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Loading change history');
+      expect(screen.queryByText('Expected Attendance')).not.toBeInTheDocument();
+
+      await act(async () => {
+        resolveSecond({ ok: true, history: [MOCK_ENTRIES[1]] });
+      });
+      expect(screen.getByText('Venue Requirements')).toBeInTheDocument();
+      expect(screen.queryByText('Expected Attendance')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
   });
 });
-

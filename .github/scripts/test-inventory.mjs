@@ -164,8 +164,10 @@ if (detailsIndex >= 0) {
   if (!target) throw new Error('--details needs an output path');
   writeFileSync(target, JSON.stringify(inventory, null, 2) + '\n');
 }
-const ledgerMethods = methods.map(({ id, file, line, suites, title, parameterized, categories, references }) =>
-  ({ id, file, line, suites, title, parameterized, categories, references }));
+// Stable IDs, suites and parameterization remain available in --details.
+// The source path and line identify each committed declaration.
+const ledgerMethods = methods.map(({ file, line, title, categories, references }) =>
+  ({ file, line, title, categories, references }));
 const ledgerSql = sql.map(({ id, file, line, title, categories, references }) => ({ id, file, line, title, categories, references }));
 const output = '{\n' + `  "schemaVersion": 1,\n  "reviewDate": ${JSON.stringify(catalogue.reviewDate)},\n  "scope": ${JSON.stringify(inventory.scope)},\n`
   + '  "methods": [\n' + ledgerMethods.map(method => '    ' + JSON.stringify(method)).join(',\n') + '\n  ],\n'

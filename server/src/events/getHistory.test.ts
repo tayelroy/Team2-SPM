@@ -7,10 +7,7 @@ import { createApp } from '../app';
 import { createAuthorization } from '../auth';
 import { PERMISSIONS, type Principal, type Role } from '../auth/policy';
 import { dbConfig } from '../db/config';
-import {
-  createGetEventHistoryHandler,
-  type GetEventHistoryDependencies
-} from './getHistory';
+import { createGetEventHistoryHandler } from './getHistory';
 import type { EventAuditLogRecord, FetchEventAuditLogsResult } from '../db/auditLogs';
 import type { FetchEventRequestResult, EventRequestRecord } from '../db/eventRequests';
 
@@ -101,14 +98,16 @@ function buildApp(options: HarnessOptions = {}) {
 
 describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () => {
   describe('RBAC & Access Restriction (AC 3)', () => {
-    test('[FAILURE] rejects unauthenticated request with 401', async () => {
-      const { app } = buildApp({ principal: undefined });
+    test('[FAILURE] [SG2-40:authentication] [SG2-25:AC3] rejects unauthenticated request with 401 before database reads', async () => {
+      const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ principal: undefined });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 401);
-      assert.match(res.body.error, /authentication required/i);
+      assert.deepEqual(res.body, { error: 'Authentication required' });
+      assert.equal(fetchEventRequest.mock.callCount(), 0);
+      assert.equal(fetchAuditLogs.mock.callCount(), 0);
     });
 
-    test('[FAILURE] denies attendee role with 403 Forbidden and performs zero event or audit reads', async () => {
+    test('[FAILURE] [SG2-40:AC3] denies attendee role with 403 Forbidden and performs zero event or audit reads', async () => {
       const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ principal: ATTENDEE });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 403);
@@ -117,92 +116,110 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       assert.equal(fetchAuditLogs.mock.calls.length, 0);
     });
 
-    test('[FAILURE] denies unrelated event organiser with 403 Forbidden and performs zero audit reads', async () => {
-      const { app, fetchAuditLogs } = buildApp({ principal: UNRELATED_ORGANISER });
+    test('[FAILURE] [SG2-40:AC3] denies unrelated event organiser with 403 Forbidden and performs zero audit reads', async () => {
+      const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ principal: UNRELATED_ORGANISER });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 403);
       assert.equal(res.body.error, 'You are not authorized to view the change history of this event.');
+      assert.equal(fetchEventRequest.mock.callCount(), 1);
+      assert.equal(fetchEventRequest.mock.calls[0].arguments[1], 101);
       assert.equal(fetchAuditLogs.mock.calls.length, 0);
     });
 
-    test('[NORMAL] allows owning event organiser to retrieve history with 200', async () => {
-      const { app } = buildApp({ principal: ORGANISER });
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] allows owning event organiser to retrieve history with 200', async () => {
+      const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ principal: ORGANISER });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.equal(res.body.event_id, 101);
-      assert.equal(res.body.history.length, 2);
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.equal(fetchEventRequest.mock.callCount(), 1);
+      assert.equal(fetchAuditLogs.mock.callCount(), 1);
+      assert.equal(fetchEventRequest.mock.calls[0].arguments[1], 101);
+      assert.equal(fetchAuditLogs.mock.calls[0].arguments[1], 101);
     });
 
-    test('[NORMAL] allows event coordinator to retrieve history with 200', async () => {
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] allows event coordinator to retrieve history with 200', async () => {
       const { app } = buildApp({ principal: COORDINATOR });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.equal(res.body.event_id, 101);
-      assert.equal(res.body.history.length, 2);
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
     });
 
-    test('[NORMAL] allows venue staff to retrieve history with 200', async () => {
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] allows venue staff to retrieve history with 200', async () => {
       const { app } = buildApp({ principal: VENUE_STAFF });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.equal(res.body.event_id, 101);
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
     });
 
-    test('[NORMAL] allows technical support staff to retrieve history with 200', async () => {
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] allows technical support staff to retrieve history with 200', async () => {
       const { app } = buildApp({ principal: TECH_SUPPORT });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.equal(res.body.event_id, 101);
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
     });
   });
 
   describe('Validation & Error Handling', () => {
-    test('[BOUNDARY] returns 400 for non-integer or negative or invalid eventId', async () => {
+    test('[BOUNDARY] [FAILURE] [SG2-40:event-id-validation] event ID one is accepted; zero and malformed IDs are refused before reads', async () => {
       for (const invalidId of ['abc', '0', '-5', '1.5']) {
-        const { app } = buildApp();
+        const { app, fetchEventRequest, fetchAuditLogs } = buildApp();
         const res = await request(app).get(`/api/event-requests/${invalidId}/history`);
         assert.equal(res.status, 400);
-        assert.match(res.body.error, /positive integer/i);
+        assert.deepEqual(res.body, { error: 'eventId must be a positive integer.' });
+        assert.equal(fetchEventRequest.mock.callCount(), 0);
+        assert.equal(fetchAuditLogs.mock.callCount(), 0);
       }
+      const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ historyResult: { ok: true, logs: [] } });
+      const accepted = await request(app).get('/api/event-requests/1/history');
+      assert.equal(accepted.status, 200);
+      assert.deepEqual(accepted.body, { event_id: 1, history: [] });
+      assert.equal(fetchEventRequest.mock.callCount(), 1);
+      assert.equal(fetchAuditLogs.mock.callCount(), 1);
+      assert.equal(fetchEventRequest.mock.calls[0].arguments[1], 1);
+      assert.equal(fetchAuditLogs.mock.calls[0].arguments[1], 1);
     });
 
-    test('[FAILURE] returns 503 when admin client is unavailable', async () => {
-      const { app } = buildApp({ admin: null });
+    test('[FAILURE] [SG2-40:history-unavailability] returns 503 when admin client is unavailable before reads', async () => {
+      const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ admin: null });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 503);
-      assert.match(res.body.error, /temporarily unavailable/i);
+      assert.deepEqual(res.body, { error: 'Event history service is temporarily unavailable. Please try again later.' });
+      assert.equal(fetchEventRequest.mock.callCount(), 0);
+      assert.equal(fetchAuditLogs.mock.callCount(), 0);
     });
 
-    test('[FAILURE] returns 404 when event request does not exist', async () => {
-      const { app } = buildApp({
+    test('[FAILURE] [SG2-40:event-not-found] returns 404 when event request does not exist without reading audit logs', async () => {
+      const { app, fetchAuditLogs } = buildApp({
         eventResult: { ok: false, reason: 'not_found', message: 'Not found' }
       });
       const res = await request(app).get('/api/event-requests/999/history');
       assert.equal(res.status, 404);
-      assert.match(res.body.error, /event not found/i);
+      assert.deepEqual(res.body, { error: 'Event not found.' });
+      assert.equal(fetchAuditLogs.mock.callCount(), 0);
     });
 
-    test('[FAILURE] returns 503 when fetching event request fails', async () => {
-      const { app } = buildApp({
-        eventResult: { ok: false, reason: 'unavailable', message: 'DB down' }
+    test('[FAILURE] [SG2-40:history-unavailability] event read failure returns generic 503 without reading audit logs', async () => {
+      const { app, fetchAuditLogs } = buildApp({
+        eventResult: { ok: false, reason: 'unavailable', message: 'SECRET_PROVIDER_DETAILS' }
       });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 503);
-      assert.match(res.body.error, /temporarily unavailable/i);
+      assert.deepEqual(res.body, { error: 'Event history service is temporarily unavailable. Please try again later.' });
+      assert.equal(fetchAuditLogs.mock.callCount(), 0);
     });
 
-    test('[FAILURE] returns 503 when fetching audit logs fails', async () => {
+    test('[FAILURE] [SG2-40:history-unavailability] audit read failure returns generic 503 without provider details', async () => {
       const { app } = buildApp({
-        historyResult: { ok: false, reason: 'unavailable', message: 'DB error' }
+        historyResult: { ok: false, reason: 'unavailable', message: 'SECRET_PROVIDER_DETAILS' }
       });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 503);
-      assert.match(res.body.error, /temporarily unavailable/i);
+      assert.deepEqual(res.body, { error: 'Event history service is temporarily unavailable. Please try again later.' });
     });
   });
 
   describe('Payload & Ordering (AC 1 & AC 2)', () => {
-    test('[BOUNDARY] returns empty history array when event has no audit logs', async () => {
+    test('[BOUNDARY] [SG2-40:AC1] returns empty history array when event has no audit logs', async () => {
       const { app } = buildApp({
         historyResult: { ok: true, logs: [] }
       });
@@ -214,8 +231,11 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       });
     });
 
-    test('[NORMAL] returns full history in reverse chronological order with resolved actor names and diffs', async () => {
-      const { app } = buildApp();
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] returns actor, time and before/after values in the provider order without extra provider fields', async () => {
+      const { app } = buildApp({ historyResult: {
+        ok: true,
+        logs: SAMPLE_LOGS.map(log => ({ ...log, provider_internal_note: 'SECRET_PROVIDER_DETAILS' }))
+      } });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.equal(res.body.event_id, 101);
@@ -236,9 +256,10 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       assert.equal(res.body.history[1].old_value, '2026-11-10T09:00:00.000Z');
       assert.equal(res.body.history[1].new_value, '2026-11-15T09:00:00.000Z');
       assert.equal(res.body.history[1].created_at, '2026-09-25T14:00:00.000Z');
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
     });
 
-    test('[BOUNDARY] falls back actor_name to Unknown if actor_name is null', async () => {
+    test('[BOUNDARY] [SG2-40:AC1] [SG2-40:AC2] missing actor names use Unknown while null old/new values are retained', async () => {
       const { app } = buildApp({
         historyResult: {
           ok: true,
@@ -258,7 +279,23 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.equal(res.body.history[0].actor_name, 'Unknown');
+      assert.deepEqual(res.body, { event_id: 101, history: [{
+        log_id: 1, event_id: 101, actor_id: 'unknown-id', actor_name: 'Unknown',
+        field_name: 'venue_requirements', old_value: null, new_value: 'Stage setup',
+        created_at: '2026-09-25T12:00:00.000Z'
+      }] });
+      const cleared = buildApp({ historyResult: { ok: true, logs: [{
+        log_id: 2, event_id: 101, actor_id: COORDINATOR_ID, actor_name: 'Alex Coordinator',
+        field_name: 'venue_requirements', old_value: 'Stage setup', new_value: null,
+        created_at: '2026-09-25T13:00:00.000Z'
+      }] } });
+      const clearedResponse = await request(cleared.app).get('/api/event-requests/101/history');
+      assert.equal(clearedResponse.status, 200);
+      assert.deepEqual(clearedResponse.body, { event_id: 101, history: [{
+        log_id: 2, event_id: 101, actor_id: COORDINATOR_ID, actor_name: 'Alex Coordinator',
+        field_name: 'venue_requirements', old_value: 'Stage setup', new_value: null,
+        created_at: '2026-09-25T13:00:00.000Z'
+      }] });
     });
   });
 });
@@ -280,7 +317,7 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     Object.assign(dbConfig, originalConfig);
   });
 
-  test('[NORMAL] policy grants event_request.history.view to organisers and internal staff, excluding attendees', () => {
+  test('[NORMAL] [SG2-40:AC3] policy grants event_request.history.view to organisers and internal staff, excluding attendees', () => {
     const rolesWithPermission = PERMISSIONS['event_request.history.view'];
     assert.ok(rolesWithPermission, 'event_request.history.view permission must exist');
     assert.deepEqual([...rolesWithPermission].sort(), [
@@ -291,8 +328,11 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     ]);
   });
 
-  const appForRole = (role: Role) =>
-    createApp(
+  const appForRole = (role: Role) => {
+    const historyHandler = mock.fn((_req: express.Request, res: express.Response) => {
+      res.status(200).json({ route: 'history', reached: true });
+    });
+    const app = createApp(
       undefined,
       createAuthorization({ resolvePrincipal: async () => ({ userId: 'user-1', role }) }),
       undefined,
@@ -313,53 +353,73 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
       undefined,
       undefined,
       undefined,
-      (_req, res) => {
-        res.status(200).json({ route: 'history', reached: true });
-      }
+      historyHandler
     );
+    return { app, historyHandler };
+  };
 
-  test('[FAILURE] rejects unauthenticated request on app route with 401', async () => {
-    const res = await request(appForRole('event_coordinator')).get('/api/event-requests/101/history');
+  test('[FAILURE] [SG2-40:authentication] [SG2-25:AC3] rejects unauthenticated request on app route with 401 before the history handler', async () => {
+    const { app, historyHandler } = appForRole('event_coordinator');
+    const res = await request(app).get('/api/event-requests/101/history');
     assert.equal(res.status, 401);
     assert.equal(res.headers['www-authenticate'], 'Bearer');
+    assert.equal(res.headers['cache-control'], 'no-store');
+    assert.deepEqual(res.body, { error: 'Authentication required' });
+    assert.equal(historyHandler.mock.callCount(), 0);
   });
 
-  test('[FAILURE] denies attendee role with 403 Forbidden on app route', async () => {
-    const res = await request(appForRole('attendee'))
+  test('[FAILURE] [SG2-40:AC3] denies attendee role with 403 Forbidden on app route before the history handler', async () => {
+    const { app, historyHandler } = appForRole('attendee');
+    const res = await request(app)
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 403);
+    assert.equal(res.headers['cache-control'], 'no-store');
+    assert.deepEqual(res.body, { error: 'Access denied' });
+    assert.equal(historyHandler.mock.callCount(), 0);
   });
 
-  test('[NORMAL] allows event_coordinator role to reach mounted history handler on app route', async () => {
-    const res = await request(appForRole('event_coordinator'))
+  test('[NORMAL] [SG2-40:history-route-wiring] allows event_coordinator role to reach mounted history handler on app route', async () => {
+    const { app, historyHandler } = appForRole('event_coordinator');
+    const res = await request(app)
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 200);
-    assert.equal(res.body.reached, true);
+    assert.deepEqual(res.body, { route: 'history', reached: true });
+    assert.equal(res.headers['cache-control'], 'no-store');
+    assert.equal(historyHandler.mock.callCount(), 1);
   });
 
-  test('[NORMAL] allows event_organiser role to reach mounted history handler on app route', async () => {
-    const res = await request(appForRole('event_organiser'))
+  test('[NORMAL] [SG2-40:history-route-wiring] allows event_organiser role to reach mounted history handler on app route', async () => {
+    const { app, historyHandler } = appForRole('event_organiser');
+    const res = await request(app)
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 200);
-    assert.equal(res.body.reached, true);
+    assert.deepEqual(res.body, { route: 'history', reached: true });
+    assert.equal(res.headers['cache-control'], 'no-store');
+    assert.equal(historyHandler.mock.callCount(), 1);
   });
 
-  test('[NORMAL] allows venue_staff role to reach mounted history handler on app route', async () => {
-    const res = await request(appForRole('venue_staff'))
+  test('[NORMAL] [SG2-40:history-route-wiring] allows venue_staff role to reach mounted history handler on app route', async () => {
+    const { app, historyHandler } = appForRole('venue_staff');
+    const res = await request(app)
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 200);
-    assert.equal(res.body.reached, true);
+    assert.deepEqual(res.body, { route: 'history', reached: true });
+    assert.equal(res.headers['cache-control'], 'no-store');
+    assert.equal(historyHandler.mock.callCount(), 1);
   });
 
-  test('[NORMAL] allows technical_support_staff role to reach mounted history handler on app route', async () => {
-    const res = await request(appForRole('technical_support_staff'))
+  test('[NORMAL] [SG2-40:history-route-wiring] allows technical_support_staff role to reach mounted history handler on app route', async () => {
+    const { app, historyHandler } = appForRole('technical_support_staff');
+    const res = await request(app)
       .get('/api/event-requests/101/history')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 200);
-    assert.equal(res.body.reached, true);
+    assert.deepEqual(res.body, { route: 'history', reached: true });
+    assert.equal(res.headers['cache-control'], 'no-store');
+    assert.equal(historyHandler.mock.callCount(), 1);
   });
 });

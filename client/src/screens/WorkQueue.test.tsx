@@ -380,7 +380,7 @@ test('[FAILURE] [SG2-46:AC1] an approved event that is not assigned to the coord
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
 
-test('[NORMAL] coordinator can open change history drawer from event item detail (SG2-40)', async () => {
+test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] coordinator opens the selected event history with its actor, timestamp and old/new values', async () => {
   const historyEntry = {
     log_id: 5, event_id: 12, actor_id: 'coord-9', actor_name: 'Priya Coordinator',
     field_name: 'expected_attendance', old_value: '50', new_value: '80',
@@ -409,14 +409,16 @@ test('[NORMAL] coordinator can open change history drawer from event item detail
   expect(fetch).toHaveBeenCalledWith('/api/event-requests/12/history', {
     headers: { Authorization: 'Bearer token' },
   });
-  expect(screen.getByText('Expected Attendance')).toBeInTheDocument();
-  expect(screen.getByText('50')).toBeInTheDocument();
-  expect(screen.getByText('80')).toBeInTheDocument();
+  const entry = within(screen.getByTestId('audit-entry-5'));
+  expect(entry.getByText('Priya Coordinator')).toBeInTheDocument();
+  expect(entry.getByText('Expected Attendance')).toBeInTheDocument();
+  expect(entry.getByText('20 Sept 2026, 18:00 SGT')).toBeInTheDocument();
+  expect(entry.getByTestId('diff-old')).toHaveTextContent(/^50$/);
+  expect(entry.getByTestId('diff-new')).toHaveTextContent(/^80$/);
 
   // Close drawer
   const closeBtn = screen.getByRole('button', { name: /close change history/i });
   fireEvent.click(closeBtn);
   expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
 });
-
 

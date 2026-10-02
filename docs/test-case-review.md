@@ -1,12 +1,14 @@
-# Test case review — 1 October 2026
+# Test case review — 2 October 2026
 
 Reviewed by LIM JUN WEI.
 
-I went through all 85 current test files against the supplied DoD, Week 4 test-case guidance and Week 6 automated-testing guidance. I checked the actual acceptance criteria in the SPM Jira project, rather than assigning requirements from test names. The PDFs are reference material for this review; their illustrative feature rules are not new requirements for this repository.
+Updated after merging main at `4665858`: preserved all 45 regression cases, reviewed the 53 integrated history declarations, added SG2-40 requirement tags and restored the DoD v2.0 template wording. The 1 October execution results below are historical; fresh merged-head validation is running.
+
+I went through all 87 current test files against the supplied DoD, Week 4 test-case guidance and Week 6 automated-testing guidance. I checked the actual acceptance criteria in the SPM Jira project, rather than assigning requirements from test names. The PDFs are reference material for this review; their illustrative feature rules are not new requirements for this repository.
 
 The complete [method inventory](test-case-inventory.json) lists each method or SQL assertion, source file and line, category and story/AC reference. The [Jira catalogue](test-acceptance-criteria.json) records the requirement text and original feature PRs. Jira's bullets are not numbered; AC1, AC2 and so on follow their displayed order on 1 October. Named references such as `SG2-20:prototype-view-model` are supporting technical contracts, not claims that an entire Jira AC passes.
 
-The review contains 1,138 executable test declarations and 154 SQL assertion contracts. Parameterized declarations expand to several runner cases. These are supporting checks, not 1,292 independent user acceptance workflows. Every current file is included in the diff; useful cases were retained and corrected where needed.
+The review contains 1,191 executable test declarations and 154 SQL assertion contracts. Parameterized declarations expand to several runner cases. These are supporting checks, not 1,345 independent user acceptance workflows. Every current file is included in the diff; useful cases were retained and corrected where needed.
 
 ## Changes that matter
 
@@ -32,7 +34,7 @@ Local execution used Node 24.10.0/npm 11.6.1 on 1 October 2026. The PR's GitHub 
 ## What this review cannot mark done
 
 - SG2-33 AC4 and SG2-34 AC4: assignment actor/time and assignment history were deferred in original PR #48. There is no invented passing test for that missing feature.
-- SG2-40: SQL history payload and immutability checks support the requirement; this checkout has no mounted history API or history-view workflow. SQL evidence does not establish the complete user-facing history ACs.
+- SG2-40 now has the mounted history API and drawer from PR #50. Handler, transport and component checks support actor/time, newest-first display, old/new values and access restrictions. Hosted Supabase and deployed history workflows remain unverified.
 - SG2-39: the existing audit-error case proves that an event update can remain saved if the following audit insert fails. Atomic event/history persistence remains an implementation gap. The impact-confirmation path itself refuses changes until confirmation.
 - Venue layout replacement uses separate delete/insert provider calls. Passing adapter tests do not establish transactional replacement under real competing database writes.
 - Some sample booking, equipment and attendee screens remain prototype contracts. Their tests are explicitly labelled supporting contracts, rather than acceptance evidence for future features.
@@ -51,7 +53,7 @@ Counts below are source method/assertion memberships, including supporting contr
 | [SG2-22](https://smu-spm-group.atlassian.net/browse/SG2-22) | 5 | 7 | 4 | 23 | AC1, AC4 |
 | [SG2-23](https://smu-spm-group.atlassian.net/browse/SG2-23) | 16 | 4 | 5 | 28 | None (see scope limits above) |
 | [SG2-24](https://smu-spm-group.atlassian.net/browse/SG2-24) | 16 | 3 | 3 | 30 | None (see scope limits above) |
-| [SG2-25](https://smu-spm-group.atlassian.net/browse/SG2-25) | 11 | 1 | 4 | 72 | None (see scope limits above) |
+| [SG2-25](https://smu-spm-group.atlassian.net/browse/SG2-25) | 11 | 1 | 4 | 74 | None (see scope limits above) |
 | [SG2-26](https://smu-spm-group.atlassian.net/browse/SG2-26) | 19 | 10 | 7 | 55 | None (see scope limits above) |
 | [SG2-27](https://smu-spm-group.atlassian.net/browse/SG2-27) | 22 | 12 | 2 | 37 | None (see scope limits above) |
 | [SG2-28](https://smu-spm-group.atlassian.net/browse/SG2-28) | 23 | 17 | 3 | 30 | None (see scope limits above) |
@@ -65,7 +67,7 @@ Counts below are source method/assertion memberships, including supporting contr
 | [SG2-37](https://smu-spm-group.atlassian.net/browse/SG2-37) | 13 | 4 | 5 | 17 | None (see scope limits above) |
 | [SG2-38](https://smu-spm-group.atlassian.net/browse/SG2-38) | 29 | 4 | 1 | 24 | None (see scope limits above) |
 | [SG2-39](https://smu-spm-group.atlassian.net/browse/SG2-39) | 35 | 27 | 15 | 44 | None (see scope limits above) |
-| [SG2-40](https://smu-spm-group.atlassian.net/browse/SG2-40) | 7 | 2 | 1 | 12 | None (see scope limits above) |
+| [SG2-40](https://smu-spm-group.atlassian.net/browse/SG2-40) | 30 | 10 | 3 | 33 | None (see scope limits above) |
 | [SG2-41](https://smu-spm-group.atlassian.net/browse/SG2-41) | 18 | 8 | 4 | 20 | None (see scope limits above) |
 | [SG2-42](https://smu-spm-group.atlassian.net/browse/SG2-42) | 8 | 9 | 6 | 20 | None (see scope limits above) |
 | [SG2-43](https://smu-spm-group.atlassian.net/browse/SG2-43) | 15 | 12 | 3 | 29 | None (see scope limits above) |
@@ -82,11 +84,12 @@ Counts below are source method/assertion memberships, including supporting contr
 | [.github/scripts/test-inventory.test.mjs](../.github/scripts/test-inventory.test.mjs) | 9 | 2 | 1 | 1 | 6 |
 | [client/src/App.test.tsx](../client/src/App.test.tsx) | 39 | 30 | 1 | 0 | 8 |
 | [client/src/HealthCheck.test.tsx](../client/src/HealthCheck.test.tsx) | 5 | 1 | 0 | 0 | 4 |
-| [client/src/api/eventRequests.test.ts](../client/src/api/eventRequests.test.ts) | 96 | 16 | 7 | 8 | 65 |
+| [client/src/api/eventRequests.test.ts](../client/src/api/eventRequests.test.ts) | 105 | 17 | 9 | 8 | 71 |
 | [client/src/api/profile.test.ts](../client/src/api/profile.test.ts) | 10 | 2 | 0 | 0 | 8 |
 | [client/src/api/workQueue.test.ts](../client/src/api/workQueue.test.ts) | 15 | 4 | 0 | 0 | 11 |
 | [client/src/auth/access.test.ts](../client/src/auth/access.test.ts) | 6 | 2 | 0 | 0 | 4 |
 | [client/src/auth/session.test.ts](../client/src/auth/session.test.ts) | 7 | 2 | 1 | 0 | 4 |
+| [client/src/components/EventAuditDrawer.test.tsx](../client/src/components/EventAuditDrawer.test.tsx) | 17 | 9 | 2 | 2 | 4 |
 | [client/src/components/EventStageTracker.test.tsx](../client/src/components/EventStageTracker.test.tsx) | 4 | 3 | 1 | 0 | 0 |
 | [client/src/hooks/useInertiaScroll.test.tsx](../client/src/hooks/useInertiaScroll.test.tsx) | 8 | 3 | 2 | 2 | 1 |
 | [client/src/hooks/useParticleOrb.test.tsx](../client/src/hooks/useParticleOrb.test.tsx) | 9 | 4 | 1 | 2 | 2 |
@@ -96,14 +99,14 @@ Counts below are source method/assertion memberships, including supporting contr
 | [client/src/screens/CoordinatorAssignment.test.tsx](../client/src/screens/CoordinatorAssignment.test.tsx) | 9 | 3 | 1 | 3 | 2 |
 | [client/src/screens/Dashboard.test.tsx](../client/src/screens/Dashboard.test.tsx) | 5 | 2 | 1 | 1 | 1 |
 | [client/src/screens/DraftRequests.test.tsx](../client/src/screens/DraftRequests.test.tsx) | 13 | 2 | 2 | 5 | 4 |
-| [client/src/screens/EventDetail.test.tsx](../client/src/screens/EventDetail.test.tsx) | 24 | 7 | 4 | 3 | 10 |
+| [client/src/screens/EventDetail.test.tsx](../client/src/screens/EventDetail.test.tsx) | 28 | 9 | 5 | 3 | 11 |
 | [client/src/screens/EventPlanningDrawer.test.tsx](../client/src/screens/EventPlanningDrawer.test.tsx) | 24 | 7 | 7 | 4 | 6 |
 | [client/src/screens/EventsTable.test.tsx](../client/src/screens/EventsTable.test.tsx) | 12 | 3 | 2 | 1 | 6 |
 | [client/src/screens/Login.test.tsx](../client/src/screens/Login.test.tsx) | 6 | 2 | 0 | 1 | 3 |
 | [client/src/screens/Profile.test.tsx](../client/src/screens/Profile.test.tsx) | 12 | 4 | 3 | 2 | 3 |
 | [client/src/screens/RequestForm.test.tsx](../client/src/screens/RequestForm.test.tsx) | 43 | 16 | 6 | 5 | 16 |
 | [client/src/screens/VenueSearch.test.tsx](../client/src/screens/VenueSearch.test.tsx) | 10 | 4 | 4 | 1 | 1 |
-| [client/src/screens/WorkQueue.test.tsx](../client/src/screens/WorkQueue.test.tsx) | 19 | 8 | 1 | 6 | 4 |
+| [client/src/screens/WorkQueue.test.tsx](../client/src/screens/WorkQueue.test.tsx) | 20 | 9 | 1 | 6 | 4 |
 | [client/src/ui.test.tsx](../client/src/ui.test.tsx) | 6 | 4 | 1 | 1 | 0 |
 | [client/src/venues/VenueBlocks.test.tsx](../client/src/venues/VenueBlocks.test.tsx) | 13 | 3 | 3 | 3 | 4 |
 | [client/src/venues/VenueLayouts.test.tsx](../client/src/venues/VenueLayouts.test.tsx) | 13 | 3 | 4 | 2 | 4 |
@@ -134,6 +137,7 @@ Counts below are source method/assertion memberships, including supporting contr
 | [server/src/decideEventRequest.test.ts](../server/src/decideEventRequest.test.ts) | 18 | 4 | 3 | 1 | 10 |
 | [server/src/deleteEventRequestDraft.test.ts](../server/src/deleteEventRequestDraft.test.ts) | 12 | 2 | 1 | 1 | 8 |
 | [server/src/eventRequests.test.ts](../server/src/eventRequests.test.ts) | 33 | 9 | 11 | 0 | 13 |
+| [server/src/events/getHistory.test.ts](../server/src/events/getHistory.test.ts) | 22 | 10 | 3 | 0 | 10 |
 | [server/src/events/updatePlanning.test.ts](../server/src/events/updatePlanning.test.ts) | 43 | 15 | 13 | 3 | 19 |
 | [server/src/getEventStage.test.ts](../server/src/getEventStage.test.ts) | 10 | 3 | 0 | 0 | 7 |
 | [server/src/getEventStageAuth.test.ts](../server/src/getEventStageAuth.test.ts) | 6 | 4 | 0 | 0 | 2 |
