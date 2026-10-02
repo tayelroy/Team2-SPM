@@ -23,7 +23,7 @@ function fakeClient(signOut: SupabaseClient['auth']['admin']['signOut']): Supaba
 }
 
 describe('POST /api/auth/logout success contract', () => {
-  test('successfully revokes session and responds with 200 when SDK signOut succeeds', async () => {
+  test('[NORMAL] [SG2-23:AC3] successfully revokes session and responds with 200 when SDK signOut succeeds', async () => {
     let passedToken: string | undefined;
     let passedScope: string | undefined;
     const client = fakeClient(async (token, scope) => {
@@ -54,7 +54,7 @@ describe('POST /api/auth/logout failure and unauthenticated contracts', () => {
       data: null, error: new AuthError('PRIVATE_PROVIDER_ERROR'),
     })) },
     { name: 'SDK throws', getClient: () => fakeClient(async () => { throw new Error('PRIVATE_PROVIDER_ERROR'); }) },
-  ]) test(`reports unconfirmed revocation when ${name}`, async () => {
+  ]) test(`[FAILURE] [SG2-23:AC3] reports unconfirmed revocation when ${name}`, async () => {
     const app = express();
     app.post('/api/auth/logout', createLogoutHandler(token => logoutAccount(token, getClient)));
     const response = await request(app).post('/api/auth/logout').set('Authorization', 'Bearer current-token');
@@ -63,7 +63,7 @@ describe('POST /api/auth/logout failure and unauthenticated contracts', () => {
     assert.deepEqual(response.body, { error: 'Unable to confirm server sign-out.' });
   });
 
-  test('missing or malformed authorization is idempotent and cannot revoke a body-supplied session', async () => {
+  test('[CONFLICT] [SG2-23:AC3] missing or malformed authorization is idempotent and cannot revoke a body-supplied session', async () => {
     const app = express();
     app.use(express.json());
     app.post('/api/auth/logout', createLogoutHandler(token => logoutAccount(token, () => {
@@ -82,20 +82,20 @@ describe('POST /api/auth/logout failure and unauthenticated contracts', () => {
 });
 
 describe('logout with an unconfigured default provider', () => {
-  test('logoutAccount returns success when accessToken is null without calling getClient', async () => {
+  test('[BOUNDARY] [SG2-23:AC3] logoutAccount returns success when accessToken is null without calling getClient', async () => {
     const result = await logoutAccount(null, () => {
       assert.fail('getClient should not be called when token is null');
     });
     assert.deepEqual(result, { outcome: 'success' });
   });
 
-  test('the default provider reports unconfirmed revocation when no database is configured', async () => {
+  test('[FAILURE] [SG2-23:AC3] the default provider reports unconfirmed revocation when no database is configured', async () => {
     // getSupabaseAdminClient returns null in test environment where DB is unconfigured
     const result = await logoutAccount('session-token');
     assert.deepEqual(result, { outcome: 'unavailable' });
   });
 
-  test('the default handler keeps anonymous logout idempotent and reports unavailable authenticated logout', async () => {
+  test('[NORMAL] [FAILURE] [SG2-23:AC3] the default handler keeps anonymous logout idempotent and reports unavailable authenticated logout', async () => {
     const app = express();
     app.post('/api/auth/logout', createLogoutHandler());
 

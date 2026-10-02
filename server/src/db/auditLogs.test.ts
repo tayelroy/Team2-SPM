@@ -9,7 +9,7 @@ import {
 
 describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
   describe('insertAuditLogs', () => {
-    test('returns empty logs immediately when entries array is empty', async () => {
+    test('[BOUNDARY] [SG2-39:AC1] returns empty logs immediately when entries array is empty', async () => {
       let called = false;
       const fakeAdmin = {
         from() {
@@ -23,7 +23,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
       assert.deepEqual(result, { ok: true, logs: [] });
     });
 
-    test('inserts entries and maps returned rows', async () => {
+    test('[NORMAL] [SG2-39:AC1] inserts entries and maps returned rows', async () => {
       let capturedTable = '';
       let capturedEntries: any = null;
 
@@ -98,7 +98,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
       }
     });
 
-    test('handles null returned data gracefully', async () => {
+    test('[BOUNDARY] [SG2-39:AC1] handles null returned data gracefully', async () => {
       const fakeAdmin = {
         from() {
           return {
@@ -127,7 +127,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
       }
     });
 
-    test('returns unavailable on database error', async () => {
+    test('[FAILURE] [SG2-39:AC1] returns unavailable on database error', async () => {
       const fakeAdmin = {
         from() {
           return {
@@ -162,7 +162,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
   });
 
   describe('fetchEventAuditLogs', () => {
-    test('fetches audit logs with ordering and maps fields', async () => {
+    test('[NORMAL] [SG2-40:audit-storage] fetches audit logs with ordering and maps fields', async () => {
       let capturedTable = '';
       let capturedEventId: any = null;
       const orderCalls: { col: string; ascending: boolean }[] = [];
@@ -238,7 +238,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
       }
     });
 
-    test('handles fallback actor_name and malformed actor shapes', async () => {
+    test('[FAILURE] [SG2-40:audit-storage] handles fallback actor_name and malformed actor shapes', async () => {
       const mockRows = [
         {
           log_id: 1,
@@ -333,7 +333,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
       }
     });
 
-    test('handles null returned rows on fetch', async () => {
+    test('[BOUNDARY] [SG2-40:audit-storage] handles null returned rows on fetch', async () => {
       const fakeClient = {
         from() {
           return {
@@ -363,7 +363,7 @@ describe('Event Audit Logs DB operations (SG2-39 / SG2-40)', () => {
       }
     });
 
-    test('returns unavailable on database error', async () => {
+    test('[FAILURE] [SG2-40:audit-storage] returns unavailable on database error', async () => {
       const fakeClient = {
         from() {
           return {

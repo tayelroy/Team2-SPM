@@ -46,7 +46,7 @@ function fakeAdmin(options: {
 }
 
 describe('createAccountRole', () => {
-  test('inserts the given snake_case role for the user', async () => {
+  test('[NORMAL] [SG2-24:AC1] inserts the given snake_case role for the user', async () => {
     let insertedRow: any;
     const admin = fakeAdmin({
       insert: async (row) => {
@@ -61,7 +61,7 @@ describe('createAccountRole', () => {
     assert.deepEqual(insertedRow, { user_id: 'user-123', role: 'attendee' });
   });
 
-  test('surfaces the database error when the insert fails', async () => {
+  test('[FAILURE] [SG2-24:AC1] surfaces the database error when the insert fails', async () => {
     const admin = fakeAdmin({ insert: async () => ({ error: { message: 'duplicate key value' } }) });
     const result = await createAccountRole(admin, 'user-123', 'attendee');
     assert.deepEqual(result, { ok: false, error: 'duplicate key value' });
@@ -69,7 +69,7 @@ describe('createAccountRole', () => {
 });
 
 describe('updateAccountRole', () => {
-  test('updates the role for an existing user', async () => {
+  test('[NORMAL] [SG2-24:AC2] updates the role for an existing user', async () => {
     let updatePayload: any;
     let filter: unknown;
     const admin = fakeAdmin({
@@ -87,13 +87,13 @@ describe('updateAccountRole', () => {
     assert.deepEqual(filter, { column: 'user_id', userId: 'target-1' });
   });
 
-  test('reports user_not_found when no row matches the target user id', async () => {
+  test('[FAILURE] [SG2-24:AC2] reports user_not_found when no row matches the target user id', async () => {
     const admin = fakeAdmin({ update: async () => ({ data: [], error: null }) });
     const result = await updateAccountRole(admin, 'does-not-exist', 'venue_staff');
     assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
   });
 
-  test('surfaces a database error from the update itself', async () => {
+  test('[FAILURE] [SG2-24:AC2] surfaces a database error from the update itself', async () => {
     const admin = fakeAdmin({ update: async () => ({ data: null, error: { message: 'connection reset' } }) });
     const result = await updateAccountRole(admin, 'target-1', 'venue_staff');
     assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
@@ -102,7 +102,7 @@ describe('updateAccountRole', () => {
 
 describe('deleteAccountRole', () => {
   for (const outcome of ['success', 'database error', 'transport rejection'] as const) {
-    test(`attempts cleanup of only the target account and resolves on ${outcome}`, async () => {
+    test(`${outcome === 'success' ? '[NORMAL]' : '[FAILURE]'} [SG2-24:account-cleanup] attempts cleanup of only the target account and resolves on ${outcome}`, async () => {
       let deletes = 0;
       let filter: unknown;
       const admin = fakeAdmin({
@@ -121,7 +121,7 @@ describe('deleteAccountRole', () => {
 });
 
 describe('getAccountRole', () => {
-  test('returns the role for an existing account', async () => {
+  test('[NORMAL] [SG2-24:AC3] returns the role for an existing account', async () => {
     let askedFor: unknown;
     const admin = fakeAdmin({
       select: async (userId) => {
@@ -136,13 +136,13 @@ describe('getAccountRole', () => {
     assert.equal(askedFor, 'coord-1');
   });
 
-  test('reports user_not_found when no row matches', async () => {
+  test('[FAILURE] [SG2-24:AC3] reports user_not_found when no row matches', async () => {
     const admin = fakeAdmin({ select: async () => ({ data: null, error: null }) });
     const result = await getAccountRole(admin, 'ghost');
     assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
   });
 
-  test('surfaces a database error', async () => {
+  test('[FAILURE] [SG2-24:AC3] surfaces a database error', async () => {
     const admin = fakeAdmin({ select: async () => ({ data: null, error: { message: 'connection reset' } }) });
     const result = await getAccountRole(admin, 'coord-1');
     assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
@@ -185,7 +185,7 @@ describe('listCoordinators', () => {
     } as unknown as SupabaseClient;
   }
 
-  test('returns coordinators with their names, sorted by name', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] returns coordinators with their names, sorted by name', async () => {
     let asked: unknown;
     const result = await listCoordinators(
       fakeListAdmin(
@@ -204,24 +204,24 @@ describe('listCoordinators', () => {
     });
   });
 
-  test('returns an empty list, without a second query, when nobody holds the role', async () => {
+  test('[BOUNDARY] [SG2-33:AC1] [SG2-34:AC1] returns an empty list, without a second query, when nobody holds the role', async () => {
     const admin = fakeListAdmin({ data: [], error: null }, { data: null, error: { message: 'must not run' } });
     assert.deepEqual(await listCoordinators(admin), { ok: true, coordinators: [] });
     const nullRoles = fakeListAdmin({ data: null, error: null }, { data: null, error: { message: 'must not run' } });
     assert.deepEqual(await listCoordinators(nullRoles), { ok: true, coordinators: [] });
   });
 
-  test('returns an empty list when no profile rows come back', async () => {
+  test('[BOUNDARY] [SG2-33:AC1] [SG2-34:AC1] returns an empty list when no profile rows come back', async () => {
     const admin = fakeListAdmin({ data: [{ user_id: 'a' }], error: null }, { data: null, error: null });
     assert.deepEqual(await listCoordinators(admin), { ok: true, coordinators: [] });
   });
 
-  test('surfaces a role lookup error', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] surfaces a role lookup error', async () => {
     const admin = fakeListAdmin({ data: null, error: { message: 'roles down' } }, { data: [], error: null });
     assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'roles down' });
   });
 
-  test('surfaces a profile lookup error', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] surfaces a profile lookup error', async () => {
     const admin = fakeListAdmin({ data: [{ user_id: 'a' }], error: null }, { data: null, error: { message: 'users down' } });
     assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'users down' });
   });

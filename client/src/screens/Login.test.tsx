@@ -13,7 +13,7 @@ function fillForm() {
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
 }
 
-test('submits credentials and hands the session to onSignIn', async () => {
+test('[NORMAL] [SG2-23:AC1] submits credentials and hands the session to onSignIn', async () => {
   const fetchMock = vi.fn().mockResolvedValue(
     new Response(
       JSON.stringify({
@@ -42,7 +42,7 @@ test('submits credentials and hands the session to onSignIn', async () => {
   });
 });
 
-test('shows the server error message on invalid credentials, and does not sign in', async () => {
+test('[FAILURE] [SG2-23:AC2] shows the server error message on invalid credentials, and does not sign in', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Invalid email or password.' }), { status: 401 }))
@@ -57,7 +57,7 @@ test('shows the server error message on invalid credentials, and does not sign i
   expect(onSignIn).not.toHaveBeenCalled();
 });
 
-test('uses a fallback message when the error response has none', async () => {
+test('[FAILURE] [SG2-23:login-errors] uses a fallback message when the error response has none', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>gateway unavailable</html>', { status: 502 })));
 
   render(<Login onSignIn={vi.fn()} onBack={vi.fn()} />);
@@ -67,7 +67,7 @@ test('uses a fallback message when the error response has none', async () => {
   expect(await screen.findByText('Sign-in failed. Please try again.')).toBeInTheDocument();
 });
 
-test('shows a generic message when the server is unreachable', async () => {
+test('[FAILURE] [SG2-23:login-errors] shows a generic message when the server is unreachable', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 
   render(<Login onSignIn={vi.fn()} onBack={vi.fn()} />);
@@ -79,7 +79,7 @@ test('shows a generic message when the server is unreachable', async () => {
   ).toBeInTheDocument();
 });
 
-test('a second click while a request is outstanding does not submit again', async () => {
+test('[CONFLICT] [SG2-23:duplicate-login] a second click while a request is outstanding does not submit again', async () => {
   let resolveResponse!: (response: Response) => void;
   const fetchMock = vi.fn().mockReturnValue(new Promise<Response>((resolve) => { resolveResponse = resolve; }));
   vi.stubGlobal('fetch', fetchMock);
@@ -100,7 +100,7 @@ test('a second click while a request is outstanding does not submit again', asyn
   expect(fetchMock).toHaveBeenCalledOnce();
 });
 
-test('the wordmark calls onBack', () => {
+test('[NORMAL] [SG2-20:navigation] the wordmark calls onBack', () => {
   const onBack = vi.fn();
   render(<Login onSignIn={vi.fn()} onBack={onBack} />);
   fireEvent.click(screen.getByRole('button', { name: /ConnectSphere/ }));

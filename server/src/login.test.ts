@@ -27,7 +27,7 @@ function buildApp(login: (input: unknown) => Promise<LoginResult>) {
 }
 
 describe('loginAccount', () => {
-  test('returns a session and the caller role on valid credentials', async () => {
+  test('[NORMAL] [SG2-23:AC1] returns a session and the caller role on valid credentials', async () => {
     let resolvedToken: string | undefined;
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
@@ -45,7 +45,7 @@ describe('loginAccount', () => {
     });
   });
 
-  test('rejects missing fields without calling Supabase', async () => {
+  test('[FAILURE] [SG2-23:AC2] rejects missing fields without calling Supabase', async () => {
     let called = false;
     const result = await loginAccount({ email: 'ada@example.com' }, () => {
       called = true;
@@ -55,7 +55,7 @@ describe('loginAccount', () => {
     assert.equal(called, false);
   });
 
-  test('rejects malformed bodies before reading credential fields or contacting Auth', async () => {
+  test('[FAILURE] [SG2-23:AC2] rejects malformed bodies before reading credential fields or contacting Auth', async () => {
     let providerCalls = 0;
     for (const input of [undefined, null, false, 42, 'credentials', []]) {
       assert.deepEqual(await loginAccount(input, () => {
@@ -66,7 +66,7 @@ describe('loginAccount', () => {
     assert.equal(providerCalls, 0);
   });
 
-  test('trims only the email and preserves the password exactly', async () => {
+  test('[NORMAL] [SG2-23:AC1] trims only the email and preserves the password exactly', async () => {
     let submitted: unknown;
     const client = {
       auth: { signInWithPassword: async (input: unknown) => {
@@ -78,7 +78,7 @@ describe('loginAccount', () => {
     assert.deepEqual(submitted, { email: 'ada@example.com', password: ' password ' });
   });
 
-  test('maps a provider credential rejection to the generic invalid-credentials result', async () => {
+  test('[FAILURE] [SG2-23:AC2] maps a provider credential rejection to the generic invalid-credentials result', async () => {
     const client = fakeClient(async () => ({
       data: { session: null, user: null },
       error: { message: 'Invalid login credentials' }
@@ -87,7 +87,7 @@ describe('loginAccount', () => {
     assert.deepEqual(result, { outcome: 'invalid_credentials' });
   });
 
-  test('reports incomplete_account when the caller has no account_roles row', async () => {
+  test('[FAILURE] [SG2-23:AC1] reports incomplete_account when the caller has no account_roles row', async () => {
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
       () => fakeClient(),
@@ -98,7 +98,7 @@ describe('loginAccount', () => {
     assert.deepEqual(result, { outcome: 'incomplete_account' });
   });
 
-  test('reports unavailable when role resolution fails for any other reason', async () => {
+  test('[FAILURE] [SG2-23:AC1] reports unavailable when role resolution fails for any other reason', async () => {
     const result = await loginAccount(
       { email: 'ada@example.com', password: 'Correct-Horse-9' },
       () => fakeClient(),
@@ -109,12 +109,12 @@ describe('loginAccount', () => {
     assert.deepEqual(result, { outcome: 'unavailable' });
   });
 
-  test('reports unavailable when Supabase is not configured', async () => {
+  test('[FAILURE] [SG2-23:AC1] reports unavailable when Supabase is not configured', async () => {
     const result = await loginAccount({ email: 'ada@example.com', password: 'Correct-Horse-9' }, () => null);
     assert.deepEqual(result, { outcome: 'unavailable' });
   });
 
-  test('falls back to the submitted email if Auth returns none on the user object', async () => {
+  test('[BOUNDARY] [SG2-23:AC1] falls back to the submitted email if Auth returns none on the user object', async () => {
     const client = fakeClient(async () => ({
       data: { session: { access_token: 'access-1', refresh_token: 'refresh-1' }, user: { id: 'user-1' } },
       error: null
@@ -133,7 +133,23 @@ describe('loginAccount', () => {
 });
 
 describe('POST /api/auth/login', () => {
-  test('returns generic JSON for malformed credential types without calling the provider', async () => {
+  test('[FAILURE] [SG2-23:AC2] wrong passwords and unknown email addresses return the same public error', async () => {
+    let roleLookups = 0;
+    for (const [email, password, providerMessage] of [
+      ['ada@example.com', 'Wrong-password-9', 'Password is incorrect'],
+      ['unknown@example.com', 'Any-password-9', 'No account with this email']
+    ]) {
+      const app = buildApp(input => loginAccount(input, () => fakeClient(async () => ({
+        data: { session: null, user: null }, error: { message: providerMessage }
+      })), async () => { roleLookups++; return { userId: 'user-1', role: 'attendee' }; }));
+      const response = await request(app).post('/api/auth/login').send({ email, password });
+      assert.equal(response.status, 401);
+      assert.deepEqual(response.body, { error: 'Invalid email or password.' });
+    }
+    assert.equal(roleLookups, 0);
+  });
+
+  test('[FAILURE] [SG2-23:AC2] returns generic JSON for malformed credential types without calling the provider', async () => {
     let providerCalls = 0;
     const app = buildApp(input => loginAccount(input, () => {
       providerCalls++;
@@ -160,7 +176,7 @@ describe('POST /api/auth/login', () => {
     assert.equal(providerCalls, 0);
   });
 
-  test('returns 200 with the session on success, and no refresh token', async () => {
+  test('[NORMAL] [SG2-23:AC1] returns 200 with the session on success, and no refresh token', async () => {
     const app = buildApp(async () => ({
       outcome: 'success',
       accessToken: 'a',
@@ -171,28 +187,28 @@ describe('POST /api/auth/login', () => {
     assert.deepEqual(response.body, { accessToken: 'a', user: { userId: '1', email: 'x', role: 'Attendee' } });
   });
 
-  test('returns 401 for invalid credentials', async () => {
+  test('[FAILURE] [SG2-23:AC2] returns 401 for invalid credentials', async () => {
     const app = buildApp(async () => ({ outcome: 'invalid_credentials' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 401);
     assert.deepEqual(response.body, { error: 'Invalid email or password.' });
   });
 
-  test('returns 403 for an incomplete account', async () => {
+  test('[FAILURE] [SG2-23:AC1] returns 403 for an incomplete account', async () => {
     const app = buildApp(async () => ({ outcome: 'incomplete_account' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 403);
     assert.deepEqual(response.body, { error: 'Your account setup is incomplete. Contact support.' });
   });
 
-  test('returns 503 when unavailable', async () => {
+  test('[FAILURE] [SG2-23:AC1] returns 503 when unavailable', async () => {
     const app = buildApp(async () => ({ outcome: 'unavailable' }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 503);
     assert.deepEqual(response.body, { error: 'Sign-in is temporarily unavailable. Please try again later.' });
   });
 
-  test('treats an absent request body as empty input', async () => {
+  test('[FAILURE] [SG2-23:AC2] treats an absent request body as empty input', async () => {
     // Exercise the handler's fallback independently of express.json(), which
     // normalises a bodyless HTTP request to {} in this Express version.
     const app = express();
@@ -206,7 +222,7 @@ describe('POST /api/auth/login', () => {
 });
 
 describe('login rate limiting', () => {
-  test('allows requests under the limit, then blocks with 429', async () => {
+  test('[BOUNDARY] [SG2-23:login-throttle] allows requests under the limit, then blocks with 429', async () => {
     const app = express();
     app.use(express.json());
     app.post('/api/auth/login', createLoginRateLimiter({ limit: 3 }), createLoginHandler(async () => ({ outcome: 'invalid_credentials' })));
@@ -220,7 +236,7 @@ describe('login rate limiting', () => {
     assert.equal(blocked.body.error, 'Too many sign-in attempts. Please try again later.');
   });
 
-  test('tracks limits independently per app instance', async () => {
+  test('[CONFLICT] [SG2-23:login-throttle] tracks limits independently per app instance', async () => {
     // createLoginRateLimiter() is a factory, not a shared singleton — two
     // instances (as createApp() makes for every test) must not share a
     // counter, or one test's login calls could 429 another test's.

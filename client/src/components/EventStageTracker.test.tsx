@@ -31,7 +31,7 @@ describe('EventStageTracker (SG2-38)', () => {
     outstanding_arrangements: ['venue_recheck', 'equipment_recheck'],
   };
 
-  test('renders plain-language stage badge, description, and recheck indicator (AC 1)', () => {
+  test('[NORMAL] [SG2-38:AC1] renders plain-language stage badge, description, and recheck indicator (AC 1)', () => {
     render(<EventStageTracker stage={mockPlanningStage} />);
 
     expect(screen.getByTestId('stage-badge')).toHaveTextContent('Approved — In Planning');
@@ -41,7 +41,7 @@ describe('EventStageTracker (SG2-38)', () => {
     expect(screen.getByText('Arrangements Recheck Needed')).toBeInTheDocument();
   });
 
-  test('renders all 5 stepper steps with proper completion and current step states', () => {
+  test('[NORMAL] [SG2-38:AC1] renders all 5 stepper steps with proper completion and current step states', () => {
     render(<EventStageTracker stage={mockPlanningStage} />);
 
     expect(screen.getByRole('list', { name: 'Lifecycle steps' })).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('EventStageTracker (SG2-38)', () => {
     expect(listItems[4]).toHaveTextContent('5');
   });
 
-  test('renders prominent Waiting On card with persona and action (AC 2)', () => {
+  test('[NORMAL] [SG2-38:AC2] renders prominent Waiting On card with persona and action (AC 2)', () => {
     render(<EventStageTracker stage={mockPlanningStage} />);
 
     const waitingOnCard = screen.getByTestId('waiting-on-card');
@@ -82,7 +82,7 @@ describe('EventStageTracker (SG2-38)', () => {
     );
   });
 
-  test('renders completed/confirmed stage when waiting_on is null', () => {
+  test('[BOUNDARY] [SG2-38:AC3] renders completed/confirmed stage when waiting_on is null', () => {
     const mockConfirmedStage: EventStageResult = {
       event_id: 102,
       raw_status: 'confirmed',

@@ -12,7 +12,7 @@ const ACCOUNT_ROLES = [
   'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
 ] as const;
 
-test('the public role catalogue contains the five documented account roles', () => {
+test('[NORMAL] [SG2-24:AC1] the public role catalogue contains the five documented account roles', () => {
   assert.deepEqual(SUPPORTED_ROLES, ACCOUNT_ROLES);
 });
 
@@ -54,7 +54,7 @@ function fixture(principal: Principal = { userId, role: 'event_organiser' }) {
   }));
 }
 
-test('login stays public alongside authenticated identity routes', async () => {
+test('[NORMAL] [SG2-23:AC1] [SG2-25:AC3] login stays public alongside authenticated identity routes', async () => {
   let resolutions = 0;
   const access = createAuthorization({ resolvePrincipal: async () => {
     resolutions++;
@@ -72,7 +72,7 @@ test('login stays public alongside authenticated identity routes', async () => {
 });
 
 for (const header of [undefined, 'Basic token', 'Bearer', 'Bearer one two', 'Bearer a,b']) {
-  test(`SG2-25: refuses missing/malformed credentials (${header}) before side effects`, async () => {
+  test(`[FAILURE] [SG2-25:AC3] SG2-25: refuses missing/malformed credentials (${header}) before side effects`, async () => {
     const { app, calls } = fixture();
     let req = request(app).post('/fixture/edit');
     if (header) req = req.set('Authorization', header);
@@ -84,7 +84,7 @@ for (const header of [undefined, 'Basic token', 'Bearer', 'Bearer one two', 'Bea
   });
 }
 
-test('duplicate authorization headers are refused', async () => {
+test('[FAILURE] [SG2-25:AC3] duplicate authorization headers are refused', async () => {
   const { app, calls } = fixture();
   const res = await request(app).post('/fixture/edit').set('Authorization', ['Bearer one', 'Bearer two'] as any);
   assert.equal(res.status, 401);
@@ -92,7 +92,7 @@ test('duplicate authorization headers are refused', async () => {
 });
 
 for (const role of ACCOUNT_ROLES) {
-  test(`SG2-25: direct HTTP action obeys the policy for ${role}`, async () => {
+  test(`${role === 'event_organiser' ? '[NORMAL]' : '[FAILURE]'} [SG2-25:AC1] [SG2-25:AC2] SG2-25: direct HTTP action obeys the policy for ${role}`, async () => {
     const { app, calls } = fixture({ userId, role });
     const res = await request(app).post('/fixture/edit').set('Authorization', 'bearer verified-token')
       .set('X-Role', 'event_organiser').set('X-User-Id', 'forged')
@@ -103,13 +103,13 @@ for (const role of ACCOUNT_ROLES) {
   });
 }
 
-test('unmapped/prototype property action is denied even to a permitted role', async () => {
+test('[FAILURE] [SG2-25:AC1] unmapped/prototype property action is denied even to a permitted role', async () => {
   const { app, calls } = fixture();
   assert.equal((await request(app).post('/fixture/unknown').set('Authorization', 'Bearer token')).status, 403);
   assert.equal(calls(), 0);
 });
 
-test('permission guard fails closed when a developer omits authentication', async () => {
+test('[FAILURE] [SG2-25:AC3] permission guard fails closed when a developer omits authentication', async () => {
   const access = createAuthorization();
   const app = express();
   app.post('/edit', access.requirePermission('fixture.edit'), (_req, res) => res.sendStatus(204));
@@ -118,7 +118,7 @@ test('permission guard fails closed when a developer omits authentication', asyn
 });
 
 for (const principal of [{ userId, role: 'admin' }, { userId: '', role: 'attendee' }, { userId }]) {
-  test(`invalid server principal fails closed: ${JSON.stringify(principal)}`, async () => {
+  test(`${principal.userId === '' ? '[BOUNDARY] [FAILURE]' : '[FAILURE]'} [SG2-24:AC1] [SG2-25:AC1] invalid server principal fails closed: ${JSON.stringify(principal)}`, async () => {
     const { app, calls } = fixture(principal as Principal);
     assert.equal((await request(app).post('/fixture/edit').set('Authorization', 'Bearer token')).status, 403);
     assert.equal(calls(), 0);
@@ -126,7 +126,7 @@ for (const principal of [{ userId, role: 'admin' }, { userId: '', role: 'attende
 }
 
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET_SENTINEL'), 'SECRET_SENTINEL']) {
-  test(`resolver failure returns generic JSON: ${String(error)}`, async () => {
+  test(`[FAILURE] [SG2-25:AC2] resolver failure returns generic JSON: ${String(error)}`, async () => {
     const access = createAuthorization({ resolvePrincipal: async () => { throw error; } });
     const res = await request(createApp(undefined, access)).get('/api/auth/me').set('Authorization', 'Bearer token');
     assert.equal(res.status, error instanceof AccessError ? error.status : 503);
@@ -134,7 +134,7 @@ for (const error of [new AccessError(401), new AccessError(403), new Error('SECR
   });
 }
 
-test('pages receive exactly the same permissions as backend guards', async () => {
+test('[NORMAL] [SG2-24:AC3] [SG2-25:AC2] pages receive exactly the same permissions as backend guards', async () => {
   const { app } = fixture();
   const res = await request(app).get('/api/auth/me').set('Authorization', 'Bearer token');
   assert.equal(res.status, 200);
@@ -142,7 +142,7 @@ test('pages receive exactly the same permissions as backend guards', async () =>
   assert.equal(res.headers['cache-control'], 'no-store');
 });
 
-test('server policy is snapshotted, not mutable through its input arrays', async () => {
+test('[CONFLICT] [SG2-25:AC2] server policy is snapshotted, not mutable through its input arrays', async () => {
   const roles: Principal['role'][] = ['attendee'];
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId, role: 'attendee' }), permissions: { read: roles } });
   roles.pop();
@@ -173,7 +173,7 @@ function provider(options: { role?: unknown; authStatus?: number; roleStatus?: n
   });
 }
 
-test('production adapter verifies Auth then reads the database role, ignoring metadata', async () => {
+test('[NORMAL] [SG2-24:AC1] [SG2-25:AC2] production adapter verifies Auth then reads the database role, ignoring metadata', async () => {
   const fetchMock = provider();
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
@@ -183,7 +183,7 @@ test('production adapter verifies Auth then reads the database role, ignoring me
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
 
-test('logout uses the SDK current-session scope; subsequent protected requests reject a revoked session', async () => {
+test('[CONFLICT] [SG2-23:AC3] logout uses the SDK current-session scope; subsequent protected requests reject a revoked session', async () => {
   // Only the external Auth/role service is simulated. Exercise the production
   // logout route, SDK request, authorization adapter and venue write guard.
   const active = new Set(['current-token', 'other-device-token']);
@@ -225,7 +225,7 @@ test('logout uses the SDK current-session scope; subsequent protected requests r
 });
 
 for (const status of [400, 401, 403, 500]) {
-  test(`Auth refuses invalid/expired credentials or fails closed on outage (${status})`, async () => {
+  test(`[FAILURE] [SG2-23:AC2] [SG2-25:AC3] Auth refuses invalid/expired credentials or fails closed on outage (${status})`, async () => {
     const fetchMock = provider({ authStatus: status });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, status === 500 ? 503 : 401);
@@ -235,7 +235,7 @@ for (const status of [400, 401, 403, 500]) {
 }
 
 for (const user of [{}, { id: userId, is_anonymous: true }]) {
-  test(`Auth response without a registered identity is denied: ${JSON.stringify(user)}`, async () => {
+  test(`[FAILURE] [SG2-25:AC3] Auth response without a registered identity is denied: ${JSON.stringify(user)}`, async () => {
     const fetchMock = provider({ user });
     assert.equal((await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token')).status, 401);
     assert.equal(fetchMock.mock.callCount(), 1);
@@ -243,14 +243,14 @@ for (const user of [{}, { id: userId, is_anonymous: true }]) {
 }
 
 for (const options of [{ missingRole: true }, { role: 'admin' }, { role: 123 }]) {
-  test(`database assignment must exist and be recognised: ${JSON.stringify(options)}`, async () => {
+  test(`[FAILURE] [SG2-24:AC1] database assignment must exist and be recognised: ${JSON.stringify(options)}`, async () => {
     provider(options);
     assert.equal((await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token')).status, 403);
   });
 }
 
 for (const status of [401, 403, 500]) {
-  test(`database lookup fails closed (${status})`, async () => {
+  test(`[FAILURE] [SG2-25:AC2] database lookup fails closed (${status})`, async () => {
     provider({ roleStatus: status });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, status === 401 ? 401 : 503);
@@ -258,7 +258,7 @@ for (const status of [401, 403, 500]) {
   });
 }
 
-test('removing a role grant blocks the next action with the same access token', async () => {
+test('[CONFLICT] [SG2-24:AC2] [SG2-25:AC1] removing a role grant blocks the next action with the same access token', async () => {
   const options = { role: 'event_organiser' };
   provider(options);
   const { app, calls } = guardedApp(createAuthorization({
@@ -276,7 +276,7 @@ test('removing a role grant blocks the next action with the same access token', 
 });
 
 for (const role of ACCOUNT_ROLES) {
-  test(`default policy denies the unregistered fixture.edit action to ${role}`, async () => {
+  test(`[FAILURE] [SG2-25:AC1] default policy denies the unregistered fixture.edit action to ${role}`, async () => {
     const { app, calls } = guardedApp(createAuthorization({
       resolvePrincipal: async () => ({ userId, role })
     }));
@@ -286,7 +286,7 @@ for (const role of ACCOUNT_ROLES) {
 }
 
 for (const endpoint of ['/auth/v1/user', '/rest/v1/account_roles']) {
-  test(`${endpoint} timeout returns 503 without running the action`, async () => {
+  test(`[FAILURE] [SG2-25:AC2] ${endpoint} timeout returns 503 without running the action`, async () => {
     const controller = new AbortController();
     let timedOutRequests = 0;
     mock.method(console, 'error', () => {});
@@ -322,7 +322,7 @@ for (const config of [
   { supabaseUrl: undefined }, { supabaseAnonKey: undefined },
   { supabaseUrl: 'http://auth-test.supabase.co' }, { supabaseUrl: 'not-a-url' }
 ]) {
-  test(`configuration fails closed without a privileged fallback: ${JSON.stringify(config)}`, async () => {
+  test(`[FAILURE] [SG2-25:AC2] configuration fails closed without a privileged fallback: ${JSON.stringify(config)}`, async () => {
     Object.assign(dbConfig, config);
     const fetchMock = provider();
     assert.equal((await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token')).status, 503);
@@ -330,14 +330,14 @@ for (const config of [
   });
 }
 
-test('network failure is a generic 503', async () => {
+test('[FAILURE] [SG2-25:AC2] network failure is a generic 503', async () => {
   mock.method(console, 'error', () => {});
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 503);
   assert.deepEqual(res.body, { error: 'Access service unavailable' });
 });
 
-test('an Auth SDK error without an HTTP status denies access before the action', async () => {
+test('[FAILURE] [SG2-25:AC2] an Auth SDK error without an HTTP status denies access before the action', async () => {
   mock.method(AuthClient.prototype, 'getUser', async () => ({
     data: { user: null }, error: new AuthError('SDK_SECRET_SENTINEL')
   }));
@@ -352,7 +352,7 @@ test('an Auth SDK error without an HTTP status denies access before the action',
   assert.equal(calls(), 0);
 });
 
-test('concurrent requests use separate user tokens and database identities', async () => {
+test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and database identities', async () => {
   let releaseFirst!: () => void;
   const secondLookupStarted = new Promise<void>(resolve => { releaseFirst = resolve; });
   mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {

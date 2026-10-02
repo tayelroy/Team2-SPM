@@ -10,23 +10,23 @@ afterEach(() => {
 });
 
 describe('formatProposedDate', () => {
-  test('handles null or empty date string', () => {
+  test('[BOUNDARY] [SG2-31:AC1] handles null or empty date string', () => {
     expect(formatProposedDate(null)).toBe('—');
     expect(formatProposedDate('')).toBe('—');
   });
 
-  test('formats valid ISO date string', () => {
+  test('[NORMAL] [SG2-31:AC1] formats valid ISO date string', () => {
     const formatted = formatProposedDate('2026-10-12T00:00:00.000Z');
     expect(formatted).toMatch(/12 Oct 2026/);
   });
 
-  test('returns original string when date is invalid', () => {
+  test('[FAILURE] [SG2-31:AC1] returns original string when date is invalid', () => {
     expect(formatProposedDate('not-a-date')).toBe('not-a-date');
   });
 });
 
 describe('EventsTable role boundary', () => {
-  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('%s cannot fetch or see organisation events', (role) => {
+  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)('[FAILURE] [SG2-26:AC2] %s cannot fetch or see organisation events', (role) => {
     const fetch = vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests');
     render(<EventsTable role={role} accessToken="token" onOpenEvent={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
@@ -37,7 +37,7 @@ describe('EventsTable role boundary', () => {
 });
 
 describe('EventsTable for Event Organiser (API consumption)', () => {
-  test('does not fetch when accessToken is missing', () => {
+  test('[FAILURE] [SG2-25:AC3] does not fetch when accessToken is missing', () => {
     const fetchSpy = vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests');
     render(<EventsTable role="Event Organiser" onOpenEvent={vi.fn()} />);
 
@@ -45,7 +45,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     expect(screen.getByText('No event requests found.')).toBeInTheDocument();
   });
 
-  test('TC-SG2-31-01 & TC-SG2-31-02: displays metadata, formatted date, coordinator, status, and action chips', async () => {
+  test('[NORMAL] [SG2-31:AC1] [SG2-31:AC4] TC-SG2-31-01 & TC-SG2-31-02: displays metadata, formatted date, coordinator, status, and action chips', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({
       ok: true,
       requests: [
@@ -103,7 +103,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     expect(onOpen).toHaveBeenCalledWith(101);
   });
 
-  test('TC-SG2-31-03: status filtering and empty boundary state', async () => {
+  test('[BOUNDARY] [SG2-31:AC2] TC-SG2-31-03: status filtering and empty boundary state', async () => {
     const fetchSpy = vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests')
       .mockResolvedValueOnce({
         ok: true,
@@ -153,7 +153,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     expect(await screen.findByText('No event requests found.')).toBeInTheDocument();
   });
 
-  test('renders error state on unauthorized rejection', async () => {
+  test('[FAILURE] [SG2-31:AC1] renders error state on unauthorized rejection', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({
       ok: false,
       kind: 'unauthorized',
@@ -172,7 +172,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     );
   });
 
-  test('renders error state on unavailable rejection and retries', async () => {
+  test('[FAILURE] [SG2-31:AC1] renders error state on unavailable rejection and retries', async () => {
     const fetchSpy = vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests')
       .mockResolvedValueOnce({
         ok: false,
@@ -202,7 +202,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  test('renders custom error message and handles network exceptions', async () => {
+  test('[FAILURE] [SG2-31:AC1] renders custom error message and handles network exceptions', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests')
       .mockResolvedValueOnce({
         ok: false,
@@ -237,7 +237,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     );
   });
 
-  test.each(['success', 'rejection'] as const)('ignores a stale %s from the previous status filter', async (outcome) => {
+  test.each(['success', 'rejection'] as const)('[CONFLICT] [SG2-31:AC1] ignores a stale %s from the previous status filter', async (outcome) => {
     type Result = Awaited<ReturnType<typeof eventRequestsApi.fetchOwnEventRequests>>;
     let resolveOld!: (value: Result) => void;
     let rejectOld!: (error: Error) => void;
@@ -263,7 +263,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
   });
 });
 
-test('colleague events remain visible but never show a personal action', async () => {
+test('[NORMAL] [SG2-26:AC3] colleague events remain visible but never show a personal action', async () => {
   vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({ ok: true, requests: [{
     eventId: 77, name: 'Colleague event', proposedDate: null, status: 'draft', coordinatorId: null,
     coordinatorName: null, canManage: false, waitingOnMe: false,

@@ -96,7 +96,7 @@ function buildDetailApp(options: DetailHarnessOptions = {}) {
 }
 
 describe('GET /api/event-requests (SG2-31)', () => {
-  test('returns the service list and passes the authenticated organiser as the query identity', async () => {
+  test('[NORMAL] [SG2-31:AC1] returns the service list and passes the authenticated organiser as the query identity', async () => {
     let capturedOrganiser: string | undefined;
     let capturedFilter: string | undefined;
 
@@ -115,7 +115,7 @@ describe('GET /api/event-requests (SG2-31)', () => {
     assert.equal(capturedFilter, undefined);
   });
 
-  test('applies valid status filter when provided in query', async () => {
+  test('[NORMAL] [SG2-31:AC2] applies valid status filter when provided in query', async () => {
     let capturedFilter: string | undefined;
 
     const response = await request(
@@ -130,7 +130,7 @@ describe('GET /api/event-requests (SG2-31)', () => {
     assert.equal(capturedFilter, 'draft');
   });
 
-  test('normalizes status query filter case and whitespace', async () => {
+  test('[NORMAL] [SG2-31:AC2] normalizes status query filter case and whitespace', async () => {
     let capturedFilter: string | undefined;
 
     const response = await request(
@@ -145,7 +145,7 @@ describe('GET /api/event-requests (SG2-31)', () => {
     assert.equal(capturedFilter, 'submitted');
   });
 
-  test('treats status=all as no filter', async () => {
+  test('[NORMAL] [SG2-31:AC2] treats status=all as no filter', async () => {
     let capturedFilter: string | undefined = 'initial';
 
     const response = await request(
@@ -160,19 +160,19 @@ describe('GET /api/event-requests (SG2-31)', () => {
     assert.equal(capturedFilter, undefined);
   });
 
-  test('returns 400 for an invalid status filter', async () => {
+  test('[FAILURE] [SG2-31:AC2] returns 400 for an invalid status filter', async () => {
     const response = await request(buildListApp()).get('/api/event-requests?status=not_a_valid_status');
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, { error: 'Invalid status filter.' });
   });
 
-  test('returns 400 for non-string status query parameter', async () => {
+  test('[FAILURE] [SG2-31:AC2] returns 400 for non-string status query parameter', async () => {
     const response = await request(buildListApp()).get('/api/event-requests?status[]=draft');
     assert.equal(response.status, 400);
     assert.deepEqual(response.body, { error: 'Invalid status filter.' });
   });
 
-  test('treats blank status query as no filter', async () => {
+  test('[BOUNDARY] [SG2-31:AC2] treats blank status query as no filter', async () => {
     let capturedFilter: string | undefined = 'initial';
     const response = await request(
       buildListApp({
@@ -186,17 +186,17 @@ describe('GET /api/event-requests (SG2-31)', () => {
     assert.equal(capturedFilter, undefined);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-31:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(buildListApp({ principal: undefined })).get('/api/event-requests');
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-31:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildListApp({ admin: null })).get('/api/event-requests');
     assert.equal(response.status, 503);
   });
 
-  test('returns 503 when fetchRequests fails', async () => {
+  test('[FAILURE] [SG2-31:AC1] returns 503 when fetchRequests fails', async () => {
     const response = await request(
       buildListApp({ listResult: { ok: false, reason: 'unavailable', message: 'DB down' } })
     ).get('/api/event-requests');
@@ -205,7 +205,7 @@ describe('GET /api/event-requests (SG2-31)', () => {
 });
 
 describe('GET /api/event-requests/:eventId (SG2-31)', () => {
-  test('returns service detail and passes the event id and authenticated organiser', async () => {
+  test('[NORMAL] [SG2-31:AC3] returns service detail and passes the event id and authenticated organiser', async () => {
     let capturedEventId: number | undefined;
     let capturedOrganiser: string | undefined;
 
@@ -224,7 +224,7 @@ describe('GET /api/event-requests/:eventId (SG2-31)', () => {
     assert.equal(capturedOrganiser, ORGANISER.userId);
   });
 
-  test('returns 400 for non-numeric or non-positive eventId', async () => {
+  test('[BOUNDARY] [SG2-31:AC3] returns 400 for non-numeric or non-positive eventId', async () => {
     const nonNumeric = await request(buildDetailApp()).get('/api/event-requests/abc');
     assert.equal(nonNumeric.status, 400);
 
@@ -232,14 +232,14 @@ describe('GET /api/event-requests/:eventId (SG2-31)', () => {
     assert.equal(nonPositive.status, 400);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-31:AC3] [SG2-25:AC3] returns 401 when no verified principal is present', async () => {
     const response = await request(buildDetailApp({ principal: undefined })).get(
       '/api/event-requests/101'
     );
     assert.equal(response.status, 401);
   });
 
-  test('returns 404 when request is not found or owned by someone else (TC-SG2-31-05)', async () => {
+  test('[FAILURE] [SG2-31:AC3] [SG2-26:AC2] returns 404 when request is not found or owned by someone else (TC-SG2-31-05)', async () => {
     const response = await request(
       buildDetailApp({ detailResult: { ok: false, reason: 'not_found', message: 'No event' } })
     ).get('/api/event-requests/999');
@@ -248,12 +248,12 @@ describe('GET /api/event-requests/:eventId (SG2-31)', () => {
     assert.deepEqual(response.body, { error: 'No event request found for this account.' });
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-31:AC3] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildDetailApp({ admin: null })).get('/api/event-requests/101');
     assert.equal(response.status, 503);
   });
 
-  test('returns 503 when fetchOwnRequest fails with unavailable', async () => {
+  test('[FAILURE] [SG2-31:AC3] returns 503 when fetchOwnRequest fails with unavailable', async () => {
     const response = await request(
       buildDetailApp({ detailResult: { ok: false, reason: 'unavailable', message: 'DB down' } })
     ).get('/api/event-requests/101');
@@ -299,19 +299,19 @@ describe('Authorisation wiring for event_request.view (SG2-31)', () => {
       }
     );
 
-  test('rejects unauthenticated requests to GET /api/event-requests', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-31:AC1] rejects unauthenticated requests to GET /api/event-requests', async () => {
     const response = await request(appForRole('event_organiser')).get('/api/event-requests');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('rejects unauthenticated requests to GET /api/event-requests/:eventId', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-31:AC3] rejects unauthenticated requests to GET /api/event-requests/:eventId', async () => {
     const response = await request(appForRole('event_organiser')).get('/api/event-requests/101');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('allows event_organiser to access GET /api/event-requests', async () => {
+  test('[NORMAL] [SG2-31:AC1] allows event_organiser to access GET /api/event-requests', async () => {
     const response = await request(appForRole('event_organiser'))
       .get('/api/event-requests')
       .set('Authorization', 'Bearer token');
@@ -321,7 +321,7 @@ describe('Authorisation wiring for event_request.view (SG2-31)', () => {
 
 
 
-  test('allows event_organiser to access GET /api/event-requests/:eventId', async () => {
+  test('[NORMAL] [SG2-31:AC3] allows event_organiser to access GET /api/event-requests/:eventId', async () => {
     const response = await request(appForRole('event_organiser'))
       .get('/api/event-requests/101')
       .set('Authorization', 'Bearer token');
@@ -332,7 +332,7 @@ describe('Authorisation wiring for event_request.view (SG2-31)', () => {
 
 
   for (const role of ['event_coordinator', 'attendee', 'venue_staff', 'technical_support_staff'] as const) {
-    test(`denies ${role} without event_request.view permission`, async () => {
+    test(`[FAILURE] [SG2-25:AC1] [SG2-31:AC1] [SG2-31:AC3] denies ${role} without event_request.view permission`, async () => {
       const listRes = await request(appForRole(role))
         .get('/api/event-requests')
         .set('Authorization', 'Bearer token');

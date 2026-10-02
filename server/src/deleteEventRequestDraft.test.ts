@@ -59,7 +59,24 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
-  test('deletes a draft owned by the caller, passing the caller id to both the lookup and the delete', async () => {
+  test('[BOUNDARY] [SG2-32:AC1] delete accepts event id one and refuses zero without reading or deleting', async () => {
+    const reads: number[] = [];
+    const deletes: number[] = [];
+    const app = buildApp({ fetchResult: { ok: true, request: { ...DRAFT_REQUEST, event_id: 1 } },
+      captureFetch: eventId => { reads.push(eventId); }, captureDelete: eventId => { deletes.push(eventId); } });
+    const refused = await request(app).delete('/api/event-requests/0');
+    assert.equal(refused.status, 400);
+    assert.deepEqual(refused.body, { error: 'eventId must be a positive integer.' });
+    assert.deepEqual(reads, []);
+    assert.deepEqual(deletes, []);
+    const accepted = await request(app).delete('/api/event-requests/1');
+    assert.equal(accepted.status, 200);
+    assert.deepEqual(accepted.body, { message: 'Draft deleted.' });
+    assert.deepEqual(reads, [1]);
+    assert.deepEqual(deletes, [1]);
+  });
+
+  test('[NORMAL] [SG2-32:AC1] deletes a draft owned by the caller, passing the caller id to both the lookup and the delete', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
     let deleted: { eventId: number; organiserId: string } | undefined;
     const response = await request(
@@ -75,7 +92,7 @@ describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
     assert.deepEqual(deleted, { eventId: 7, organiserId: 'user-1' });
   });
 
-  test('returns 400 for a non-numeric eventId, without querying the database', async () => {
+  test('[FAILURE] [SG2-32:AC1] returns 400 for a non-numeric eventId, without querying the database', async () => {
     let called = false;
     const response = await request(buildApp({ captureFetch: () => (called = true) })).delete(
       '/api/event-requests/not-a-number'
@@ -84,24 +101,24 @@ describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
     assert.equal(called, false);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-32:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined })).delete('/api/event-requests/7');
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-32:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null })).delete('/api/event-requests/7');
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the request does not exist or belongs to someone else', async () => {
+  test('[FAILURE] [SG2-32:AC1] returns 404 when the request does not exist or belongs to someone else', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'missing' } })
     ).delete('/api/event-requests/7');
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the database error when the lookup fails', async () => {
+  test('[FAILURE] [SG2-32:AC1] returns 503 without leaking the database error when the lookup fails', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).delete('/api/event-requests/7');
@@ -109,7 +126,7 @@ describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 409 when the request has already been submitted', async () => {
+  test('[CONFLICT] [SG2-32:AC2] returns 409 when the request has already been submitted', async () => {
     let deleteCalled = false;
     const response = await request(
       buildApp({
@@ -121,7 +138,7 @@ describe('DELETE /api/event-requests/:eventId (SG2-32)', () => {
     assert.equal(deleteCalled, false);
   });
 
-  test('returns 503 without leaking the database error when the delete fails', async () => {
+  test('[FAILURE] [SG2-32:AC1] returns 503 without leaking the database error when the delete fails', async () => {
     const response = await request(
       buildApp({ deleteResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).delete('/api/event-requests/7');
@@ -165,20 +182,20 @@ describe('DELETE /api/event-requests/:eventId authorisation wiring', () => {
       }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-32:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_organiser')).delete('/api/event-requests/7');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies a role without the delete permission', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-32:AC1] denies a role without the delete permission', async () => {
     const response = await request(appForRole('attendee'))
       .delete('/api/event-requests/7')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 403);
   });
 
-  test('lets an Event Organiser reach the delete handler', async () => {
+  test('[NORMAL] [SG2-32:AC1] lets an Event Organiser reach the delete handler', async () => {
     const response = await request(appForRole('event_organiser'))
       .delete('/api/event-requests/7')
       .set('Authorization', 'Bearer token');

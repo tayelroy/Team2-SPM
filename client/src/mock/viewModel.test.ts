@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'vitest';
-import { color } from '../theme';
 import type { Role } from './types';
 import {
   CALENDAR_LEGEND,
@@ -17,47 +16,47 @@ import {
 } from './viewModel';
 
 describe('badgeStyle', () => {
-  test('confirmed reads as solid teal', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] confirmed reads as solid teal', () => {
     expect(badgeStyle('Confirmed')).toEqual({
-      badgeBg: color.teal,
-      badgeFg: color.abyss,
+      badgeBg: '#00827c',
+      badgeFg: '#012624',
     });
   });
 
-  test.each(['Rejected', 'Cancelled', 'Draft'])('%s is muted grey', (status) => {
-    expect(badgeStyle(status).badgeFg).toBe(color.silver);
+  test.each(['Rejected', 'Cancelled', 'Draft'])('[NORMAL] [SG2-20:prototype-view-model] %s is muted grey', (status) => {
+    expect(badgeStyle(status).badgeFg).toBe('#bbc7c6');
   });
 
-  test('anything in flight gets the neutral pill', () => {
-    expect(badgeStyle('Under review').badgeFg).toBe(color.mist);
+  test('[NORMAL] [SG2-20:prototype-view-model] anything in flight gets the neutral pill', () => {
+    expect(badgeStyle('Under review').badgeFg).toBe('#edfffe');
   });
 
-  test('matching is case-insensitive', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] matching is case-insensitive', () => {
     for (const status of ['confirmed', 'CONFIRMED']) {
-      expect(badgeStyle(status)).toEqual({ badgeBg: color.teal, badgeFg: color.abyss });
+      expect(badgeStyle(status)).toEqual({ badgeBg: '#00827c', badgeFg: '#012624' });
     }
   });
 });
 
 describe('chipStyle', () => {
-  test('the on state uses the accent aqua', () => {
-    expect(chipStyle(true).fg).toBe(color.mist);
-    expect(chipStyle(false).fg).toBe(color.silver);
+  test('[NORMAL] [SG2-20:prototype-view-model] the on state uses the accent aqua', () => {
+    expect(chipStyle(true).fg).toBe('#edfffe');
+    expect(chipStyle(false).fg).toBe('#bbc7c6');
   });
 });
 
 describe('scopedEvents', () => {
-  test('an organiser only sees their own client', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] an organiser only sees their own client', () => {
     const events = scopedEvents('Event Organiser');
     expect(events.map((event) => event.ref)).toEqual(['E-205', 'E-201']);
   });
 
-  test('an attendee only sees confirmed events', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] an attendee only sees confirmed events', () => {
     expect(scopedEvents('Attendee').map((event) => event.ref)).toEqual(['E-198']);
   });
 
   test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff'] as Role[])(
-    '%s sees every event',
+    '[NORMAL] [SG2-20:prototype-view-model] %s sees every event',
     (role) => {
       expect(scopedEvents(role).map((event) => event.ref)).toEqual([
         'E-205', 'E-201', 'E-198', 'E-190', 'E-186', 'E-181',
@@ -67,7 +66,7 @@ describe('scopedEvents', () => {
 });
 
 describe('eventCards', () => {
-  test('an attendee sees registration framing, not internal status', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] an attendee sees registration framing, not internal status', () => {
     const cards = eventCards('Attendee');
     expect(cards).toMatchObject([{
       ref: 'E-198',
@@ -77,7 +76,7 @@ describe('eventCards', () => {
     }]);
   });
 
-  test('a coordinator gets the decision they owe on each event', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] a coordinator gets the decision they owe on each event', () => {
     const byRef = Object.fromEntries(
       eventCards('Event Coordinator').map((c) => [c.ref, c.next]),
     );
@@ -86,7 +85,7 @@ describe('eventCards', () => {
     expect(byRef['E-198']).toBe('Next: no action');
   });
 
-  test('an organiser is told what is on them', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] an organiser is told what is on them', () => {
     const byRef = Object.fromEntries(
       eventCards('Event Organiser').map((c) => [c.ref, c.next]),
     );
@@ -96,25 +95,25 @@ describe('eventCards', () => {
     expect(byRef['E-198']).toBeUndefined();
   });
 
-  test('settled events report no outstanding work', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] settled events report no outstanding work', () => {
     const byRef = Object.fromEntries(
       eventCards('Venue Staff').map((c) => [c.ref, c.next]),
     );
     expect(byRef['E-198']).toBe('Arrangements confirmed');
   });
 
-  test('the summary line carries date, attendance and venue', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] the summary line carries date, attendance and venue', () => {
     const card = eventCards('Event Coordinator')[0];
     expect(card.meta).toBe('20 Nov 2026 · 300 expected · —');
   });
 });
 
 describe('currentEvent', () => {
-  test('pins to E-201 when the role can see it', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] pins to E-201 when the role can see it', () => {
     expect(currentEvent('Event Coordinator').ref).toBe('E-201');
   });
 
-  test('falls back to the first visible event otherwise', () => {
+  test('[BOUNDARY] [SG2-20:prototype-view-model] falls back to the first visible event otherwise', () => {
     // E-201 is under review, so it is outside an attendee's confirmed-only scope.
     const event = currentEvent('Attendee');
     expect(event).toMatchObject({
@@ -124,7 +123,7 @@ describe('currentEvent', () => {
 });
 
 describe('role-scoped chrome', () => {
-  test('only the operational roles see the pipeline', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] only the operational roles see the pipeline', () => {
     expect(showsPipeline('Event Coordinator')).toBe(true);
     expect(showsPipeline('Venue Staff')).toBe(true);
     expect(showsPipeline('Technical Support Staff')).toBe(true);
@@ -132,7 +131,7 @@ describe('role-scoped chrome', () => {
     expect(showsPipeline('Attendee')).toBe(false);
   });
 
-  test('the dashboard list is titled for the role', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] the dashboard list is titled for the role', () => {
     expect(dashboardListTitle('Event Organiser')).toBe('My events & drafts');
     expect(dashboardListTitle('Attendee')).toBe('Events I can register for');
     expect(dashboardListTitle('Venue Staff')).toBe('Events needing attention');
@@ -140,12 +139,12 @@ describe('role-scoped chrome', () => {
 });
 
 describe('detailActions', () => {
-  test('a coordinator gets decision actions', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] a coordinator gets decision actions', () => {
     const labels = detailActions('Event Coordinator').map((a) => a.label);
     expect(labels).toEqual(['Approve request', 'Request clarification', 'Reject with reason', 'Reassign coordinator']);
   });
 
-  test('the organiser prototype offers amendment actions without coordinator decisions', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] the organiser prototype offers amendment actions without coordinator decisions', () => {
     const labels = detailActions('Event Organiser').map((a) => a.label);
     expect(labels).toEqual(['Edit request', 'Request a change', 'Cancel event']);
   });
@@ -154,48 +153,57 @@ describe('detailActions', () => {
 describe('calendarDays', () => {
   const days = calendarDays();
 
-  test('lays out a 5x7 grid with three leading blanks', () => {
+  test('[BOUNDARY] [SG2-20:prototype-view-model] lays out a 5x7 grid with three leading blanks', () => {
     expect(days).toHaveLength(35);
     expect(days.slice(0, 3).every((d) => d.n === '')).toBe(true);
     expect(days[3].n).toBe('1');
   });
 
-  test('numbers run to the end of the month and then stop', () => {
+  test('[BOUNDARY] [SG2-20:prototype-view-model] numbers run to the end of the month and then stop', () => {
     expect(days[33].n).toBe('31');
     expect(days[34].n).toBe('');
   });
 
-  test('marked days carry their label', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] marked days carry their label', () => {
     expect(days.find((d) => d.n === '15')?.label).toBe('Confirmed · E-186');
     expect(days.find((d) => d.n === '24')?.label).toBe('Blocked — maintenance');
     expect(days.find((d) => d.n === '3')?.label).toBe('');
   });
 
-  test('every legend swatch matches a day style in use', () => {
-    for (const entry of CALENDAR_LEGEND) {
-      expect(days.some((d) => d.bg === entry.bg && d.bd === entry.bd)).toBe(true);
-    }
+  test('[NORMAL] [SG2-20:prototype-view-model] the legend and representative days show the four documented availability states', () => {
+    expect(CALENDAR_LEGEND).toEqual([
+      { label: 'Available', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
+      { label: 'Held / requested', bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)' },
+      { label: 'Confirmed', bg: '#00827c', bd: '#00827c' },
+      { label: 'Blocked', bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)' },
+    ]);
+    expect(['3', '12', '15', '24'].map(n => days.find(day => day.n === n))).toMatchObject([
+      { label: '', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
+      { label: 'Held 09–13 · E-190', bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)' },
+      { label: 'Confirmed · E-186', bg: '#00827c', bd: '#00827c' },
+      { label: 'Blocked — maintenance', bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)' },
+    ]);
   });
 });
 
 describe('equipmentViews', () => {
-  test('offers a reserve action on available stock', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] offers a reserve action on available stock', () => {
     const rows = equipmentViews({});
     expect(rows[0].btn).toBe('Reserve');
     expect(rows[0].done).toBe(false);
   });
 
-  test('a shortfall asks for the conflict to be resolved', () => {
+  test('[CONFLICT] [SG2-20:prototype-view-model] a shortfall asks for the conflict to be resolved', () => {
     expect(equipmentViews({})[1].btn).toBe('Resolve conflict');
   });
 
-  test('items that arrived reserved are already settled', () => {
+  test('[CONFLICT] [SG2-20:prototype-view-model] items that arrived reserved are already settled', () => {
     const alreadyReserved = equipmentViews({})[3];
     expect(alreadyReserved.done).toBe(true);
     expect(alreadyReserved.avail).toBe('Reserved');
   });
 
-  test('reserving a row settles it', () => {
+  test('[NORMAL] [SG2-20:prototype-view-model] reserving a row settles it', () => {
     const rows = equipmentViews({ 0: true });
     expect(rows[0].done).toBe(true);
     expect(rows[0].btn).toBe('Reserved');
@@ -204,9 +212,9 @@ describe('equipmentViews', () => {
 });
 
 describe('statusTrailStyle', () => {
-  test('stages up to "under review" read as reached', () => {
-    expect(statusTrailStyle(0).fg).toBe(color.mist);
-    expect(statusTrailStyle(2).fg).toBe(color.mist);
-    expect(statusTrailStyle(3).fg).toBe(color.slate);
+  test('[BOUNDARY] [SG2-20:prototype-view-model] stages up to "under review" read as reached', () => {
+    expect(statusTrailStyle(0).fg).toBe('#edfffe');
+    expect(statusTrailStyle(2).fg).toBe('#edfffe');
+    expect(statusTrailStyle(3).fg).toBe('#707777');
   });
 });

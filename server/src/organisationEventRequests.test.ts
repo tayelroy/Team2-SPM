@@ -57,7 +57,7 @@ function appFor(db: ReturnType<typeof database>, userId = 'alice', role: Princip
 }
 
 describe('SG2-26 organisation access', () => {
-  test('colleagues see the same organisation events and only their own rows are manageable', async () => {
+  test('[NORMAL] [SG2-26:AC1] [SG2-26:AC3] colleagues see the same organisation events and only their own rows are manageable', async () => {
     const db = database();
     for (const user of ['alice', 'bob']) {
       const response = await request(appFor(db, user)).get('/api/event-requests');
@@ -71,7 +71,7 @@ describe('SG2-26 organisation access', () => {
     assert.match(query.searchParams.get('select')!, /organiser_id/);
   });
 
-  test('detail reads allow colleagues while creator-only mutation lookups remain restricted', async () => {
+  test('[NORMAL] [FAILURE] [SG2-26:AC2] [SG2-26:AC3] detail reads allow colleagues while creator-only mutation lookups remain restricted', async () => {
     const db = database();
     const colleague = await request(appFor(db)).get('/api/event-requests/2');
     assert.equal(colleague.status, 200);
@@ -88,7 +88,7 @@ describe('SG2-26 organisation access', () => {
     }
   });
 
-  test('scope=mine and status filtering narrow the organisation query; supplied identity is ignored', async () => {
+  test('[NORMAL] [FAILURE] [SG2-26:AC1] [SG2-31:AC2] scope=mine and status filtering narrow the organisation query; supplied identity is ignored', async () => {
     const db = database();
     const response = await request(appFor(db)).get('/api/event-requests?scope=mine&status=draft&organisation=Other&userId=carol&organiser_id=carol');
     assert.equal(response.status, 200);
@@ -101,7 +101,7 @@ describe('SG2-26 organisation access', () => {
     assert.deepEqual(filtered.body.requests.map((row: Row) => row.event_id), [2]);
   });
 
-  test('membership is refreshed between reads and exact organisation names are not normalized', async () => {
+  test('[CONFLICT] [SG2-26:AC1] [SG2-26:AC2] membership is refreshed between reads and exact organisation names are not normalized', async () => {
     const db = database();
     await fetchOrganisationEventRequests(db.client, 'alice');
     db.users[0].organisation = 'Other';
@@ -116,7 +116,7 @@ describe('SG2-26 organisation access', () => {
   });
 
   for (const membership of [null, '', '  \t ', undefined, 123, 'missing']) {
-    test(`fails closed for absent membership ${JSON.stringify(membership)}`, async () => {
+    test(`[FAILURE] [SG2-26:AC1] fails closed for absent membership ${JSON.stringify(membership)}`, async () => {
       const db = database({ users: membership === 'missing' ? [] : [{ user_id: 'alice', organisation: membership }] });
       const list = await request(appFor(db)).get('/api/event-requests');
       assert.equal(list.status, 200);
@@ -128,7 +128,7 @@ describe('SG2-26 organisation access', () => {
   }
 
   for (const fail of ['users', 'events']) {
-    test(`returns generic 503 when ${fail} lookup fails`, async () => {
+    test(`[FAILURE] [SG2-26:AC1] returns generic 503 when ${fail} lookup fails`, async () => {
       const db = database({ fail });
       for (const suffix of ['', '/1']) {
         const response = await request(appFor(db)).get(`/api/event-requests${suffix}`);
@@ -138,7 +138,7 @@ describe('SG2-26 organisation access', () => {
     });
   }
 
-  test('empty database responses produce empty list and missing detail', async () => {
+  test('[BOUNDARY] [SG2-26:AC1] empty database responses produce empty list and missing detail', async () => {
     const db = database({ nullEvents: true });
     assert.deepEqual(await fetchOrganisationEventRequests(db.client, 'alice'), { ok: true, requests: [] });
     const detail = await fetchOrganisationEventRequest(db.client, 1, 'alice');
@@ -146,7 +146,7 @@ describe('SG2-26 organisation access', () => {
   });
 
   for (const role of ['event_coordinator', 'attendee', 'venue_staff', 'technical_support_staff'] as const) {
-    test(`${role} cannot use list or detail handlers and never reaches the database`, async () => {
+    test(`[FAILURE] [SG2-25:AC1] [SG2-26:AC1] ${role} cannot use list or detail handlers and never reaches the database`, async () => {
       const db = database();
       const app = appFor(db, 'alice', role);
       for (const path of ['/api/event-requests', '/api/event-requests?scope=mine', '/api/event-requests/1', '/api/event-requests/invalid']) {
@@ -159,7 +159,7 @@ describe('SG2-26 organisation access', () => {
   }
 
   for (const scope of ['all', '', 'mine&scope=organisation', 'mine%20', '[]']) {
-    test(`rejects invalid scope ${scope} before a database read`, async () => {
+    test(`[FAILURE] [SG2-26:AC1] rejects invalid scope ${scope} before a database read`, async () => {
       const db = database();
       const response = await request(appFor(db)).get(`/api/event-requests?scope=${scope}`);
       assert.equal(response.status, 400);
@@ -167,7 +167,7 @@ describe('SG2-26 organisation access', () => {
     });
   }
 
-  test('thrown dependencies fail closed with generic 503 responses', async () => {
+  test('[FAILURE] [SG2-26:AC1] thrown dependencies fail closed with generic 503 responses', async () => {
     const app = express();
     const deps = { getPrincipal: () => ({ userId: 'alice', role: 'event_organiser' as const }), getAdminClient: () => database().client };
     app.get('/list', getEventRequestsHandler({ ...deps, fetchRequests: async () => { throw new Error('internal'); } }));
@@ -213,7 +213,7 @@ describe('SG2-26 organisation membership on writes', () => {
   }
 
   for (const organisation of [null, '', '  \t ', undefined, 'missing']) {
-    test(`missing membership ${JSON.stringify(organisation)} cannot create or mutate`, async () => {
+    test(`[FAILURE] [SG2-26:AC2] [SG2-28:AC3] missing membership ${JSON.stringify(organisation)} cannot create or mutate`, async () => {
       const db = database({ users: organisation === 'missing' ? [] : [{ user_id: 'alice', organisation }] });
       const harness = mutationApp(db);
       const create = await request(harness.app).post('/events').send({ name: 'New', organisation: 'Acme' });
@@ -227,7 +227,7 @@ describe('SG2-26 organisation membership on writes', () => {
     });
   }
 
-  test('a moved creator, a colleague and unrelated organisations cannot mutate events', async () => {
+  test('[CONFLICT] [SG2-26:AC2] [SG2-29:AC1] [SG2-32:AC1] [SG2-30:AC1] a moved creator, a colleague and unrelated organisations cannot mutate events', async () => {
     const db = database();
     const harness = mutationApp(db);
     for (const eventId of [2, 3, 4]) {
@@ -242,7 +242,7 @@ describe('SG2-26 organisation membership on writes', () => {
     assert.equal(harness.writes(), 0);
   });
 
-  test('current member creators can still create, update, delete and submit', async () => {
+  test('[NORMAL] [SG2-28:AC3] [SG2-29:AC1] [SG2-32:AC1] [SG2-30:AC1] current member creators can still create, update, delete and submit', async () => {
     const db = database({ events: [completeEvent as unknown as Row] });
     const harness = mutationApp(db);
     assert.equal((await request(harness.app).post('/events').send({ name: 'New' })).status, 201);
@@ -252,7 +252,7 @@ describe('SG2-26 organisation membership on writes', () => {
     assert.equal(harness.writes(), 4);
   });
 
-  test('membership service failures stop writes with a generic 503', async () => {
+  test('[FAILURE] [SG2-26:AC2] [SG2-28:AC3] [SG2-29:AC1] [SG2-32:AC1] [SG2-30:AC1] membership service failures stop writes with a generic 503', async () => {
     const harness = mutationApp(database({ fail: 'users' }));
     assert.equal((await request(harness.app).post('/events').send({ name: 'New' })).status, 503);
     assert.equal((await request(harness.app).patch('/events/1').send({ name: 'Changed' })).status, 503);

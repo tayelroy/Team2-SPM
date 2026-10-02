@@ -77,7 +77,27 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
-  test('updates a draft owned by the caller, passing the caller id to both the lookup and the update', async () => {
+  test('[BOUNDARY] [SG2-29:AC1] editing accepts event id one and refuses zero before reading or writing', async () => {
+    const reads: number[] = [];
+    const writes: number[] = [];
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...DRAFT_REQUEST, event_id: 1 } },
+      updateResult: { ok: true, request: { ...DRAFT_REQUEST, ...COMPLETE_BODY, event_id: 1 } },
+      captureFetch: eventId => { reads.push(eventId); }, captureUpdate: eventId => { writes.push(eventId); }
+    });
+    const refused = await request(app).patch('/api/event-requests/0').send(COMPLETE_BODY);
+    assert.equal(refused.status, 400);
+    assert.deepEqual(refused.body, { error: 'eventId must be a positive integer.' });
+    assert.deepEqual(reads, []);
+    assert.deepEqual(writes, []);
+    const accepted = await request(app).patch('/api/event-requests/1').send(COMPLETE_BODY);
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.request.event_id, 1);
+    assert.deepEqual(reads, [1]);
+    assert.deepEqual(writes, [1]);
+  });
+
+  test('[NORMAL] [SG2-29:AC1] [SG2-29:AC2] updates a draft owned by the caller, passing the caller id to both the lookup and the update', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
     let updated: { eventId: number; organiserId: string; values: unknown } | undefined;
     const response = await request(
@@ -99,14 +119,14 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, ...COMPLETE_BODY });
   });
 
-  test('an update omitting only accessibility needs is submission-ready', async () => {
+  test('[NORMAL] [SG2-28:AC2] [SG2-29:AC1] an update omitting only accessibility needs is submission-ready', async () => {
     const { accessibility_needs, ...withoutAccessibility } = COMPLETE_BODY;
     const response = await request(buildApp()).patch('/api/event-requests/7').send(withoutAccessibility);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, []);
   });
 
-  test('reports what is still outstanding for an incomplete update', async () => {
+  test('[NORMAL] [SG2-28:AC4] [SG2-29:AC1] reports what is still outstanding for an incomplete update', async () => {
     const response = await request(buildApp()).patch('/api/event-requests/7').send({ name: 'Partner Forum' });
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, [
@@ -114,7 +134,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     ]);
   });
 
-  test('ownership fields in the body are ignored, not trusted', async () => {
+  test('[FAILURE] [SG2-25:AC2] [SG2-29:AC1] ownership fields in the body are ignored, not trusted', async () => {
     let updated: { eventId: number; values: unknown } | undefined;
     const response = await request(
       buildApp({ captureUpdate: (eventId, _organiserId, values) => (updated = { eventId, values }) })
@@ -128,7 +148,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     }
   });
 
-  test('rejects malformed values with a message naming the field', async () => {
+  test('[FAILURE] [SG2-29:AC1] rejects malformed values with a message naming the field', async () => {
     let writes = 0;
     const response = await request(buildApp({ captureUpdate: () => { writes++; } }))
       .patch('/api/event-requests/7')
@@ -139,7 +159,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(writes, 0);
   });
 
-  test('treats an absent request body as an empty update', async () => {
+  test('[BOUNDARY] [SG2-29:AC1] treats an absent request body as an empty update', async () => {
     // No express.json() here, so req.body is undefined rather than {}.
     const bare = express();
     bare.patch(
@@ -159,7 +179,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     ]);
   });
 
-  test('returns 400 for a non-numeric eventId, without querying the database', async () => {
+  test('[FAILURE] [SG2-29:AC1] returns 400 for a non-numeric eventId, without querying the database', async () => {
     let called = false;
     const response = await request(buildApp({ captureFetch: () => (called = true) }))
       .patch('/api/event-requests/not-a-number')
@@ -168,19 +188,19 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(called, false);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-29:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined }))
       .patch('/api/event-requests/7')
       .send(COMPLETE_BODY);
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-29:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null })).patch('/api/event-requests/7').send(COMPLETE_BODY);
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the request does not exist or belongs to someone else', async () => {
+  test('[FAILURE] [SG2-29:AC1] returns 404 when the request does not exist or belongs to someone else', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'missing' } })
     )
@@ -189,7 +209,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the database error when the lookup fails', async () => {
+  test('[FAILURE] [SG2-29:AC1] returns 503 without leaking the database error when the lookup fails', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -199,7 +219,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 409 when the request has already been submitted', async () => {
+  test('[CONFLICT] [SG2-30:AC3] returns 409 when the request has already been submitted', async () => {
     let updateCalled = false;
     const response = await request(
       buildApp({
@@ -213,7 +233,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(updateCalled, false);
   });
 
-  test('returns 503 without leaking the database error when the update fails', async () => {
+  test('[FAILURE] [SG2-29:AC1] returns 503 without leaking the database error when the update fails', async () => {
     const response = await request(
       buildApp({ updateResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -260,13 +280,13 @@ describe('PATCH /api/event-requests/:eventId authorisation wiring', () => {
       }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-29:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_organiser')).patch('/api/event-requests/7').send({});
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies a role without the update permission', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-29:AC1] denies a role without the update permission', async () => {
     const response = await request(appForRole('attendee'))
       .patch('/api/event-requests/7')
       .set('Authorization', 'Bearer token')
@@ -274,7 +294,7 @@ describe('PATCH /api/event-requests/:eventId authorisation wiring', () => {
     assert.equal(response.status, 403);
   });
 
-  test('lets an Event Organiser reach the update handler', async () => {
+  test('[NORMAL] [SG2-29:AC1] lets an Event Organiser reach the update handler', async () => {
     const response = await request(appForRole('event_organiser'))
       .patch('/api/event-requests/7')
       .set('Authorization', 'Bearer token')

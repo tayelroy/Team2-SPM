@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CoordinatorAssignment from './CoordinatorAssignment';
 
@@ -32,18 +32,16 @@ function api(
   return fetchMock;
 }
 
-const card = (title: string) => screen.getByRole('heading', { name: title }).closest('div')!.parentElement!.parentElement!;
-
 describe('CoordinatorAssignment (SG2-33/34)', () => {
-  test('lists requests, marking who is assigned and who is not', async () => {
+  test('[NORMAL] [SG2-33:AC1] lists requests, marking who is assigned and who is not', async () => {
     api();
     render(<CoordinatorAssignment accessToken="tok" />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading requests…');
 
     await screen.findByRole('heading', { name: 'Partner Forum' });
-    expect(within(card('Partner Forum')).getByText('Coordinator: Unassigned')).toBeInTheDocument();
-    expect(within(card('Partner Forum')).getByText('E-7 · Acme')).toBeInTheDocument();
-    expect(within(card('Partner Forum')).getByRole('button', { name: 'Assign' })).toBeDisabled();
+    expect(screen.getByText('Coordinator: Unassigned')).toBeInTheDocument();
+    expect(screen.getByText('E-7 · Acme')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Assign' })).toBeDisabled();
     expect(screen.getByRole('heading', { name: 'Untitled request' })).toBeInTheDocument();
     expect(screen.getByText('E-8 · No organisation')).toBeInTheDocument();
     expect(screen.getByText('Coordinator: Sarah Coordinator')).toBeInTheDocument();
@@ -51,24 +49,26 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     expect(screen.getByRole('button', { name: 'Reassign' })).toBeDisabled();
   });
 
-  test('assigns a coordinator to an unassigned request (SG2-33)', async () => {
+  test('[NORMAL] [SG2-33:AC1] assigns a coordinator to an unassigned request (SG2-33)', async () => {
     const fetchMock = api();
     render(<CoordinatorAssignment accessToken="tok" />);
     await screen.findByRole('heading', { name: 'Partner Forum' });
 
     fireEvent.change(screen.getByLabelText('Coordinator for Partner Forum'), { target: { value: 'c2' } });
-    fireEvent.click(within(card('Partner Forum')).getByRole('button', { name: 'Assign' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
 
     expect(await screen.findByText('Assigned to Raj Coordinator.')).toBeInTheDocument();
     expect(screen.getByText('Coordinator: Raj Coordinator')).toBeInTheDocument();
-    expect(within(card('Partner Forum')).getByRole('button', { name: 'Reassign' })).toBeDisabled();
+    const reassignButtons = screen.getAllByRole('button', { name: 'Reassign' });
+    expect(reassignButtons).toHaveLength(2);
+    for (const button of reassignButtons) expect(button).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/event-requests/7/coordinator',
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ coordinatorId: 'c2' }) }),
     );
   });
 
-  test('reassigns a request to a different coordinator (SG2-34)', async () => {
+  test('[NORMAL] [SG2-34:AC1] reassigns a request to a different coordinator (SG2-34)', async () => {
     api();
     render(<CoordinatorAssignment accessToken="tok" />);
     await screen.findByRole('heading', { name: 'Partner Forum' });
@@ -82,33 +82,37 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     expect(screen.getByText('Coordinator: Raj Coordinator')).toBeInTheDocument();
   });
 
-  test('shows the reason and keeps the old coordinator when the save is refused', async () => {
+  test('[CONFLICT] [SG2-33:AC1] shows the reason and keeps the old coordinator when the save is refused', async () => {
     api(undefined, () => Response.json({ error: 'A coordinator can only be assigned to a submitted request.' }, { status: 409 }));
     render(<CoordinatorAssignment accessToken="tok" />);
     await screen.findByRole('heading', { name: 'Partner Forum' });
 
     fireEvent.change(screen.getByLabelText('Coordinator for Partner Forum'), { target: { value: 'c1' } });
-    fireEvent.click(within(card('Partner Forum')).getByRole('button', { name: 'Assign' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('A coordinator can only be assigned to a submitted request.');
-    expect(within(card('Partner Forum')).getByText('Coordinator: Unassigned')).toBeInTheDocument();
+    expect(screen.getByText('Coordinator: Unassigned')).toBeInTheDocument();
   });
 
-  test('disables the button while a save is in flight', async () => {
+  test('[CONFLICT] [SG2-33:duplicate-submit] disables the button while a save is in flight', async () => {
     let finish!: (response: Response) => void;
-    api(undefined, () => new Promise<Response>((resolve) => (finish = resolve)));
+    const fetchMock = api(undefined, () => new Promise<Response>((resolve) => (finish = resolve)));
     render(<CoordinatorAssignment accessToken="tok" />);
     await screen.findByRole('heading', { name: 'Partner Forum' });
 
     fireEvent.change(screen.getByLabelText('Coordinator for Partner Forum'), { target: { value: 'c1' } });
-    fireEvent.click(within(card('Partner Forum')).getByRole('button', { name: 'Assign' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
 
-    expect(await screen.findByRole('button', { name: 'Saving…' })).toBeDisabled();
+    const saving = await screen.findByRole('button', { name: 'Saving…' });
+    expect(saving).toBeDisabled();
+    fireEvent.click(saving);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1);
     finish(Response.json({ request: {} }));
     expect(await screen.findByText('Assigned to Sarah Coordinator.')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1);
   });
 
-  test('offers a retry when requests cannot be loaded', async () => {
+  test('[FAILURE] [SG2-33:AC1] offers a retry when requests cannot be loaded', async () => {
     let calls = 0;
     api(() => (++calls === 1 ? new Response(null, { status: 503 }) : Response.json({ requests: REQUESTS, coordinators: COORDINATORS })));
     render(<CoordinatorAssignment accessToken="tok" />);
@@ -118,19 +122,19 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     expect(await screen.findByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
   });
 
-  test('explains a refusal to a signed-in account that is not Technical Support', async () => {
+  test('[FAILURE] [SG2-33:AC1] explains a refusal to a signed-in account that is not Technical Support', async () => {
     api(() => new Response(null, { status: 403 }));
     render(<CoordinatorAssignment accessToken="tok" />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Only Technical Support Staff can assign coordinators.');
   });
 
-  test('says so when there is nothing to assign', async () => {
+  test('[BOUNDARY] [SG2-33:AC1] says so when there is nothing to assign', async () => {
     api(() => Response.json({ requests: [], coordinators: COORDINATORS }));
     render(<CoordinatorAssignment accessToken="tok" />);
     expect(await screen.findByRole('heading', { name: 'Nothing to assign' })).toBeInTheDocument();
   });
 
-  test('ignores a response that arrives after the screen is closed', async () => {
+  test('[CONFLICT] [SG2-33:AC1] ignores a response that arrives after the screen is closed', async () => {
     let resolve!: (response: Response) => void;
     api(() => new Promise<Response>((r) => (resolve = r)));
     const { unmount } = render(<CoordinatorAssignment accessToken="tok" />);

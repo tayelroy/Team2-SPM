@@ -26,7 +26,7 @@ import {
   TextField,
 } from './ui';
 
-test('the buttons report their clicks', () => {
+test('[NORMAL] [SG2-20:ui-primitives] the buttons report their clicks', () => {
   const gradient = vi.fn();
   const ghost = vi.fn();
   const icon = vi.fn();
@@ -60,7 +60,7 @@ test('the buttons report their clicks', () => {
   );
 });
 
-test('fields preserve labels, descriptions, editable values and read-only reference data', () => {
+test('[NORMAL] [SG2-20:ui-primitives] fields preserve labels, descriptions, editable values and read-only reference data', () => {
   render(
     <>
       <Field
@@ -82,7 +82,7 @@ test('fields preserve labels, descriptions, editable values and read-only refere
   expect(screen.getByLabelText('Date')).toHaveValue('12 Oct 2026');
 });
 
-test('the text field carries its placeholder', () => {
+test('[NORMAL] [SG2-20:ui-primitives] the text field carries its placeholder', () => {
   render(<TextField label="Why" placeholder="Reason for the change…" rows={4} />);
   expect(screen.getByLabelText('Why')).toHaveAttribute(
     'placeholder',
@@ -90,7 +90,7 @@ test('the text field carries its placeholder', () => {
   );
 });
 
-test('the presentational primitives render their content', () => {
+test('[NORMAL] [SG2-20:ui-primitives] the presentational primitives render their content', () => {
   render(
     <Card>
       <RecessedCard>
@@ -119,7 +119,7 @@ test('the presentational primitives render their content', () => {
   expect(screen.getByText('venue photo')).toBeInTheDocument();
 });
 
-test('controlled Field and TextField treat an absent value as empty', () => {
+test('[BOUNDARY] [SG2-20:ui-primitives] controlled Field and TextField treat an absent value as empty', () => {
   const onField = vi.fn();
   const onArea = vi.fn();
   render(
@@ -140,7 +140,7 @@ test('controlled Field and TextField treat an absent value as empty', () => {
   expect(onArea).toHaveBeenCalledWith('Two keynotes');
 });
 
-test('a disabled GhostButton does not fire its click handler', () => {
+test('[CONFLICT] [SG2-20:ui-primitives] a disabled GhostButton does not fire its click handler', () => {
   const onClick = vi.fn();
   render(<GhostButton onClick={onClick} disabled>Save draft</GhostButton>);
   const button = screen.getByRole('button', { name: 'Save draft' });

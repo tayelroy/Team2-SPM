@@ -3,7 +3,7 @@ import { VenueLayoutError, describeLayouts, fetchVenueLayouts, saveVenueLayouts 
 
 afterEach(() => vi.unstubAllGlobals());
 
-test('describeLayouts summarises the recorded set, falling back to "Other" for an unnamed custom layout', () => {
+test('[BOUNDARY] [SG2-43:AC1] [SG2-43:AC2] describeLayouts summarises the recorded set, falling back to "Other" for an unnamed custom layout', () => {
   expect(describeLayouts([])).toBe('NA');
   expect(describeLayouts([{ layout: 'classroom', other_description: null }])).toBe('Classroom');
   expect(describeLayouts([
@@ -20,11 +20,11 @@ test.each([
   [400, 'Choose a layout for each entry; "Other" needs a short description.'],
   [404, 'This venue is no longer available. Reload the catalogue.'],
   [503, 'Unable to reach the venue service. Please try again.']
-] as const)('VenueLayoutError(%i) carries a safe, user-facing message', (status, message) => {
+] as const)('[FAILURE] [SG2-43:AC1] [SG2-43:AC2] VenueLayoutError(%i) carries a safe, user-facing message', (status, message) => {
   expect(new VenueLayoutError(status).message).toBe(message);
 });
 
-test('fetchVenueLayouts requests the venue\'s layouts with the bearer token and no caching', async () => {
+test('[NORMAL] [SG2-43:AC1] [SG2-43:AC2] fetchVenueLayouts requests the venue\'s layouts with the bearer token and no caching', async () => {
   const controller = new AbortController();
   const fetchMock = vi.fn().mockResolvedValue(Response.json({ layouts: [{ layout: 'classroom', other_description: null }] }));
   vi.stubGlobal('fetch', fetchMock);
@@ -37,12 +37,12 @@ test('fetchVenueLayouts requests the venue\'s layouts with the bearer token and 
   });
 });
 
-test('fetchVenueLayouts throws VenueLayoutError on a non-ok response', async () => {
+test('[FAILURE] [SG2-43:AC1] [SG2-43:AC2] fetchVenueLayouts throws VenueLayoutError on a non-ok response', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));
   await expect(fetchVenueLayouts('token', new AbortController().signal, 7)).rejects.toThrow('Unable to reach the venue service');
 });
 
-test('saveVenueLayouts PUTs the complete replacement set as JSON', async () => {
+test('[NORMAL] [SG2-43:AC1] [SG2-43:AC2] saveVenueLayouts PUTs the complete replacement set as JSON', async () => {
   const controller = new AbortController();
   const layouts = [{ layout: 'classroom' as const }];
   const fetchMock = vi.fn().mockResolvedValue(Response.json({ layouts: [{ layout: 'classroom', other_description: null }] }));
@@ -59,7 +59,7 @@ test('saveVenueLayouts PUTs the complete replacement set as JSON', async () => {
   });
 });
 
-test('saveVenueLayouts throws VenueLayoutError on a non-ok response', async () => {
+test('[FAILURE] [SG2-43:AC1] [SG2-43:AC2] saveVenueLayouts throws VenueLayoutError on a non-ok response', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 400 })));
   await expect(saveVenueLayouts('token', new AbortController().signal, 7, [])).rejects.toThrow('Choose a layout for each entry');
 });

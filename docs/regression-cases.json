@@ -1,7 +1,7 @@
 [
   {
     "id": "SG2-41-P01",
-    "title": "Internal users open the exact events and requests waiting on their role",
+    "title": "internal users open the exact events and requests waiting on their role",
     "type": "Positive / role isolation / responsive",
     "story": "SG2-41",
     "purpose": "Prove that the dashboard gathers role-specific work and opens the selected record through the real application routes.",
@@ -18,9 +18,39 @@
     "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "All 19 browser journeys passed in the hosted Chromium job, including this journey and the SG2-26 report gate.",
-    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test browser regression' job; https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832820.",
-    "execution_date": "23 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-41",
+        "source": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "All 19 browser journeys passed in the hosted Chromium job, including this journey and the SG2-26 report gate.",
+        "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test browser regression' job; https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832820.",
+        "execution_date": "23 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-41:AC1",
+      "SG2-41:AC2",
+      "SG2-41:AC3",
+      "SG2-41:AC4"
+    ],
+    "method_id": "TC-0ade7cc1c1aa"
   },
   {
     "id": "SG2-41-DB01",
@@ -40,13 +70,31 @@
     "evidence": "supabase/tests/internal_work_queue.sql; .github/workflows/ci.yml; docs/work-queue.md",
     "layer": "PostgreSQL policy test",
     "status": "Pass",
-    "actual": "The auth fixture, all six migrations and all four SQL suites passed in the workflow's native PostgreSQL 17 service, including the queue view, access restrictions and transaction rollback.",
-    "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test database policies' job (postgres:17); https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832819. Hosted Supabase execution is not claimed.",
-    "execution_date": "23 Sep 2026"
+    "actual": "All seven disposable PostgreSQL suites passed, including this scenario.",
+    "execution_evidence": "1 Oct 2026; auth fixture, all migrations and seven suites; disposable PostgreSQL 17.4, transactional rollback, no shared Supabase.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "source": "supabase/tests/internal_work_queue.sql; .github/workflows/ci.yml; docs/work-queue.md"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "The auth fixture, all six migrations and all four SQL suites passed in the workflow's native PostgreSQL 17 service, including the queue view, access restrictions and transaction rollback.",
+        "execution_evidence": "23 Sep 2026; PR #39 head 9ab83aa; GitHub Actions 'Test database policies' job (postgres:17); https://github.com/tayelroy/Team2-SPM/actions/runs/35808277040/job/107013832819. Hosted Supabase execution is not claimed.",
+        "execution_date": "23 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "PW-AUTH-01",
-    "title": "Each seeded role reaches its assigned application",
+    "title": "each seeded role reaches its assigned application",
     "type": "Positive",
     "story": "SG2-23; SG2-24; SG2-25",
     "purpose": "Catch login-to-application wiring and runtime regressions across all five roles.",
@@ -60,13 +108,40 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Each role signs in, sees its matching role banner and named action (New request, Venues, Catalogue, Equipment requests or Event page), and produces no page error or Vite overlay.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-23; SG2-24; SG2-25",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Each role signs in, sees its matching role banner and named action (New request, Venues, Catalogue, Equipment requests or Event page), and produces no page error or Vite overlay.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-23:AC1",
+      "SG2-24:AC1"
+    ],
+    "method_id": "TC-7b6dab994476"
   },
   {
     "id": "PW-AUTH-02",
-    "title": "Invalid login stays signed out",
+    "title": "invalid login stays signed out with a generic message",
     "type": "Negative",
     "story": "SG2-23",
     "purpose": "Keep failed authentication from creating a browser session or exposing application navigation.",
@@ -81,13 +156,39 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. An error alert is visible; navigation is absent; connectsphere.session is absent.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-23",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. An error alert is visible; navigation is absent; connectsphere.session is absent.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-23:AC2"
+    ],
+    "method_id": "TC-719cab8f0b9c"
   },
   {
     "id": "PW-AUTH-03",
-    "title": "Logout removes browser access and revokes the fixture session",
+    "title": "logout removes browser access and revokes the fixture session",
     "type": "Negative / state transition",
     "story": "Authentication regression (logout; not SG2-26)",
     "purpose": "Verify logout invalidates the current fixture session across browser and API layers.",
@@ -102,13 +203,39 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Public landing screen returns; navigation stays absent after reload; retained token receives 401. This proves fixture revocation, not deployed Supabase revocation.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "Authentication regression (logout; not SG2-26)",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Public landing screen returns; navigation stays absent after reload; retained token receives 401. This proves fixture revocation, not deployed Supabase revocation.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-23:AC3"
+    ],
+    "method_id": "TC-06196447529c"
   },
   {
     "id": "SG2-42-P01",
-    "title": "Staff create, edit, search and reload venue details",
+    "title": "staff create edit search and reload persisted venue details",
     "type": "Positive",
     "story": "SG2-42",
     "purpose": "Exercise one complete venue maintenance journey, including reading back changed data.",
@@ -124,13 +251,40 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-42",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-42:AC1",
+      "SG2-42:AC2"
+    ],
+    "method_id": "TC-0a69b2cfbad0"
   },
   {
     "id": "SG2-42-N01",
-    "title": "Read-only users cannot create or edit venues",
+    "title": "read-only users cannot create venues through UI or API",
     "type": "Negative",
     "story": "SG2-42; SG2-25",
     "purpose": "Verify the permission decision at both the visible control and protected API.",
@@ -146,13 +300,39 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Coordinator can read but cannot write: 403 for create/update; 401 without credentials; the fixture list remains at its two seeded venues.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-42; SG2-25",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Coordinator can read but cannot write: 403 for create/update; 401 without credentials; the fixture list remains at its two seeded venues.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-42:AC3"
+    ],
+    "method_id": "TC-e78c7e8482d6"
   },
   {
     "id": "SG2-42-B01",
-    "title": "Venue capacity accepts exact bounds and rejects adjacent values",
+    "title": "venue capacity accepts exact bounds and rejects adjacent values",
     "type": "Boundary",
     "story": "SG2-42",
     "purpose": "Catch off-by-one errors at the implemented integer capacity limits.",
@@ -168,13 +348,39 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. 1 and 2147483647 create visible venues with those exact stored capacities; 0 and 2147483648 fail browser validity and receive API 400. The fixture contains its two seeds plus exactly two accepted additions.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-42",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. 1 and 2147483647 create visible venues with those exact stored capacities; 0 and 2147483648 fail browser validity and receive API 400. The fixture contains its two seeds plus exactly two accepted additions.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-42:AC1"
+    ],
+    "method_id": "TC-bd46b4c698d1"
   },
   {
     "id": "SG2-42-B02",
-    "title": "Venue names accept 255 characters and refuse 256",
+    "title": "venue names accept 255 characters and refuse 256 without writes",
     "type": "Boundary",
     "story": "SG2-42",
     "purpose": "Check the venue-name limit without silently truncating or saving an invalid record.",
@@ -189,13 +395,39 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. 256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-42",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. 256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-42:AC1"
+    ],
+    "method_id": "TC-dc7871d6dea4"
   },
   {
     "id": "SG2-28-P01",
-    "title": "Submit a fresh request and immediately display its saved details",
+    "title": "submit a fresh request and verify its saved data and status",
     "type": "Positive",
     "story": "SG2-28; SG2-30",
     "purpose": "Catch broken create-to-submit wiring, stale or missing event selection, and missing field persistence.",
@@ -212,13 +444,41 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-28; SG2-30",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC1",
+      "SG2-31:AC3"
+    ],
+    "method_id": "TC-6cea16b8d437"
   },
   {
     "id": "SG2-28-B01",
-    "title": "An empty draft saves once but cannot be submitted",
+    "title": "an empty draft saves once but cannot be submitted",
     "type": "Boundary / negative",
     "story": "SG2-28; SG2-29; SG2-30",
     "purpose": "Separate incomplete draft saving from submission and prevent repeated saves creating duplicate records.",
@@ -233,13 +493,42 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-28; SG2-29; SG2-30",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. One new draft is created across both saves; two own records exist including the seeded one; submission returns 400 and status remains draft.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "BOUNDARY",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC4",
+      "SG2-29:AC1",
+      "SG2-30:AC2"
+    ],
+    "method_id": "TC-ad7aad397c1b"
   },
   {
     "id": "SG2-29-P01",
-    "title": "Editing then submitting preserves the latest field values",
+    "title": "editing then submitting preserves the latest field values",
     "type": "Positive",
     "story": "SG2-29; SG2-30",
     "purpose": "Detect stale submitted values and failure to clear a previously stored optional field.",
@@ -255,13 +544,41 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-29; SG2-30",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-29:AC1",
+      "SG2-29:AC2",
+      "SG2-30:AC1"
+    ],
+    "method_id": "TC-747b61ba6f0a"
   },
   {
     "id": "SG2-32-P01",
-    "title": "Draft deletion requires confirmation and survives reload",
+    "title": "My drafts excludes non-drafts and confirmed deletion survives reload",
     "type": "Positive / negative",
     "story": "SG2-32",
     "purpose": "Verify cancellation preserves a draft and confirmation removes it.",
@@ -276,13 +593,41 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Cancel leaves the draft intact; confirmation removes it; the empty state is visible after reload in the same running fixture.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-32",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Cancel leaves the draft intact; confirmation removes it; the empty state is visible after reload in the same running fixture.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-32:AC1",
+      "SG2-32:AC2"
+    ],
+    "method_id": "TC-994308016312"
   },
   {
     "id": "SG2-27-P01",
-    "title": "Profile changes persist and external users have no department field",
+    "title": "profile changes persist and external users have no department field",
     "type": "Positive",
     "story": "SG2-27",
     "purpose": "Check profile update/readback and the external-role field rule in one user journey.",
@@ -297,13 +642,40 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Success status appears; new name, phone and SMS choice remain after page reload in fixture storage; Department is absent.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-27",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Success status appears; new name, phone and SMS choice remain after page reload in fixture storage; Department is absent.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-27:AC2",
+      "SG2-27:AC4"
+    ],
+    "method_id": "TC-1e705fb2ca91"
   },
   {
     "id": "SG2-27-B01",
-    "title": "Profile phone accepts eight Singapore digits with optional +65",
+    "title": "profile phone accepts eight Singapore digits with optional +65",
     "type": "Boundary",
     "story": "SG2-27",
     "purpose": "Enforce the owner-confirmed Singapore phone rule and prevent invalid updates from replacing the last valid stored number.",
@@ -319,13 +691,39 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Eight local digits, including the +65-prefixed formatted example, return 200 and Profile updated. Seven/nine local digits with or without +65, and a different country prefix, return 400 with the Singapore eight-digit validation alert and preserve the last valid stored phone. +65 6123 4567 remains after reload.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-27",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Eight local digits, including the +65-prefixed formatted example, return 200 and Profile updated. Seven/nine local digits with or without +65, and a different country prefix, return 400 with the Singapore eight-digit validation alert and preserve the last valid stored phone. +65 6123 4567 remains after reload.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-27:AC3"
+    ],
+    "method_id": "TC-3face3e2aef4"
   },
   {
     "id": "SG2-44-P01",
-    "title": "Calendar renders fixture availability and changes its requested month",
+    "title": "calendar renders fixture availability and changes its requested month",
     "type": "Positive",
     "story": "SG2-44",
     "purpose": "Verify the calendar reads the availability endpoint and requests the selected month.",
@@ -340,9 +738,36 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. June shows Regression Hall, its confirmed booking and maintenance label. Next month requests July successfully and the June maintenance label disappears. Uses fixture availability, not live Supabase.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-44",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. June shows Regression Hall, its confirmed booking and maintenance label. Next month requests July successfully and the June maintenance label disappears. Uses fixture availability, not live Supabase.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-44:AC1",
+      "SG2-44:AC2"
+    ],
+    "method_id": "TC-d16f3bc6645c"
   },
   {
     "id": "BE-AUTH-01",
@@ -361,9 +786,28 @@
     "evidence": "server/src/authorization.test.ts; server/src/login.test.ts",
     "layer": "Backend API/provider-fixture tests",
     "status": "Pass",
-    "actual": "Current backend assertions passed. Requests are denied with their defined 401/403/503 response; generic messages hide provider detail; guarded-action tests record no denied side effects. These simulate credential rejection, not elapsed real-token expiry. Invalid login field types return the generic 401 response without calling the identity provider.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Current full server and client test runs passed; see the exhaustive method inventory for individual contracts.",
+    "execution_evidence": "1 Oct 2026; npm run ci; server 780/780, client 624/624, per-file application coverage 100% in all four metrics. PR check supplies pushed-head evidence.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-23; SG2-25",
+        "source": "server/src/authorization.test.ts; server/src/login.test.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current backend assertions passed. Requests are denied with their defined 401/403/503 response; generic messages hide provider detail; guarded-action tests record no denied side effects. These simulate credential rejection, not elapsed real-token expiry. Invalid login field types return the generic 401 response without calling the identity provider.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "BE-AUTH-02",
@@ -382,9 +826,28 @@
     "evidence": "server/src/authorization.test.ts",
     "layer": "Backend API/provider-fixture tests",
     "status": "Pass",
-    "actual": "Current backend assertions passed. Identity reports attendee and no fixture permission; next action returns 403; side-effect count remains one. The database role response changes in a provider mock.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Current full server and client test runs passed; see the exhaustive method inventory for individual contracts.",
+    "execution_evidence": "1 Oct 2026; npm run ci; server 780/780, client 624/624, per-file application coverage 100% in all four metrics. PR check supplies pushed-head evidence.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-25",
+        "source": "server/src/authorization.test.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current backend assertions passed. Identity reports attendee and no fixture permission; next action returns 403; side-effect count remains one. The database role response changes in a provider mock.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "BE-EVENT-01",
@@ -405,9 +868,28 @@
     "evidence": "server/src/eventRequests.test.ts; server/src/submitEventRequest.test.ts",
     "layer": "Backend API/unit tests",
     "status": "Pass",
-    "actual": "Current backend assertions passed. Incomplete drafts save while submission-required fields are reported. Description 5000 is accepted and 5001 rejected. Event names accept 255 Unicode code points and reject 256. Attendance accepts 1 and 2147483647; 0 and 2147483648 receive 400 before insert.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Current full server and client test runs passed; see the exhaustive method inventory for individual contracts.",
+    "execution_evidence": "1 Oct 2026; npm run ci; server 780/780, client 624/624, per-file application coverage 100% in all four metrics. PR check supplies pushed-head evidence.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-28; SG2-29; SG2-30",
+        "source": "server/src/eventRequests.test.ts; server/src/submitEventRequest.test.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current backend assertions passed. Incomplete drafts save while submission-required fields are reported. Description 5000 is accepted and 5001 rejected. Event names accept 255 Unicode code points and reject 256. Attendance accepts 1 and 2147483647; 0 and 2147483648 receive 400 before insert.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "BE-PERSIST-01",
@@ -426,9 +908,28 @@
     "evidence": "server/src/profile.test.ts; server/src/eventRequests.test.ts; server/src/updateEventRequestDraft.test.ts; server/src/submitEventRequest.test.ts; server/src/venues.test.ts",
     "layer": "Backend API/store-fixture tests",
     "status": "Pass",
-    "actual": "Current backend assertions passed. Unavailable/erroring stores produce defined safe failures without raw database details; missing venue update is 404 and an insert returning no row is 503; handlers do not report successful persistence.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Current full server and client test runs passed; see the exhaustive method inventory for individual contracts.",
+    "execution_evidence": "1 Oct 2026; npm run ci; server 780/780, client 624/624, per-file application coverage 100% in all four metrics. PR check supplies pushed-head evidence.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-27; SG2-28; SG2-29; SG2-30; SG2-42",
+        "source": "server/src/profile.test.ts; server/src/eventRequests.test.ts; server/src/updateEventRequestDraft.test.ts; server/src/submitEventRequest.test.ts; server/src/venues.test.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current backend assertions passed. Unavailable/erroring stores produce defined safe failures without raw database details; missing venue update is 404 and an insert returning no row is 503; handlers do not report successful persistence.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; npm run ci; 474/474 backend tests; /tmp/team2-fable-followup/final-ci.log. Controlled providers/stores; no deployed Supabase.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "DB-ROLE-01",
@@ -448,9 +949,27 @@
     "evidence": "supabase/tests/account_roles.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "All seven disposable PostgreSQL suites passed, including this scenario.",
+    "execution_evidence": "1 Oct 2026; auth fixture, all migrations and seven suites; disposable PostgreSQL 17.4, transactional rollback, no shared Supabase.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "source": "supabase/tests/account_roles.sql"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "DB-AVAIL-01",
@@ -470,9 +989,27 @@
     "evidence": "supabase/tests/venue_availability.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "All seven disposable PostgreSQL suites passed, including this scenario.",
+    "execution_evidence": "1 Oct 2026; auth fixture, all migrations and seven suites; disposable PostgreSQL 17.4, transactional rollback, no shared Supabase.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "source": "supabase/tests/venue_availability.sql"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "CI-REG-01",
@@ -493,7 +1030,17 @@
     "status": "Not Executed",
     "actual": "Hosted execution, lifecycle and repository merge-blocking behavior were not re-executed or verified in this local review. Passing local tooling tests do not establish these outcomes.",
     "execution_evidence": "22 Sep 2026 local review only; no current hosted run evidence collected.",
-    "execution_date": ""
+    "execution_date": "",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Historical hosted execution retained; current PR checks and repository protection require live evidence.",
+      "method_scope": {
+        "story": "SG2-22",
+        "source": ".github/workflows/ci.yml"
+      }
+    }
   },
   {
     "id": "CI-REG-02",
@@ -514,11 +1061,21 @@
     "status": "Not Executed",
     "actual": "Hosted execution, lifecycle and repository merge-blocking behavior were not re-executed or verified in this local review. Passing local tooling tests do not establish these outcomes.",
     "execution_evidence": "22 Sep 2026 local review only; no current hosted run evidence collected.",
-    "execution_date": ""
+    "execution_date": "",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Historical hosted execution retained; current PR checks and repository protection require live evidence.",
+      "method_scope": {
+        "story": "SG2-22",
+        "source": ".github/workflows/ci.yml"
+      }
+    }
   },
   {
     "id": "SG2-26-P01",
-    "title": "Colleagues share organisation events with creator-only actions",
+    "title": "colleagues read the same organisation events with creator-only actions",
     "type": "Positive",
     "story": "SG2-26",
     "purpose": "Catch missing same-organisation events and incorrectly offered management actions on a colleague-owned request.",
@@ -534,13 +1091,43 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-26",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-26:AC1",
+      "SG2-26:AC2",
+      "SG2-26:AC3",
+      "SG2-25:AC2"
+    ],
+    "method_id": "TC-5aa85e6b67b1"
   },
   {
     "id": "SG2-26-N01",
-    "title": "Unrelated and unassigned accounts cannot read organisation events",
+    "title": "another organisation and an account without membership cannot read events",
     "type": "Negative",
     "story": "SG2-26",
     "purpose": "Catch organisation list/detail responses that include foreign events or treat missing membership as unrestricted access.",
@@ -556,9 +1143,37 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. Foreign and absent event reads both return 404; only own-organisation rows appear; missing membership yields no events.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-26",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. Foreign and absent event reads both return 404; only own-organisation rows appear; missing membership yields no events.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-26:AC1",
+      "SG2-26:AC2"
+    ],
+    "method_id": "TC-bbec8291ae45"
   },
   {
     "id": "DB-ORG-01",
@@ -578,13 +1193,31 @@
     "evidence": "supabase/tests/event_organisation_isolation.sql",
     "layer": "PostgreSQL policy test",
     "status": "Pass",
-    "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "All seven disposable PostgreSQL suites passed, including this scenario.",
+    "execution_evidence": "1 Oct 2026; auth fixture, all migrations and seven suites; disposable PostgreSQL 17.4, transactional rollback, no shared Supabase.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "source": "supabase/tests/event_organisation_isolation.sql"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "SG2-26-N02",
-    "title": "Organisation events are restricted to Event Organisers",
+    "title": "only Event Organisers can access organisation event records",
     "type": "Negative / role boundary",
     "story": "SG2-26",
     "purpose": "Reject every non-organiser role before accessing organisation event records.",
@@ -599,13 +1232,40 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-26",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. All four roles receive 403 Access denied from every organisation event read endpoint and do not see My events navigation.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-25:AC1",
+      "SG2-25:AC2"
+    ],
+    "method_id": "TC-c6fc2aaa8b1a"
   },
   {
     "id": "SG2-26-P02",
-    "title": "Saved event changes reach colleague dashboard, list and detail",
+    "title": "saved event changes reach a colleague dashboard list and detail after reload",
     "type": "Positive / persistence",
     "story": "SG2-26",
     "purpose": "Prevent static, stale or unrelated event data from replacing current organisation-scoped API results.",
@@ -621,13 +1281,40 @@
     "evidence": "e2e/regression.spec.ts; .github/scripts/regression-gate.mjs",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed. The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
-    "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
-    "execution_date": "22 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-26",
+        "source": "e2e/regression.spec.ts; .github/scripts/regression-gate.mjs"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed. The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
+        "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
+        "execution_date": "22 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-26:AC3",
+      "SG2-29:AC2"
+    ],
+    "method_id": "TC-6e3d9ddc7f83"
   },
   {
     "id": "SG2-45-P01",
-    "title": "Staff block a free period, see it on the calendar, then remove it",
+    "title": "staff block a free period, see it on the calendar, then remove it",
     "type": "Positive",
     "story": "SG2-45",
     "purpose": "Verify AC1 and AC3: a block with a reason is recorded, shown as unavailable on the availability calendar, and removing it frees the period.",
@@ -643,13 +1330,40 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
-    "execution_date": "26 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-45",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
+        "execution_date": "26 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-45:AC1",
+      "SG2-45:AC3"
+    ],
+    "method_id": "TC-09212e343f70"
   },
   {
     "id": "SG2-45-N01",
-    "title": "A confirmed booking cannot be blocked and other roles cannot block",
+    "title": "a confirmed booking cannot be blocked and other roles cannot block",
     "type": "Negative / role isolation",
     "story": "SG2-45",
     "purpose": "Verify AC2 and the Venue Staff-only permission for blocking and removing blocks.",
@@ -665,9 +1379,37 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
-    "execution_date": "26 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-45",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
+        "execution_date": "26 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-45:AC2",
+      "SG2-25:AC1"
+    ],
+    "method_id": "TC-3d0422f68056"
   },
   {
     "id": "DB-BLOCK-01",
@@ -687,13 +1429,31 @@
     "evidence": "supabase/tests/venue_blocks.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "All migrations and all six SQL suites passed in the order used by ci.yml. Weakening the insert policy, the delete policy, or dropping the trigger each made this suite fail as expected.",
-    "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; Docker postgres:17; ci.yml database-tests steps reproduced locally.",
-    "execution_date": "26 Sep 2026"
+    "actual": "All seven disposable PostgreSQL suites passed, including this scenario.",
+    "execution_evidence": "1 Oct 2026; auth fixture, all migrations and seven suites; disposable PostgreSQL 17.4, transactional rollback, no shared Supabase.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "source": "supabase/tests/venue_blocks.sql"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "All migrations and all six SQL suites passed in the order used by ci.yml. Weakening the insert policy, the delete policy, or dropping the trigger each made this suite fail as expected.",
+        "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; Docker postgres:17; ci.yml database-tests steps reproduced locally.",
+        "execution_date": "26 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI"
   },
   {
     "id": "SG2-46-P01",
-    "title": "An approved event opens a pre-filled venue search that leaves out busy venues",
+    "title": "an approved event opens a pre-filled venue search that leaves out busy venues",
     "type": "Positive",
     "story": "SG2-46",
     "purpose": "Verify AC1–AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
@@ -709,13 +1469,42 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
-    "execution_date": "28 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-46",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
+        "execution_date": "28 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-46:AC1",
+      "SG2-46:AC2",
+      "SG2-46:AC3",
+      "SG2-46:AC4"
+    ],
+    "method_id": "TC-414ab324b23c"
   },
   {
     "id": "SG2-46-N01",
-    "title": "Only coordinators can search venues",
+    "title": "only coordinators can search venues",
     "type": "Negative / role isolation",
     "story": "SG2-46",
     "purpose": "Verify the venues.search permission in the menu and on the API.",
@@ -730,9 +1519,330 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
-    "execution_date": "28 Sep 2026"
+    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+    "execution_date": "1 Oct 2026",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Reviewed against current assertions and SPM Jira ACs; the review scope and outstanding feature gaps are in docs/test-case-review.md.",
+      "method_scope": {
+        "story": "SG2-46",
+        "source": "e2e/regression.spec.ts"
+      }
+    },
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "28 Sep 2026; feature/SG2-46-search-venues working tree; npm run test:regression; installed Chromium; 28/28 passed; required SG2-26 gate passed.",
+        "execution_date": "28 Sep 2026"
+      }
+    ],
+    "executed_by": "LIM JUN WEI",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-25:AC1",
+      "SG2-25:AC3",
+      "SG2-46:AC2"
+    ],
+    "method_id": "TC-10aec0a92f0f"
+  },
+  {
+    "id": "SG2-35-P01",
+    "title": "opening an assigned submitted request moves it to under review",
+    "story": "SG2-35",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-35:AC1",
+      "SG2-35:AC2"
+    ],
+    "method_id": "TC-214d52a40b6d",
+    "purpose": "Verify the named user journey through the real application routes.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "(await request.post('/__e2e/assigned-review')).status()",
+      "request.post('/__e2e/assigned-review')",
+      "page.getByRole('button', { name: 'Refresh', exact: true }).click()",
+      "queue.getByRole('button', { name: /Assigned Review Forum/ }).click()",
+      "page.request.get('/api/work-queue/event/51', { headers: await authHeaders(page) })"
+    ],
+    "data": [
+      "queue = page.getByRole('region', { name: 'Awaiting review' })",
+      "detail = await page.request.get('/api/work-queue/event/51', { headers: await authHeaders(page) })"
+    ],
+    "expected": [
+      "expect((await request.post('/__e2e/assigned-review')).status()).toBe(204)",
+      "expect(page.getByRole('heading', { name: 'Assigned Review Forum' })).toBeVisible()",
+      "expect(page.getByText('under review')).toBeVisible()",
+      "expect(page.getByText('Decide whether the forum proceeds')).toBeVisible()",
+      "expect(detail.status()).toBe(200)",
+      "expect((await detail.json()).items[0].status).toBe('under_review')"
+    ],
+    "evidence": "e2e/regression.spec.ts:530",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the current 28-journey Chromium run.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "npm run test:e2e; isolated loopback storage and test-only Chromium; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-35-N01",
+    "title": "a request awaiting assignment is readable but never enters review",
+    "story": "SG2-35",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-35:AC3"
+    ],
+    "method_id": "TC-0aa7b559f8cc",
+    "purpose": "Verify the named user journey through the real application routes.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "(await request.post('/__e2e/work-queue')).status()",
+      "request.post('/__e2e/work-queue')",
+      "page.getByRole('button', { name: 'Refresh', exact: true }).click()",
+      "page.getByRole('region', { name: 'Awaiting review' }) .getByRole('button', { name: /Sustainability Leadership Forum/ }).click()",
+      "(await page.request.patch('/api/event-requests/41/review', { headers })).status()",
+      "page.request.patch('/api/event-requests/41/review', { headers })",
+      "page.request.get('/api/work-queue/event/41', { headers })"
+    ],
+    "data": [
+      "headers = await authHeaders(page)",
+      "detail = await page.request.get('/api/work-queue/event/41', { headers })"
+    ],
+    "expected": [
+      "expect((await request.post('/__e2e/work-queue')).status()).toBe(204)",
+      "expect(page.getByText(/Awaiting assignment/)).toBeVisible()",
+      "expect(page.getByText('submitted')).toBeVisible()",
+      "expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404)",
+      "expect((await detail.json()).items[0].status).toBe('submitted')"
+    ],
+    "evidence": "e2e/regression.spec.ts:550",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the current 28-journey Chromium run.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "npm run test:e2e; isolated loopback storage and test-only Chromium; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-37-P01",
+    "title": "approving a request under review persists the approved outcome",
+    "story": "SG2-37",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-37:AC1"
+    ],
+    "method_id": "TC-079867206fe9",
+    "purpose": "Verify the named user journey through the real application routes.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "(await request.post('/__e2e/under-review')).status()",
+      "request.post('/__e2e/under-review')",
+      "page.getByRole('button', { name: 'Refresh', exact: true }).click()",
+      "page.getByRole('region', { name: 'Awaiting review' }) .getByRole('button', { name: /Decision Forum/ }).click()",
+      "page.getByRole('button', { name: 'Approve', exact: true }).click()",
+      "page.request.get('/api/work-queue/event/52', { headers })"
+    ],
+    "data": [
+      "headers = await authHeaders(page)",
+      "item = await page.request.get('/api/work-queue/event/52', { headers })"
+    ],
+    "expected": [
+      "expect((await request.post('/__e2e/under-review')).status()).toBe(204)",
+      "expect(page.getByRole('heading', { name: 'Decision Forum' })).toBeVisible()",
+      "expect(page.getByText('approved')).toBeVisible()",
+      "expect((await item.json()).items[0].status).toBe('approved')"
+    ],
+    "evidence": "e2e/regression.spec.ts:568",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the current 28-journey Chromium run.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "npm run test:e2e; isolated loopback storage and test-only Chromium; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-37-P02",
+    "title": "rejecting requires a reason and shows it to the organiser",
+    "story": "SG2-37",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-37:AC2"
+    ],
+    "method_id": "TC-32b96c915bb7",
+    "purpose": "Verify the named user journey through the real application routes.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "(await request.post('/__e2e/under-review')).status()",
+      "request.post('/__e2e/under-review')",
+      "page.getByRole('button', { name: 'Refresh', exact: true }).click()",
+      "page.getByRole('region', { name: 'Awaiting review' }) .getByRole('button', { name: /Decision Forum/ }).click()",
+      "page.getByRole('button', { name: 'Reject', exact: true }).click()",
+      "page.getByLabel(/Reason/).fill('Clashes with the AGM on the same evening.')",
+      "page.getByRole('button', { name: 'Profile', exact: true }).click()",
+      "page.getByRole('button', { name: 'Logout', exact: true }).click()",
+      "page.request.get('/api/event-requests/52', { headers })",
+      "page.getByRole('button', { name: /Decision Forum/ }).click()"
+    ],
+    "data": [
+      "headers = await authHeaders(page)",
+      "detail = await page.request.get('/api/event-requests/52', { headers })",
+      "decided = (await detail.json()).request"
+    ],
+    "expected": [
+      "expect((await request.post('/__e2e/under-review')).status()).toBe(204)",
+      "expect(page.getByRole('alert')).toContainText('reason is required')",
+      "expect(page.getByText('under review')).toBeVisible()",
+      "expect(page.getByText('rejected')).toBeVisible()",
+      "expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible()",
+      "expect(decided.status).toBe('rejected')",
+      "expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.')",
+      "expect(page.getByRole('region', { name: 'Why this request was rejected' })) .toContainText('Clashes with the AGM on the same evening.')"
+    ],
+    "evidence": "e2e/regression.spec.ts:587",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the current 28-journey Chromium run.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "npm run test:e2e; isolated loopback storage and test-only Chromium; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-37-N01",
+    "title": "a request another coordinator is reviewing cannot be decided",
+    "story": "SG2-35; SG2-37",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-35:AC3",
+      "SG2-37:AC1"
+    ],
+    "method_id": "TC-1d7882c708e2",
+    "purpose": "Verify the named user journey through the real application routes.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "(await request.post('/__e2e/work-queue')).status()",
+      "request.post('/__e2e/work-queue')",
+      "page.request.patch('/api/event-requests/43/decision', { headers, data: { decision: 'approved' }, })",
+      "page.request.patch('/api/event-requests/41/decision', { headers, data: { decision: 'approved' }, })"
+    ],
+    "data": [
+      "headers = await authHeaders(page)",
+      "refused = await page.request.patch('/api/event-requests/43/decision', { headers, data: { decision: 'approved' }, })",
+      "unassigned = await page.request.patch('/api/event-requests/41/decision', { headers, data: { decision: 'approved' }, })"
+    ],
+    "expected": [
+      "expect((await request.post('/__e2e/work-queue')).status()).toBe(204)",
+      "expect(refused.status()).toBe(404)",
+      "expect(unassigned.status()).toBe(404)"
+    ],
+    "evidence": "e2e/regression.spec.ts:621",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the current 28-journey Chromium run.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "npm run test:e2e; isolated loopback storage and test-only Chromium; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-LAYOUT-01",
+    "title": "Venue layout limits, stored values and denied role actions",
+    "story": "SG2-43",
+    "purpose": "Check committed PostgreSQL constraints and role policies through actual stored records and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17.4, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed required related records as service_role.",
+      "Run the tagged normal, boundary, conflict and failure assertions through actual SQL reads and mutations.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_layouts.sql",
+    "expected": "Each tagged fixed-value, null-safe predicate or expected SQLSTATE succeeds. See the per-assertion inventory.",
+    "evidence": "supabase/tests/venue_layouts.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "All seven database suites passed, including this suite.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "Auth fixture, all committed migrations and seven transactional suites passed in disposable PostgreSQL 17.4. No deployed Supabase claim.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Provider delete/insert replacement is not proven atomic by this suite.",
+      "method_scope": {
+        "source": "supabase/tests/venue_layouts.sql"
+      }
+    }
+  },
+  {
+    "id": "DB-PLANNING-01",
+    "title": "Planning values and immutable event history storage",
+    "story": "SG2-39; SG2-40",
+    "purpose": "Check committed PostgreSQL constraints and role policies through actual stored records and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17.4, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed required related records as service_role.",
+      "Run the tagged normal, boundary, conflict and failure assertions through actual SQL reads and mutations.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/event_planning_and_audit.sql",
+    "expected": "Each tagged fixed-value, null-safe predicate or expected SQLSTATE succeeds. See the per-assertion inventory.",
+    "evidence": "supabase/tests/event_planning_and_audit.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "All seven database suites passed, including this suite.",
+    "execution_date": "1 Oct 2026",
+    "executed_by": "LIM JUN WEI",
+    "execution_evidence": "Auth fixture, all committed migrations and seven transactional suites passed in disposable PostgreSQL 17.4. No deployed Supabase claim.",
+    "review": {
+      "date": "2026-10-01",
+      "by": "LIM JUN WEI",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Storage evidence only. Mounted history API/UI acceptance and atomic event/history updates remain outside demonstrated scope.",
+      "method_scope": {
+        "source": "supabase/tests/event_planning_and_audit.sql"
+      }
+    }
   },
   {
     "id": "SG2-40-P01",

@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('saveSession / loadSession / clearSession', () => {
-  test('round-trips a session through tab-scoped storage without persisting it in localStorage', () => {
+  test('[NORMAL] [SG2-23:session-storage] round-trips a session through tab-scoped storage without persisting it in localStorage', () => {
     const persistentWrite = vi.spyOn(localStorage, 'setItem');
     saveSession(session);
     expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!)).toEqual(session);
@@ -21,36 +21,36 @@ describe('saveSession / loadSession / clearSession', () => {
     expect(loadSession()).toEqual(session);
   });
 
-  test('loadSession returns null when nothing is stored', () => {
+  test('[BOUNDARY] [SG2-23:session-storage] loadSession returns null when nothing is stored', () => {
     expect(loadSession()).toBeNull();
   });
 
-  test('clearSession removes a stored session', () => {
+  test('[NORMAL] [SG2-23:AC3] clearSession removes a stored session', () => {
     saveSession(session);
     clearSession();
     expect(loadSession()).toBeNull();
   });
 
-  test('saveSession does not throw if storage is unavailable', () => {
+  test('[FAILURE] [SG2-23:session-storage] saveSession does not throw if storage is unavailable', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('quota exceeded');
     });
     expect(() => saveSession(session)).not.toThrow();
   });
 
-  test('loadSession returns null if storage throws', () => {
+  test('[FAILURE] [SG2-23:session-storage] loadSession returns null if storage throws', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('storage unavailable');
     });
     expect(loadSession()).toBeNull();
   });
 
-  test('loadSession returns null for malformed stored JSON', () => {
+  test('[FAILURE] [SG2-23:session-storage] loadSession returns null for malformed stored JSON', () => {
     sessionStorage.setItem('connectsphere.session', '{not-json');
     expect(loadSession()).toBeNull();
   });
 
-  test('clearSession does not throw if storage is unavailable', () => {
+  test('[FAILURE] [SG2-23:session-storage] clearSession does not throw if storage is unavailable', () => {
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('storage unavailable');
     });

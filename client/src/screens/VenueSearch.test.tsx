@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import VenueSearch, { describeCriteria } from './VenueSearch';
-import { EMPTY_SEARCH, formatSgt, type VenueMatch } from '../venues/searchApi';
+import { EMPTY_SEARCH, type VenueMatch } from '../venues/searchApi';
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -31,15 +31,15 @@ function fill(values: Record<string, string>) {
   for (const [label, value] of Object.entries(values)) fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
-test('describeCriteria lists every applied criterion in one line', () => {
+test('[NORMAL] [SG2-46:AC2] describeCriteria lists every applied criterion in one line', () => {
   expect(describeCriteria({ from: '2030-06-15T00:00', until: '2030-06-15T23:59', attendance: '80', location: 'North',
     layout: 'theatre', facilities: 'stage', accessibility: 'step-free' })).toBe(
-    `${formatSgt('2030-06-14T16:00:00.000Z')} – ${formatSgt('2030-06-15T15:59:00.000Z')} · 80+ people · Location: North · Layout: Theatre · Facilities: stage · Accessibility: step-free`);
+    '15 Jun 2030, 12:00 am – 15 Jun 2030, 11:59 pm · 80+ people · Location: North · Layout: Theatre · Facilities: stage · Accessibility: step-free');
   expect(describeCriteria({ ...EMPTY_SEARCH, from: '2030-06-15T00:00', until: '2030-06-15T23:59' }))
-    .toBe(`${formatSgt('2030-06-14T16:00:00.000Z')} – ${formatSgt('2030-06-15T15:59:00.000Z')}`);
+    .toBe('15 Jun 2030, 12:00 am – 15 Jun 2030, 11:59 pm');
 });
 
-test('AC2: a manual search sends every criterion and lists matching venues with held bookings flagged', async () => {
+test('[NORMAL] [SG2-46:AC2] AC2: a manual search sends every criterion and lists matching venues with held bookings flagged', async () => {
   const fetch = stubSearch(() => Response.json({ venues: [terrace, bare] }));
   render(<VenueSearch accessToken="token" />);
   expect(screen.getByText('Search venues')).toBeInTheDocument();
@@ -53,13 +53,13 @@ test('AC2: a manual search sends every criterion and lists matching venues with 
     layout: 'banquet', location: 'Level', facilities: 'bar', accessibility: 'lift' });
   expect(screen.getByRole('heading', { name: 'Rooftop Terrace' })).toBeInTheDocument();
   expect(screen.getByText('Banquet', { selector: 'span' })).toBeInTheDocument();
-  expect(screen.getByText(`⚠ Held booking ${formatSgt(terrace.held[0].starts_at)} – ${formatSgt(terrace.held[0].ends_at)} (not confirmed)`)).toBeInTheDocument();
+  expect(screen.getByText('⚠ Held booking 15 Jun 2030, 9:00 pm – 16 Jun 2030, 12:00 am (not confirmed)')).toBeInTheDocument();
   expect(screen.getByText('Location not recorded')).toBeInTheDocument();
   expect(screen.getByText('—')).toBeInTheDocument();
   expect(screen.getAllByText('Not recorded')).toHaveLength(2);
 });
 
-test('a single match is counted in the singular', async () => {
+test('[BOUNDARY] [SG2-46:AC2] a single match is counted in the singular', async () => {
   stubSearch(() => Response.json({ venues: [bare] }));
   render(<VenueSearch accessToken="token" />);
   fill({ 'From (Singapore time)': '2030-06-15T09:00', 'Until (Singapore time)': '2030-06-15T17:00' });
@@ -67,7 +67,7 @@ test('a single match is counted in the singular', async () => {
   expect(await screen.findByText(/^1 venue available/)).toBeInTheDocument();
 });
 
-test('AC4: when nothing matches it says so and shows the criteria searched', async () => {
+test('[BOUNDARY] [SG2-46:AC4] AC4: when nothing matches it says so and shows the criteria searched', async () => {
   stubSearch(() => Response.json({ venues: [] }));
   render(<VenueSearch accessToken="token" />);
   fill({ 'From (Singapore time)': '2030-06-15T09:00', 'Until (Singapore time)': '2030-06-15T17:00', Attendance: '500' });
@@ -76,7 +76,7 @@ test('AC4: when nothing matches it says so and shows the criteria searched', asy
   expect(screen.getByText(/^Searched: .* · 500\+ people$/)).toBeInTheDocument();
 });
 
-test('a missing or backwards period is caught before searching', async () => {
+test('[BOUNDARY] [SG2-46:AC2] a missing or backwards period is caught before searching', async () => {
   const fetch = stubSearch(() => Response.json({ venues: [] }));
   render(<VenueSearch accessToken="token" />);
   fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
@@ -89,7 +89,7 @@ test('a missing or backwards period is caught before searching', async () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test('server refusals and network failures are reported, and Clear resets the search', async () => {
+test('[FAILURE] [SG2-46:AC2] server refusals and network failures are reported, and Clear resets the search', async () => {
   stubSearch(() => Response.json({ error: 'Nope' }, { status: 403 }));
   render(<VenueSearch accessToken="token" />);
   fill({ 'From (Singapore time)': '2030-06-15T09:00', 'Until (Singapore time)': '2030-06-15T17:00' });
@@ -103,7 +103,7 @@ test('server refusals and network failures are reported, and Clear resets the se
   expect(screen.getByLabelText('From (Singapore time)')).toHaveValue('');
 });
 
-test('AC1: opened from an approved event, the criteria are pre-filled and the search runs straight away', async () => {
+test('[NORMAL] [SG2-46:AC1] AC1: opened from an approved event, the criteria are pre-filled and the search runs straight away', async () => {
   const fetch = stubSearch(() => Response.json({ venues: [terrace] }));
   render(<VenueSearch accessToken="token" prefill={prefill} />);
   expect(screen.getByText('For: Meridian Forum (#10)')).toBeInTheDocument();
@@ -114,14 +114,14 @@ test('AC1: opened from an approved event, the criteria are pre-filled and the se
   expect(query(fetch)).toMatchObject({ attendance: '180', accessibility: 'step-free' });
 });
 
-test('AC3: an event without accessibility needs says accessibility is not used to match', async () => {
+test('[NORMAL] [SG2-46:AC3] AC3: an event without accessibility needs says accessibility is not used to match', async () => {
   stubSearch(() => Response.json({ venues: [] }));
   render(<VenueSearch accessToken="token" prefill={{ ...prefill, accessibilityNeeds: null, values: { ...prefill.values, accessibility: '' } }} />);
   expect(screen.getByText(/No accessibility needs were specified for this event/)).toBeInTheDocument();
   await screen.findByRole('heading', { name: 'No venues match' });
 });
 
-test('an event without a date is pre-filled but not searched until the period is entered', () => {
+test('[BOUNDARY] [SG2-46:AC1] an event without a date is pre-filled but not searched until the period is entered', () => {
   const fetch = stubSearch(() => Response.json({ venues: [] }));
   render(<VenueSearch accessToken="token" prefill={{ ...prefill, values: { ...prefill.values, from: '', until: '' } }} />);
   expect(fetch).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ function abortable(_url: string, init?: RequestInit) {
   return new Promise<Response>((_, reject) => init!.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
 }
 
-test('a newer search supersedes one still running, and leaving aborts it', async () => {
+test('[CONFLICT] [SG2-46:search-supersession] a newer search supersedes one still running, and leaving aborts it', async () => {
   let call = 0;
   const fetch = vi.fn((url: string, init?: RequestInit) => call++ === 0 ? abortable(url, init) : Promise.resolve(Response.json({ venues: [bare] })));
   vi.stubGlobal('fetch', fetch);

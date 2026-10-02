@@ -26,14 +26,14 @@ function freshClients(): typeof import('./supabase') {
   return require('./supabase');
 }
 
-test('neither client initializes without a project URL', () => {
+test('[FAILURE] [SG2-20:AC2] neither client initializes without a project URL', () => {
   dbConfig.supabaseUrl = undefined;
   const clients = freshClients();
   assert.equal(clients.getSupabaseClient(), null);
   assert.equal(clients.getSupabaseAdminClient(), null);
 });
 
-test('neither client initializes without API credentials', () => {
+test('[FAILURE] [SG2-20:AC2] neither client initializes without API credentials', () => {
   dbConfig.supabaseAnonKey = undefined;
   dbConfig.supabaseServiceRoleKey = undefined;
   const clients = freshClients();
@@ -42,7 +42,7 @@ test('neither client initializes without API credentials', () => {
 });
 
 for (const url of ['http://configuration-test.supabase.co', 'invalid-url']) {
-  test(`invalid configuration cannot initialize either client: ${url}`, async () => {
+  test(`[FAILURE] [SG2-20:AC2] invalid configuration cannot initialize either client: ${url}`, async () => {
     dbConfig.supabaseUrl = url;
     const clients = freshClients();
     assert.equal(clients.getSupabaseClient(), null);
@@ -52,14 +52,14 @@ for (const url of ['http://configuration-test.supabase.co', 'invalid-url']) {
   });
 }
 
-test('admin access requires the service-role key', () => {
+test('[FAILURE] [SG2-20:AC2] admin access requires the service-role key', () => {
   dbConfig.supabaseServiceRoleKey = undefined;
   const clients = freshClients();
   assert.ok(clients.getSupabaseClient());
   assert.equal(clients.getSupabaseAdminClient(), null);
 });
 
-test('standard and admin clients use their own API keys and are reused separately', async () => {
+test('[NORMAL] [SG2-20:AC2] standard and admin clients use their own API keys and are reused separately', async () => {
   const keys: (string | null)[] = [];
   mock.method(globalThis, 'fetch', async (...[_input, init]: Parameters<typeof fetch>) => {
     keys.push(new Headers(init?.headers).get('apikey'));
@@ -78,7 +78,7 @@ test('standard and admin clients use their own API keys and are reused separatel
   assert.deepEqual(keys, ['sb_publishable_anon-test', 'sb_secret_admin-test']);
 });
 
-test('server-only configuration supports the existing service-role fallback', async () => {
+test('[NORMAL] [SG2-20:AC2] server-only configuration supports the existing service-role fallback', async () => {
   dbConfig.supabaseAnonKey = undefined;
   mock.method(globalThis, 'fetch', async (...[_input, init]: Parameters<typeof fetch>) => {
     assert.equal(new Headers(init?.headers).get('apikey'), 'sb_secret_admin-test');
@@ -91,7 +91,7 @@ test('server-only configuration supports the existing service-role fallback', as
   assert.equal((await clients.checkSupabaseHealth()).status, 'connected');
 });
 
-test('health handles a non-Error rejection without crashing', async () => {
+test('[FAILURE] [SG2-20:AC2] health handles a non-Error rejection without crashing', async () => {
   mock.method(globalThis, 'fetch', async () => { throw 'network failure'; });
   const health = await freshClients().checkSupabaseHealth();
   assert.equal(health.status, 'error');
