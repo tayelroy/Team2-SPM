@@ -24,6 +24,7 @@
 - [ ] Local tests pass (`npm test`) and 100% per-file statement, branch, line and function coverage maintained (`npm run ci`).
 - [ ] Clean build with zero compilation errors and zero linter warnings.
 - [ ] Zero secrets, tokens or credentials committed.
+- [ ] Dynamic & responsive display: If new webpage or page changes introduced, verified layout adapts cleanly across mobile and laptop viewports.
 - [ ] Traceability matrix / `docs/regression-cases.json` updated.
 - [ ] CI pipeline passes on GitHub Actions.
 
