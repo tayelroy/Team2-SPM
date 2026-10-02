@@ -26,7 +26,7 @@ function api(routes: Record<string, () => Response | Promise<Response>>) {
   return fetch;
 }
 
-test('SG2-47: each kind of problem says what it means for booking', () => {
+test('[NORMAL] [SG2-47:AC2] [SG2-47:AC3] [SG2-47:AC4] each kind of problem says what it means for booking', () => {
   expect(consequence({ suitable: true, issues: [] })).toBeNull();
   expect(consequence(seminar.suitability)).toMatch(/^Cannot be booked: no exception is permitted/);
   expect(consequence(theatre.suitability)).toMatch(/^Can be booked only once .* approve a capacity exception/);
@@ -34,7 +34,7 @@ test('SG2-47: each kind of problem says what it means for booking', () => {
     .toBe('Raise the missing accessibility features with the organiser before booking.');
 });
 
-test('SG2-47 AC1/AC2: venues that do not fit the event are listed with every reason', async () => {
+test('[NORMAL] [SG2-47:AC1] [SG2-47:AC2] venues that do not fit the event are listed with every reason', async () => {
   api({ '/api/venues/suitability?event_id=7': () => Response.json({ venues: [atrium, seminar, theatre] }) });
   render(<EventVenueFit accessToken="token" eventId={7} eventName="Leadership Forum" />);
   expect(screen.getByText('Checking how venues fit this event…')).toBeInTheDocument();
@@ -47,7 +47,7 @@ test('SG2-47 AC1/AC2: venues that do not fit the event are listed with every rea
   expect(within(section).getByText("Expected attendance of 150 is above this venue's capacity of 120.")).toBeInTheDocument();
 });
 
-test('SG2-47: when every venue fits it says so, and a failure is reported', async () => {
+test('[NORMAL] [FAILURE] [SG2-47:AC1] when every venue fits it says so, and a failure is reported', async () => {
   api({ suitability: () => Response.json({ venues: [atrium] }) });
   render(<EventVenueFit accessToken="token" eventId={7} eventName="Leadership Forum" />);
   expect(await screen.findByRole('heading', { name: 'Every venue fits Leadership Forum' })).toBeInTheDocument();
@@ -57,7 +57,7 @@ test('SG2-47: when every venue fits it says so, and a failure is reported', asyn
   expect(await screen.findByText('Venue suitability is unavailable right now. Please try again.')).toBeInTheDocument();
 });
 
-test('SG2-47 AC3/AC5: a capacity exception is approved on the request, and the booking still needs a decision', async () => {
+test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] a capacity exception is approved on the request, and the booking still needs a decision', async () => {
   const fetch = api({
     '/31/suitability': () => Response.json({ venue: theatre, exceptions: [], booking: 'needs_capacity_exception' }),
     '/31/capacity-exception': () => Response.json({ exception: approval, booking: 'allowed' }, { status: 201 })
@@ -73,7 +73,7 @@ test('SG2-47 AC3/AC5: a capacity exception is approved on the request, and the b
   expect(fetch).toHaveBeenCalledWith('/api/venue-booking-requests/31/capacity-exception', expect.objectContaining({ method: 'POST' }));
 });
 
-test('SG2-47 AC2: a blocked request offers no exception, and earlier approvals are listed', async () => {
+test('[NORMAL] [SG2-47:AC2] [SG2-47:AC3] a blocked request offers no exception, and earlier approvals are listed', async () => {
   api({ '/32/suitability': () => Response.json({ venue: seminar, exceptions: [{ ...approval, approver_name: null, approver_role: 'someone_else' }], booking: 'blocked' }) });
   render(<BookingRequestFit accessToken="token" requestId={32} />);
   expect(await screen.findByText(/^Cannot be booked: no exception is permitted/)).toBeInTheDocument();
@@ -81,7 +81,7 @@ test('SG2-47 AC2: a blocked request offers no exception, and earlier approvals a
   expect(screen.queryByRole('button', { name: 'Approve capacity exception' })).not.toBeInTheDocument();
 });
 
-test('SG2-47: a fitting venue says so, and failures to load or approve are reported', async () => {
+test('[FAILURE] [SG2-47:AC3] a fitting venue says so, and failures to load or approve are reported', async () => {
   api({ '/33/suitability': () => Response.json({ venue: atrium, exceptions: [], booking: 'allowed' }) });
   render(<BookingRequestFit accessToken="token" requestId={33} />);
   expect(await screen.findByText('This venue fits the event.')).toBeInTheDocument();
@@ -102,7 +102,23 @@ test('SG2-47: a fitting venue says so, and failures to load or approve are repor
   expect(screen.getByRole('button', { name: 'Approve capacity exception' })).toBeEnabled();
 });
 
-test('SG2-47: leaving before the fit loads ignores the late answer', async () => {
+test('[CONFLICT] [SG2-47:AC3] a rapid double click on Approve sends one approval request', async () => {
+  let respond!: (response: Response) => void;
+  const fetch = api({
+    '/31/suitability': () => Response.json({ venue: theatre, exceptions: [], booking: 'needs_capacity_exception' }),
+    '/31/capacity-exception': () => new Promise<Response>(done => { respond = done; })
+  });
+  render(<BookingRequestFit accessToken="token" requestId={31} />);
+  const button = await screen.findByRole('button', { name: 'Approve capacity exception' });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  fireEvent.click(screen.getByRole('button', { name: 'Approving…' }));
+  await act(async () => { respond(Response.json({ exception: approval, booking: 'allowed' }, { status: 201 })); });
+  expect(fetch.mock.calls.filter(call => String(call[0]).endsWith('/capacity-exception'))).toHaveLength(1);
+  expect(screen.getAllByText(/^Capacity exception for 150 people approved by Vera/)).toHaveLength(1);
+});
+
+test('[CONFLICT] [SG2-47:stale-response] leaving before the fit loads ignores the late answer', async () => {
   const pending: ((response: Response) => void)[] = [];
   api({ suitability: () => new Promise<Response>(done => { pending.push(done); }) });
   render(<EventVenueFit accessToken="token" eventId={7} eventName="Forum" />).unmount();

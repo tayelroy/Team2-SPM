@@ -64,6 +64,8 @@ function fakeStore(seed: {
     async request(id) { return requests.find(row => row.request_id === id) ?? null; },
     async exceptions(id) { return exceptions.filter(row => row.request_id === id); },
     async recordException(values) {
+      // Mirrors the unique (request_id, expected_attendance) index.
+      if (exceptions.some(row => row.request_id === values.request_id && row.expected_attendance === values.expected_attendance)) return null;
       recorded.push(values);
       const record = { ...values, exception_id: exceptions.length + 1, approver_name: 'Approver', approved_at: '2030-06-01T00:00:00.000Z' };
       exceptions.push(record);
@@ -89,7 +91,7 @@ const as = (user: string) => ({ Authorization: `Bearer ${user}` });
 
 // --- GET /api/venues/suitability ---------------------------------------------
 
-test('SG2-47 AC1/AC2/AC4: an assigned coordinator sees every venue against the event, with each reason it does not fit', async () => {
+test('[NORMAL] [SG2-47:AC1] [SG2-47:AC2] [SG2-47:AC4] an assigned coordinator sees every venue against the event, with each reason it does not fit', async () => {
   const response = await request(app(fakeStore().store)).get('/api/venues/suitability?event_id=7').set(as('coordinator'));
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.event, {
@@ -106,7 +108,7 @@ test('SG2-47 AC1/AC2/AC4: an assigned coordinator sees every venue against the e
   assert.deepEqual(byName['Seminar Room'].issues[2].missing, ['hearing loop']);
 });
 
-test('SG2-47: one venue can be viewed against the event', async () => {
+test('[NORMAL] [FAILURE] [SG2-47:AC1] one venue can be viewed against the event', async () => {
   const response = await request(app(fakeStore().store)).get('/api/venues/suitability?event_id=7&venue_id=3').set(as('venue'));
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.venues.map((venue: { venue_id: number }) => venue.venue_id), [3]);
@@ -114,7 +116,7 @@ test('SG2-47: one venue can be viewed against the event', async () => {
   assert.deepEqual([missing.status, missing.body], [404, { error: 'Venue not found.' }]);
 });
 
-test('SG2-47: an event outside the caller\'s reach is reported as not found', async () => {
+test('[FAILURE] [SG2-47:event-visibility] an event outside the caller\'s reach is reported as not found', async () => {
   const composed = app(fakeStore().store);
   for (const user of ['other_coordinator', 'other_organiser']) {
     const response = await request(composed).get('/api/venues/suitability?event_id=7').set(as(user));
@@ -126,7 +128,7 @@ test('SG2-47: an event outside the caller\'s reach is reported as not found', as
   assert.equal((await request(composed).get('/api/venues/suitability?event_id=8').set(as('venue'))).status, 404);
 });
 
-test('SG2-47: suitability needs a signed-in internal role or organiser, and whole-number ids', async () => {
+test('[FAILURE] [BOUNDARY] [SG2-47:suitability-access] suitability needs a signed-in internal role or organiser, and whole-number ids', async () => {
   const composed = app(fakeStore().store);
   assert.equal((await request(composed).get('/api/venues/suitability?event_id=7')).status, 401);
   assert.equal((await request(composed).get('/api/venues/suitability?event_id=7').set(as('attendee'))).status, 403);
@@ -136,7 +138,7 @@ test('SG2-47: suitability needs a signed-in internal role or organiser, and whol
   }
 });
 
-test('SG2-47: suitability is unavailable when the database is', async () => {
+test('[FAILURE] [SG2-47:suitability-unavailable] suitability is unavailable when the database is', async () => {
   const unconfigured = app(fakeStore().store, { getAdminClient: () => null });
   assert.equal((await request(unconfigured).get('/api/venues/suitability?event_id=7').set(as('venue'))).status, 503);
   const failing = fakeStore().store;
@@ -148,7 +150,7 @@ test('SG2-47: suitability is unavailable when the database is', async () => {
 
 // --- GET /api/venue-booking-requests/:requestId/suitability --------------------
 
-test('SG2-47: a booking request shows its venue against the event and whether it may go ahead', async () => {
+test('[NORMAL] [SG2-47:AC2] [SG2-47:AC3] a booking request shows its venue against the event and whether it may go ahead', async () => {
   const { store } = fakeStore({ exceptions: [{ exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_name: 'Vera',
     approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' }] });
   const composed = app(store);
@@ -167,7 +169,7 @@ test('SG2-47: a booking request shows its venue against the event and whether it
   assert.equal(needs.body.booking, 'needs_capacity_exception');
 });
 
-test('SG2-47: a booking request that is unknown, malformed or outside the caller\'s reach is refused', async () => {
+test('[FAILURE] [SG2-47:request-visibility] a booking request that is unknown, malformed or outside the caller\'s reach is refused', async () => {
   const composed = app(fakeStore().store);
   assert.equal((await request(composed).get('/api/venue-booking-requests/abc/suitability').set(as('venue'))).status, 400);
   assert.equal((await request(composed).get('/api/venue-booking-requests/99/suitability').set(as('venue'))).status, 404);
@@ -179,7 +181,7 @@ test('SG2-47: a booking request that is unknown, malformed or outside the caller
 
 // --- POST /api/venue-booking-requests/:requestId/capacity-exception -------------
 
-test('SG2-47 AC3/AC5: Venue Staff approve a capacity exception; the approver is recorded and the booking is left undecided', async () => {
+test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] Venue Staff approve a capacity exception; the approver is recorded and the booking is left undecided', async () => {
   const { store, recorded, requests } = fakeStore();
   const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as('venue'));
   assert.equal(response.status, 201);
@@ -189,7 +191,7 @@ test('SG2-47 AC3/AC5: Venue Staff approve a capacity exception; the approver is 
   assert.equal(requests[0].status, 'pending');
 });
 
-test('SG2-47 AC3: Technical Support Staff and the event\'s own organiser may also approve', async () => {
+test('[NORMAL] [FAILURE] [SG2-47:AC3] Technical Support Staff and the event\'s own organiser may also approve', async () => {
   for (const user of ['support', 'organiser']) {
     const { store, recorded } = fakeStore();
     const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as(user));
@@ -202,7 +204,7 @@ test('SG2-47 AC3: Technical Support Staff and the event\'s own organiser may als
   assert.deepEqual(recorded, []);
 });
 
-test('SG2-47 AC3: a coordinator cannot approve an exception, even for their own event', async () => {
+test('[FAILURE] [SG2-47:AC3] a coordinator cannot approve an exception, even for their own event', async () => {
   const { store, recorded } = fakeStore();
   const composed = app(store);
   for (const user of ['coordinator', 'attendee']) {
@@ -211,7 +213,7 @@ test('SG2-47 AC3: a coordinator cannot approve an exception, even for their own 
   assert.deepEqual(recorded, []);
 });
 
-test('SG2-47 AC2: no exception is permitted for a venue missing a required facility', async () => {
+test('[FAILURE] [SG2-47:AC2] no exception is permitted for a venue missing a required facility', async () => {
   const { store, recorded } = fakeStore();
   const response = await request(app(store)).post('/api/venue-booking-requests/32/capacity-exception').set(as('venue'));
   assert.equal(response.status, 409);
@@ -219,7 +221,7 @@ test('SG2-47 AC2: no exception is permitted for a venue missing a required facil
   assert.deepEqual(recorded, []);
 });
 
-test('SG2-47: an exception is refused when it is not needed, already covered or the request is decided', async () => {
+test('[CONFLICT] [SG2-47:AC3] [SG2-47:AC5] an exception is refused when it is not needed, already covered or the request is decided', async () => {
   const covered: CapacityExceptionRecord = { exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_name: null,
     approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' };
   const cases: [string, ReturnType<typeof fakeStore>, number, string][] = [
@@ -234,7 +236,31 @@ test('SG2-47: an exception is refused when it is not needed, already covered or 
   }
 });
 
-test('SG2-47: an exception for a lower attendance does not cover a rise; a new approval is recorded', async () => {
+test('[CONFLICT] [SG2-47:AC3] two approvers acting at once record one exception; the other is told it is already approved', async () => {
+  const { store, recorded } = fakeStore();
+  // Hold both requests after they have read "no exception yet", so both
+  // reach the insert: only the database's uniqueness can stop the second.
+  const read = store.exceptions;
+  let arrived = 0;
+  let release!: () => void;
+  const bothRead = new Promise<void>(resolve => { release = resolve; });
+  store.exceptions = async id => {
+    const rows = await read(id);
+    if (++arrived === 2) release();
+    await bothRead;
+    return rows;
+  };
+  const composed = app(store);
+  const responses = await Promise.all(['venue', 'support'].map(user =>
+    request(composed).post('/api/venue-booking-requests/31/capacity-exception').set(as(user))));
+  assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
+  assert.deepEqual(responses.find(response => response.status === 409)!.body,
+    { error: 'A capacity exception covering this attendance has already been approved.' });
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].expected_attendance, 150);
+});
+
+test('[BOUNDARY] [SG2-47:AC3] an exception for a lower attendance does not cover a rise; a new approval is recorded', async () => {
   const { store, recorded } = fakeStore({ exceptions: [{ exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_name: null,
     approver_role: 'venue_staff', expected_attendance: 130, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' }] });
   const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as('support'));

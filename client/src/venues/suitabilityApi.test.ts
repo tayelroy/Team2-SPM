@@ -13,14 +13,14 @@ function respond(response: () => Response) {
   return fetch;
 }
 
-test('SG2-47: the venues for an event are fetched with the caller\'s token', async () => {
+test('[NORMAL] [SG2-47:AC1] the venues for an event are fetched with the caller\'s token', async () => {
   const fetch = respond(() => Response.json({ event: {}, venues: [theatre] }));
   expect(await fetchEventFit('token', 7)).toEqual({ ok: true, venues: [theatre] });
   expect(fetch).toHaveBeenCalledWith('/api/venues/suitability?event_id=7',
     { headers: { Authorization: 'Bearer token' }, cache: 'no-store' });
 });
 
-test('SG2-47: a booking request\'s fit is fetched, and an exception is approved with a POST', async () => {
+test('[NORMAL] [SG2-47:AC3] a booking request\'s fit is fetched, and an exception is approved with a POST', async () => {
   const fetch = respond(() => Response.json({ venue: theatre, exceptions: [], booking: 'needs_capacity_exception', request: {} }));
   expect(await fetchRequestFit('token', 31)).toEqual({ ok: true, venue: theatre, exceptions: [], booking: 'needs_capacity_exception' });
   expect(fetch.mock.calls[0][0]).toBe('/api/venue-booking-requests/31/suitability');
@@ -31,7 +31,7 @@ test('SG2-47: a booking request\'s fit is fetched, and an exception is approved 
     { method: 'POST', headers: { Authorization: 'Bearer token' }, cache: 'no-store' });
 });
 
-test('SG2-47: refusals are explained, and a conflict passes on the server\'s reason', async () => {
+test('[FAILURE] [SG2-47:AC2] [SG2-47:AC3] refusals are explained, and a conflict passes on the server\'s reason', async () => {
   const cases: [Response, string][] = [
     [new Response(null, { status: 401 }), 'Your session has expired. Sign in again.'],
     [new Response(null, { status: 403 }), 'Your account cannot do this.'],
@@ -50,7 +50,7 @@ test('SG2-47: refusals are explained, and a conflict passes on the server\'s rea
   expect(await fetchRequestFit('token', 31)).toEqual({ ok: false, error: 'Venue suitability is unavailable right now. Please try again.' });
 });
 
-test('SG2-47: a response of the wrong shape is treated as unavailable', async () => {
+test('[FAILURE] [SG2-47:suitability-response-shape] a response of the wrong shape is treated as unavailable', async () => {
   const unavailable = { ok: false, error: 'Venue suitability is unavailable right now. Please try again.' };
   for (const body of [{ venues: [{ venue_id: 3 }] }, { venues: 'none' }, {}]) {
     respond(() => Response.json(body));

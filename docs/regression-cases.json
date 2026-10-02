@@ -2000,9 +2000,27 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
-    "execution_date": "1 Oct 2026"
+    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "2 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
+        "execution_date": "1 Oct 2026"
+      }
+    ],
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC1",
+      "SG2-47:AC2",
+      "SG2-47:AC4"
+    ],
+    "method_id": "TC-b7ceded9236f"
   },
   {
     "id": "SG2-47-P02",
@@ -2021,9 +2039,26 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
-    "execution_date": "1 Oct 2026"
+    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "2 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
+        "execution_date": "1 Oct 2026"
+      }
+    ],
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC3",
+      "SG2-47:AC5"
+    ],
+    "method_id": "TC-10ecbce02763"
   },
   {
     "id": "SG2-47-N01",
@@ -2043,9 +2078,26 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Current browser assertions passed as expected.",
-    "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
-    "execution_date": "1 Oct 2026"
+    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "2 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Current browser assertions passed as expected.",
+        "execution_evidence": "1 Oct 2026; feature/SG2-47-venue-suitability-warnings working tree; npm run test:regression; installed Chromium; 31/31 passed; required SG2-26 gate passed.",
+        "execution_date": "1 Oct 2026"
+      }
+    ],
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC2",
+      "SG2-47:AC3"
+    ],
+    "method_id": "TC-ad0afb3cedb0"
   },
   {
     "id": "SG2-40-P01",

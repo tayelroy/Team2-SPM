@@ -850,7 +850,7 @@ test('SG2-46-N01 | [SG2-25:AC1] [SG2-25:AC3] [SG2-46:AC2] [FAILURE] only coordin
   expect((await allowed.json()).venues.map((venue: { name: string }) => venue.name)).toEqual(['Quiet Room', 'Regression Hall']);
 });
 
-test('SG2-47-P01 | a coordinator sees which venues do not fit an approved event and why', async ({ page, request }) => {
+test('SG2-47-P01 | [SG2-47:AC1] [SG2-47:AC2] [SG2-47:AC4] [NORMAL] a coordinator sees which venues do not fit an approved event and why', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
@@ -872,7 +872,7 @@ test('SG2-47-P01 | a coordinator sees which venues do not fit an approved event 
   await expect(hall.getByText('Cannot be booked: no exception is permitted for a missing facility.', { exact: true })).toBeVisible();
 });
 
-test('SG2-47-P02 | venue staff approve a capacity exception without approving the booking', async ({ page, request }) => {
+test('SG2-47-P02 | [SG2-47:AC3] [SG2-47:AC5] [NORMAL] venue staff approve a capacity exception without approving the booking', async ({ page, request }) => {
   await signIn(page, 'venue');
   expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
@@ -895,7 +895,7 @@ test('SG2-47-P02 | venue staff approve a capacity exception without approving th
     exceptions: [{ approver_role: 'venue_staff', approved_by: 'user-venue', expected_attendance: 150 }] });
 });
 
-test('SG2-47-N01 | a missing facility cannot be excepted, and coordinators cannot approve exceptions', async ({ page, request }) => {
+test('SG2-47-N01 | [SG2-47:AC2] [SG2-47:AC3] [FAILURE] a missing facility cannot be excepted, and coordinators cannot approve exceptions', async ({ page, request }) => {
   expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
   await signIn(page, 'venue');
   await page.getByRole('region', { name: 'Booking requests awaiting decision' }).getByRole('button', { name: /Regression Hall/ }).click();

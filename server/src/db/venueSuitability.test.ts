@@ -27,7 +27,7 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
 const exception = { exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_role: 'venue_staff',
   expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' };
 
-test('SG2-47: the store reads one event and one booking request by id', async () => {
+test('[NORMAL] [SG2-47:suitability-store] the store reads one event and one booking request by id', async () => {
   const calls: Call[] = [];
   const event = { event_id: 7 };
   const store = createVenueSuitabilityStore(fakeAdmin({
@@ -40,7 +40,7 @@ test('SG2-47: the store reads one event and one booking request by id', async ()
   assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => call.args), [['event_id', 7], ['event_id', 8], ['request_id', 31]]);
 });
 
-test('SG2-47: the store lists every venue in name order, or only the one asked for', async () => {
+test('[NORMAL] [SG2-47:suitability-store] the store lists every venue in name order, or only the one asked for', async () => {
   const calls: Call[] = [];
   const store = createVenueSuitabilityStore(fakeAdmin({ venues: [{ data: [{ venue_id: 1 }], error: null }, { data: [], error: null }] }, calls));
   assert.deepEqual(await store.venues(), [{ venue_id: 1 }]);
@@ -49,7 +49,7 @@ test('SG2-47: the store lists every venue in name order, or only the one asked f
   assert.deepEqual(calls.filter(call => call.method === 'order').map(call => call.args[0]), ['name', 'venue_id', 'name', 'venue_id']);
 });
 
-test('SG2-47: exceptions come back with each approver\'s name, looked up once per approver', async () => {
+test('[NORMAL] [SG2-47:AC3] exceptions come back with each approver\'s name, looked up once per approver', async () => {
   const calls: Call[] = [];
   const store = createVenueSuitabilityStore(fakeAdmin({
     venue_capacity_exceptions: [{ data: [exception, { ...exception, exception_id: 2 }, { ...exception, exception_id: 3, approved_by: 'user-gone' }], error: null }, { data: [], error: null }],
@@ -62,7 +62,7 @@ test('SG2-47: exceptions come back with each approver\'s name, looked up once pe
   assert.equal(calls.filter(call => call.table === 'users' && call.method === 'select').length, 1);
 });
 
-test('SG2-47: recording an exception inserts the approval and returns it with the approver\'s name', async () => {
+test('[NORMAL] [SG2-47:AC3] recording an exception inserts the approval and returns it with the approver\'s name', async () => {
   const calls: Call[] = [];
   const store = createVenueSuitabilityStore(fakeAdmin({
     venue_capacity_exceptions: [{ data: exception, error: null }],
@@ -73,7 +73,17 @@ test('SG2-47: recording an exception inserts the approval and returns it with th
   assert.deepEqual(calls.find(call => call.method === 'insert')?.args, [values]);
 });
 
-test('SG2-47: any database failure is reported as temporarily unavailable', async () => {
+test('[CONFLICT] [SG2-47:AC3] an approval already recorded by a concurrent approver is reported as a duplicate, not a failure', async () => {
+  const calls: Call[] = [];
+  const store = createVenueSuitabilityStore(fakeAdmin({
+    venue_capacity_exceptions: [{ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } }]
+  }, calls));
+  const values = { request_id: 31, approved_by: 'user-support', approver_role: 'technical_support_staff', expected_attendance: 150, venue_capacity: 120 };
+  assert.equal(await store.recordException(values), null);
+  assert.equal(calls.filter(call => call.table === 'users').length, 0);
+});
+
+test('[FAILURE] [SG2-47:suitability-unavailable] any database failure is reported as temporarily unavailable', async () => {
   const failure = { data: null, error: { message: 'offline' } };
   const values = { request_id: 31, approved_by: 'user-venue', approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120 };
   const attempts: [string, Record<string, Result[]>, (store: ReturnType<typeof createVenueSuitabilityStore>) => Promise<unknown>][] = [
