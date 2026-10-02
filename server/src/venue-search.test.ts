@@ -68,7 +68,7 @@ async function names(overrides: Partial<VenueSearchCriteria> = {}, extra: Record
 
 // --- searchVenues ------------------------------------------------------------
 
-test('SG2-46: with no criteria every free venue is returned in name order with its layouts', async () => {
+test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returned in name order with its layouts', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({ venues: { data: [hall, terrace], error: null }, venue_layouts: {
     data: [{ venue_id: 3, layout: 'banquet', other_description: null }], error: null } }, calls);
@@ -86,14 +86,14 @@ test('SG2-46: with no criteria every free venue is returned in name order with i
   assert.deepEqual(calls.find(call => call.table === 'venues' && call.method === 'order')?.args, ['name', { ascending: true }]);
 });
 
-test('AC2: a blocked venue or one with a confirmed booking in the period is not returned', async () => {
+test('[CONFLICT] [SG2-45:AC1] [SG2-46:AC2] AC2: a blocked venue or one with a confirmed booking in the period is not returned', async () => {
   assert.deepEqual(await names({}, {
     venue_unavailability: { data: [{ venue_id: 1, starts_at: FROM, ends_at: TO }], error: null },
     venue_bookings: { data: [{ venue_id: 2, starts_at: FROM, ends_at: TO, status: 'confirmed' }], error: null }
   }), ['Rooftop Terrace', 'Unrecorded Room']);
 });
 
-test('a held booking does not exclude the venue but is reported, earliest first', async () => {
+test('[NORMAL] [SG2-46:AC2] a held booking does not exclude the venue but is reported, earliest first', async () => {
   const later = { venue_id: 3, starts_at: '2030-06-15T09:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', status: 'held' };
   const earlier = { ...later, starts_at: '2030-06-15T01:00:00.000Z', ends_at: '2030-06-15T02:00:00.000Z' };
   const result = await searchVenues(criteria({ attendance: 101 }), catalogue({ venue_bookings: { data: [later, earlier], error: null } }));
@@ -102,7 +102,7 @@ test('a held booking does not exclude the venue but is reported, earliest first'
   ]);
 });
 
-test('AC2: attendance, location, layout, facilities and accessibility must all be met', async () => {
+test('[NORMAL] [SG2-43:AC3] [SG2-46:AC2] AC2: attendance, location, layout, facilities and accessibility must all be met', async () => {
   assert.deepEqual(await names({ attendance: 100 }), ['Atrium Hall', 'Rooftop Terrace'], 'capacity is inclusive; unrecorded capacity never fits');
   assert.deepEqual(await names({ location: 'level 1' }), ['Atrium Hall', 'Rooftop Terrace'], 'location is a case-insensitive substring');
   assert.deepEqual(await names({ layout: 'banquet' }), ['Rooftop Terrace']);
@@ -113,12 +113,42 @@ test('AC2: attendance, location, layout, facilities and accessibility must all b
   assert.deepEqual(await names({ attendance: 50, accessibility: ['step-free'], layout: 'theatre' }), ['Atrium Hall']);
 });
 
-test('AC3: no accessibility keywords means accessibility is not a matching requirement', async () => {
+test('[BOUNDARY] [SG2-46:AC2] attendance at capacity fits and capacity plus one excludes the venue', async () => {
+  assert.deepEqual(await names({ attendance: 99 }), ['Atrium Hall', 'Rooftop Terrace']);
+  assert.deepEqual(await names({ attendance: 100 }), ['Atrium Hall', 'Rooftop Terrace']);
+  assert.deepEqual(await names({ attendance: 101 }), ['Rooftop Terrace']);
+});
+
+test('[BOUNDARY] [SG2-46:AC2] search accepts exactly 31 days and refuses the next millisecond', () => {
+  assert.deepEqual(parseVenueSearch({ from: FROM, to: '2030-07-16T00:00:00.000Z' }), {
+    ok: true, criteria: { starts_at: FROM, ends_at: '2030-07-16T00:00:00.000Z', attendance: null,
+      location: null, layout: null, facilities: [], accessibility: [] }
+  });
+  assert.deepEqual(parseVenueSearch({ from: FROM, to: '2030-07-16T00:00:00.001Z' }), {
+    ok: false, message: 'The search period must not exceed 31 days.'
+  });
+});
+
+test('[BOUNDARY] [SG2-46:AC2] text and keyword counts stop at 255 characters and 10 terms', () => {
+  const text = '🏛'.repeat(255);
+  const ten = 'a,b,c,d,e,f,g,h,i,j';
+  assert.deepEqual(parseVenueSearch({ from: FROM, to: TO, location: text, facilities: ten }), {
+    ok: true, criteria: { starts_at: FROM, ends_at: TO, attendance: null, location: text, layout: null,
+      facilities: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'], accessibility: [] }
+  });
+  for (const query of [{ location: '🏛'.repeat(256) }, { facilities: `${ten},k` }]) {
+    assert.deepEqual(parseVenueSearch({ from: FROM, to: TO, ...query }), {
+      ok: false, message: 'Text criteria must be single values within 255 characters, with at most 10 keywords each.'
+    });
+  }
+});
+
+test('[NORMAL] [SG2-46:AC3] AC3: no accessibility keywords means accessibility is not a matching requirement', async () => {
   assert.deepEqual(await names({ accessibility: [] }), ['Atrium Hall', 'Seminar Room A', 'Rooftop Terrace', 'Unrecorded Room']);
 });
 
 for (const table of ['venues', 'venue_layouts', 'venue_unavailability', 'venue_bookings']) {
-  test(`a failed read of ${table} makes the search unavailable`, async () => {
+  test(`[FAILURE] [SG2-46:AC2] a failed read of ${table} makes the search unavailable`, async () => {
     const result = await searchVenues(criteria(), catalogue({ [table]: { data: null, error: { message: 'SECRET' } } }));
     assert.deepEqual(result, { outcome: 'unavailable' });
   });
@@ -126,7 +156,7 @@ for (const table of ['venues', 'venue_layouts', 'venue_unavailability', 'venue_b
 
 // --- parseVenueSearch ----------------------------------------------------------
 
-test('parseVenueSearch normalises a complete query', () => {
+test('[NORMAL] [SG2-46:AC2] parseVenueSearch normalises a complete query', () => {
   assert.deepEqual(parseVenueSearch({
     from: '2030-06-15T08:00:00+08:00', to: '2030-06-15T23:59:00+08:00', attendance: '80', location: ' North Wing ',
     layout: 'Theatre', facilities: 'Stage, PA ,,', accessibility: 'Step-free'
@@ -138,7 +168,7 @@ test('parseVenueSearch normalises a complete query', () => {
     { ok: true, criteria: criteria() }, 'blank criteria are not applied');
 });
 
-test('parseVenueSearch rejects malformed periods and criteria', () => {
+test('[BOUNDARY] [FAILURE] [SG2-46:AC2] parseVenueSearch rejects malformed periods and criteria', () => {
   const period = { from: FROM, to: TO };
   const cases: [Record<string, unknown>, RegExp][] = [
     [{}, /ISO 8601/], [{ from: FROM }, /ISO 8601/], [{ from: 'nope', to: TO }, /ISO 8601/], [{ from: 5, to: TO }, /ISO 8601/],
@@ -171,18 +201,18 @@ function app(role: Role, handler = createVenueSearchHandler(async (search) => ({
 const auth = { Authorization: 'Bearer valid-token' };
 const query = `from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}&attendance=80`;
 
-for (const role of ACCOUNT_ROLES) test(`SG2-46: only event coordinators can search venues (${role})`, async () => {
+for (const role of ACCOUNT_ROLES) test(`${role === 'event_coordinator' ? '[NORMAL]' : '[FAILURE]'} [SG2-25:AC1] [SG2-46:AC2] SG2-46: only event coordinators can search venues (${role})`, async () => {
   const response = await request(app(role)).get(`/api/venues/search?${query}`).set(auth);
   assert.equal(response.status, role === 'event_coordinator' ? 200 : 403);
 });
 
-test('the handler passes the parsed criteria to the search and returns its venues', async () => {
+test('[NORMAL] [SG2-46:AC2] the handler passes the parsed criteria to the search and returns its venues', async () => {
   const response = await request(app('event_coordinator')).get(`/api/venues/search?${query}`).set(auth);
   assert.equal(response.headers['cache-control'], 'no-store');
   assert.deepEqual(response.body.venues[0].searched, { ...criteria(), attendance: 80 });
 });
 
-test('invalid criteria are rejected before any query', async () => {
+test('[FAILURE] [SG2-46:AC2] invalid criteria are rejected before any query', async () => {
   let searched = false;
   const handler = createVenueSearchHandler(async () => { searched = true; return { outcome: 'ok', venues: [] }; }, () => catalogue());
   const response = await request(app('event_coordinator', handler)).get('/api/venues/search?from=bad').set(auth);
@@ -191,7 +221,7 @@ test('invalid criteria are rejected before any query', async () => {
   assert.equal(searched, false);
 });
 
-test('an unconfigured database, a failed read or a thrown error returns 503 without details', async () => {
+test('[FAILURE] [SG2-46:AC2] an unconfigured database, a failed read or a thrown error returns 503 without details', async () => {
   const failures = [
     createVenueSearchHandler(async () => ({ outcome: 'ok', venues: [] }), () => null),
     createVenueSearchHandler(async () => ({ outcome: 'unavailable' }), () => catalogue()),
@@ -208,7 +238,7 @@ const original = { ...dbConfig };
 beforeEach(() => { for (const key of Object.keys(dbConfig) as (keyof typeof dbConfig)[]) dbConfig[key] = undefined; });
 afterEach(() => { Object.assign(dbConfig, original); });
 
-test('the production app requires authentication and uses the default handler and client', async () => {
+test('[FAILURE] [SG2-25:AC3] [SG2-46:AC2] the production app requires authentication and uses the default handler and client', async () => {
   assert.equal((await request(createApp()).get(`/api/venues/search?${query}`)).status, 401);
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'user-1', role: 'event_coordinator' }) });
   const response = await request(createApp(undefined, access)).get(`/api/venues/search?${query}`).set(auth);

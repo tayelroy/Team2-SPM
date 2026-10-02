@@ -21,17 +21,17 @@ afterEach(() => {
   Object.assign(dbConfig, originalConfig);
 });
 
-test('missing URL is unconfigured and sends no request', async () => {
+test('[FAILURE] [SG2-20:AC2] missing URL is unconfigured and sends no request', async () => {
   dbConfig.supabaseUrl = undefined;
   assert.deepEqual(await checkSupabaseHealth(), { configured: false, status: 'unconfigured' });
 });
 
-test('missing API key is unconfigured and sends no request', async () => {
+test('[FAILURE] [SG2-20:AC2] missing API key is unconfigured and sends no request', async () => {
   dbConfig.supabaseAnonKey = undefined;
   assert.deepEqual(await checkSupabaseHealth(), { configured: false, status: 'unconfigured' });
 });
 
-test('Supabase JS client queries through HTTPS and is reused', async () => {
+test('[NORMAL] [SG2-20:AC2] Supabase JS client queries through HTTPS and is reused', async () => {
   const fetchMock = mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     assert.equal(String(input), 'https://test-project.supabase.co/rest/v1/events?select=id');
     assert.equal(new Headers(init?.headers).get('apikey'), 'sb_publishable_test-key');
@@ -46,7 +46,7 @@ test('Supabase JS client queries through HTTPS and is reused', async () => {
   assert.equal(fetchMock.mock.callCount(), 1);
 });
 
-test('health performs a bounded HTTPS request without following redirects', async () => {
+test('[NORMAL] [SG2-20:AC2] health performs a bounded HTTPS request without following redirects', async () => {
   const timeoutMock = mock.method(AbortSignal, 'timeout', () => new AbortController().signal);
   const fetchMock = mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     assert.equal(String(input), 'https://test-project.supabase.co/auth/v1/health');
@@ -60,7 +60,7 @@ test('health performs a bounded HTTPS request without following redirects', asyn
   assert.deepEqual(timeoutMock.mock.calls[0].arguments, [5000]);
 });
 
-test('Supabase non-success response is unhealthy without copying its body', async () => {
+test('[FAILURE] [SG2-20:AC2] Supabase non-success response is unhealthy without copying its body', async () => {
   mock.method(globalThis, 'fetch', async () => new Response('PRIVATE_ERROR_SENTINEL', { status: 503 }));
   const health = await checkSupabaseHealth();
   assert.equal(health.status, 'error');
@@ -68,12 +68,12 @@ test('Supabase non-success response is unhealthy without copying its body', asyn
   assert.doesNotMatch(JSON.stringify(health), /SENTINEL/);
 });
 
-test('network failures are unhealthy', async () => {
+test('[FAILURE] [SG2-20:AC2] network failures are unhealthy', async () => {
   mock.method(globalThis, 'fetch', async () => { throw new Error('Network unavailable'); });
   assert.equal((await checkSupabaseHealth()).status, 'error');
 });
 
-test('aborted health request reports an error', async () => {
+test('[FAILURE] [SG2-20:AC2] aborted health request reports an error', async () => {
   const controller = new AbortController();
   mock.method(AbortSignal, 'timeout', () => controller.signal);
   mock.method(globalThis, 'fetch', async (...[_input, init]: Parameters<typeof fetch>) => {
@@ -86,7 +86,7 @@ test('aborted health request reports an error', async () => {
   assert.equal(health.error, 'Health request timed out');
 });
 
-test('health rejects plaintext URLs before making a request', async () => {
+test('[FAILURE] [SG2-20:AC2] health rejects plaintext URLs before making a request', async () => {
   dbConfig.supabaseUrl = 'http://test-project.supabase.co';
   const fetchMock = mock.method(globalThis, 'fetch', async () => new Response());
   const health = await checkSupabaseHealth();
@@ -95,7 +95,7 @@ test('health rejects plaintext URLs before making a request', async () => {
 });
 
 for (const route of ['/health/db', '/api/health/db']) {
-  test(`${route} hides real health-helper network errors and project URL`, async () => {
+  test(`[FAILURE] [SG2-20:AC2] ${route} hides real health-helper network errors and project URL`, async () => {
     mock.method(globalThis, 'fetch', async () => { throw new Error('PRIVATE_ERROR_SENTINEL'); });
     const response = await request(app).get(route);
     assert.equal(response.status, 503);

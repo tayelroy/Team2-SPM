@@ -928,3 +928,71 @@ export async function postClarification(
   if (!body?.clarification || typeof body?.status !== 'string') return { ok: false, message: UNAVAILABLE };
   return { ok: true, clarification: body.clarification as Clarification, status: body.status };
 }
+
+export interface EventAuditLogEntry {
+  log_id: number;
+  event_id: number;
+  actor_id: string;
+  actor_name: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+}
+
+export type GetEventHistoryOutcome =
+  | { ok: true; history: EventAuditLogEntry[] }
+  | {
+      ok: false;
+      kind: 'unauthorized' | 'forbidden' | 'not_found' | 'unavailable' | 'error';
+      message: string;
+    };
+
+/**
+ * Retrieves the change history for an event (SG2-40).
+ * Maps to `GET /api/event-requests/:eventId/history`.
+ */
+export async function getEventHistory(
+  eventId: string | number,
+  token: string
+): Promise<GetEventHistoryOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/history`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { ok: false, kind: 'unauthorized', message: body?.error ?? 'Authentication required' };
+    }
+    if (response.status === 403) {
+      return { ok: false, kind: 'forbidden', message: body?.error ?? 'Access forbidden' };
+    }
+    if (response.status === 404) {
+      return { ok: false, kind: 'not_found', message: body?.error ?? 'Event not found.' };
+    }
+    if (response.status === 503) {
+      return { ok: false, kind: 'unavailable', message: body?.error ?? UNAVAILABLE };
+    }
+    return {
+      ok: false,
+      kind: 'error',
+      message: body?.error ?? `Failed to fetch event history (HTTP ${response.status}).`,
+    };
+  }
+
+  if (!body || typeof body !== 'object' || !Array.isArray(body.history)) {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  return {
+    ok: true,
+    history: body.history as EventAuditLogEntry[],
+  };
+}

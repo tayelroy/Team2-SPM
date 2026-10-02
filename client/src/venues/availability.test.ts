@@ -15,14 +15,14 @@ const VALID = {
   ]
 };
 
-test('no session token denies access without making a request', async () => {
+test('[FAILURE] [SG2-44:AC3] no session token denies access without making a request', async () => {
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
   expect(await loadAllVenuesAvailability(null, VALID.from, VALID.to)).toBeNull();
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('loads and validates the response with the session token and date range', async () => {
+test('[NORMAL] [SG2-44:AC1] loads and validates the response with the session token and date range', async () => {
   const controller = new AbortController();
   const fetchMock = vi.fn().mockResolvedValue(Response.json({ ...VALID, secret: 'not retained' }));
   vi.stubGlobal('fetch', fetchMock);
@@ -36,12 +36,12 @@ test('loads and validates the response with the session token and date range', a
   );
 });
 
-test.each([401, 403])('denies access when the server returns %s', async (status) => {
+test.each([401, 403])('[FAILURE] [SG2-44:AC3] denies access when the server returns %s', async (status) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status })));
   expect(await loadAllVenuesAvailability('token', VALID.from, VALID.to)).toBeNull();
 });
 
-test('outage and abort failures cannot produce a result', async () => {
+test('[FAILURE] [SG2-44:AC1] outage and abort failures cannot produce a result', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));
   await expect(loadAllVenuesAvailability('token', VALID.from, VALID.to)).rejects.toThrow('Unable to load venue availability');
 
@@ -62,7 +62,7 @@ test.each([
   { from: VALID.from, to: VALID.to, venues: [{ venueId: 1, name: 'A', entries: [{ start: 's', end: 1, kind: 'booking', label: 'l' }] }] },
   { from: VALID.from, to: VALID.to, venues: [{ venueId: 1, name: 'A', entries: [{ start: 's', end: 'e', kind: 'nope', label: 'l' }] }] },
   { from: VALID.from, to: VALID.to, venues: [{ venueId: 1, name: 'A', entries: [{ start: 's', end: 'e', kind: 'booking', label: 5 }] }] }
-])('rejects malformed responses: %j', async (data) => {
+])('[FAILURE] [SG2-44:AC1] rejects malformed responses: %j', async (data) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)));
   await expect(loadAllVenuesAvailability('token', VALID.from, VALID.to)).rejects.toThrow('Invalid venue availability response');
 });

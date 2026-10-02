@@ -55,18 +55,33 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId/review (SG2-35)', () => {
-  test('opens a request assigned to the caller, passing the caller id to the transition', async () => {
+  test('[BOUNDARY] [SG2-35:AC2] review accepts event id one and rejects zero before a transition', async () => {
+    const transitioned: number[] = [];
+    const app = buildApp({ reviewResult: { ok: true, request: { ...REVIEWED_REQUEST, event_id: 1 } },
+      captureReview: eventId => { transitioned.push(eventId); } });
+    const refused = await request(app).patch('/api/event-requests/0/review');
+    assert.equal(refused.status, 400);
+    assert.deepEqual(refused.body, { error: 'eventId must be a positive integer.' });
+    assert.deepEqual(transitioned, []);
+    const accepted = await request(app).patch('/api/event-requests/1/review');
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.request.event_id, 1);
+    assert.deepEqual(transitioned, [1]);
+  });
+
+  test('[NORMAL] [SG2-35:AC1] [SG2-35:AC2] opens a request assigned to the caller, passing the caller id to the transition', async () => {
     let reviewed: { eventId: number; coordinatorId: string } | undefined;
     const response = await request(
       buildApp({ captureReview: (eventId, coordinatorId) => (reviewed = { eventId, coordinatorId }) })
     ).patch('/api/event-requests/7/review');
 
     assert.equal(response.status, 200);
-    assert.equal(response.body.request.status, 'under_review');
+    assert.deepEqual(response.body, { request: REVIEWED_REQUEST });
     assert.deepEqual(reviewed, { eventId: 7, coordinatorId: 'coordinator-1' });
   });
 
-  test('returns 400 for a non-numeric eventId, without touching the database', async () => {
+
+  test('[FAILURE] [SG2-35:AC2] returns 400 for a non-numeric eventId, without touching the database', async () => {
     let called = false;
     const response = await request(buildApp({ captureReview: () => (called = true) })).patch(
       '/api/event-requests/not-a-number/review'
@@ -75,24 +90,24 @@ describe('PATCH /api/event-requests/:eventId/review (SG2-35)', () => {
     assert.equal(called, false);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-35:AC2] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined })).patch('/api/event-requests/7/review');
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-35:AC2] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null })).patch('/api/event-requests/7/review');
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the request is assigned to another coordinator or is not reviewable', async () => {
+  test('[CONFLICT] [SG2-35:AC3] returns 404 when the request is assigned to another coordinator or is not reviewable', async () => {
     const response = await request(
       buildApp({ reviewResult: { ok: false, reason: 'not_found', message: 'missing' } })
     ).patch('/api/event-requests/7/review');
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the database error when the transition fails', async () => {
+  test('[FAILURE] [SG2-35:AC2] returns 503 without leaking the database error when the transition fails', async () => {
     const response = await request(
       buildApp({ reviewResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     ).patch('/api/event-requests/7/review');
@@ -143,20 +158,20 @@ describe('PATCH /api/event-requests/:eventId/review authorisation wiring', () =>
       }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-35:AC2] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('event_coordinator')).patch('/api/event-requests/7/review');
     assert.equal(response.status, 401);
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies an Event Organiser, who owns requests but does not review them', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-35:AC3] denies an Event Organiser, who owns requests but does not review them', async () => {
     const response = await request(appForRole('event_organiser'))
       .patch('/api/event-requests/7/review')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 403);
   });
 
-  test('lets an Event Coordinator reach the review handler', async () => {
+  test('[NORMAL] [SG2-35:AC2] lets an Event Coordinator reach the review handler', async () => {
     const response = await request(appForRole('event_coordinator'))
       .patch('/api/event-requests/7/review')
       .set('Authorization', 'Bearer token');

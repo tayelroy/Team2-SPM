@@ -60,7 +60,7 @@ const DRAFT_FULL_RECORD = {
   registration_needed: true
 };
 
-test('no token never loads data', () => {
+test('[FAILURE] [SG2-29:AC3] no token never loads data', () => {
   const fetch = vi.fn();
   vi.stubGlobal('fetch', fetch);
   render(<DraftRequests onEdit={noop} />);
@@ -68,7 +68,7 @@ test('no token never loads data', () => {
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test('shows loading, then the draft-specific empty state when no drafts are returned', async () => {
+test('[BOUNDARY] [SG2-29:AC3] shows loading, then the draft-specific empty state when no drafts are returned', async () => {
   const fetch = api([]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading your requests');
@@ -77,7 +77,7 @@ test('shows loading, then the draft-specific empty state when no drafts are retu
   expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine', { method: 'GET', headers: { Authorization: 'Bearer test-token' } });
 });
 
-test('[CONFLICT] [SG2-36:AC2] lists only requests the organiser can still edit, never submitted ones', async () => {
+test('[CONFLICT] [SG2-32:AC2] [SG2-36:AC2] lists only requests the organiser can still edit, never submitted ones', async () => {
   // The list now asks for every one of the caller's requests and keeps the
   // editable ones, so a submitted request must be dropped rather than shown.
   api([DRAFT, SUBMITTED]);
@@ -110,7 +110,7 @@ test('[NORMAL] [SG2-36:AC2] editing a returned request opens it for amendment', 
   expect(onEdit).toHaveBeenCalledWith(RETURNED_FULL);
 });
 
-test('Edit fetches the full record (not just the list summary) before handing it to onEdit', async () => {
+test('[NORMAL] [SG2-29:AC2] Edit fetches the full record (not just the list summary) before handing it to onEdit', async () => {
   const fetch = api([DRAFT, SUBMITTED], { 7: DRAFT_FULL_RECORD });
   const detail = deferred<Response>();
   const onEdit = vi.fn();
@@ -129,7 +129,7 @@ test('Edit fetches the full record (not just the list summary) before handing it
   });
 });
 
-test('a failed edit fetch shows an error instead of opening a half-blank form', async () => {
+test('[FAILURE] [SG2-29:AC2] a failed edit fetch shows an error instead of opening a half-blank form', async () => {
   api([DRAFT]);
   const onEdit = vi.fn();
   render(<DraftRequests accessToken="test-token" onEdit={onEdit} />);
@@ -138,20 +138,20 @@ test('a failed edit fetch shows an error instead of opening a half-blank form', 
   expect(onEdit).not.toHaveBeenCalled();
 });
 
-test('Edit is hidden once a delete confirmation is showing for that draft', async () => {
+test('[CONFLICT] [SG2-32:AC1] Edit is hidden once a delete confirmation is showing for that draft', async () => {
   api([DRAFT]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
 });
 
-test('falls back to "Untitled request" when the name is blank', async () => {
+test('[BOUNDARY] [SG2-29:AC3] falls back to "Untitled request" when the name is blank', async () => {
   api([{ event_id: 9, status: 'draft', name: '  ' }]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('heading', { name: 'Untitled request' })).toBeInTheDocument();
 });
 
-test('deleting a draft requires confirmation, and Cancel backs out without calling the API', async () => {
+test('[NORMAL] [SG2-32:AC1] deleting a draft requires confirmation, and Cancel backs out without calling the API', async () => {
   const fetch = api([DRAFT]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -162,7 +162,7 @@ test('deleting a draft requires confirmation, and Cancel backs out without calli
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
-test('confirming delete removes the request and disables the buttons while in flight', async () => {
+test('[CONFLICT] [SG2-32:duplicate-submit] confirming delete removes the request and disables the buttons while in flight', async () => {
   const fetch = api([DRAFT]);
   const del = deferred<Response>();
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
@@ -179,7 +179,7 @@ test('confirming delete removes the request and disables the buttons while in fl
   });
 });
 
-test('a failed delete shows an error and keeps the request in the list', async () => {
+test('[CONFLICT] [SG2-32:AC2] a failed delete shows an error and keeps the request in the list', async () => {
   const fetch = api([DRAFT]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -189,7 +189,7 @@ test('a failed delete shows an error and keeps the request in the list', async (
   expect(screen.getByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
 });
 
-test('clicking Delete on a different draft clears an existing delete error', async () => {
+test('[FAILURE] [SG2-32:AC1] clicking Delete on a different draft clears an existing delete error', async () => {
   const DRAFT_TWO = { event_id: 10, status: 'draft', name: 'Second Draft' };
   // A failed delete on DRAFT leaves it in the confirm state (its own "Confirm
   // delete"/"Cancel", not "Delete") — starting a fresh delete on DRAFT_TWO is
@@ -213,7 +213,7 @@ test('clicking Delete on a different draft clears an existing delete error', asy
   expect(screen.queryByText('Could not reach the server. Please try again.')).not.toBeInTheDocument();
 });
 
-test('a load failure offers retry and recovers', async () => {
+test('[FAILURE] [SG2-29:AC3] a load failure offers retry and recovers', async () => {
   const fetch = vi.fn().mockRejectedValueOnce(new Error('offline'));
   vi.stubGlobal('fetch', fetch);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
@@ -223,7 +223,7 @@ test('a load failure offers retry and recovers', async () => {
   expect(await screen.findByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
 });
 
-test('a stale successful load cannot restore another user’s requests', async () => {
+test('[CONFLICT] [SG2-26:session-isolation] a stale successful load cannot restore another user’s requests', async () => {
   const load = deferred<Response>();
   const fetch = vi.fn(() => load.promise);
   vi.stubGlobal('fetch', fetch);

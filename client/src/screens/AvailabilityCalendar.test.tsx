@@ -25,13 +25,13 @@ function stubJson(body: unknown) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)));
 }
 
-test('shows a loading state before the response resolves', () => {
+test('[NORMAL] [SG2-44:AC1] shows a loading state before the response resolves', () => {
   vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
   render(<AvailabilityCalendar />);
   expect(screen.getByText('Loading venue availability…')).toBeInTheDocument();
 });
 
-test('renders bookings and unavailability across every venue for the month', async () => {
+test('[NORMAL] [SG2-44:AC2] renders bookings and unavailability across every venue for the month', async () => {
   stubJson({
     from: '2026-10-01T00:00:00.000Z',
     to: '2026-11-01T00:00:00.000Z',
@@ -56,7 +56,7 @@ test('renders bookings and unavailability across every venue for the month', asy
   expect(screen.getByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
 });
 
-test('shows a no-access message when there is no session at all', async () => {
+test('[FAILURE] [SG2-44:AC3] shows a no-access message when there is no session at all', async () => {
   sessionStorage.clear();
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
@@ -65,19 +65,19 @@ test('shows a no-access message when there is no session at all', async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('shows a no-access message when the server denies the request', async () => {
+test('[FAILURE] [SG2-44:AC3] shows a no-access message when the server denies the request', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 403 })));
   render(<AvailabilityCalendar />);
   expect(await screen.findByText("You don't have access to this view.")).toBeInTheDocument();
 });
 
-test('shows an error message when the request fails', async () => {
+test('[FAILURE] [SG2-44:AC1] shows an error message when the request fails', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
   render(<AvailabilityCalendar />);
   expect(await screen.findByText("Couldn't load venue availability. Try again.")).toBeInTheDocument();
 });
 
-test('the month dropdown jumps directly to the chosen month', async () => {
+test('[NORMAL] [SG2-44:AC1] the month dropdown jumps directly to the chosen month', async () => {
   const fetchMock = vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] }));
   vi.stubGlobal('fetch', fetchMock);
 
@@ -91,7 +91,7 @@ test('the month dropdown jumps directly to the chosen month', async () => {
   expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2026-01-01T00:00:00.000Z'));
 });
 
-test('the year dropdown jumps directly to the chosen year, keeping the same month', async () => {
+test('[NORMAL] [SG2-44:AC1] the year dropdown jumps directly to the chosen year, keeping the same month', async () => {
   const fetchMock = vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] }));
   vi.stubGlobal('fetch', fetchMock);
 
@@ -105,7 +105,7 @@ test('the year dropdown jumps directly to the chosen year, keeping the same mont
   expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2030-10-01T00:00:00.000Z'));
 });
 
-test('the dropdowns stay in sync with the arrows', async () => {
+test('[NORMAL] [SG2-44:AC1] the dropdowns stay in sync with the arrows', async () => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] })));
   render(<AvailabilityCalendar />);
   await screen.findByRole('heading', { name: 'October 2026' });
@@ -117,13 +117,14 @@ test('the dropdowns stay in sync with the arrows', async () => {
   expect((screen.getByRole('combobox', { name: 'Jump to year' }) as HTMLSelectElement).value).toBe('2026');
 });
 
-test('the year dropdown extends to cover a year reached only via the arrows', async () => {
+test('[BOUNDARY] [SG2-44:AC1] the year dropdown extends to cover a year reached only via the arrows', async () => {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] })));
   render(<AvailabilityCalendar />);
   await screen.findByRole('heading', { name: 'October 2026' });
 
   const yearSelect = screen.getByRole('combobox', { name: 'Jump to year' }) as HTMLSelectElement;
-  const maxYear = Math.max(...Array.from(yearSelect.options).map((o) => Number(o.value)));
+  const maxYear = 2031;
+  expect(Array.from(yearSelect.options).map((o) => o.value)).toContain('2031');
   fireEvent.change(yearSelect, { target: { value: String(maxYear) } });
   await screen.findByRole('heading', { name: `October ${maxYear}` });
 
@@ -138,7 +139,7 @@ test('the year dropdown extends to cover a year reached only via the arrows', as
   expect(yearSelect.value).toBe(String(maxYear + 1));
 });
 
-test('moving to the next month re-fetches a new date range', async () => {
+test('[NORMAL] [SG2-44:AC1] moving to the next month re-fetches a new date range', async () => {
   const fetchMock = vi.fn().mockImplementation((url: string) => {
     const range = new URL(url, 'http://localhost').searchParams;
     const from = range.get('from')!;

@@ -73,7 +73,26 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () => {
-  test('assigns a coordinator to a request with none yet (SG2-33)', async () => {
+  test('[BOUNDARY] [SG2-33:AC1] assignment accepts event id one and refuses zero before any lookup or write', async () => {
+    const calls: unknown[] = [];
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, event_id: 1 } },
+      assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, event_id: 1, coordinator_id: 'coord-1' } },
+      captureFetch: eventId => { calls.push(['event', eventId]); },
+      captureRole: coordinatorId => { calls.push(['role', coordinatorId]); },
+      captureAssign: (eventId, coordinatorId) => { calls.push(['assign', eventId, coordinatorId]); }
+    });
+    const refused = await request(app).patch('/api/event-requests/0/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(refused.status, 400);
+    assert.deepEqual(refused.body, { error: 'eventId must be a positive integer.' });
+    assert.deepEqual(calls, []);
+    const accepted = await request(app).patch('/api/event-requests/1/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.request.event_id, 1);
+    assert.deepEqual(calls, [['event', 1], ['role', 'coord-1'], ['assign', 1, 'coord-1']]);
+  });
+
+  test('[NORMAL] [SG2-33:AC1] [SG2-33:AC2] assigns a coordinator to a request with none yet (SG2-33)', async () => {
     let assigned: { eventId: number; coordinatorId: string } | undefined;
     const response = await request(
       buildApp({ captureAssign: (eventId, coordinatorId) => (assigned = { eventId, coordinatorId }) })
@@ -86,7 +105,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     assert.deepEqual(assigned, { eventId: 7, coordinatorId: 'coord-1' });
   });
 
-  test('reassigns a request that already has a coordinator (SG2-34)', async () => {
+  test('[NORMAL] [SG2-34:AC1] [SG2-34:AC2] reassigns a request that already has a coordinator (SG2-34)', async () => {
     const response = await request(
       buildApp({
         fetchResult: {
@@ -102,40 +121,40 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     assert.equal(response.body.request.coordinator_id, 'coord-new');
   });
 
-  test('returns 400 for a non-numeric eventId', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 400 for a non-numeric eventId', async () => {
     const response = await request(buildApp())
       .patch('/api/event-requests/not-a-number/coordinator')
       .send({ coordinatorId: 'coord-1' });
     assert.equal(response.status, 400);
   });
 
-  test('returns 400 when coordinatorId is missing', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 400 when coordinatorId is missing', async () => {
     const response = await request(buildApp()).patch('/api/event-requests/7/coordinator').send({});
     assert.equal(response.status, 400);
   });
 
-  test('returns 400 when coordinatorId is blank', async () => {
+  test('[BOUNDARY] [SG2-33:AC1] [SG2-34:AC1] returns 400 when coordinatorId is blank', async () => {
     const response = await request(buildApp())
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: '   ' });
     assert.equal(response.status, 400);
   });
 
-  test('returns 401 when no verified principal is present', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 401 when no verified principal is present', async () => {
     const response = await request(buildApp({ principal: undefined }))
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: 'coord-1' });
     assert.equal(response.status, 401);
   });
 
-  test('returns 503 when the database client is unavailable', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 when the database client is unavailable', async () => {
     const response = await request(buildApp({ admin: null }))
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: 'coord-1' });
     assert.equal(response.status, 503);
   });
 
-  test('returns 404 when the event request does not exist', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 404 when the event request does not exist', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'missing' } })
     )
@@ -144,7 +163,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     assert.equal(response.status, 404);
   });
 
-  test('returns 503 without leaking the database error when the lookup fails', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 without leaking the database error when the lookup fails', async () => {
     const response = await request(
       buildApp({ fetchResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -154,21 +173,21 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 400 when coordinatorId does not belong to any account', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 400 when coordinatorId does not belong to any account', async () => {
     const response = await request(buildApp({ roleResult: { ok: false, reason: 'user_not_found' } }))
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: 'ghost' });
     assert.equal(response.status, 400);
   });
 
-  test('returns 400 when the target account is not an Event Coordinator', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 400 when the target account is not an Event Coordinator', async () => {
     const response = await request(buildApp({ roleResult: { ok: true, role: 'venue_staff' } }))
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: 'coord-1' });
     assert.equal(response.status, 400);
   });
 
-  test('returns 503 without leaking the database error when the role lookup fails', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 without leaking the database error when the role lookup fails', async () => {
     const response = await request(
       buildApp({ roleResult: { ok: false, reason: 'error', error: 'PRIVATE_SENTINEL' } })
     )
@@ -178,7 +197,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 409 when the request is still a draft', async () => {
+  test('[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] returns 409 when the assignment no longer matches an assignable status', async () => {
     const response = await request(
       buildApp({
         assignResult: {
@@ -193,7 +212,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     assert.equal(response.status, 409);
   });
 
-  test('returns 503 without leaking the database error when the update fails', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 without leaking the database error when the update fails', async () => {
     const response = await request(
       buildApp({ assignResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
     )
@@ -251,7 +270,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
       }
     );
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('technical_support_staff')).patch(
       '/api/event-requests/7/coordinator'
     );
@@ -259,21 +278,21 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
     assert.equal(response.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies a role without the assign-coordinator permission', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] denies a role without the assign-coordinator permission', async () => {
     const response = await request(appForRole('event_organiser'))
       .patch('/api/event-requests/7/coordinator')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 403);
   });
 
-  test('denies an Event Coordinator (they receive assignments, not make them)', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] denies an Event Coordinator (they receive assignments, not make them)', async () => {
     const response = await request(appForRole('event_coordinator'))
       .patch('/api/event-requests/7/coordinator')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 403);
   });
 
-  test('lets Technical Support Staff reach the assign-coordinator handler', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] lets Technical Support Staff reach the assign-coordinator handler', async () => {
     const response = await request(appForRole('technical_support_staff'))
       .patch('/api/event-requests/7/coordinator')
       .set('Authorization', 'Bearer token');

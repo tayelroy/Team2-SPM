@@ -45,20 +45,20 @@ describe('GET /api/event-requests/:eventId/stage authorisation wiring (SG2-38)',
       }
     );
 
-  test('rejects unauthenticated request with 401', async () => {
+  test('[FAILURE] [SG2-25:AC3] [SG2-38:AC1] rejects unauthenticated request with 401', async () => {
     const res = await request(appForRole('event_organiser')).get('/api/event-requests/101/stage');
     assert.equal(res.status, 401);
     assert.equal(res.headers['www-authenticate'], 'Bearer');
   });
 
-  test('denies attendee role with 403 Forbidden', async () => {
+  test('[FAILURE] [SG2-25:AC1] [SG2-38:AC1] denies attendee role with 403 Forbidden', async () => {
     const res = await request(appForRole('attendee'))
       .get('/api/event-requests/101/stage')
       .set('Authorization', 'Bearer token');
     assert.equal(res.status, 403);
   });
 
-  test('allows event_organiser role to reach handler', async () => {
+  test('[NORMAL] [SG2-38:AC1] allows event_organiser role to reach handler', async () => {
     const res = await request(appForRole('event_organiser'))
       .get('/api/event-requests/101/stage')
       .set('Authorization', 'Bearer token');
@@ -66,7 +66,7 @@ describe('GET /api/event-requests/:eventId/stage authorisation wiring (SG2-38)',
     assert.equal(res.body.reached, true);
   });
 
-  test('allows event_coordinator role to reach handler', async () => {
+  test('[NORMAL] [SG2-38:AC1] allows event_coordinator role to reach handler', async () => {
     const res = await request(appForRole('event_coordinator'))
       .get('/api/event-requests/101/stage')
       .set('Authorization', 'Bearer token');
@@ -74,7 +74,7 @@ describe('GET /api/event-requests/:eventId/stage authorisation wiring (SG2-38)',
     assert.equal(res.body.reached, true);
   });
 
-  test('allows venue_staff role to reach handler', async () => {
+  test('[NORMAL] [SG2-38:AC1] allows venue_staff role to reach handler', async () => {
     const res = await request(appForRole('venue_staff'))
       .get('/api/event-requests/101/stage')
       .set('Authorization', 'Bearer token');
@@ -82,7 +82,7 @@ describe('GET /api/event-requests/:eventId/stage authorisation wiring (SG2-38)',
     assert.equal(res.body.reached, true);
   });
 
-  test('allows technical_support_staff role to reach handler', async () => {
+  test('[NORMAL] [SG2-38:AC1] allows technical_support_staff role to reach handler', async () => {
     const res = await request(appForRole('technical_support_staff'))
       .get('/api/event-requests/101/stage')
       .set('Authorization', 'Bearer token');

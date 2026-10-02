@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 for (const configured of [false, true]) {
-  test(`startup uses the ${configured ? 'configured' : 'default'} port and reports configuration`, () => {
+  test(`[NORMAL] [SG2-20:AC1] startup uses the ${configured ? 'configured' : 'default'} port and reports configuration`, () => {
     if (configured) process.env.PORT = '7001';
     else delete process.env.PORT;
     dbConfig.supabaseUrl = configured ? 'https://test-project.supabase.co' : undefined;

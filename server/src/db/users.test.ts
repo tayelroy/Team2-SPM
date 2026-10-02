@@ -40,7 +40,7 @@ const record = {
 };
 
 describe('createUserRecord', () => {
-  test('inserts the user with the chosen role id looked up from public.roles', async () => {
+  test('[NORMAL] [SG2-24:account-provisioning] inserts the user with the chosen role id looked up from public.roles', async () => {
     let insertedRow: any;
     const admin = fakeAdmin({
       insert: async (row) => {
@@ -60,7 +60,7 @@ describe('createUserRecord', () => {
     });
   });
 
-  test('looks up whichever role was chosen, not a hardcoded default', async () => {
+  test('[NORMAL] [SG2-24:account-provisioning] looks up whichever role was chosen, not a hardcoded default', async () => {
     let queriedRoleName: string | undefined;
     const admin = fakeAdmin({
       onRoleNameQueried: (roleName) => {
@@ -73,7 +73,7 @@ describe('createUserRecord', () => {
     assert.equal(queriedRoleName, 'Event Organiser');
   });
 
-  test('fails without inserting when the chosen role is not configured', async () => {
+  test('[FAILURE] [SG2-24:account-provisioning] fails without inserting when the chosen role is not configured', async () => {
     let insertCalled = false;
     const admin = fakeAdmin({
       roleLookup: async () => ({ data: null, error: null }),
@@ -89,7 +89,7 @@ describe('createUserRecord', () => {
     assert.equal(insertCalled, false);
   });
 
-  test('fails without inserting when the role lookup errors', async () => {
+  test('[FAILURE] [SG2-24:account-provisioning] fails without inserting when the role lookup errors', async () => {
     let inserts = 0;
     const admin = fakeAdmin({
       roleLookup: async () => ({ data: null, error: { message: 'connection reset' } }),
@@ -102,7 +102,7 @@ describe('createUserRecord', () => {
     assert.equal(inserts, 0);
   });
 
-  test('surfaces the database error when the insert fails', async () => {
+  test('[FAILURE] [SG2-24:account-provisioning] surfaces the database error when the insert fails', async () => {
     const admin = fakeAdmin({
       insert: async () => ({ error: { message: 'duplicate key value violates unique constraint' } })
     });

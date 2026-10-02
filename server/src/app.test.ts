@@ -17,7 +17,7 @@ before(() => {
   }
 });
 
-test('application composition mounts injected service routers without exposing test controls in production', async () => {
+test('[NORMAL] [SG2-20:AC3] application composition mounts injected service routers without exposing test controls in production', async () => {
   const availability = Router().get('/availability', (_req, res) => res.json({ service: 'availability' }));
   const venues = Router().get('/', (_req, res) => res.json({ service: 'venues' }));
   const layouts = Router().get('/1/layouts', (_req, res) => res.json({ service: 'layouts' }));
@@ -37,7 +37,7 @@ test('application composition mounts injected service routers without exposing t
 describe('Public database readiness', () => {
   for (const route of ['/health/db', '/api/health/db']) {
     for (const status of ['connected', 'unconfigured', 'error'] as const) {
-      test(`${route}: ${status} returns only public fields`, async () => {
+      test(`${status === 'error' ? '[FAILURE]' : '[NORMAL]'} [SG2-20:AC2] ${route}: ${status} returns only public fields`, async () => {
         const configured = status !== 'unconfigured';
         const health: UnifiedDatabaseHealth = {
           provider: 'Supabase', configured,
@@ -58,7 +58,7 @@ describe('Public database readiness', () => {
       });
     }
 
-    test(`${route}: unexpected failure returns generic JSON`, async () => {
+    test(`[FAILURE] [SG2-20:AC2] ${route}: unexpected failure returns generic JSON`, async () => {
       const response = await request(createApp(async () => {
         throw new Error('PASSWORD_SENTINEL: invalid connection string');
       })).get(route);
@@ -69,7 +69,7 @@ describe('Public database readiness', () => {
 });
 
 describe('Health Check API', () => {
-  test('base health aliases report configured Supabase without exposing credentials', async (t) => {
+  test('[NORMAL] [SG2-20:AC2] base health aliases report configured Supabase without exposing credentials', async (t) => {
     const previous = { ...dbConfig };
     t.after(() => Object.assign(dbConfig, previous));
     dbConfig.supabaseUrl = 'https://private-project.supabase.co';
@@ -83,24 +83,22 @@ describe('Health Check API', () => {
     }
   });
 
-  test('both liveness aliases return the public unconfigured health contract', async () => {
+  test('[NORMAL] [SG2-20:AC2] both liveness aliases return the public unconfigured health contract', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-01T01:00:00.000Z') });
+    t.mock.method(process, 'uptime', () => 12.5);
     for (const route of ['/health', '/api/health']) {
       const response = await request(app).get(route);
       assert.equal(response.status, 200);
-      assert.equal(response.body.status, 'ok');
-      assert.equal(response.body.service, 'ConnectSphere Backend');
-      assert.ok(typeof response.body.uptime === 'number');
-      assert.ok(typeof response.body.timestamp === 'string');
-      assert.ok(response.body.database);
-      assert.equal(response.body.database.provider, 'Supabase');
-      assert.equal(response.body.database.configured, false);
-      assert.equal(response.body.database.supabaseClient, 'unconfigured');
+      assert.deepEqual(response.body, {
+        status: 'ok', service: 'ConnectSphere Backend', uptime: 12.5, timestamp: '2026-10-01T01:00:00.000Z',
+        database: { provider: 'Supabase', configured: false, supabaseClient: 'unconfigured' }
+      });
     }
   });
 });
 
 describe('Supabase HTTPS Client Connection Modules', () => {
-  test('checkDatabaseHealth returns structured health object', async () => {
+  test('[NORMAL] [SG2-20:AC2] checkDatabaseHealth returns structured health object', async () => {
     const health = await checkDatabaseHealth();
     assert.equal(health.provider, 'Supabase');
     assert.equal(health.configured, false);

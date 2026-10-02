@@ -392,6 +392,8 @@ describe('clarification authorisation wiring', () => {
       undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
       undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
       undefined, undefined,
+      // SG2-40's history handler sits between planning and the clarification pair.
+      undefined,
       reached,
       reached
     );

@@ -1,9 +1,11 @@
+vi.hoisted(() => vi.stubEnv('TZ', 'UTC'));
+
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Venues from '../screens/Venues';
 import type { Venue } from './api';
-import { describePeriod, type VenueBlock } from './blocksApi';
+import { type VenueBlock } from './blocksApi';
 
 const venue: Venue = { venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
   facilities: 'Stage', accessibility_features: 'Hearing loop', operating_information: 'Weekdays, 09:00–18:00' };
@@ -13,7 +15,12 @@ const coordinator = { userId: 'coordinator', role: 'event_coordinator', permissi
 const existing: VenueBlock = { unavailability_id: 1, starts_at: '2030-08-01T01:00:00.000Z', ends_at: '2030-08-02T01:00:00.000Z', reason: 'Scheduled maintenance' };
 const booking = { booking_id: 7, event_id: 3, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z' };
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'));
+});
+
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 type Handler = (url: string, init?: RequestInit) => Promise<Response> | Response | undefined;
 
@@ -61,29 +68,29 @@ function abortable(_url: string, init?: RequestInit) {
   return new Promise<Response>((_, reject) => init!.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
 }
 
-test('only callers who may manage blocks see the block control', async () => {
+test('[FAILURE] [SG2-45:AC1] only callers who may manage blocks see the block control', async () => {
   api(coordinator);
   render(<Venues accessToken="test-token" onBook={vi.fn()} />);
   await screen.findByRole('searchbox');
   expect(screen.queryByRole('button', { name: /^Block/ })).not.toBeInTheDocument();
 });
 
-test('the block screen lists the venue\'s upcoming blocks, or says there are none', async () => {
+test('[BOUNDARY] [SG2-45:AC1] the block screen lists the venue\'s upcoming blocks, or says there are none', async () => {
   await openBlocks([existing]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
-  expect(item).toHaveTextContent(describePeriod(existing.starts_at, existing.ends_at));
+  expect(item).toHaveTextContent('1 Aug 2030, 1:00 am – 2 Aug 2030, 1:00 am');
   cleanup();
   await openBlocks([]);
   expect(await screen.findByText(/No upcoming blocks/)).toBeInTheDocument();
 });
 
-test('AC1: blocking a free period with a reason records it and shows it in the list, earliest first', async () => {
+test('[NORMAL] [SG2-45:AC1] AC1: blocking a free period with a reason records it and shows it in the list, earliest first', async () => {
   const { fetch } = await openBlocks([existing]);
   await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   fillBlock('2030-07-01T09:00', '2030-07-01T17:00', '  Carpet replacement ');
-  const starts = new Date('2030-07-01T09:00').toISOString();
-  const ends = new Date('2030-07-01T17:00').toISOString();
-  expect(await screen.findByRole('status')).toHaveTextContent(`Atrium Hall is blocked ${describePeriod(starts, ends)}.`);
+  const starts = '2030-07-01T09:00:00.000Z';
+  const ends = '2030-07-01T17:00:00.000Z';
+  expect(await screen.findByRole('status')).toHaveTextContent('Atrium Hall is blocked 1 Jul 2030, 9:00 am – 1 Jul 2030, 5:00 pm.');
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({
     method: 'POST', body: JSON.stringify({ starts_at: starts, ends_at: ends, reason: 'Carpet replacement' })
   }));
@@ -91,32 +98,34 @@ test('AC1: blocking a free period with a reason records it and shows it in the l
   expect(screen.getByLabelText('Reason')).toHaveValue('');
 });
 
-test('AC2: a period holding a confirmed booking is refused and the booking is identified', async () => {
+test('[CONFLICT] [SG2-45:AC2] AC2: a period holding a confirmed booking is refused and the booking is identified', async () => {
   await openBlocks([], (url, init) => url === '/api/venues/1/blocks' && init?.method === 'POST'
     ? Response.json({ error: 'conflict', booking }, { status: 409 }) : undefined);
   await screen.findByText(/No upcoming blocks/);
   fillBlock('2030-06-15T09:00', '2030-06-15T13:00', 'Deep clean');
-  expect(await screen.findByRole('alert')).toHaveTextContent(`booking #7 for event 3, ${describePeriod(booking.starts_at, booking.ends_at)}`);
+  expect(await screen.findByRole('alert')).toHaveTextContent('booking #7 for event 3, 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am');
   expect(screen.getByText(/No upcoming blocks/)).toBeInTheDocument();
   expect(screen.getByLabelText('Reason')).toHaveValue('Deep clean');
 });
 
-test('AC3: removing a block makes the venue available for that period again', async () => {
+test('[NORMAL] [SG2-45:AC3] AC3: removing a block makes the venue available for that period again', async () => {
   const { fetch } = await openBlocks([existing]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   fireEvent.click(within(item).getByRole('button', { name: 'Remove block' }));
-  expect(await screen.findByRole('status')).toHaveTextContent(`Block removed. Atrium Hall is available again ${describePeriod(existing.starts_at, existing.ends_at)}.`);
+  expect(await screen.findByRole('status')).toHaveTextContent('Block removed. Atrium Hall is available again 1 Aug 2030, 1:00 am – 2 Aug 2030, 1:00 am.');
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks/1', expect.objectContaining({ method: 'DELETE' }));
   expect(screen.getByText(/No upcoming blocks/)).toBeInTheDocument();
 });
 
-test('an invalid period or missing reason is caught before any request', async () => {
+test('[BOUNDARY] [SG2-45:AC1] an invalid period or missing reason is caught before any request', async () => {
   const { fetch } = await openBlocks();
   await screen.findByText(/No upcoming blocks/);
   for (const [start, end, reason] of [
     ['', '2030-07-01T17:00', 'Reason'],
     ['2030-07-01T09:00', '', 'Reason'],
     ['2030-07-01T17:00', '2030-07-01T09:00', 'Reason'],
+    ['2030-07-01T09:00', '2030-07-01T09:00', 'Reason'],
+    ['2026-09-30T23:59', '2026-10-01T00:00', 'Reason'],
     ['2020-07-01T09:00', '2020-07-01T17:00', 'Reason'],
     ['2030-07-01T09:00', '2030-07-01T17:00', '   '],
     ['2030-07-01T09:00', '2030-07-01T17:00', 'x'.repeat(501)]
@@ -127,13 +136,24 @@ test('an invalid period or missing reason is caught before any request', async (
   expect(fetch).not.toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({ method: 'POST' }));
 });
 
-test('a failed read of the blocks is reported without leaving the screen', async () => {
+test('[BOUNDARY] [SG2-45:AC1] a one-minute free period accepts a reason of exactly 500 characters', async () => {
+  const { fetch } = await openBlocks();
+  await screen.findByText(/No upcoming blocks/);
+  const reason = '🧹'.repeat(500);
+  fillBlock('2030-07-01T09:00', '2030-07-01T09:01', reason);
+  expect(await screen.findByRole('listitem', { name: reason })).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({
+    method: 'POST', body: JSON.stringify({ starts_at: '2030-07-01T09:00:00.000Z', ends_at: '2030-07-01T09:01:00.000Z', reason }),
+  }));
+});
+
+test('[FAILURE] [SG2-45:AC1] a failed read of the blocks is reported without leaving the screen', async () => {
   await openBlocks([], url => url === '/api/venues/1/blocks' ? new Response('', { status: 503 }) : undefined);
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to reach the venue service');
   expect(screen.getByText(/No upcoming blocks/)).toBeInTheDocument();
 });
 
-test('a network failure while saving keeps the form and reports a generic error', async () => {
+test('[FAILURE] [SG2-45:AC1] a network failure while saving keeps the form and reports a generic error', async () => {
   await openBlocks([], (url, init) => {
     if (url === '/api/venues/1/blocks' && init?.method === 'POST') throw new TypeError('Failed to fetch');
     return undefined;
@@ -144,7 +164,7 @@ test('a network failure while saving keeps the form and reports a generic error'
   expect(screen.getByLabelText('Reason')).toHaveValue('Carpet replacement');
 });
 
-test('a lost session drops the catalogue and asks the user to sign in again', async () => {
+test('[FAILURE] [SG2-45:AC1] a lost session drops the catalogue and asks the user to sign in again', async () => {
   await openBlocks([existing], (_url, init) => init?.method === 'DELETE' ? new Response('', { status: 401 }) : undefined);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   fireEvent.click(within(item).getByRole('button', { name: 'Remove block' }));
@@ -153,13 +173,13 @@ test('a lost session drops the catalogue and asks the user to sign in again', as
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
-test('back to catalogue returns to the venue list', async () => {
+test('[NORMAL] [SG2-45:AC1] back to catalogue returns to the venue list', async () => {
   await openBlocks();
   fireEvent.click(screen.getByRole('button', { name: 'Back to catalogue' }));
   expect(screen.getByRole('heading', { name: 'Atrium Hall' })).toBeInTheDocument();
 });
 
-test('leaving while the blocks are loading discards the stale request', async () => {
+test('[CONFLICT] [SG2-45:block-isolation] leaving while the blocks are loading discards the stale request', async () => {
   const { fetch, rerender } = await openBlocks([], (url, init) => url === '/api/venues/1/blocks' ? abortable(url, init) : undefined);
   expect(screen.getByRole('status')).toHaveTextContent('Loading blocks…');
   rerender(<Venues accessToken={null} onBook={vi.fn()} />);
@@ -167,7 +187,7 @@ test('leaving while the blocks are loading discards the stale request', async ()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
-test('leaving mid-save aborts the request without reporting an error', async () => {
+test('[CONFLICT] [SG2-45:block-isolation] leaving mid-save aborts the request without reporting an error', async () => {
   const { fetch, rerender } = await openBlocks([], (url, init) =>
     url === '/api/venues/1/blocks' && init?.method === 'POST' ? abortable(url, init) : undefined);
   await screen.findByText(/No upcoming blocks/);
@@ -179,3 +199,5 @@ test('leaving mid-save aborts the request without reporting an error', async () 
   expect(post[1]!.signal!.aborted).toBe(true);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
+
+afterAll(() => vi.unstubAllEnvs());

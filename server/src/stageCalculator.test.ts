@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { computeEventStage, type EventStageInput } from './events/stageCalculator';
 
 describe('computeEventStage (SG2-38)', () => {
-  test('draft state returns plain-language "Draft" stage waiting on Event Organiser', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] draft state returns plain-language "Draft" stage waiting on Event Organiser', () => {
     const input: EventStageInput = {
       event_id: 1,
       status: 'draft',
@@ -25,7 +25,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[1].status, 'upcoming');
   });
 
-  test('submitted state without coordinator returns "Submitted" stage waiting on ConnectSphere Staff', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] submitted state without coordinator returns "Submitted" stage waiting on ConnectSphere Staff', () => {
     const input: EventStageInput = {
       event_id: 2,
       status: 'submitted',
@@ -47,7 +47,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[2].status, 'upcoming');
   });
 
-  test('submitted state with coordinator assigned returns "Under Review" waiting on named coordinator', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] submitted state with coordinator assigned returns "Under Review" waiting on named coordinator', () => {
     const input: EventStageInput = {
       event_id: 3,
       status: 'submitted',
@@ -105,7 +105,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.waiting_on?.user_id, null);
   });
 
-  test('under_review status directly maps to "Under Review" stage', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] under_review status directly maps to "Under Review" stage', () => {
     const input: EventStageInput = {
       event_id: 4,
       status: 'under_review',
@@ -121,7 +121,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[2].status, 'current');
   });
 
-  test('approved status returns unified "Approved — In Planning" stage waiting on coordinator arrangements', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] approved status returns unified "Approved — In Planning" stage waiting on coordinator arrangements', () => {
     const input: EventStageInput = {
       event_id: 5,
       status: 'approved',
@@ -146,7 +146,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[4].status, 'upcoming');
   });
 
-  test('planning status also maps to "Approved — In Planning" stage', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] planning status also maps to "Approved — In Planning" stage', () => {
     const input: EventStageInput = {
       event_id: 6,
       status: 'planning',
@@ -165,7 +165,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.deepEqual(result.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
   });
 
-  test('confirmed status maps to "Confirmed" stage with no pending waiting-on', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] confirmed status maps to "Confirmed" stage with no pending waiting-on', () => {
     const input: EventStageInput = {
       event_id: 7,
       status: 'confirmed',
@@ -179,10 +179,12 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stage, 'Confirmed');
     assert.equal(result.stage_key, 'confirmed');
     assert.equal(result.waiting_on, null);
-    assert.equal(result.stepper_steps.every((s) => s.status === 'completed'), true);
+    assert.deepEqual(result.stepper_steps.map(step => [step.key, step.status]), [
+      ['draft', 'completed'], ['submitted', 'completed'], ['under_review', 'completed'], ['in_planning', 'completed'], ['confirmed', 'completed']
+    ]);
   });
 
-  test('completed status maps to "Completed" terminal stage with all steps completed', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] completed status maps to "Completed" terminal stage with all steps completed', () => {
     const input: EventStageInput = {
       event_id: 8,
       status: 'completed',
@@ -194,10 +196,12 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stage, 'Completed');
     assert.equal(result.stage_key, 'completed');
     assert.equal(result.waiting_on, null);
-    assert.equal(result.stepper_steps.every((s) => s.status === 'completed'), true);
+    assert.deepEqual(result.stepper_steps.map(step => [step.key, step.status]), [
+      ['draft', 'completed'], ['submitted', 'completed'], ['under_review', 'completed'], ['in_planning', 'completed'], ['confirmed', 'completed']
+    ]);
   });
 
-  test('cancelled status maps to "Cancelled" terminal stage with no pending waiting-on', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] cancelled status maps to "Cancelled" terminal stage with no pending waiting-on', () => {
     const input: EventStageInput = {
       event_id: 9,
       status: 'cancelled',
@@ -211,7 +215,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.waiting_on, null);
   });
 
-  test('rejected status maps to "Rejected" terminal stage with no pending waiting-on', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] rejected status maps to "Rejected" terminal stage with no pending waiting-on', () => {
     const input: EventStageInput = {
       event_id: 10,
       status: 'rejected',
@@ -225,7 +229,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.waiting_on, null);
   });
 
-  test('unrecognized/custom status hits the default branch with capitalized stage and status key', () => {
+  test('[FAILURE] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] an unknown stage keeps a readable label and has no pending actor', () => {
     const input: EventStageInput = {
       event_id: 11,
       status: 'on_hold',
@@ -241,7 +245,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[0].status, 'current');
   });
 
-  test('coordinatorPersona defaults to "Event Coordinator" when coordinator_id is present without coordinator_name', () => {
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] a coordinator with no recorded name keeps their responsibility and user id', () => {
     // submitted with coordinator_id but no coordinator_name
     const submittedInput: EventStageInput = {
       event_id: 12,
@@ -282,7 +286,7 @@ describe('computeEventStage (SG2-38)', () => {
     });
   });
 
-  test('draft state when organiser_id is undefined returns waiting_on with null user_id', () => {
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] draft state when organiser_id is undefined returns waiting_on with null user_id', () => {
     const input: EventStageInput = {
       event_id: 15,
       status: 'draft'
@@ -298,7 +302,7 @@ describe('computeEventStage (SG2-38)', () => {
     });
   });
 
-  test('handles edge branches: empty status defaults to draft, missing coordinator_id falls back to null user_id', () => {
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] missing stage and coordinator values produce safe display defaults', () => {
     // empty status string
     const emptyStatusResult = computeEventStage({ event_id: 16, status: '' });
     assert.equal(emptyStatusResult.stage, 'Draft');

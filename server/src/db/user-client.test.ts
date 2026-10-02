@@ -16,27 +16,27 @@ afterEach(() => {
   Object.assign(dbConfig, originalConfig);
 });
 
-test('returns null when the project URL is missing', () => {
+test('[FAILURE] [SG2-25:AC2] [SG2-44:AC3] returns null when the project URL is missing', () => {
   dbConfig.supabaseUrl = undefined;
   assert.equal(createUserScopedClient('token'), null);
 });
 
-test('returns null when the anon key is missing', () => {
+test('[FAILURE] [SG2-25:AC2] [SG2-44:AC3] returns null when the anon key is missing', () => {
   dbConfig.supabaseAnonKey = undefined;
   assert.equal(createUserScopedClient('token'), null);
 });
 
-test('returns null for a plaintext project URL', () => {
+test('[FAILURE] [SG2-25:AC2] [SG2-44:AC3] returns null for a plaintext project URL', () => {
   dbConfig.supabaseUrl = 'http://scoped-test.supabase.co';
   assert.equal(createUserScopedClient('token'), null);
 });
 
-test('returns null for a malformed project URL', () => {
+test('[FAILURE] [SG2-25:AC2] [SG2-44:AC3] returns null for a malformed project URL', () => {
   dbConfig.supabaseUrl = 'not-a-url';
   assert.equal(createUserScopedClient('token'), null);
 });
 
-test('acts as the caller with a bounded, redirect-refusing request', async () => {
+test('[NORMAL] [SG2-25:AC2] [SG2-44:AC3] acts as the caller with a bounded, redirect-refusing request', async () => {
   const timeoutMock = mock.method(AbortSignal, 'timeout', () => new AbortController().signal);
   const fetchMock = mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
     assert.equal(String(input), 'https://scoped-test.supabase.co/rest/v1/venue_bookings?select=starts_at');

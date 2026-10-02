@@ -52,7 +52,7 @@ function fakeClient(tables: Record<string, TableResult>, calls: QueryCall[] = []
 
 // --- getVenueAvailability -------------------------------------------------------
 
-test('queries the chosen venue over the half-open range and merges occupied periods in start order', async () => {
+test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries the chosen venue over the half-open range and merges occupied periods in start order', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({
     venue_bookings: {
@@ -90,7 +90,7 @@ test('queries the chosen venue over the half-open range and merges occupied peri
   });
 });
 
-test('keeps entries that share a start instant', async () => {
+test('[BOUNDARY] [SG2-44:AC1] [SG2-44:AC2] keeps entries that share a start instant', async () => {
   const client = fakeClient({
     venue_bookings: {
       data: [{ starts_at: '2026-10-05T09:00:00.000Z', ends_at: '2026-10-05T10:00:00.000Z', status: 'held', event_id: null }],
@@ -109,7 +109,7 @@ test('keeps entries that share a start instant', async () => {
   ] });
 });
 
-test('returns an empty list when both queries return null', async () => {
+test('[BOUNDARY] [SG2-44:AC1] returns an empty list when both queries return null', async () => {
   const client = fakeClient({
     venue_bookings: { data: null, error: null },
     venue_unavailability: { data: null, error: null }
@@ -117,7 +117,7 @@ test('returns an empty list when both queries return null', async () => {
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'ok', entries: [] });
 });
 
-test('is unavailable when the bookings query fails', async () => {
+test('[FAILURE] [SG2-44:AC1] is unavailable when the bookings query fails', async () => {
   const client = fakeClient({
     venue_bookings: { data: null, error: { message: 'boom' } },
     venue_unavailability: { data: [], error: null }
@@ -125,7 +125,7 @@ test('is unavailable when the bookings query fails', async () => {
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'unavailable' });
 });
 
-test('is unavailable when the unavailability query fails', async () => {
+test('[FAILURE] [SG2-44:AC1] is unavailable when the unavailability query fails', async () => {
   const client = fakeClient({
     venue_bookings: { data: [], error: null },
     venue_unavailability: { data: null, error: { message: 'boom' } }
@@ -133,12 +133,12 @@ test('is unavailable when the unavailability query fails', async () => {
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'unavailable' });
 });
 
-test('is unavailable without a Supabase client', async () => {
+test('[FAILURE] [SG2-44:AC1] is unavailable without a Supabase client', async () => {
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, null), { outcome: 'unavailable' });
 });
 
 for (const badId of ['0', '-1', '3.5', 'abc', '', 5.5, 0, -2, null, undefined, {}]) {
-  test(`rejects a non-positive-integer venue id: ${JSON.stringify(badId)}`, async () => {
+  test(`${badId === '0' || badId === 0 ? '[BOUNDARY]' : '[FAILURE]'} [SG2-44:AC1] rejects a non-positive-integer venue id: ${JSON.stringify(badId)}`, async () => {
     assert.deepEqual(await getVenueAvailability(badId, FROM, TO, fakeClient({})), {
       outcome: 'invalid',
       message: 'A positive integer venue id is required.'
@@ -154,7 +154,7 @@ for (const [from, to] of [
   [TO, 'nope'],
   [['x'], TO]
 ] as Array<[unknown, unknown]>) {
-  test(`rejects non ISO date-times: ${JSON.stringify([from, to])}`, async () => {
+  test(`[FAILURE] [SG2-44:AC1] rejects non ISO date-times: ${JSON.stringify([from, to])}`, async () => {
     assert.deepEqual(await getVenueAvailability('5', from, to, fakeClient({})), {
       outcome: 'invalid',
       message: 'from and to must be ISO 8601 date-times.'
@@ -163,7 +163,7 @@ for (const [from, to] of [
 }
 
 for (const [from, to] of [[TO, TO], [TO, FROM]]) {
-  test(`rejects a non-increasing range: ${JSON.stringify([from, to])}`, async () => {
+  test(`[BOUNDARY] [SG2-44:AC1] rejects a non-increasing range: ${JSON.stringify([from, to])}`, async () => {
     assert.deepEqual(await getVenueAvailability('5', from, to, fakeClient({})), {
       outcome: 'invalid',
       message: 'from must be earlier than to.'
@@ -171,7 +171,7 @@ for (const [from, to] of [[TO, TO], [TO, FROM]]) {
   });
 }
 
-test('accepts exactly 366 days and rejects one millisecond beyond the limit without querying', async () => {
+test('[BOUNDARY] [SG2-44:AC1] accepts exactly 366 days and rejects one millisecond beyond the limit without querying', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({}, calls);
   assert.deepEqual(
@@ -189,7 +189,7 @@ test('accepts exactly 366 days and rejects one millisecond beyond the limit with
 
 // --- getAllVenuesAvailability --------------------------------------------------
 
-test('queries every venue over the chosen range and groups sorted entries by venue', async () => {
+test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries every venue over the chosen range and groups sorted entries by venue', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({
     venues: {
@@ -250,12 +250,12 @@ test('queries every venue over the chosen range and groups sorted entries by ven
   });
 });
 
-test('all-venues read treats a null venue list as empty', async () => {
+test('[BOUNDARY] [SG2-44:AC1] all-venues read treats a null venue list as empty', async () => {
   const client = fakeClient({ venues: { data: null, error: null } });
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'ok', venues: [] });
 });
 
-test('all-venues read treats null booking/unavailability data as empty', async () => {
+test('[BOUNDARY] [SG2-44:AC1] all-venues read treats null booking/unavailability data as empty', async () => {
   const client = fakeClient({
     venues: { data: [{ venue_id: 1, name: 'Atrium' }], error: null },
     venue_bookings: { data: null, error: null },
@@ -267,23 +267,23 @@ test('all-venues read treats null booking/unavailability data as empty', async (
   });
 });
 
-test('all-venues read rejects an invalid range', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues read rejects an invalid range', async () => {
   assert.deepEqual(await getAllVenuesAvailability('not-a-date', TO, fakeClient({})), {
     outcome: 'invalid',
     message: 'from and to must be ISO 8601 date-times.'
   });
 });
 
-test('all-venues read is unavailable without a Supabase client', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable without a Supabase client', async () => {
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, null), { outcome: 'unavailable' });
 });
 
-test('all-venues read is unavailable when the venue list query fails', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the venue list query fails', async () => {
   const client = fakeClient({ venues: { data: null, error: { message: 'boom' } } });
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });
 });
 
-test('all-venues read is unavailable when the bookings query fails', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the bookings query fails', async () => {
   const client = fakeClient({
     venues: { data: [], error: null },
     venue_bookings: { data: null, error: { message: 'boom' } }
@@ -291,7 +291,7 @@ test('all-venues read is unavailable when the bookings query fails', async () =>
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });
 });
 
-test('all-venues read is unavailable when the unavailability query fails', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the unavailability query fails', async () => {
   const client = fakeClient({
     venues: { data: [], error: null },
     venue_bookings: { data: [], error: null },
@@ -311,7 +311,7 @@ function handlerApp(
   return app;
 }
 
-test('handler passes the path, query, and caller-scoped client through and returns 200', async () => {
+test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] handler passes the path, query, and caller-scoped client through and returns 200', async () => {
   const calls: { args?: unknown[]; token?: string } = {};
   const app = handlerApp(
     async (...args) => {
@@ -333,21 +333,21 @@ test('handler passes the path, query, and caller-scoped client through and retur
   assert.deepEqual(calls.args, ['5', 'A', 'B', { scoped: 'tok-123' }]);
 });
 
-test('handler maps an invalid result to 400', async () => {
+test('[FAILURE] [SG2-44:AC1] handler maps an invalid result to 400', async () => {
   const app = handlerApp(async () => ({ outcome: 'invalid', message: 'bad range' }));
   const res = await request(app).get('/v/5/availability').set('Authorization', 'Bearer tok');
   assert.equal(res.status, 400);
   assert.deepEqual(res.body, { error: 'bad range' });
 });
 
-test('handler maps an unavailable result to 503', async () => {
+test('[FAILURE] [SG2-44:AC1] handler maps an unavailable result to 503', async () => {
   const app = handlerApp(async () => ({ outcome: 'unavailable' }));
   const res = await request(app).get('/v/5/availability').set('Authorization', 'Bearer tok');
   assert.equal(res.status, 503);
   assert.deepEqual(res.body, { error: 'Venue availability is temporarily unavailable.' });
 });
 
-test('handler passes a null client when the request carries no bearer token', async () => {
+test('[FAILURE] [SG2-44:AC3] handler passes a null client when the request carries no bearer token', async () => {
   let clientArg: unknown = 'unset';
   let madeClient = false;
   const app = handlerApp(
@@ -367,7 +367,7 @@ test('handler passes a null client when the request carries no bearer token', as
   assert.equal(madeClient, false);
 });
 
-test('handler ignores a non-bearer Authorization header', async () => {
+test('[FAILURE] [SG2-44:AC3] handler ignores a non-bearer Authorization header', async () => {
   let clientArg: unknown = 'unset';
   const app = handlerApp(async (_venueId, _from, _to, client) => {
     clientArg = client;
@@ -390,7 +390,7 @@ function allVenuesHandlerApp(
   return app;
 }
 
-test('all-venues handler passes query and caller-scoped client through and returns 200', async () => {
+test('[NORMAL] [SG2-44:AC1] all-venues handler passes query and caller-scoped client through and returns 200', async () => {
   const calls: { args?: unknown[]; token?: string } = {};
   const app = allVenuesHandlerApp(
     async (...args) => {
@@ -412,21 +412,21 @@ test('all-venues handler passes query and caller-scoped client through and retur
   assert.deepEqual(calls.args, ['A', 'B', { scoped: 'tok-123' }]);
 });
 
-test('all-venues handler maps an invalid result to 400', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues handler maps an invalid result to 400', async () => {
   const app = allVenuesHandlerApp(async () => ({ outcome: 'invalid', message: 'bad range' }));
   const res = await request(app).get('/v/availability').set('Authorization', 'Bearer tok');
   assert.equal(res.status, 400);
   assert.deepEqual(res.body, { error: 'bad range' });
 });
 
-test('all-venues handler maps an unavailable result to 503', async () => {
+test('[FAILURE] [SG2-44:AC1] all-venues handler maps an unavailable result to 503', async () => {
   const app = allVenuesHandlerApp(async () => ({ outcome: 'unavailable' }));
   const res = await request(app).get('/v/availability').set('Authorization', 'Bearer tok');
   assert.equal(res.status, 503);
   assert.deepEqual(res.body, { error: 'Venue availability is temporarily unavailable.' });
 });
 
-test('all-venues handler passes a null client when the request carries no bearer token', async () => {
+test('[FAILURE] [SG2-44:AC3] all-venues handler passes a null client when the request carries no bearer token', async () => {
   let clientArg: unknown = 'unset';
   let madeClient = false;
   const app = allVenuesHandlerApp(
@@ -469,7 +469,7 @@ function appAs(role: string) {
   );
 }
 
-test('the default availability router refuses unauthenticated requests to both routes', async () => {
+test('[FAILURE] [SG2-44:AC3] the default availability router refuses unauthenticated requests to both routes', async () => {
   const app = express();
   app.use('/api/venues', createVenueAvailabilityRouter());
   for (const path of ['/api/venues/availability', '/api/venues/5/availability']) {
@@ -479,13 +479,13 @@ test('the default availability router refuses unauthenticated requests to both r
   }
 });
 
-test('unauthenticated availability requests are refused', async () => {
+test('[FAILURE] [SG2-44:AC3] unauthenticated availability requests are refused', async () => {
   const res = await request(appAs('event_coordinator')).get('/api/venues/5/availability');
   assert.equal(res.status, 401);
 });
 
 for (const role of ACCOUNT_ROLES) {
-  test(`SG2-44: availability view obeys the policy for ${role}`, async () => {
+  test(`${['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role) ? '[NORMAL]' : '[FAILURE]'} [SG2-44:AC3] SG2-44: availability view obeys the policy for ${role}`, async () => {
     const allowed = ['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role);
     mock.method(globalThis, 'fetch', async () => Response.json([]));
 
@@ -501,7 +501,7 @@ for (const role of ACCOUNT_ROLES) {
 }
 
 for (const role of ACCOUNT_ROLES) {
-  test(`SG2-44: all-venues availability view obeys the policy for ${role}`, async () => {
+  test(`${['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role) ? '[NORMAL]' : '[FAILURE]'} [SG2-44:AC3] SG2-44: all-venues availability view obeys the policy for ${role}`, async () => {
     const allowed = ['event_coordinator', 'venue_staff', 'technical_support_staff'].includes(role);
     mock.method(globalThis, 'fetch', async () => Response.json([]));
 

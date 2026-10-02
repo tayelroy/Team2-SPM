@@ -2,7 +2,6 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import App from './App';
-import { NOTIFICATIONS } from './mock/data';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
@@ -86,7 +85,7 @@ async function signInAs(role: Role) {
 
 const header = () => screen.getByRole('banner');
 
-test('the landing page leads into sign-in', () => {
+test('[NORMAL] [SG2-20:navigation] the landing page leads into sign-in', () => {
   render(<App />);
   expect(
     screen.getByRole('heading', {
@@ -98,14 +97,14 @@ test('the landing page leads into sign-in', () => {
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('the wordmark returns from sign-in to the landing page', () => {
+test('[NORMAL] [SG2-20:navigation] the wordmark returns from sign-in to the landing page', () => {
   render(<App />);
   fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
   fireEvent.click(screen.getByRole('button', { name: /ConnectSphere/ }));
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
-test('invalid credentials show a generic error and keep you on sign-in', async () => {
+test('[FAILURE] [SG2-23:AC2] invalid credentials show a generic error and keep you on sign-in', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'Invalid email or password.' }), { status: 401 }))
@@ -120,7 +119,7 @@ test('invalid credentials show a generic error and keep you on sign-in', async (
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('an attendee lands on the event page rather than a dashboard', async () => {
+test('[NORMAL] [SG2-23:AC1] an attendee lands on the event page rather than a dashboard', async () => {
   await signInAs('Attendee');
   expect(screen.getByRole('heading', { name: 'Event page' })).toBeInTheDocument();
   expect(
@@ -154,10 +153,10 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
   };
-  test('the role catalogue contains all five documented roles', () => {
+  test('[NORMAL] [SG2-24:AC1] the role catalogue contains all five documented roles', () => {
     expect(ROLES).toEqual(expectedRoles);
   });
-  test.each(expectedRoles)('%s', async (role) => {
+  test.each(expectedRoles)('[NORMAL] [SG2-23:AC1] %s', async (role) => {
     await signInAs(role);
     for (const [navLabel, heading] of destinations[role]) {
       fireEvent.click(within(header()).getByRole('button', { name: navLabel }));
@@ -171,7 +170,7 @@ describe('every role can reach every screen in its navigation', () => {
 test.each([
   ['Venue Staff', 'Booking requests', 'Booking approval'],
   ['Technical Support Staff', 'Equipment requests', 'Equipment requests'],
-] as const)('%s reach sample-data screens only through the Preview menu', async (role, label, heading) => {
+] as const)('[NORMAL] [SG2-41:preview-separation] %s reach sample-data screens only through the Preview menu', async (role, label, heading) => {
   await signInAs(role);
   expect(within(header()).queryByRole('button', { name: label })).not.toBeInTheDocument();
   const preview = within(header()).getByRole('button', { name: 'Preview' });
@@ -185,7 +184,7 @@ test.each([
 });
 
 // Outside-click and focus dismissal share useDismissOutside, covered by the profile options test.
-test('the Preview menu toggles and closes with Escape, returning focus', async () => {
+test('[NORMAL] [SG2-41:preview-separation] the Preview menu toggles and closes with Escape, returning focus', async () => {
   await signInAs('Venue Staff');
   const preview = within(header()).getByRole('button', { name: 'Preview' });
   fireEvent.click(preview);
@@ -200,12 +199,12 @@ test('the Preview menu toggles and closes with Escape, returning focus', async (
   expect(preview).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('roles without sample-data screens have no Preview menu', async () => {
+test('[NORMAL] [SG2-41:preview-separation] roles without sample-data screens have no Preview menu', async () => {
   await signInAs('Event Coordinator');
   expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
 });
 
-test('the role shown in the header is a read-only label, not a selector', async () => {
+test('[FAILURE] [SG2-24:AC2] the role shown in the header is a read-only label, not a selector', async () => {
   await signInAs('Event Coordinator');
   const roleLabel = screen.getByLabelText('Your role');
   expect(roleLabel).toHaveTextContent('Event Coordinator');
@@ -214,7 +213,7 @@ test('the role shown in the header is a read-only label, not a selector', async 
   expect(roleLabel.tagName).not.toBe('SELECT');
 });
 
-test('a persisted session resumes straight into the app on the next visit', async () => {
+test('[NORMAL] [SG2-23:session-resume] a persisted session resumes straight into the app on the next visit', async () => {
   await signInAs('Venue Staff');
   cleanup();
 
@@ -225,7 +224,7 @@ test('a persisted session resumes straight into the app on the next visit', asyn
   expect(await screen.findByRole('heading', { name: 'Venue desk' })).toBeInTheDocument();
 });
 
-test.each([401, 403])('a %s validation denial clears the session and returns to landing', async (status) => {
+test.each([401, 403])('[FAILURE] [SG2-23:session-resume] a %s validation denial clears the session and returns to landing', async (status) => {
   await signInAs('Venue Staff');
   cleanup();
 
@@ -235,7 +234,7 @@ test.each([401, 403])('a %s validation denial clears the session and returns to 
   expect(sessionStorage.getItem('connectsphere.session')).toBeNull();
 });
 
-test.each([500, 503, 'offline'] as const)('a %s validation failure preserves the session after the check finishes', async (failure) => {
+test.each([500, 503, 'offline'] as const)('[FAILURE] [SG2-23:session-resume] a %s validation failure preserves the session after the check finishes', async (failure) => {
   await signInAs('Venue Staff');
   cleanup();
   const saved = sessionStorage.getItem('connectsphere.session');
@@ -251,7 +250,7 @@ test.each([500, 503, 'offline'] as const)('a %s validation failure preserves the
 test.each([
   ['Venue Staff', 'Catalogue', 'Venue desk'],
   ['Attendee', 'My registrations', 'Event page'],
-] as const)('the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
+] as const)('[NORMAL] [SG2-23:session-resume] the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
   await signInAs(role);
   fireEvent.click(within(header()).getByRole('button', { name: destination }));
   const saved = sessionStorage.getItem('connectsphere.session');
@@ -264,7 +263,7 @@ test.each([
   expect(screen.getByRole('heading', { level: 1, name: home })).toBeInTheDocument();
 });
 
-test('the profile options open, toggle and dismiss with Escape, outside clicks or focus', async () => {
+test('[NORMAL] [SG2-23:AC3] the profile options open, toggle and dismiss with Escape, outside clicks or focus', async () => {
   await signInAs('Event Coordinator');
   const profile = screen.getByRole('button', { name: 'Profile' });
   expect(profile).toHaveAttribute('aria-expanded', 'false');
@@ -293,7 +292,7 @@ test('the profile options open, toggle and dismiss with Escape, outside clicks o
   expect(fetch).not.toHaveBeenCalledWith('/api/auth/logout', expect.anything());
 });
 
-test('My Profile navigates to the profile screen and closes the dropdown', async () => {
+test('[NORMAL] [SG2-27:AC1] My Profile navigates to the profile screen and closes the dropdown', async () => {
   await signInAs('Event Coordinator');
   fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
   fireEvent.click(screen.getByRole('button', { name: 'My Profile' }));
@@ -302,7 +301,7 @@ test('My Profile navigates to the profile screen and closes the dropdown', async
   await screen.findByLabelText('Name');
 });
 
-test('profile Logout immediately removes local access and waits for server confirmation', async () => {
+test('[NORMAL] [SG2-23:AC3] profile Logout immediately removes local access and waits for server confirmation', async () => {
   await signInAs('Event Coordinator');
   let complete!: (response: Response) => void;
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
@@ -323,7 +322,7 @@ test('profile Logout immediately removes local access and waits for server confi
   expect(screen.getByRole('button', { name: 'Open app' })).toBeInTheDocument();
 });
 
-test.each(['offline', 'server failure'])('Logout clears local access and reports unconfirmed revocation on %s', async failure => {
+test.each(['offline', 'server failure'])('[FAILURE] [SG2-23:AC3] Logout clears local access and reports unconfirmed revocation on %s', async failure => {
   await signInAs('Event Coordinator');
   vi.stubGlobal('fetch', vi.fn(async () => {
     if (failure === 'server failure') return new Response(null, { status: 503 });
@@ -338,12 +337,12 @@ test.each(['offline', 'server failure'])('Logout clears local access and reports
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('the notification drawer opens and closes', async () => {
+test('[NORMAL] [SG2-20:prototype-notifications] the notification drawer opens and closes', async () => {
   await signInAs('Event Coordinator');
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 
   fireEvent.click(
-    screen.getByRole('button', { name: `Notifications (${NOTIFICATIONS.length})` }),
+    screen.getByRole('button', { name: 'Notifications (5)' }),
   );
   const drawer = screen.getByRole('complementary', { name: 'Notifications' });
   expect(
@@ -354,7 +353,7 @@ test('the notification drawer opens and closes', async () => {
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 });
 
-test('the dashboard primary action opens the venue catalogue', async () => {
+test('[NORMAL] [SG2-42:AC1] the dashboard primary action opens the venue catalogue', async () => {
   await signInAs('Event Coordinator');
   fireEvent.click(screen.getByRole('button', { name: 'Search venues' }));
   expect(screen.getByRole('heading', { name: 'Venue catalogue' })).toBeInTheDocument();
@@ -362,7 +361,7 @@ test('the dashboard primary action opens the venue catalogue', async () => {
   expect(screen.queryByRole('button', { name: 'Search venues' })).not.toBeInTheDocument();
 });
 
-test('the signed-in coordinator opens the actual selected work item and returns to the queue', async () => {
+test('[NORMAL] [SG2-41:AC4] the signed-in coordinator opens the actual selected work item and returns to the queue', async () => {
   await signInAs('Event Coordinator');
   fireEvent.click(await screen.findByRole('button', { name: /Actual review request/ }));
   expect(await screen.findByRole('heading', { name: 'Actual review request' })).toBeInTheDocument();
@@ -378,14 +377,14 @@ describe('the events table', () => {
     fireEvent.click(within(header()).getByRole('button', { name: 'All events' }));
   };
 
-  test('coordinator navigation cannot expose organisation event rows', async () => {
+  test('[FAILURE] [SG2-26:AC2] coordinator navigation cannot expose organisation event rows', async () => {
     await openTable();
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   });
 
-  test('an organiser can see their events list and drill down into details from dashboard or nav', async () => {
+  test('[NORMAL] [SG2-26:AC1] an organiser can see their events list and drill down into details from dashboard or nav', async () => {
     mockLoginResponse('Event Organiser');
     const prevFetch = globalThis.fetch;
     vi.stubGlobal(
@@ -455,20 +454,20 @@ describe('the events table', () => {
 });
 
 describe('the event detail action panel', () => {
-  test('an attendee is refused organiser event detail', () => {
+  test('[FAILURE] [SG2-26:AC2] an attendee is refused organiser event detail', () => {
     render(<EventDetail role="Attendee" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
   });
 
-  test('coordinator review navigation shows no event content or decision actions', async () => {
+  test('[FAILURE] [SG2-26:AC2] coordinator review navigation shows no event content or decision actions', async () => {
     await signInAs('Event Coordinator');
     fireEvent.click(within(header()).getByRole('button', { name: 'Review' }));
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
   });
 
-  test('an organiser gets amendment actions instead', async () => {
+  test('[NORMAL] [SG2-29:AC2] an organiser gets amendment actions instead', async () => {
     await signInAs('Event Organiser');
     fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
     expect(await screen.findByText('Your options')).toBeInTheDocument();
@@ -486,7 +485,7 @@ describe('the request form', () => {
     fireEvent.click(within(header()).getByRole('button', { name: 'New request' }));
   };
 
-  test('requirement chips toggle when no suitability conflict is reported', () => {
+  test('[NORMAL] [SG2-28:AC1] requirement chips toggle when no suitability conflict is reported', () => {
     render(<RequestForm onSubmit={vi.fn()} showConflicts={false} />);
     expect(screen.queryByText(/180 expected attendance rules out/)).not.toBeInTheDocument();
     const chip = screen.getByRole('button', { name: 'Hearing loop' });
@@ -502,7 +501,7 @@ describe('the request form', () => {
     expect(unselected).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('saving a draft creates it and reports what is still outstanding', async () => {
+  test('[BOUNDARY] [SG2-28:AC4] saving a draft creates it and reports what is still outstanding', async () => {
     await openForm();
     expect(screen.getByText('You can save and finish this later.')).toBeInTheDocument();
 
@@ -529,7 +528,7 @@ describe('the request form', () => {
     ).toBeInTheDocument();
   });
 
-  test.each([false, true])('submitting opens the saved event details (previous selection: %s)', async (hasPreviousSelection) => {
+  test.each([false, true])('[NORMAL] [SG2-30:AC1] submitting opens the saved event details (previous selection: %s)', async (hasPreviousSelection) => {
     await signInAs('Event Organiser');
     if (hasPreviousSelection) {
       fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
@@ -591,7 +590,7 @@ describe('the request form', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
   });
 
-  test('saving a draft and submitting sends the accessToken to the submit endpoint', async () => {
+  test('[NORMAL] [SG2-30:AC1] saving a draft and submitting sends the accessToken to the submit endpoint', async () => {
     await openForm();
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
@@ -636,7 +635,7 @@ describe('the request form', () => {
 });
 
 describe('editing a draft (SG2-29)', () => {
-  test('Edit opens the form pre-filled, and a successful submit returns to My drafts', async () => {
+  test('[NORMAL] [SG2-29:AC2] Edit opens the form pre-filled, and a successful submit returns to My drafts', async () => {
     await signInAs('Event Organiser');
     fireEvent.click(within(header()).getByRole('button', { name: 'My drafts' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
@@ -665,14 +664,14 @@ describe('editing a draft (SG2-29)', () => {
   });
 });
 
-test('requesting a venue opens the booking approval screen', async () => {
+test('[NORMAL] [SG2-20:prototype-booking] requesting a venue opens the booking approval screen', async () => {
   await signInAs('Event Coordinator');
   fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Request Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
 });
 
-test('signed-in Venue Staff navigate to the catalogue and open an editor populated from the API', async () => {
+test('[NORMAL] [SG2-42:AC1] signed-in Venue Staff navigate to the catalogue and open an editor populated from the API', async () => {
   await signInAs('Venue Staff');
   fireEvent.click(within(header()).getByRole('button', { name: 'Catalogue' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Atrium Hall' }));
@@ -681,7 +680,7 @@ test('signed-in Venue Staff navigate to the catalogue and open an editor populat
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
 });
 
-test('reserving equipment settles the row', async () => {
+test('[NORMAL] [SG2-20:prototype-equipment] reserving equipment settles the row', async () => {
   await signInAs('Technical Support Staff');
   fireEvent.click(within(header()).getByRole('button', { name: 'Preview' }));
   fireEvent.click(within(header()).getByRole('button', { name: 'Equipment requests' }));
@@ -699,7 +698,7 @@ test('reserving equipment settles the row', async () => {
   }
 });
 
-test('the calendar shows the month grid with real venue availability', async () => {
+test('[NORMAL] [SG2-44:AC1] the calendar shows the month grid with real venue availability', async () => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-15T12:00:00.000Z'));
   await signInAs('Venue Staff');
@@ -728,7 +727,7 @@ test('the calendar shows the month grid with real venue availability', async () 
   expect(screen.getByText('Unavailable')).toBeInTheDocument();
 });
 
-test('an attendee can withdraw and re-register', async () => {
+test('[NORMAL] [SG2-20:prototype-registration] an attendee can withdraw and re-register', async () => {
   await signInAs('Attendee');
   expect(
     screen.getByText("You're registered — confirmation sent to your email."),
@@ -746,7 +745,7 @@ test('an attendee can withdraw and re-register', async () => {
   ).toBeInTheDocument();
 });
 
-test('standalone change-request prototype categories toggle', () => {
+test('[NORMAL] [SG2-20:prototype-amendment] standalone change-request prototype categories toggle', () => {
   render(<ChangeRequest />);
 
   const selected = screen.getByRole('button', { name: 'Expected attendance' });
@@ -760,7 +759,7 @@ test('standalone change-request prototype categories toggle', () => {
   expect(other).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('organiser dashboard opens the selected real event and has no mock notifications', async () => {
+test('[NORMAL] [SG2-26:AC1] organiser dashboard opens the selected real event and has no mock notifications', async () => {
   await signInAs('Event Organiser');
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' }));
   expect(screen.getByText('No notifications available.')).toBeInTheDocument();
@@ -772,7 +771,7 @@ test('organiser dashboard opens the selected real event and has no mock notifica
 });
 
 // SG2-46: an approved event opens venue search pre-filled; the menu opens it blank.
-test('a coordinator opens venue search from an approved event, and from the menu without it', async () => {
+test('[NORMAL] [SG2-46:AC1] a coordinator opens venue search from an approved event, and from the menu without it', async () => {
   const approved = { kind: 'event', item_id: 10, event_id: 10, title: 'Approved Forum', event_name: 'Approved Forum',
     status: 'approved', starts_at: '2030-06-15T02:00:00.000Z', ends_at: null, category: 'assigned', assigned_to_me: true,
     details: { expected_attendance: 40, accessibility_needs: null } };

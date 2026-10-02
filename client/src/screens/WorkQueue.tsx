@@ -3,6 +3,7 @@ import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, ty
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
 import ClarificationThread from '../components/ClarificationThread';
+import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 
 const GROUPS = {
@@ -102,6 +103,7 @@ export type FindVenues = (prefill: VenueSearchPrefill) => void;
 function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
   const { status, error, setStatus } = useOpenedForReview(item, accessToken);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   const [currentDetails, setCurrentDetails] = useState(item.details);
   const [startsAt, setStartsAt] = useState(item.starts_at);
@@ -146,14 +148,23 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
         prompt={currentStatus === 'under_review' ? 'Ask the organiser a question' : 'Add a follow-up question'}
         onPosted={setStatus}
       />}
-      {canEditPlanning && (
+      {item.kind === 'event' && (
         <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+          {canEditPlanning && (
+            <button
+              type="button"
+              className="organisation-button organisation-button-primary"
+              onClick={() => setDrawerOpen(true)}
+            >
+              Edit Planning Information
+            </button>
+          )}
           <button
             type="button"
-            className="organisation-button organisation-button-primary"
-            onClick={() => setDrawerOpen(true)}
+            className="organisation-button"
+            onClick={() => setHistoryDrawerOpen(true)}
           >
-            Edit Planning Information
+            View Change History
           </button>
         </div>
       )}
@@ -200,6 +211,15 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
               planning_notes: updatedEvent.planning_notes,
             }));
           }}
+        />
+      )}
+      {item.kind === 'event' && (
+        <EventAuditDrawer
+          isOpen={historyDrawerOpen}
+          onClose={() => setHistoryDrawerOpen(false)}
+          eventId={item.event_id}
+          eventName={item.title}
+          accessToken={accessToken}
         />
       )}
     </article>

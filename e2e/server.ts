@@ -111,7 +111,9 @@ const app = createApp(
   // SG2-33's assign handler keeps its production default here, as on main.
   undefined,
   createDecideEventRequestHandler(eventDependencies),
-  // The assignable-list and planning handlers keep their production defaults.
+  // The assignable-list, planning and SG2-40 history handlers keep their
+  // production defaults.
+  undefined,
   undefined,
   undefined,
   // SG2-36's clarification exchange, against the in-memory client.

@@ -41,18 +41,18 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('GET /api/event-requests/assignable (SG2-33/SG2-34)', () => {
-  test('returns the assignable requests and the coordinators to choose from', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] returns the assignable requests and the coordinators to choose from', async () => {
     const response = await request(buildApp()).get('/api/event-requests/assignable');
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { requests: [REQUEST], coordinators: [COORDINATOR] });
   });
 
-  test('returns 503 when the database is not configured', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 when the database is not configured', async () => {
     const response = await request(buildApp({ admin: null })).get('/api/event-requests/assignable');
     assert.equal(response.status, 503);
   });
 
-  test('returns 503 when the request lookup fails, without leaking the cause', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 when the request lookup fails, without leaking the cause', async () => {
     const response = await request(
       buildApp({ requests: { ok: false, reason: 'unavailable', message: 'SENTINEL leak' } })
     ).get('/api/event-requests/assignable');
@@ -60,7 +60,7 @@ describe('GET /api/event-requests/assignable (SG2-33/SG2-34)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('returns 503 when the coordinator lookup fails, without leaking the cause', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 503 when the coordinator lookup fails, without leaking the cause', async () => {
     const response = await request(buildApp({ coordinators: { ok: false, error: 'SENTINEL leak' } })).get(
       '/api/event-requests/assignable'
     );
@@ -68,8 +68,19 @@ describe('GET /api/event-requests/assignable (SG2-33/SG2-34)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('builds with its production defaults', () => {
-    assert.equal(typeof createListAssignableHandler(), 'function');
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] the default handler returns a retryable response when the database is unconfigured', async (t) => {
+    const previous = { ...dbConfig };
+    t.after(() => Object.assign(dbConfig, previous));
+    dbConfig.supabaseUrl = undefined;
+    dbConfig.supabaseAnonKey = undefined;
+    dbConfig.supabaseServiceRoleKey = undefined;
+    const app = express();
+    app.get('/api/event-requests/assignable', createListAssignableHandler());
+    const response = await request(app).get('/api/event-requests/assignable');
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.body, {
+      error: 'Event requests are temporarily unavailable. Please try again later.'
+    });
   });
 });
 
@@ -101,12 +112,12 @@ describe('GET /api/event-requests/assignable authorisation wiring', () => {
     return (createApp as (...a: unknown[]) => express.Express)(...args);
   };
 
-  test('rejects an unauthenticated request', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] rejects an unauthenticated request', async () => {
     const response = await request(appForRole('technical_support_staff')).get('/api/event-requests/assignable');
     assert.equal(response.status, 401);
   });
 
-  test('denies roles that cannot assign a coordinator', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] denies roles that cannot assign a coordinator', async () => {
     for (const role of ['event_organiser', 'event_coordinator', 'venue_staff', 'attendee'] as const) {
       const response = await request(appForRole(role))
         .get('/api/event-requests/assignable')
@@ -115,7 +126,7 @@ describe('GET /api/event-requests/assignable authorisation wiring', () => {
     }
   });
 
-  test('routes Technical Support Staff to the list, not to the single-request lookup', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] routes Technical Support Staff to the list, not to the single-request lookup', async () => {
     const response = await request(appForRole('technical_support_staff'))
       .get('/api/event-requests/assignable')
       .set('Authorization', 'Bearer token');

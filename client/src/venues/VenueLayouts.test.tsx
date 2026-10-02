@@ -46,18 +46,18 @@ function fillVenueFields(name = 'Atrium Hall') {
   }
 }
 
-test('AC2: supported layouts are shown on the venue\'s details as soon as the catalogue loads, with no per-card loading state', async () => {
+test('[NORMAL] [SG2-43:AC2] AC2: supported layouts are shown on the venue\'s details as soon as the catalogue loads, with no per-card loading state', async () => {
   await open(staff, [{ layout: 'classroom', other_description: null }]);
   expect(screen.getByText('Classroom')).toBeInTheDocument();
   expect(screen.queryByText(/Loading…/)).not.toBeInTheDocument();
 });
 
-test('a venue with no recorded layouts shows "NA"', async () => {
+test('[BOUNDARY] [SG2-43:AC2] a venue with no recorded layouts shows "NA"', async () => {
   await open(staff, []);
   expect(screen.getByText('Supported layouts').nextSibling).toHaveTextContent('NA');
 });
 
-test('a failed layouts read for one venue does not block the catalogue; that venue falls back to "NA"', async () => {
+test('[FAILURE] [SG2-43:AC2] a failed layouts read for one venue does not block the catalogue; that venue falls back to "NA"', async () => {
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === '/api/auth/me') return Response.json(staff);
     if (url === '/api/venues' && (!init?.method || init.method === 'GET')) return Response.json({ venues: [venue] });
@@ -70,13 +70,13 @@ test('a failed layouts read for one venue does not block the catalogue; that ven
   expect(screen.getByText('Supported layouts').nextSibling).toHaveTextContent('NA');
 });
 
-test('coordinators can see supported layouts but have no controls to manage them', async () => {
+test('[FAILURE] [SG2-43:AC2] coordinators can see supported layouts but have no controls to manage them', async () => {
   await open(coordinator, [{ layout: 'banquet', other_description: null }]);
   expect(await screen.findByText('Banquet')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument();
 });
 
-test('AC1: venue staff edit details and supported layouts together in one form and submit', async () => {
+test('[NORMAL] [SG2-43:AC1] AC1: venue staff edit details and supported layouts together in one form and submit', async () => {
   const { fetch } = await open(staff, [{ layout: 'classroom', other_description: null }]);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Edit venue' })).toBeInTheDocument();
@@ -101,7 +101,7 @@ test('AC1: venue staff edit details and supported layouts together in one form a
   expect(screen.getByText('Classroom, Theatre, U-shape with side tables')).toBeInTheDocument();
 });
 
-test('creating a new venue has no layouts section, since there is no venue id yet', async () => {
+test('[BOUNDARY] [SG2-43:AC2] creating a new venue has no layouts section, since there is no venue id yet', async () => {
   await open(staff, []);
   fireEvent.click(screen.getByRole('button', { name: 'Add venue' }));
   expect(screen.getByRole('heading', { name: 'Add venue' })).toBeInTheDocument();
@@ -109,7 +109,7 @@ test('creating a new venue has no layouts section, since there is no venue id ye
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 });
 
-test('"Other" cannot be submitted without a description', async () => {
+test('[FAILURE] [SG2-43:AC1] "Other" cannot be submitted without a description', async () => {
   await open(staff, []);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'Other' }));
@@ -117,7 +117,25 @@ test('"Other" cannot be submitted without a description', async () => {
   expect(screen.getByRole('alert')).toHaveTextContent('255 characters or fewer');
 });
 
-test('cancel leaves the record untouched', async () => {
+test('[BOUNDARY] [SG2-43:AC1] Other accepts 255 characters and rejects 256 before any save', async () => {
+  const { fetch } = await open(staff, []);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Other' }));
+  fireEvent.change(screen.getByLabelText('Describe the other layout'), { target: { value: '🪑'.repeat(256) } });
+  fireEvent.submit(screen.getByRole('form'));
+  expect(screen.getByRole('alert')).toHaveTextContent('255 characters or fewer');
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0);
+  const description = '🪑'.repeat(255);
+  fireEvent.change(screen.getByLabelText('Describe the other layout'), { target: { value: description } });
+  fireEvent.submit(screen.getByRole('form'));
+  expect(await screen.findByRole('status')).toHaveTextContent('Atrium Hall saved');
+  expect(fetch).toHaveBeenCalledWith('/api/venues/1/layouts', expect.objectContaining({
+    method: 'PUT', body: JSON.stringify({ layouts: [{ layout: 'other', other_description: description }] }),
+  }));
+  expect(screen.getByText(description)).toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-43:AC1] cancel leaves the record untouched', async () => {
   const { fetch } = await open(staff, []);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'Theatre' }));
@@ -126,7 +144,7 @@ test('cancel leaves the record untouched', async () => {
   expect(fetch).not.toHaveBeenCalledWith('/api/venues/1/layouts', expect.objectContaining({ method: 'PUT' }));
 });
 
-test('a caller who can edit venue details but not layouts sees the venue form without the layouts section', async () => {
+test('[FAILURE] [SG2-43:AC1] a caller who can edit venue details but not layouts sees the venue form without the layouts section', async () => {
   const identity = { userId: 'staff', role: 'venue_staff', permissions: ['venues.read', 'venues.create', 'venues.update'] };
   await open(identity, []);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
@@ -134,7 +152,7 @@ test('a caller who can edit venue details but not layouts sees the venue form wi
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 });
 
-test('a newly created venue has no layouts entry yet; the catalogue and edit form fall back to empty without fetching it', async () => {
+test('[BOUNDARY] [SG2-43:AC2] a newly created venue has no layouts entry yet; the catalogue and edit form fall back to empty without fetching it', async () => {
   const { fetch } = await open(staff, []);
   fireEvent.click(screen.getByRole('button', { name: 'Add venue' }));
   for (const [label, value] of Object.entries({ 'Venue name': 'Harbour Room', Location: 'Roof', Capacity: '80',
@@ -150,7 +168,7 @@ test('a newly created venue has no layouts entry yet; the catalogue and edit for
   }
 });
 
-test('aborting while layouts are loading for the catalogue discards the stale response', async () => {
+test('[CONFLICT] [SG2-43:layouts-isolation] aborting while layouts are loading for the catalogue discards the stale response', async () => {
   let resolveLayouts!: (value: Response) => void;
   const layoutsPromise = new Promise<Response>(resolve => { resolveLayouts = resolve; });
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -167,7 +185,7 @@ test('aborting while layouts are loading for the catalogue discards the stale re
   expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
 });
 
-test('leaving mid-save after venue details succeed but before layouts finish aborts the layouts step', async () => {
+test('[CONFLICT] [SG2-43:layouts-isolation] leaving mid-save after venue details succeed but before layouts finish aborts the layouts step', async () => {
   let resolveLayoutsSave!: (value: Response) => void;
   const layoutsSavePromise = new Promise<Response>(resolve => { resolveLayoutsSave = resolve; });
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
