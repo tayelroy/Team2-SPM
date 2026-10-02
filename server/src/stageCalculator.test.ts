@@ -71,6 +71,40 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[3].status, 'upcoming');
   });
 
+  test('[NORMAL] [SG2-36:AC1] a request returned for clarification waits on the organiser at the review step', () => {
+    const input: EventStageInput = {
+      event_id: 4,
+      status: 'needs_clarification',
+      organiser_id: 'org-123',
+      coordinator_id: 'coord-456',
+      coordinator_name: 'Sarah Tan'
+    };
+
+    const result = computeEventStage(input);
+
+    assert.equal(result.stage, 'Clarification Needed');
+    assert.equal(result.stage_key, 'needs_clarification');
+    // The organiser can see that a response is needed from them, not from staff.
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Event Organiser',
+      action: 'Answer the coordinator and resubmit the request',
+      user_id: 'org-123'
+    });
+    // Still at review: the request is paused, not moved backwards or forwards.
+    assert.equal(result.stepper_steps[2].status, 'current');
+    assert.equal(result.stepper_steps[3].status, 'upcoming');
+  });
+
+  test('[BOUNDARY] [SG2-36:AC1] a returned request with no recorded organiser still names who it waits on', () => {
+    const result = computeEventStage({
+      event_id: 4,
+      status: 'needs_clarification',
+      organiser_id: undefined as unknown as string
+    });
+    assert.equal(result.waiting_on?.persona, 'Event Organiser');
+    assert.equal(result.waiting_on?.user_id, null);
+  });
+
   test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] under_review status directly maps to "Under Review" stage', () => {
     const input: EventStageInput = {
       event_id: 4,

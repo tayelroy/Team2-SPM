@@ -118,7 +118,8 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
   const waiting = requests.filter((event) => event.waitingOnMe);
   const figures = [
     { label: 'Organisation events', value: requests.length },
-    { label: 'My drafts', value: requests.filter((event) => event.canManage && event.status === 'draft').length },
+    // Counts what My drafts lists: drafts plus requests returned with a question (SG2-36).
+    { label: 'My drafts', value: requests.filter((event) => event.canManage && ['draft', 'needs_clarification'].includes(event.status)).length },
     { label: 'Waiting on me', value: waiting.length },
   ];
   return <div className="organisation-dashboard">

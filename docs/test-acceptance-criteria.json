@@ -218,6 +218,16 @@
       }
     },
     {
+      "id": "SG2-36",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-36",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Given a request assigned to me, when I return it for clarification with a message, then the Event Organiser is notified and can see my questions and that a response is needed",
+        "AC2": "Given a returned request, the Event Organiser can amend and resubmit it, after which it returns to my review queue and I am notified",
+        "AC3": "The clarification exchange remains visible against the event record"
+      }
+    },
+    {
       "id": "SG2-37",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-37",
       "originalPullRequests": [

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
+import ClarificationThread from '../components/ClarificationThread';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 
@@ -114,6 +115,10 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
   const isTerminal = ['cancelled', 'completed', 'rejected'].includes(currentStatus.toLowerCase());
   const canEditPlanning = item.kind === 'event' && item.assigned_to_me && !isTerminal;
   const canDecide = item.kind === 'event' && item.assigned_to_me && currentStatus === 'under_review';
+  // SG2-36: while reviewing, the coordinator can ask instead of deciding; once
+  // returned, they can add follow-ups until the organiser resubmits.
+  const canClarify = item.kind === 'event' && item.assigned_to_me
+    && (currentStatus === 'under_review' || currentStatus === 'needs_clarification');
 
   return (
     <article className="organisation-detail" aria-label={KINDS[item.kind]}>
@@ -136,6 +141,13 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
         })}
       </dl>
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
+      {canClarify && accessToken && <ClarificationThread
+        eventId={item.event_id}
+        accessToken={accessToken}
+        canPost
+        prompt={currentStatus === 'under_review' ? 'Ask the organiser a question' : 'Add a follow-up question'}
+        onPosted={setStatus}
+      />}
       {item.kind === 'event' && (
         <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
           {canEditPlanning && (

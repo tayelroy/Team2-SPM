@@ -23,7 +23,7 @@ function deferred<T>() {
 function api(requests: unknown[] = [], details: Record<number, unknown> = {}) {
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-token' });
-    if (url === '/api/event-requests?scope=mine&status=draft' && (init?.method ?? 'GET') === 'GET') {
+    if (url === '/api/event-requests?scope=mine' && (init?.method ?? 'GET') === 'GET') {
       return Response.json({ requests });
     }
     const detailMatch = typeof url === 'string' && url.match(/^\/api\/event-requests\/(\d+)$/);
@@ -74,18 +74,40 @@ test('[BOUNDARY] [SG2-29:AC3] shows loading, then the draft-specific empty state
   expect(screen.getByRole('status')).toHaveTextContent('Loading your requests');
   expect(await screen.findByRole('heading', { name: 'No draft requests' })).toBeInTheDocument();
   expect(screen.getByText(/Submitted requests are listed in My events/)).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine&status=draft', { method: 'GET', headers: { Authorization: 'Bearer test-token' } });
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests?scope=mine', { method: 'GET', headers: { Authorization: 'Bearer test-token' } });
 });
 
-test('[CONFLICT] [SG2-32:AC2] keeps Edit/Delete disabled for non-draft rows even if a stale response includes them', async () => {
+test('[CONFLICT] [SG2-32:AC2] [SG2-36:AC2] lists only requests the organiser can still edit, never submitted ones', async () => {
+  // The list now asks for every one of the caller's requests and keeps the
+  // editable ones, so a submitted request must be dropped rather than shown.
   api([DRAFT, SUBMITTED]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Board Offsite' })).toBeInTheDocument();
-  expect(screen.getByText('Draft')).toBeInTheDocument();
-  expect(screen.getByText('Submitted')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Board Offsite' })).not.toBeInTheDocument();
   expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1);
   expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+});
+
+test('[NORMAL] [SG2-36:AC2] a request returned with a question can be edited but not deleted', async () => {
+  const RETURNED = { event_id: 11, status: 'needs_clarification', name: 'Returned Forum' };
+  api([RETURNED]);
+  render(<DraftRequests accessToken="test-token" onEdit={noop} />);
+  expect(await screen.findByRole('heading', { name: 'Returned Forum' })).toBeInTheDocument();
+  expect(screen.getByText(/Your coordinator has a question/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+  // It is no longer a draft, so the server would refuse a delete anyway.
+  expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-36:AC2] editing a returned request opens it for amendment', async () => {
+  const RETURNED = { event_id: 11, status: 'needs_clarification', name: 'Returned Forum' };
+  const RETURNED_FULL = { ...DRAFT_FULL_RECORD, event_id: 11, status: 'needs_clarification', name: 'Returned Forum' };
+  api([RETURNED], { 11: RETURNED_FULL });
+  const onEdit = vi.fn();
+  render(<DraftRequests accessToken="test-token" onEdit={onEdit} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+  await act(async () => {});
+  expect(onEdit).toHaveBeenCalledWith(RETURNED_FULL);
 });
 
 test('[NORMAL] [SG2-29:AC2] Edit fetches the full record (not just the list summary) before handing it to onEdit', async () => {
@@ -173,7 +195,7 @@ test('[FAILURE] [SG2-32:AC1] clicking Delete on a different draft clears an exis
   // delete"/"Cancel", not "Delete") — starting a fresh delete on DRAFT_TWO is
   // the only remaining "Delete" button, and should clear the stale error.
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
-    if (url === '/api/event-requests?scope=mine&status=draft' && (init?.method ?? 'GET') === 'GET') {
+    if (url === '/api/event-requests?scope=mine' && (init?.method ?? 'GET') === 'GET') {
       return Response.json({ requests: [DRAFT, DRAFT_TWO] });
     }
     if (url === '/api/event-requests/7' && init?.method === 'DELETE') {

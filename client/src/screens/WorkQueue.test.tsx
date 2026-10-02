@@ -293,6 +293,7 @@ function decisionApi(onDecision?: (body: unknown) => Response) {
     if (typeof url === 'string' && url.endsWith('/decision')) {
       return onDecision ? onDecision(JSON.parse(String(init?.body))) : Response.json({ request: { event_id: 12, status: 'approved' } });
     }
+    if (typeof url === 'string' && url.endsWith('/clarifications')) return Response.json({ clarifications: [], status: 'under_review' });
     return Response.json({ items: [underReview] });
   });
   vi.stubGlobal('fetch', fetch);
@@ -334,7 +335,9 @@ test('[CONFLICT] [SG2-37:duplicate-decision] decision buttons disable while a de
   let settle!: (response: Response) => void;
   const pending = new Promise<Response>(resolve => { settle = resolve; });
   const fetch = vi.fn(async (url: string) => typeof url === 'string' && url.endsWith('/decision')
-    ? pending : Response.json({ items: [underReview] }));
+    ? pending
+    : url.endsWith('/clarifications') ? Response.json({ clarifications: [], status: 'under_review' })
+      : Response.json({ items: [underReview] }));
   vi.stubGlobal('fetch', fetch);
   await openUnderReview();
   fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
@@ -378,6 +381,72 @@ test('[FAILURE] [SG2-46:AC1] an approved event that is not assigned to the coord
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
   await screen.findByRole('heading', { name: 'Leadership Forum' });
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
+});
+
+/** SG2-36: the reviewing coordinator can ask the organiser instead of deciding. */
+const question = {
+  clarification_id: 1, event_id: 12, sender_id: 'coordinator-1', sender_name: 'Casey Coordinator',
+  message: 'Is the date firm?', created_at: '2030-05-01T02:00:00Z',
+};
+
+function clarificationApi(item: WorkItem, thread: unknown[], onPost: () => Response) {
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/clarifications')) {
+      return init?.method === 'POST' ? onPost() : Response.json({ clarifications: thread, status: item.status });
+    }
+    return Response.json({ items: [item] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
+
+test('[NORMAL] [SG2-36:AC1] asking a question returns the request to the organiser and keeps the question', async () => {
+  const fetch = clarificationApi(underReview, [], () => Response.json({ clarification: question, status: 'needs_clarification' }, { status: 201 }));
+  await openUnderReview();
+  const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+  expect(await within(thread).findByText('No questions have been asked yet.')).toBeVisible();
+  fireEvent.change(within(thread).getByLabelText('Ask the organiser a question'), { target: { value: 'Is the date firm?' } });
+  fireEvent.click(within(thread).getByRole('button', { name: 'Send' }));
+  expect(await screen.findByText('needs clarification')).toBeVisible();
+  expect(within(thread).getByText('Is the date firm?')).toBeVisible();
+  expect(within(thread).getByLabelText('Add a follow-up question')).toHaveValue('');
+  expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
+  const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST');
+  expect(post?.[0]).toBe('/api/event-requests/12/clarifications');
+  expect(JSON.parse(String(post?.[1]?.body))).toEqual({ message: 'Is the date firm?' });
+});
+
+test('[NORMAL] [SG2-36:AC3] a returned request shows the earlier questions and allows a follow-up but no decision', async () => {
+  clarificationApi({ ...underReview, status: 'needs_clarification' }, [question], () => Response.json({}));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+  expect(await within(thread).findByText('Is the date firm?')).toBeVisible();
+  expect(within(thread).getByText('Casey Coordinator')).toBeVisible();
+  expect(within(thread).getByLabelText('Add a follow-up question')).toBeVisible();
+  expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-36:AC1] a refused question shows why and leaves the request under review', async () => {
+  clarificationApi(underReview, [], () => Response.json({ error: 'A message is required.' }, { status: 400 }));
+  await openUnderReview();
+  const thread = await screen.findByRole('region', { name: 'Clarification conversation' });
+  await within(thread).findByText('No questions have been asked yet.');
+  fireEvent.click(within(thread).getByRole('button', { name: 'Send' }));
+  expect(await within(thread).findByRole('alert')).toHaveTextContent('A message is required.');
+  expect(screen.getByText('under review')).toBeVisible();
+});
+
+test.each([
+  ['not assigned to me', { ...underReview, assigned_to_me: false }],
+  ['already approved', { ...underReview, status: 'approved' }],
+])('[CONFLICT] [SG2-36:AC1] a request %s offers no clarification thread', async (_label, item) => {
+  const fetch = clarificationApi(item, [], () => Response.json({}));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(screen.queryByRole('region', { name: 'Clarification conversation' })).not.toBeInTheDocument();
+  expect(fetch.mock.calls.some(([url]) => url.endsWith('/clarifications'))).toBe(false);
 });
 
 test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] coordinator opens the selected event history with its actor, timestamp and old/new values', async () => {

@@ -39,7 +39,7 @@ function mockLoginResponse(role: Role) {
         return Response.json({ venues: [{ venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
           facilities: 'Stage', accessibility_features: 'Lift', operating_information: 'Weekdays' }] });
       }
-      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine&status=draft')) {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine')) {
         expect(init?.headers).toMatchObject({ Authorization: 'Bearer test-access-token' });
         return Response.json({ requests: [{ event_id: 9, can_manage: true, status: 'draft', name: 'Draft Forum' }] });
       }
@@ -557,6 +557,9 @@ describe('the request form', () => {
         });
       }
       if (url === '/api/event-requests/42' && init?.method === 'GET') return Response.json({ request: submitted });
+      if (url === '/api/event-requests/42/clarifications' && init?.method === 'GET') {
+        return Response.json({ clarifications: [], status: 'submitted' });
+      }
       throw new Error(`Unexpected request: ${init?.method} ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -581,6 +584,7 @@ describe('the request form', () => {
       '/api/event-requests/42/submit',
       '/api/event-requests/42/stage',
       '/api/event-requests/42',
+      '/api/event-requests/42/clarifications',
     ]);
     expect(fetchMock.mock.calls[3][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
@@ -598,7 +602,7 @@ describe('the request form', () => {
     });
 
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine&status=draft') || url === '/api/event-requests/42') {
+      if ((url === '/api/event-requests' || url === '/api/event-requests?scope=mine') || url === '/api/event-requests/42') {
         return new Response(
           JSON.stringify({
             request: { event_id: 42, status: 'draft' },

@@ -155,7 +155,7 @@ export type FetchEventDetailResult =
  */
 export function isWaitingOnOrganiser(status: string): boolean {
   const normalized = status.trim().toLowerCase();
-  return normalized === 'draft' || normalized === 'rejected';
+  return normalized === 'draft' || normalized === 'rejected' || normalized === 'needs_clarification';
 }
 
 function mapEventRequestSummary(raw: Record<string, unknown>): EventRequestSummary {
@@ -370,13 +370,20 @@ export type ListMyDraftRequestsOutcome =
   | { ok: true; requests: DraftListItem[] }
   | { ok: false; message: string };
 
+/** Statuses the organiser can still edit: a draft (SG2-32), or a request a
+ * coordinator returned with a question (SG2-36). */
+const EDITABLE_STATUSES = new Set(['draft', 'needs_clarification']);
+
 /**
- * Lists only the caller's own drafts, within their current organisation (SG2-32).
+ * Lists the caller's own requests that are still theirs to edit, within their
+ * current organisation (SG2-32, widened by SG2-36). Filtered here rather than
+ * by the server's single-value `status` parameter, so a request returned for
+ * clarification appears alongside drafts without a second round trip.
  *
  * @param token Bearer access token from the signed-in session.
  */
 export async function listMyDraftRequests(token: string): Promise<ListMyDraftRequestsOutcome> {
-  const response = await getEventRequestResponse('/api/event-requests?scope=mine&status=draft', token);
+  const response = await getEventRequestResponse('/api/event-requests?scope=mine', token);
   if (!response) return { ok: false, message: UNAVAILABLE };
 
   if (!response.ok) {
@@ -387,7 +394,8 @@ export async function listMyDraftRequests(token: string): Promise<ListMyDraftReq
 
   const body = await readEventRequestJson(response, null);
   if (!Array.isArray(body?.requests)) return { ok: false, message: UNAVAILABLE };
-  return { ok: true, requests: body.requests as DraftListItem[] };
+  const requests = (body.requests as DraftListItem[]).filter(request => EDITABLE_STATUSES.has(request.status));
+  return { ok: true, requests };
 }
 
 export type FetchEventRequestDraftOutcome =
@@ -848,6 +856,79 @@ export async function assignCoordinator(
   return unavailable;
 }
 
+/** One message in an event's clarification thread (SG2-36). */
+export interface Clarification {
+  clarification_id: number;
+  event_id: number;
+  sender_id: string;
+  sender_name: string | null;
+  message: string;
+  created_at: string;
+}
+
+export type ClarificationThreadOutcome =
+  | { ok: true; clarifications: Clarification[]; status: string }
+  | { ok: false; message: string };
+
+export type PostClarificationOutcome =
+  | { ok: true; clarification: Clarification; status: string }
+  | { ok: false; message: string };
+
+function clarificationError(status: number): string {
+  if (status === 401) return 'You are signed out. Sign in again to see this conversation.';
+  if (status === 403) return 'Your role cannot take part in this conversation.';
+  if (status === 404) return 'This request is not one you are part of.';
+  return UNAVAILABLE;
+}
+
+/**
+ * Reads the clarification exchange on an event (SG2-36). Maps to
+ * `GET /api/event-requests/:eventId/clarifications`.
+ */
+export async function fetchClarifications(
+  eventId: number,
+  token: string,
+): Promise<ClarificationThreadOutcome> {
+  const response = await getEventRequestResponse(`/api/event-requests/${eventId}/clarifications`, token);
+  if (!response) return { ok: false, message: UNAVAILABLE };
+  if (!response.ok) return { ok: false, message: clarificationError(response.status) };
+  const body = await readEventRequestJson(response, null);
+  if (!Array.isArray(body?.clarifications) || typeof body?.status !== 'string') {
+    return { ok: false, message: UNAVAILABLE };
+  }
+  return { ok: true, clarifications: body.clarifications as Clarification[], status: body.status };
+}
+
+/**
+ * Posts a message to an event's clarification exchange (SG2-36). Maps to
+ * `POST /api/event-requests/:eventId/clarifications`. When the assigned
+ * coordinator posts while reviewing, the server also returns the request to
+ * the organiser; the resulting status comes back so the screen can follow it.
+ */
+export async function postClarification(
+  eventId: number,
+  message: string,
+  token: string,
+): Promise<PostClarificationOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/clarifications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message }),
+    });
+  } catch {
+    return { ok: false, message: UNAVAILABLE };
+  }
+  const body = await readEventRequestJson(response, null);
+  if (!response.ok) {
+    if (response.status === 400 && typeof body?.error === 'string') return { ok: false, message: body.error };
+    return { ok: false, message: clarificationError(response.status) };
+  }
+  if (!body?.clarification || typeof body?.status !== 'string') return { ok: false, message: UNAVAILABLE };
+  return { ok: true, clarification: body.clarification as Clarification, status: body.status };
+}
+
 export interface EventAuditLogEntry {
   log_id: number;
   event_id: number;
@@ -915,4 +996,3 @@ export async function getEventHistory(
     history: body.history as EventAuditLogEntry[],
   };
 }
-

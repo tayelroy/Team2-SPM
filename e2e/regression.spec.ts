@@ -636,6 +636,85 @@ test('SG2-37-N01 | [SG2-35:AC3] [SG2-37:AC1] [CONFLICT] a request another coordi
   expect(unassigned.status()).toBe(404);
 });
 
+async function signOut(page: Page) {
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+}
+
+test('SG2-36-P01 | [SG2-36:AC1] [SG2-36:AC2] [SG2-36:AC3] [NORMAL] a question goes to the organiser, who answers and resubmits for review', async ({ page, request }) => {
+  // AC1: the reviewing coordinator returns the request with a question.
+  await signIn(page, 'coordinator');
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+  const coordinatorThread = page.getByRole('region', { name: 'Clarification conversation' });
+  await expect(coordinatorThread.getByText('No questions have been asked yet.')).toBeVisible();
+  await coordinatorThread.getByLabel('Ask the organiser a question').fill('Is 15 June firm, or could it move a week?');
+  await coordinatorThread.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByText('needs clarification', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Decide this request' })).toHaveCount(0);
+  await signOut(page);
+
+  // AC1: the organiser sees that a response is needed, and the question itself.
+  await signIn(page, 'organiser');
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: /Decision Forum/ }).click();
+  await expect(page.getByRole('status', { name: 'Your coordinator has a question' })).toBeVisible();
+  const organiserThread = page.getByRole('region', { name: 'Clarification conversation' });
+  await expect(organiserThread.getByText('Is 15 June firm, or could it move a week?')).toBeVisible();
+  await organiserThread.getByLabel('Answer your coordinator').fill('It can move to 22 June if needed.');
+  await organiserThread.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(organiserThread.getByText('It can move to 22 June if needed.')).toBeVisible();
+
+  // AC2: the organiser amends and resubmits from My drafts.
+  await page.getByRole('button', { name: 'Edit request', exact: true }).click();
+  await page.getByRole('region', { name: 'My draft requests' }).locator('div')
+    .filter({ hasText: /^Your coordinator has a question/ })
+    .getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel(/^Purpose/).fill('Decide whether the forum proceeds (date flexible)');
+  await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect.poll(async () => (await eventRecords(page)).find(r => r.event_id === 52)?.status).toBe('submitted');
+  await signOut(page);
+
+  // AC2 + AC3: it is back in the coordinator's review queue with the whole exchange.
+  await signIn(page, 'coordinator');
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Decision Forum/ }).click();
+  await expect(page.getByText('under review', { exact: true })).toBeVisible();
+  const history = page.getByRole('region', { name: 'Clarification conversation' }).getByRole('list', { name: 'Messages' });
+  await expect(history.getByRole('listitem')).toHaveCount(2);
+  await expect(history).toContainText('Is 15 June firm, or could it move a week?');
+  await expect(history).toContainText('It can move to 22 June if needed.');
+  await expect(page.getByRole('region', { name: 'Decide this request' })).toBeVisible();
+});
+
+test('SG2-36-N01 | [SG2-36:AC3] [CONFLICT] only the two parties to the request can read or join the exchange', async ({ page, request }) => {
+  expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
+  await signIn(page, 'colleague');
+  const colleague = await authHeaders(page);
+  // A colleague in the same organisation still is not the requester.
+  expect((await page.request.get('/api/event-requests/52/clarifications', { headers: colleague })).status()).toBe(404);
+  expect((await page.request.post('/api/event-requests/52/clarifications', {
+    headers: colleague, data: { message: 'Can I weigh in?' },
+  })).status()).toBe(404);
+  await signOut(page);
+
+  await signIn(page, 'venue');
+  expect((await page.request.get('/api/event-requests/52/clarifications', { headers: await authHeaders(page) })).status()).toBe(403);
+  await signOut(page);
+
+  // The organiser cannot reopen the request by posting while it is under review.
+  await signIn(page, 'organiser');
+  const organiser = await authHeaders(page);
+  const posted = await page.request.post('/api/event-requests/52/clarifications', {
+    headers: organiser, data: { message: 'Any update?' },
+  });
+  expect(posted.status()).toBe(201);
+  expect((await posted.json()).status).toBe('under_review');
+});
+
 test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
   await signIn(page, 'venue');
   await nav(page, 'Catalogue');

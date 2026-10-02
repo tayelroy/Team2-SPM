@@ -10,6 +10,7 @@ import {
   fetchOwnEventRequest,
   fetchOwnEventRequests,
   decideEventRequest,
+  requestClarification,
   insertEventRequestDraft,
   startEventReview,
   submitEventRequest,
@@ -243,6 +244,9 @@ function fakeEventsUpdateDraftClient(
             eq(column: string, value: unknown) {
               if (column === 'event_id') filters.eventId = value;
               if (column === 'organiser_id') filters.organiserId = value;
+              return chain;
+            },
+            in(column: string, value: unknown) {
               if (column === 'status') filters.status = value;
               return chain;
             },
@@ -642,7 +646,7 @@ describe('fetchOwnEventRequests', () => {
 });
 
 describe('submitEventRequest', () => {
-  test('[NORMAL] [SG2-30:AC1] updates status to submitted, filtered to draft or rejected rows', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] updates status to submitted, filtered to draft, rejected or returned rows', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
     const result = await submitEventRequest(
       fakeEventsUpdateClient(
@@ -655,7 +659,7 @@ describe('submitEventRequest', () => {
     if (result.ok) assert.equal(result.request.status, 'submitted');
     assert.deepEqual(captured?.row, { status: 'submitted' });
     assert.equal(captured?.eventId, 7);
-    assert.deepEqual(captured?.status, ['draft', 'rejected']);
+    assert.deepEqual(captured?.status, ['draft', 'rejected', 'needs_clarification']);
   });
 
   test('[FAILURE] [SG2-30:AC1] reports unavailable when the update errors', async () => {
@@ -812,6 +816,46 @@ describe('decideEventRequest', () => {
   }
 });
 
+describe('requestClarification', () => {
+  test('[NORMAL] [SG2-36:AC1] returns the request to its organiser, filtered to this coordinator and under review', async () => {
+    let captured:
+      | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
+      | undefined;
+    const result = await requestClarification(
+      fakeEventsDecisionClient(
+        { data: [{ event_id: 7, status: 'needs_clarification', coordinator_id: 'coordinator-1' }], error: null },
+        (c) => (captured = c)
+      ),
+      7,
+      'coordinator-1'
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.status, 'needs_clarification');
+    assert.deepEqual(captured?.row, { status: 'needs_clarification' });
+    assert.equal(captured?.eventId, 7);
+    assert.equal(captured?.coordinatorId, 'coordinator-1');
+    // Only a request this coordinator is actively reviewing may be parked.
+    assert.equal(captured?.status, 'under_review');
+  });
+
+  test('[FAILURE] [SG2-36:AC1] reports unavailable when the update errors', async () => {
+    const result = await requestClarification(
+      fakeEventsDecisionClient({ data: null, error: { message: 'connection reset' } }),
+      7,
+      'coordinator-1'
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+  });
+
+  for (const data of [[], null]) {
+    test(`[CONFLICT] [SG2-36:AC1] reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+      const result = await requestClarification(fakeEventsDecisionClient({ data, error: null }), 7, 'coordinator-1');
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_found');
+    });
+  }
+});
+
 describe('deleteEventRequestDraft', () => {
   test('[NORMAL] [SG2-32:AC1] [SG2-32:AC2] deletes, filtered to the given event, organiser and draft status', async () => {
     let captured: { eventId: unknown; organiserId: unknown; status: unknown } | undefined;
@@ -845,7 +889,7 @@ describe('deleteEventRequestDraft', () => {
 });
 
 describe('updateEventRequestDraft', () => {
-  test('[NORMAL] [SG2-29:AC1] [SG2-30:AC3] updates the given fields, filtered to the event, organiser and draft status', async () => {
+  test('[NORMAL] [SG2-29:AC1] [SG2-30:AC3] [SG2-36:AC2] updates the given fields, filtered to the event, organiser and editable statuses', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown; status: unknown } | undefined;
     const result = await updateEventRequestDraft(
       fakeEventsUpdateDraftClient(
@@ -862,7 +906,7 @@ describe('updateEventRequestDraft', () => {
     assert.deepEqual(captured?.row, { ...EMPTY_VALUES, name: 'Renamed' });
     assert.equal(captured?.eventId, 7);
     assert.equal(captured?.organiserId, 'user-1');
-    assert.equal(captured?.status, 'draft');
+    assert.deepEqual(captured?.status, ['draft', 'needs_clarification']);
   });
 
   test('[FAILURE] [SG2-29:AC1] reports unavailable when the update errors', async () => {
