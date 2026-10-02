@@ -24,9 +24,11 @@ test('[NORMAL] [SG2-20:AC3] application composition mounts injected service rout
   const blocks = Router().get('/1/blocks', (_req, res) => res.json({ service: 'blocks' }));
   const search = Router().get('/search', (_req, res) => res.json({ service: 'search' }));
   const profile = Router().get('/', (_req, res) => res.json({ service: 'profile' }));
+  const suitability = Router().get('/suitability', (_req, res) => res.json({ service: 'suitability' }));
+  const bookingRequests = Router().get('/1/suitability', (_req, res) => res.json({ service: 'bookingRequests' }));
   const composed = createApp(undefined, undefined, undefined, undefined, undefined, undefined,
-    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, blocks, search, profile });
-  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/blocks', 'blocks'], ['/api/venues/search', 'search'], ['/api/profile', 'profile']]) {
+    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, blocks, search, profile, suitability, bookingRequests });
+  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/blocks', 'blocks'], ['/api/venues/search', 'search'], ['/api/profile', 'profile'], ['/api/venues/suitability', 'suitability'], ['/api/venue-booking-requests/1/suitability', 'bookingRequests']]) {
     const response = await request(composed).get(path);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { service });

@@ -114,6 +114,29 @@ test('[NORMAL] [SG2-46:AC1] AC1: opened from an approved event, the criteria are
   expect(query(fetch)).toMatchObject({ attendance: '180', accessibility: 'step-free' });
 });
 
+test('[NORMAL] [SG2-47:AC1] after searching for an event, venues that do not fit it are listed with the reason', async () => {
+  const small = { venue_id: 2, name: 'Seminar Room', location: null, capacity: 60,
+    suitability: { suitable: false, issues: [{ kind: 'capacity', message: "Expected attendance of 180 is above this venue's capacity of 60." }] } };
+  const fetch = vi.fn(async (url: string) => url.startsWith('/api/venues/suitability')
+    ? Response.json({ venues: [small] }) : Response.json({ venues: [terrace] }));
+  vi.stubGlobal('fetch', fetch);
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  expect(await screen.findByRole('heading', { name: '1 of 1 venues do not fit Meridian Forum' })).toBeInTheDocument();
+  expect(screen.getByText("Expected attendance of 180 is above this venue's capacity of 60.")).toBeInTheDocument();
+  expect(fetch.mock.calls.map(call => call[0])).toContain('/api/venues/suitability?event_id=10');
+  fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+  expect(screen.queryByRole('region', { name: 'Venues that do not fit Meridian Forum' })).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-47:AC1] a manual search does not check venues against any event', async () => {
+  const fetch = stubSearch(() => Response.json({ venues: [terrace] }));
+  render(<VenueSearch accessToken="token" />);
+  fill({ 'From (Singapore time)': '2030-06-15T09:00', 'Until (Singapore time)': '2030-06-15T17:00' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await screen.findByRole('heading', { name: 'Rooftop Terrace' });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
 test('[NORMAL] [SG2-46:AC3] AC3: an event without accessibility needs says accessibility is not used to match', async () => {
   stubSearch(() => Response.json({ venues: [] }));
   render(<VenueSearch accessToken="token" prefill={{ ...prefill, accessibilityNeeds: null, values: { ...prefill.values, accessibility: '' } }} />);

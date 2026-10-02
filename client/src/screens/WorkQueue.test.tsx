@@ -107,7 +107,8 @@ test.each([
   expect(within(detail).getByText('Leadership Forum · Event #12')).toBeVisible();
   expect(within(detail).getByText(/14:00/)).toBeVisible();
   expect(screen.getByText('Set up before doors open')).toBeVisible();
-  expect(fetch).toHaveBeenLastCalledWith(`/api/work-queue/${kind}/7`, expect.anything());
+  // A venue request then also loads its suitability (SG2-47).
+  expect(fetch).toHaveBeenCalledWith(`/api/work-queue/${kind}/7`, expect.anything());
 });
 
 test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit empty groups, then newly arrived work', async () => {

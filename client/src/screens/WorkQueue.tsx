@@ -5,6 +5,7 @@ import EventPlanningDrawer from './EventPlanningDrawer';
 import ClarificationThread from '../components/ClarificationThread';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
+import { BookingRequestFit } from '../venues/VenueFit';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
@@ -213,6 +214,7 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           }}
         />
       )}
+      {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} />}
       {item.kind === 'event' && (
         <EventAuditDrawer
           isOpen={historyDrawerOpen}

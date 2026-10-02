@@ -50,6 +50,7 @@ export class MemoryDatabase {
       })),
       account_roles: accounts.map(account => ({ user_id: `user-${account.key}`, role: account.role })),
       venue_booking_requests: [],
+      venue_capacity_exceptions: [],
       equipment_requests: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
       events: [
@@ -92,6 +93,25 @@ export class MemoryDatabase {
       coordinator_id: 'user-coordinator', purpose: 'Decide whether the forum proceeds',
       decided_by: null, decided_at: null, decision_reason: null,
     });
+  }
+
+  /** SG2-47: an approved event for 150 people needing a stage, a projector and
+   * a hearing loop. Grand Ballroom fits; Lecture Theatre is only too small
+   * (request 21 needs a capacity exception); Regression Hall also lacks a
+   * stage (request 22 is blocked). Booking requests are seeded directly
+   * because coordinators cannot raise them until SG2-48. */
+  seedVenueSuitability() {
+    const facilities = { location: 'Level 2', operating_information: '08:00–22:00', accessibility_features: 'Step-free, hearing loop' };
+    this.tables.venues.push(
+      { ...facilities, venue_id: 3, name: 'Lecture Theatre', capacity: 120, facilities: 'Stage, projector' },
+      { ...facilities, venue_id: 4, name: 'Grand Ballroom', capacity: 300, facilities: 'Stage, projector, PA' }
+    );
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 61, name: 'Suitability Forum', status: 'approved', coordinator_id: 'user-coordinator',
+      expected_attendance: 150, venue_requirements: 'A stage and a projector', accessibility_needs: 'Needs a hearing loop'
+    });
+    const request = { event_id: 61, starts_at: '2030-06-17T02:00:00Z', ends_at: '2030-06-17T10:00:00Z', status: 'pending', notes: null };
+    this.tables.venue_booking_requests.push({ ...request, request_id: 21, venue_id: 3 }, { ...request, request_id: 22, venue_id: 1 });
   }
 
   seedAssignedReview() {
@@ -192,7 +212,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     if (this.operation === 'insert') {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
       const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id',
-        event_clarifications: 'clarification_id', event_audit_logs: 'log_id' }[this.table];
+        event_clarifications: 'clarification_id', event_audit_logs: 'log_id', venue_capacity_exceptions: 'exception_id' }[this.table];
       let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
       rows = incoming.map(value => {
         const row = structuredClone(value);

@@ -20,6 +20,7 @@ import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
 import { createVenueBlocksRouter } from './venues/blocks';
 import { createVenueSearchRouter } from './venues/search';
+import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from './venues/suitabilityRoutes';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
@@ -45,7 +46,9 @@ export function createApp(
     layouts: createVenueLayoutsRouter(access),
     blocks: createVenueBlocksRouter(access),
     search: createVenueSearchRouter(access),
-    profile: createProfileRouter(access)
+    profile: createProfileRouter(access),
+    suitability: createVenueSuitabilityRouter(access),
+    bookingRequests: createBookingRequestSuitabilityRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
@@ -79,6 +82,10 @@ export function createApp(
   app.use('/api/venues', routers.availability);
   // SG2-46: coordinators search for venues that fit an event.
   app.use('/api/venues', routers.search);
+  // SG2-47: why a venue does or does not fit an event, and capacity
+  // exceptions on a venue booking request.
+  app.use('/api/venues', routers.suitability);
+  app.use('/api/venue-booking-requests', routers.bookingRequests);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

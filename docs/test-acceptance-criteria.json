@@ -352,6 +352,18 @@
         "AC3": "Accessibility is used as a matching requirement only when accessibility needs have been specified for the event",
         "AC4": "When nothing matches, this is stated and the current search criteria are shown"
       }
+    },
+    {
+      "id": "SG2-47",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-47",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Given expected attendance above the venue's capacity, when I view that venue against the event, then it is flagged unsuitable and the reason is stated",
+        "AC2": "Given a required facility the venue lacks, when I view that venue against the event, then the missing facility is identified and booking is blocked; no exception is permitted",
+        "AC3": "A capacity exception can be approved by Venue Staff, Technical Support Staff or the Event Organiser for the event; the approval and approver are recorded against the booking request. A coordinator acknowledging the warning alone does not approve an exception",
+        "AC4": "When no accessibility needs are specified, missing accessibility features do not make the venue unsuitable; when needs are specified, any missing features are identified in the suitability check",
+        "AC5": "Approval of a capacity exception does not approve the booking; Venue Staff still decide on the booking request"
+      }
     }
   ]
 }
