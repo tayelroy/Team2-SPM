@@ -10,6 +10,7 @@ import { dbConfig } from './db/config';
 import { createAssignCoordinatorHandler } from './events/assignCoordinator';
 import type { AssignCoordinatorResult, FetchEventRequestResult } from './db/eventRequests';
 import type { GetAccountRoleResult } from './db/accountRoles';
+import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 
 const STAFF: Principal = { userId: 'staff-1', role: 'technical_support_staff' };
 
@@ -37,9 +38,15 @@ interface HarnessOptions {
   fetchResult?: FetchEventRequestResult;
   roleResult?: GetAccountRoleResult;
   assignResult?: AssignCoordinatorResult;
+  /** Result of the compensating write that undoes an unrecorded assignment. */
+  rollbackResult?: AssignCoordinatorResult;
+  auditResult?: InsertAuditLogsResult;
   captureFetch?: (eventId: number) => void;
   captureRole?: (userId: string) => void;
   captureAssign?: (eventId: number, coordinatorId: string) => void;
+  /** Every coordinator write, including a rollback: [eventId, to, expectedCurrent]. */
+  writes?: [number, string | null, string | null][];
+  audits?: InsertAuditLogInput[][];
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -58,14 +65,23 @@ function buildApp(options: HarnessOptions = {}) {
         options.captureRole?.(userId);
         return options.roleResult ?? { ok: true, role: 'event_coordinator' };
       },
-      assignCoordinator: async (_admin, eventId, coordinatorId) => {
-        options.captureAssign?.(eventId, coordinatorId);
+      assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent) => {
+        options.writes?.push([eventId, coordinatorId, expectedCurrent]);
+        const isRollback = (options.writes?.length ?? 0) > 1;
+        if (isRollback) {
+          return options.rollbackResult ?? { ok: true, request: SUBMITTED_REQUEST };
+        }
+        options.captureAssign?.(eventId, coordinatorId!);
         return (
           options.assignResult ?? {
             ok: true,
             request: { ...SUBMITTED_REQUEST, coordinator_id: coordinatorId, coordinator_name: 'Coord One' }
           }
         );
+      },
+      writeHistory: async (_admin, entries) => {
+        options.audits?.push(entries);
+        return options.auditResult ?? { ok: true, logs: [] };
       }
     })
   );
@@ -218,6 +234,166 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
     )
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 503);
+    assert.doesNotMatch(response.text, /SENTINEL/);
+  });
+});
+
+describe('PATCH /api/event-requests/:eventId/coordinator records the assignment in the event history (SG2-33 AC4, SG2-34 AC4)', () => {
+  const ASSIGNED = { ...SUBMITTED_REQUEST, coordinator_id: 'coord-old', coordinator_name: 'Old Coordinator' };
+
+  test('[NORMAL] [SG2-33:AC4] a first assignment is recorded with the staff member who made it', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(
+      buildApp({
+        audits,
+        writes,
+        assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-1', coordinator_name: 'Sarah Tan' } }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-1' });
+
+    assert.equal(response.status, 200);
+    // The write only applies while the request is still unassigned.
+    assert.deepEqual(writes, [[7, 'coord-1', null]]);
+    // The database stamps created_at, so "when" is not taken from the caller.
+    assert.deepEqual(audits, [[
+      { event_id: 7, actor_id: 'staff-1', field_name: 'coordinator_id', old_value: null, new_value: 'Sarah Tan' }
+    ]]);
+  });
+
+  test('[NORMAL] [SG2-34:AC4] a reassignment keeps the previous coordinator in the history row', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(
+      buildApp({
+        audits,
+        writes,
+        fetchResult: { ok: true, request: ASSIGNED },
+        assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-new', coordinator_name: 'New Coordinator' } }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-new' });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(writes, [[7, 'coord-new', 'coord-old']]);
+    assert.deepEqual(audits, [[
+      { event_id: 7, actor_id: 'staff-1', field_name: 'coordinator_id', old_value: 'Old Coordinator', new_value: 'New Coordinator' }
+    ]]);
+  });
+
+  test('[BOUNDARY] [SG2-33:AC4] [SG2-34:AC4] choosing the coordinator already assigned changes nothing and adds no history', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(buildApp({ audits, writes, fetchResult: { ok: true, request: ASSIGNED } }))
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-old' });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.coordinator_id, 'coord-old');
+    assert.deepEqual(writes, []);
+    assert.deepEqual(audits, []);
+  });
+
+  test('[BOUNDARY] [SG2-33:AC4] falls back to the coordinator id when a name cannot be resolved', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    await request(
+      buildApp({
+        audits,
+        fetchResult: { ok: true, request: { ...ASSIGNED, coordinator_name: null } },
+        assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-new', coordinator_name: null } }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-new' });
+
+    assert.deepEqual(audits[0][0], {
+      event_id: 7, actor_id: 'staff-1', field_name: 'coordinator_id', old_value: 'coord-old', new_value: 'coord-new'
+    });
+  });
+
+  test('[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] refuses a request that is not in an assignable status before any write', async () => {
+    const writes: [number, string | null, string | null][] = [];
+    const audits: InsertAuditLogInput[][] = [];
+    for (const status of ['draft', 'rejected', 'completed', 'cancelled']) {
+      const response = await request(
+        buildApp({ writes, audits, fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status } } })
+      )
+        .patch('/api/event-requests/7/coordinator')
+        .send({ coordinatorId: 'coord-1' });
+      assert.equal(response.status, 409, status);
+      assert.deepEqual(response.body, {
+        error: 'A coordinator can only be assigned to a submitted request that is not yet closed out.'
+      });
+    }
+    assert.deepEqual(writes, []);
+    assert.deepEqual(audits, []);
+  });
+
+  test('[CONFLICT] [SG2-34:AC4] a reassignment that loses a race is refused, so history never names the wrong previous coordinator', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const response = await request(
+      buildApp({
+        audits,
+        fetchResult: { ok: true, request: ASSIGNED },
+        assignResult: { ok: false, reason: 'not_assignable', message: 'zero rows' }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-new' });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(response.body, {
+      error: 'This request changed while you were assigning it. Reload the list and try again.'
+    });
+    assert.deepEqual(audits, []);
+  });
+
+  test('[FAILURE] [SG2-33:AC4] [SG2-34:AC4] an assignment that cannot be recorded is undone and reported as unavailable', async () => {
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(
+      buildApp({
+        writes,
+        fetchResult: { ok: true, request: ASSIGNED },
+        assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-new', coordinator_name: 'New Coordinator' } },
+        auditResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-new' });
+
+    assert.equal(response.status, 503);
+    assert.doesNotMatch(response.text, /SENTINEL/);
+    // Put the previous coordinator back, but only if nobody has changed it since.
+    assert.deepEqual(writes, [[7, 'coord-new', 'coord-old'], [7, 'coord-old', 'coord-new']]);
+  });
+
+  test('[FAILURE] [SG2-33:AC4] a first assignment that cannot be recorded is undone back to unassigned', async () => {
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(
+      buildApp({ writes, auditResult: { ok: false, reason: 'unavailable', message: 'down' } })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-1' });
+
+    assert.equal(response.status, 503);
+    assert.deepEqual(writes, [[7, 'coord-1', null], [7, null, 'coord-1']]);
+  });
+
+  test('[FAILURE] [SG2-33:AC4] still answers 503 without leaking details when the undo also fails', async () => {
+    const response = await request(
+      buildApp({
+        writes: [],
+        auditResult: { ok: false, reason: 'unavailable', message: 'down' },
+        rollbackResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-1' });
+
     assert.equal(response.status, 503);
     assert.doesNotMatch(response.text, /SENTINEL/);
   });

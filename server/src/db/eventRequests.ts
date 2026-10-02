@@ -597,22 +597,30 @@ export const COORDINATOR_ASSIGNABLE_STATUSES = [
  * whether `coordinator_id` was previously null or held a different
  * coordinator. `status` is repeated as a condition on the write itself
  * (not just a pre-check in the handler), matching the IDOR-hardening
- * pattern already used by deleteEventRequestDraft/updateEventRequestDraft:
- * if the request has moved to a non-assignable status by the time this
- * runs, zero rows come back rather than silently assigning a draft or a
- * closed-out request.
+ * pattern already used by deleteEventRequestDraft/updateEventRequestDraft.
+ *
+ * `expectedCurrent` is the coordinator the caller read beforehand, and is
+ * also a condition on the write: if another assignment landed in between,
+ * zero rows come back instead of overwriting it, so the history entry the
+ * caller writes next (SG2-33/34 AC4) always names the real previous
+ * coordinator. Passing `coordinatorId: null` clears the assignment, which
+ * is how an assignment that could not be recorded is undone.
  */
 export async function assignEventCoordinator(
   admin: SupabaseClient,
   eventId: number,
-  coordinatorId: string
+  coordinatorId: string | null,
+  expectedCurrent: string | null
 ): Promise<AssignCoordinatorResult> {
-  const { data, error } = await admin
+  const guarded = admin
     .from('events')
     .update({ coordinator_id: coordinatorId })
     .eq('event_id', eventId)
-    .in('status', COORDINATOR_ASSIGNABLE_STATUSES)
-    .select(DETAIL_COLUMNS);
+    .in('status', COORDINATOR_ASSIGNABLE_STATUSES);
+  const { data, error } = await (expectedCurrent === null
+    ? guarded.is('coordinator_id', null)
+    : guarded.eq('coordinator_id', expectedCurrent)
+  ).select(DETAIL_COLUMNS);
 
   if (error) {
     return { ok: false, reason: 'unavailable', message: error.message };
@@ -621,7 +629,7 @@ export async function assignEventCoordinator(
     return {
       ok: false,
       reason: 'not_assignable',
-      message: 'This event request cannot have a coordinator assigned in its current status.'
+      message: 'This event request is no longer assignable from the coordinator it was read with.'
     };
   }
   const row = data[0] as unknown as Record<string, unknown>;

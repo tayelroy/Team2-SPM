@@ -5,6 +5,7 @@ import {
   type AssignableRequest,
   type CoordinatorOption,
 } from '../api/eventRequests';
+import { EventAuditDrawer } from '../components/EventAuditDrawer';
 import { badgeStyle } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
 import { Badge, Card, Eyebrow, GhostButton, GradientButton, Notice } from '../ui';
@@ -18,6 +19,8 @@ function formatStatus(status: string): string {
  * Technical Support Staff assign an Event Coordinator to a request, or hand it
  * to a different one (SG2-33, SG2-34). Both are the same write, so one control
  * serves both; only its label changes once a coordinator is already set.
+ * Each change is recorded in the event history (SG2-33/34 AC4), which opens
+ * from the same card in SG2-40's history drawer.
  */
 export default function CoordinatorAssignment({ accessToken }: { accessToken: string }) {
   const [requests, setRequests] = useState<AssignableRequest[]>([]);
@@ -28,6 +31,7 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
   const [picked, setPicked] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
   const [rowMessage, setRowMessage] = useState<Record<number, { text: string; failed: boolean }>>({});
+  const [historyFor, setHistoryFor] = useState<{ eventId: number; name: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,6 +161,14 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
               >
                 {savingId === request.eventId ? 'Saving…' : request.coordinatorId ? 'Reassign' : 'Assign'}
               </GradientButton>
+              <button
+                type="button"
+                className="organisation-button"
+                aria-label={`View change history for ${title}`}
+                onClick={() => setHistoryFor({ eventId: request.eventId, name: title })}
+              >
+                View Change History
+              </button>
             </div>
             {message?.text && (
               <p role={message.failed ? 'alert' : 'status'} style={{ margin: 0, color: color.silver, fontSize: '13px' }}>
@@ -166,6 +178,15 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
           </Card>
         );
       })}
+      {historyFor && (
+        <EventAuditDrawer
+          isOpen
+          onClose={() => setHistoryFor(null)}
+          eventId={historyFor.eventId}
+          eventName={historyFor.name}
+          accessToken={accessToken}
+        />
+      )}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CoordinatorAssignment from './CoordinatorAssignment';
 
@@ -21,10 +21,12 @@ const REQUESTS = [
 function api(
   list: () => Response | Promise<Response> = () => Response.json({ requests: REQUESTS, coordinators: COORDINATORS }),
   patch: (url: string, init: RequestInit) => Response | Promise<Response> = () => Response.json({ request: {} }),
+  history: (url: string) => Response | Promise<Response> = () => Response.json({ event_id: 0, history: [] }),
 ) {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer tok' });
     if (init?.method === 'PATCH') return patch(url, init);
+    if (url.endsWith('/history')) return history(url);
     expect(url).toBe('/api/event-requests/assignable');
     return list();
   });
@@ -141,5 +143,40 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     unmount();
     resolve(Response.json({ requests: REQUESTS, coordinators: COORDINATORS }));
     await waitFor(() => expect(screen.queryByRole('heading')).not.toBeInTheDocument());
+  });
+
+  test('[NORMAL] [SG2-34:AC4] Technical Support can open the history and see the previous coordinator after a reassignment', async () => {
+    const fetchMock = api(undefined, undefined, (url) => {
+      expect(url).toBe('/api/event-requests/8/history');
+      return Response.json({
+        event_id: 8,
+        history: [
+          { log_id: 2, event_id: 8, actor_id: 'tss-1', actor_name: 'Technical Support One', field_name: 'coordinator_id',
+            old_value: 'Sarah Coordinator', new_value: 'Raj Coordinator', created_at: '2026-10-02T02:30:00.000Z' },
+          { log_id: 1, event_id: 8, actor_id: 'tss-1', actor_name: 'Technical Support One', field_name: 'coordinator_id',
+            old_value: null, new_value: 'Sarah Coordinator', created_at: '2026-10-01T01:00:00.000Z' },
+        ],
+      });
+    });
+    render(<CoordinatorAssignment accessToken="tok" />);
+    await screen.findByRole('heading', { name: 'Partner Forum' });
+
+    fireEvent.change(screen.getByLabelText('Coordinator for Untitled request'), { target: { value: 'c2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reassign' }));
+    await screen.findByText('Assigned to Raj Coordinator.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'View change history for Untitled request' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Event Change History' });
+    const newest = await within(drawer).findByTestId('audit-entry-2');
+    expect(newest).toHaveTextContent('Technical Support One');
+    expect(newest).toHaveTextContent('Coordinator');
+    expect(newest).toHaveTextContent('Sarah Coordinator');
+    expect(newest).toHaveTextContent('Raj Coordinator');
+    expect(newest).toHaveTextContent('2 Oct 2026, 10:30 SGT');
+    expect(within(drawer).getByTestId('audit-entry-1')).toHaveTextContent('(empty)');
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/8/history', expect.anything());
+
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Close change history' }));
+    expect(screen.queryByRole('dialog', { name: 'Event Change History' })).not.toBeInTheDocument();
   });
 });
