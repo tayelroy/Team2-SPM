@@ -114,6 +114,19 @@ export class MemoryDatabase {
     this.tables.venue_booking_requests.push({ ...request, request_id: 21, venue_id: 3 }, { ...request, request_id: 22, venue_id: 1 });
   }
 
+  /** SG2-33/34: an unassigned submitted request, plus a second coordinator
+   * (no sign-in account needed) so a real reassignment can be made. */
+  seedCoordinatorAssignment() {
+    this.tables.users.push({
+      user_id: 'user-coordinator2', name: 'Regression second coordinator', organisation: 'Regression Organisation',
+      phone: null, communication_preferences: [], department: 'Operations'
+    });
+    this.tables.account_roles.push({ user_id: 'user-coordinator2', role: 'event_coordinator' });
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 71, name: 'Assignment Forum', status: 'submitted', coordinator_id: null
+    });
+  }
+
   seedAssignedReview() {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 51, name: 'Assigned Review Forum', status: 'submitted',
@@ -242,6 +255,10 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         if (key.startsWith('coordinator:')) {
           const coordinator = this.database.tables.users.find(user => user.user_id === row.coordinator_id);
           return ['coordinator', coordinator ? { name: coordinator.name } : null];
+        }
+        if (key.startsWith('actor:')) {
+          const actor = this.database.tables.users.find(user => user.user_id === row.actor_id);
+          return ['actor', actor ? { name: actor.name } : null];
         }
         if (key.startsWith('sender:')) {
           const sender = this.database.tables.users.find(user => user.user_id === row.sender_id);

@@ -1644,6 +1644,51 @@
     }
   },
   {
+    "id": "SG2-34-P01",
+    "title": "an assignment and a reassignment are recorded and the previous coordinator stays in the history",
+    "story": "SG2-34",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-33:AC4",
+      "SG2-34:AC2",
+      "SG2-34:AC3",
+      "SG2-34:AC4"
+    ],
+    "method_id": "TC-47af2a9b626d",
+    "purpose": "Verify that Technical Support Staff assigning and then reassigning a coordinator is recorded with who made each change, that the previous coordinator stays visible in the event history, that the previous coordinator loses the request and that the organiser sees the new contact.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment: unassigned submitted request 71 and a second coordinator.",
+    "steps": [
+      "request.post('/__e2e/coordinator-assignment')",
+      "Sign in as support@example.test and open Assign coordinators",
+      "Assign Regression coordinator to Assignment Forum",
+      "Reassign Assignment Forum to Regression second coordinator",
+      "Open View change history for Assignment Forum",
+      "page.request.get('/api/event-requests/71/history', { headers })",
+      "As coordinator@example.test: request.patch('/api/event-requests/71/review')",
+      "As organiser@example.test: request.get('/api/event-requests/71')"
+    ],
+    "data": [
+      "Event 71 'Assignment Forum' (submitted, unassigned)",
+      "Coordinators: Regression coordinator, Regression second coordinator",
+      "Actor: Regression support (user-support)"
+    ],
+    "expected": [
+      "Drawer shows two entries, newest first: Regression support changed Coordinator from Regression coordinator to Regression second coordinator; then (empty) to Regression coordinator",
+      "Stored history equals [[user-support, coordinator_id, Regression coordinator, Regression second coordinator], [user-support, coordinator_id, null, Regression coordinator]]",
+      "Previous coordinator's review call returns 404",
+      "Organiser's detail returns coordinator_name 'Regression second coordinator'"
+    ],
+    "evidence": "e2e/regression.spec.ts:568",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 34-journey Chromium run (npm run test:e2e exit 0, regression gate green).",
+    "execution_date": "2 Oct 2026",
+    "executed_by": "Marcus Chua",
+    "execution_evidence": "npm run test:e2e on feature/SG2-34-coordinator-assignment-history working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
     "id": "SG2-37-P01",
     "title": "approving a request under review persists the approved outcome",
     "story": "SG2-37",
@@ -1674,7 +1719,7 @@
       "expect(page.getByText('approved')).toBeVisible()",
       "expect((await item.json()).items[0].status).toBe('approved')"
     ],
-    "evidence": "e2e/regression.spec.ts:568",
+    "evidence": "e2e/regression.spec.ts:615",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1728,7 +1773,7 @@
       "expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.')",
       "expect(page.getByRole('region', { name: 'Why this request was rejected' })) .toContainText('Clashes with the AGM on the same evening.')"
     ],
-    "evidence": "e2e/regression.spec.ts:587",
+    "evidence": "e2e/regression.spec.ts:634",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1771,7 +1816,7 @@
       "expect(refused.status()).toBe(404)",
       "expect(unassigned.status()).toBe(404)"
     ],
-    "evidence": "e2e/regression.spec.ts:621",
+    "evidence": "e2e/regression.spec.ts:668",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1808,7 +1853,7 @@
     ],
     "data": "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; question and answer texts fixed in the spec.",
     "expected": "Status needs_clarification after the question; organiser notice and question visible; answer appended; event 52 stored as submitted after resubmission; the coordinator sees it under review with both messages (2 list items) and the decision panel back.",
-    "evidence": "e2e/regression.spec.ts:645",
+    "evidence": "e2e/regression.spec.ts:692",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
@@ -1842,7 +1887,7 @@
     ],
     "data": "Event 52; colleague, venue and organiser fixture accounts.",
     "expected": "Colleague GET and POST return 404; venue staff GET returns 403; the organiser's POST returns 201 with status still under_review.",
-    "evidence": "e2e/regression.spec.ts:693",
+    "evidence": "e2e/regression.spec.ts:740",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
