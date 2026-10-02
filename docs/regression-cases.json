@@ -13,7 +13,7 @@
       "Sign in as venue and technical support staff; open each pending request and verify its identity, event, time window and stored facts.",
       "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
     ],
-    "data": "Events 41\u201344; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
+    "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
     "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; event cards show the client organisation, not a repeated title; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
     "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
     "layer": "Playwright browser + fixture API",
@@ -246,7 +246,7 @@
       "Rename it Updated Browser Hall and change capacity to 125.",
       "Reload, search for Updated Browser, and read the venue API."
     ],
-    "data": "North Wing; capacity 100 then 125; Projector; Lift; 09:00\u201318:00",
+    "data": "North Wing; capacity 100 then 125; Projector; Lift; 09:00–18:00",
     "expected": "Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -390,7 +390,7 @@
       "Verify the error and repeat that invalid request through the fixture API.",
       "Change to 255 characters and submit; read the venue count."
     ],
-    "data": "Name = \u754c repeated 256 then 255 times; other fields valid",
+    "data": "Name = 界 repeated 256 then 255 times; other fields valid",
     "expected": "256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -964,7 +964,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1004,7 +1004,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1087,7 +1087,7 @@
       "Check My drafts and reload."
     ],
     "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
-    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller\u2019s own requests.",
+    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -1107,7 +1107,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller\u2019s own requests.",
+        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1134,7 +1134,7 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as an organiser in another organisation.",
-      "Inspect My events and request another organisation\u2019s event directly.",
+      "Inspect My events and request another organisation’s event directly.",
       "Compare with a nonexistent event.",
       "Sign in with no organisation and inspect list and detail."
     ],
@@ -1208,7 +1208,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1321,12 +1321,12 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
-      "Block 20 June 2030 09:00\u201317:00 with reason Carpet replacement.",
+      "Block 20 June 2030 09:00–17:00 with reason Carpet replacement.",
       "Open Venue Availability for June 2030 and inspect the calendar.",
       "Return to the block screen, remove the block, and re-check the API and calendar."
     ],
     "data": "Seeded Regression Hall with its existing Scheduled maintenance block; 20 June 2030",
-    "expected": "The new block is listed and appears as Regression Hall \u00b7 Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
+    "expected": "The new block is listed and appears as Regression Hall · Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -1369,12 +1369,12 @@
     "purpose": "Verify AC2 and the Venue Staff-only permission for blocking and removing blocks.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Sign in as Venue Staff and try to block 14\u201316 June 2030, which covers confirmed booking #1.",
+      "Sign in as Venue Staff and try to block 14–16 June 2030, which covers confirmed booking #1.",
       "Repeat the overlapping block through the API.",
       "Sign in as coordinator, technical support, organiser and attendee; try to list, create and remove blocks through the API; check the coordinator catalogue has no block control.",
       "Call the create endpoint without credentials."
     ],
-    "data": "Seeded confirmed booking #1 for event 1 on 15 June 2030 02:00\u201304:00 UTC; all fixture roles",
+    "data": "Seeded confirmed booking #1 for event 1 on 15 June 2030 02:00–04:00 UTC; all fixture roles",
     "expected": "The UI and API refuse the block with 409 and identify booking #1 for event 1; other roles receive 403, unauthenticated calls 401; no block is written.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1456,7 +1456,7 @@
     "title": "an approved event opens a pre-filled venue search that leaves out busy venues",
     "type": "Positive",
     "story": "SG2-46",
-    "purpose": "Verify AC1\u2013AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
+    "purpose": "Verify AC1–AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, seed a request under review, approve it and choose Find venues for this event.",
@@ -1843,5 +1843,91 @@
         "source": "supabase/tests/event_planning_and_audit.sql"
       }
     }
+  },
+  {
+    "id": "SG2-40-P01",
+    "title": "Change history lists actor, field and old/new values newest-first",
+    "type": "Positive",
+    "story": "SG2-40",
+    "purpose": "Verify AC1 and AC2: the audit trail returns entries ordered newest-first by actor and timestamp, and the drawer renders the humanized field name with its old and new value diff.",
+    "preconditions": "Backend: committed suite with local HTTP/provider/store fakes, no real account or deployed database. Frontend: Vitest + Testing Library with a mocked getEventHistory API.",
+    "steps": [
+      "Backend: seed audit log rows across multiple fields/actors and call fetchEventAuditLogs; confirm the query orders by created_at then log_id descending.",
+      "Frontend: mock getEventHistory to resolve with pre-ordered mock entries and render EventAuditDrawer with isOpen=true.",
+      "Check each entry's actor name, humanized field label, SGT-formatted timestamp and old-to-new diff values, including null old/new values rendered as (empty)."
+    ],
+    "data": "Three mock audit entries for event 42: expected_attendance 100→250, venue_requirements null→'Auditorium with stage lighting', accessibility_needs 'Wheelchair ramp'→null",
+    "expected": "Entries render newest-first with correct actor names, humanized field labels, SGT timestamps and old/new diffs; null values render as (empty).",
+    "evidence": "server/src/db/auditLogs.test.ts; server/src/events/getHistory.test.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "Backend API/unit tests; Frontend component tests",
+    "status": "Pass",
+    "actual": "All EventAuditDrawer.test.tsx (16/16) and getHistory.test.ts assertions passed locally.",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-40-N01",
+    "title": "Attendees and unrelated organisers are blocked from an event's change history",
+    "type": "Negative / RBAC",
+    "story": "SG2-40",
+    "purpose": "Verify AC3: attendees are denied outright and event organisers cannot read the history of events they do not own.",
+    "preconditions": "Backend: committed suite with local HTTP/provider/store fakes, no real account or deployed database.",
+    "steps": [
+      "Call the history handler as an attendee principal and verify it is rejected before any database read.",
+      "Call the history handler as an event_organiser principal whose userId does not match the event's organiser_id and verify 403.",
+      "Call the history handler for a missing eventId and verify 404."
+    ],
+    "data": "Attendee principal; organiser principal mismatched to event.organiser_id; nonexistent eventId",
+    "expected": "Attendees receive 403 before any audit log fetch; mismatched organisers receive 403; missing events receive 404.",
+    "evidence": "server/src/events/getHistory.test.ts",
+    "layer": "Backend API/unit tests",
+    "status": "Pass",
+    "actual": "getHistory.test.ts RBAC and not-found assertions passed locally (22/22 in file; 774/774 in full backend suite).",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-40-F01",
+    "title": "Null actor/values and backend outage show a safe fallback with retry",
+    "type": "Failure / negative",
+    "story": "SG2-40",
+    "purpose": "Verify the drawer and handler degrade safely when the actor name or old/new values are null and when the history service or network is unavailable.",
+    "preconditions": "Backend: committed suite with local HTTP/provider/store fakes. Frontend: Vitest + Testing Library with a mocked getEventHistory API.",
+    "steps": [
+      "Backend: return an audit log row with a null actor_name and confirm the handler falls back to 'Unknown'.",
+      "Backend: simulate an admin client/database failure and confirm the handler returns 503 with the generic unavailable message.",
+      "Frontend: mock getEventHistory to resolve ok:false (4xx/503) and to reject (network error); verify the drawer shows the error notice with a working Retry action, and shows the signed-out message when no token is available.",
+      "Frontend: mock getEventHistory to resolve with an empty history array and verify the empty-state placeholder renders."
+    ],
+    "data": "Audit log row with actor_name=null; simulated admin-client failure; mocked 4xx/503 and rejected fetch outcomes; no accessToken and no session",
+    "expected": "Null actor_name renders as 'Unknown'; backend/database failures return 503 with the generic unavailable message; the drawer shows the error notice with a functioning Retry button, the signed-out message when unauthenticated, and the empty-state placeholder for zero history rows.",
+    "evidence": "server/src/events/getHistory.test.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "Backend API/unit tests; Frontend component tests",
+    "status": "Pass",
+    "actual": "All relevant EventAuditDrawer.test.tsx and getHistory.test.ts failure-path assertions passed locally.",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-40-C01",
+    "title": "[CONFLICT] A stale in-flight fetch is ignored when eventId flips mid-fetch",
+    "type": "Conflict / race condition",
+    "story": "SG2-40",
+    "purpose": "Catch a race condition where switching the drawer's eventId while a slower fetch for the previous event is still in flight would otherwise let the stale response overwrite newer history.",
+    "preconditions": "Frontend: Vitest + Testing Library with a controllable, manually-resolved mocked getEventHistory API so request completion order can be sequenced independently of request start order.",
+    "steps": [
+      "Render EventAuditDrawer open for event 42 and let getEventHistory start an unresolved fetch.",
+      "Rerender the same drawer instance with eventId changed to 99 while the first fetch is still pending, starting a second fetch.",
+      "Resolve the second (event 99) request first and confirm its history renders.",
+      "Resolve the first (event 42, stale) request afterwards and confirm its history is discarded, not applied over the current event's rendered history."
+    ],
+    "data": "Two mocked getEventHistory responses for events 42 and 99, resolved out of start order (99 resolves before 42)",
+    "expected": "Only the latest request's history is ever rendered; a stale response resolving after a newer one must not overwrite the currently displayed history.",
+    "evidence": "client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "Frontend component tests",
+    "status": "Pass",
+    "actual": "Added a monotonically-increasing request-id guard in EventAuditDrawer's fetchHistory so only the response matching the latest request is applied to state; the new '[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch' test (client/src/components/EventAuditDrawer.test.tsx) passed, and EventAuditDrawer.tsx retained 100% statement/branch coverage (16/16 tests in file; 647/647 in full client suite).",
+    "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
+    "execution_date": "1 Oct 2026"
   }
 ]

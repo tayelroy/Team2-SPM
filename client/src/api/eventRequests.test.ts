@@ -13,6 +13,8 @@ import {
   updateEventRequestDraft,
   getEventStage,
   updateEventPlanning,
+  getEventHistory,
+  type EventAuditLogEntry,
   type EventStageResult,
   type EventRequestDetail,
   type EventRequestSummary,
@@ -1595,3 +1597,186 @@ describe('assignCoordinator (SG2-33/34)', () => {
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual(retry);
   });
 });
+
+describe('getEventHistory (SG2-40)', () => {
+  const mockHistory: EventAuditLogEntry[] = [
+    {
+      log_id: 2,
+      event_id: 101,
+      actor_id: 'coord-1',
+      actor_name: 'Coordinator Sarah',
+      field_name: 'expected_attendance',
+      old_value: '100',
+      new_value: '250',
+      created_at: '2026-09-25T14:30:00.000Z',
+    },
+    {
+      log_id: 1,
+      event_id: 101,
+      actor_id: 'coord-1',
+      actor_name: 'Coordinator Sarah',
+      field_name: 'proposed_date',
+      old_value: '2026-11-10T09:00:00.000Z',
+      new_value: '2026-11-15T09:00:00.000Z',
+      created_at: '2026-09-25T14:00:00.000Z',
+    },
+  ];
+
+  test('[NORMAL] successfully retrieves change history with reverse chronological entries', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: mockHistory }, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const outcome = await getEventHistory(101, 'test-token');
+
+    expect(outcome).toEqual({ ok: true, history: mockHistory });
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/101/history', {
+      headers: { Authorization: 'Bearer test-token' },
+    });
+  });
+
+  test('[BOUNDARY] handles empty history list', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ event_id: 101, history: [] }, 200)));
+
+    const outcome = await getEventHistory(101, 'test-token');
+
+    expect(outcome).toEqual({ ok: true, history: [] });
+  });
+
+  test('[FAILURE] handles 401 unauthorized', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
+
+    const outcome = await getEventHistory(101, 'invalid-token');
+
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Authentication required',
+    });
+  });
+
+  test('[FAILURE] handles 403 forbidden', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse({ error: 'Attendees are not authorized to view change history.' }, 403)),
+    );
+
+    const outcome = await getEventHistory(101, 'attendee-token');
+
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Attendees are not authorized to view change history.',
+    });
+  });
+
+  test('[FAILURE] handles 404 not found', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
+
+    const outcome = await getEventHistory(999, 'token-1');
+
+    expect(outcome).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event not found.',
+    });
+  });
+
+  test('[FAILURE] handles 503 unavailable and network failures', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Service down' }, 503)));
+
+    const unavailableOutcome = await getEventHistory(101, 'token-1');
+    expect(unavailableOutcome).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Service down',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+    const networkFailOutcome = await getEventHistory(101, 'token-1');
+    expect(networkFailOutcome).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('[BOUNDARY] falls back to default messages when error payload is empty', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 401)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unauthorized',
+      message: 'Authentication required',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 403)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'forbidden',
+      message: 'Access forbidden',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 404)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'not_found',
+      message: 'Event not found.',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 503)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('[FAILURE] handles generic HTTP error responses (500)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Internal failure' }, 500)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Internal failure',
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 500)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event history (HTTP 500).',
+    });
+  });
+
+  test('[FAILURE] handles invalid JSON responses or non-object / non-array bodies', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('<html>Bad Gateway</html>', {
+          status: 502,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    );
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event history (HTTP 502).',
+    });
+
+    // 200 OK with null body
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(null, 200)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+
+    // 200 OK with non-array history
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ history: 'not an array' }, 200)));
+    expect(await getEventHistory(101, 'token')).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+});
+

@@ -865,3 +865,145 @@ test('[BOUNDARY] [SG2-37:legacy-rejection] a rejection recorded without a stored
   await screen.findByRole('heading', { name: 'Annual Gala' });
   expect(screen.queryByRole('region', { name: 'Why this request was rejected' })).not.toBeInTheDocument();
 });
+
+describe('EventDetail change history integration (SG2-40)', () => {
+  const baseRequest = {
+    eventId: 101,
+    organiserId: 'org-1',
+    organisation: 'Acme Corp',
+    status: 'planning',
+    name: 'Leadership Retreat',
+    purpose: 'Executive alignment',
+    description: '',
+    proposedDate: '2026-11-20T08:00:00.000Z',
+    expectedAttendance: 45,
+    venueRequirements: null,
+    accessibilityNeeds: null,
+    equipmentRequirements: null,
+    registrationNeeded: true,
+    coordinatorId: 'coord-1',
+    coordinatorName: 'Sarah Jenkins',
+    canManage: true,
+    waitingOnMe: false,
+    decisionReason: null,
+    decidedAt: null,
+  };
+
+  test('[NORMAL] renders "View Change History" button for Event Organiser and opens drawer on click', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseRequest,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+      ok: true,
+      history: [
+        {
+          log_id: 1,
+          event_id: 101,
+          actor_id: 'coord-1',
+          actor_name: 'Sarah Jenkins',
+          field_name: 'expected_attendance',
+          old_value: '40',
+          new_value: '45',
+          created_at: '2026-09-25T14:30:00.000Z',
+        },
+      ],
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />
+    );
+
+    const historyBtn = await screen.findByRole('button', { name: /view change history/i });
+    expect(historyBtn).toBeInTheDocument();
+
+    // Drawer is closed initially
+    expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+
+    // Click to open drawer
+    fireEvent.click(historyBtn);
+
+    const dialog = await screen.findByRole('dialog', { name: /change history/i });
+    expect(dialog).toBeInTheDocument();
+    expect(await screen.findByText('Expected Attendance')).toBeInTheDocument();
+  });
+
+  test('[NORMAL] renders "View Change History" button for Event Coordinator and opens drawer on click', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: baseRequest,
+    });
+    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+      ok: true,
+      history: [],
+    });
+
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />
+    );
+
+    const historyBtn = await screen.findByRole('button', { name: /view change history/i });
+    expect(historyBtn).toBeInTheDocument();
+
+    fireEvent.click(historyBtn);
+    expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+  });
+
+  test('[FAILURE] does not render "View Change History" for Attendees', () => {
+    render(
+      <EventDetail
+        role="Attendee"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: /view change history/i })).not.toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] renders "View Change History" for Organiser when canManage is false and closes drawer properly', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        ...baseRequest,
+        canManage: false,
+      },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
+      ok: true,
+      history: [],
+    });
+
+    render(
+      <EventDetail
+        role="Event Organiser"
+        selectedEventId={101}
+        accessToken="test-token"
+        onNavigate={vi.fn()}
+      />
+    );
+
+    const historyBtn = await screen.findByRole('button', { name: /view change history/i });
+    expect(historyBtn).toBeInTheDocument();
+
+    fireEvent.click(historyBtn);
+    expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
+
+    const closeBtn = screen.getByRole('button', { name: /close change history/i });
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+  });
+});
+
+

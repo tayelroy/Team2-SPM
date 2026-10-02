@@ -6,6 +6,7 @@ import {
   type EventStageResult
 } from '../api/eventRequests';
 import EventPlanningDrawer from './EventPlanningDrawer';
+import EventAuditDrawer from '../components/EventAuditDrawer';
 import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
 import type { Role, Screen } from '../mock/types';
@@ -55,6 +56,7 @@ export default function EventDetail({
   const [notFound, setNotFound] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [isPlanningDrawerOpen, setIsPlanningDrawerOpen] = useState(false);
+  const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthorizedRole || !selectedEventId || !accessToken) {
@@ -320,9 +322,20 @@ export default function EventDetail({
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
             {!detail.canManage && !isCoordinator ? (
-              <p role="status" className="organisation-detail-notice">
-                View only. This event is shared with your organisation. Only its creator can edit or submit the request.
-              </p>
+              <>
+                <p role="status" className="organisation-detail-notice">
+                  View only. This event is shared with your organisation. Only its creator can edit or submit the request.
+                </p>
+                <div className="organisation-detail-actions">
+                  <button
+                    className="organisation-button"
+                    type="button"
+                    onClick={() => setIsHistoryDrawerOpen(true)}
+                  >
+                    View Change History
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 {isRejected && isOrganiser ? (
@@ -349,6 +362,13 @@ export default function EventDetail({
                       Edit Planning Information
                     </button>
                   ) : null}
+                  <button
+                    className="organisation-button"
+                    type="button"
+                    onClick={() => setIsHistoryDrawerOpen(true)}
+                  >
+                    View Change History
+                  </button>
                 </div>
               </>
             )}
@@ -396,6 +416,13 @@ export default function EventDetail({
               }}
             />
           )}
+          <EventAuditDrawer
+            isOpen={isHistoryDrawerOpen}
+            onClose={() => setIsHistoryDrawerOpen(false)}
+            eventId={detail.eventId}
+            eventName={detail.name}
+            accessToken={accessToken}
+          />
         </article>
       );
     }
