@@ -10,33 +10,43 @@ begin;
 -- 2: organiser A (owns event 93601)
 -- 3: organiser B (owns event 93602)
 -- 4: attendee (external user)
+-- 5: coordinator 2 (internal staff, assigned to event 93604 only)
+-- 6: venue staff (internal staff, no part in any exchange)
 insert into auth.users (id) values
   ('d0000000-0000-4000-8000-000000000001'),
   ('d0000000-0000-4000-8000-000000000002'),
   ('d0000000-0000-4000-8000-000000000003'),
-  ('d0000000-0000-4000-8000-000000000004');
+  ('d0000000-0000-4000-8000-000000000004'),
+  ('d0000000-0000-4000-8000-000000000005'),
+  ('d0000000-0000-4000-8000-000000000006');
 
 insert into public.users (user_id, name, organisation, role_id) values
   ('d0000000-0000-4000-8000-000000000001', 'Coordinator C', 'Acme Corp', 2),
   ('d0000000-0000-4000-8000-000000000002', 'Organiser A', 'Acme Corp', 1),
   ('d0000000-0000-4000-8000-000000000003', 'Organiser B', 'Beta Inc', 1),
-  ('d0000000-0000-4000-8000-000000000004', 'Attendee D', 'Acme Corp', 5);
+  ('d0000000-0000-4000-8000-000000000004', 'Attendee D', 'Acme Corp', 5),
+  ('d0000000-0000-4000-8000-000000000005', 'Coordinator E', 'Acme Corp', 2),
+  ('d0000000-0000-4000-8000-000000000006', 'Venue Staff V', 'Acme Corp', 3);
 
 insert into public.account_roles (user_id, role) values
   ('d0000000-0000-4000-8000-000000000001', 'event_coordinator'),
   ('d0000000-0000-4000-8000-000000000002', 'event_organiser'),
   ('d0000000-0000-4000-8000-000000000003', 'event_organiser'),
-  ('d0000000-0000-4000-8000-000000000004', 'attendee');
+  ('d0000000-0000-4000-8000-000000000004', 'attendee'),
+  ('d0000000-0000-4000-8000-000000000005', 'event_coordinator'),
+  ('d0000000-0000-4000-8000-000000000006', 'venue_staff');
 
 insert into public.events (event_id, organiser_id, coordinator_id, organisation, name, status) values
   (93601, 'd0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000001', 'Acme Corp', 'Event A', 'under_review'),
   (93602, 'd0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000001', 'Beta Inc', 'Event B', 'under_review'),
-  (93603, 'd0000000-0000-4000-8000-000000000002', null, 'Acme Corp', 'Event without questions', 'submitted');
+  (93603, 'd0000000-0000-4000-8000-000000000002', null, 'Acme Corp', 'Event without questions', 'submitted'),
+  (93604, 'd0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000005', 'Beta Inc', 'Event D', 'under_review');
 
 insert into public.event_clarifications (event_id, sender_id, message, created_at) values
   (93601, 'd0000000-0000-4000-8000-000000000001', 'Is the date firm?', '2026-10-01 02:00:00+00'),
   (93601, 'd0000000-0000-4000-8000-000000000002', 'Yes, 12 October.', '2026-10-01 03:00:00+00'),
-  (93602, 'd0000000-0000-4000-8000-000000000001', 'How many guests?', '2026-10-01 04:00:00+00');
+  (93602, 'd0000000-0000-4000-8000-000000000001', 'How many guests?', '2026-10-01 04:00:00+00'),
+  (93604, 'd0000000-0000-4000-8000-000000000005', 'Is catering needed?', '2026-10-01 05:00:00+00');
 
 -- 1. Status and table constraints, as the API's service role writes them:
 do $$
@@ -76,14 +86,18 @@ begin
   end;
 end $$;
 
--- 2. Internal staff read every thread but cannot write one directly:
+-- 2. A coordinator reads only the threads on requests assigned to them, and
+-- cannot write one directly:
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'd0000000-0000-4000-8000-000000000001', true);
 select set_config('request.jwt.claims', '{"sub":"d0000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 do $$
 begin
-  if (select count(*) from public.event_clarifications) <> 4 then
-    raise exception '[SG2-36:coordinator-thread-read] [SG2-36:AC3] [NORMAL] The coordinator should see every clarification message';
+  if (select count(*) from public.event_clarifications where event_id in (93601, 93602)) <> 4 then
+    raise exception '[SG2-36:coordinator-thread-read] [SG2-36:AC3] [NORMAL] The coordinator should see every message on their assigned requests';
+  end if;
+  if exists (select 1 from public.event_clarifications where event_id = 93604) then
+    raise exception '[SG2-36:unassigned-coordinator-thread] [SG2-36:AC3] [FAILURE] A coordinator must NOT see the thread on a request assigned to someone else';
   end if;
   begin
     insert into public.event_clarifications (event_id, sender_id, message)
@@ -121,7 +135,8 @@ declare caller uuid;
 begin
   foreach caller in array array[
     'd0000000-0000-4000-8000-000000000001', 'd0000000-0000-4000-8000-000000000002',
-    'd0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000004'
+    'd0000000-0000-4000-8000-000000000003', 'd0000000-0000-4000-8000-000000000004',
+    'd0000000-0000-4000-8000-000000000005', 'd0000000-0000-4000-8000-000000000006'
   ]::uuid[] loop
     perform set_config('request.jwt.claim.sub', caller::text, true);
     begin
@@ -137,7 +152,16 @@ begin
   end loop;
 end $$;
 
--- 4. An attendee sees no thread at all:
+-- 4. Venue staff and attendees take no part in any exchange:
+select set_config('request.jwt.claim.sub', 'd0000000-0000-4000-8000-000000000006', true);
+select set_config('request.jwt.claims', '{"sub":"d0000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+do $$
+begin
+  if (select count(*) from public.event_clarifications) <> 0 then
+    raise exception '[SG2-36:venue-staff-thread-read] [SG2-36:AC3] [FAILURE] Venue staff should see no clarification messages';
+  end if;
+end $$;
+
 select set_config('request.jwt.claim.sub', 'd0000000-0000-4000-8000-000000000004', true);
 select set_config('request.jwt.claims', '{"sub":"d0000000-0000-4000-8000-000000000004","role":"authenticated"}', true);
 do $$
@@ -164,7 +188,23 @@ begin
   end;
 end $$;
 
--- 6. Read access follows the caller's current role, not the role they had:
+-- 6. Read access follows the current assignment and role, not past ones:
+reset role;
+set local role service_role;
+update public.events set coordinator_id = 'd0000000-0000-4000-8000-000000000005'
+  where event_id = 93602;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'd0000000-0000-4000-8000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"d0000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+do $$
+begin
+  if exists (select 1 from public.event_clarifications where event_id = 93602) then
+    raise exception '[SG2-36:reassigned-thread-access] [SG2-36:AC3] [CONFLICT] A coordinator must lose the thread as soon as the request is reassigned';
+  end if;
+  if (select count(*) from public.event_clarifications where event_id = 93601) <> 3 then
+    raise exception '[SG2-36:retained-thread-access] [SG2-36:AC3] [CONFLICT] Reassigning one request must not affect the coordinator''s other threads';
+  end if;
+end $$;
 reset role;
 set local role service_role;
 update public.account_roles set role = 'attendee'

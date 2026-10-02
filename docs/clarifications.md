@@ -43,13 +43,19 @@ Migration `supabase/migrations/202609300001_event_clarifications.sql` adds:
   `created_at`), with a non-blank message check and cascading delete with its
   event.
 
-Row-level security is enabled and forced. Signed-in internal staff may read
-every thread and an organiser may read the threads on their own events; no
-client role may insert, update or delete, so the API (service role) is the only
-writer and the thread is append-only. `anon` has no access.
+Row-level security is enabled and forced. Direct reads match the API: only the
+assigned coordinator and the owning organiser can read a thread, checked by
+`public.is_clarification_participant(event_id)` (migration
+`202610020001_event_clarifications_participant_read.sql`, a `security definer`
+function because coordinators cannot read `events` rows directly). Other
+coordinators, venue staff, technical support staff and attendees see nothing,
+and a coordinator loses access as soon as the request is reassigned. No client
+role may insert, update or delete, so the API (service role) is the only writer
+and the thread is append-only. `anon` has no access.
 
-The migration was applied to the hosted Supabase project on 2 October 2026. A
-fresh environment applies it with the other migrations in filename order.
+Both migrations must be applied to the hosted Supabase project, in filename
+order: `202609300001` was applied on 2 October 2026, and `202610020001`
+replaces its read policy.
 
 ## Verification
 

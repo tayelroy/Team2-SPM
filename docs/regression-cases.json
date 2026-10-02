@@ -1901,15 +1901,15 @@
     "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
     "steps": [
       "Seed users, roles, events and messages as the superuser.",
-      "Run the tagged normal, boundary, conflict and failure assertions as the coordinator, both organisers, an attendee and anon.",
+      "Run the tagged normal, boundary, conflict and failure assertions as the assigned and an unassigned coordinator, both organisers, venue staff, an attendee and anon.",
       "Roll back the suite transaction."
     ],
     "data": "Synthetic IDs and values defined in supabase/tests/event_clarifications.sql",
-    "expected": "Each tagged predicate or expected SQLSTATE succeeds: blank messages and broken references are refused, organisers read only their own thread, no signed-in role can insert, edit or delete, anon cannot read, and access ends when an internal role is revoked.",
+    "expected": "Each tagged predicate or expected SQLSTATE succeeds: blank messages and broken references are refused; only the assigned coordinator and the owning organiser read a thread; other coordinators, venue staff and attendees see nothing; reassignment and role revocation remove access; no signed-in role can insert, edit or delete; anon cannot read.",
     "evidence": "supabase/tests/event_clarifications.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "All eight database suites passed, including this suite. Mutation check: dropping the blank-message constraint and opening the read policy each made the suite fail on the matching assertion.",
+    "actual": "All eight database suites passed, including this suite. Mutation checks: dropping the blank-message constraint, opening the read policy, and running without migration 202610020001 each made the suite fail on the matching assertion.",
     "execution_date": "2 Oct 2026",
     "executed_by": "YE ZHAN",
     "execution_evidence": "2 Oct 2026; feature/SG2-36-ask-for-clarification working tree after merging origin/main (#50, #52); npm run test:e2e 30/30 and server 855/855 + client 690/690 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and eight database suites. Hosted CI evidence comes from the PR check.",
@@ -1917,7 +1917,7 @@
       "date": "2026-10-02",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json",
-      "note": "The same migration was applied to the hosted Supabase project on 2 Oct 2026 and verified read-only (status, table, policy, forced RLS, no anon access).",
+      "note": "Migration 202609300001 was applied to the hosted Supabase project on 2 Oct 2026; 202610020001 (participant-only reads, from the AI security review finding) must also be applied.",
       "method_scope": {
         "source": "supabase/tests/event_clarifications.sql"
       }
