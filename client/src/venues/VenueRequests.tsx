@@ -90,7 +90,7 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
         {venue.layouts.map(item => <option key={item.layout} value={item.layout}>{describeLayouts([item])}</option>)}
       </select>
     </div>
-    <Fact label="Venue requirements sent with the request" value={venueRequirements ?? 'None recorded for this event'} />
+    <Fact label="Venue requirements" value={venueRequirements ?? 'None recorded for this event'} />
     {error ? <p role="alert" style={{ margin: 0 }}>{error}</p> : null}
     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
       <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',
