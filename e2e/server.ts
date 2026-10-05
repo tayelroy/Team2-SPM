@@ -22,6 +22,8 @@ import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
+import { createVenueOperationsRouter } from '../server/src/venues/operations';
+import { DEFAULT_OPERATIONS, type VenueOperationRecord } from '../server/src/venues/operationFields';
 import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
@@ -76,6 +78,26 @@ const layouts = createVenueLayoutsRouter(access, () => ({
     return result.data as VenueLayoutRecord[];
   }
 }));
+// SG2-77: the memory adapter has no upsert, so save reads then inserts or updates.
+const OPERATION_COLUMNS = 'setup_minutes,turnaround_minutes,emergency_access,known_restrictions,updated_at';
+const operations = createVenueOperationsRouter(access, () => ({
+  async get(venueId) {
+    const venueResult = await database.client.from('venues').select('venue_id').eq('venue_id', venueId).maybeSingle();
+    if (!venueResult.data) return null;
+    const result = await database.client.from('venue_operations').select(OPERATION_COLUMNS).eq('venue_id', venueId).maybeSingle();
+    return (result.data as VenueOperationRecord | null) ?? { ...DEFAULT_OPERATIONS };
+  },
+  async save(venueId, values) {
+    const venueResult = await database.client.from('venues').select('venue_id').eq('venue_id', venueId).maybeSingle();
+    if (!venueResult.data) return null;
+    const row = { ...values, updated_at: new Date().toISOString() };
+    const existing = await database.client.from('venue_operations').select('venue_id').eq('venue_id', venueId).maybeSingle();
+    const table = database.client.from('venue_operations');
+    const query = existing.data ? table.update(row).eq('venue_id', venueId) : table.insert({ venue_id: venueId, ...row });
+    const result = await query.select(OPERATION_COLUMNS).maybeSingle();
+    return result.data as VenueOperationRecord;
+  }
+}));
 const BLOCK_COLUMNS = 'unavailability_id,starts_at,ends_at,reason';
 const blocks = createVenueBlocksRouter(access, () => ({
   async list(venueId, now) {
@@ -111,7 +133,7 @@ const app = createApp(
   createDeleteEventDraftHandler(eventDependencies),
   createUpdateEventDraftHandler(eventDependencies),
   getEventRequestDetailHandler(eventDependencies),
-  { availability, venues, layouts, blocks, search: createVenueSearchRouter(access, createVenueSearchHandler(undefined, getClient)), profile: createProfileRouter(access, { getAdminClient: getClient }),
+  { availability, venues, layouts, operations, blocks, search: createVenueSearchRouter(access, createVenueSearchHandler(undefined, getClient)), profile: createProfileRouter(access, { getAdminClient: getClient }),
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.

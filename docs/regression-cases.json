@@ -1584,7 +1584,7 @@
       "expect(detail.status()).toBe(200)",
       "expect((await detail.json()).items[0].status).toBe('under_review')"
     ],
-    "evidence": "e2e/regression.spec.ts:530",
+    "evidence": "e2e/regression.spec.ts:571",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1630,7 +1630,7 @@
       "expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404)",
       "expect((await detail.json()).items[0].status).toBe('submitted')"
     ],
-    "evidence": "e2e/regression.spec.ts:550",
+    "evidence": "e2e/regression.spec.ts:591",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1680,7 +1680,7 @@
       "Previous coordinator's review call returns 404",
       "Organiser's detail returns coordinator_name 'Regression second coordinator'"
     ],
-    "evidence": "e2e/regression.spec.ts:568",
+    "evidence": "e2e/regression.spec.ts:609",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 34-journey Chromium run (npm run test:e2e exit 0, regression gate green).",
@@ -1724,7 +1724,7 @@
       "The assigned coordinator's own review (200), decision (200), planning update (200) and venue request (201) succeed",
       "After each reassignment the previous coordinator is refused on every action exactly as for an unassigned event"
     ],
-    "evidence": "e2e/regression.spec.ts:615",
+    "evidence": "e2e/regression.spec.ts:656",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "SG2-90-P01 passed in the 43-journey Chromium run (42 passed, 1 failed). The one failure, SG2-85-P02 (tentative-hold notices), fails identically on a clean origin/main at 5531afa, so it predates this story; npm run test:e2e therefore exits 1 until that is fixed.",
@@ -1764,7 +1764,7 @@
       "After the event is handed back the planning update returns 200",
       "History holds exactly two coordinator entries, newest first: second coordinator → Regression coordinator, then Regression coordinator → second coordinator"
     ],
-    "evidence": "e2e/regression.spec.ts:664",
+    "evidence": "e2e/regression.spec.ts:705",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed alongside SG2-90-P01 in the Chromium run; removing the same-coordinator no-op in assignCoordinator.ts makes it fail.",
@@ -1803,7 +1803,7 @@
       "expect(page.getByText('approved')).toBeVisible()",
       "expect((await item.json()).items[0].status).toBe('approved')"
     ],
-    "evidence": "e2e/regression.spec.ts:698",
+    "evidence": "e2e/regression.spec.ts:739",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1857,7 +1857,7 @@
       "expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.')",
       "expect(page.getByRole('region', { name: 'Why this request was rejected' })) .toContainText('Clashes with the AGM on the same evening.')"
     ],
-    "evidence": "e2e/regression.spec.ts:717",
+    "evidence": "e2e/regression.spec.ts:758",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1900,7 +1900,7 @@
       "expect(refused.status()).toBe(404)",
       "expect(unassigned.status()).toBe(404)"
     ],
-    "evidence": "e2e/regression.spec.ts:751",
+    "evidence": "e2e/regression.spec.ts:792",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1937,7 +1937,7 @@
     ],
     "data": "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; question and answer texts fixed in the spec.",
     "expected": "Status needs_clarification after the question; organiser notice and question visible; answer appended; event 52 stored as submitted after resubmission; the coordinator sees it under review with both messages (2 list items) and the decision panel back.",
-    "evidence": "e2e/regression.spec.ts:775",
+    "evidence": "e2e/regression.spec.ts:816",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
@@ -1971,7 +1971,7 @@
     ],
     "data": "Event 52; colleague, venue and organiser fixture accounts.",
     "expected": "Colleague GET and POST return 404; venue staff GET returns 403; the organiser's POST returns 201 with status still under_review.",
-    "evidence": "e2e/regression.spec.ts:823",
+    "evidence": "e2e/regression.spec.ts:864",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
@@ -2669,5 +2669,69 @@
         "execution_date": "5 Oct 2026"
       }
     ]
+  },
+  {
+    "id": "SG2-77-P01",
+    "title": "staff record setup, turnaround and safety details that coordinators can read",
+    "story": "SG2-77",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-77:AC1",
+      "SG2-77:AC3",
+      "SG2-77:AC5"
+    ],
+    "purpose": "Verify Venue Staff record a venue's setup and turnaround times and safety details through the real routes, and that coordinators can read but not change them.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Sign in as Venue Staff and open the catalogue; Regression Hall shows 0 min setup and turnaround.",
+      "Edit Regression Hall: set 30 minutes setup, 45 minutes turnaround and an emergency access note; save.",
+      "Reload; check the card and the stored values; send a negative setup time to the API.",
+      "Sign in as a coordinator; read the values and try to change them through the API."
+    ],
+    "data": "Venue 1 (Regression Hall); venue and coordinator fixture accounts.",
+    "expected": "Defaults show as 0 minutes and Not recorded; saved values persist after reload; a negative value gets 400; the coordinator reads 45 minutes turnaround and gets 403 on a change.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "5 Oct 2026; feature/SG2-77-venue-setup-turnaround on top of main dd9be1b; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_operations suite. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-05",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-OPS-01",
+    "title": "Venue setup, turnaround and safety limits, change history and role access",
+    "story": "SG2-77",
+    "purpose": "Check committed PostgreSQL constraints, the change-history trigger and role policies through actual stored records and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed users, roles and venues as the superuser.",
+      "Run the tagged assertions as Venue Staff, a coordinator, Technical Support Staff, an organiser, an attendee and anon.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_operations.sql",
+    "expected": "0 and 1440 minutes are accepted, -1 and 1441 refused; defaults are 0 minutes; every change is recorded with old and new value, who and when; only Venue Staff change values; two staff edits in a row keep the last value and record both authors; nobody writes history directly; external users and anon see nothing; losing the Venue Staff role removes write access.",
+    "evidence": "supabase/tests/venue_operations.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation check: opening the update policy to every role made the suite fail on the matching assertion.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "5 Oct 2026; feature/SG2-77-venue-setup-turnaround on top of main dd9be1b; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_operations suite. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-05",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json",
+      "method_scope": {
+        "source": "supabase/tests/venue_operations.sql"
+      }
+    }
   }
 ]
