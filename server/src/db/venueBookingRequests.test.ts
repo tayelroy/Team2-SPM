@@ -16,7 +16,7 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
       const builder: Record<string, unknown> = {
         then: (resolve: (value: Result) => unknown) => Promise.resolve(result).then(resolve)
       };
-      for (const method of ['select', 'eq', 'in', 'lt', 'gt', 'order', 'range', 'maybeSingle', 'insert']) {
+      for (const method of ['select', 'eq', 'in', 'not', 'lt', 'gt', 'order', 'range', 'maybeSingle', 'insert']) {
         builder[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return builder; };
       }
       return builder;
@@ -42,7 +42,7 @@ test('[NORMAL] [SG2-48:AC1] [SG2-48:AC3] making a request inserts only the reque
   assert.deepEqual([...new Set(calls.map(call => call.table))], ['venue_booking_requests', 'venues', 'users']);
 });
 
-test('[NORMAL] [SG2-48:AC4] a duplicate is a live request from the same event for the same venue over an overlapping period', async () => {
+test('[NORMAL] [SG2-48:AC4] a duplicate is a live coordinator request from the same event for the same venue over an overlapping period', async () => {
   const calls: Call[] = [];
   const store = createVenueBookingRequestStore(fakeAdmin({
     venue_booking_requests: [{ data: [row], error: null }, { data: [], error: null }],
@@ -51,9 +51,10 @@ test('[NORMAL] [SG2-48:AC4] a duplicate is a live request from the same event fo
   }, calls));
   assert.equal((await store.duplicate(values))?.request_id, 41);
   assert.equal(await store.duplicate({ ...values, venue_id: 2 }), null);
-  const filters = calls.filter(call => call.table === 'venue_booking_requests' && ['eq', 'in', 'lt', 'gt', 'range'].includes(call.method));
-  assert.deepEqual(filters.slice(0, 6).map(call => [call.method, ...call.args]), [
-    ['eq', 'event_id', 7], ['eq', 'venue_id', 1], ['in', 'status', ['pending', 'approved']],
+  const filters = calls.filter(call => call.table === 'venue_booking_requests' && ['eq', 'in', 'not', 'lt', 'gt', 'range'].includes(call.method));
+  // A tentative hold's own request (SG2-84) has no requester and is not compared.
+  assert.deepEqual(filters.slice(0, 7).map(call => [call.method, ...call.args]), [
+    ['eq', 'event_id', 7], ['eq', 'venue_id', 1], ['in', 'status', ['pending', 'approved']], ['not', 'requested_by', 'is', null],
     ['lt', 'starts_at', row.ends_at], ['gt', 'ends_at', row.starts_at], ['range', 0, 0]
   ]);
 });
@@ -76,7 +77,7 @@ test('[NORMAL] [SG2-48:AC3] an event\'s requests are listed earliest first; earl
   assert.deepEqual(await store.list(9), []);
 });
 
-test('[NORMAL] [SG2-48:request-store] the event, the venue and the venue\'s layouts are read by id', async () => {
+test('[NORMAL] [SG2-48:AC1] [SG2-48:request-store] the event, the venue and the venue\'s layouts are read by id', async () => {
   const calls: Call[] = [];
   const store = createVenueBookingRequestStore(fakeAdmin({
     events: [{ data: { event_id: 7 }, error: null }],
@@ -101,7 +102,7 @@ test('[CONFLICT] [SG2-48:AC4] the same request made twice at once is refused by 
   assert.equal(calls.filter(call => call.table !== 'venue_booking_requests').length, 0);
 });
 
-test('[FAILURE] [SG2-48:request-unavailable] any database failure is reported as temporarily unavailable', async () => {
+test('[FAILURE] [SG2-48:AC1] [SG2-48:request-unavailable] any database failure is reported as temporarily unavailable', async () => {
   const failure = { data: null, error: { message: 'offline' } };
   const attempts: [string, Record<string, Result[]>, (store: ReturnType<typeof createVenueBookingRequestStore>) => Promise<unknown>][] = [
     ['layouts', { venue_layouts: [failure] }, store => store.layouts(1)],

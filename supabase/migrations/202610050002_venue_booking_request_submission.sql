@@ -29,6 +29,8 @@ alter table public.venue_booking_requests
 -- checks first so it can name the earlier request; this is the backstop for a
 -- coordinator submitting the same request twice at once. Rejected and
 -- cancelled requests do not count, so a venue can be asked for again.
+-- Only coordinators' requests (with a requester) are compared: the rows a
+-- tentative hold creates for itself (SG2-84) are managed by the hold.
 create schema if not exists extensions;
 create extension if not exists btree_gist with schema extensions;
 alter table public.venue_booking_requests
@@ -37,7 +39,7 @@ alter table public.venue_booking_requests
     event_id with =,
     venue_id with =,
     tstzrange(starts_at, ends_at) with &&
-  ) where (status in ('pending', 'approved'));
+  ) where (status in ('pending', 'approved') and requested_by is not null);
 
 -- Venue Staff see the layout, the requirements carried by the request and
 -- who asked (AC2). Unchanged otherwise from SG2-41.

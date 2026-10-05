@@ -30,8 +30,9 @@ export interface VenueBookingRequestStore {
   venue(venueId: number): Promise<SuitabilityVenueRow | null>;
   /** The layouts the venue supports (SG2-43). */
   layouts(venueId: number): Promise<Layout[]>;
-  /** A pending or approved request from the same event for the same venue
-   * over an overlapping period, if there is one (AC4). */
+  /** A coordinator's pending or approved request from the same event for the
+   * same venue over an overlapping period, if there is one (AC4). Requests a
+   * tentative hold creates for itself (SG2-84) have no requester. */
   duplicate(values: VenueBookingRequestValues): Promise<VenueBookingRequestRecord | null>;
   /** Null when the same request was made concurrently and the database
    * refused it as a duplicate. */
@@ -79,7 +80,7 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
     },
     async duplicate({ event_id, venue_id, starts_at, ends_at }) {
       const { data, error } = await admin.from('venue_booking_requests').select(REQUEST_COLUMNS)
-        .eq('event_id', event_id).eq('venue_id', venue_id).in('status', LIVE_STATUSES)
+        .eq('event_id', event_id).eq('venue_id', venue_id).in('status', LIVE_STATUSES).not('requested_by', 'is', null)
         .lt('starts_at', ends_at).gt('ends_at', starts_at).order('starts_at').range(0, 0);
       check(error);
       return (await present(data as Row[]))[0] ?? null;

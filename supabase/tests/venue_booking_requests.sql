@@ -52,6 +52,14 @@ begin
     raise exception '[SG2-48:pending-does-not-block-others] [SG2-48:AC3] [NORMAL] A pending request must not stop another event requesting the venue';
   end if;
 
+  -- A tentative hold (SG2-84) creates its own request without a requester; it
+  -- is not a coordinator's duplicate.
+  insert into public.venue_booking_requests (event_id, venue_id, starts_at, ends_at, notes)
+    values (94801, 94802, '2030-06-15T03:00Z', '2030-06-15T04:00Z', 'Tentative hold — approval required');
+  if (select count(*) from public.venue_booking_requests where event_id = 94801 and venue_id = 94802 and status = 'pending') <> 2 then
+    raise exception '[SG2-48:hold-not-duplicate] [SG2-48:AC4] [BOUNDARY] A hold''s own request must not be refused as a duplicate of a coordinator request';
+  end if;
+
   -- The next period may start exactly when the earlier one ends.
   insert into public.venue_booking_requests (event_id, venue_id, starts_at, ends_at, layout, requested_by)
     values (94801, 94801, '2030-06-15T10:00Z', '2030-06-15T12:00Z', 'theatre', 'c0000000-0000-4000-8000-000000000002');
