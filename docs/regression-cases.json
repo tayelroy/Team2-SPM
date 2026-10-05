@@ -2396,9 +2396,9 @@
     "evidence": "supabase/tests/venue_holds.sql; .github/scripts/test-venue-holds-concurrency.mjs; .github/workflows/ci.yml; docs/venue-holds.md",
     "layer": "PostgreSQL policy and concurrency tests",
     "status": "Pass",
-    "actual": "All 14 migrations and all 10 SQL suites pass on fresh disposable PostgreSQL 18.4. All three two-session concurrency checks pass through native PostgreSQL and the actual psql subprocess driver.",
+    "actual": "All 14 migrations and all 10 SQL suites pass on fresh disposable PostgreSQL 18.4. All four two-session concurrency checks pass through native PostgreSQL and the actual psql subprocess driver, including expiry while approval waits for an event lock.",
     "execution_date": "5 Oct 2026",
-    "execution_evidence": "Local: /tmp/holds-real-sql-fresh.log and /tmp/holds-psql-concurrency.log. CI additionally executes the psql driver through its PostgreSQL 17 container. No hosted Supabase or live pg_cron job is claimed.",
+    "execution_evidence": "Local: /tmp/holds-real-sql-followup.log and /tmp/holds-psql-concurrency-followup.log. CI additionally executes the psql driver through its PostgreSQL 17 container. No hosted Supabase or live pg_cron job is claimed.",
     "executed_by": "Codex (automated local verification)"
   },
   {
@@ -2432,9 +2432,9 @@
     "evidence": "supabase/tests/venue_holds.sql; .github/scripts/test-venue-holds-concurrency.mjs; .github/workflows/ci.yml; docs/venue-holds.md",
     "layer": "PostgreSQL policy and concurrency tests",
     "status": "Pass",
-    "actual": "All 14 migrations and all 10 SQL suites pass on fresh disposable PostgreSQL 18.4. All three two-session concurrency checks pass through native PostgreSQL and the actual psql subprocess driver.",
+    "actual": "All 14 migrations and all 10 SQL suites pass on fresh disposable PostgreSQL 18.4. All four two-session concurrency checks pass through native PostgreSQL and the actual psql subprocess driver, including expiry while approval waits for an event lock.",
     "execution_date": "5 Oct 2026",
-    "execution_evidence": "Local: /tmp/holds-real-sql-fresh.log and /tmp/holds-psql-concurrency.log. CI additionally executes the psql driver through its PostgreSQL 17 container. No hosted Supabase or live pg_cron job is claimed.",
+    "execution_evidence": "Local: /tmp/holds-real-sql-followup.log and /tmp/holds-psql-concurrency-followup.log. CI additionally executes the psql driver through its PostgreSQL 17 container. No hosted Supabase or live pg_cron job is claimed.",
     "executed_by": "Codex (automated local verification)"
   }
 ]

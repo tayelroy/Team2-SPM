@@ -224,4 +224,133 @@ begin
   then raise exception '[SG2-84:failed-notification-partially-committed-hold-request-or-history] [FAILURE] [SG2-84:AC6] failed notification partially committed hold, request or history'; end if;
 end;
 $$;
+-- Placement conflicts are checked against both forms of existing occupancy.
+insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status)
+ values(98401,98401,now()+interval '30 days',now()+interval '31 days','confirmed');
+insert into public.venue_unavailability(venue_id,starts_at,ends_at,reason)
+ values(98401,now()+interval '32 days',now()+interval '33 days','Existing placement block');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+do $$
+declare result jsonb;
+begin
+ if public.create_venue_hold(98401,98401,now()+interval '30 days 1 hour',now()+interval '30 days 2 hours',clock_timestamp()+interval '2 days')->>'outcome' <> 'conflict'
+  then raise exception '[SG2-84:placement-confirmed-booking-conflict] [CONFLICT] [SG2-84:AC3] Placement overlapped an existing confirmed booking'; end if;
+ if public.create_venue_hold(98401,98401,now()+interval '32 days 1 hour',now()+interval '32 days 2 hours',clock_timestamp()+interval '2 days')->>'outcome' <> 'conflict'
+  then raise exception '[SG2-84:placement-unavailability-conflict] [CONFLICT] [SG2-84:AC3] Placement overlapped existing venue unavailability'; end if;
+ result := public.create_venue_hold(98401,98401,now()+interval '34 days',now()+interval '35 days',clock_timestamp()+interval '2 days');
+ if result->>'outcome' <> 'created' then raise exception '[SG2-84:late-block-hold-fixture] [NORMAL] [SG2-84:AC1] Hold required for the late block test was not created'; end if;
+ perform set_config('holds.late_block',result#>>'{hold,hold_id}',true);
+end;
+$$;
+reset role;
+insert into public.venue_unavailability(venue_id,starts_at,ends_at,reason)
+ values(98401,now()+interval '34 days 1 hour',now()+interval '34 days 2 hours','Block added after tentative placement');
+set local role authenticated;
+do $$
+begin
+ if public.change_venue_hold(current_setting('holds.late_block')::bigint,'convert')->>'outcome' <> 'conflict'
+  then raise exception '[SG2-84:conversion-new-unavailability-conflict] [CONFLICT] [SG2-84:AC5] Conversion approved a period made unavailable after placement'; end if;
+end;
+$$;
+reset role;
+do $$
+begin
+ if (select status from public.venue_holds where hold_id = current_setting('holds.late_block')::bigint) <> 'tentative'
+  or exists(select 1 from public.venue_bookings where venue_id = 98401 and starts_at = now()+interval '34 days')
+  or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id) where h.hold_id = current_setting('holds.late_block')::bigint and r.status = 'pending')
+  then raise exception '[SG2-84:conversion-conflict-preserves-pending-hold] [CONFLICT] [SG2-84:AC5] Rejected late-block conversion changed hold, request or booking state'; end if;
+end;
+$$;
+
+-- A failed expiry notice must not partially expire the hold or its request.
+set local role authenticated;
+do $$
+declare result jsonb;
+begin
+ result := public.create_venue_hold(98401,98401,now()+interval '50 days',now()+interval '51 days',clock_timestamp()+interval '2 days');
+ if result->>'outcome' <> 'created' then raise exception '[SG2-85:expiry-rollback-hold-fixture] [NORMAL] [SG2-85:AC1] Hold required for expiry rollback was not created'; end if;
+ perform set_config('holds.expiry_rollback',result#>>'{hold,hold_id}',true);
+end;
+$$;
+reset role;
+update public.venue_holds set expires_at = created_at+interval '1 microsecond' where hold_id = current_setting('holds.expiry_rollback')::bigint;
+create function pg_temp.reject_expiry_notice() returns trigger language plpgsql as $$
+begin
+ if new.kind = 'expired' and new.hold_id = current_setting('holds.expiry_rollback')::bigint then
+  raise exception using errcode = 'P0001',message = '[SG2-85:expiry-notice-failure-injection] [FAILURE] [SG2-85:AC4] injected_expiry_notice_failure';
+ end if;
+ return new;
+end;
+$$;
+create trigger reject_expiry_notice before insert on public.venue_hold_notifications for each row execute function pg_temp.reject_expiry_notice();
+do $$
+begin
+ begin
+  perform public.process_venue_hold_deadlines();
+  raise exception '[SG2-85:expiry-notice-failure-expected] [FAILURE] [SG2-85:AC4] Expected injected expiry notification failure';
+ exception when raise_exception then
+  if sqlerrm not like '%injected_expiry_notice_failure' then raise; end if;
+ end;
+ if (select status from public.venue_holds where hold_id = current_setting('holds.expiry_rollback')::bigint) <> 'tentative'
+  or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id) where h.hold_id = current_setting('holds.expiry_rollback')::bigint and r.status = 'pending')
+  or exists(select 1 from public.event_audit_logs where actor_id is null and new_value = 'Expired hold ' || current_setting('holds.expiry_rollback'))
+  or exists(select 1 from public.venue_hold_notifications where hold_id = current_setting('holds.expiry_rollback')::bigint and kind = 'expired')
+  then raise exception '[SG2-85:expiry-notice-failure-atomic-rollback] [FAILURE] [SG2-85:AC1] [SG2-85:AC4] [SG2-85:AC5] Failed expiry partially changed hold, request, System history or notification'; end if;
+end;
+$$;
+drop trigger reject_expiry_notice on public.venue_hold_notifications;
+do $$
+begin
+ perform public.process_venue_hold_deadlines();
+ if (select status from public.venue_holds where hold_id = current_setting('holds.expiry_rollback')::bigint) <> 'expired'
+  or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id) where h.hold_id = current_setting('holds.expiry_rollback')::bigint and r.status = 'cancelled')
+  or (select count(*) from public.event_audit_logs where actor_id is null and new_value = 'Expired hold ' || current_setting('holds.expiry_rollback')) <> 1
+  or (select count(*) from public.venue_hold_notifications where hold_id = current_setting('holds.expiry_rollback')::bigint and kind = 'expired') <> 1
+  then raise exception '[SG2-85:expiry-notice-retry-commits-once] [NORMAL] [SG2-85:AC1] [SG2-85:AC4] [SG2-85:AC5] Retried expiry did not commit hold, request, System history and notification exactly once'; end if;
+end;
+$$;
+-- Warning delivery and its once-only marker share the same transaction.
+set local role authenticated;
+do $$
+declare result jsonb;
+begin
+ result := public.create_venue_hold(98401,98401,now()+interval '52 days',now()+interval '53 days',clock_timestamp()+interval '4 days');
+ if result->>'outcome' <> 'created' then raise exception '[SG2-85:warning-rollback-hold-fixture] [NORMAL] [SG2-85:AC4] Hold required for warning rollback was not created'; end if;
+ perform set_config('holds.warning_rollback',result#>>'{hold,hold_id}',true);
+end;
+$$;
+reset role;
+update public.venue_holds set expires_at = clock_timestamp()+interval '2 days' where hold_id = current_setting('holds.warning_rollback')::bigint;
+create function pg_temp.reject_warning_notice() returns trigger language plpgsql as $$
+begin
+ if new.kind = 'warning' and new.hold_id = current_setting('holds.warning_rollback')::bigint then
+  raise exception using errcode = 'P0001',message = '[SG2-85:warning-notice-failure-injection] [FAILURE] [SG2-85:AC4] injected_warning_notice_failure';
+ end if;
+ return new;
+end;
+$$;
+create trigger reject_warning_notice before insert on public.venue_hold_notifications for each row execute function pg_temp.reject_warning_notice();
+do $$
+begin
+ begin
+  perform public.process_venue_hold_deadlines();
+  raise exception '[SG2-85:warning-notice-failure-expected] [FAILURE] [SG2-85:AC4] Expected injected warning notification failure';
+ exception when raise_exception then
+  if sqlerrm not like '%injected_warning_notice_failure' then raise; end if;
+ end;
+ if (select warning_sent_at from public.venue_holds where hold_id = current_setting('holds.warning_rollback')::bigint) is not null
+  or exists(select 1 from public.venue_hold_notifications where hold_id = current_setting('holds.warning_rollback')::bigint and kind = 'warning')
+  then raise exception '[SG2-85:warning-notice-failure-rolls-back-marker] [FAILURE] [SG2-85:AC4] Failed warning delivery left its sent marker or notification behind'; end if;
+end;
+$$;
+drop trigger reject_warning_notice on public.venue_hold_notifications;
+do $$
+begin
+ perform public.process_venue_hold_deadlines(); perform public.process_venue_hold_deadlines();
+ if (select warning_sent_at from public.venue_holds where hold_id = current_setting('holds.warning_rollback')::bigint) is null
+  or (select count(*) from public.venue_hold_notifications where hold_id = current_setting('holds.warning_rollback')::bigint and kind = 'warning') <> 1
+  then raise exception '[SG2-85:warning-notice-retry-records-once] [NORMAL] [SG2-85:AC4] Retried warning failed to set its marker or was delivered more than once'; end if;
+end;
+$$;
 rollback;
