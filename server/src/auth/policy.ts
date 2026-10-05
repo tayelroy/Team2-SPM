@@ -62,6 +62,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // shown, but only Venue Staff record them.
   'venues.layouts.read': ['venue_staff', 'event_coordinator'],
   'venues.layouts.update': ['venue_staff'],
+  // SG2-77: setup/turnaround times and safety details are read wherever
+  // venue availability is read (they change what counts as free), but only
+  // Venue Staff record them.
+  'venues.operations.read': ['venue_staff', 'event_coordinator', 'technical_support_staff'],
+  'venues.operations.update': ['venue_staff'],
   // SG2-46: coordinators narrow the venues down to those that could host an
   // event they are planning.
   'venues.search': ['event_coordinator'],
