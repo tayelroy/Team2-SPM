@@ -209,7 +209,7 @@ test('[BOUNDARY] [SG2-48:AC1] the request needs whole-number ids, a known layout
   });
 });
 
-test('[FAILURE] [SG2-48:request-access] only a signed-in coordinator may request a venue', async () => {
+test('[FAILURE] [SG2-48:AC1] [SG2-48:request-access] only a signed-in coordinator may request a venue', async () => {
   const composed = app(fakeStore().store);
   assert.equal((await request(composed).post('/api/venue-booking-requests').send(body())).status, 401);
   for (const user of ['venue', 'support', 'organiser', 'attendee']) {
@@ -230,7 +230,7 @@ test('[NORMAL] [SG2-48:AC3] the coordinator and Venue Staff see the event\'s req
   }
 });
 
-test('[FAILURE] [BOUNDARY] [SG2-48:request-visibility] requests for an event outside the caller\'s reach, or without a valid id, are not listed', async () => {
+test('[FAILURE] [BOUNDARY] [SG2-48:AC3] [SG2-48:request-visibility] requests for an event outside the caller\'s reach, or without a valid id, are not listed', async () => {
   const composed = app(fakeStore().store);
   const hidden = await request(composed).get('/api/venue-booking-requests?event_id=7').set(as('other_coordinator'));
   assert.deepEqual([hidden.status, hidden.body], [404, { error: 'Event not found.' }]);
@@ -243,7 +243,7 @@ test('[FAILURE] [BOUNDARY] [SG2-48:request-visibility] requests for an event out
   }
 });
 
-test('[FAILURE] [SG2-48:request-unavailable] an unconfigured or failing database is reported as temporarily unavailable', async () => {
+test('[FAILURE] [SG2-48:AC1] [SG2-48:request-unavailable] an unconfigured or failing database is reported as temporarily unavailable', async () => {
   const unconfigured = app(null);
   assert.equal((await post(unconfigured, 'coordinator', body({ starts_at: '2099-06-15T02:00:00.000Z', ends_at: '2099-06-15T10:00:00.000Z' }))).status, 503);
   const noStore = app(null, { getAdminClient: () => ({}) as SupabaseClient });

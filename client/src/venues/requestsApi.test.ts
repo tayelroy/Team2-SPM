@@ -51,7 +51,7 @@ test('[CONFLICT] [FAILURE] [SG2-48:AC4] refusals are explained, and a duplicate 
   expect(await fetchVenueRequests('token', 10)).toEqual({ ok: false, error: unavailable });
 });
 
-test('[BOUNDARY] [SG2-48:request-response-shape] a response of the wrong shape is treated as unavailable', async () => {
+test('[BOUNDARY] [SG2-48:AC1] [SG2-48:AC3] [SG2-48:request-response-shape] a response of the wrong shape is treated as unavailable', async () => {
   const unavailable = { ok: false, error: 'Venue requests are unavailable right now. Please try again.' };
   for (const body of [{ request: pending }, { request: { request_id: 41 }, booking: 'allowed' }, { booking: 'allowed' }]) {
     respond(() => Response.json(body, { status: 201 }));
