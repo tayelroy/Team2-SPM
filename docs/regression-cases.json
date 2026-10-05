@@ -2229,5 +2229,212 @@
     "actual": "Added a monotonically-increasing request-id guard in EventAuditDrawer's fetchHistory so only the response matching the latest request is applied to state; the new '[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch' test (client/src/components/EventAuditDrawer.test.tsx) passed, and EventAuditDrawer.tsx retained 100% statement/branch coverage (16/16 tests in file; 647/647 in full client suite).",
     "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
     "execution_date": "1 Oct 2026"
+  },
+  {
+    "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the final 38/38-case browser run against the rebuilt production React app and real Express routes with reset disposable storage. The assertions verify the specified visible and persisted results.",
+    "id": "SG2-84-P01",
+    "title": "Staff place Tentative holds with mandatory expiry and exclusive periods",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "story": "SG2-84",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC1",
+      "SG2-84:AC2",
+      "SG2-84:AC3",
+      "SG2-84:AC4",
+      "SG2-84:AC6"
+    ],
+    "purpose": "Prove staff placement, expiry validation, Tentative labelling, conflict enforcement and responsive display.",
+    "steps": [
+      "Refuse missing expiry in the form and public HTTP route.",
+      "Place a future hold; verify exact persisted period/expiry, Tentative status and no confirmed booking.",
+      "Reject an overlapping period; accept an adjacent period.",
+      "Inspect the hold list at 1440px and 390px and its Tentative calendar entry."
+    ],
+    "expected": "Missing expiry saves nothing; overlaps fail without losing inputs; adjacent holds save; Tentative stays distinct from confirmed; mobile has no horizontal overflow.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: installed Chrome; temporary /tmp/sg2-holds-playwright.config.ts (video disabled, repository browser config unchanged); /tmp/spm-holds-final-browser.log and /tmp/spm-holds-final-gate.log. e2e tsc, all 13 report-gate checks and required SG2-26 report gate pass. 1440px/390px hold layout and full-height desktop/mobile notification portal inspected; screenshots /tmp/sg2-holds-qa. No hosted Supabase is claimed.",
+    "executed_by": "Codex (automated local verification)"
+  },
+  {
+    "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the final 38/38-case browser run against the rebuilt production React app and real Express routes with reset disposable storage. The assertions verify the specified visible and persisted results.",
+    "id": "SG2-84-P02",
+    "title": "Approve a live hold through its request and release another early",
+    "type": "NORMAL / CONFLICT",
+    "story": "SG2-84",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC5",
+      "SG2-85:AC1",
+      "SG2-85:AC2"
+    ],
+    "purpose": "Verify conversion and early release persist and cannot be expired or converted twice.",
+    "steps": [
+      "Place and approve a live hold; read back converted status and booking ID.",
+      "Refuse repeated approval; place and release a second hold.",
+      "Advance beyond both deadlines; verify the confirmed booking remains and the released period is free."
+    ],
+    "expected": "One confirmed booking is retained, repeated conversion returns 409, release is preserved, and only the confirmed period occupies the calendar.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: installed Chrome; temporary /tmp/sg2-holds-playwright.config.ts (video disabled, repository browser config unchanged); /tmp/spm-holds-final-browser.log and /tmp/spm-holds-final-gate.log. e2e tsc, all 13 report-gate checks and required SG2-26 report gate pass. 1440px/390px hold layout and full-height desktop/mobile notification portal inspected; screenshots /tmp/sg2-holds-qa. No hosted Supabase is claimed.",
+    "executed_by": "Codex (automated local verification)"
+  },
+  {
+    "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the final 38/38-case browser run against the rebuilt production React app and real Express routes with reset disposable storage. The assertions verify the specified visible and persisted results.",
+    "id": "SG2-85-P01",
+    "title": "Coordinator receives deadline notices and System history; staff must place a new request",
+    "type": "NORMAL / BOUNDARY / CONFLICT",
+    "story": "SG2-85",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC6",
+      "SG2-85:AC1",
+      "SG2-85:AC2",
+      "SG2-85:AC3",
+      "SG2-85:AC4",
+      "SG2-85:AC5"
+    ],
+    "purpose": "Prove recipient isolation, default 24-hour warning, exact deadline expiry and recorded history.",
+    "steps": [
+      "Place holds on two coordinators’ events and sign in as the first coordinator.",
+      "Verify assigned holds and placement notification; no warning one millisecond before the 24-hour threshold.",
+      "At the threshold receive one warning; at exact expiry receive Expired status and one expiry notice.",
+      "Open the existing event history and inspect its System/Automatic expiry entry.",
+      "Sign in as staff; refuse overdue conversion and place a new request for the freed period."
+    ],
+    "expected": "Another coordinator’s holds/notices stay hidden; warnings and expiry are idempotent; expired holds are unapprovable; history records the transition; a new request succeeds.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: installed Chrome; temporary /tmp/sg2-holds-playwright.config.ts (video disabled, repository browser config unchanged); /tmp/spm-holds-final-browser.log and /tmp/spm-holds-final-gate.log. e2e tsc, all 13 report-gate checks and required SG2-26 report gate pass. 1440px/390px hold layout and full-height desktop/mobile notification portal inspected; screenshots /tmp/sg2-holds-qa. No hosted Supabase is claimed.",
+    "executed_by": "Codex (automated local verification)"
+  },
+  {
+    "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the final 38/38-case browser run against the rebuilt production React app and real Express routes with reset disposable storage. The assertions verify the specified visible and persisted results.",
+    "id": "SG2-84-N01",
+    "title": "Role restrictions protect hold creation, release and approval",
+    "type": "FAILURE",
+    "story": "SG2-84",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC1",
+      "SG2-84:AC5",
+      "SG2-85:AC3"
+    ],
+    "purpose": "Verify hold mutation access through real HTTP routes rather than hidden navigation alone.",
+    "steps": [
+      "Place a hold as Venue Staff.",
+      "Attempt creation, release and conversion as coordinator, support, organiser and attendee.",
+      "Attempt creation without authentication."
+    ],
+    "expected": "Every non-staff mutation returns 403; anonymous creation returns 401.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: installed Chrome; temporary /tmp/sg2-holds-playwright.config.ts (video disabled, repository browser config unchanged); /tmp/spm-holds-final-browser.log and /tmp/spm-holds-final-gate.log. e2e tsc, all 13 report-gate checks and required SG2-26 report gate pass. 1440px/390px hold layout and full-height desktop/mobile notification portal inspected; screenshots /tmp/sg2-holds-qa. No hosted Supabase is claimed.",
+    "executed_by": "Codex (automated local verification)"
+  },
+  {
+    "id": "SG2-84-DB01",
+    "title": "Transactional placement, conversion, release, conflicts and recipient policies",
+    "type": "Database normal / boundary / conflict / failure",
+    "story": "SG2-84",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC1",
+      "SG2-84:AC2",
+      "SG2-84:AC3",
+      "SG2-84:AC4",
+      "SG2-84:AC5",
+      "SG2-84:AC6"
+    ],
+    "purpose": "Verify the real SQL contracts independently of browser storage fixtures.",
+    "preconditions": "Disposable PostgreSQL, auth fixture, all 14 migrations and all 10 SQL suites; two independent sessions for concurrency. No shared Supabase.",
+    "steps": [
+      "Run supabase/tests/venue_holds.sql with transactional rollback.",
+      "Assert exact stored statuses, linked requests/bookings, expiry messages and audit records.",
+      "Reject invalid data and denied roles/direct table writes; verify recipient RLS.",
+      "Run simultaneous placement, direct booking and conversion/expiry checks through two PostgreSQL sessions."
+    ],
+    "data": "Synthetic 984xx/98584 records and d840/e840 fixture identities; 24-hour default, adjusted lead time and exact deadline boundaries.",
+    "expected": "Exclusive active periods, atomic lifecycle records, isolated notices and history, idempotent deadlines, denied unauthorized writes and one committed result under races.",
+    "evidence": "supabase/tests/venue_holds.sql; .github/scripts/test-venue-holds-concurrency.mjs; .github/workflows/ci.yml; docs/venue-holds.md",
+    "layer": "PostgreSQL policy and concurrency tests",
+    "status": "Pass",
+    "actual": "All 14 migrations and all 10 SQL suites pass on fresh disposable PostgreSQL 18.4. All three two-session concurrency checks pass through native PostgreSQL and the actual psql subprocess driver.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: /tmp/holds-real-sql-fresh.log and /tmp/holds-psql-concurrency.log. CI additionally executes the psql driver through its PostgreSQL 17 container. No hosted Supabase or live pg_cron job is claimed.",
+    "executed_by": "Codex (automated local verification)"
+  },
+  {
+    "id": "SG2-85-DB01",
+    "title": "Deadline processing, warning settings, atomic history and expiry notices",
+    "type": "Database normal / boundary / conflict / failure",
+    "story": "SG2-85",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-85:AC1",
+      "SG2-85:AC2",
+      "SG2-85:AC3",
+      "SG2-85:AC4",
+      "SG2-85:AC5"
+    ],
+    "purpose": "Verify the real SQL contracts independently of browser storage fixtures.",
+    "preconditions": "Disposable PostgreSQL, auth fixture, all 14 migrations and all 10 SQL suites; two independent sessions for concurrency. No shared Supabase.",
+    "steps": [
+      "Run supabase/tests/venue_holds.sql with transactional rollback.",
+      "Assert exact stored statuses, linked requests/bookings, expiry messages and audit records.",
+      "Reject invalid data and denied roles/direct table writes; verify recipient RLS.",
+      "Run simultaneous placement, direct booking and conversion/expiry checks through two PostgreSQL sessions."
+    ],
+    "data": "Synthetic 984xx/98584 records and d840/e840 fixture identities; 24-hour default, adjusted lead time and exact deadline boundaries.",
+    "expected": "Exclusive active periods, atomic lifecycle records, isolated notices and history, idempotent deadlines, denied unauthorized writes and one committed result under races.",
+    "evidence": "supabase/tests/venue_holds.sql; .github/scripts/test-venue-holds-concurrency.mjs; .github/workflows/ci.yml; docs/venue-holds.md",
+    "layer": "PostgreSQL policy and concurrency tests",
+    "status": "Pass",
+    "actual": "All 14 migrations and all 10 SQL suites pass on fresh disposable PostgreSQL 18.4. All three two-session concurrency checks pass through native PostgreSQL and the actual psql subprocess driver.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: /tmp/holds-real-sql-fresh.log and /tmp/holds-psql-concurrency.log. CI additionally executes the psql driver through its PostgreSQL 17 container. No hosted Supabase or live pg_cron job is claimed.",
+    "executed_by": "Codex (automated local verification)"
   }
 ]

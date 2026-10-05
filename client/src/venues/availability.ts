@@ -4,7 +4,7 @@
  * failure, and never trust the response shape without checking it first.
  */
 
-export type AvailabilityKind = 'booking' | 'unavailable';
+export type AvailabilityKind = 'booking' | 'unavailable' | 'hold';
 
 export interface AvailabilityEntry {
   start: string;
@@ -34,7 +34,7 @@ function isEntry(value: unknown): value is AvailabilityEntry {
     isRecord(value) &&
     typeof value.start === 'string' &&
     typeof value.end === 'string' &&
-    (value.kind === 'booking' || value.kind === 'unavailable') &&
+    (value.kind === 'booking' || value.kind === 'unavailable' || value.kind === 'hold') &&
     typeof value.label === 'string'
   );
 }

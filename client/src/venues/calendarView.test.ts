@@ -86,6 +86,18 @@ test('[NORMAL] [SG2-44:AC1] a day with both a booking and an unavailability is m
   expect(byDate['2026-10-10'].items).toEqual(['Atrium · held', 'Rooftop · Closed']);
 });
 
+test('[NORMAL] [SG2-84:AC4] tentative holds have their own day state and are never labelled as bookings', () => {
+  const hold = { start: '2026-10-10T09:00:00.000Z', end: '2026-10-10T12:00:00.000Z', kind: 'hold' as const, label: 'Tentative' };
+  const days = buildCalendarDays(OCT_2026, [venue('Atrium', [hold])]);
+  expect(days.find(day => day.date === '2026-10-10')).toMatchObject({ kind: 'tentative', items: ['Atrium · Tentative'] });
+});
+
+test.each(['booking', 'unavailable'] as const)('[CONFLICT] [SG2-84:AC4] a tentative hold plus %s produces a mixed day across venues', kind => {
+  const hold = { start: '2026-10-10T09:00:00.000Z', end: '2026-10-10T12:00:00.000Z', kind: 'hold' as const, label: 'Tentative' };
+  const days = buildCalendarDays(OCT_2026, [venue('Atrium', [hold]), venue('Hall', [{ ...hold, kind, label: kind }])]);
+  expect(days.find(day => day.date === '2026-10-10')?.kind).toBe('mixed');
+});
+
 test('[BOUNDARY] [SG2-44:AC1] more than three entries on one day are capped with a "+N more" marker', () => {
   const entries = Array.from({ length: 5 }, (_, i) => ({
     start: '2026-10-12T00:00:00.000Z',

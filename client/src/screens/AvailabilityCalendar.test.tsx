@@ -56,6 +56,17 @@ test('[NORMAL] [SG2-44:AC2] renders bookings and unavailability across every ven
   expect(screen.getByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
 });
 
+test('[NORMAL] [SG2-84:AC4] displays a distinct Tentative legend and hold state without calling it booked', async () => {
+  stubJson({ from: '2026-10-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z', venues: [{
+    venueId: 1, name: 'Atrium', entries: [{ start: '2026-10-15T09:00:00.000Z', end: '2026-10-15T12:00:00.000Z', kind: 'hold', label: 'Tentative' }],
+  }] });
+  render(<AvailabilityCalendar />);
+  const hold = await screen.findByText('Atrium · Tentative');
+  expect(screen.getByText('Tentative')).toBeInTheDocument();
+  expect(hold.parentElement).toHaveAttribute('aria-label', '2026-10-15: tentative');
+  expect(screen.queryByText('Atrium · Booked')).not.toBeInTheDocument();
+});
+
 test('[FAILURE] [SG2-44:AC3] shows a no-access message when there is no session at all', async () => {
   sessionStorage.clear();
   const fetchMock = vi.fn();

@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { authorization } from '../auth';
 import { createUserScopedClient } from '../db/user-client';
 
-export type AvailabilityKind = 'booking' | 'unavailable';
+export type AvailabilityKind = 'booking' | 'hold' | 'unavailable';
 
 /** One occupied period for a venue: a booking or a recorded unavailability. */
 export interface AvailabilityEntry {
@@ -78,8 +78,8 @@ function bookingEntry(row: BookingRow): AvailabilityEntry {
   return {
     start: row.starts_at,
     end: row.ends_at,
-    kind: 'booking',
-    label: row.event_id === null ? row.status : `${row.status} · event ${row.event_id}`
+    kind: row.status === 'tentative' ? 'hold' : 'booking',
+    label: row.event_id === null ? (row.status === 'tentative' ? 'Tentative' : row.status) : `${row.status === 'tentative' ? 'Tentative' : row.status} · event ${row.event_id}`
   };
 }
 
@@ -110,7 +110,7 @@ export async function getVenueAvailability(
 
   const [bookings, unavailability] = await Promise.all([
     client
-      .from('venue_bookings')
+      .from('venue_booking_occupancy')
       .select('starts_at, ends_at, status, event_id')
       .eq('venue_id', id)
       .lt('starts_at', range.toIso)
@@ -154,7 +154,7 @@ export async function getAllVenuesAvailability(
   const [venues, bookings, unavailability] = await Promise.all([
     client.from('venues').select('venue_id, name').order('name', { ascending: true }),
     client
-      .from('venue_bookings')
+      .from('venue_booking_occupancy')
       .select('venue_id, starts_at, ends_at, status, event_id')
       .lt('starts_at', range.toIso)
       .gt('ends_at', range.fromIso),
