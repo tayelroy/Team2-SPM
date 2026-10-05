@@ -2487,8 +2487,8 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "actual": "Passed in the 42-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue merged with main at cf40661 (SG2-84/85 holds); npm run test:e2e; 42/42 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
     "execution_date": "5 Oct 2026",
     "executed_by": "LIM DAO JUN",
     "categories": [
@@ -2499,7 +2499,15 @@
       "SG2-48:AC2",
       "SG2-48:AC3"
     ],
-    "method_id": "TC-8e1cdb1d3f1b"
+    "method_id": "TC-8e1cdb1d3f1b",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "5 Oct 2026"
+      }
+    ]
   },
   {
     "id": "SG2-48-P02",
@@ -2518,8 +2526,8 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "actual": "Passed in the 42-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue merged with main at cf40661 (SG2-84/85 holds); npm run test:e2e; 42/42 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
     "execution_date": "5 Oct 2026",
     "executed_by": "LIM DAO JUN",
     "categories": [
@@ -2528,7 +2536,15 @@
     "mapped_acs": [
       "SG2-48:AC4"
     ],
-    "method_id": "TC-9b6ac1f0e760"
+    "method_id": "TC-9b6ac1f0e760",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "5 Oct 2026"
+      }
+    ]
   },
   {
     "id": "SG2-48-N01",
@@ -2548,8 +2564,8 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "actual": "Passed in the 42-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue merged with main at cf40661 (SG2-84/85 holds); npm run test:e2e; 42/42 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
     "execution_date": "5 Oct 2026",
     "executed_by": "LIM DAO JUN",
     "categories": [
@@ -2560,6 +2576,14 @@
       "SG2-48:AC1",
       "SG2-48:AC4"
     ],
-    "method_id": "TC-225fa037a5c5"
+    "method_id": "TC-225fa037a5c5",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "5 Oct 2026"
+      }
+    ]
   }
 ]
