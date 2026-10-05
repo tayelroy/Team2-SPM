@@ -12,29 +12,12 @@ const TONE: Record<HoldNotification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate,
 };
 
-function HoldNotificationDrawer({ accessToken, onClose, onCount }: {
-  accessToken: string; onClose: () => void; onCount: (count: number) => void;
+function HoldNotificationDrawer({ notifications, loading, error, onClose, onRetry }: {
+  notifications: HoldNotification[] | null; loading: boolean; error: string;
+  onClose: () => void; onRetry: () => void;
 }) {
-  const [notifications, setNotifications] = useState<HoldNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [attempt, setAttempt] = useState(0);
   const drawer = useRef<HTMLElement>(null);
-
   useEffect(() => { drawer.current!.focus(); }, []);
-  useEffect(() => {
-    let current = true;
-    setLoading(true);
-    setError('');
-    loadHoldNotifications(accessToken).then(result => {
-      if (!current) return;
-      setLoading(false);
-      if (!result.ok) { setError(result.message); return; }
-      setNotifications(result.notifications);
-      onCount(result.notifications.length);
-    });
-    return () => { current = false; };
-  }, [accessToken, attempt, onCount]);
 
   return <>
     <button type="button" aria-label="Close notifications overlay" tabIndex={-1} onClick={onClose}
@@ -48,9 +31,9 @@ function HoldNotificationDrawer({ accessToken, onClose, onCount }: {
         <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 500, letterSpacing: '-0.02em', color: color.platinum }}>Notifications</h3>
         <IconButton label="Close notifications" onClick={onClose}>✕</IconButton>
       </div>
-      {loading ? <p role="status" style={{ color: color.silver }}>Loading hold notifications…</p> : error ?
-        <Notice role="alert"><span>{error}</span><GhostButton onClick={() => setAttempt(value => value + 1)}>Retry</GhostButton></Notice> :
-        notifications.length === 0 ? <p style={{ color: color.silver }}>No hold notifications available.</p> :
+      {loading && notifications === null ? <p role="status" style={{ color: color.silver }}>Loading hold notifications…</p> : null}
+      {error ? <Notice role="alert"><span>{error}</span><GhostButton onClick={onRetry}>Retry</GhostButton></Notice> : null}
+      {notifications === null ? null : notifications.length === 0 ? <p style={{ color: color.silver }}>No hold notifications available.</p> :
           notifications.map(notification => <div key={notification.notification_id}
             style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', paddingBottom: '18px', borderBottom: rule.faint }}>
             <Dot tone={TONE[notification.kind]} style={{ marginTop: '7px' }} />
@@ -64,19 +47,54 @@ function HoldNotificationDrawer({ accessToken, onClose, onCount }: {
   </>;
 }
 
-/** Fetch only when opened; remount with a new session to clear recipient state. */
-export default function HoldNotifications({ accessToken }: { accessToken: string }) {
+/** Keep the badge and drawer synchronized for the authenticated session. */
+function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
   const [open, setOpen] = useState(false);
-  const [count, setCount] = useState(0);
+  const [notifications, setNotifications] = useState<HoldNotification[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const refresh = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    let current = true;
+    let inFlight = false;
+    const load = () => {
+      if (inFlight) return;
+      inFlight = true;
+      setLoading(true);
+      setError('');
+      void loadHoldNotifications(accessToken).then(result => {
+        if (!current) return;
+        inFlight = false;
+        setLoading(false);
+        if (result.ok) setNotifications(result.notifications);
+        else setError(result.message);
+      });
+    };
+    refresh.current = load;
+    load();
+    const timer = window.setInterval(load, 30_000);
+    window.addEventListener('focus', load);
+    return () => {
+      current = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', load);
+    };
+  }, [accessToken]);
+  const count = notifications === null ? (error ? 'unavailable' : 'loading') : notifications.length;
   const trigger = useRef<HTMLButtonElement>(null);
   const close = () => { setOpen(false); trigger.current!.focus(); };
   return <>
-    <button ref={trigger} type="button" onClick={() => setOpen(value => !value)} aria-label={`Notifications (${count})`} aria-expanded={open}
+    <button ref={trigger} type="button" onClick={() => { if (!open) refresh.current!(); setOpen(value => !value); }} aria-label={`Notifications (${count})`} aria-expanded={open}
       style={{ position: 'relative', background: surface.iconButton, border: 'none', borderRadius: radius.sm,
         width: '32px', height: '32px', color: color.platinum, fontSize: '13px', cursor: 'pointer' }}>
       ●<span style={{ position: 'absolute', top: '-6px', right: '-6px', minWidth: '18px', height: '18px', borderRadius: '9px',
-        background: color.accent, color: color.abyss, fontSize: '10px', lineHeight: '18px', letterSpacing: '0.04em' }}>{count}</span>
+        background: color.accent, color: color.abyss, fontSize: '10px', lineHeight: '18px', letterSpacing: '0.04em' }}>{notifications === null ? '…' : notifications.length}</span>
     </button>
-    {open ? createPortal(<HoldNotificationDrawer accessToken={accessToken} onClose={close} onCount={setCount} />, document.body) : null}
+    {open ? createPortal(<HoldNotificationDrawer notifications={notifications} loading={loading} error={error} onClose={close} onRetry={() => refresh.current!()} />, document.body) : null}
   </>;
+}
+
+/** A token change discards recipient data synchronously, including pending responses. */
+export default function HoldNotifications({ accessToken }: { accessToken: string }) {
+  return <HoldNotificationsSession key={accessToken} accessToken={accessToken} />;
 }

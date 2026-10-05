@@ -348,7 +348,7 @@ test('[NORMAL] [SG2-84:AC6] the signed-in coordinator opens and closes the live 
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 
   fireEvent.click(
-    screen.getByRole('button', { name: 'Notifications (0)' }),
+    await screen.findByRole('button', { name: 'Notifications (1)' }),
   );
   const drawer = screen.getByRole('complementary', { name: 'Notifications' });
   expect(

@@ -46,7 +46,7 @@ All routes require a verified bearer token and send `Cache-Control: no-store`.
 | `POST /api/venue-holds` | Venue Staff; `{ event_id, venue_id, starts_at, ends_at, expires_at }`; `201 { hold }`. Times require explicit zones. |
 | `POST /api/venue-holds/:id/convert` | Venue Staff; approval of an active hold's pending request; `200 { hold }`. |
 | `POST /api/venue-holds/:id/release` | Venue Staff; early release of an active hold; `200 { hold }`. |
-| `GET /api/venue-holds/notifications` | Internal users receive only their own persisted notifications. The existing bell loads these when opened and supports refresh/retry. |
+| `GET /api/venue-holds/notifications` | Internal users receive only their own persisted notifications. The existing bell loads these on sign-in, refreshes every 30 seconds and on window focus, and shares current notices with the open drawer. Opening the drawer refreshes immediately; failures can be retried. |
 
 Invalid inputs return 400, missing records 404, conflicts/inactive holds/suitability failures 409, denied access 401/403 and provider failures 503. Failed saves preserve form input. Rapid repeated submissions and decisions issue a single mutation. Account changes and unmounted views cannot display obsolete read responses.
 
@@ -72,10 +72,16 @@ Local browser journeys use a production React build and real Express handlers wi
 
 ## Local verification — 5 October 2026
 
-- `npm run ci`: clean production build; 924 backend and 805 frontend cases pass, with 100% statement, branch, function and line coverage per file. The existing inventory and reviewer checks pass. Local runtime: Node 24.10.0; CI uses Node 22.
-- Full browser regression: 38/38 pass with no skips or retries; e2e TypeScript and all 13 report-gate checks pass. The final required SG2-26 report gate passes. Local Playwright used installed Chrome with video disabled in a temporary config; repository browser settings and dependencies are unchanged.
+- `npm run ci`: clean production build; 924 backend and 808 frontend cases pass, with 100% statement, branch, function and line coverage per file. The existing inventory and reviewer checks pass. Local runtime: Node 24.10.0; CI uses Node 22.
+- Full browser regression: 39/39 pass with no skips or retries; e2e TypeScript and all 13 report-gate checks pass. The final required SG2-26 report gate passes. Local Playwright used installed Chrome with video disabled in a temporary config; repository browser settings and dependencies are unchanged.
 - Fresh disposable PostgreSQL 18.4: all 14 migrations and all 10 SQL suites pass. Four concurrency contracts also pass through the actual `psql` driver, including approval that crosses its deadline while waiting for an event lock; CI runs the same driver through its PostgreSQL 17 container.
 - Additional SQL contracts verify placement against existing bookings/blocks, conversion after a new block, and complete rollback/retry when warning or expiry notifications fail. Fresh SQL and concurrency evidence: `/tmp/holds-real-sql-followup.log` and `/tmp/holds-psql-concurrency-followup.log`.
 - PR #57's reported coordinator read-isolation finding is addressed at the database boundary. Thirteen additional SQL contracts verify direct-table denial, scoped RPCs across assignment changes, redacted global occupancy, restricted projection fields, external/missing-identity denial and staff/service compatibility. Fresh PostgreSQL verification again passed all 14 migrations and 10 suites; the independent patch review found no surviving bypass or regression. Final hosted verification is recorded on the PR.
 - The 1440px/390px hold layouts and desktop/mobile notification portal were visually inspected. Screenshots are in `/tmp/sg2-holds-qa`; browser and SQL fixtures never use shared Supabase data.
 - The latest `origin/main` was fetched and remained `dd9be1b76b6168f77c8a78b90ab3b36c97b4346b`, the branch base. The implementation has a successful Vercel preview. The PR must still obtain a teammate's structured sign-off and deployed database/scheduler verification before merge; final commit checks are recorded on PR #57.
+
+## Notification refresh verification — 5 October 2026
+
+The hold inbox now loads at sign-in and shares its current records with the badge and drawer. It refreshes every 30 seconds, on window focus and when opened. Overlapping refreshes share one pending request; account changes clear previous recipient data immediately and ignore old responses. Initial loading/failure is not displayed as a false zero, and background failures preserve known notices with a Retry action. This remains limited to SG2-84 AC6 and SG2-85 AC4.
+
+Three additional component declarations cover polling with the drawer closed/open, focus failure/recovery and token changes with pending responses. Existing coverage also verifies request deduplication and timer/listener cleanup. Browser regression SG2-85-P02 verifies the badge goes from 1 to 2 at the warning threshold while closed, then expiry arrives with count 3 while the drawer remains open. The full local suite passes 39 browser cases and 924 backend/808 frontend tests with 100% coverage; screenshots at 1440px and 390px are retained in `/tmp/sg2-holds-refresh-qa`. Final hosted results are recorded on PR #57.

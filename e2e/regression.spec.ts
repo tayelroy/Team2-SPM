@@ -1094,7 +1094,7 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await expect(page.getByRole('form', { name: 'Place a tentative hold' })).toHaveCount(0);
     const headers = await authHeaders(page);
     expect((await page.request.post('/api/venue-holds/1/convert', { headers })).status()).toBe(403);
-    await page.getByRole('button', { name: 'Notifications (0)', exact: true }).click();
+    await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
     await expect(page.getByText('Tentative hold placed', { exact: true })).toBeVisible();
     await expect(page.getByText('Hold expiring soon', { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
@@ -1146,6 +1146,42 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     expect((await page.request.post('/api/venue-holds/1/convert', { headers: staffHeaders })).status()).toBe(409);
     await placeHold(page, { expiry: '2030-06-04T10:00' });
     await expect(page.getByRole('article', { name: 'Hold #3', exact: true }).getByText('Tentative', { exact: true })).toBeVisible();
+  });
+
+  test('SG2-85-P02 | [SG2-84:AC6] [SG2-85:AC4] [NORMAL] [BOUNDARY] existing notices populate the bell and new warning/expiry arrivals refresh without reopening', async ({ page, request }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.clock.install();
+    expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+    await openHolds(page);
+    await placeHold(page);
+    await switchAccount(page, 'coordinator');
+    await nav(page, 'Venue holds');
+    await expect(page.getByRole('button', { name: 'Notifications (1)', exact: true })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Notifications', exact: true })).toHaveCount(0);
+
+    // The coordinator keeps the drawer closed as the 24-hour warning becomes due.
+    await clockAt(page, '2030-06-02T02:00:00.000Z');
+    await page.clock.fastForward(30_000);
+    await expect(page.getByRole('button', { name: 'Notifications (2)', exact: true })).toBeVisible();
+    await capture(page, 'coordinator-automatic-warning-badge', false);
+    await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+    await expect(page.getByText('Hold expiring soon', { exact: true })).toBeVisible();
+
+    // Leave the drawer open: expiry must arrive without closing/reopening it.
+    await clockAt(page, holdExpiry);
+    await page.clock.fastForward(30_000);
+    await expect(page.getByText('Hold expired', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Notifications (3)', exact: true })).toHaveAttribute('aria-expanded', 'true');
+    await capture(page, 'coordinator-live-expiry-desktop', false);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const panel = page.getByRole('complementary', { name: 'Notifications', exact: true });
+    expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await capture(page, 'coordinator-live-expiry-mobile', false);
+    expect(errors).toEqual([]);
   });
 
   test('SG2-84-N01 | [SG2-84:AC1] [SG2-84:AC5] [SG2-85:AC3] [FAILURE] role restrictions protect hold creation, release and approval through the real HTTP routes', async ({ page, request }) => {

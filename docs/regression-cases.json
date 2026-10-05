@@ -2340,6 +2340,38 @@
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
+    "actual": "The coordinator bell loaded the existing placement at sign-in, increased from 1 to 2 after the 30-second closed-drawer warning refresh, and increased to 3 with expiry appearing in the still-open drawer. Full local browser run passed 39/39; exact 1440px/390px visual follow-up passed.",
+    "id": "SG2-85-P02",
+    "title": "Hold notices refresh on sign-in and arrive while the drawer is closed or open",
+    "type": "NORMAL / BOUNDARY / CONFLICT",
+    "story": "SG2-85",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC6",
+      "SG2-85:AC4"
+    ],
+    "purpose": "Verify the existing hold inbox and badge discover persisted notices without manually reopening the drawer.",
+    "steps": [
+      "Place a hold as Venue Staff and sign in as its assigned coordinator.",
+      "Verify the closed notification bell automatically shows the existing placement notice.",
+      "Advance the disposable database clock to the 24-hour warning threshold and browser timers by 30 seconds; verify the closed badge changes from 1 to 2.",
+      "Open the drawer and verify the warning; leave it open, advance to expiry and advance browser timers by 30 seconds.",
+      "Verify the expiry notice appears and the count becomes 3 without reopening; inspect desktop and 390px mobile layout."
+    ],
+    "expected": "The badge loads on sign-in and updates from 1 to 2 while closed; the open drawer gains expiry and count 3 automatically, with no unexpected console errors or horizontal overflow.",
+    "execution_date": "5 Oct 2026",
+    "execution_evidence": "Local: npm run ci passed 924 backend +808 frontend tests at 100% per-file coverage; /tmp/sg2-holds-refresh-ci.log. Full 39/39 browser run: /tmp/sg2-holds-refresh-browser.log; required report gate /tmp/sg2-holds-refresh-gate.log. Notification visuals: /tmp/sg2-holds-refresh-qa. Production React and real Express routes use disposable identity/storage; no hosted Supabase execution is claimed.",
+    "executed_by": "Codex (automated local verification)"
+  },
+  {
+    "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
     "actual": "Passed in the final 38/38-case browser run against the rebuilt production React app and real Express routes with reset disposable storage. The assertions verify the specified visible and persisted results.",
     "id": "SG2-84-N01",
     "title": "Role restrictions protect hold creation, release and approval",
