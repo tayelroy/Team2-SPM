@@ -7,6 +7,7 @@ import { LAYOUT_LABELS, LAYOUTS, describeLayouts, type Layout } from '../venues/
 import { EMPTY_SEARCH, VenueSearchError, formatSgt, searchVenues, sgtToIso, type VenueMatch, type VenueSearchValues } from '../venues/searchApi';
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
 import { EventVenueFit } from '../venues/VenueFit';
+import { EventVenueRequests, VenueRequestForm, requestedNotice } from '../venues/VenueRequests';
 
 const TEXT_FIELDS = [
   ['location', 'Location', 'e.g. North Wing'],
@@ -34,6 +35,11 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   const [loading, setLoading] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const [error, setError] = useState('');
+  // SG2-48: the venue whose request form is open, what the last request
+  // said, and a counter that reloads the event's requests after one is made.
+  const [requesting, setRequesting] = useState<number | null>(null);
+  const [notice, setNotice] = useState('');
+  const [requestsVersion, setRequestsVersion] = useState(0);
   const pending = useRef<AbortController | null>(null);
 
   async function run(criteria: VenueSearchValues) {
@@ -42,6 +48,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
     pending.current = controller;
     setLoading(true);
     setError('');
+    setNotice('');
+    setRequesting(null);
     try {
       const venues = await searchVenues(accessToken, controller.signal, criteria);
       setResults(venues);
@@ -127,6 +135,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
 
       {loading ? <p role="status">Searching venues…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
+      {notice ? <p role="status" style={{ margin: 0, color: color.accent }}>{notice}</p> : null}
       {!loading && results && searched ? (
         results.length === 0 ? (
           <Card style={{ gap: '12px' }}>
@@ -162,6 +171,19 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
                       ⚠ Held booking {formatSgt(period.starts_at)} – {formatSgt(period.ends_at)} (not confirmed)
                     </p>
                   ))}
+                  {/* SG2-48 AC1: from an event's search, request one of the venues found. */}
+                  {prefill ? (requesting === venue.venue_id
+                    ? <VenueRequestForm accessToken={accessToken} eventId={prefill.eventId} venue={venue}
+                        period={{ from: searched.from, until: searched.until }} layout={searched.layout}
+                        venueRequirements={prefill.venueRequirements} onCancel={() => setRequesting(null)}
+                        onRequested={(_request, booking) => {
+                          setRequesting(null);
+                          setNotice(requestedNotice(venue.name, booking));
+                          setRequestsVersion(version => version + 1);
+                        }} />
+                    : <GhostButton onClick={() => { setNotice(''); setRequesting(venue.venue_id); }} style={{ alignSelf: 'flex-start' }}>
+                        Request this venue
+                      </GhostButton>) : null}
                 </Card>
               ))}
             </div>
@@ -170,6 +192,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
       ) : null}
       {/* SG2-47: once a search has run for an event, say which venues do not fit it and why. */}
       {prefill && searched ? <EventVenueFit accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} /> : null}
+      {/* SG2-48 AC3: the event's requests, each shown as pending until decided. */}
+      {prefill && searched ? <EventVenueRequests accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion} /> : null}
     </section>
   );
 }

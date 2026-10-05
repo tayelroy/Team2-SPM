@@ -8,8 +8,8 @@ import { parseVenueSearch, type VenueSearchCriteria } from './searchFields';
 
 const VENUE_COLUMNS = 'venue_id,name,location,capacity,facilities,accessibility_features,operating_information';
 
-/** A held booking does not stop a venue matching, but the coordinator should
- * know it is pencilled in, since it may still be confirmed. */
+/** Legacy pencilled-in bookings remain visible as warnings. Active tentative
+ * holds occupy their periods and are excluded from available matches. */
 export type HeldPeriod = { starts_at: string; ends_at: string };
 export type VenueMatch = VenueRecord & { layouts: VenueLayoutRecord[]; held: HeldPeriod[] };
 
@@ -25,7 +25,7 @@ function includesAll(text: string | null, keywords: string[]): boolean {
 
 /**
  * Venues that meet every applied criterion and are free for the whole period
- * (SG2-46): no block (SG2-45) and no confirmed booking overlaps it. Reads with
+ * (SG2-46): no block, confirmed booking or active tentative hold overlaps it. Reads with
  * the caller's own token, so RLS limits the occupancy tables to internal roles.
  */
 export async function searchVenues(criteria: VenueSearchCriteria, client: SupabaseClient): Promise<SearchResult> {
@@ -34,7 +34,7 @@ export async function searchVenues(criteria: VenueSearchCriteria, client: Supaba
     client.from('venues').select(VENUE_COLUMNS).order('name', { ascending: true }),
     client.from('venue_layouts').select('venue_id,layout,other_description'),
     client.from('venue_unavailability').select('venue_id,starts_at,ends_at').lt('starts_at', to).gt('ends_at', from),
-    client.from('venue_bookings').select('venue_id,starts_at,ends_at,status').lt('starts_at', to).gt('ends_at', from)
+    client.from('venue_booking_occupancy').select('venue_id,starts_at,ends_at,status').lt('starts_at', to).gt('ends_at', from)
   ]);
   if (venues.error || layouts.error || blocks.error || bookings.error) return { outcome: 'unavailable' };
 
@@ -42,7 +42,7 @@ export async function searchVenues(criteria: VenueSearchCriteria, client: Supaba
   const held = new Map<number, HeldPeriod[]>();
   for (const row of blocks.data as OccupancyRow[]) occupied.add(row.venue_id);
   for (const row of bookings.data as OccupancyRow[]) {
-    if (row.status === 'confirmed') occupied.add(row.venue_id);
+    if (row.status === 'confirmed' || row.status === 'tentative') occupied.add(row.venue_id);
     else held.set(row.venue_id, [...(held.get(row.venue_id) ?? []), { starts_at: row.starts_at, ends_at: row.ends_at }]);
   }
   const layoutsByVenue = new Map<number, VenueLayoutRecord[]>();

@@ -35,7 +35,7 @@ export function monthRange(reference: Date): MonthRange {
   };
 }
 
-export type DayKind = 'free' | 'booked' | 'unavailable' | 'mixed';
+export type DayKind = 'free' | 'booked' | 'unavailable' | 'tentative' | 'mixed';
 
 export interface CalendarDay {
   /** ISO date (yyyy-mm-dd) for an in-month day, null for a leading/trailing blank. */
@@ -76,6 +76,7 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
     const items: string[] = [];
     let hasBooking = false;
     let hasUnavailable = false;
+    let hasHold = false;
 
     for (const venue of venues) {
       for (const entry of venue.entries) {
@@ -83,13 +84,15 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
         const entryEnd = Date.parse(entry.end);
         if (entryStart < dayEnd && entryEnd > dayStart) {
           if (entry.kind === 'booking') hasBooking = true;
+          else if (entry.kind === 'hold') hasHold = true;
           else hasUnavailable = true;
           items.push(`${venue.name} · ${entry.label}`);
         }
       }
     }
 
-    const kind: DayKind = hasBooking && hasUnavailable ? 'mixed' : hasBooking ? 'booked' : hasUnavailable ? 'unavailable' : 'free';
+    const occupiedKinds = Number(hasBooking) + Number(hasUnavailable) + Number(hasHold);
+    const kind: DayKind = occupiedKinds > 1 ? 'mixed' : hasBooking ? 'booked' : hasUnavailable ? 'unavailable' : hasHold ? 'tentative' : 'free';
     const shown = items.slice(0, MAX_ITEMS_PER_DAY);
     if (items.length > MAX_ITEMS_PER_DAY) shown.push(`+${items.length - MAX_ITEMS_PER_DAY} more`);
 

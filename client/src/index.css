@@ -192,3 +192,16 @@ a:hover {
   .organisation-summary-stat strong { font-size: 28px; }
   .organisation-summary-stat span { font-size: 11px; }
 }
+.venue-holds { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.venue-hold-form, .venue-hold-card { padding: 24px; background: rgba(1, 29, 28, .55); border: 1px solid rgba(255, 255, 255, .1); border-radius: 14px; min-width: 0; }
+.venue-hold-form h3, .venue-hold-card h3 { margin: 0; font-weight: 500; }
+.venue-hold-form p, .venue-hold-card p { color: #adb9b8; line-height: 1.5; overflow-wrap: anywhere; }
+.venue-hold-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 18px; margin: 24px 0; }
+.venue-hold-fields label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; min-width: 0; }
+.venue-hold-fields input, .venue-hold-fields select { min-width: 0; width: 100%; box-sizing: border-box; padding: 12px; background: #082c2a; color: #e6f2ef; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; font: inherit; color-scheme: dark; }
+.venue-hold-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 18px; }
+.venue-hold-header, .venue-hold-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.venue-hold-header { justify-content: space-between; }
+.venue-hold-status { padding: 6px 10px; border-radius: 6px; font-size: 12px; background: rgba(255,255,255,.08); }
+.venue-hold-tentative { background: rgba(246,190,76,.13); color: #f6be4c; }
+.venue-hold-converted { background: rgba(203,255,252,.15); color: #cbfffc; }

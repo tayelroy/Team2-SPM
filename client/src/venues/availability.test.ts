@@ -36,6 +36,12 @@ test('[NORMAL] [SG2-44:AC1] loads and validates the response with the session to
   );
 });
 
+test('[NORMAL] [SG2-84:AC4] accepts a tentative hold as a distinct availability kind', async () => {
+  const data = { ...VALID, venues: [{ ...VALID.venues[0], entries: [{ ...VALID.venues[0].entries[0], kind: 'hold', label: 'Tentative' }] }] };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)));
+  expect(await loadAllVenuesAvailability('token', VALID.from, VALID.to)).toEqual(data);
+});
+
 test.each([401, 403])('[FAILURE] [SG2-44:AC3] denies access when the server returns %s', async (status) => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status })));
   expect(await loadAllVenuesAvailability('token', VALID.from, VALID.to)).toBeNull();

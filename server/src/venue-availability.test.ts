@@ -52,10 +52,23 @@ function fakeClient(tables: Record<string, TableResult>, calls: QueryCall[] = []
 
 // --- getVenueAvailability -------------------------------------------------------
 
+test('[NORMAL] [SG2-84:AC3] [SG2-84:AC4] tentative periods have their own kind and confirmed bookings retain their labels', async () => {
+  const result = await getVenueAvailability(1, FROM, TO, fakeClient({ venue_booking_occupancy: { data: [
+    { starts_at: FROM, ends_at: TO, status: 'tentative', event_id: 7 },
+    { starts_at: FROM, ends_at: TO, status: 'tentative', event_id: null },
+    { starts_at: FROM, ends_at: TO, status: 'confirmed', event_id: null }
+  ], error: null } }));
+  assert.deepEqual(result, { outcome: 'ok', entries: [
+    { start: FROM, end: TO, kind: 'hold', label: 'Tentative · event 7' },
+    { start: FROM, end: TO, kind: 'hold', label: 'Tentative' },
+    { start: FROM, end: TO, kind: 'booking', label: 'confirmed' }
+  ] });
+});
+
 test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries the chosen venue over the half-open range and merges occupied periods in start order', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({
-    venue_bookings: {
+    venue_booking_occupancy: {
       data: [
         { starts_at: '2026-10-05T09:00:00.000Z', ends_at: '2026-10-05T12:00:00.000Z', status: 'held', event_id: null },
         { starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', status: 'confirmed', event_id: 12 }
@@ -72,7 +85,7 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries the chosen venue over the half-
 
   const result = await getVenueAvailability(7, FROM, TO, client);
 
-  for (const table of ['venue_bookings', 'venue_unavailability']) {
+  for (const table of ['venue_booking_occupancy', 'venue_unavailability']) {
     assert.deepEqual(calls.filter(call => call.table === table && ['eq', 'lt', 'gt'].includes(call.method)), [
       { table, method: 'eq', args: ['venue_id', 7] },
       { table, method: 'lt', args: ['starts_at', TO] },
@@ -92,7 +105,7 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries the chosen venue over the half-
 
 test('[BOUNDARY] [SG2-44:AC1] [SG2-44:AC2] keeps entries that share a start instant', async () => {
   const client = fakeClient({
-    venue_bookings: {
+    venue_booking_occupancy: {
       data: [{ starts_at: '2026-10-05T09:00:00.000Z', ends_at: '2026-10-05T10:00:00.000Z', status: 'held', event_id: null }],
       error: null
     },
@@ -111,7 +124,7 @@ test('[BOUNDARY] [SG2-44:AC1] [SG2-44:AC2] keeps entries that share a start inst
 
 test('[BOUNDARY] [SG2-44:AC1] returns an empty list when both queries return null', async () => {
   const client = fakeClient({
-    venue_bookings: { data: null, error: null },
+    venue_booking_occupancy: { data: null, error: null },
     venue_unavailability: { data: null, error: null }
   });
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'ok', entries: [] });
@@ -119,7 +132,7 @@ test('[BOUNDARY] [SG2-44:AC1] returns an empty list when both queries return nul
 
 test('[FAILURE] [SG2-44:AC1] is unavailable when the bookings query fails', async () => {
   const client = fakeClient({
-    venue_bookings: { data: null, error: { message: 'boom' } },
+    venue_booking_occupancy: { data: null, error: { message: 'boom' } },
     venue_unavailability: { data: [], error: null }
   });
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'unavailable' });
@@ -127,7 +140,7 @@ test('[FAILURE] [SG2-44:AC1] is unavailable when the bookings query fails', asyn
 
 test('[FAILURE] [SG2-44:AC1] is unavailable when the unavailability query fails', async () => {
   const client = fakeClient({
-    venue_bookings: { data: [], error: null },
+    venue_booking_occupancy: { data: [], error: null },
     venue_unavailability: { data: null, error: { message: 'boom' } }
   });
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'unavailable' });
@@ -200,7 +213,7 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries every venue over the chosen ran
       ],
       error: null
     },
-    venue_bookings: {
+    venue_booking_occupancy: {
       data: [
         { venue_id: 1, starts_at: '2026-10-05T09:00:00.000Z', ends_at: '2026-10-05T12:00:00.000Z', status: 'held', event_id: null },
         { venue_id: 1, starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', status: 'confirmed', event_id: 12 }
@@ -220,7 +233,7 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries every venue over the chosen ran
   assert.deepEqual(calls.filter(call => call.table === 'venues' && call.method === 'order'), [
     { table: 'venues', method: 'order', args: ['name', { ascending: true }] }
   ]);
-  for (const table of ['venue_bookings', 'venue_unavailability']) {
+  for (const table of ['venue_booking_occupancy', 'venue_unavailability']) {
     assert.deepEqual(calls.filter(call => call.table === table && ['eq', 'lt', 'gt'].includes(call.method)), [
       { table, method: 'lt', args: ['starts_at', TO] },
       { table, method: 'gt', args: ['ends_at', FROM] }
@@ -258,7 +271,7 @@ test('[BOUNDARY] [SG2-44:AC1] all-venues read treats a null venue list as empty'
 test('[BOUNDARY] [SG2-44:AC1] all-venues read treats null booking/unavailability data as empty', async () => {
   const client = fakeClient({
     venues: { data: [{ venue_id: 1, name: 'Atrium' }], error: null },
-    venue_bookings: { data: null, error: null },
+    venue_booking_occupancy: { data: null, error: null },
     venue_unavailability: { data: null, error: null }
   });
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), {
@@ -286,7 +299,7 @@ test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the venue list 
 test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the bookings query fails', async () => {
   const client = fakeClient({
     venues: { data: [], error: null },
-    venue_bookings: { data: null, error: { message: 'boom' } }
+    venue_booking_occupancy: { data: null, error: { message: 'boom' } }
   });
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });
 });
@@ -294,7 +307,7 @@ test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the bookings qu
 test('[FAILURE] [SG2-44:AC1] all-venues read is unavailable when the unavailability query fails', async () => {
   const client = fakeClient({
     venues: { data: [], error: null },
-    venue_bookings: { data: [], error: null },
+    venue_booking_occupancy: { data: [], error: null },
     venue_unavailability: { data: null, error: { message: 'boom' } }
   });
   assert.deepEqual(await getAllVenuesAvailability(FROM, TO, client), { outcome: 'unavailable' });

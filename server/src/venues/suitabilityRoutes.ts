@@ -15,7 +15,7 @@ export interface VenueSuitabilityDependencies {
   store?: (admin: SupabaseClient) => VenueSuitabilityStore;
 }
 
-function parseId(raw: unknown): number | null {
+export function parseId(raw: unknown): number | null {
   if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw) || Number(raw) > 2147483647) return null;
   return Number(raw);
 }
@@ -23,7 +23,7 @@ function parseId(raw: unknown): number | null {
 /** Venue Staff and Technical Support Staff work across every event; a
  * coordinator sees only events assigned to them and an organiser only their
  * own. The route permission has already excluded every other role. */
-function canSeeEvent(principal: Principal, event: SuitabilityEventRow): boolean {
+export function canSeeEvent(principal: Principal, event: SuitabilityEventRow): boolean {
   if (principal.role === 'event_coordinator') return event.coordinator_id === principal.userId;
   if (principal.role === 'event_organiser') return event.organiser_id === principal.userId;
   return true;

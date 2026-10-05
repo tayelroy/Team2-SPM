@@ -22,11 +22,13 @@ import { createVenueOperationsRouter } from './venues/operations';
 import { createVenueBlocksRouter } from './venues/blocks';
 import { createVenueSearchRouter } from './venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from './venues/suitabilityRoutes';
+import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
+import { createVenueHoldsRouter } from './venues/holds';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -50,7 +52,8 @@ export function createApp(
     search: createVenueSearchRouter(access),
     profile: createProfileRouter(access),
     suitability: createVenueSuitabilityRouter(access),
-    bookingRequests: createBookingRequestSuitabilityRouter(access)
+    bookingRequests: createBookingRequestSuitabilityRouter(access),
+    venueRequests: createVenueBookingRequestsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
@@ -61,7 +64,8 @@ export function createApp(
   updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal }),
   getEventHistoryHandler: RequestHandler = createGetEventHistoryHandler({ getPrincipal: access.getPrincipal }),
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
-  addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal })
+  addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
+  venueHoldsRouter = createVenueHoldsRouter(access)
 ) {
   const app = express();
 
@@ -88,6 +92,9 @@ export function createApp(
   // exceptions on a venue booking request.
   app.use('/api/venues', routers.suitability);
   app.use('/api/venue-booking-requests', routers.bookingRequests);
+  // SG2-48: coordinators request a venue for an approved event.
+  app.use('/api/venue-booking-requests', routers.venueRequests);
+  app.use('/api/venue-holds', venueHoldsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

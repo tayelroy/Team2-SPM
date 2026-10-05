@@ -932,7 +932,7 @@ export async function postClarification(
 export interface EventAuditLogEntry {
   log_id: number;
   event_id: number;
-  actor_id: string;
+  actor_id: string | null;
   actor_name: string;
   field_name: string;
   old_value: string | null;

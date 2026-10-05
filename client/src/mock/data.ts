@@ -104,11 +104,13 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
     ['equipment', 'Equipment'],
+    ['holds', 'Venue holds'],
   ],
   'Venue Staff': [
     ['dashboard', 'Dashboard'],
     ['calendar', 'Venue Availability'],
     ['venues', 'Catalogue'],
+    ['holds', 'Venue holds'],
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
@@ -173,6 +175,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   venues: 'Venue catalogue',
   calendar: 'Venue availability',
   booking: 'Booking approval',
+  holds: 'Venue holds',
   equipment: 'Equipment requests',
   attendee: 'Event page',
   change: 'Change request',
@@ -193,6 +196,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   calendar:
     'Available, held, confirmed and blocked days for the selected venue.',
   booking: 'Approve or reject with a reason. Overlaps are detected automatically.',
+  holds: 'Reserve a venue while arrangements are finalised, with a clear expiry and approval decision.',
   equipment:
     'Check availability and reserve. Reserving reduces stock for overlapping events.',
   attendee: 'Confirmed event details, registration, and your current status.',

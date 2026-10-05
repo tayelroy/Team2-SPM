@@ -366,6 +366,44 @@
       }
     },
     {
+      "id": "SG2-48",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-48",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Can request a chosen venue for an approved event, carrying the event timing, required layout and venue requirements",
+        "AC2": "The request reaches Venue Staff and awaits their decision",
+        "AC3": "The request is shown as pending while awaiting a decision; it does not hold the venue or block its availability. The venue is committed to the event only when the request is approved",
+        "AC4": "An event can have requests for several different venues (Week 7 change #3); a duplicate request for the same venue and an overlapping period is refused"
+      }
+    },
+    {
+      "id": "SG2-84",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-84",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-05",
+      "acceptanceCriteria": {
+        "AC1": "I can place a hold on a venue for an event and a period, and I must set an expiry date/time that is in the future",
+        "AC2": "A hold cannot be created without an expiry",
+        "AC3": "While the hold is active, the venue is shown as held for that period, and other requests for that period are reported as conflicts with the hold",
+        "AC4": "A hold is shown as \"Tentative\", never as a confirmed booking, and does not count as an approved venue booking when the event is confirmed",
+        "AC5": "A hold can be turned into a confirmed booking through the normal approval process before it expires, or released early",
+        "AC6": "The Event Coordinator is notified when a hold is placed, including its expiry"
+      }
+    },
+    {
+      "id": "SG2-85",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-85",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-05",
+      "acceptanceCriteria": {
+        "AC1": "Given an active hold whose expiry time has passed without being converted to a confirmed booking, the hold's status becomes Expired",
+        "AC2": "Once a hold has expired, the venue becomes available for other requests for that period",
+        "AC3": "An expired hold is never treated as a confirmed booking and cannot be approved; a new request is needed",
+        "AC4": "The Event Coordinator is warned before the hold expires (e.g. 24 hours before; confirm the lead time with the customer) and notified again when it expires",
+        "AC5": "The expiry is recorded in the event's history"
+      }
+    },
+    {
       "id": "SG2-77",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-77",
       "originalPullRequests": [],

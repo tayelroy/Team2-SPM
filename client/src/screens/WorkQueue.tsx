@@ -6,6 +6,7 @@ import ClarificationThread from '../components/ClarificationThread';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
+import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
@@ -20,6 +21,8 @@ const DETAIL_LABELS: Record<string, string> = {
   accessibility_needs: 'Accessibility needs', equipment_requirements: 'Equipment requirements',
   registration_needed: 'Registration needed', location: 'Location', capacity: 'Venue capacity',
   quantity: 'Quantity requested', notes: 'Request notes',
+  // SG2-48 AC2: what Venue Staff need to decide on a venue request.
+  layout: 'Required layout', requested_by: 'Requested by',
 };
 const KINDS = { event: 'Event request', venue: 'Venue booking request', equipment: 'Equipment request' };
 
@@ -137,7 +140,8 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
       </div>
       <dl className="organisation-detail-facts">
         {Object.entries(DETAIL_LABELS).filter(([key]) => key in currentDetails).map(([key, label]) => {
-          const value = currentDetails[key];
+          const value = key === 'layout' && typeof currentDetails.layout === 'string'
+            ? LAYOUT_LABELS[currentDetails.layout as Layout] : currentDetails[key];
           return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
         })}
       </dl>

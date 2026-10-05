@@ -119,6 +119,10 @@ independently of what the UI shows.
 - **Catalogue** to add or edit a venue's location, capacity, facilities,
   accessibility features and operating information.
 - **Venue Availability** for the booking calendar.
+- **Venue holds** to place a Tentative hold with a mandatory expiry, release it,
+  or approve its linked booking request. Coordinators can view their assigned
+  event holds and receive placement, warning and expiry messages in Notifications.
+  Apply the [hold migration and scheduler setup](docs/venue-holds.md) before deployment.
 
 ### As Technical Support Staff
 

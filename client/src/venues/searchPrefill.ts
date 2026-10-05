@@ -8,6 +8,8 @@ export interface VenueSearchPrefill {
   values: VenueSearchValues;
   /** The event's accessibility needs as the organiser wrote them, if any. */
   accessibilityNeeds: string | null;
+  /** SG2-48 AC1: the venue requirements a venue request will carry. */
+  venueRequirements: string | null;
 }
 
 /** Accessibility needs are free text, so only recognised features become
@@ -32,10 +34,12 @@ export function prefillFromEvent(item: WorkItem): VenueSearchPrefill {
   const attendance = item.details.expected_attendance;
   const rawNeeds = item.details.accessibility_needs;
   const needs = typeof rawNeeds === 'string' && rawNeeds.trim() ? rawNeeds.trim() : null;
+  const requirements = item.details.venue_requirements;
   return {
     eventId: item.event_id,
     eventName: item.title,
     accessibilityNeeds: needs,
+    venueRequirements: typeof requirements === 'string' && requirements.trim() ? requirements.trim() : null,
     values: {
       ...EMPTY_SEARCH,
       from: day === null ? '' : `${day}T00:00`,

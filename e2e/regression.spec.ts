@@ -1006,3 +1006,353 @@ test('SG2-47-N01 | [SG2-47:AC2] [SG2-47:AC3] [FAILURE] a missing facility cannot
   }
   expect((await page.request.post('/api/venue-booking-requests/21/capacity-exception')).status()).toBe(401);
 });
+
+test.describe('Tentative venue holds (SG2-84/85)', () => {
+  test.use({ timezoneId: 'Asia/Singapore' });
+  const holdNow = '2030-06-01T02:00:00.000Z';
+  const holdExpiry = '2030-06-03T02:00:00.000Z';
+  const holdValues = { event_id: 81, venue_id: 1, starts_at: '2030-06-05T02:00:00.000Z', ends_at: '2030-06-05T04:00:00.000Z', expires_at: holdExpiry };
+
+  async function openHolds(page: Page, account = 'venue', now = holdNow) {
+    await signIn(page, account);
+    await page.clock.setFixedTime(now);
+    await nav(page, 'Venue holds');
+    await expect(page.getByRole('heading', { name: 'Tentative venue holds', exact: true })).toBeVisible();
+  }
+
+  async function fillHold(page: Page, values: { event?: string; venue?: string; start?: string; end?: string; expiry?: string } = {}) {
+    await page.getByRole('combobox', { name: 'Event', exact: true }).selectOption(values.event ?? '81');
+    await page.getByRole('combobox', { name: 'Venue', exact: true }).selectOption(values.venue ?? '1');
+    await page.getByLabel('Period starts', { exact: true }).fill(values.start ?? '2030-06-05T10:00');
+    await page.getByLabel('Period ends', { exact: true }).fill(values.end ?? '2030-06-05T12:00');
+    await page.getByLabel('Hold expires', { exact: true }).fill(values.expiry ?? '2030-06-03T10:00');
+  }
+
+  async function placeHold(page: Page, values: Parameters<typeof fillHold>[1] = {}) {
+    await fillHold(page, values);
+    await page.getByRole('button', { name: 'Place hold', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Hold placed. The Event Coordinator has been notified of its expiry.');
+  }
+
+  async function clockAt(page: Page, now: string) {
+    expect((await page.request.post('/__e2e/hold-time', { data: { now } })).status()).toBe(204);
+    await page.clock.setFixedTime(now);
+  }
+
+  async function switchAccount(page: Page, account: string, now = holdNow) {
+    await page.getByRole('button', { name: 'Profile', exact: true }).click();
+    await page.getByRole('button', { name: 'Logout', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+    await signIn(page, account);
+    await page.clock.setFixedTime(now);
+  }
+
+  async function capture(page: Page, name: string, fullPage = true) {
+    if (process.env.SG2_HOLDS_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_HOLDS_SCREENSHOTS}/${name}.png`, fullPage });
+  }
+
+  test('SG2-84-P01 | [SG2-84:AC1] [SG2-84:AC2] [SG2-84:AC3] [SG2-84:AC4] [SG2-84:AC6] [NORMAL] [FAILURE] [BOUNDARY] [CONFLICT] staff require an expiry, place a Tentative hold and refuse overlaps while allowing adjacent periods', async ({ page, request }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error' && !/status of (400|409)/.test(message.text())) errors.push(message.text()); });
+    expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await openHolds(page);
+    await expect(page).toHaveTitle(/ConnectSphere/i);
+    expect(new URL(page.url()).origin).toBe('http://127.0.0.1:4173');
+    await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+    await expect(page.getByLabel('Hold expires', { exact: true })).toHaveAttribute('required', '');
+    await fillHold(page, { expiry: '' });
+    await page.getByRole('button', { name: 'Place hold', exact: true }).click();
+    expect(await page.getByLabel('Hold expires', { exact: true }).evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
+    const headers = await authHeaders(page);
+    expect((await page.request.get('/api/venue-holds', { headers })).ok()).toBe(true);
+    expect((await (await page.request.get('/api/venue-holds', { headers })).json()).holds).toEqual([]);
+    expect((await page.request.post('/api/venue-holds', { headers, data: { ...holdValues, expires_at: undefined } })).status()).toBe(400);
+
+    await placeHold(page);
+    const first = page.getByRole('article', { name: 'Hold #1', exact: true });
+    await expect(first.getByText('Tentative', { exact: true })).toBeVisible();
+    await expect(first.getByText('Expiry: 3 Jun 2030, 10:00 (SGT) · Hold #1', { exact: true })).toBeVisible();
+    const list = await (await page.request.get('/api/venue-holds', { headers })).json();
+    expect(list.holds[0]).toMatchObject({ status: 'tentative', booking_id: null, ...holdValues });
+    await fillHold(page, { start: '2030-06-05T11:00', end: '2030-06-05T13:00' });
+    await page.getByRole('button', { name: 'Place hold', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText('This venue is already booked, held or unavailable for that period.');
+    await placeHold(page, { start: '2030-06-05T12:00', end: '2030-06-05T13:00' });
+    await expect(page.getByRole('article', { name: 'Hold #2', exact: true })).toBeVisible();
+    await capture(page, 'staff-holds-desktop');
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await capture(page, 'staff-holds-mobile');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await nav(page, 'Venue Availability');
+    await expect(page.getByRole('heading', { name: 'June 2030', exact: true })).toBeVisible();
+    await expect(page.getByText('Tentative', { exact: true })).toBeVisible();
+    await expect(page.getByText('Regression Hall · Tentative · event 81').first()).toBeVisible();
+    await capture(page, 'tentative-calendar-desktop');
+    expect(errors).toEqual([]);
+  });
+
+  test('SG2-84-P02 | [SG2-84:AC5] [SG2-85:AC1] [SG2-85:AC2] [NORMAL] [CONFLICT] staff approve a live hold through its booking request and release a second hold', async ({ page, request }) => {
+    expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+    await openHolds(page);
+    await placeHold(page);
+    const first = page.getByRole('article', { name: 'Hold #1', exact: true });
+    await first.getByRole('button', { name: 'Approve booking', exact: true }).click();
+    await expect(first.getByText('Confirmed booking', { exact: true })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Booking approved. The hold is now a confirmed booking.');
+    const headers = await authHeaders(page);
+    const converted = (await (await page.request.get('/api/venue-holds', { headers })).json()).holds[0];
+    expect(converted.status).toBe('converted');
+    expect(converted.booking_id).toBeGreaterThan(0);
+    expect((await page.request.post('/api/venue-holds/1/convert', { headers })).status()).toBe(409);
+    await placeHold(page, { venue: '2' });
+    const second = page.getByRole('article', { name: 'Hold #2', exact: true });
+    await second.getByRole('button', { name: 'Release hold', exact: true }).click();
+    await expect(second.getByText('Released', { exact: true })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('Hold released. The period is available for other requests.');
+    await clockAt(page, '2030-06-04T02:00:00.000Z');
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(first.getByText('Confirmed booking', { exact: true })).toBeVisible();
+    await expect(second.getByText('Released', { exact: true })).toBeVisible();
+    const availability = await page.request.get('/api/venues/availability?from=2030-06-05T00:00:00Z&to=2030-06-06T00:00:00Z', { headers });
+    const venues = (await availability.json()).venues;
+    expect(venues.find((venue: { venueId: number }) => venue.venueId === 1).entries).toEqual([expect.objectContaining({ kind: 'booking', label: 'confirmed · event 81' })]);
+    expect(venues.find((venue: { venueId: number }) => venue.venueId === 2).entries).toEqual([]);
+    await capture(page, 'converted-and-released');
+  });
+
+  test('SG2-85-P01 | [SG2-84:AC6] [SG2-85:AC1] [SG2-85:AC2] [SG2-85:AC3] [SG2-85:AC4] [SG2-85:AC5] [NORMAL] [BOUNDARY] [CONFLICT] an assigned coordinator receives one 24-hour warning, exact expiry and System history, then staff place a new request', async ({ page, request }) => {
+    expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+    await openHolds(page);
+    await placeHold(page);
+    await placeHold(page, { event: '82', venue: '2' });
+    await switchAccount(page, 'coordinator');
+    await nav(page, 'Venue holds');
+    await expect(page.getByRole('article', { name: 'Hold #1', exact: true })).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Hold #2', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('form', { name: 'Place a tentative hold' })).toHaveCount(0);
+    const headers = await authHeaders(page);
+    expect((await page.request.post('/api/venue-holds/1/convert', { headers })).status()).toBe(403);
+    await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+    await expect(page.getByText('Tentative hold placed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Hold expiring soon', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+    await clockAt(page, '2030-06-02T01:59:59.999Z');
+    expect((await (await page.request.get('/api/venue-holds/notifications', { headers })).json()).notifications.map((notice: { kind: string }) => notice.kind)).toEqual(['placed']);
+    await clockAt(page, '2030-06-02T02:00:00.000Z');
+    await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+    await expect(page.getByText('Hold expiring soon', { exact: true })).toBeVisible();
+    await expect(page.getByText('2 Jun 2030, 10:00 SGT', { exact: true })).toBeVisible();
+    const notices = (await (await page.request.get('/api/venue-holds/notifications', { headers })).json()).notifications;
+    expect(notices).toHaveLength(2);
+    expect(notices.every((notice: { event_id: number }) => notice.event_id === 81)).toBe(true);
+    expect(notices.filter((notice: { kind: string }) => notice.kind === 'warning')).toHaveLength(1);
+    await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+    await clockAt(page, '2030-06-03T01:59:59.999Z');
+    expect((await (await page.request.get('/api/venue-holds', { headers })).json()).holds[0].status).toBe('tentative');
+    await clockAt(page, holdExpiry);
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(page.getByRole('article', { name: 'Hold #1', exact: true }).getByText('Expired', { exact: true })).toBeVisible();
+    await expect(page.getByText('A new request is needed. This expired hold cannot be approved.', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+    await expect(page.getByText('Hold expired', { exact: true })).toBeVisible();
+    expect(await page.getByRole('complementary', { name: 'Notifications', exact: true }).evaluate(panel => panel.getBoundingClientRect().height)).toBeGreaterThan(600);
+    await capture(page, 'coordinator-expiry-notifications', false);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const panel = page.getByRole('complementary', { name: 'Notifications', exact: true });
+    expect(await panel.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.top === 0 && bounds.left >= 0 && bounds.right <= innerWidth && bounds.height === innerHeight && element.scrollWidth <= element.clientWidth;
+    })).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(panel.getByText('Hold expired', { exact: true })).toBeVisible();
+    await capture(page, 'coordinator-notifications-mobile', false);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+    await nav(page, 'Dashboard');
+    await page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Tentative Hold Forum/ }).click();
+    await page.getByRole('button', { name: 'View Change History', exact: true }).click();
+    await expect(page.getByText('System', { exact: true })).toBeVisible();
+    await expect(page.getByText('Automatic', { exact: true })).toBeVisible();
+    await expect(page.getByText('Expired hold 1', { exact: true })).toBeVisible();
+    await capture(page, 'system-expiry-history', false);
+    await page.getByRole('button', { name: 'Close change history', exact: true }).click();
+    await switchAccount(page, 'venue', holdExpiry);
+    await nav(page, 'Venue holds');
+    const expired = page.getByRole('article', { name: 'Hold #1', exact: true });
+    await expect(expired.getByRole('button', { name: 'Approve booking', exact: true })).toHaveCount(0);
+    const staffHeaders = await authHeaders(page);
+    expect((await page.request.post('/api/venue-holds/1/convert', { headers: staffHeaders })).status()).toBe(409);
+    await placeHold(page, { expiry: '2030-06-04T10:00' });
+    await expect(page.getByRole('article', { name: 'Hold #3', exact: true }).getByText('Tentative', { exact: true })).toBeVisible();
+  });
+
+  test('SG2-85-P02 | [SG2-84:AC6] [SG2-85:AC4] [NORMAL] [BOUNDARY] existing notices populate the bell and new warning/expiry arrivals refresh without reopening', async ({ page, request }) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.clock.install();
+    expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+    await openHolds(page);
+    await placeHold(page);
+    await switchAccount(page, 'coordinator');
+    await nav(page, 'Venue holds');
+    await expect(page.getByRole('button', { name: 'Notifications (1)', exact: true })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Notifications', exact: true })).toHaveCount(0);
+
+    // The coordinator keeps the drawer closed as the 24-hour warning becomes due.
+    await clockAt(page, '2030-06-02T02:00:00.000Z');
+    await page.clock.fastForward(30_000);
+    await expect(page.getByRole('button', { name: 'Notifications (2)', exact: true })).toBeVisible();
+    await capture(page, 'coordinator-automatic-warning-badge', false);
+    await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+    await expect(page.getByText('Hold expiring soon', { exact: true })).toBeVisible();
+
+    // Leave the drawer open: expiry must arrive without closing/reopening it.
+    await clockAt(page, holdExpiry);
+    await page.clock.fastForward(30_000);
+    await expect(page.getByText('Hold expired', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Notifications (3)', exact: true })).toHaveAttribute('aria-expanded', 'true');
+    await capture(page, 'coordinator-live-expiry-desktop', false);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const panel = page.getByRole('complementary', { name: 'Notifications', exact: true });
+    expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await capture(page, 'coordinator-live-expiry-mobile', false);
+    expect(errors).toEqual([]);
+  });
+
+  test('SG2-84-N01 | [SG2-84:AC1] [SG2-84:AC5] [SG2-85:AC3] [FAILURE] role restrictions protect hold creation, release and approval through the real HTTP routes', async ({ page, request }) => {
+    expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+    await openHolds(page);
+    await placeHold(page);
+    for (const account of ['coordinator', 'support', 'organiser', 'attendee']) {
+      await switchAccount(page, account);
+      const headers = await authHeaders(page);
+      for (const [url, data] of [['/api/venue-holds', holdValues], ['/api/venue-holds/1/release', {}], ['/api/venue-holds/1/convert', {}]] as const) {
+        expect((await page.request.post(url, { headers, data })).status()).toBe(403);
+      }
+    }
+    expect((await page.request.post('/api/venue-holds', { data: holdValues })).status()).toBe(401);
+  });
+});
+
+async function openVenueRequestSearch(page: Page) {
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Venue Request Forum/ }).click();
+  await page.getByRole('button', { name: 'Find venues for this event', exact: true }).click();
+  await expect(page.getByText('For: Venue Request Forum (#91)', { exact: true })).toBeVisible();
+}
+
+function venueCard(page: Page, venue: string) {
+  return page.locator('.venue-grid > *').filter({ has: page.getByRole('heading', { name: venue, exact: true }) }).first();
+}
+
+/** Fills and sends an open request form for the venue. */
+async function sendVenueRequest(page: Page, venue: string, from: string, until: string) {
+  const form = page.getByRole('form', { name: `Request ${venue}` });
+  await form.getByLabel('Request from (Singapore time)').fill(from);
+  await form.getByLabel('Request until (Singapore time)').fill(until);
+  await form.getByRole('button', { name: 'Send request', exact: true }).click();
+  return form;
+}
+
+async function requestVenue(page: Page, venue: string, from: string, until: string) {
+  await venueCard(page, venue).getByRole('button', { name: 'Request this venue', exact: true }).click();
+  return sendVenueRequest(page, venue, from, until);
+}
+
+test('SG2-48-P01 | [SG2-48:AC1] [SG2-48:AC2] [SG2-48:AC3] [NORMAL] a coordinator requests a venue; it waits pending for Venue Staff without holding the venue', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  // 80 guests leaves out Quiet Room; Regression Hall is free all day.
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText('No venues have been requested for this event yet.', { exact: true })).toBeVisible();
+
+  // AC1: the request carries the period, the layout and the event's venue requirements.
+  const card = venueCard(page, 'Regression Hall');
+  await card.getByRole('button', { name: 'Request this venue', exact: true }).click();
+  await expect(card.getByLabel('Required layout')).toHaveValue('theatre');
+  await expect(card.getByText('A projector', { exact: true })).toBeVisible();
+  await sendVenueRequest(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.', { exact: true })).toBeVisible();
+
+  // AC3: shown as pending, and the venue is neither held nor shown as unavailable.
+  await expect(list.getByText('Pending', { exact: true })).toBeVisible();
+  await expect(list.getByText(/Awaiting a Venue Staff decision/)).toBeVisible();
+  const period = `from=${encodeURIComponent('2030-06-20T01:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T04:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${period}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries).toEqual([]);
+  const search = await page.request.get(`/api/venues/search?${period}`, { headers: await authHeaders(page) });
+  expect((await search.json()).venues.map((venue: { name: string; held: unknown[] }) => [venue.name, venue.held]))
+    .toEqual([['Quiet Room', []], ['Regression Hall', []]]);
+
+  // AC2: Venue Staff receive it, awaiting their decision, with what they need to decide.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  await expect(queue.getByRole('button', { name: /Regression Hall/ })).toContainText('pending');
+  await queue.getByRole('button', { name: /Regression Hall/ }).click();
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  await expect(detail.getByText('Venue Request Forum · Event #91', { exact: true })).toBeVisible();
+  for (const [label, value] of [['Required layout', 'Theatre'], ['Venue requirements', 'A projector'], ['Requested by', 'Regression coordinator']]) {
+    await expect(detail.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd')).toHaveText(value);
+  }
+  await expect(detail.getByText(/20 Jun 2030, 09:00 – 20 Jun 2030, 12:00/)).toBeVisible();
+});
+
+test('SG2-48-P02 | [SG2-48:AC4] [NORMAL] one event requests several different venues, each pending on its own', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  await page.getByLabel('Attendance', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(/^2 venues available/)).toBeVisible();
+  await requestVenue(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toBeVisible();
+  await requestVenue(page, 'Quiet Room', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Quiet Room requested\./)).toBeVisible();
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByRole('heading', { level: 3 })).toHaveText(['Regression Hall', 'Quiet Room']);
+  await expect(list.getByText('Pending', { exact: true })).toHaveCount(2);
+  await expect(list.getByText(/Boardroom/)).toBeVisible();
+});
+
+test('SG2-48-N01 | [SG2-48:AC1] [SG2-48:AC4] [CONFLICT] [FAILURE] a duplicate request, an unoffered layout or a non-coordinator is refused', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  await requestVenue(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toBeVisible();
+
+  // AC4: the same venue over an overlapping period is refused, naming the earlier request.
+  const form = await requestVenue(page, 'Regression Hall', '2030-06-20T11:00', '2030-06-20T14:00');
+  await expect(form.getByRole('alert')).toHaveText(/^This event already requested Regression Hall for an overlapping period \(request #\d+, pending\)\.$/);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText('Pending', { exact: true })).toHaveCount(1);
+
+  // AC1: only a layout the venue offers, a valid period, and an event the caller coordinates.
+  const headers = await authHeaders(page);
+  const values = { event_id: 91, venue_id: 1, layout: 'theatre', starts_at: '2030-06-21T01:00:00.000Z', ends_at: '2030-06-21T04:00:00.000Z' };
+  const layout = await page.request.post('/api/venue-booking-requests', { headers, data: { ...values, layout: 'banquet' } });
+  expect([layout.status(), (await layout.json()).error]).toEqual([409, 'Regression Hall does not offer the banquet layout. It offers: theatre, classroom.']);
+  expect((await page.request.post('/api/venue-booking-requests', { headers, data: { ...values, event_id: 1 } })).status()).toBe(404);
+  expect((await page.request.post('/api/venue-booking-requests', { headers, data: { ...values, ends_at: values.starts_at } })).status()).toBe(400);
+
+  for (const account of ['venue', 'organiser', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const refused = await page.request.post('/api/venue-booking-requests', { headers: await authHeaders(page), data: values });
+      expect(refused.status()).toBe(403);
+    });
+  }
+  expect((await page.request.post('/api/venue-booking-requests', { data: values })).status()).toBe(401);
+});

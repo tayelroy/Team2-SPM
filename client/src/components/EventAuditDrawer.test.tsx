@@ -202,6 +202,19 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   });
 
   describe('data fetching states', () => {
+    test('[NORMAL] [SG2-85:AC5] automatic hold expiry identifies the actor as System and gives the hold field a readable label', async () => {
+      vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({ ok: true, history: [{
+        ...MOCK_ENTRIES[0], actor_id: null, actor_name: 'Unknown', field_name: 'venue_hold_status', old_value: 'Active', new_value: 'Expired',
+      }] });
+      render(<EventAuditDrawer isOpen={true} onClose={vi.fn()} eventId={42} accessToken="token" />);
+      expect(await screen.findByText('System')).toBeInTheDocument();
+      expect(screen.getByText('Automatic')).toBeInTheDocument();
+      expect(screen.getByText('Tentative Hold Status')).toBeInTheDocument();
+      expect(screen.getByTestId('diff-old')).toHaveTextContent('Active');
+      expect(screen.getByTestId('diff-new')).toHaveTextContent('Expired');
+      expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+    });
+
     test('[NORMAL] [SG2-40:loading-state] renders loading indicator while fetching history', () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockImplementation(
         () => new Promise(() => {}) // never resolves
