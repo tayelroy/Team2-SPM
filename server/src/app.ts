@@ -27,6 +27,7 @@ import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
+import { createVenueHoldsRouter } from './venues/holds';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -61,7 +62,8 @@ export function createApp(
   updateEventPlanningHandler: RequestHandler = createUpdateEventPlanningHandler({ getPrincipal: access.getPrincipal }),
   getEventHistoryHandler: RequestHandler = createGetEventHistoryHandler({ getPrincipal: access.getPrincipal }),
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
-  addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal })
+  addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
+  venueHoldsRouter = createVenueHoldsRouter(access)
 ) {
   const app = express();
 
@@ -90,6 +92,7 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  app.use('/api/venue-holds', venueHoldsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

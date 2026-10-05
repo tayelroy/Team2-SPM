@@ -28,6 +28,7 @@ const FIELD_LABELS: Record<string, string> = {
   arrangements_recheck_needed: 'Arrangements Recheck Needed',
   status: 'Status',
   coordinator_id: 'Coordinator',
+  venue_hold_status: 'Tentative Hold Status',
 };
 
 /** Formats an ISO string into Singapore Standard Time (SGT). */
@@ -277,10 +278,10 @@ export function EventAuditDrawer({
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <strong style={{ color: color.platinum, fontSize: '13px' }}>
-                      {entry.actor_name}
+                      {entry.actor_id === null ? 'System' : entry.actor_name}
                     </strong>
                     <Badge size={10} bg="rgba(94, 234, 212, 0.15)" fg="#5eead4">
-                      Editor
+                      {entry.actor_id === null ? 'Automatic' : 'Editor'}
                     </Badge>
                   </div>
                   <span style={{ color: color.silver, fontSize: '12px' }}>

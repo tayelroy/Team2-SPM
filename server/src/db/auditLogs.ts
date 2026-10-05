@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 export interface EventAuditLogRecord {
   log_id: number;
   event_id: number;
-  actor_id: string;
+  actor_id: string | null;
   actor_name?: string | null;
   field_name: string;
   old_value: string | null;
@@ -71,7 +71,7 @@ export async function fetchEventAuditLogs(
   const logs: EventAuditLogRecord[] = rows.map((row) => ({
     log_id: row.log_id as number,
     event_id: row.event_id as number,
-    actor_id: row.actor_id as string,
+    actor_id: row.actor_id as string | null,
     actor_name: extractActorName(row),
     field_name: row.field_name as string,
     old_value: typeof row.old_value === 'string' ? row.old_value : null,
@@ -106,7 +106,7 @@ export async function insertAuditLogs(
   const logs: EventAuditLogRecord[] = rows.map((row) => ({
     log_id: row.log_id as number,
     event_id: row.event_id as number,
-    actor_id: row.actor_id as string,
+    actor_id: row.actor_id as string | null,
     actor_name: null,
     field_name: row.field_name as string,
     old_value: typeof row.old_value === 'string' ? row.old_value : null,

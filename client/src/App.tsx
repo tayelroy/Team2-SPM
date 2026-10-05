@@ -20,6 +20,7 @@ import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
+import VenueHolds from './screens/VenueHolds';
 import type { VenueSearchPrefill } from './venues/searchPrefill';
 import { GhostButton } from './ui';
 
@@ -199,6 +200,7 @@ export default function App() {
     ),
     calendar: <AvailabilityCalendar />,
     booking: <BookingApproval />,
+    holds: <VenueHolds key={session!.accessToken} role={role} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
@@ -209,7 +211,7 @@ export default function App() {
   }[screen];
 
   return (
-    <AppShell role={role} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
+    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event.
       setVenuePrefill(null);
       setScreen(nextScreen);

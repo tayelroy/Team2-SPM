@@ -23,6 +23,7 @@ type QueryResult = { data: Row[] | Row | null; error: null; status: number };
 export class MemoryDatabase {
   tables: Record<string, Row[]> = {};
   sessions = new Map<string, string>();
+  venueHoldNow: () => number = Date.now;
   private sessionSequence = 0;
 
   constructor() { this.reset(); }
@@ -51,6 +52,8 @@ export class MemoryDatabase {
       account_roles: accounts.map(account => ({ user_id: `user-${account.key}`, role: account.role })),
       venue_booking_requests: [],
       venue_capacity_exceptions: [],
+      venue_holds: [],
+      venue_hold_notifications: [],
       equipment_requests: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
       events: [
@@ -132,7 +135,7 @@ export class MemoryDatabase {
    * Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
   seedVenueRequest() {
     this.tables.events.push({
-      ...this.tables.events[0], event_id: 81, name: 'Venue Request Forum', status: 'approved', coordinator_id: 'user-coordinator',
+      ...this.tables.events[0], event_id: 91, name: 'Venue Request Forum', status: 'approved', coordinator_id: 'user-coordinator',
       proposed_date: '2030-06-20T02:00:00.000Z', expected_attendance: 80, venue_requirements: 'A projector'
     });
     this.tables.venue_layouts.push(
@@ -190,6 +193,11 @@ export class MemoryDatabase {
   readonly client = {
     from: (table: string) => {
       if (table === 'internal_work_items') this.tables[table] = this.workItems();
+      if (table === 'venue_booking_occupancy') this.tables[table] = [
+        ...this.tables.venue_bookings,
+        ...this.tables.venue_holds.filter(hold => hold.status === 'tentative' && Date.parse(String(hold.expires_at)) > this.venueHoldNow())
+          .map(hold => ({ venue_id: hold.venue_id, event_id: hold.event_id, starts_at: hold.starts_at, ends_at: hold.ends_at, status: 'tentative' })),
+      ];
       if (!(table in this.tables)) throw new Error(`Unsupported fixture table: ${table}`);
       return new MemoryQuery(this, table);
     },
@@ -225,6 +233,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   select(columns = '*') { this.columns = columns; return this; }
   eq(key: string, value: unknown) { this.filters.push(row => row[key] === value); return this; }
   is(key: string, value: null) { this.filters.push(row => row[key] === value); return this; }
+  not(key: string, operator: 'is', value: null) { this.filters.push(row => (row[key] ?? null) !== value); return this; }
   range(start: number, end: number) { this.window = [start, end]; return this; }
   in(key: string, values: unknown[]) { this.filters.push(row => values.includes(row[key])); return this; }
   lt(key: string, value: string | number) { this.filters.push(row => (row[key] as string | number) < value); return this; }

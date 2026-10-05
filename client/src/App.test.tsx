@@ -30,6 +30,10 @@ function mockLoginResponse(role: Role) {
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
+      if (url === '/api/venue-holds') return Response.json({ holds: [] });
+      if (url === '/api/venue-holds/options') return Response.json({ events: [], venues: [] });
+      if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
+        kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
         kind: 'event', item_id: 51, event_id: 51, title: 'Actual review request', event_name: 'Actual review request',
         status: 'submitted', starts_at: null, ends_at: null, category: 'review', details: { purpose: 'Review this request' },
@@ -141,10 +145,12 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
       ['Review', 'Event detail'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
+      ['Venue holds', 'Venue holds'],
     ],
     'Venue Staff': [
       ['Dashboard', 'Venue desk'],
       ['Venue Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
+      ['Venue holds', 'Venue holds'],
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
@@ -337,16 +343,16 @@ test.each(['offline', 'server failure'])('[FAILURE] [SG2-23:AC3] Logout clears l
   expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-20:prototype-notifications] the notification drawer opens and closes', async () => {
+test('[NORMAL] [SG2-84:AC6] the signed-in coordinator opens and closes the live hold notification drawer', async () => {
   await signInAs('Event Coordinator');
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 
   fireEvent.click(
-    screen.getByRole('button', { name: 'Notifications (5)' }),
+    await screen.findByRole('button', { name: 'Notifications (1)' }),
   );
   const drawer = screen.getByRole('complementary', { name: 'Notifications' });
   expect(
-    within(drawer).getByText('Clarification requested on E-201'),
+    await within(drawer).findByText('Tentative hold for Atrium Hall expires 14 June 2030.'),
   ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Close notifications' }));

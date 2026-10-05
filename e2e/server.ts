@@ -33,12 +33,15 @@ import type { BookingConflict, VenueBlockRecord } from '../server/src/venues/blo
 import { dbConfig } from '../server/src/db';
 import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
+import { createVenueHoldsRouter } from '../server/src/venues/holds';
+import { VenueHoldFixture } from './support/venue-holds';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
 for (const key of Object.keys(dbConfig) as (keyof typeof dbConfig)[]) dbConfig[key] = undefined;
 for (const key of Object.keys(process.env)) if (key.startsWith('SUPABASE_')) delete process.env[key];
 const database = new MemoryDatabase();
+const venueHolds = new VenueHoldFixture(database);
 const getClient = () => database.client;
 const access = createAuthorization({ resolvePrincipal: token => database.principal(token) });
 const eventDependencies = { getPrincipal: access.getPrincipal, getAdminClient: getClient };
@@ -128,13 +131,15 @@ const app = createApp(
   createGetEventHistoryHandler(eventDependencies),
   // SG2-36's clarification exchange, against the in-memory client.
   createListClarificationsHandler(eventDependencies),
-  createAddClarificationHandler(eventDependencies)
+  createAddClarificationHandler(eventDependencies),
+  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
 // mounted in production and no real service credentials are needed.
 app.post('/__e2e/reset', (_req, res) => {
   database.reset();
+  venueHolds.reset();
   rateLimiter.resetKey('127.0.0.1');
   rateLimiter.resetKey('::ffff:127.0.0.1');
   res.status(204).end();
@@ -162,6 +167,14 @@ app.post('/__e2e/coordinator-assignment', (_req, res) => {
 });
 app.post('/__e2e/under-review', (_req, res) => {
   database.seedUnderReview();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-holds', (_req, res) => {
+  venueHolds.seed();
+  res.status(204).end();
+});
+app.post('/__e2e/hold-time', (req, res) => {
+  if (typeof req.body?.now !== 'string' || !venueHolds.advance(req.body.now)) { res.status(400).json({ error: 'Use a finite, nondecreasing fixture instant.' }); return; }
   res.status(204).end();
 });
 const buildDirectory = path.resolve(__dirname, '../client/dist');
