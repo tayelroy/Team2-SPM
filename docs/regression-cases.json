@@ -1584,7 +1584,7 @@
       "expect(detail.status()).toBe(200)",
       "expect((await detail.json()).items[0].status).toBe('under_review')"
     ],
-    "evidence": "e2e/regression.spec.ts:530",
+    "evidence": "e2e/regression.spec.ts:571",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1630,7 +1630,7 @@
       "expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404)",
       "expect((await detail.json()).items[0].status).toBe('submitted')"
     ],
-    "evidence": "e2e/regression.spec.ts:550",
+    "evidence": "e2e/regression.spec.ts:591",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1680,13 +1680,97 @@
       "Previous coordinator's review call returns 404",
       "Organiser's detail returns coordinator_name 'Regression second coordinator'"
     ],
-    "evidence": "e2e/regression.spec.ts:568",
+    "evidence": "e2e/regression.spec.ts:609",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 34-journey Chromium run (npm run test:e2e exit 0, regression gate green).",
     "execution_date": "2 Oct 2026",
     "executed_by": "Marcus Chua",
     "execution_evidence": "npm run test:e2e on feature/SG2-34-coordinator-assignment-history working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
+    "id": "SG2-90-P01",
+    "title": "a coordinator acts only on events assigned to them and loses an event the moment it is reassigned",
+    "story": "SG2-90",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-90:AC1",
+      "SG2-90:AC2",
+      "SG2-90:AC3",
+      "SG2-90:AC4"
+    ],
+    "method_id": "TC-63274af11afc",
+    "purpose": "Verify, through the real Express API and in-memory fixture, that an Event Coordinator can review, decide, update planning for and request a venue for only the events assigned to them, that another coordinator's and unassigned events are refused on the server in every state, and that a coordinator is refused everywhere once Technical Support reassigns the event.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-access: events 81-91 across approved, submitted and under-review states, owned by the signed-in coordinator, by a second coordinator, or unassigned.",
+    "steps": [
+      "request.post('/__e2e/coordinator-access')",
+      "As coordinator@example.test, attempt review, decision, planning update, clarification and venue request on events 82-87 (another coordinator's and unassigned, in each state)",
+      "As support@example.test, read the history of events 82-87",
+      "As coordinator@example.test, review event 88, decide event 89, update planning on event 81 and request a venue for event 81",
+      "As support@example.test, reassign events 81, 90 and 91 to the second coordinator, then repeat every coordinator action on each"
+    ],
+    "data": [
+      "Events 81 (approved), 88/90 (submitted), 89/91 (under review) assigned to coordinator@example.test",
+      "Events 82/84/86 assigned to a second coordinator; events 83/85/87 unassigned",
+      "Second coordinator user-coordinator2 (no sign-in account)"
+    ],
+    "expected": [
+      "Review, decision and clarification return 404, planning returns 403 and the venue request returns 404 for every event that is not assigned to the caller",
+      "No history is written for any refused attempt",
+      "The assigned coordinator's own review (200), decision (200), planning update (200) and venue request (201) succeed",
+      "After each reassignment the previous coordinator is refused on every action exactly as for an unassigned event"
+    ],
+    "evidence": "e2e/regression.spec.ts:656",
+    "layer": "Playwright fixture API",
+    "status": "Pass",
+    "actual": "SG2-90-P01 passed in the 43-journey Chromium run (42 passed, 1 failed). The one failure, SG2-85-P02 (tentative-hold notices), fails identically on a clean origin/main at 5531afa, so it predates this story; npm run test:e2e therefore exits 1 until that is fixed.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "Marcus Chua",
+    "execution_evidence": "5 Oct 2026; feature/SG2-90-restrict-coordinators-to-assigned working tree on main at 5531afa; npm run test:e2e with Supabase variables blanked; SG2-90-P01 green, SG2-85-P02 red on both this branch and main; test-only Chromium; no hosted Supabase."
+  },
+  {
+    "id": "SG2-90-P02",
+    "title": "rights follow the current assignment exactly: handing an event back restores them and reassigning to the same coordinator changes nothing",
+    "story": "SG2-90",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-90:AC1",
+      "SG2-90:AC3"
+    ],
+    "method_id": "TC-b438c5e7a741",
+    "purpose": "Verify the edge of 'currently assigned': a no-op reassignment to the same coordinator keeps their rights and records nothing, and an event handed away and back is refused while away and actionable again once returned.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-access (event 81 approved, assigned to the signed-in coordinator; second coordinator user-coordinator2).",
+    "steps": [
+      "request.post('/__e2e/coordinator-access')",
+      "As support@example.test, reassign event 81 to its current coordinator",
+      "As coordinator@example.test, update planning on event 81",
+      "Reassign event 81 to the second coordinator; repeat the planning update",
+      "Reassign event 81 back; repeat the planning update",
+      "As support@example.test, read the history of event 81"
+    ],
+    "data": [
+      "Event 81 'Own Forum' (approved), coordinator Regression coordinator",
+      "Second coordinator Regression second coordinator (no sign-in account)"
+    ],
+    "expected": [
+      "Same-coordinator reassignment returns 200 and the coordinator's planning update still returns 200",
+      "While assigned away the planning update returns 403",
+      "After the event is handed back the planning update returns 200",
+      "History holds exactly two coordinator entries, newest first: second coordinator → Regression coordinator, then Regression coordinator → second coordinator"
+    ],
+    "evidence": "e2e/regression.spec.ts:705",
+    "layer": "Playwright fixture API",
+    "status": "Pass",
+    "actual": "Passed alongside SG2-90-P01 in the Chromium run; removing the same-coordinator no-op in assignCoordinator.ts makes it fail.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "Marcus Chua",
+    "execution_evidence": "npx playwright test -g SG2-90 on feature/SG2-90-restrict-coordinators-to-assigned working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
   },
   {
     "id": "SG2-37-P01",
@@ -1719,7 +1803,7 @@
       "expect(page.getByText('approved')).toBeVisible()",
       "expect((await item.json()).items[0].status).toBe('approved')"
     ],
-    "evidence": "e2e/regression.spec.ts:615",
+    "evidence": "e2e/regression.spec.ts:739",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1773,7 +1857,7 @@
       "expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.')",
       "expect(page.getByRole('region', { name: 'Why this request was rejected' })) .toContainText('Clashes with the AGM on the same evening.')"
     ],
-    "evidence": "e2e/regression.spec.ts:634",
+    "evidence": "e2e/regression.spec.ts:758",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1816,7 +1900,7 @@
       "expect(refused.status()).toBe(404)",
       "expect(unassigned.status()).toBe(404)"
     ],
-    "evidence": "e2e/regression.spec.ts:668",
+    "evidence": "e2e/regression.spec.ts:792",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1853,7 +1937,7 @@
     ],
     "data": "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; question and answer texts fixed in the spec.",
     "expected": "Status needs_clarification after the question; organiser notice and question visible; answer appended; event 52 stored as submitted after resubmission; the coordinator sees it under review with both messages (2 list items) and the decision panel back.",
-    "evidence": "e2e/regression.spec.ts:692",
+    "evidence": "e2e/regression.spec.ts:816",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
@@ -1887,7 +1971,7 @@
     ],
     "data": "Event 52; colleague, venue and organiser fixture accounts.",
     "expected": "Colleague GET and POST return 404; venue staff GET returns 403; the organiser's POST returns 201 with status still under_review.",
-    "evidence": "e2e/regression.spec.ts:740",
+    "evidence": "e2e/regression.spec.ts:864",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",

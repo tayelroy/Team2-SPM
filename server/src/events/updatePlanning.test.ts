@@ -766,7 +766,8 @@ interface HandlerHarnessOptions {
   updatePlanningFields?: (
     admin: SupabaseClient,
     eventId: number,
-    fields: UpdatePlanningFieldsInput
+    fields: UpdatePlanningFieldsInput,
+    coordinatorId: string
   ) => Promise<UpdateEventPlanningResult>;
 }
 
@@ -792,11 +793,11 @@ function buildApp(options: HandlerHarnessOptions = {}) {
         }
         return { ok: true, event: { ...BASE_EVENT, event_id: eventId } };
       },
-      updatePlanningFields: async (admin, eventId, fields) => {
+      updatePlanningFields: async (admin, eventId, fields, coordinatorId) => {
         options.captureUpdateEventId?.(eventId);
         options.captureUpdateFields?.(fields);
         if (options.updatePlanningFields) {
-          return options.updatePlanningFields(admin, eventId, fields);
+          return options.updatePlanningFields(admin, eventId, fields, coordinatorId);
         }
         if (options.updateResult) {
           return options.updateResult;
@@ -967,6 +968,30 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       error: 'Only the assigned event coordinator can update planning details.'
     });
     assert.equal(updateCalled, false);
+    assert.equal(auditCalled, false);
+  });
+
+  test('[CONFLICT] [SG2-90:AC3] a coordinator reassigned between reading and writing is refused with 409 and leaves no history', async () => {
+    let writtenFor: string | undefined;
+    let auditCalled = false;
+    // The read still shows the caller as coordinator; by the time the write
+    // runs the event belongs to someone else, so the guarded write matches no row.
+    const response = await request(
+      buildApp({
+        fetchResult: { ok: true, event: { ...BASE_EVENT, coordinator_id: COORDINATOR.userId } },
+        updatePlanningFields: async (_admin, _eventId, _fields, coordinatorId) => {
+          writtenFor = coordinatorId;
+          return { ok: false, reason: 'not_found', message: 'Event not found.' };
+        },
+        captureAuditEntries: () => (auditCalled = true)
+      })
+    )
+      .patch('/api/event-requests/10/planning')
+      .send({ planning_notes: 'Written after losing the event' });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(response.body, { error: 'This event is no longer assigned to you. Refresh and try again.' });
+    assert.equal(writtenFor, COORDINATOR.userId);
     assert.equal(auditCalled, false);
   });
 
@@ -1182,7 +1207,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
   });
 
   test('[FAILURE] [SG2-39:AC1] handles updatePlanningFields failure', async () => {
-    // not_found
+    // not_found: the write matched no row, because the assignment moved on (SG2-90)
     const notFoundRes = await request(
       buildApp({
         updateResult: { ok: false, reason: 'not_found', message: 'Missing' }
@@ -1190,7 +1215,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     )
       .patch('/api/event-requests/10/planning')
       .send({ planning_notes: 'Notes' });
-    assert.equal(notFoundRes.status, 404);
+    assert.equal(notFoundRes.status, 409);
 
     // unavailable
     const unavailRes = await request(

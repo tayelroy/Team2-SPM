@@ -415,6 +415,18 @@
         "AC5": "I can record a venue's emergency access arrangements and any known restrictions (e.g. maximum occupancy for a given layout, prohibited equipment, access limits); these are shown on the venue's details and in the Safety Officer's view of the event (SG2-91), or as \"Not recorded\" if missing",
         "AC6": "Only Venue Staff can change a venue's setup time, turnaround time or safety details, and each change is recorded with who made it and when"
       }
+    },
+    {
+      "id": "SG2-90",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-90",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-05",
+      "acceptanceCriteria": {
+        "AC1": "An Event Coordinator can review, update, request venues/equipment for, and confirm only the events currently assigned to them",
+        "AC2": "Any attempt to act on an event that isn't assigned to them is refused on the server side",
+        "AC3": "Once an event is reassigned, the previous coordinator can no longer act on it",
+        "AC4": "Events in the unassigned queue cannot be acted on by any Event Coordinator"
+      }
     }
   ]
 }
