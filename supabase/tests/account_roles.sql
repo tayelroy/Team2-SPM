@@ -118,11 +118,13 @@ end $$;
 
 -- SG2-86: Event Coordinator Lead and Safety Officer alongside the five
 -- existing roles. Fresh fixtures (not reused from the blocks above).
-set local role service_role;
+reset role;
 insert into auth.users (id) values
   ('50000000-0000-4000-8000-000000000005'),
   ('60000000-0000-4000-8000-000000000006'),
   ('70000000-0000-4000-8000-000000000007');
+
+set local role service_role;
 insert into public.users (user_id, name, organisation, role_id) values
   ('70000000-0000-4000-8000-000000000007', 'Organiser Seven', 'Acme Corp', 1);
 insert into public.events (event_id, organiser_id, organisation, name, status) values
