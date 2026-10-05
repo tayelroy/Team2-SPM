@@ -6,6 +6,7 @@ import VenueForm, { inputStyle } from '../venues/VenueForm';
 import VenueBlocks from '../venues/VenueBlocks';
 import { VenueLayoutError, describeLayouts, fetchVenueLayouts, saveVenueLayouts, type VenueLayout, type VenueLayoutValues } from '../venues/layoutsApi';
 import { VenueError, venueRequest, type Venue, type VenueValues } from '../venues/api';
+import { NO_OPERATIONS, VenueOperationsError, describeTimes, fetchVenueOperations, saveVenueOperations, type VenueOperationValues, type VenueOperations } from '../venues/operationsApi';
 
 /** Use the signed-in token and server permissions to load and maintain records. */
 export default function Venues({ accessToken = null, onBook }: { accessToken?: string | null; onBook: () => void }) {
@@ -23,6 +24,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
   const [editing, setEditing] = useState<Venue | null | undefined>(undefined);
   const [blocking, setBlocking] = useState<Venue | undefined>(undefined);
   const [layoutsByVenue, setLayoutsByVenue] = useState<Record<number, VenueLayout[]>>({});
+  const [operationsByVenue, setOperationsByVenue] = useState<Record<number, VenueOperations>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
   const pending = useRef<AbortController | null>(null);
@@ -52,10 +54,16 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
           ? await Promise.all((data.venues as Venue[]).map((venue: Venue) =>
               fetchVenueLayouts(token!, controller.signal, venue.venue_id).catch(() => [] as VenueLayout[])))
           : [];
+        // SG2-77: same approach for setup/turnaround times and safety details.
+        const operations = can(identity, 'venues.operations.read')
+          ? await Promise.all((data.venues as Venue[]).map((venue: Venue) =>
+              fetchVenueOperations(token!, controller.signal, venue.venue_id).catch(() => NO_OPERATIONS)))
+          : [];
         if (controller.signal.aborted) return;
         setAccess(identity);
         setVenues(data.venues);
         setLayoutsByVenue(Object.fromEntries((data.venues as Venue[]).map((venue: Venue, index: number) => [venue.venue_id, layouts[index] ?? []])));
+        setOperationsByVenue(Object.fromEntries((data.venues as Venue[]).map((venue: Venue, index: number) => [venue.venue_id, operations[index] ?? NO_OPERATIONS])));
       } catch (failure) {
         if (!controller.signal.aborted) setError(failure instanceof VenueError ? failure.message : 'Unable to load venues. Please try again.');
       } finally {
@@ -68,7 +76,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
 
   useEffect(() => () => { pending.current?.abort(); }, []);
 
-  async function save(values: VenueValues, layoutValues?: VenueLayoutValues[]) {
+  async function save(values: VenueValues, layoutValues?: VenueLayoutValues[], operationValues?: VenueOperationValues) {
     if (pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
@@ -83,16 +91,22 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
         if (controller.signal.aborted) return;
         setLayoutsByVenue(current => ({ ...current, [venue.venue_id]: layouts }));
       }
+      if (operationValues !== undefined) {
+        const operations = await saveVenueOperations(token!, controller.signal, venue.venue_id, operationValues);
+        if (controller.signal.aborted) return;
+        setOperationsByVenue(current => ({ ...current, [venue.venue_id]: operations }));
+      }
       setSaved(`${venue.name} saved. The catalogue is up to date.`);
       setEditing(undefined);
     } catch (failure) {
       if (controller.signal.aborted) return;
-      if ((failure instanceof VenueError || failure instanceof VenueLayoutError) && [401, 403].includes(failure.status)) {
+      const known = failure instanceof VenueError || failure instanceof VenueLayoutError || failure instanceof VenueOperationsError;
+      if (known && [401, 403].includes(failure.status)) {
         setAccess(null);
         setVenues([]);
         setEditing(undefined);
       }
-      setError(failure instanceof VenueError || failure instanceof VenueLayoutError ? failure.message
+      setError(known ? failure.message
         : 'Unable to save venue. Your changes are still in the form. Please try again.');
     } finally {
       pending.current = null;
@@ -107,6 +121,7 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
     onAccessLost={message => { setAccess(null); setVenues([]); setBlocking(undefined); setError(message); }} />;
   if (editing !== undefined) return <VenueForm venue={editing}
     layouts={editing && can(access, 'venues.layouts.update') ? layoutsByVenue[editing.venue_id] ?? [] : undefined}
+    operations={editing && can(access, 'venues.operations.update') ? operationsByVenue[editing.venue_id] ?? NO_OPERATIONS : undefined}
     saving={saving} error={error} onSave={save}
     onCancel={() => { setEditing(undefined); setError(''); }} />;
 
@@ -147,6 +162,11 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
             <Fact label="Accessibility" value={venue.accessibility_features ?? 'Not recorded'} />
             <Fact label="Operating information" value={venue.operating_information ?? 'Not recorded'} />
             {can(access, 'venues.layouts.read') ? <Fact label="Supported layouts" value={describeLayouts(layoutsByVenue[venue.venue_id] ?? [])} /> : null}
+            {can(access, 'venues.operations.read') ? <>
+              <Fact label="Setup and turnaround" value={describeTimes(operationsByVenue[venue.venue_id] ?? NO_OPERATIONS)} />
+              <Fact label="Emergency access" value={operationsByVenue[venue.venue_id]?.emergency_access ?? 'Not recorded'} />
+              <Fact label="Known restrictions" value={operationsByVenue[venue.venue_id]?.known_restrictions ?? 'Not recorded'} />
+            </> : null}
           </div>
           <div style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {can(access, 'venues.update') ? <GhostButton onClick={() => { setSaved(''); setEditing(venue); }}>Edit {venue.name}</GhostButton> : null}

@@ -66,6 +66,7 @@ export class MemoryDatabase {
         { unavailability_id: 1, venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }
       ],
       venue_layouts: [],
+      venue_operations: [],
       event_clarifications: [],
       event_audit_logs: []
     };

@@ -2229,5 +2229,69 @@
     "actual": "Added a monotonically-increasing request-id guard in EventAuditDrawer's fetchHistory so only the response matching the latest request is applied to state; the new '[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch' test (client/src/components/EventAuditDrawer.test.tsx) passed, and EventAuditDrawer.tsx retained 100% statement/branch coverage (16/16 tests in file; 647/647 in full client suite).",
     "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
     "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-77-P01",
+    "title": "staff record setup, turnaround and safety details that coordinators can read",
+    "story": "SG2-77",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-77:AC1",
+      "SG2-77:AC3",
+      "SG2-77:AC5"
+    ],
+    "purpose": "Verify Venue Staff record a venue's setup and turnaround times and safety details through the real routes, and that coordinators can read but not change them.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Sign in as Venue Staff and open the catalogue; Regression Hall shows 0 min setup and turnaround.",
+      "Edit Regression Hall: set 30 minutes setup, 45 minutes turnaround and an emergency access note; save.",
+      "Reload; check the card and the stored values; send a negative setup time to the API.",
+      "Sign in as a coordinator; read the values and try to change them through the API."
+    ],
+    "data": "Venue 1 (Regression Hall); venue and coordinator fixture accounts.",
+    "expected": "Defaults show as 0 minutes and Not recorded; saved values persist after reload; a negative value gets 400; the coordinator reads 45 minutes turnaround and gets 403 on a change.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "5 Oct 2026; feature/SG2-77-venue-setup-turnaround on top of main dd9be1b; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_operations suite. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-05",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-OPS-01",
+    "title": "Venue setup, turnaround and safety limits, change history and role access",
+    "story": "SG2-77",
+    "purpose": "Check committed PostgreSQL constraints, the change-history trigger and role policies through actual stored records and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed users, roles and venues as the superuser.",
+      "Run the tagged assertions as Venue Staff, a coordinator, Technical Support Staff, an organiser, an attendee and anon.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_operations.sql",
+    "expected": "0 and 1440 minutes are accepted, -1 and 1441 refused; defaults are 0 minutes; every change is recorded with old and new value, who and when; only Venue Staff change values; nobody writes history directly; external users and anon see nothing; losing the Venue Staff role removes write access.",
+    "evidence": "supabase/tests/venue_operations.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation check: opening the update policy to every role made the suite fail on the matching assertion.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "5 Oct 2026; feature/SG2-77-venue-setup-turnaround on top of main dd9be1b; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_operations suite. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-05",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json",
+      "method_scope": {
+        "source": "supabase/tests/venue_operations.sql"
+      }
+    }
   }
 ]
