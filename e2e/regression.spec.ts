@@ -612,6 +612,55 @@ test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] 
   expect((await detail.json()).request.coordinator_name).toBe('Regression second coordinator');
 });
 
+test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] [CONFLICT] [FAILURE] a coordinator acts only on events assigned to them and loses an event the moment it is reassigned', async ({ request }) => {
+  expect((await request.post('/__e2e/coordinator-access')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const coordinator = await tokenFor('coordinator');
+  const support = await tokenFor('support');
+
+  // Every action a coordinator can take on an event, attempted directly on the API.
+  const attempt = async (eventId: number) => ({
+    review: (await request.patch(`/api/event-requests/${eventId}/review`, { headers: coordinator })).status(),
+    decision: (await request.patch(`/api/event-requests/${eventId}/decision`, { headers: coordinator, data: { decision: 'approved' } })).status(),
+    planning: (await request.patch(`/api/event-requests/${eventId}/planning`, { headers: coordinator, data: { planning_notes: 'Not mine' } })).status(),
+    clarification: (await request.post(`/api/event-requests/${eventId}/clarifications`, { headers: coordinator, data: { message: 'Not mine' } })).status(),
+    venue: (await request.post('/api/venue-booking-requests', { headers: coordinator, data: {
+      event_id: eventId, venue_id: 1, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T10:00:00.000Z', layout: 'theatre' } })).status()
+  });
+  const refused = { review: 404, decision: 404, planning: 403, clarification: 404, venue: 404 };
+
+  // SG2-90 AC2 / AC4: another coordinator's events and unassigned events are refused, whatever
+  // state they are in (approved, awaiting review, under review).
+  const notMine = [82, 83, 84, 85, 86, 87];
+  for (const eventId of notMine) expect({ eventId, ...await attempt(eventId) }).toEqual({ eventId, ...refused });
+  // Refused attempts changed nothing: no history was written for any of them.
+  for (const eventId of notMine) {
+    const history = await request.get(`/api/event-requests/${eventId}/history`, { headers: support });
+    expect((await history.json()).history).toEqual([]);
+  }
+
+  // SG2-90 AC1: on their own events the same coordinator can review, decide, update planning and request a venue.
+  expect((await request.patch('/api/event-requests/88/review', { headers: coordinator })).status()).toBe(200);
+  expect((await request.patch('/api/event-requests/89/decision', { headers: coordinator, data: { decision: 'approved' } })).status()).toBe(200);
+  const own = await request.patch('/api/event-requests/81/planning', { headers: coordinator, data: { planning_notes: 'Catering confirmed' } });
+  expect(own.status()).toBe(200);
+  expect((await own.json()).event.planning_notes).toBe('Catering confirmed');
+  const venue = await request.post('/api/venue-booking-requests', { headers: coordinator, data: {
+    event_id: 81, venue_id: 1, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T10:00:00.000Z', layout: 'theatre' } });
+  expect(venue.status()).toBe(201);
+
+  // SG2-90 AC3: once Technical Support hands each event on, the previous coordinator is refused everywhere.
+  for (const eventId of [81, 90, 91]) {
+    const reassign = await request.patch(`/api/event-requests/${eventId}/coordinator`, { headers: support, data: { coordinatorId: 'user-coordinator2' } });
+    expect(reassign.status()).toBe(200);
+    expect({ eventId, ...await attempt(eventId) }).toEqual({ eventId, ...refused });
+  }
+});
+
 test('SG2-37-P01 | [SG2-37:AC1] [NORMAL] approving a request under review persists the approved outcome', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/under-review')).status()).toBe(204);

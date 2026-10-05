@@ -16,6 +16,7 @@ import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
 import { createAssignCoordinatorHandler } from '../server/src/events/assignCoordinator';
+import { createUpdateEventPlanningHandler } from '../server/src/events/updatePlanning';
 import { createListAssignableHandler } from '../server/src/events/listAssignable';
 import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
@@ -126,8 +127,9 @@ const app = createApp(
   createAssignCoordinatorHandler(eventDependencies),
   createDecideEventRequestHandler(eventDependencies),
   createListAssignableHandler({ getAdminClient: getClient }),
-  // The planning handler keeps its production default.
-  undefined,
+  // SG2-90: planning updates run against the in-memory client so a reassigned
+  // coordinator's write can be refused end to end.
+  createUpdateEventPlanningHandler(eventDependencies),
   createGetEventHistoryHandler(eventDependencies),
   // SG2-36's clarification exchange, against the in-memory client.
   createListClarificationsHandler(eventDependencies),
@@ -163,6 +165,10 @@ app.post('/__e2e/venue-request', (_req, res) => {
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {
   database.seedCoordinatorAssignment();
+  res.status(204).end();
+});
+app.post('/__e2e/coordinator-access', (_req, res) => {
+  database.seedCoordinatorAccess();
   res.status(204).end();
 });
 app.post('/__e2e/under-review', (_req, res) => {
