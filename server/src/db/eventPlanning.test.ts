@@ -296,7 +296,7 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     assert.equal(rows[0].planning_notes, 'current write');
   });
 
-  test('[CONFLICT] [SG2-90:AC4] updateEventPlanningFields changes nothing on an unassigned event, whoever asks', async () => {
+  test('[FAILURE] [SG2-90:AC4] updateEventPlanningFields changes nothing on an unassigned event, whoever asks', async () => {
     const rows = [{ event_id: 102, status: 'submitted', coordinator_id: null, planning_notes: null }];
 
     const result = await updateEventPlanningFields(fakeEventsTable(rows), 102, { planning_notes: 'x' }, 'coord-uuid-1');
