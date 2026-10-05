@@ -1315,3 +1315,16 @@ test('SG2-48-N01 | [SG2-48:AC1] [SG2-48:AC4] [CONFLICT] [FAILURE] a duplicate re
   }
   expect((await page.request.post('/api/venue-booking-requests', { data: values })).status()).toBe(401);
 });
+
+test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, sees its own role and is denied ungranted operations', async ({ page }) => {
+  await signIn(page, 'safety');
+  await expect(page.getByLabel('Your role', { exact: true })).toHaveText('Safety Officer');
+
+  await profile(page);
+  await expect(page.getByLabel('Department', { exact: true })).toBeVisible();
+  // The header role badge and the page eyebrow also read "Safety Officer";
+  // the profile card's Role fact is the last matching element on the page.
+  await expect(page.getByText('Safety Officer', { exact: true }).last()).toBeVisible();
+
+  expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
+});
