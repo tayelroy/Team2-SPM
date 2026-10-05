@@ -1,9 +1,14 @@
+// SG2-86 adds the two Week 7 roles below. Their only grants today are
+// profile.read/profile.update (inherited via [...ROLES]); further grants
+// arrive with SG2-87/88/97/100.
 export const ROLES = [
   'event_organiser',
   'event_coordinator',
   'venue_staff',
   'technical_support_staff',
-  'attendee'
+  'attendee',
+  'event_coordinator_lead',
+  'safety_officer'
 ] as const;
 
 export type Role = typeof ROLES[number];
@@ -85,8 +90,13 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
 
 // SG2-27: roles treated as internal to ConnectSphere, who additionally see
 // their department on their profile. event_organiser and attendee represent
-// client-side/external users. Team decision, 2026-09-15.
-export const INTERNAL_ROLES: readonly Role[] = ['event_coordinator', 'venue_staff', 'technical_support_staff'];
+// client-side/external users. Team decision, 2026-09-15. SG2-86 adds
+// event_coordinator_lead and safety_officer as internal; this list is
+// mirrored in the event_audit_logs RLS policy (202610050001_week7_roles.sql)
+// and the two must change together.
+export const INTERNAL_ROLES: readonly Role[] = [
+  'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
+];
 
 export function isInternalRole(role: Role): boolean {
   return (INTERNAL_ROLES as readonly string[]).includes(role);

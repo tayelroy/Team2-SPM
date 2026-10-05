@@ -40,8 +40,9 @@ function buildApp(options: Parameters<typeof fakeAdmin>[0] = {}, getAdmin?: () =
 describe('PATCH /api/users/:userId/role', () => {
   for (const [displayRole, storedRole] of [
     ['Event Organiser', 'event_organiser'], ['Event Coordinator', 'event_coordinator'],
-    ['Venue Staff', 'venue_staff'], ['Technical Support Staff', 'technical_support_staff'], ['Attendee', 'attendee']
-  ]) test(`[NORMAL] [SG2-24:AC1] [SG2-24:AC2] updates the target account using the stored form of ${displayRole}`, async () => {
+    ['Venue Staff', 'venue_staff'], ['Technical Support Staff', 'technical_support_staff'], ['Attendee', 'attendee'],
+    ['Event Coordinator Lead', 'event_coordinator_lead'], ['Safety Officer', 'safety_officer']
+  ]) test(`[NORMAL] [SG2-24:AC1] [SG2-24:AC2] [SG2-86:AC1] updates the target account using the stored form of ${displayRole}`, async () => {
     let updatePayload: any;
     let target: unknown;
     const app = buildApp({
@@ -62,6 +63,14 @@ describe('PATCH /api/users/:userId/role', () => {
     let writes = 0;
     const app = buildApp({ update: async () => { writes++; return { data: [], error: null }; } });
     const response = await request(app).patch('/api/users/target-1/role').send({});
+    assert.equal(response.status, 400);
+    assert.equal(writes, 0);
+  });
+
+  test('[BOUNDARY] [SG2-86:AC1] rejects the snake_case form of a new role; only Title Case is recognised', async () => {
+    let writes = 0;
+    const app = buildApp({ update: async () => { writes++; return { data: [], error: null }; } });
+    const response = await request(app).patch('/api/users/target-1/role').send({ role: 'safety_officer' });
     assert.equal(response.status, 400);
     assert.equal(writes, 0);
   });
@@ -97,8 +106,11 @@ describe('PATCH /api/users/:userId/role', () => {
 });
 
 describe('role changes through the protected app route', () => {
-  for (const role of ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'] as const) {
-    test(`${role === 'technical_support_staff' ? '[NORMAL]' : '[FAILURE]'} [SG2-24:AC2] ${role} is checked before a role change`, async () => {
+  for (const role of [
+    'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee',
+    'event_coordinator_lead', 'safety_officer'
+  ] as const) {
+    test(`${role === 'technical_support_staff' ? '[NORMAL] [SG2-24:AC2]' : '[FAILURE] [SG2-24:AC2] [SG2-86:AC2]'} ${role} is checked before a role change`, async () => {
       let changes = 0;
       const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'caller-1', role }) });
       const app = createApp(undefined, access, undefined, undefined, undefined, (req, res) => {
@@ -124,5 +136,27 @@ describe('role changes through the protected app route', () => {
     assert.equal(response.status, 401);
     assert.equal(changes, 0);
     assert.deepEqual(response.body, { error: 'Authentication required' });
+  });
+});
+
+describe('concurrent role changes for one account (SG2-86)', () => {
+  test('[CONFLICT] [SG2-86:AC1] two in-flight PATCH calls for one userId both reach the writer in order', async () => {
+    const payloads: unknown[] = [];
+    const app = buildApp({
+      update: async (payload) => {
+        payloads.push(payload);
+        return { data: [{ user_id: 'target-1' }], error: null };
+      }
+    });
+    const [first, second] = await Promise.all([
+      request(app).patch('/api/users/target-1/role').send({ role: 'Safety Officer' }),
+      request(app).patch('/api/users/target-1/role').send({ role: 'Event Coordinator Lead' })
+    ]);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(payloads.length, 2);
+    assert.deepEqual([...payloads].sort((a: any, b: any) => a.role.localeCompare(b.role)), [
+      { role: 'event_coordinator_lead' }, { role: 'safety_officer' }
+    ]);
   });
 });

@@ -191,9 +191,22 @@ describe('PUT /api/profile (SG2-27)', () => {
   });
 });
 
+describe('SG2-86: Event Coordinator Lead and Safety Officer profiles', () => {
+  for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+    test(`[NORMAL] [SG2-86:AC3] GET /api/profile for ${role} includes department, matching the other internal roles`, async () => {
+      const res = await request(fixture(role)).get('/api/profile').set('Authorization', 'Bearer token');
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body.profile, PROFILE);
+    });
+  }
+});
+
 describe('profile permission wiring', () => {
-  for (const role of ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'] as const) {
-    test(`[NORMAL] [SG2-27:AC1] [SG2-27:AC2] ${role} may read and update their own profile`, async () => {
+  for (const role of [
+    'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee',
+    'event_coordinator_lead', 'safety_officer'
+  ] as const) {
+    test(`[NORMAL] [SG2-27:AC1] [SG2-27:AC2] [SG2-86:AC4] ${role} may read and update their own profile`, async () => {
       const app = fixture(role);
       const get = await request(app).get('/api/profile').set('Authorization', 'Bearer token');
       assert.equal(get.status, 200);
@@ -371,6 +384,11 @@ describe('isInternalRole (SG2-27 team decision, 2026-09-15)', () => {
     assert.equal(isInternalRole('event_coordinator'), true);
     assert.equal(isInternalRole('venue_staff'), true);
     assert.equal(isInternalRole('technical_support_staff'), true);
+  });
+
+  test('[NORMAL] [SG2-86:AC3] event_coordinator_lead and safety_officer are internal', () => {
+    assert.equal(isInternalRole('event_coordinator_lead'), true);
+    assert.equal(isInternalRole('safety_officer'), true);
   });
 
   test('[NORMAL] [SG2-27:AC4] event_organiser and attendee are external', () => {

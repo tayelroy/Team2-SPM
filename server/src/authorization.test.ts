@@ -5,14 +5,16 @@ import request from 'supertest';
 import { AuthClient, AuthError } from '@supabase/supabase-js';
 import { createApp } from './app';
 import { AccessError, createAuthorization, Principal, ROLES as SUPPORTED_ROLES } from './auth';
+import { INTERNAL_ROLES, isInternalRole, isRole, PERMISSIONS, permissionsFor } from './auth/policy';
 import { dbConfig } from './db/config';
 
 // Documented account roles form the oracle, independent of the production list.
 const ACCOUNT_ROLES = [
-  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
+  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee',
+  'event_coordinator_lead', 'safety_officer'
 ] as const;
 
-test('[NORMAL] [SG2-24:AC1] the public role catalogue contains the five documented account roles', () => {
+test('[NORMAL] [SG2-24:AC1] [SG2-86:AC1] the public role catalogue contains the seven documented account roles', () => {
   assert.deepEqual(SUPPORTED_ROLES, ACCOUNT_ROLES);
 });
 
@@ -376,4 +378,93 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
   assert.equal(first.body.role, 'event_organiser');
   assert.equal(second.body.userId, '20000000-0000-4000-8000-000000000002');
   assert.equal(second.body.role, 'attendee');
+});
+
+// SG2-86: Event Coordinator Lead and Safety Officer — Week 7 customer changes.
+for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+  test(`[NORMAL] [SG2-86:AC1] GET /api/auth/me for ${role} returns only the universal profile grants`, async () => {
+    const fetchMock = provider({ role });
+    const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { userId, role, permissions: ['profile.read', 'profile.update'] });
+    assert.equal(fetchMock.mock.callCount(), 2);
+  });
+}
+
+test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejecting near misses', () => {
+  assert.equal(isRole('event_coordinator_lead'), true);
+  assert.equal(isRole('safety_officer'), true);
+  assert.equal(isRole('safety_officer '), false);
+  assert.equal(isRole('lead'), false);
+});
+
+test('[NORMAL] [SG2-86:AC4] permissionsFor every existing role is unchanged by the new roles', () => {
+  const EXPECTED: Record<string, string[]> = {
+    event_organiser: [
+      'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
+      'event_request.update', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
+      'venues.suitability.view', 'venue_booking.capacity_exception.approve', 'profile.read', 'profile.update'
+    ],
+    event_coordinator: [
+      'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
+      'event_request.decide', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
+      'venues.read', 'venues.layouts.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
+      'venue_booking.request.view', 'venues.holds.read', 'profile.read', 'profile.update'
+    ],
+    venue_staff: [
+      'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
+      'venues.read', 'venues.create', 'venues.update', 'venues.layouts.read', 'venues.layouts.update',
+      'venues.blocks.manage', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
+      'venue_booking.request.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
+    ],
+    technical_support_staff: [
+      'work_queue.read', 'venues.availability.view', 'users.role.update', 'event_request.assign_coordinator',
+      'event_request.stage.view', 'event_request.history.view', 'venues.suitability.view',
+      'venue_booking.capacity_exception.approve', 'venues.holds.read', 'profile.read', 'profile.update'
+    ],
+    attendee: ['profile.read', 'profile.update']
+  };
+  for (const [role, expected] of Object.entries(EXPECTED)) {
+    assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);
+  }
+});
+
+test('[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles', () => {
+  assert.deepEqual([...INTERNAL_ROLES].sort(), [
+    'event_coordinator', 'event_coordinator_lead', 'safety_officer', 'technical_support_staff', 'venue_staff'
+  ]);
+  assert.equal(isInternalRole('event_organiser'), false);
+  assert.equal(isInternalRole('attendee'), false);
+});
+
+for (const action of ['work_queue.read', 'event_request.decide', 'venues.search'] as const) {
+  test(`[FAILURE] [SG2-86:AC2] safety_officer is refused ${action} server-side`, async () => {
+    const access = createAuthorization({
+      resolvePrincipal: async () => ({ userId, role: 'safety_officer' }),
+      permissions: PERMISSIONS
+    });
+    let calls = 0;
+    const app = express();
+    app.use(access.requireAuth);
+    app.post('/action', access.requirePermission(action), (_req, res) => { calls++; res.sendStatus(200); });
+    const res = await request(app).post('/action').set('Authorization', 'Bearer token');
+    assert.equal(res.status, 403);
+    assert.equal(calls, 0);
+  });
+}
+
+test('[CONFLICT] [SG2-86:AC1] two concurrent /api/auth/me requests resolving different new roles each get their own role', async () => {
+  mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
+    const token = new Headers(init?.headers).get('authorization')!;
+    const id = token === 'Bearer lead-token' ? userId : '20000000-0000-4000-8000-000000000002';
+    const url = new URL(String(input));
+    if (url.pathname === '/auth/v1/user') return Response.json({ id, aud: 'authenticated' });
+    assert.equal(url.searchParams.get('user_id'), `eq.${id}`);
+    return Response.json([{ role: token === 'Bearer lead-token' ? 'event_coordinator_lead' : 'safety_officer' }]);
+  });
+  const app = createApp();
+  const [lead, safety] = await Promise.all(['lead-token', 'safety-token'].map(token =>
+    request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`)));
+  assert.equal(lead.body.role, 'event_coordinator_lead');
+  assert.equal(safety.body.role, 'safety_officer');
 });
