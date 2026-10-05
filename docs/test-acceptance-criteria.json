@@ -402,6 +402,17 @@
         "AC4": "The Event Coordinator is warned before the hold expires (e.g. 24 hours before; confirm the lead time with the customer) and notified again when it expires",
         "AC5": "The expiry is recorded in the event's history"
       }
+    },
+    {
+      "id": "SG2-86",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-86",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Event Coordinator Lead and Safety Officer are available as account roles alongside the existing five roles",
+        "AC2": "An account holding either role can reach only the functions for that role; any other action is refused on the server side",
+        "AC3": "The role is shown on the user's profile",
+        "AC4": "Users in the existing roles are unaffected"
+      }
     }
   ]
 }
