@@ -2229,5 +2229,98 @@
     "actual": "Added a monotonically-increasing request-id guard in EventAuditDrawer's fetchHistory so only the response matching the latest request is applied to state; the new '[CONFLICT] ignores a stale fetch response when eventId flips mid-fetch' test (client/src/components/EventAuditDrawer.test.tsx) passed, and EventAuditDrawer.tsx retained 100% statement/branch coverage (16/16 tests in file; 647/647 in full client suite).",
     "execution_evidence": "1 Oct 2026; feature/SG2-40-see-who-changed-what-on-an-event working tree; npm run ci (build + test:coverage) green locally. Hosted CI re-run not collected in this session.",
     "execution_date": "1 Oct 2026"
+  },
+  {
+    "id": "SG2-48-P01",
+    "title": "A coordinator requests a venue; it waits pending for Venue Staff without holding the venue",
+    "type": "Positive",
+    "story": "SG2-48",
+    "purpose": "Verify AC1, AC2 and AC3: the request carries the period, layout and the event's venue requirements, reaches Venue Staff awaiting their decision, is shown as pending, and neither holds the venue nor makes it unavailable.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
+      "Open the request form on Regression Hall, check the default layout and the venue requirements shown, and request 09:00–12:00 on 20 June 2030.",
+      "Check the event's venue requests and read the venue's availability and the venue search for that period through the API.",
+      "Sign in as venue staff and open the Regression Hall request from the work queue."
+    ],
+    "data": "Event 81 (approved, 80 guests, \"A projector\"); Regression Hall (venue 1, theatre and classroom layouts)",
+    "expected": "The coordinator is told the request is pending and the venue is not held; it is listed as Pending; availability has no entry and search still returns Regression Hall with no hold; Venue Staff see it pending with layout Theatre, requirements \"A projector\", requester and the requested period.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-48:AC1",
+      "SG2-48:AC2",
+      "SG2-48:AC3"
+    ],
+    "method_id": "TC-8e1cdb1d3f1b"
+  },
+  {
+    "id": "SG2-48-P02",
+    "title": "One event requests several different venues, each pending on its own",
+    "type": "Positive",
+    "story": "SG2-48",
+    "purpose": "Verify AC4 (Week 7 change #3): one event can hold requests for several different venues over the same period.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
+      "Clear the attendance and search again so both venues are listed.",
+      "Request Regression Hall, then Quiet Room, for 09:00–12:00 on 20 June 2030."
+    ],
+    "data": "Event 81; Regression Hall (theatre) and Quiet Room (boardroom)",
+    "expected": "Both requests are accepted and the event's venue requests list both venues as Pending, Quiet Room with its Boardroom layout.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-48:AC4"
+    ],
+    "method_id": "TC-9b6ac1f0e760"
+  },
+  {
+    "id": "SG2-48-N01",
+    "title": "A duplicate request, an unoffered layout or a non-coordinator is refused",
+    "type": "Negative / role isolation",
+    "story": "SG2-48",
+    "purpose": "Verify AC4 and AC1: a second request for the same venue over an overlapping period is refused, only a layout the venue offers can be requested, and only the event's coordinator can request.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Seed the venue request fixture, sign in as coordinator and request Regression Hall 09:00–12:00 on 20 June 2030.",
+      "Request Regression Hall again for 11:00–14:00 the same day.",
+      "Through the API, request a banquet layout, an event the coordinator does not coordinate, and an empty period.",
+      "Sign in as venue staff, organiser and attendee and try to request through the API; then try without credentials."
+    ],
+    "data": "Event 81 and draft event 1; Regression Hall (theatre and classroom only)",
+    "expected": "The overlapping request is refused naming the earlier pending request and only one request is listed; the API answers 409 naming the offered layouts, 404 for the other event and 400 for the empty period; other roles receive 403 and an unauthenticated call 401.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 37-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "5 Oct 2026; feature/SG2-48-request-venue working tree on main at dd9be1b; npm run test:e2e; 37/37 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "5 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-48:AC1",
+      "SG2-48:AC4"
+    ],
+    "method_id": "TC-225fa037a5c5"
   }
 ]

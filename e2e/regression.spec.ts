@@ -965,3 +965,120 @@ test('SG2-47-N01 | [SG2-47:AC2] [SG2-47:AC3] [FAILURE] a missing facility cannot
   }
   expect((await page.request.post('/api/venue-booking-requests/21/capacity-exception')).status()).toBe(401);
 });
+
+async function openVenueRequestSearch(page: Page) {
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Venue Request Forum/ }).click();
+  await page.getByRole('button', { name: 'Find venues for this event', exact: true }).click();
+  await expect(page.getByText('For: Venue Request Forum (#81)', { exact: true })).toBeVisible();
+}
+
+function venueCard(page: Page, venue: string) {
+  return page.locator('.venue-grid > *').filter({ has: page.getByRole('heading', { name: venue, exact: true }) }).first();
+}
+
+/** Fills and sends an open request form for the venue. */
+async function sendVenueRequest(page: Page, venue: string, from: string, until: string) {
+  const form = page.getByRole('form', { name: `Request ${venue}` });
+  await form.getByLabel('Request from (Singapore time)').fill(from);
+  await form.getByLabel('Request until (Singapore time)').fill(until);
+  await form.getByRole('button', { name: 'Send request', exact: true }).click();
+  return form;
+}
+
+async function requestVenue(page: Page, venue: string, from: string, until: string) {
+  await venueCard(page, venue).getByRole('button', { name: 'Request this venue', exact: true }).click();
+  return sendVenueRequest(page, venue, from, until);
+}
+
+test('SG2-48-P01 | [SG2-48:AC1] [SG2-48:AC2] [SG2-48:AC3] [NORMAL] a coordinator requests a venue; it waits pending for Venue Staff without holding the venue', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  // 80 guests leaves out Quiet Room; Regression Hall is free all day.
+  await expect(page.getByText(/^1 venue available/)).toBeVisible();
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText('No venues have been requested for this event yet.', { exact: true })).toBeVisible();
+
+  // AC1: the request carries the period, the layout and the event's venue requirements.
+  const card = venueCard(page, 'Regression Hall');
+  await card.getByRole('button', { name: 'Request this venue', exact: true }).click();
+  await expect(card.getByLabel('Required layout')).toHaveValue('theatre');
+  await expect(card.getByText('A projector', { exact: true })).toBeVisible();
+  await sendVenueRequest(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.', { exact: true })).toBeVisible();
+
+  // AC3: shown as pending, and the venue is neither held nor shown as unavailable.
+  await expect(list.getByText('Pending', { exact: true })).toBeVisible();
+  await expect(list.getByText(/Awaiting a Venue Staff decision/)).toBeVisible();
+  const period = `from=${encodeURIComponent('2030-06-20T01:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T04:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${period}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries).toEqual([]);
+  const search = await page.request.get(`/api/venues/search?${period}`, { headers: await authHeaders(page) });
+  expect((await search.json()).venues.map((venue: { name: string; held: unknown[] }) => [venue.name, venue.held]))
+    .toEqual([['Quiet Room', []], ['Regression Hall', []]]);
+
+  // AC2: Venue Staff receive it, awaiting their decision, with what they need to decide.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  await expect(queue.getByRole('button', { name: /Regression Hall/ })).toContainText('pending');
+  await queue.getByRole('button', { name: /Regression Hall/ }).click();
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  await expect(detail.getByText('Venue Request Forum · Event #81', { exact: true })).toBeVisible();
+  for (const [label, value] of [['Required layout', 'Theatre'], ['Venue requirements', 'A projector'], ['Requested by', 'Regression coordinator']]) {
+    await expect(detail.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd')).toHaveText(value);
+  }
+  await expect(detail.getByText(/20 Jun 2030, 09:00 – 20 Jun 2030, 12:00/)).toBeVisible();
+});
+
+test('SG2-48-P02 | [SG2-48:AC4] [NORMAL] one event requests several different venues, each pending on its own', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  await page.getByLabel('Attendance', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(/^2 venues available/)).toBeVisible();
+  await requestVenue(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toBeVisible();
+  await requestVenue(page, 'Quiet Room', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Quiet Room requested\./)).toBeVisible();
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByRole('heading', { level: 3 })).toHaveText(['Regression Hall', 'Quiet Room']);
+  await expect(list.getByText('Pending', { exact: true })).toHaveCount(2);
+  await expect(list.getByText(/Boardroom/)).toBeVisible();
+});
+
+test('SG2-48-N01 | [SG2-48:AC1] [SG2-48:AC4] [CONFLICT] [FAILURE] a duplicate request, an unoffered layout or a non-coordinator is refused', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  await requestVenue(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toBeVisible();
+
+  // AC4: the same venue over an overlapping period is refused, naming the earlier request.
+  const form = await requestVenue(page, 'Regression Hall', '2030-06-20T11:00', '2030-06-20T14:00');
+  await expect(form.getByRole('alert')).toHaveText(/^This event already requested Regression Hall for an overlapping period \(request #\d+, pending\)\.$/);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText('Pending', { exact: true })).toHaveCount(1);
+
+  // AC1: only a layout the venue offers, a valid period, and an event the caller coordinates.
+  const headers = await authHeaders(page);
+  const values = { event_id: 81, venue_id: 1, layout: 'theatre', starts_at: '2030-06-21T01:00:00.000Z', ends_at: '2030-06-21T04:00:00.000Z' };
+  const layout = await page.request.post('/api/venue-booking-requests', { headers, data: { ...values, layout: 'banquet' } });
+  expect([layout.status(), (await layout.json()).error]).toEqual([409, 'Regression Hall does not offer the banquet layout. It offers: theatre, classroom.']);
+  expect((await page.request.post('/api/venue-booking-requests', { headers, data: { ...values, event_id: 1 } })).status()).toBe(404);
+  expect((await page.request.post('/api/venue-booking-requests', { headers, data: { ...values, ends_at: values.starts_at } })).status()).toBe(400);
+
+  for (const account of ['venue', 'organiser', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const refused = await page.request.post('/api/venue-booking-requests', { headers: await authHeaders(page), data: values });
+      expect(refused.status()).toBe(403);
+    });
+  }
+  expect((await page.request.post('/api/venue-booking-requests', { data: values })).status()).toBe(401);
+});
