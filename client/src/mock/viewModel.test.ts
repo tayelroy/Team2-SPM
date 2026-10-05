@@ -10,6 +10,9 @@ import {
   detailActions,
   equipmentViews,
   eventCards,
+  navFor,
+  previewNavFor,
+  primaryActionFor,
   scopedEvents,
   showsPipeline,
   statusTrailStyle,
@@ -135,6 +138,36 @@ describe('role-scoped chrome', () => {
     expect(dashboardListTitle('Event Organiser')).toBe('My events & drafts');
     expect(dashboardListTitle('Attendee')).toBe('Events I can register for');
     expect(dashboardListTitle('Venue Staff')).toBe('Events needing attention');
+  });
+
+  // SG2-86: the two new roles fall through every one of these role branches
+  // to the "all other staff" default — no new case needed, confirmed here.
+  test('[NORMAL] [SG2-86:AC4] the new Week 7 roles are not treated as operational for the pipeline', () => {
+    expect(showsPipeline('Event Coordinator Lead')).toBe(false);
+    expect(showsPipeline('Safety Officer')).toBe(false);
+  });
+
+  test('[NORMAL] [SG2-86:AC4] the new Week 7 roles get the generic dashboard list title', () => {
+    expect(dashboardListTitle('Event Coordinator Lead')).toBe('Events needing attention');
+    expect(dashboardListTitle('Safety Officer')).toBe('Events needing attention');
+  });
+});
+
+describe('navFor / previewNavFor / primaryActionFor (SG2-86)', () => {
+  test('[NORMAL] [SG2-86:AC1] Safety Officer has a minimal nav: dashboard and all events only', () => {
+    expect(navFor('Safety Officer')).toEqual([
+      { screen: 'dashboard', label: 'Dashboard' },
+      { screen: 'events', label: 'All events' },
+    ]);
+  });
+
+  test('[BOUNDARY] [SG2-86:AC1] Safety Officer has no preview-only screens', () => {
+    expect(previewNavFor('Safety Officer')).toEqual([]);
+  });
+
+  test('[NORMAL] [SG2-86:AC1] the new roles land on My profile as their one usable primary action', () => {
+    expect(primaryActionFor('Event Coordinator Lead')).toEqual({ label: 'My profile', screen: 'profile' });
+    expect(primaryActionFor('Safety Officer')).toEqual({ label: 'My profile', screen: 'profile' });
   });
 });
 

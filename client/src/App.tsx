@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Role, Screen } from './mock/types';
+import { isRole, type Role, type Screen } from './mock/types';
 import { clearSession, loadSession, saveSession } from './auth/session';
 import type { StoredSession } from './auth/session';
 import type { EventRequestDraft } from './api/eventRequests';
@@ -30,13 +30,23 @@ function landingScreenFor(role: Role): Screen {
 }
 
 /**
+ * SG2-86: a server role absent from the client's Role union (stale deploy,
+ * unexpected value) would otherwise reach HEAD[role] as undefined and crash
+ * the shell. Falls back to the least-privileged role; the server enforces
+ * access regardless, so a mislabelled shell cannot grant anything.
+ */
+function toRole(value: string): Role {
+  return isRole(value) ? value : 'Attendee';
+}
+
+/**
  * A persisted session takes priority — someone with a live session landing
  * on "/" or "/?screen=login" resumes where they left off rather than seeing
  * sign-in again. Without one, "/?screen=login" is a deep link straight to
  * sign-in for anything outside the shell that needs one.
  */
 function initialScreen(session: StoredSession | null): Screen {
-  if (session) return landingScreenFor(session.user.role as Role);
+  if (session) return landingScreenFor(toRole(session.user.role));
   return new URLSearchParams(window.location.search).get('screen') === 'login' ? 'login' : 'landing';
 }
 
@@ -85,7 +95,7 @@ export default function App() {
   function handleSignIn(newSession: StoredSession) {
     saveSession(newSession);
     setSession(newSession);
-    setScreen(landingScreenFor(newSession.user.role as Role));
+    setScreen(landingScreenFor(toRole(newSession.user.role)));
   }
 
   async function handleSignOut() {
@@ -130,7 +140,7 @@ export default function App() {
   // (which sets both together) or a persisted session restored at mount
   // (same). The assertion documents that invariant rather than adding an
   // unreachable branch just to satisfy the type checker.
-  const role = session!.user.role as Role;
+  const role = toRole(session!.user.role);
 
   const body = {
     dashboard: (
@@ -204,7 +214,7 @@ export default function App() {
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
-    profile: <Profile />,
+    profile: <Profile role={role} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
       accessToken={session!.accessToken} prefill={venuePrefill} />

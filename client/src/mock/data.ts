@@ -121,6 +121,17 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['dashboard', 'My registrations'],
     ['attendee', 'Event page'],
   ],
+  // SG2-86: deliberately minimal — a nav item pointing at a screen the role
+  // has no permission for would render a page that 403s. The assignment
+  // queue and safety-check screens arrive with SG2-87/SG2-100.
+  'Event Coordinator Lead': [
+    ['dashboard', 'Dashboard'],
+    ['events', 'All events'],
+  ],
+  'Safety Officer': [
+    ['dashboard', 'Dashboard'],
+    ['events', 'All events'],
+  ],
 };
 
 /** Prototype screens still showing sample data. They sit in a "Preview" menu,
@@ -164,6 +175,16 @@ export const HEAD: Record<
     title: 'My registrations',
     blurb:
       "Events you can register for and the ones you're already on the list for.",
+  },
+  'Event Coordinator Lead': {
+    eyebrow: 'Event Coordinator Lead',
+    title: 'Coordination lead desk',
+    blurb: 'Assignment tools arrive with the assignment queue.',
+  },
+  'Safety Officer': {
+    eyebrow: 'Safety Officer',
+    title: 'Safety desk',
+    blurb: 'Safety checks arrive with the safety review flow.',
   },
 };
 
@@ -243,6 +264,8 @@ export const STATS: Record<Role, Stat[]> = {
     { value: '3', label: 'Open to register' },
     { value: '0', label: 'Withdrawn' },
   ],
+  'Event Coordinator Lead': [],
+  'Safety Officer': [],
 };
 
 export const ACTIONS: Record<Role, ActionItem[]> = {
@@ -352,6 +375,8 @@ export const ACTIONS: Record<Role, ActionItem[]> = {
       screen: 'dashboard',
     },
   ],
+  'Event Coordinator Lead': [],
+  'Safety Officer': [],
 };
 
 export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
@@ -360,6 +385,10 @@ export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
   'Venue Staff': { label: 'Open availability', screen: 'calendar' },
   'Technical Support Staff': { label: 'Check availability', screen: 'equipment' },
   Attendee: { label: 'Browse events', screen: 'attendee' },
+  // SG2-86: the one screen either role can actually use until SG2-87/SG2-100
+  // grant their functional screens.
+  'Event Coordinator Lead': { label: 'My profile', screen: 'profile' },
+  'Safety Officer': { label: 'My profile', screen: 'profile' },
 };
 
 export const PIPELINE = [
