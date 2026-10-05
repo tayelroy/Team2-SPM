@@ -661,6 +661,40 @@ test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] 
   }
 });
 
+test('SG2-90-P02 | [SG2-90:AC1] [SG2-90:AC3] [BOUNDARY] rights follow the current assignment exactly: handing an event back restores them and reassigning to the same coordinator changes nothing', async ({ request }) => {
+  expect((await request.post('/__e2e/coordinator-access')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const coordinator = await tokenFor('coordinator');
+  const support = await tokenFor('support');
+  const assignTo = async (coordinatorId: string) =>
+    (await request.patch('/api/event-requests/81/coordinator', { headers: support, data: { coordinatorId } })).status();
+  const plan = async (notes: string) =>
+    (await request.patch('/api/event-requests/81/planning', { headers: coordinator, data: { planning_notes: notes } })).status();
+
+  // Reassigning to the coordinator who already holds the event is a no-op: rights stay, nothing is recorded.
+  expect(await assignTo('user-coordinator')).toBe(200);
+  expect(await plan('Still mine')).toBe(200);
+
+  // Away and back again: refused while away, restored the moment it returns.
+  expect(await assignTo('user-coordinator2')).toBe(200);
+  expect(await plan('Away')).toBe(403);
+  expect(await assignTo('user-coordinator')).toBe(200);
+  expect(await plan('Back again')).toBe(200);
+
+  // Only the two real handovers are in the history, newest first.
+  const history = await request.get('/api/event-requests/81/history', { headers: support });
+  expect((await history.json()).history
+    .filter((entry: Record<string, unknown>) => entry.field_name === 'coordinator_id')
+    .map((entry: Record<string, unknown>) => [entry.old_value, entry.new_value])).toEqual([
+    ['Regression second coordinator', 'Regression coordinator'],
+    ['Regression coordinator', 'Regression second coordinator']
+  ]);
+});
+
 test('SG2-37-P01 | [SG2-37:AC1] [NORMAL] approving a request under review persists the approved outcome', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/under-review')).status()).toBe(204);
