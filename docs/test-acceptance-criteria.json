@@ -364,6 +364,17 @@
         "AC4": "When no accessibility needs are specified, missing accessibility features do not make the venue unsuitable; when needs are specified, any missing features are identified in the suitability check",
         "AC5": "Approval of a capacity exception does not approve the booking; Venue Staff still decide on the booking request"
       }
+    },
+    {
+      "id": "SG2-48",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-48",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Can request a chosen venue for an approved event, carrying the event timing, required layout and venue requirements",
+        "AC2": "The request reaches Venue Staff and awaits their decision",
+        "AC3": "The request is shown as pending while awaiting a decision; it does not hold the venue or block its availability. The venue is committed to the event only when the request is approved",
+        "AC4": "An event can have requests for several different venues (Week 7 change #3); a duplicate request for the same venue and an overlapping period is refused"
+      }
     }
   ]
 }
