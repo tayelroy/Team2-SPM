@@ -130,6 +130,21 @@ export class MemoryDatabase {
     });
   }
 
+  /** SG2-48: an approved event assigned to the coordinator, for 80 people
+   * needing a projector on 20 June 2030, when both venues are free. Regression
+   * Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
+  seedVenueRequest() {
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 91, name: 'Venue Request Forum', status: 'approved', coordinator_id: 'user-coordinator',
+      proposed_date: '2030-06-20T02:00:00.000Z', expected_attendance: 80, venue_requirements: 'A projector'
+    });
+    this.tables.venue_layouts.push(
+      { venue_id: 1, layout: 'theatre', other_description: null },
+      { venue_id: 1, layout: 'classroom', other_description: null },
+      { venue_id: 2, layout: 'boardroom', other_description: null }
+    );
+  }
+
   seedAssignedReview() {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 51, name: 'Assigned Review Forum', status: 'submitted',
@@ -157,7 +172,10 @@ export class MemoryDatabase {
         items.push({ kind, item_id: request.request_id, event_id: event.event_id, title: resource.name,
           event_name: event.name || 'Untitled event', status: request.status, starts_at: request.starts_at, ends_at: request.ends_at,
           audience, assigned_to: null, category: kind, details: kind === 'venue'
-            ? { location: resource.location, capacity: resource.capacity, expected_attendance: event.expected_attendance, venue_requirements: event.venue_requirements, accessibility_needs: event.accessibility_needs, notes: request.notes }
+            ? { location: resource.location, capacity: resource.capacity, expected_attendance: event.expected_attendance,
+              venue_requirements: request.venue_requirements ?? event.venue_requirements, accessibility_needs: event.accessibility_needs, notes: request.notes,
+              // SG2-48 AC2: the layout and requester, as the SQL view adds them.
+              layout: request.layout ?? null, requested_by: this.tables.users.find(user => user.user_id === request.requested_by)?.name ?? null }
             : { quantity: request.quantity, equipment_requirements: event.equipment_requirements, notes: request.notes } });
       }
     }
@@ -215,6 +233,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   select(columns = '*') { this.columns = columns; return this; }
   eq(key: string, value: unknown) { this.filters.push(row => row[key] === value); return this; }
   is(key: string, value: null) { this.filters.push(row => row[key] === value); return this; }
+  not(key: string, operator: 'is', value: null) { this.filters.push(row => (row[key] ?? null) !== value); return this; }
   range(start: number, end: number) { this.window = [start, end]; return this; }
   in(key: string, values: unknown[]) { this.filters.push(row => values.includes(row[key])); return this; }
   lt(key: string, value: string | number) { this.filters.push(row => (row[key] as string | number) < value); return this; }
@@ -233,12 +252,15 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     if (this.operation === 'insert') {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
       const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id',
-        event_clarifications: 'clarification_id', event_audit_logs: 'log_id', venue_capacity_exceptions: 'exception_id' }[this.table];
+        event_clarifications: 'clarification_id', event_audit_logs: 'log_id', venue_capacity_exceptions: 'exception_id',
+        venue_booking_requests: 'request_id' }[this.table];
       let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
       rows = incoming.map(value => {
         const row = structuredClone(value);
         if (id) row[id] = nextId++;
         if (['event_clarifications', 'event_audit_logs'].includes(this.table)) row.created_at ??= new Date().toISOString();
+        // SG2-48: the column defaults a new venue request takes.
+        if (this.table === 'venue_booking_requests') { row.status ??= 'pending'; row.requested_at ??= new Date().toISOString(); }
         table.push(row);
         return row;
       });

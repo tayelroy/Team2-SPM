@@ -68,6 +68,12 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // Support Staff or the event's own organiser (enforced per-row). Never a
   // coordinator: acknowledging the warning does not approve an exception.
   'venue_booking.capacity_exception.approve': ['venue_staff', 'technical_support_staff', 'event_organiser'],
+  // SG2-48 AC1: the coordinator assigned to an approved event requests a
+  // venue for it. Which event is enforced per-row by the assignment.
+  'venue_booking.request': ['event_coordinator'],
+  // SG2-48 AC2/AC3: the assigned coordinator follows their requests while
+  // they await a decision, and Venue Staff, who decide them, see them too.
+  'venue_booking.request.view': ['event_coordinator', 'venue_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],

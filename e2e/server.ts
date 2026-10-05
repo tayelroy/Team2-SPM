@@ -24,6 +24,7 @@ import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
 import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
+import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -111,7 +112,9 @@ const app = createApp(
   getEventRequestDetailHandler(eventDependencies),
   { availability, venues, layouts, blocks, search: createVenueSearchRouter(access, createVenueSearchHandler(undefined, getClient)), profile: createProfileRouter(access, { getAdminClient: getClient }),
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
-    bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }) },
+    bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
+    // SG2-48: venue requests, against the in-memory client.
+    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient }) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.
@@ -152,6 +155,10 @@ app.post('/__e2e/assigned-review', (_req, res) => {
 });
 app.post('/__e2e/venue-suitability', (_req, res) => {
   database.seedVenueSuitability();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-request', (_req, res) => {
+  database.seedVenueRequest();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {

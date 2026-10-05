@@ -31,8 +31,10 @@ from public.events where event_id between 94101 and 94109;
 insert into public.equipment_requests (request_id, event_id, equipment_id, quantity, starts_at, ends_at, notes)
 select event_id, event_id, 94101, 4, '2030-06-15T02:00Z', '2030-06-15T10:00Z', 'Four microphones'
 from public.events where event_id between 94101 and 94109;
+-- SG2-48 AC4: an approved request for the same venue and an overlapping
+-- period would duplicate the pending one above, so decided ones use another day.
 insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, status)
-select 94200 + n, 94102, 94101, '2030-06-15T02:00Z', '2030-06-15T10:00Z', status
+select 94200 + n, 94102, 94101, '2030-06-20T02:00Z', '2030-06-20T10:00Z', status
 from (values (1, 'approved'), (2, 'rejected'), (3, 'cancelled')) decisions(n, status);
 insert into public.equipment_requests (request_id, event_id, equipment_id, quantity, starts_at, ends_at, status)
 select 94200 + n, 94102, 94101, 1, '2030-06-15T02:00Z', '2030-06-15T10:00Z', status
