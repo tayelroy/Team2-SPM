@@ -307,6 +307,47 @@ test('SG2-42-P01 | [SG2-42:AC1] [SG2-42:AC2] [NORMAL] staff create edit search a
   expect((await saved.json()).venues).toContainEqual(expect.objectContaining({ ...venueValues, name: 'Updated Browser Hall', capacity: 125 }));
 });
 
+test('SG2-77-P01 | [SG2-77:AC1] [SG2-77:AC3] [SG2-77:AC5] [NORMAL] staff record setup, turnaround and safety details that coordinators can read', async ({ page }) => {
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  const hall = page.getByRole('heading', { name: 'Regression Hall', exact: true }).locator('xpath=ancestor::*[contains(@class, "venue-grid")]/*[.//h2[text()="Regression Hall"]]');
+  // AC3: nothing recorded yet reads as 0 minutes and "Not recorded".
+  await expect(hall.getByText('0 min setup · 0 min turnaround', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Regression Hall', exact: true }).click();
+  await page.getByLabel('Setup time (minutes)', { exact: true }).fill('30');
+  await page.getByLabel('Turnaround time (minutes)', { exact: true }).fill('45');
+  await page.getByLabel('Emergency access', { exact: true }).fill('Two exits to the car park');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByText('Regression Hall saved. The catalogue is up to date.', { exact: true })).toBeVisible();
+  await page.reload();
+  await nav(page, 'Catalogue');
+  await expect(hall.getByText('30 min setup · 45 min turnaround', { exact: true })).toBeVisible();
+  await expect(hall.getByText('Two exits to the car park', { exact: true })).toBeVisible();
+  await expect(hall.getByText('Not recorded', { exact: true })).toBeVisible();
+  const saved = await page.request.get('/api/venues/1/operations', { headers: await authHeaders(page) });
+  expect((await saved.json()).operations).toMatchObject({
+    setup_minutes: 30, turnaround_minutes: 45, emergency_access: 'Two exits to the car park', known_restrictions: null
+  });
+  // AC4: a negative value is refused by the API as well as the form.
+  const refused = await page.request.put('/api/venues/1/operations', {
+    headers: await authHeaders(page), data: { setup_minutes: -1, turnaround_minutes: 0 }
+  });
+  expect(refused.status()).toBe(400);
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+
+  // AC6: a coordinator reads the times but cannot change them.
+  await signIn(page, 'coordinator');
+  const coordinatorHeaders = await authHeaders(page);
+  const read = await page.request.get('/api/venues/1/operations', { headers: coordinatorHeaders });
+  expect((await read.json()).operations.turnaround_minutes).toBe(45);
+  const write = await page.request.put('/api/venues/1/operations', {
+    headers: coordinatorHeaders, data: { setup_minutes: 0, turnaround_minutes: 0 }
+  });
+  expect(write.status()).toBe(403);
+});
+
 test('SG2-42-N01 | [SG2-42:AC3] [FAILURE] read-only users cannot create venues through UI or API', async ({ page }) => {
   await signIn(page, 'coordinator');
   await nav(page, 'Venues');

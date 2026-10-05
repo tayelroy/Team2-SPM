@@ -402,6 +402,19 @@
         "AC4": "The Event Coordinator is warned before the hold expires (e.g. 24 hours before; confirm the lead time with the customer) and notified again when it expires",
         "AC5": "The expiry is recorded in the event's history"
       }
+    },
+    {
+      "id": "SG2-77",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-77",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Given a venue record, when I set a setup time and a turnaround time in minutes, then both are saved against that venue and shown on the venue's details",
+        "AC2": "Setup and turnaround times can be configured separately for each venue",
+        "AC3": "A venue with no value set defaults to 0 minutes of setup and turnaround",
+        "AC4": "Negative values are refused",
+        "AC5": "I can record a venue's emergency access arrangements and any known restrictions (e.g. maximum occupancy for a given layout, prohibited equipment, access limits); these are shown on the venue's details and in the Safety Officer's view of the event (SG2-91), or as \"Not recorded\" if missing",
+        "AC6": "Only Venue Staff can change a venue's setup time, turnaround time or safety details, and each change is recorded with who made it and when"
+      }
     }
   ]
 }

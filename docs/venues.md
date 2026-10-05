@@ -153,3 +153,20 @@ The Automation index identifies the current executed tests supporting them.
 Old browser-fixture and venue-RLS results were removed from the current register;
 they do not establish this branch's behavior. Hosted CI and SQL cases remain
 Not Executed for this snapshot.
+
+## SG2-77: Setup, turnaround and safety details
+
+Venue Staff record how long each venue needs before an event to prepare and after it to reset, plus its emergency access arrangements and known restrictions. They edit these in the venue form; every venue card shows them, with "Not recorded" for missing safety details.
+
+| Route | Who | Result |
+| --- | --- | --- |
+| `GET /api/venues/:venueId/operations` | Venue Staff, Event Coordinators, Technical Support Staff | `200 { operations }`; a venue with nothing saved returns 0 minutes and no safety details |
+| `PUT /api/venues/:venueId/operations` | Venue Staff | `200 { operations }`; minutes must be whole numbers from 0 to 1440 and each note at most 2000 characters (`400` otherwise) |
+
+Unknown venues return `404`; storage failures return `503` without details.
+
+Migration `202610050003_venue_operations.sql` adds `venue_operations` (one row per venue) and `venue_operation_history`. A trigger records every changed field with its old and new value, who changed it and when; nobody can write the history directly. Row-level security mirrors the routes: the three internal roles read, only Venue Staff insert or update, and only Venue Staff read the history. The store uses the caller's own token, so the trigger records the real user.
+
+Verification: `supabase/tests/venue_operations.sql` (CI database job), `server/src/venue-operations.test.ts`, `server/src/db/venueOperations.test.ts`, `client/src/venues/VenueOperations.test.tsx`, `client/src/venues/operationsApi.test.ts` and browser journey `SG2-77-P01`.
+
+SG2-78 uses these times to widen each booking's occupied period in availability, conflict checks and search.

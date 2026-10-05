@@ -5,6 +5,7 @@ import { color, gradient, label, radius, rule, surface } from '../theme';
 import type { Venue, VenueValues } from './api';
 import { LAYOUT_LABELS, LAYOUTS } from './layoutsApi';
 import type { Layout, VenueLayout, VenueLayoutValues } from './layoutsApi';
+import { MAX_MINUTES, MAX_SAFETY_TEXT, type VenueOperations, type VenueOperationValues } from './operationsApi';
 
 const FIELDS = [
   ['name', 'Venue name', 'e.g. Atrium Hall'],
@@ -20,16 +21,19 @@ export const inputStyle = {
   borderRadius: radius.sm, padding: '13px 14px', color: color.mist, fontSize: '14px', lineHeight: 1.5
 };
 
-export default function VenueForm({ venue, layouts, saving, error, onSave, onCancel }: {
+export default function VenueForm({ venue, layouts, operations, saving, error, onSave, onCancel }: {
   venue: Venue | null;
   /** The venue's current supported layouts (SG2-43). Only passed — and only
    * then is the layouts section shown — when editing an existing venue and
    * the caller may manage them; omitted entirely while creating a venue,
    * since layouts need a venue id that does not exist yet. */
   layouts?: VenueLayout[];
+  /** The venue's setup/turnaround times and safety details (SG2-77). Passed,
+   * like layouts, only when editing an existing venue the caller may manage. */
+  operations?: VenueOperations;
   saving: boolean;
   error: string;
-  onSave: (values: VenueValues, layouts?: VenueLayoutValues[]) => void;
+  onSave: (values: VenueValues, layouts?: VenueLayoutValues[], operations?: VenueOperationValues) => void;
   onCancel: () => void;
 }) {
   const [values, setValues] = useState(() => venue ? {
@@ -41,6 +45,11 @@ export default function VenueForm({ venue, layouts, saving, error, onSave, onCan
   const [selectedLayouts, setSelectedLayouts] = useState<Set<Layout>>(() => new Set((layouts ?? []).map(item => item.layout)));
   const [otherDescription, setOtherDescription] = useState(() => layouts?.find(item => item.layout === 'other')?.other_description ?? '');
   const [layoutsInvalid, setLayoutsInvalid] = useState(false);
+  const [timing, setTiming] = useState(() => ({
+    setup: String(operations?.setup_minutes ?? 0), turnaround: String(operations?.turnaround_minutes ?? 0),
+    emergency: operations?.emergency_access ?? '', restrictions: operations?.known_restrictions ?? ''
+  }));
+  const [operationsInvalid, setOperationsInvalid] = useState(false);
 
   function toggleLayout(layout: Layout) {
     setSelectedLayouts(current => {
@@ -58,19 +67,26 @@ export default function VenueForm({ venue, layouts, saving, error, onSave, onCan
       FIELDS.some(([key]) => !values[key].trim()) || Array.from(values.name.trim()).length > 255;
     const otherNeedsDescription = layouts !== undefined && selectedLayouts.has('other') &&
       (!otherDescription.trim() || Array.from(otherDescription.trim()).length > 255);
+    const minutesValid = (text: string) => /^\d+$/.test(text.trim()) && Number(text) <= MAX_MINUTES;
+    const noteValid = (text: string) => Array.from(text.trim()).length <= MAX_SAFETY_TEXT;
+    const timingInvalid = operations !== undefined && !(minutesValid(timing.setup) && minutesValid(timing.turnaround)
+      && noteValid(timing.emergency) && noteValid(timing.restrictions));
     setInvalid(venueInvalid);
     setLayoutsInvalid(otherNeedsDescription);
-    if (venueInvalid || otherNeedsDescription) return;
+    setOperationsInvalid(timingInvalid);
+    if (venueInvalid || otherNeedsDescription || timingInvalid) return;
     const venueValues: VenueValues = { name: values.name.trim(), location: values.location.trim(), capacity,
       facilities: values.facilities.trim(), accessibility_features: values.accessibility_features.trim(),
       operating_information: values.operating_information.trim() };
-    if (layouts === undefined) {
-      onSave(venueValues);
-      return;
-    }
-    const layoutValues: VenueLayoutValues[] = Array.from(selectedLayouts).map(layout =>
+    const layoutValues: VenueLayoutValues[] | undefined = layouts === undefined ? undefined : Array.from(selectedLayouts).map(layout =>
       layout === 'other' ? { layout, other_description: otherDescription.trim() } : { layout });
-    onSave(venueValues, layoutValues);
+    const operationValues: VenueOperationValues | undefined = operations === undefined ? undefined : {
+      setup_minutes: Number(timing.setup), turnaround_minutes: Number(timing.turnaround),
+      emergency_access: timing.emergency.trim() || null, known_restrictions: timing.restrictions.trim() || null
+    };
+    if (operationValues) onSave(venueValues, layoutValues, operationValues);
+    else if (layoutValues) onSave(venueValues, layoutValues);
+    else onSave(venueValues);
   }
 
   return (
@@ -134,6 +150,36 @@ export default function VenueForm({ venue, layouts, saving, error, onSave, onCan
                   </div>
                 ))}
                 {layoutsInvalid ? <p role="alert">Describe the "Other" layout in 255 characters or fewer.</p> : null}
+              </div>
+            ) : null}
+            {operations !== undefined ? (
+              <div style={{ marginTop: '28px', paddingTop: '24px', borderTop: rule.edge, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <Eyebrow>Setup, turnaround and safety</Eyebrow>
+                  <p style={{ margin: '8px 0 0', color: color.silver, fontSize: '13px', lineHeight: 1.5 }}>
+                    Time needed before each event to prepare the room and after it to reset. Bookings occupy the venue for these periods too.
+                  </p>
+                </div>
+                <div className="venue-fields">
+                  {([['setup', 'Setup time (minutes)'], ['turnaround', 'Turnaround time (minutes)']] as const).map(([key, title]) => (
+                    <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+                      <label htmlFor={`venue-${key}-minutes`} style={label}>{title}</label>
+                      <input id={`venue-${key}-minutes`} type="number" min={0} max={MAX_MINUTES} step={1} required
+                        value={timing[key]} style={inputStyle}
+                        onChange={e => setTiming(current => ({ ...current, [key]: e.target.value }))} />
+                    </div>
+                  ))}
+                  {([['emergency', 'Emergency access', 'e.g. Two exits to the car park; assembly point at the main gate'],
+                    ['restrictions', 'Known restrictions', 'e.g. Maximum 120 in banquet layout; no open flames']] as const).map(([key, title, placeholder]) => (
+                    <div key={key} className="venue-field-wide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+                      <label htmlFor={`venue-${key}`} style={label}>{title}</label>
+                      <textarea id={`venue-${key}`} rows={3} value={timing[key]} placeholder={placeholder}
+                        style={{ ...inputStyle, resize: 'vertical' }}
+                        onChange={e => setTiming(current => ({ ...current, [key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+                {operationsInvalid ? <p role="alert">Enter setup and turnaround times as whole minutes from 0 to {MAX_MINUTES}, and keep each safety note within {MAX_SAFETY_TEXT} characters.</p> : null}
               </div>
             ) : null}
             {error ? <p role="alert">{error}</p> : null}

@@ -21,6 +21,7 @@ test('[NORMAL] [SG2-20:AC3] application composition mounts injected service rout
   const availability = Router().get('/availability', (_req, res) => res.json({ service: 'availability' }));
   const venues = Router().get('/', (_req, res) => res.json({ service: 'venues' }));
   const layouts = Router().get('/1/layouts', (_req, res) => res.json({ service: 'layouts' }));
+  const operations = Router().get('/1/operations', (_req, res) => res.json({ service: 'operations' }));
   const blocks = Router().get('/1/blocks', (_req, res) => res.json({ service: 'blocks' }));
   const search = Router().get('/search', (_req, res) => res.json({ service: 'search' }));
   const profile = Router().get('/', (_req, res) => res.json({ service: 'profile' }));
@@ -28,8 +29,8 @@ test('[NORMAL] [SG2-20:AC3] application composition mounts injected service rout
   const bookingRequests = Router().get('/1/suitability', (_req, res) => res.json({ service: 'bookingRequests' }));
   const venueRequests = Router().get('/', (_req, res) => res.json({ service: 'venueRequests' }));
   const composed = createApp(undefined, undefined, undefined, undefined, undefined, undefined,
-    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, blocks, search, profile, suitability, bookingRequests, venueRequests });
-  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/blocks', 'blocks'], ['/api/venues/search', 'search'], ['/api/profile', 'profile'], ['/api/venues/suitability', 'suitability'], ['/api/venue-booking-requests/1/suitability', 'bookingRequests'], ['/api/venue-booking-requests', 'venueRequests']]) {
+    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, operations, blocks, search, profile, suitability, bookingRequests, venueRequests });
+  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/operations', 'operations'], ['/api/venues/1/blocks', 'blocks'], ['/api/venues/search', 'search'], ['/api/profile', 'profile'], ['/api/venues/suitability', 'suitability'], ['/api/venue-booking-requests/1/suitability', 'bookingRequests'], ['/api/venue-booking-requests', 'venueRequests']]) {
     const response = await request(composed).get(path);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { service });
