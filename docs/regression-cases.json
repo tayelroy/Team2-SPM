@@ -2633,7 +2633,7 @@
       "Roll back the suite transaction."
     ],
     "data": "Synthetic IDs and values defined in supabase/tests/venue_operations.sql",
-    "expected": "0 and 1440 minutes are accepted, -1 and 1441 refused; defaults are 0 minutes; every change is recorded with old and new value, who and when; only Venue Staff change values; nobody writes history directly; external users and anon see nothing; losing the Venue Staff role removes write access.",
+    "expected": "0 and 1440 minutes are accepted, -1 and 1441 refused; defaults are 0 minutes; every change is recorded with old and new value, who and when; only Venue Staff change values; two staff edits in a row keep the last value and record both authors; nobody writes history directly; external users and anon see nothing; losing the Venue Staff role removes write access.",
     "evidence": "supabase/tests/venue_operations.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",

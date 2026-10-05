@@ -69,7 +69,7 @@ test('[BOUNDARY] [SG2-77:AC3] a venue with nothing saved reads as 0 minutes and 
 
 for (const role of ACCOUNT_ROLES) {
   const reads = ['venue_staff', 'event_coordinator', 'technical_support_staff'].includes(role);
-  test(`${role === 'venue_staff' ? '[NORMAL]' : reads ? '[CONFLICT]' : '[FAILURE]'} [SG2-77:AC6] only Venue Staff change venue operations (${role})`, async () => {
+  test(`${role === 'venue_staff' ? '[NORMAL]' : '[FAILURE]'} [SG2-77:AC6] only Venue Staff change venue operations (${role})`, async () => {
     const { app, writes } = fixture(role);
     const write = await put(app, body);
     assert.equal(write.status, role === 'venue_staff' ? 200 : 403);

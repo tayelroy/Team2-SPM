@@ -63,12 +63,30 @@ test('[BOUNDARY] [SG2-77:AC3] [SG2-77:AC5] a venue with nothing saved shows 0 mi
   expect(fact('Known restrictions')).toHaveTextContent('Not recorded');
 });
 
-test('[FAILURE] [SG2-77:AC3] a failed read for one venue still shows the catalogue with the defaults', async () => {
-  await open(staff, 503);
-  expect(fact('Setup and turnaround')).toHaveTextContent('0 min setup · 0 min turnaround');
+test('[FAILURE] [SG2-77:AC3] [SG2-77:AC6] a failed read shows "Unavailable" and the form cannot overwrite the saved values', async () => {
+  const fetch = await open(staff, 503);
+  expect(fact('Setup and turnaround')).toHaveTextContent('Unavailable');
+  expect(fact('Emergency access')).toHaveTextContent('Unavailable');
+  expect(fact('Known restrictions')).toHaveTextContent('Unavailable');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
+  expect(screen.queryByLabelText('Setup time (minutes)')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  await screen.findByText('Atrium Hall saved. The catalogue is up to date.');
+  expect(operationPuts(fetch)).toHaveLength(0);
 });
 
-test('[CONFLICT] [SG2-77:AC6] coordinators see the times but get no controls to change them', async () => {
+test('[CONFLICT] [SG2-77:AC1] [SG2-77:AC6] saving twice in quick succession sends one venue save and one times save', async () => {
+  const fetch = await open(staff, recorded);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
+  const form = screen.getByRole('form', { name: 'Edit venue' });
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  await screen.findByText('Atrium Hall saved. The catalogue is up to date.');
+  expect(fetch.mock.calls.filter(([url, init]) => url === '/api/venues/1' && init?.method === 'PUT')).toHaveLength(1);
+  expect(operationPuts(fetch)).toHaveLength(1);
+});
+
+test('[FAILURE] [SG2-77:AC6] coordinators see the times but get no controls to change them', async () => {
   await open(coordinator, recorded);
   expect(fact('Setup and turnaround')).toHaveTextContent('30 min setup · 45 min turnaround');
   expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument();

@@ -7,27 +7,30 @@ begin;
 
 -- Seed test identities:
 -- 1: venue staff   2: event coordinator   3: technical support staff
--- 4: event organiser   5: attendee
+-- 4: event organiser   5: attendee   6: second venue staff member
 insert into auth.users (id) values
   ('e0000000-0000-4000-8000-000000000001'),
   ('e0000000-0000-4000-8000-000000000002'),
   ('e0000000-0000-4000-8000-000000000003'),
   ('e0000000-0000-4000-8000-000000000004'),
-  ('e0000000-0000-4000-8000-000000000005');
+  ('e0000000-0000-4000-8000-000000000005'),
+  ('e0000000-0000-4000-8000-000000000006');
 
 insert into public.users (user_id, name, organisation, role_id) values
   ('e0000000-0000-4000-8000-000000000001', 'Venue Staff V', 'ConnectSphere', 3),
   ('e0000000-0000-4000-8000-000000000002', 'Coordinator C', 'ConnectSphere', 2),
   ('e0000000-0000-4000-8000-000000000003', 'Tech Support T', 'ConnectSphere', 4),
   ('e0000000-0000-4000-8000-000000000004', 'Organiser O', 'Acme Corp', 1),
-  ('e0000000-0000-4000-8000-000000000005', 'Attendee A', 'Acme Corp', 5);
+  ('e0000000-0000-4000-8000-000000000005', 'Attendee A', 'Acme Corp', 5),
+  ('e0000000-0000-4000-8000-000000000006', 'Venue Staff W', 'ConnectSphere', 3);
 
 insert into public.account_roles (user_id, role) values
   ('e0000000-0000-4000-8000-000000000001', 'venue_staff'),
   ('e0000000-0000-4000-8000-000000000002', 'event_coordinator'),
   ('e0000000-0000-4000-8000-000000000003', 'technical_support_staff'),
   ('e0000000-0000-4000-8000-000000000004', 'event_organiser'),
-  ('e0000000-0000-4000-8000-000000000005', 'attendee');
+  ('e0000000-0000-4000-8000-000000000005', 'attendee'),
+  ('e0000000-0000-4000-8000-000000000006', 'venue_staff');
 
 insert into public.venues (venue_id, name, location, capacity, facilities, accessibility_features, operating_information) values
   (97701, 'Main Hall', 'Level 1', 200, 'Stage', 'Step-free', '08:00-22:00'),
@@ -94,6 +97,19 @@ begin
       and field_name = 'setup_minutes' and old_value = '30' and new_value = '30') then
     raise exception '[SG2-77:unchanged-not-recorded] [SG2-77:AC6] [BOUNDARY] Fields that did not change must not add history';
   end if;
+  -- A second staff member edits the same venue straight after: the last save
+  -- stands and both edits stay in the history, each with its own author.
+  update public.venue_operations set setup_minutes = 20 where venue_id = 97701;
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000006', true);
+  update public.venue_operations set setup_minutes = 15 where venue_id = 97701;
+  if not exists (select 1 from public.venue_operations where venue_id = 97701 and setup_minutes = 15
+      and updated_by = 'e0000000-0000-4000-8000-000000000006')
+     or (select count(*) from public.venue_operation_history where venue_id = 97701 and field_name = 'setup_minutes'
+      and ((old_value = '30' and new_value = '20' and changed_by = 'e0000000-0000-4000-8000-000000000001')
+        or (old_value = '20' and new_value = '15' and changed_by = 'e0000000-0000-4000-8000-000000000006'))) <> 2 then
+    raise exception '[SG2-77:sequential-staff-edits] [SG2-77:AC6] [CONFLICT] Two staff edits in a row must keep the last value and record both, each with its author';
+  end if;
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000001', true);
   begin
     insert into public.venue_operation_history (venue_id, field_name, new_value)
       values (97701, 'setup_minutes', '0');
@@ -115,7 +131,7 @@ begin
     end if;
     update public.venue_operations set setup_minutes = 5 where venue_id = 97701;
     if exists (select 1 from public.venue_operations where venue_id = 97701 and setup_minutes = 5) then
-      raise exception '[SG2-77:non-staff-update] [SG2-77:AC6] [CONFLICT] Reader % must not change a venue''s setup time', reader;
+      raise exception '[SG2-77:non-staff-update] [SG2-77:AC6] [FAILURE] Reader % must not change a venue''s setup time', reader;
     end if;
     if exists (select 1 from public.venue_operation_history) then
       raise exception '[SG2-77:history-staff-only] [SG2-77:AC6] [FAILURE] Reader % must not read change history', reader;
