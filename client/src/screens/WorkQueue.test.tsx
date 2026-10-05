@@ -111,6 +111,25 @@ test.each([
   expect(fetch).toHaveBeenCalledWith(`/api/work-queue/${kind}/7`, expect.anything());
 });
 
+test('[NORMAL] [SG2-48:AC2] Venue Staff see the layout, venue requirements and requester of a pending venue request', async () => {
+  const request = { ...review, kind: 'venue', category: 'venue', item_id: 41, title: 'Atrium Hall', status: 'pending',
+    ends_at: '2030-06-15T10:00:00Z', details: { venue_requirements: 'A stage', layout: 'theatre', requested_by: 'Casey Coordinator' } };
+  const earlier = { ...request, item_id: 42, title: 'Quiet Room', details: { layout: null, requested_by: null } };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(url.includes('/suitability') ? {}
+    : { items: url.endsWith('/venue/41') ? [request] : url.endsWith('/venue/42') ? [earlier] : [request, earlier] })));
+  render(<Dashboard role="Venue Staff" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Atrium Hall/ }));
+  const detail = await screen.findByRole('article', { name: 'Venue booking request' });
+  for (const [label, value] of [['Required layout', 'Theatre'], ['Venue requirements', 'A stage'], ['Requested by', 'Casey Coordinator']]) {
+    expect(within(detail).getByText(label).nextElementSibling).toHaveTextContent(value);
+  }
+  expect(within(detail).getByText('pending')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
+  fireEvent.click(await screen.findByRole('button', { name: /Quiet Room/ }));
+  const legacy = await screen.findByRole('article', { name: 'Venue booking request' });
+  expect(within(legacy).getByText('Required layout').nextElementSibling).toHaveTextContent('Not provided');
+});
+
 test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit empty groups, then newly arrived work', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 }))
     .mockResolvedValueOnce(Response.json({ items: [] })).mockResolvedValueOnce(Response.json({ items: [review] }));

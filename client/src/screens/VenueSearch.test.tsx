@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import VenueSearch, { describeCriteria } from './VenueSearch';
 import { EMPTY_SEARCH, type VenueMatch } from '../venues/searchApi';
@@ -14,7 +14,7 @@ const terrace: VenueMatch = { venue_id: 3, name: 'Rooftop Terrace', location: 'L
 const bare: VenueMatch = { venue_id: 4, name: 'Unrecorded Room', location: null, capacity: null, facilities: null,
   accessibility_features: null, operating_information: null, layouts: [], held: [] };
 
-const prefill: VenueSearchPrefill = { eventId: 10, eventName: 'Meridian Forum', accessibilityNeeds: 'Step-free access to the stage',
+const prefill: VenueSearchPrefill = { eventId: 10, eventName: 'Meridian Forum', accessibilityNeeds: 'Step-free access to the stage', venueRequirements: 'A bar',
   values: { ...EMPTY_SEARCH, from: '2030-06-15T00:00', until: '2030-06-15T23:59', attendance: '180', accessibility: 'step-free' } };
 
 function stubSearch(respond: () => Response | Promise<Response>) {
@@ -169,4 +169,62 @@ test('[CONFLICT] [SG2-46:search-supersession] a newer search supersedes one stil
   fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
   unmount();
   await act(async () => {});
+});
+
+const requested = { request_id: 41, event_id: 10, venue_id: 3, venue_name: 'Rooftop Terrace', status: 'pending',
+  starts_at: '2030-06-14T16:00:00.000Z', ends_at: '2030-06-15T15:59:00.000Z', layout: 'banquet',
+  venue_requirements: 'A bar', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z' };
+
+/** The venue search, suitability and venue request endpoints, as a coordinator sees them. */
+function stubEventSearch(booking = 'allowed') {
+  const made: unknown[] = [];
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/venues/suitability')) return Response.json({ venues: [] });
+    if (url.startsWith('/api/venue-booking-requests') && init?.method === 'POST') {
+      made.push(JSON.parse(init.body as string));
+      return Response.json({ request: requested, booking }, { status: 201 });
+    }
+    if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: made.length ? [requested] : [] });
+    return Response.json({ venues: [terrace] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  return made;
+}
+
+test('[NORMAL] [SG2-48:AC1] [SG2-48:AC3] from an event\'s search a venue is requested for the searched period, and is then listed as pending', async () => {
+  const made = stubEventSearch();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  expect(await screen.findByText('No venues have been requested for this event yet.')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Request this venue' }));
+  expect(screen.getByText('A bar')).toBeVisible();
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  expect(await screen.findByText('Rooftop Terrace requested. It is pending until Venue Staff decide, and the venue is not held until then.')).toBeVisible();
+  expect(made).toEqual([{ event_id: 10, venue_id: 3, layout: 'banquet', starts_at: '2030-06-14T16:00:00.000Z', ends_at: '2030-06-15T15:59:00.000Z' }]);
+  const list = screen.getByRole('region', { name: 'Venue requests for Meridian Forum' });
+  expect(await within(list).findByText('Pending')).toBeVisible();
+  expect(screen.queryByRole('form', { name: 'Request Rooftop Terrace' })).not.toBeInTheDocument();
+  // A new search starts afresh.
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await vi.waitFor(() => expect(screen.queryByText(/Rooftop Terrace requested/)).not.toBeInTheDocument());
+});
+
+test('[NORMAL] [SG2-48:AC3] [SG2-47:AC5] requesting a venue too small for the event says a capacity exception is still needed; the form can be cancelled', async () => {
+  stubEventSearch('needs_capacity_exception');
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('form', { name: 'Request Rooftop Terrace' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Request this venue' }));
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  expect(await screen.findByText(/A capacity exception must also be approved before it can be booked\./)).toBeVisible();
+});
+
+test('[FAILURE] [SG2-48:AC1] a manual search, not opened from an event, offers no venue request', async () => {
+  stubSearch(() => Response.json({ venues: [terrace] }));
+  render(<VenueSearch accessToken="token" />);
+  fill({ 'From (Singapore time)': '2030-06-15T09:00', 'Until (Singapore time)': '2030-06-15T17:00' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await screen.findByRole('heading', { name: 'Rooftop Terrace' });
+  expect(screen.queryByRole('button', { name: 'Request this venue' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: /Venue requests for/ })).not.toBeInTheDocument();
 });
