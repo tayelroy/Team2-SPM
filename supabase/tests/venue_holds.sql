@@ -3,19 +3,21 @@ begin;
 insert into auth.users(id) values
  ('d8400000-0000-4000-8000-000000000001'),('d8400000-0000-4000-8000-000000000002'),
  ('d8400000-0000-4000-8000-000000000003'),('d8400000-0000-4000-8000-000000000004'),
- ('d8400000-0000-4000-8000-000000000005');
+ ('d8400000-0000-4000-8000-000000000005'),('d8400000-0000-4000-8000-000000000006');
 insert into public.users(user_id,name,role_id) values
  ('d8400000-0000-4000-8000-000000000001','Hold staff',3),
  ('d8400000-0000-4000-8000-000000000002','Coordinator',2),
  ('d8400000-0000-4000-8000-000000000003','Organiser',1),
  ('d8400000-0000-4000-8000-000000000004','Other coordinator',2),
- ('d8400000-0000-4000-8000-000000000005','Attendee',5);
+ ('d8400000-0000-4000-8000-000000000005','Attendee',5),
+ ('d8400000-0000-4000-8000-000000000006','Hold technical support',4);
 insert into public.account_roles(user_id,role) values
  ('d8400000-0000-4000-8000-000000000001','venue_staff'),
  ('d8400000-0000-4000-8000-000000000002','event_coordinator'),
  ('d8400000-0000-4000-8000-000000000003','event_organiser'),
  ('d8400000-0000-4000-8000-000000000004','event_coordinator'),
- ('d8400000-0000-4000-8000-000000000005','attendee');
+ ('d8400000-0000-4000-8000-000000000005','attendee'),
+ ('d8400000-0000-4000-8000-000000000006','technical_support_staff');
 insert into public.venues(venue_id,name,capacity,facilities) values
  (98401,'Hold Hall',100,'Stage, projection'),(98402,'Small Hall',20,null),(98403,'Missing facility',100,null);
 insert into public.events(event_id,organiser_id,coordinator_id,name,status,expected_attendance,venue_requirements) values
@@ -163,6 +165,9 @@ do $$
 begin
  if jsonb_array_length(public.list_venue_hold_notifications()) < 3 then raise exception '[SG2-85:coordinator-cannot-read-notifications] [NORMAL] [SG2-85:AC4] coordinator cannot read notifications'; end if;
  if jsonb_array_length(public.list_venue_holds()) = 0 then raise exception '[SG2-84:assigned-coordinator-cannot-read-holds] [NORMAL] [SG2-84:AC1] assigned coordinator cannot read holds'; end if;
+ if exists(select 1 from public.venue_holds) then raise exception '[SG2-84:coordinator-details-require-scoped-rpc] [FAILURE] [SG2-84:AC1] Coordinator detailed reads must use the assigned-event RPC'; end if;
+ if not exists(select 1 from public.venue_booking_occupancy where venue_id = 98401 and starts_at = now()+interval '20 days' and status = 'tentative' and event_id = 98401)
+  then raise exception '[SG2-84:assigned-coordinator-occupancy-retained] [NORMAL] [SG2-84:AC3] Assigned coordinator lost the live occupied period'; end if;
  begin
   perform public.change_venue_hold(current_setting('holds.stale')::bigint,'release');
   raise exception '[SG2-84:coordinator-mutated-hold] [FAILURE] [SG2-84:AC5] coordinator mutated hold';
@@ -173,18 +178,92 @@ select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000004'
 do $$
 begin
  if public.list_venue_hold_notifications() <> '[]'::jsonb or public.list_venue_holds() <> '[]'::jsonb or exists(select 1 from public.venue_hold_notifications) then raise exception '[SG2-84:unassigned-coordinator-saw-another-person-notifications-or-event] [FAILURE] [SG2-84:AC6] unassigned coordinator saw another person notifications or event details'; end if;
+ if exists(select 1 from public.venue_holds) then raise exception '[SG2-84:unassigned-coordinator-direct-holds-denied] [FAILURE] [SG2-84:AC1] Unassigned coordinator must not read raw hold metadata in any lifecycle state'; end if;
+ if not exists(select 1 from public.venue_booking_occupancy where venue_id = 98401 and starts_at = now()+interval '20 days' and status = 'tentative' and event_id is null)
+  or exists(select 1 from public.venue_hold_occupancy() where event_id is not null)
+  then raise exception '[SG2-84:shared-occupancy-redacts-unassigned-events] [NORMAL] [SG2-84:AC3] Shared live occupied periods must remain visible without unrelated event identifiers'; end if;
+ if exists(select 1 from public.venue_hold_occupancy() o where to_jsonb(o) ?| array['hold_id','request_id','booking_id','created_by','expires_at','created_at','warning_sent_at'])
+  then raise exception '[SG2-84:occupancy-projection-limits-metadata] [FAILURE] [SG2-84:AC3] Occupancy projection exposed detailed hold fields'; end if;
 end;
 $$;
 select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000005',true);
 do $$
 begin
  if exists(select 1 from public.venue_booking_occupancy) then raise exception '[SG2-84:external-attendee-saw-internal-occupancy] [FAILURE] [SG2-84:AC3] external attendee saw internal occupancy'; end if;
+ if exists(select 1 from public.venue_holds) or exists(select 1 from public.venue_hold_occupancy())
+  then raise exception '[SG2-84:external-hold-projection-denied] [FAILURE] [SG2-84:AC3] External role must not receive detailed or projected hold data'; end if;
  begin
   perform public.list_venue_holds(); raise exception '[SG2-84:attendee-read-holds-through-rpc] [FAILURE] [SG2-84:AC1] attendee read holds through RPC';
  exception when insufficient_privilege then null; end;
 end;
 $$;
 reset role;
+-- The corrected privacy boundary follows current assignment, without changing
+-- event assignment workflows or hiding shared occupied periods.
+update public.events set coordinator_id = 'd8400000-0000-4000-8000-000000000004' where event_id = 98401;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000002',true);
+do $$
+begin
+ if exists(select 1 from jsonb_array_elements(public.list_venue_holds()) h where (h->>'event_id')::integer = 98401)
+  or not exists(select 1 from public.venue_hold_occupancy() where venue_id = 98401 and starts_at = now()+interval '20 days' and event_id is null)
+  then raise exception '[SG2-84:former-assignment-details-removed] [CONFLICT] [SG2-84:AC1] [SG2-84:AC3] Former assignment must lose detailed records while retaining redacted occupancy'; end if;
+end;
+$$;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000004',true);
+do $$
+begin
+ if not exists(select 1 from jsonb_array_elements(public.list_venue_holds()) h where (h->>'event_id')::integer = 98401)
+  or not exists(select 1 from public.venue_hold_occupancy() where venue_id = 98401 and starts_at = now()+interval '20 days' and event_id = 98401)
+  or exists(select 1 from public.venue_holds)
+  then raise exception '[SG2-84:current-assignment-rpc-read-retained] [NORMAL] [SG2-84:AC1] [SG2-84:AC3] Current assignment must retain its scoped RPC and occupancy without raw table access'; end if;
+end;
+$$;
+reset role;
+update public.events set coordinator_id = 'd8400000-0000-4000-8000-000000000002' where event_id = 98401;
+select set_config('holds.raw_count',(select count(*)::text from public.venue_holds),true);
+select set_config('holds.active_count',(select count(*)::text from public.venue_holds where status = 'tentative' and expires_at > clock_timestamp()),true);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+do $$
+begin
+ if (select count(*) from public.venue_holds) <> current_setting('holds.raw_count')::integer
+  or (select count(*) from public.venue_hold_occupancy()) <> current_setting('holds.active_count')::integer
+  then raise exception '[SG2-84:staff-direct-read-compatibility] [NORMAL] [SG2-84:AC1] [SG2-84:AC3] Venue Staff lost detailed or live occupancy reads'; end if;
+end;
+$$;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000006',true);
+do $$
+begin
+ if (select count(*) from public.venue_holds) <> current_setting('holds.raw_count')::integer
+  or (select count(*) from public.venue_hold_occupancy()) <> current_setting('holds.active_count')::integer
+  then raise exception '[SG2-84:technical-direct-read-compatibility] [NORMAL] [SG2-84:AC3] Technical Support Staff lost existing internal read access'; end if;
+end;
+$$;
+select set_config('request.jwt.claim.sub','',true);
+do $$
+begin
+ if exists(select 1 from public.venue_hold_occupancy()) or exists(select 1 from public.venue_holds)
+  then raise exception '[SG2-84:missing-identity-hold-read-denied] [BOUNDARY] [SG2-84:AC1] [SG2-84:AC3] An authenticated database role without a caller identity must not receive hold data'; end if;
+end;
+$$;
+reset role;
+set local role service_role;
+do $$
+begin
+ if (select count(*) from public.venue_holds) <> current_setting('holds.raw_count')::integer
+  or (select count(*) from public.venue_hold_occupancy()) <> current_setting('holds.active_count')::integer
+  or exists(select 1 from public.venue_hold_occupancy() where event_id is null)
+  then raise exception '[SG2-84:trusted-service-occupancy-retained] [NORMAL] [SG2-84:AC3] Trusted service reads without an end-user identity lost hold occupancy'; end if;
+end;
+$$;
+reset role;
+do $$
+begin
+ if has_function_privilege('anon','public.venue_hold_occupancy()','EXECUTE')
+  then raise exception '[SG2-84:anonymous-hold-projection-denied] [FAILURE] [SG2-84:AC3] Anonymous callers must not execute the occupancy projection'; end if;
+end;
+$$;
 do $$
 declare name text;
 begin

@@ -52,21 +52,41 @@ revoke all on sequence public.venue_holds_hold_id_seq,public.venue_hold_notifica
 grant select on public.venue_holds,public.venue_hold_notifications to authenticated;
 grant select,insert,update,delete on public.venue_holds,public.venue_hold_notifications,public.venue_hold_settings to service_role;
 grant usage,select on sequence public.venue_holds_hold_id_seq,public.venue_hold_notifications_notification_id_seq to service_role;
--- Occupancy is shared by internal scheduling roles; event details in the list
--- RPC below additionally constrain coordinators to their own assignments.
+-- Coordinators read detailed records only through the assigned-event list RPC.
+-- Raw table reads must not provide a second, broader path to that metadata.
 create policy venue_holds_read_internal on public.venue_holds for select to authenticated using (
   exists(select 1 from public.account_roles ar where ar.user_id = (select auth.uid())
-    and ar.role in ('venue_staff','event_coordinator','technical_support_staff'))
+    and ar.role in ('venue_staff','technical_support_staff'))
 );
 create policy venue_hold_notifications_recipient on public.venue_hold_notifications for select to authenticated using (recipient_id = (select auth.uid()));
 
+-- Shared scheduling needs every live busy period, even for another coordinator.
+-- This guarded projection exposes no hold/request/creator/deadline/history fields.
+-- The SET ROLE setting preserves the caller's database role inside this definer;
+-- current_user would instead identify the function owner.
+create function public.venue_hold_occupancy()
+returns table(venue_id integer,starts_at timestamptz,ends_at timestamptz,status text,event_id integer)
+language plpgsql security definer set search_path = '' as $$
+declare caller_role text; trusted_service boolean := coalesce(current_setting('role',true) = 'service_role',false);
+begin
+  select ar.role into caller_role from public.account_roles ar where ar.user_id = auth.uid();
+  if not trusted_service and (caller_role is null or caller_role not in ('venue_staff','event_coordinator','technical_support_staff')) then return; end if;
+  return query
+    select h.venue_id,h.starts_at,h.ends_at,'tentative'::text,
+      case when trusted_service or caller_role <> 'event_coordinator' or e.coordinator_id = auth.uid() then h.event_id else null::integer end
+    from public.venue_holds h join public.events e on e.event_id = h.event_id
+    where h.status = 'tentative' and h.expires_at > clock_timestamp();
+end;
+$$;
+revoke all on function public.venue_hold_occupancy() from public,anon,authenticated;
+grant execute on function public.venue_hold_occupancy() to authenticated,service_role;
+
 -- Reads release a period at the exact deadline, even between timer runs.
--- security_invoker preserves the base tables' RLS and does not expose events.
+-- Legacy booking RLS remains intact; live holds use the limited projection.
 create view public.venue_booking_occupancy with (security_invoker = true) as
 select b.venue_id,b.starts_at,b.ends_at,b.status,b.event_id from public.venue_bookings b
 union all
-select h.venue_id,h.starts_at,h.ends_at,'tentative'::text,h.event_id from public.venue_holds h
-where h.status = 'tentative' and h.expires_at > clock_timestamp();
+select h.venue_id,h.starts_at,h.ends_at,h.status,h.event_id from public.venue_hold_occupancy() h;
 revoke all on public.venue_booking_occupancy from public,anon,authenticated;
 grant select on public.venue_booking_occupancy to authenticated,service_role;
 
