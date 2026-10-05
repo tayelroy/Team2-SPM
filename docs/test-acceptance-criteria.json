@@ -402,6 +402,18 @@
         "AC4": "The Event Coordinator is warned before the hold expires (e.g. 24 hours before; confirm the lead time with the customer) and notified again when it expires",
         "AC5": "The expiry is recorded in the event's history"
       }
+    },
+    {
+      "id": "SG2-90",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-90",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-05",
+      "acceptanceCriteria": {
+        "AC1": "An Event Coordinator can review, update, request venues/equipment for, and confirm only the events currently assigned to them",
+        "AC2": "Any attempt to act on an event that isn't assigned to them is refused on the server side",
+        "AC3": "Once an event is reassigned, the previous coordinator can no longer act on it",
+        "AC4": "Events in the unassigned queue cannot be acted on by any Event Coordinator"
+      }
     }
   ]
 }

@@ -232,49 +232,38 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
     }
   });
 
-  test('[NORMAL] [SG2-39:AC1] [SG2-39:AC4] updateEventPlanningFields updates fields and returns updated record', async () => {
-    let capturedUpdates: any = null;
-    let capturedId: any = null;
-
-    const updatedEvent = {
-      event_id: 101,
-      status: 'planning',
-      coordinator_id: 'coord-uuid-1',
-      organiser_id: 'org-uuid-1',
-      expected_attendance: 250,
-      proposed_date: '2026-11-01T09:00:00Z',
-      venue_requirements: 'Auditorium',
-      accessibility_needs: null,
-      equipment_requirements: null,
-      registration_needed: true,
-      registration_capacity: 250,
-      registration_opens_at: null,
-      registration_closes_at: null,
-      planning_notes: null,
-      arrangements_recheck_needed: true,
-      outstanding_arrangements: ['venue_recheck', 'equipment_recheck']
-    };
-
-    const fakeAdmin = {
+  /** A stateful `events` table: update() applies only to rows matching every .eq() filter. */
+  function fakeEventsTable(rows: Record<string, unknown>[], failWith?: string) {
+    return {
       from(table: string) {
         assert.equal(table, 'events');
         return {
-          update(fields: any) {
-            capturedUpdates = fields;
-            return {
-              eq(col: string, val: any) {
-                assert.equal(col, 'event_id');
-                capturedId = val;
-                return {
-                  select: async () => ({ data: [updatedEvent], error: null })
-                };
+          update(fields: Record<string, unknown>) {
+            const filters: [string, unknown][] = [];
+            const builder = {
+              eq(column: string, value: unknown) {
+                filters.push([column, value]);
+                return builder;
+              },
+              async select() {
+                if (failWith) return { data: null, error: { message: failWith } };
+                const matched = rows.filter(row => filters.every(([column, value]) => row[column] === value));
+                for (const row of matched) Object.assign(row, fields);
+                return { data: matched.map(row => ({ ...row })), error: null };
               }
             };
+            return builder;
           }
         };
       }
     } as unknown as SupabaseClient;
+  }
 
+  test('[NORMAL] [SG2-39:AC1] [SG2-39:AC4] updateEventPlanningFields updates fields and returns updated record', async () => {
+    const rows: Record<string, unknown>[] = [{
+      event_id: 101, status: 'approved', coordinator_id: 'coord-uuid-1', organiser_id: 'org-uuid-1',
+      expected_attendance: 150, arrangements_recheck_needed: false, outstanding_arrangements: []
+    }];
     const updates: UpdatePlanningFieldsInput = {
       expected_attendance: 250,
       registration_capacity: 250,
@@ -283,38 +272,44 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
       status: 'planning'
     };
 
-    const result = await updateEventPlanningFields(fakeAdmin, 101, updates);
-    assert.deepEqual(capturedUpdates, updates);
-    assert.equal(capturedId, 101);
+    const result = await updateEventPlanningFields(fakeEventsTable(rows), 101, updates, 'coord-uuid-1');
+
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.equal(result.event.expected_attendance, 250);
+      assert.equal(result.event.status, 'planning');
       assert.equal(result.event.arrangements_recheck_needed, true);
       assert.deepEqual(result.event.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
     }
+    assert.equal(rows[0].registration_capacity, 250);
+  });
+
+  test('[CONFLICT] [SG2-90:AC3] updateEventPlanningFields changes nothing for a coordinator the event was reassigned away from', async () => {
+    const rows = [{ event_id: 101, status: 'planning', coordinator_id: 'coord-new', planning_notes: 'kept' }];
+
+    const stale = await updateEventPlanningFields(fakeEventsTable(rows), 101, { planning_notes: 'stale write' }, 'coord-old');
+    assert.deepEqual(stale, { ok: false, reason: 'not_found', message: 'Event not found.' });
+    assert.equal(rows[0].planning_notes, 'kept');
+
+    const current = await updateEventPlanningFields(fakeEventsTable(rows), 101, { planning_notes: 'current write' }, 'coord-new');
+    assert.equal(current.ok, true);
+    assert.equal(rows[0].planning_notes, 'current write');
+  });
+
+  test('[CONFLICT] [SG2-90:AC4] updateEventPlanningFields changes nothing on an unassigned event, whoever asks', async () => {
+    const rows = [{ event_id: 102, status: 'submitted', coordinator_id: null, planning_notes: null }];
+
+    const result = await updateEventPlanningFields(fakeEventsTable(rows), 102, { planning_notes: 'x' }, 'coord-uuid-1');
+
+    assert.equal(result.ok, false);
+    assert.equal(rows[0].planning_notes, null);
   });
 
   test('[BOUNDARY] [SG2-39:AC3] updateEventPlanningFields falls back to empty array when outstanding_arrangements is null', async () => {
-    const fakeAdmin = {
-      from() {
-        return {
-          update() {
-            return {
-              eq() {
-                return {
-                  select: async () => ({
-                    data: [{ event_id: 108, outstanding_arrangements: null }],
-                    error: null
-                  })
-                };
-              }
-            };
-          }
-        };
-      }
-    } as unknown as SupabaseClient;
+    const rows = [{ event_id: 108, coordinator_id: 'coord-uuid-1', outstanding_arrangements: null }];
 
-    const result = await updateEventPlanningFields(fakeAdmin, 108, { planning_notes: 'note' });
+    const result = await updateEventPlanningFields(fakeEventsTable(rows), 108, { planning_notes: 'note' }, 'coord-uuid-1');
+
     assert.equal(result.ok, true);
     if (result.ok) {
       assert.deepEqual(result.event.outstanding_arrangements, []);
@@ -322,44 +317,13 @@ describe('Event Planning DB operations (SG2-38 / SG2-39)', () => {
   });
 
   test('[FAILURE] [SG2-39:AC1] updateEventPlanningFields returns not_found if no rows matched', async () => {
-    const fakeAdmin = {
-      from() {
-        return {
-          update() {
-            return {
-              eq() {
-                return {
-                  select: async () => ({ data: [], error: null })
-                };
-              }
-            };
-          }
-        };
-      }
-    } as unknown as SupabaseClient;
-
-    const result = await updateEventPlanningFields(fakeAdmin, 999, { planning_notes: 'note' });
+    const result = await updateEventPlanningFields(fakeEventsTable([]), 999, { planning_notes: 'note' }, 'coord-uuid-1');
     assert.deepEqual(result, { ok: false, reason: 'not_found', message: 'Event not found.' });
   });
 
   test('[FAILURE] [SG2-39:AC1] updateEventPlanningFields returns unavailable on database error', async () => {
-    const fakeAdmin = {
-      from() {
-        return {
-          update() {
-            return {
-              eq() {
-                return {
-                  select: async () => ({ data: null, error: { message: 'Write lock timeout' } })
-                };
-              }
-            };
-          }
-        };
-      }
-    } as unknown as SupabaseClient;
-
-    const result = await updateEventPlanningFields(fakeAdmin, 101, { planning_notes: 'note' });
+    const rows = [{ event_id: 101, coordinator_id: 'coord-uuid-1' }];
+    const result = await updateEventPlanningFields(fakeEventsTable(rows, 'Write lock timeout'), 101, { planning_notes: 'note' }, 'coord-uuid-1');
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'Write lock timeout' });
   });
 });

@@ -106,17 +106,24 @@ export async function fetchEventPlanningRecord(
 }
 
 /**
- * Updates planning fields for an event.
+ * Updates planning fields for an event on behalf of its coordinator.
+ *
+ * `coordinator_id` is a condition on the write itself rather than only a prior
+ * read, as in startEventReview and decideEventRequest: a coordinator whose
+ * event was reassigned after they loaded it matches no row, so a previous
+ * coordinator cannot act once the assignment has moved (SG2-90).
  */
 export async function updateEventPlanningFields(
   admin: SupabaseClient,
   eventId: number,
-  fields: UpdatePlanningFieldsInput
+  fields: UpdatePlanningFieldsInput,
+  coordinatorId: string
 ): Promise<UpdateEventPlanningResult> {
   const { data, error } = await admin
     .from('events')
     .update(fields)
     .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
     .select(PLANNING_UPDATE_COLUMNS);
 
   if (error) {
