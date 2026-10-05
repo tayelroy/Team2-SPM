@@ -5,6 +5,7 @@ import type { Notification, Role, Screen } from '../mock/types';
 import { navFor, previewNavFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
+import HoldNotifications from '../components/HoldNotifications';
 
 /** Slide-over notification panel. */
 function NotificationDrawer({ onClose, notifications }: { onClose: () => void; notifications: Notification[] }) {
@@ -146,12 +147,14 @@ export default function AppShell({
   screen,
   onNavigate,
   onSignOut,
+  accessToken,
   children,
 }: {
   role: Role;
   screen: Exclude<Screen, 'landing' | 'login'>;
   onNavigate: (screen: Screen) => void;
   onSignOut: () => void;
+  accessToken?: string;
   children: ReactNode;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -162,7 +165,8 @@ export default function AppShell({
   const previewRef = useRef<HTMLDivElement>(null);
   const previewButton = useRef<HTMLButtonElement>(null);
   const head = HEAD[role];
-  const notifications = role === 'Event Organiser' ? [] : NOTIFICATIONS;
+  const internalRole = role === 'Event Coordinator' || role === 'Venue Staff' || role === 'Technical Support Staff';
+  const notifications = internalRole ? NOTIFICATIONS : [];
   const primary = primaryActionFor(role);
   const preview = previewNavFor(role);
 
@@ -282,7 +286,7 @@ export default function AppShell({
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <button
+            {accessToken && internalRole ? <HoldNotifications key={accessToken} accessToken={accessToken} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
               aria-label={`Notifications (${notifications.length})`}
@@ -316,7 +320,7 @@ export default function AppShell({
               >
                 {notifications.length}
               </span>
-            </button>
+            </button>}
 
             <div
               ref={profileRef}

@@ -23,6 +23,7 @@ type QueryResult = { data: Row[] | Row | null; error: null; status: number };
 export class MemoryDatabase {
   tables: Record<string, Row[]> = {};
   sessions = new Map<string, string>();
+  venueHoldNow: () => number = Date.now;
   private sessionSequence = 0;
 
   constructor() { this.reset(); }
@@ -51,6 +52,8 @@ export class MemoryDatabase {
       account_roles: accounts.map(account => ({ user_id: `user-${account.key}`, role: account.role })),
       venue_booking_requests: [],
       venue_capacity_exceptions: [],
+      venue_holds: [],
+      venue_hold_notifications: [],
       equipment_requests: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
       events: [
@@ -172,6 +175,11 @@ export class MemoryDatabase {
   readonly client = {
     from: (table: string) => {
       if (table === 'internal_work_items') this.tables[table] = this.workItems();
+      if (table === 'venue_booking_occupancy') this.tables[table] = [
+        ...this.tables.venue_bookings,
+        ...this.tables.venue_holds.filter(hold => hold.status === 'tentative' && Date.parse(String(hold.expires_at)) > this.venueHoldNow())
+          .map(hold => ({ venue_id: hold.venue_id, event_id: hold.event_id, starts_at: hold.starts_at, ends_at: hold.ends_at, status: 'tentative' })),
+      ];
       if (!(table in this.tables)) throw new Error(`Unsupported fixture table: ${table}`);
       return new MemoryQuery(this, table);
     },

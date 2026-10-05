@@ -70,6 +70,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venue_booking.capacity_exception.approve': ['venue_staff', 'technical_support_staff', 'event_organiser'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
+  'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
+  'venues.holds.manage': ['venue_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

@@ -77,7 +77,7 @@ test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returne
     { ...hall, layouts: [], held: [] },
     { ...terrace, layouts: [{ layout: 'banquet', other_description: null }], held: [] }
   ] });
-  for (const table of ['venue_unavailability', 'venue_bookings']) {
+  for (const table of ['venue_unavailability', 'venue_booking_occupancy']) {
     assert.deepEqual(calls.filter(call => call.table === table && ['lt', 'gt'].includes(call.method)), [
       { table, method: 'lt', args: ['starts_at', TO] },
       { table, method: 'gt', args: ['ends_at', FROM] }
@@ -89,14 +89,21 @@ test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returne
 test('[CONFLICT] [SG2-45:AC1] [SG2-46:AC2] AC2: a blocked venue or one with a confirmed booking in the period is not returned', async () => {
   assert.deepEqual(await names({}, {
     venue_unavailability: { data: [{ venue_id: 1, starts_at: FROM, ends_at: TO }], error: null },
-    venue_bookings: { data: [{ venue_id: 2, starts_at: FROM, ends_at: TO, status: 'confirmed' }], error: null }
+    venue_booking_occupancy: { data: [{ venue_id: 2, starts_at: FROM, ends_at: TO, status: 'confirmed' }], error: null }
   }), ['Rooftop Terrace', 'Unrecorded Room']);
 });
 
-test('[NORMAL] [SG2-46:AC2] a held booking does not exclude the venue but is reported, earliest first', async () => {
+test('[CONFLICT] [SG2-84:AC3] active tentative holds exclude a venue from available search results', async () => {
+  const result = await searchVenues(criteria(), catalogue({ venue_booking_occupancy: { data: [
+    { venue_id: 3, starts_at: FROM, ends_at: TO, status: 'tentative' }
+  ], error: null } }));
+  assert.deepEqual(result.outcome === 'ok' && result.venues.map(venue => venue.name), ['Atrium Hall', 'Seminar Room A', 'Unrecorded Room']);
+});
+
+test('[NORMAL] [SG2-46:AC2] legacy held bookings remain searchable with ordered warning periods', async () => {
   const later = { venue_id: 3, starts_at: '2030-06-15T09:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', status: 'held' };
   const earlier = { ...later, starts_at: '2030-06-15T01:00:00.000Z', ends_at: '2030-06-15T02:00:00.000Z' };
-  const result = await searchVenues(criteria({ attendance: 101 }), catalogue({ venue_bookings: { data: [later, earlier], error: null } }));
+  const result = await searchVenues(criteria({ attendance: 101 }), catalogue({ venue_booking_occupancy: { data: [later, earlier], error: null } }));
   assert.deepEqual(result.outcome === 'ok' && result.venues.map(venue => [venue.name, venue.held]), [
     ['Rooftop Terrace', [{ starts_at: earlier.starts_at, ends_at: earlier.ends_at }, { starts_at: later.starts_at, ends_at: later.ends_at }]]
   ]);
@@ -147,7 +154,7 @@ test('[NORMAL] [SG2-46:AC3] AC3: no accessibility keywords means accessibility i
   assert.deepEqual(await names({ accessibility: [] }), ['Atrium Hall', 'Seminar Room A', 'Rooftop Terrace', 'Unrecorded Room']);
 });
 
-for (const table of ['venues', 'venue_layouts', 'venue_unavailability', 'venue_bookings']) {
+for (const table of ['venues', 'venue_layouts', 'venue_unavailability', 'venue_booking_occupancy']) {
   test(`[FAILURE] [SG2-46:AC2] a failed read of ${table} makes the search unavailable`, async () => {
     const result = await searchVenues(criteria(), catalogue({ [table]: { data: null, error: { message: 'SECRET' } } }));
     assert.deepEqual(result, { outcome: 'unavailable' });
