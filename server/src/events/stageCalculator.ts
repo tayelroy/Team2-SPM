@@ -119,7 +119,7 @@ export function computeEventStage(event: EventStageInput): EventStageResult {
           action: 'Assign event coordinator',
           user_id: null
         };
-        activeStepIndex = 2;
+        activeStepIndex = 1;
       }
       break;
 

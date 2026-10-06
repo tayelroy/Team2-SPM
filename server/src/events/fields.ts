@@ -236,6 +236,6 @@ export const STATUS_TRANSITIONS: Readonly<Record<EventStatus, readonly EventStat
 };
 
 export function canTransition(from: EventStatus, to: EventStatus): boolean {
-  return STATUS_TRANSITIONS[from].includes(to);
+  return (STATUS_TRANSITIONS[from] ?? []).includes(to);
 }
 

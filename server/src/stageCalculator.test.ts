@@ -42,18 +42,18 @@ describe('computeEventStage (SG2-38)', () => {
       action: 'Assign event coordinator',
       user_id: null
     });
-    assert.equal(result.stepper_steps[1].status, 'completed');
-    assert.equal(result.stepper_steps[2].status, 'current');
-    assert.equal(result.stepper_steps[3].status, 'upcoming');
+    assert.equal(result.stepper_steps[0].status, 'completed');
+    assert.equal(result.stepper_steps[1].status, 'current');
+    assert.equal(result.stepper_steps[2].status, 'upcoming');
   });
 
-  test('[BOUNDARY] [SG2-100:AC2] submitted with coordinator_id null still lands at the under_review step, matching Unit 2\'s post-removal behaviour', () => {
+  test('[BOUNDARY] [SG2-100:AC2] submitted with coordinator_id null still lands at the Awaiting Assignment step, matching Unit 2\'s post-removal behaviour', () => {
     const result = computeEventStage({
       event_id: 2,
       status: 'submitted',
       coordinator_id: null
     });
-    assert.equal(result.stepper_steps[2].status, 'current');
+    assert.equal(result.stepper_steps[1].status, 'current');
   });
 
   test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] unassigned status returns "Awaiting Assignment" stage waiting on the Event Coordinator Lead', () => {

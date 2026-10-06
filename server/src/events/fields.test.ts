@@ -45,4 +45,8 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
       assert.equal(canTransition('cancelled', to), false, `cancelled -> ${to} should be illegal`);
     }
   });
+
+  test('[FAILURE] [SG2-100:AC4] an unrecognised from-status falls back to no legal transitions instead of throwing', () => {
+    assert.equal(canTransition('not_a_real_status' as EventStatus, 'confirmed'), false);
+  });
 });
