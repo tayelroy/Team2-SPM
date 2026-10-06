@@ -399,15 +399,36 @@ export const PIPELINE = [
   { label: 'Completed', count: 9, pct: '92%' },
 ];
 
-export const STATUS_FILTERS = [
-  'All',
-  'Draft',
-  'Submitted',
-  'Under review',
-  'Approved',
-  'Planning',
-  'Confirmed',
-  'Rejected',
+/**
+ * Every status an event can be filtered to, in lifecycle order (SG2-100).
+ *
+ * `value` is the stored status and `label` is what the reader sees; before
+ * SG2-100 these were one list of labels, which meant "Under review" was sent
+ * to the API as `under review` and came back 400. Keeping the two apart is
+ * what makes the four Week 7 statuses filterable at all, since every one of
+ * them has a multi-word name.
+ */
+export interface StatusFilter {
+  value: string;
+  label: string;
+}
+
+export const STATUS_FILTERS: readonly StatusFilter[] = [
+  { value: 'all', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'unassigned', label: 'Awaiting Assignment' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'under_review', label: 'Under Review' },
+  { value: 'needs_clarification', label: 'Clarification Needed' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'planning', label: 'Arrangements' },
+  { value: 'awaiting_safety_check', label: 'Awaiting Safety Check' },
+  { value: 'safety_rejected', label: 'Safety Rejected' },
+  { value: 'preparation', label: 'Preparation' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 export const EQUIPMENT: EquipmentRequest[] = [

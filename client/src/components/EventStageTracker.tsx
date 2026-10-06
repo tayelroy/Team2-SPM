@@ -78,12 +78,17 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
       <div
         role="list"
         aria-label="Lifecycle steps"
+        data-testid="stepper-track"
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
           position: 'relative',
           padding: '12px 0 6px',
+          // SG2-100: at seven steps a 390px viewport cannot fit them all.
+          // The track scrolls on its own rather than pushing the page
+          // sideways, and each step's own minWidth (below) keeps its label
+          // legible instead of letting it compress to fit.
           overflowX: 'auto',
           gap: '8px',
         }}

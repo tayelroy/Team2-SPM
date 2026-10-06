@@ -1548,3 +1548,50 @@ describe('completeEvent (SG2-100 AC4)', () => {
     if (result.ok) assert.equal(result.previous_status, '');
   });
 });
+
+
+describe('the event end time on a detail read (SG2-100 AC4)', () => {
+  async function detailFor(venue_bookings: unknown) {
+    const result = await fetchEventRequestById(
+      fakeEventsSelectClient({
+        data: [{ event_id: 7, organiser_id: 'user-1', status: 'confirmed', venue_bookings }],
+        error: null
+      }),
+      7
+    );
+    assert.equal(result.ok, true);
+    return result.ok ? result.request : null;
+  }
+
+  test('[NORMAL] [SG2-100:AC6] the end time is the latest confirmed booking, whatever order they arrive in', async () => {
+    const request = await detailFor([
+      { ends_at: '2026-11-04T18:00:00.000Z', status: 'confirmed' },
+      { ends_at: '2026-11-06T21:30:00.000Z', status: 'confirmed' },
+      { ends_at: '2026-11-05T12:00:00.000Z', status: 'confirmed' }
+    ]);
+    assert.equal(request?.ends_at, '2026-11-06T21:30:00.000Z');
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] a held booking does not set an end time, and a later held one cannot extend it', async () => {
+    const heldOnly = await detailFor([{ ends_at: '2026-11-04T18:00:00.000Z', status: 'held' }]);
+    assert.equal(heldOnly?.ends_at, null);
+
+    const mixed = await detailFor([
+      { ends_at: '2026-11-04T18:00:00.000Z', status: 'confirmed' },
+      { ends_at: '2026-12-01T18:00:00.000Z', status: 'held' }
+    ]);
+    assert.equal(mixed?.ends_at, '2026-11-04T18:00:00.000Z');
+  });
+
+  test('[FAILURE] [SG2-100:AC6] an absent, empty or malformed bookings list leaves the end time unknown', async () => {
+    for (const bookings of [undefined, null, [], 'nonsense', [{ status: 'confirmed' }], [{ ends_at: 42, status: 'confirmed' }], [null]]) {
+      const request = await detailFor(bookings);
+      assert.equal(request?.ends_at, null, JSON.stringify(bookings ?? null));
+    }
+  });
+
+  test('[FAILURE] [SG2-100:AC6] the bookings the end time was derived from are not sent to the caller', async () => {
+    const request = await detailFor([{ ends_at: '2026-11-04T18:00:00.000Z', status: 'confirmed' }]);
+    assert.equal('venue_bookings' in (request as object), false);
+  });
+});

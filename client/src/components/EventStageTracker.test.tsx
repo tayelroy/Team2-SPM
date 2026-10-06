@@ -125,3 +125,94 @@ describe('EventStageTracker (SG2-38)', () => {
     expect(screen.queryByText('Arrangements Recheck Needed')).not.toBeInTheDocument();
   });
 });
+
+describe('EventStageTracker at seven steps (SG2-100 AC9)', () => {
+  const SEVEN_STEP_LABELS = [
+    'Draft',
+    'Awaiting Assignment',
+    'Under Review',
+    'Arrangements',
+    'Safety Check',
+    'Preparation',
+    'Confirmed',
+  ];
+
+  const safetyStage: EventStageResult = {
+    event_id: 202,
+    raw_status: 'awaiting_safety_check',
+    stage: 'Awaiting Safety Check',
+    stage_key: 'awaiting_safety_check',
+    description: 'Arrangements are complete; the Safety Officer has the operational safety check.',
+    waiting_on: {
+      persona: 'Safety Officer',
+      action: 'Complete the operational safety check',
+      user_id: null,
+    },
+    stepper_steps: [
+      { key: 'draft', label: 'Draft', status: 'completed' },
+      { key: 'unassigned', label: 'Awaiting Assignment', status: 'completed' },
+      { key: 'under_review', label: 'Under Review', status: 'completed' },
+      { key: 'in_planning', label: 'Arrangements', status: 'completed' },
+      { key: 'safety_check', label: 'Safety Check', status: 'current' },
+      { key: 'preparation', label: 'Preparation', status: 'upcoming' },
+      { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
+    ],
+    arrangements_recheck_needed: false,
+    outstanding_arrangements: [],
+  };
+
+  test('[NORMAL] [SG2-100:AC5] all seven steps render with their plain-language labels, in order', () => {
+    render(<EventStageTracker stage={safetyStage} />);
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(7);
+    // Completed steps show a tick instead of their number.
+    expect(items.map((item) => item.textContent)).toEqual([
+      '✓Draft',
+      '✓Awaiting Assignment',
+      '✓Under Review',
+      '✓Arrangements',
+      '5Safety Check',
+      '6Preparation',
+      '7Confirmed',
+    ]);
+    expect(items.map((item) => item.textContent?.replace(/^(✓|\d)/, ''))).toEqual(SEVEN_STEP_LABELS);
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Awaiting Safety Check');
+    expect(items[4]).toHaveAttribute('aria-current', 'step');
+  });
+
+  test('[BOUNDARY] [SG2-100:AC9] the step track scrolls on a narrow viewport rather than squashing or overflowing the page', () => {
+    render(<EventStageTracker stage={safetyStage} />);
+    const track = screen.getByTestId('stepper-track');
+    // The track owns the horizontal scroll, so seven steps never push the
+    // surrounding page sideways at 390px.
+    expect(track).toHaveStyle({ overflowX: 'auto' });
+    // Each step keeps a legible floor width, so seven of them are wider than
+    // a 390px viewport and the track above is what absorbs the difference.
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(item).toHaveStyle({ 'min-width': '95px' });
+    }
+  });
+
+  test('[FAILURE] [SG2-100:AC5] a stage with nobody waiting on it renders without a responsibility card', () => {
+    render(
+      <EventStageTracker
+        stage={{
+          ...safetyStage,
+          raw_status: 'safety_rejected',
+          stage: 'Safety Rejected',
+          stage_key: 'safety_rejected',
+          description: 'The operational safety check was not passed.',
+          waiting_on: null,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Safety Rejected');
+    expect(screen.getAllByRole('listitem')).toHaveLength(7);
+  });
+
+  test('[CONFLICT] [SG2-100:AC5] an empty stepper payload renders nothing rather than throwing', () => {
+    render(<EventStageTracker stage={{ ...safetyStage, stepper_steps: [] }} />);
+    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Awaiting Safety Check');
+  });
+});

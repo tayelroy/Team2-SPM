@@ -18,6 +18,12 @@ export interface EventRequestRecord extends DraftValues {
   /** Who marked the event completed and when (SG2-100 AC4). */
   completed_by?: string | null;
   completed_at?: string | null;
+  /**
+   * When the event finishes: the latest end of its confirmed venue bookings
+   * (SG2-100 AC4). Null while it has none. Derived rather than stored, so it
+   * cannot drift from the bookings it describes.
+   */
+  ends_at?: string | null;
 }
 
 /** An event request row in summary format for list views (SG2-31). */
@@ -111,8 +117,9 @@ const DETAIL_COLUMNS =
   'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
   // SG2-37: the organiser sees the outcome and, for a rejection, why.
   'decided_at, decision_reason, ' +
-  // SG2-100 AC4: who marked the event completed, and when.
-  'completed_by, completed_at';
+  // SG2-100 AC4: who marked the event completed and when, plus the bookings
+  // the event's end time is derived from.
+  'completed_by, completed_at, venue_bookings(ends_at, status)';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {
@@ -134,6 +141,39 @@ function extractCoordinatorPhone(row: Record<string, unknown>): string | null {
   const joined = Array.isArray(row.coordinator) ? row.coordinator[0] : row.coordinator;
   const phone = (joined as Record<string, unknown> | null | undefined)?.phone;
   return typeof phone === 'string' && phone.trim() ? phone : null;
+}
+
+/**
+ * The event's end time: the latest `ends_at` among its confirmed venue
+ * bookings (SG2-100 AC4). `public.events` has no end-time column, an event
+ * may occupy several venues, and the last booking ending is the real signal
+ * that the event is over. Null when nothing confirms when it ends — callers
+ * must read that as "not known to have finished", never as finished.
+ */
+function extractEndsAt(row: Record<string, unknown>): string | null {
+  const bookings = Array.isArray(row.venue_bookings) ? row.venue_bookings : [];
+  let latest: string | null = null;
+  for (const entry of bookings as Record<string, unknown>[]) {
+    if (entry?.status !== 'confirmed' || typeof entry.ends_at !== 'string') continue;
+    if (latest === null || entry.ends_at > latest) latest = entry.ends_at;
+  }
+  return latest;
+}
+
+/**
+ * Turns a DETAIL_COLUMNS row into the record the API returns. The embedded
+ * `venue_bookings` rows exist only to derive `ends_at`, so they are dropped
+ * rather than sent on: the client is told when the event finishes, not which
+ * bookings said so.
+ */
+function toDetailRecord(row: Record<string, unknown>): EventRequestRecord {
+  const { venue_bookings: _bookings, ...rest } = row;
+  return {
+    ...(rest as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row),
+    ends_at: extractEndsAt(row)
+  };
 }
 
 function extractCoordinatorId(row: Record<string, unknown>): string | null {
@@ -351,9 +391,7 @@ export async function fetchOwnEventRequest(
   }
   const row = data[0] as unknown as Record<string, unknown>;
   const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row),
+    ...toDetailRecord(row),
     coordinator_phone: extractCoordinatorPhone(row)
   };
   return { ok: true, request };
@@ -443,11 +481,7 @@ export async function startEventReview(
     return { ok: false, reason: 'not_found', message: 'No reviewable event request is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -495,11 +529,7 @@ export async function decideEventRequest(
     return { ok: false, reason: 'not_found', message: 'No event request under review is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -539,11 +569,7 @@ export async function requestClarification(
     return { ok: false, reason: 'not_found', message: 'No event request under review is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -604,11 +630,7 @@ export async function fetchEventRequestById(
     return { ok: false, reason: 'not_found', message: 'No event request found with that id.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -689,11 +711,7 @@ export async function assignEventCoordinator(
     };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -859,10 +877,6 @@ export async function completeEvent(
     return { ok: false, reason: 'not_found', message: 'No completable event is assigned to this account.' };
   }
   const row = rows[0];
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request, previous_status: previousStatus };
 }

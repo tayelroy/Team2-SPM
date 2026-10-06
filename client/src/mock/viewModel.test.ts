@@ -14,9 +14,12 @@ import {
   previewNavFor,
   primaryActionFor,
   scopedEvents,
+  statusLabel,
+  STATUS_LABELS,
   showsPipeline,
   statusTrailStyle,
 } from './viewModel';
+import { color } from '../theme';
 
 describe('badgeStyle', () => {
   test('[NORMAL] [SG2-20:prototype-view-model] confirmed reads as solid teal', () => {
@@ -249,5 +252,58 @@ describe('statusTrailStyle', () => {
     expect(statusTrailStyle(0).fg).toBe('#edfffe');
     expect(statusTrailStyle(2).fg).toBe('#edfffe');
     expect(statusTrailStyle(3).fg).toBe('#707777');
+  });
+});
+
+describe('statusLabel (SG2-100 AC5)', () => {
+  test('[NORMAL] [SG2-100:AC5] every stored status has a plain-language name', () => {
+    // Independent literals, not a re-derivation of STATUS_LABELS: this is the
+    // vocabulary the reader sees, and it is the thing under test.
+    const EXPECTED: [string, string][] = [
+      ['draft', 'Draft'],
+      ['unassigned', 'Awaiting Assignment'],
+      ['submitted', 'Submitted'],
+      ['under_review', 'Under Review'],
+      ['needs_clarification', 'Clarification Needed'],
+      ['approved', 'Approved'],
+      ['planning', 'Arrangements'],
+      ['awaiting_safety_check', 'Awaiting Safety Check'],
+      ['safety_rejected', 'Safety Rejected'],
+      ['preparation', 'Preparation'],
+      ['confirmed', 'Confirmed'],
+      ['completed', 'Completed'],
+      ['cancelled', 'Cancelled'],
+      ['rejected', 'Rejected'],
+    ];
+    for (const [status, label] of EXPECTED) {
+      expect(statusLabel(status)).toBe(label);
+    }
+    expect(EXPECTED).toHaveLength(Object.keys(STATUS_LABELS).length);
+  });
+
+  test('[BOUNDARY] [SG2-100:AC5] surrounding whitespace and casing do not change the answer', () => {
+    expect(statusLabel('  AWAITING_SAFETY_CHECK  ')).toBe('Awaiting Safety Check');
+    expect(statusLabel('Under_Review')).toBe('Under Review');
+  });
+
+  test('[FAILURE] [SG2-100:AC5] an unrecognised status falls back to itself rather than to a guess', () => {
+    expect(statusLabel('some_future_status')).toBe('some_future_status');
+    expect(statusLabel('')).toBe('');
+  });
+});
+
+describe('badgeStyle for the Week 7 statuses (SG2-100 AC5)', () => {
+  test('[NORMAL] [SG2-100:AC5] a failed safety check reads as a dead state, like rejected and cancelled', () => {
+    const dead = { badgeBg: 'rgba(112,119,119,0.35)', badgeFg: color.silver };
+    expect(badgeStyle('safety_rejected')).toEqual(dead);
+    expect(badgeStyle('rejected')).toEqual(dead);
+    expect(badgeStyle('cancelled')).toEqual(dead);
+  });
+
+  test('[BOUNDARY] [SG2-100:AC5] the live Week 7 statuses keep the neutral in-progress pill', () => {
+    const live = { badgeBg: 'rgba(255,255,255,0.09)', badgeFg: color.mist };
+    for (const status of ['unassigned', 'awaiting_safety_check', 'preparation', 'completed']) {
+      expect(badgeStyle(status)).toEqual(live);
+    }
   });
 });
