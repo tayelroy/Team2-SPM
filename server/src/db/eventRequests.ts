@@ -15,6 +15,9 @@ export interface EventRequestRecord extends DraftValues {
   /** Who decided, when, and why it was rejected (SG2-37). */
   decided_at?: string | null;
   decision_reason?: string | null;
+  /** Who marked the event completed and when (SG2-100 AC4). */
+  completed_by?: string | null;
+  completed_at?: string | null;
 }
 
 /** An event request row in summary format for list views (SG2-31). */
@@ -61,6 +64,15 @@ export type AssignCoordinatorResult =
   | { ok: false; reason: 'not_found' | 'not_assignable' | 'unavailable'; message: string };
 
 /**
+ * SG2-100 AC4. `previous_status` is the status the event held before
+ * completion, so the caller can write a truthful audit row without a second
+ * read; the guarded update is what established it.
+ */
+export type CompleteEventResult =
+  | { ok: true; request: EventRequestRecord; previous_status: string }
+  | { ok: false; reason: 'not_found' | 'not_finished' | 'unavailable'; message: string };
+
+/**
  * A status move applied in the same write as a coordinator assignment
  * (SG2-100). `from` guards the write so the move cannot land on a row that
  * has since changed status; `to` is the value written.
@@ -98,7 +110,9 @@ const DETAIL_COLUMNS =
   'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
   'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
   // SG2-37: the organiser sees the outcome and, for a rejection, why.
-  'decided_at, decision_reason';
+  'decided_at, decision_reason, ' +
+  // SG2-100 AC4: who marked the event completed, and when.
+  'completed_by, completed_at';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {
@@ -756,4 +770,99 @@ export async function fetchAssignableRequests(admin: SupabaseClient): Promise<Fe
       coordinator_name: extractCoordinatorName(row)
     }))
   };
+}
+
+/**
+ * Statuses an event can be marked completed from (SG2-100 AC4). An event is
+ * only ever held once its arrangements are done, so `preparation` and
+ * `confirmed` are the two live statuses an event can be in when its end
+ * time passes. `approved`, `planning`, `cancelled` and `rejected` are not
+ * here, which is what makes completing one of those a `not_found`.
+ */
+export const COMPLETABLE_STATUSES = ['preparation', 'confirmed'];
+
+/**
+ * Marks an event this coordinator is assigned to as completed (SG2-100 AC4).
+ *
+ * "The event's end time" is `max(venue_bookings.ends_at)` over the event's
+ * confirmed bookings: `public.events` has no end-time column, an event may
+ * occupy several venues, and the last booking ending is the real signal that
+ * the event is over. An event with no confirmed booking has no end time to
+ * have passed, so it fails closed as `not_finished` — never as finished.
+ *
+ * Ownership and status are checked before the clock so the only error a
+ * coordinator can distinguish is the actionable one: "not yours / not
+ * completable" and "does not exist" share a single `not_found`, while
+ * `not_finished` is safe to disclose to the coordinator the event is
+ * actually assigned to.
+ *
+ * Both guards are then repeated as conditions on the update itself, not only
+ * as pre-checks — the IDOR-hardening shape from SG2-32/SG2-35. That is also
+ * what makes a double-click idempotent (the second call matches zero rows
+ * and reports `not_found`) and stops two coordinators racing one completion.
+ */
+export async function completeEvent(
+  admin: SupabaseClient,
+  eventId: number,
+  coordinatorId: string,
+  now: Date
+): Promise<CompleteEventResult> {
+  const existing = await admin
+    .from('events')
+    .select('event_id, status')
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .in('status', COMPLETABLE_STATUSES);
+
+  if (existing.error) {
+    return { ok: false, reason: 'unavailable', message: existing.error.message };
+  }
+  const found = (existing.data as Record<string, unknown>[] | null) ?? [];
+  if (found.length === 0) {
+    return { ok: false, reason: 'not_found', message: 'No completable event is assigned to this account.' };
+  }
+  const previousStatus = typeof found[0].status === 'string' ? found[0].status : '';
+
+  const bookings = await admin
+    .from('venue_bookings')
+    .select('ends_at')
+    .eq('event_id', eventId)
+    .eq('status', 'confirmed')
+    .order('ends_at', { ascending: false })
+    .limit(1);
+
+  if (bookings.error) {
+    return { ok: false, reason: 'unavailable', message: bookings.error.message };
+  }
+  const latest = ((bookings.data as Record<string, unknown>[] | null) ?? [])[0]?.ends_at;
+  const endsAt = typeof latest === 'string' ? Date.parse(latest) : NaN;
+  if (!Number.isFinite(endsAt) || endsAt > now.getTime()) {
+    return { ok: false, reason: 'not_finished', message: 'This event has not finished yet.' };
+  }
+
+  const { data, error } = await admin
+    .from('events')
+    .update({ status: 'completed', completed_by: coordinatorId, completed_at: now.toISOString() })
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .in('status', COMPLETABLE_STATUSES)
+    .select(DETAIL_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
+  if (rows.length === 0) {
+    // The event moved on between the read and the write — a second
+    // double-click, or another coordinator taking it over. One reason, so
+    // neither can be told which.
+    return { ok: false, reason: 'not_found', message: 'No completable event is assigned to this account.' };
+  }
+  const row = rows[0];
+  const request: EventRequestRecord = {
+    ...(row as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row)
+  };
+  return { ok: true, request, previous_status: previousStatus };
 }

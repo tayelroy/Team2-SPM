@@ -15,6 +15,7 @@ import { createAssignCoordinatorHandler } from './events/assignCoordinator';
 import { createListAssignableHandler } from './events/listAssignable';
 import { createStartEventReviewHandler } from './events/review';
 import { createDecideEventRequestHandler } from './events/decide';
+import { createCompleteEventHandler } from './events/complete';
 import { createAddClarificationHandler, createListClarificationsHandler } from './events/clarifications';
 import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
@@ -65,7 +66,11 @@ export function createApp(
   getEventHistoryHandler: RequestHandler = createGetEventHistoryHandler({ getPrincipal: access.getPrincipal }),
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
-  venueHoldsRouter = createVenueHoldsRouter(access)
+  venueHoldsRouter = createVenueHoldsRouter(access),
+  // SG2-100 AC4. Appended rather than grouped with the other event handlers
+  // on purpose: every parameter here is positional, and inserting one in the
+  // middle would silently shift every caller's later arguments.
+  completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -142,6 +147,14 @@ export function createApp(
     '/:eventId/decision',
     access.requirePermission('event_request.decide'),
     decideEventRequestHandler
+  );
+  // SG2-100 AC4: the assigned coordinator marks an event that has been held
+  // as completed. Registered before '/:eventId', which would otherwise
+  // capture it.
+  eventRequests.patch(
+    '/:eventId/complete',
+    access.requirePermission('event_request.complete'),
+    completeEventHandler
   );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(

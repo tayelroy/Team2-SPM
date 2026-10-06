@@ -382,11 +382,22 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 
 // SG2-86: Event Coordinator Lead and Safety Officer — Week 7 customer changes.
 for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
-  test(`[NORMAL] [SG2-86:AC1] GET /api/auth/me for ${role} returns only the universal profile grants`, async () => {
+  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body, { userId, role, permissions: ['profile.read', 'profile.update'] });
+    // SG2-100 added the stage and history reads both roles need; the queues
+    // they act on arrive with SG2-87/88/91/97.
+    assert.deepEqual(res.body, {
+      userId,
+      role,
+      permissions: [
+        'event_request.stage.view',
+        'event_request.history.view',
+        'profile.read',
+        'profile.update'
+      ]
+    });
     assert.equal(fetchMock.mock.callCount(), 2);
   });
 }
@@ -407,7 +418,8 @@ test('[NORMAL] [SG2-86:AC4] permissionsFor every existing role is unchanged by t
     ],
     event_coordinator: [
       'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
-      'event_request.decide', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
+      'event_request.decide', 'event_request.clarify', 'event_request.complete',
+      'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
       'venue_booking.request.view', 'venues.holds.read', 'profile.read', 'profile.update'
     ],
@@ -427,6 +439,82 @@ test('[NORMAL] [SG2-86:AC4] permissionsFor every existing role is unchanged by t
   for (const [role, expected] of Object.entries(EXPECTED)) {
     assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);
   }
+});
+
+test('[NORMAL] [SG2-100:AC13] the two Week 7 roles hold exactly the profile grants plus the SG2-100 reads', () => {
+  // Written as an independent literal, never computed from PERMISSIONS: this
+  // file's snapshot went stale during SG2-86 for exactly that reason.
+  const EXPECTED = [
+    'event_request.stage.view',
+    'event_request.history.view',
+    'profile.read',
+    'profile.update'
+  ];
+  for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+    assert.deepEqual(permissionsFor(role, PERMISSIONS).sort(), [...EXPECTED].sort(), role);
+  }
+});
+
+test('[NORMAL] [SG2-100:AC13] only an Event Coordinator may complete an event', () => {
+  assert.deepEqual([...PERMISSIONS['event_request.complete']], ['event_coordinator']);
+});
+
+for (const role of [
+  'event_organiser', 'attendee', 'venue_staff', 'technical_support_staff',
+  'safety_officer', 'event_coordinator_lead'
+] as const) {
+  test(`[FAILURE] [SG2-100:AC13] ${role} is refused event_request.complete server-side`, async () => {
+    const access = createAuthorization({
+      resolvePrincipal: async () => ({ userId, role }),
+      permissions: PERMISSIONS
+    });
+    let calls = 0;
+    const app = express();
+    app.use(access.requireAuth);
+    app.patch(
+      '/api/event-requests/:eventId/complete',
+      access.requirePermission('event_request.complete'),
+      (_req, res) => { calls++; res.sendStatus(200); }
+    );
+    const res = await request(app).patch('/api/event-requests/7/complete').set('Authorization', 'Bearer token');
+    assert.equal(res.status, 403);
+    assert.equal(calls, 0);
+  });
+}
+
+test('[BOUNDARY] [SG2-100:AC6] the complete route is matched on its own, not captured by the draft-update catch-all', async () => {
+  // '/:eventId' would swallow '/7/complete' if it were registered first, and
+  // the symptom would be silent: the request would be gated by
+  // event_request.update instead. The two permissions have disjoint role
+  // lists, so which gate answers says which route matched.
+  // Leave the service-role key unset so the completion handler answers from
+  // its own unavailable branch instead of reaching for a real database.
+  dbConfig.supabaseServiceRoleKey = '';
+
+  async function completeAs(role: Principal['role']) {
+    const access = createAuthorization({
+      resolvePrincipal: async () => ({ userId, role }),
+      permissions: PERMISSIONS
+    });
+    return request(createApp(undefined, access))
+      .patch('/api/event-requests/7/complete')
+      .set('Authorization', 'Bearer token');
+  }
+
+  // A coordinator holds event_request.complete but not event_request.update,
+  // so passing the gate and reaching the unconfigured database proves the
+  // completion route matched.
+  const coordinator = await completeAs('event_coordinator');
+  assert.equal(coordinator.status, 503);
+  assert.deepEqual(coordinator.body, {
+    error: 'Event requests are temporarily unavailable. Please try again later.'
+  });
+
+  // An organiser holds event_request.update but not event_request.complete.
+  // 403 is the completion gate refusing them; reaching the draft update
+  // would have let them through.
+  const organiser = await completeAs('event_organiser');
+  assert.equal(organiser.status, 403);
 });
 
 test('[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles', () => {

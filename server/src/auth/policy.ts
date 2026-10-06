@@ -1,6 +1,6 @@
-// SG2-86 adds the two Week 7 roles below. Their only grants today are
-// profile.read/profile.update (inherited via [...ROLES]); further grants
-// arrive with SG2-87/88/97/100.
+// SG2-86 added the two Week 7 roles below. SG2-100 gives them the stage and
+// history reads they cannot work without; the queues they act on arrive with
+// SG2-87/88/91/97.
 export const ROLES = [
   'event_organiser',
   'event_coordinator',
@@ -51,10 +51,24 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // coordinator and the organiser who raised it. Which request is enforced
   // per-row in the handler, not by this grant.
   'event_request.clarify': ['event_coordinator', 'event_organiser'],
-  // SG2-38: see what stage an event has reached
-  'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
-  // SG2-40: see who changed what on an event
-  'event_request.history.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
+  // SG2-100 AC4: the assigned coordinator marks an event that has been held
+  // as completed. Which event is enforced per-row by the assignment and by
+  // the guards on the write itself, not by this grant.
+  'event_request.complete': ['event_coordinator'],
+  // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
+  // roles: the Lead assigns from the awaiting-assignment queue and the Safety
+  // Officer answers a safety check, and neither can do so without seeing
+  // where the event has got to.
+  'event_request.stage.view': [
+    'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff',
+    'event_coordinator_lead', 'safety_officer'
+  ],
+  // SG2-40: see who changed what on an event. Widened by SG2-100 for the
+  // same reason as the stage view.
+  'event_request.history.view': [
+    'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff',
+    'event_coordinator_lead', 'safety_officer'
+  ],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],

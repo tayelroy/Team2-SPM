@@ -995,7 +995,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(auditCalled, false);
   });
 
-  test('[CONFLICT] [SG2-39:AC5] AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
+  test('[CONFLICT] [SG2-39:AC5] [SG2-100:AC7] AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
     for (const status of ['cancelled', 'completed', 'rejected']) {
       let updateCalled = false;
       let auditCalled = false;

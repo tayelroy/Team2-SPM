@@ -12,6 +12,7 @@ import {
   decideEventRequest,
   requestClarification,
   insertEventRequestDraft,
+  completeEvent,
   startEventReview,
   submitEventRequest,
   updateEventRequestDraft
@@ -1317,5 +1318,233 @@ describe('fetchAssignableRequests', () => {
       await fetchAssignableRequests(fakeAssignableClient({ data: null, error: { message: 'boom' } })),
       { ok: false, reason: 'unavailable', message: 'boom' }
     );
+  });
+});
+
+
+/**
+ * SG2-100 AC4: completeEvent makes three calls — the ownership/status read,
+ * the confirmed-booking end-time read, and the guarded update. This records
+ * every filter on each so the guards can be asserted rather than assumed.
+ */
+function fakeCompleteClient(options: {
+  eventResult?: Result;
+  bookingResult?: Result;
+  updateResult?: Result;
+  capture?: (calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[]) => void;
+}): SupabaseClient {
+  const calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
+  const report = () => options.capture?.(calls);
+  return {
+    from(table: string) {
+      return {
+        select(_columns: string) {
+          const filters: [string, string, unknown][] = [];
+          const chain: Record<string, unknown> = {
+            eq(column: string, value: unknown) { filters.push(['eq', column, value]); return chain; },
+            in(column: string, value: unknown) { filters.push(['in', column, value]); return chain; },
+            order(column: string, opts: unknown) { filters.push(['order', column, opts]); return chain; },
+            limit(count: number) { filters.push(['limit', 'rows', count]); return chain; },
+            then(resolve: (value: Result) => unknown) {
+              calls.push({ table, op: 'select', filters });
+              report();
+              const result = table === 'venue_bookings'
+                ? options.bookingResult ?? { data: [], error: null }
+                : options.eventResult ?? { data: [], error: null };
+              return Promise.resolve(result).then(resolve);
+            }
+          };
+          return chain;
+        },
+        update(row: Record<string, unknown>) {
+          const filters: [string, string, unknown][] = [];
+          const chain: Record<string, unknown> = {
+            eq(column: string, value: unknown) { filters.push(['eq', column, value]); return chain; },
+            in(column: string, value: unknown) { filters.push(['in', column, value]); return chain; },
+            select: async () => {
+              calls.push({ table, op: 'update', row, filters });
+              report();
+              return options.updateResult ?? { data: [], error: null };
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
+const NOW = new Date('2026-11-05T12:00:00.000Z');
+const COMPLETABLE = ['preparation', 'confirmed'];
+
+describe('completeEvent (SG2-100 AC4)', () => {
+  test('[NORMAL] [SG2-100:AC6] [SG2-100:AC13] writes the completion with both guards repeated on the update', async () => {
+    let calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
+    const result = await completeEvent(
+      fakeCompleteClient({
+        eventResult: { data: [{ event_id: 7, status: 'confirmed' }], error: null },
+        bookingResult: { data: [{ ends_at: '2026-11-05T10:00:00.000Z' }], error: null },
+        updateResult: {
+          data: [{ event_id: 7, status: 'completed', completed_by: 'coord-1', completed_at: NOW.toISOString(), coordinator: { name: 'Coord One' } }],
+          error: null
+        },
+        capture: (c) => (calls = c)
+      }),
+      7,
+      'coord-1',
+      NOW
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.request.status, 'completed');
+      assert.equal(result.request.coordinator_name, 'Coord One');
+      assert.equal(result.previous_status, 'confirmed');
+    }
+
+    // The end time comes from the latest confirmed booking, never from events.
+    assert.equal(calls[1].table, 'venue_bookings');
+    assert.deepEqual(calls[1].filters, [
+      ['eq', 'event_id', 7],
+      ['eq', 'status', 'confirmed'],
+      ['order', 'ends_at', { ascending: false }],
+      ['limit', 'rows', 1]
+    ]);
+
+    const update = calls[2];
+    assert.equal(update.op, 'update');
+    assert.deepEqual(update.row, {
+      status: 'completed',
+      completed_by: 'coord-1',
+      completed_at: '2026-11-05T12:00:00.000Z'
+    });
+    assert.deepEqual(update.filters, [
+      ['eq', 'event_id', 7],
+      ['eq', 'coordinator_id', 'coord-1'],
+      ['in', 'status', COMPLETABLE]
+    ]);
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] an end time exactly now counts as passed; one millisecond later does not', async () => {
+    async function at(endsAt: string) {
+      return completeEvent(
+        fakeCompleteClient({
+          eventResult: { data: [{ event_id: 7, status: 'preparation' }], error: null },
+          bookingResult: { data: [{ ends_at: endsAt }], error: null },
+          updateResult: { data: [{ event_id: 7, status: 'completed' }], error: null }
+        }),
+        7,
+        'coord-1',
+        NOW
+      );
+    }
+
+    assert.equal((await at('2026-11-05T12:00:00.000Z')).ok, true);
+    const justAfter = await at('2026-11-05T12:00:00.001Z');
+    assert.equal(justAfter.ok, false);
+    if (!justAfter.ok) assert.equal(justAfter.reason, 'not_finished');
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] an event with no confirmed booking fails closed as not finished', async () => {
+    for (const bookingResult of [{ data: [], error: null }, { data: null, error: null }, { data: [{ ends_at: null }], error: null }]) {
+      const result = await completeEvent(
+        fakeCompleteClient({
+          eventResult: { data: [{ event_id: 7, status: 'confirmed' }], error: null },
+          bookingResult
+        }),
+        7,
+        'coord-1',
+        NOW
+      );
+      // Never "finished": an event whose end time cannot be established has
+      // not been shown to be over.
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_finished');
+    }
+  });
+
+  for (const data of [[], null]) {
+    test(`[FAILURE] [SG2-100:AC6] the ownership and status read is scoped to the coordinator and the completable statuses, matching ${JSON.stringify(data)} rows`, async () => {
+      let calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
+      const result = await completeEvent(
+        fakeCompleteClient({ eventResult: { data, error: null }, capture: (c) => (calls = c) }),
+        7,
+        'coord-1',
+        NOW
+      );
+
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.reason, 'not_found');
+        assert.equal(result.message, 'No completable event is assigned to this account.');
+      }
+      assert.deepEqual(calls[0].filters, [
+        ['eq', 'event_id', 7],
+        ['eq', 'coordinator_id', 'coord-1'],
+        ['in', 'status', COMPLETABLE]
+      ]);
+      // The booking read never happens, so an unrelated event's schedule is
+      // not probed on the way to a 404.
+      assert.equal(calls.length, 1);
+    });
+  }
+
+  test('[CONFLICT] [SG2-100:AC6] a completion that loses the race to the update reports not_found', async () => {
+    for (const data of [[], null]) {
+      const result = await completeEvent(
+        fakeCompleteClient({
+          eventResult: { data: [{ event_id: 7, status: 'confirmed' }], error: null },
+          bookingResult: { data: [{ ends_at: '2026-11-05T10:00:00.000Z' }], error: null },
+          updateResult: { data, error: null }
+        }),
+        7,
+        'coord-1',
+        NOW
+      );
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.reason, 'not_found');
+    }
+  });
+
+  test('[FAILURE] [SG2-100:AC6] every failing query is reported as unavailable with its own message', async () => {
+    const eventFailure = await completeEvent(
+      fakeCompleteClient({ eventResult: { data: null, error: { message: 'events down' } } }),
+      7, 'coord-1', NOW
+    );
+    assert.deepEqual(eventFailure, { ok: false, reason: 'unavailable', message: 'events down' });
+
+    const bookingFailure = await completeEvent(
+      fakeCompleteClient({
+        eventResult: { data: [{ event_id: 7, status: 'confirmed' }], error: null },
+        bookingResult: { data: null, error: { message: 'bookings down' } }
+      }),
+      7, 'coord-1', NOW
+    );
+    assert.deepEqual(bookingFailure, { ok: false, reason: 'unavailable', message: 'bookings down' });
+
+    const updateFailure = await completeEvent(
+      fakeCompleteClient({
+        eventResult: { data: [{ event_id: 7, status: 'confirmed' }], error: null },
+        bookingResult: { data: [{ ends_at: '2026-11-05T10:00:00.000Z' }], error: null },
+        updateResult: { data: null, error: { message: 'update down' } }
+      }),
+      7, 'coord-1', NOW
+    );
+    assert.deepEqual(updateFailure, { ok: false, reason: 'unavailable', message: 'update down' });
+  });
+
+  test('[BOUNDARY] [SG2-100:AC8] a row that comes back without a readable status reports an empty previous value rather than guessing', async () => {
+    const result = await completeEvent(
+      fakeCompleteClient({
+        eventResult: { data: [{ event_id: 7, status: null }], error: null },
+        bookingResult: { data: [{ ends_at: '2026-11-05T10:00:00.000Z' }], error: null },
+        updateResult: { data: [{ event_id: 7, status: 'completed' }], error: null }
+      }),
+      7,
+      'coord-1',
+      NOW
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.previous_status, '');
   });
 });
