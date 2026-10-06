@@ -13,7 +13,7 @@ export interface EventStageTrackerProps {
  *
  * Displays:
  * 1. Current stage badge in plain language and descriptive sub-label.
- * 2. 5-step visual pipeline stepper (Draft → Submitted → Under Review → Approved — In Planning → Confirmed).
+ * 2. 7-step visual pipeline stepper (Draft → Awaiting Assignment → Under Review → Arrangements → Safety Check → Preparation → Confirmed), SG2-100.
  * 3. Prominent "Waiting On" responsibility card showing the active persona and next required action.
  */
 export default function EventStageTracker({ stage, style }: EventStageTrackerProps) {

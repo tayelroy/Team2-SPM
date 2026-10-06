@@ -377,7 +377,7 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
       stage: {
         event_id: 101,
         raw_status: 'approved',
-        stage: 'Approved — In Planning',
+        stage: 'Arrangements',
         stage_key: 'in_planning',
         description: 'Event approved; coordinator is actively arranging venue and equipment.',
         waiting_on: {
@@ -386,9 +386,11 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         },
         stepper_steps: [
           { key: 'draft', label: 'Draft', status: 'completed' },
-          { key: 'submitted', label: 'Submitted', status: 'completed' },
+          { key: 'unassigned', label: 'Awaiting Assignment', status: 'completed' },
           { key: 'under_review', label: 'Under Review', status: 'completed' },
-          { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+          { key: 'in_planning', label: 'Arrangements', status: 'current' },
+          { key: 'safety_check', label: 'Safety Check', status: 'upcoming' },
+          { key: 'preparation', label: 'Preparation', status: 'upcoming' },
           { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
         ],
         arrangements_recheck_needed: true,
@@ -406,7 +408,7 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Annual Tech Summit' })).toBeInTheDocument();
-    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Approved — In Planning');
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Arrangements');
     expect(screen.getByText('Event approved; coordinator is actively arranging venue and equipment.')).toBeInTheDocument();
     expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('Event Coordinator (Sarah Jenkins)');
     expect(screen.getByTestId('waiting-on-action')).toHaveTextContent('Next step: Complete venue suitability check and equipment reservation');

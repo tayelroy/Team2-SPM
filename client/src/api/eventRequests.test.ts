@@ -1002,7 +1002,7 @@ describe('getEventStage (SG2-38)', () => {
     const mockStage: EventStageResult = {
       event_id: 101,
       raw_status: 'planning',
-      stage: 'Approved — In Planning',
+      stage: 'Arrangements',
       stage_key: 'in_planning',
       description: 'Event approved; coordinator is actively arranging venue and equipment.',
       waiting_on: {
@@ -1012,9 +1012,11 @@ describe('getEventStage (SG2-38)', () => {
       },
       stepper_steps: [
         { key: 'draft', label: 'Draft', status: 'completed' },
-        { key: 'submitted', label: 'Submitted', status: 'completed' },
+        { key: 'unassigned', label: 'Awaiting Assignment', status: 'completed' },
         { key: 'under_review', label: 'Under Review', status: 'completed' },
-        { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+        { key: 'in_planning', label: 'Arrangements', status: 'current' },
+        { key: 'safety_check', label: 'Safety Check', status: 'upcoming' },
+        { key: 'preparation', label: 'Preparation', status: 'upcoming' },
         { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
       ],
       arrangements_recheck_needed: false,
