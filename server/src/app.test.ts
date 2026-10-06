@@ -28,9 +28,10 @@ test('[NORMAL] [SG2-20:AC3] application composition mounts injected service rout
   const suitability = Router().get('/suitability', (_req, res) => res.json({ service: 'suitability' }));
   const bookingRequests = Router().get('/1/suitability', (_req, res) => res.json({ service: 'bookingRequests' }));
   const venueRequests = Router().get('/', (_req, res) => res.json({ service: 'venueRequests' }));
+  const conflicts = Router().get('/1/conflicts', (_req, res) => res.json({ service: 'conflicts' }));
   const composed = createApp(undefined, undefined, undefined, undefined, undefined, undefined,
-    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, operations, blocks, search, profile, suitability, bookingRequests, venueRequests });
-  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/operations', 'operations'], ['/api/venues/1/blocks', 'blocks'], ['/api/venues/search', 'search'], ['/api/profile', 'profile'], ['/api/venues/suitability', 'suitability'], ['/api/venue-booking-requests/1/suitability', 'bookingRequests'], ['/api/venue-booking-requests', 'venueRequests']]) {
+    undefined, undefined, undefined, undefined, undefined, undefined, { availability, venues, layouts, operations, blocks, search, profile, suitability, bookingRequests, venueRequests, conflicts });
+  for (const [path, service] of [['/api/venues/availability', 'availability'], ['/api/venues', 'venues'], ['/api/venues/1/layouts', 'layouts'], ['/api/venues/1/operations', 'operations'], ['/api/venues/1/blocks', 'blocks'], ['/api/venues/search', 'search'], ['/api/profile', 'profile'], ['/api/venues/suitability', 'suitability'], ['/api/venue-booking-requests/1/suitability', 'bookingRequests'], ['/api/venue-booking-requests', 'venueRequests'], ['/api/venue-booking-requests/1/conflicts', 'conflicts']]) {
     const response = await request(composed).get(path);
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { service });

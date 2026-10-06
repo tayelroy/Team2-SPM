@@ -170,3 +170,22 @@ Migration `202610050003_venue_operations.sql` adds `venue_operations` (one row p
 Verification: `supabase/tests/venue_operations.sql` (CI database job), `server/src/venue-operations.test.ts`, `server/src/db/venueOperations.test.ts`, `client/src/venues/VenueOperations.test.tsx`, `client/src/venues/operationsApi.test.ts` and browser journey `SG2-77-P01`.
 
 SG2-78 uses these times to widen each booking's occupied period in availability, conflict checks and search.
+
+## SG2-50: Preventing double-booking
+
+A venue is never committed to two overlapping events. Held and confirmed bookings and live tentative holds (SG2-84) commit a venue; a pending request does not. Periods that only touch (one ends as the next starts) do not overlap.
+
+- **Reported when requested (AC1).** `POST /api/venue-booking-requests` still makes the request, and its `201` reply carries `conflicts`: every booking or hold it overlaps at that venue, by number and period. The coordinator's notice lists them. A coordinator sees the event only when it is one of theirs.
+- **Shown to Venue Staff (AC1).** Each venue request in the work queue has a "Booking conflicts" panel, naming the event that holds the venue.
+- **Approval refused (AC2).** `approvalRefusal()` in `server/src/venues/conflicts.ts` returns a `409` refusal naming each conflict. SG2-49's approve step (not merged yet) must call it before committing; until then a stand-in route in `server/src/venue-conflicts.test.ts` exercises it. Underneath every path, the database refuses the write.
+- **Released periods (AC3).** Only held and confirmed bookings and unexpired tentative holds count, so a released, expired, rejected or cancelled one frees its period. Decided requests report no conflicts.
+
+| Route | Who | Result |
+| --- | --- | --- |
+| `GET /api/venue-booking-requests/:requestId/conflicts` | Venue Staff; the event's assigned coordinator | `200 { request_id, status, conflicts }`; empty once the request is decided. `400` bad ID, `404` unknown or not the coordinator's event, `503` storage failure |
+
+Migration `202610060001_venue_double_booking.sql` adds the exclusion constraint `venue_bookings_no_double_booking`: two held or confirmed bookings for the same venue can never overlap, even when written at the same moment. Live data had no overlapping bookings when it was written (6 Oct 2026).
+
+Verification: `supabase/tests/venue_double_booking.sql` (CI database job), `server/src/venue-conflicts.test.ts`, `server/src/db/venueConflicts.test.ts`, `client/src/venues/BookingConflicts.test.tsx` and browser journey `SG2-50-P01`.
+
+SG2-78 widens each period by the venue's setup and turnaround time inside `createVenueConflictStore`, so every check above picks it up.

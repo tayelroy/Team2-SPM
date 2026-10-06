@@ -7,6 +7,7 @@ import { createAuthorization, AccessError, type Role } from './auth';
 import { dbConfig } from './db';
 import type { SuitabilityEventRow, SuitabilityVenueRow } from './db/venueSuitability';
 import type { NewVenueBookingRequest, VenueBookingRequestRecord, VenueBookingRequestStore } from './db/venueBookingRequests';
+import type { ConflictOptions, ConflictPeriod, VenueConflictRow } from './db/venueConflicts';
 import type { Layout } from './venues/layoutFields';
 import { validateVenueBookingRequest } from './venues/bookingRequestFields';
 import { createVenueBookingRequestsRouter, type VenueBookingRequestDependencies } from './venues/bookingRequests';
@@ -46,11 +47,12 @@ const body = (overrides: Record<string, unknown> = {}) => ({
   event_id: 7, venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', layout: 'theatre', ...overrides
 });
 
-function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean } = {}) {
+function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean; occupied?: VenueConflictRow[] } = {}) {
   const events = seed.events ?? [forum];
   const venues = [atrium, theatre, seminar, bare];
   const requests: VenueBookingRequestRecord[] = seed.requests ?? [];
   const created: NewVenueBookingRequest[] = [];
+  const checked: [ConflictPeriod, ConflictOptions][] = [];
   const store: VenueBookingRequestStore = {
     async event(id) { return events.find(event => event.event_id === id) ?? null; },
     async venue(id) { return venues.find(venue => venue.venue_id === id) ?? null; },
@@ -70,9 +72,14 @@ function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBooki
       requests.push(record);
       return record;
     },
-    async list(id) { return requests.filter(row => row.event_id === id); }
+    async list(id) { return requests.filter(row => row.event_id === id); },
+    // SG2-50: whatever the seed says occupies the venue over the period.
+    async conflicts(period, options) {
+      checked.push([{ venue_id: period.venue_id, starts_at: period.starts_at, ends_at: period.ends_at }, options]);
+      return (seed.occupied ?? []).filter(row => row.starts_at < period.ends_at && row.ends_at > period.starts_at);
+    }
   };
-  return { store, created, requests };
+  return { store, created, requests, checked };
 }
 
 function app(store: VenueBookingRequestStore | null, dependencies: VenueBookingRequestDependencies = {}) {
@@ -100,6 +107,7 @@ test('[NORMAL] [SG2-48:AC1] [SG2-48:AC2] the assigned coordinator requests a ven
   assert.equal(response.status, 201);
   assert.deepEqual(response.body, {
     booking: 'allowed',
+    conflicts: [],
     request: {
       request_id: 41, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status: 'pending', layout: 'theatre',
       starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',

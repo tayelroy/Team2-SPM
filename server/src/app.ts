@@ -29,6 +29,7 @@ import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
+import { createVenueConflictsRouter } from './venues/conflicts';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -53,7 +54,8 @@ export function createApp(
     profile: createProfileRouter(access),
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
-    venueRequests: createVenueBookingRequestsRouter(access)
+    venueRequests: createVenueBookingRequestsRouter(access),
+    conflicts: createVenueConflictsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
@@ -94,6 +96,8 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  // SG2-50: what a pending venue request overlaps.
+  app.use('/api/venue-booking-requests', routers.conflicts);
   app.use('/api/venue-holds', venueHoldsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission

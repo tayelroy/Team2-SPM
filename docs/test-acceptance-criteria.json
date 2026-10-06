@@ -404,6 +404,17 @@
       }
     },
     {
+      "id": "SG2-50",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "Given a venue committed to an event for a period, when a request is raised for an overlapping period at that venue, then the conflict is reported and the conflicting booking is identified",
+        "AC2": "Given a request in conflict, when approval is attempted, then approval is refused while the conflict stands",
+        "AC3": "Given a booking that is rejected or cancelled, when the period is next checked, then it no longer causes a conflict"
+      }
+    },
+    {
       "id": "SG2-77",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-77",
       "originalPullRequests": [],

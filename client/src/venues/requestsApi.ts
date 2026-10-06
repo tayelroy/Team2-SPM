@@ -1,5 +1,6 @@
 /** Venue requests for an event (SG2-48). Mirrors server/src/venues/bookingRequests.ts. */
 import type { Layout } from './layoutsApi';
+import { formatSgt } from './searchApi';
 import type { BookingReadiness } from './suitabilityApi';
 
 export interface VenueRequest {
@@ -14,6 +15,32 @@ export interface VenueRequest {
   venue_requirements: string | null;
   requester_name: string | null;
   requested_at: string;
+}
+
+/** Something already committing the venue that a request overlaps (SG2-50).
+ * Mirrors server/src/db/venueConflicts.ts. The event is left out when it is
+ * another coordinator's. */
+export interface VenueConflict {
+  kind: 'booking' | 'hold';
+  reference_id: number;
+  event_id: number | null;
+  event_name: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+}
+
+/** "Confirmed booking #12 for Gala Night, 15 Jun 2030, 10:00 – 15 Jun 2030, 18:00". */
+export function describeConflict(conflict: VenueConflict): string {
+  const what = conflict.kind === 'hold' ? `Tentative hold #${conflict.reference_id}`
+    : `${conflict.status.charAt(0).toUpperCase()}${conflict.status.slice(1)} booking #${conflict.reference_id}`;
+  const event = conflict.event_name ?? (conflict.event_id === null ? 'another event' : `event #${conflict.event_id}`);
+  return `${what} for ${event}, ${formatSgt(conflict.starts_at)} – ${formatSgt(conflict.ends_at)}`;
+}
+
+function isConflict(value: unknown): value is VenueConflict {
+  const conflict = value as VenueConflict | null;
+  return typeof conflict?.reference_id === 'number' && typeof conflict.starts_at === 'string' && typeof conflict.ends_at === 'string';
 }
 
 export interface NewVenueRequest {
@@ -55,11 +82,22 @@ async function call<T>(url: string, token: string | null | undefined, read: (bod
   }
 }
 
-/** Requests a venue for an event (AC1). The request starts pending (AC3). */
+/** Requests a venue for an event (AC1). The request starts pending (AC3),
+ * with anything it already overlaps at the venue (SG2-50 AC1). */
 export function requestVenue(token: string | null | undefined, values: NewVenueRequest) {
-  return call('/api/venue-booking-requests', token, body => isRequest(body?.request) && typeof body?.booking === 'string'
-    ? { request: body.request, booking: body.booking as BookingReadiness } : null,
-  { method: 'POST', body: JSON.stringify(values) });
+  return call('/api/venue-booking-requests', token, body => {
+    const conflicts = body?.conflicts ?? [];
+    return isRequest(body?.request) && typeof body?.booking === 'string' && Array.isArray(conflicts) && conflicts.every(isConflict)
+      ? { request: body.request, booking: body.booking as BookingReadiness, conflicts } : null;
+  }, { method: 'POST', body: JSON.stringify(values) });
+}
+
+/** What a pending request overlaps at its venue (SG2-50 AC1). */
+export function fetchRequestConflicts(token: string | null | undefined, requestId: number) {
+  return call(`/api/venue-booking-requests/${requestId}/conflicts`, token, body => {
+    const conflicts = body?.conflicts;
+    return Array.isArray(conflicts) && conflicts.every(isConflict) ? { conflicts } : null;
+  });
 }
 
 /** The event's venue requests and where each stands (AC3). */

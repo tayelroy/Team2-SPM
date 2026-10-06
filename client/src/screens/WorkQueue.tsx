@@ -6,6 +6,7 @@ import ClarificationThread from '../components/ClarificationThread';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
+import { BookingRequestConflicts } from '../venues/BookingConflicts';
 import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
 
 const GROUPS = {
@@ -219,6 +220,8 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
         />
       )}
       {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} />}
+      {/* SG2-50 AC1: anything else committing the venue over the requested period. */}
+      {item.kind === 'venue' && <BookingRequestConflicts accessToken={accessToken} requestId={item.item_id} />}
       {item.kind === 'event' && (
         <EventAuditDrawer
           isOpen={historyDrawerOpen}

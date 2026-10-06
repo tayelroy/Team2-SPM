@@ -84,6 +84,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-48 AC2/AC3: the assigned coordinator follows their requests while
   // they await a decision, and Venue Staff, who decide them, see them too.
   'venue_booking.request.view': ['event_coordinator', 'venue_staff'],
+  // SG2-50 AC1: what a pending request overlaps, for Venue Staff deciding it
+  // and the assigned coordinator (enforced per-row).
+  'venue_booking.conflicts.view': ['event_coordinator', 'venue_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],

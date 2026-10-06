@@ -2755,5 +2755,65 @@
     "actual": "Passed in local Playwright e2e suite with other regression journeys.",
     "execution_evidence": "6 Oct 2026; feature/SG2-86-event-coordinator-lead-and-safety-officer; npm run ci green locally with 100% per-file coverage in server and client.",
     "execution_date": "6 Oct 2026"
+  },
+  {
+    "id": "SG2-50-P01",
+    "title": "a request overlapping a confirmed booking is reported to the coordinator and to Venue Staff",
+    "story": "SG2-50",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-50:AC1",
+      "SG2-50:AC2"
+    ],
+    "purpose": "Verify a coordinator's request that overlaps another event's confirmed booking is still made but reports the booking by number and period, and that Venue Staff see the clash by event, with approval refused while it stands.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Sign in as the coordinator, open Venue Request Forum and search for venues.",
+      "Request Regression Hall for 15 Jun 2030 11:00-13:00 (overlapping confirmed booking #1, 10:00-12:00); read the notice.",
+      "Request Regression Hall for 08:00-10:00 the same day (ending as booking #1 starts); read the notice.",
+      "Sign in as Venue Staff and open each request from the work queue."
+    ],
+    "data": "Venue 1 (Regression Hall) with confirmed booking #1 for event 1 (Planning workshop); event 91; coordinator and venue fixture accounts.",
+    "expected": "The overlapping request is pending and its notice names confirmed booking #1 for another event and says it cannot be approved while the conflict stands; the adjacent request reports no conflict; Venue Staff see booking #1 for Planning workshop on the first request and nothing on the second.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "6 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "6 Oct 2026; feature/SG2-50-prevent-double-booking on top of main acb0c17; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_double_booking suite. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-06",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-DOUBLE-BOOKING-01",
+    "title": "Held and confirmed bookings for the same venue never overlap",
+    "story": "SG2-50",
+    "purpose": "Check the committed exclusion constraint refuses overlapping held or confirmed bookings on every write path, accepts touching periods and other venues, and frees a period once its booking is gone.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed two venues and a confirmed booking as the superuser.",
+      "Insert and move bookings into, beside and away from that period; remove it and book the period again.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_double_booking.sql",
+    "expected": "Overlapping confirmed or held bookings, and a booking moved into an overlap, are refused; a booking starting as another ends and the same period at another venue are accepted; one microsecond of overlap is refused; a removed booking's period can be booked again; the rule covers exactly held and confirmed bookings.",
+    "evidence": "supabase/tests/venue_double_booking.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: dropping the constraint failed overlapping-confirmed-refused; widening it to a third status failed committed-statuses-only.",
+    "execution_date": "6 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "6 Oct 2026; feature/SG2-50-prevent-double-booking on top of main acb0c17; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_double_booking suite. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-06",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

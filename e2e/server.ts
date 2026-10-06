@@ -28,6 +28,7 @@ import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -137,7 +138,9 @@ const app = createApp(
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
-    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient }) },
+    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient }),
+    // SG2-50: what a pending request overlaps, against the in-memory client.
+    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.

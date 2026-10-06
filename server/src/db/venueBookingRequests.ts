@@ -3,6 +3,7 @@ import { AccessError } from '../auth/policy';
 import type { Layout } from '../venues/layoutFields';
 import type { VenueBookingRequestValues } from '../venues/bookingRequestFields';
 import { createVenueSuitabilityStore, type SuitabilityEventRow, type SuitabilityVenueRow } from './venueSuitability';
+import { createVenueConflictStore, type VenueConflictStore } from './venueConflicts';
 
 /** A venue request as people see it: the venue and requester by name. The
  * requester's account id is not sent to clients. */
@@ -39,6 +40,8 @@ export interface VenueBookingRequestStore {
   create(values: NewVenueBookingRequest): Promise<VenueBookingRequestRecord | null>;
   /** The event's requests, earliest first. */
   list(eventId: number): Promise<VenueBookingRequestRecord[]>;
+  /** What else commits the venue over the period (SG2-50 AC1). */
+  conflicts: VenueConflictStore['conflicts'];
 }
 
 const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at';
@@ -51,6 +54,7 @@ type Row = Omit<VenueBookingRequestRecord, 'venue_name' | 'requester_name'> & { 
  * the event before using this store. */
 export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBookingRequestStore {
   const suitability = createVenueSuitabilityStore(admin);
+  const occupancy = createVenueConflictStore(admin);
   function check(error: unknown) {
     if (error) throw new AccessError(503);
   }
@@ -70,6 +74,7 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
   }
   return {
     event: eventId => suitability.event(eventId),
+    conflicts: (period, options) => occupancy.conflicts(period, options),
     async venue(venueId) {
       return (await suitability.venues(venueId))[0] ?? null;
     },

@@ -409,13 +409,13 @@ test('[NORMAL] [SG2-86:AC4] permissionsFor every existing role is unchanged by t
       'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
       'event_request.decide', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
-      'venue_booking.request.view', 'venues.holds.read', 'profile.read', 'profile.update'
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venues.holds.read', 'profile.read', 'profile.update'
     ],
     venue_staff: [
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.create', 'venues.update', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
-      'venue_booking.request.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
       'work_queue.read', 'venues.availability.view', 'users.role.update', 'event_request.assign_coordinator',
