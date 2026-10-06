@@ -356,7 +356,7 @@ test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-32:AC2] submission stops stale d
   assert.equal((await submitEventRequest(db.client, 7)).ok, true);
   assert.equal((await updateEventRequestDraft(db.client, 7, 'user-1', { ...EMPTY_VALUES, name: 'Stale edit' })).ok, false);
   assert.equal((await deleteEventRequestDraft(db.client, 7, 'user-1')).ok, false);
-  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'submitted', organiser_id: 'user-1', name: 'Original draft' }]);
+  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'unassigned', organiser_id: 'user-1', name: 'Original draft' }]);
 });
 
 describe('fetchOrganiserOrganisation', () => {
@@ -646,18 +646,18 @@ describe('fetchOwnEventRequests', () => {
 });
 
 describe('submitEventRequest', () => {
-  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] updates status to submitted, filtered to draft, rejected or returned rows', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] [SG2-100:AC2] updates status to unassigned, filtered to draft, rejected or returned rows', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
     const result = await submitEventRequest(
       fakeEventsUpdateClient(
-        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'submitted' }], error: null },
+        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'unassigned' }], error: null },
         (c) => (captured = c)
       ),
       7
     );
     assert.equal(result.ok, true);
-    if (result.ok) assert.equal(result.request.status, 'submitted');
-    assert.deepEqual(captured?.row, { status: 'submitted' });
+    if (result.ok) assert.equal(result.request.status, 'unassigned');
+    assert.deepEqual(captured?.row, { status: 'unassigned' });
     assert.equal(captured?.eventId, 7);
     assert.deepEqual(captured?.status, ['draft', 'rejected', 'needs_clarification']);
   });
@@ -1018,7 +1018,17 @@ function fakeAssignClient(
   } as unknown as SupabaseClient;
 }
 
-const ASSIGNABLE = ['submitted', 'under_review', 'approved', 'planning', 'confirmed'];
+const ASSIGNABLE = [
+  'unassigned',
+  'submitted',
+  'under_review',
+  'approved',
+  'planning',
+  'awaiting_safety_check',
+  'safety_rejected',
+  'preparation',
+  'confirmed'
+];
 
 describe('assignEventCoordinator', () => {
   test('[NORMAL] [SG2-33:AC1] [SG2-33:AC2] sets coordinator_id only while the request is assignable and still unassigned', async () => {
@@ -1105,6 +1115,94 @@ describe('assignEventCoordinator', () => {
   }
 });
 
+describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
+  test('[NORMAL] [SG2-100:AC3] writes submitted alongside the coordinator and guards on unassigned', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
+    const result = await assignEventCoordinator(
+      fakeAssignClient(
+        {
+          data: [{ event_id: 7, status: 'submitted', coordinator_id: 'coord-1', coordinator: { name: 'Coord One' } }],
+          error: null
+        },
+        (c) => (captured = c)
+      ),
+      7,
+      'coord-1',
+      null,
+      { from: 'unassigned', to: 'submitted' }
+    );
+
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.status, 'submitted');
+    assert.deepEqual(captured?.row, { coordinator_id: 'coord-1', status: 'submitted' });
+    // The `from` status is a condition on the write, not a pre-check: a row
+    // that moved on between read and write matches zero rows instead of
+    // being rewound.
+    assert.deepEqual(captured?.filters, [
+      ['eq', 'event_id', 7],
+      ['eq', 'status', 'unassigned'],
+      ['is', 'coordinator_id', null]
+    ]);
+  });
+
+  test('[CONFLICT] [SG2-100:AC3] a reassignment on a live event never carries a status key', async () => {
+    for (const status of ['approved', 'planning', 'awaiting_safety_check', 'preparation', 'confirmed']) {
+      let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
+      const result = await assignEventCoordinator(
+        fakeAssignClient(
+          { data: [{ event_id: 7, status, coordinator_id: 'coord-new' }], error: null },
+          (c) => (captured = c)
+        ),
+        7,
+        'coord-new',
+        'coord-old'
+      );
+      assert.equal(result.ok, true);
+      if (result.ok) assert.equal(result.request.status, status);
+      assert.deepEqual(Object.keys(captured?.row ?? {}), ['coordinator_id']);
+      assert.equal(Object.prototype.hasOwnProperty.call(captured?.row ?? {}, 'status'), false);
+      assert.deepEqual(captured?.filters, [
+        ['eq', 'event_id', 7],
+        ['in', 'status', ASSIGNABLE],
+        ['eq', 'coordinator_id', 'coord-old']
+      ]);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-100:AC3] the undo of a first assignment puts unassigned back', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
+    const result = await assignEventCoordinator(
+      fakeAssignClient(
+        { data: [{ event_id: 7, status: 'unassigned', coordinator_id: null }], error: null },
+        (c) => (captured = c)
+      ),
+      7,
+      null,
+      'coord-1',
+      { from: 'submitted', to: 'unassigned' }
+    );
+    assert.equal(result.ok, true);
+    assert.deepEqual(captured?.row, { coordinator_id: null, status: 'unassigned' });
+    assert.deepEqual(captured?.filters, [
+      ['eq', 'event_id', 7],
+      ['eq', 'status', 'submitted'],
+      ['eq', 'coordinator_id', 'coord-1']
+    ]);
+  });
+
+  test('[FAILURE] [SG2-100:AC3] reports not_assignable when the guarded status move matches nothing', async () => {
+    const result = await assignEventCoordinator(
+      fakeAssignClient({ data: [], error: null }),
+      7,
+      'coord-1',
+      null,
+      { from: 'unassigned', to: 'submitted' }
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'not_assignable');
+  });
+});
+
 describe('coordinator contact on a single request (SG2-33 AC3)', () => {
   async function phoneFor(coordinator: unknown) {
     const result = await fetchOwnEventRequest(
@@ -1183,7 +1281,7 @@ describe('fetchAssignableRequests', () => {
       )
     );
 
-    assert.deepEqual(statuses, ['submitted', 'under_review', 'approved', 'planning', 'confirmed']);
+    assert.deepEqual(statuses, ASSIGNABLE);
     assert.deepEqual(result, {
       ok: true,
       requests: [

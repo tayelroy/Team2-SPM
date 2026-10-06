@@ -25,7 +25,12 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[1].status, 'upcoming');
   });
 
-  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] submitted state without coordinator returns "Submitted" stage waiting on ConnectSphere Staff', () => {
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-100:AC2] submitted means assigned-and-awaiting-review even with no coordinator on the row', () => {
+    // SG2-100 Unit 2 deleted the old "submitted + null coordinator means
+    // awaiting assignment" branch: submission writes `unassigned` now, and
+    // 202610060002 backfilled the rows that used to take that branch. A
+    // stray row would read as Under Review with nobody named — asserting
+    // that here is what proves the branch is gone rather than relabelled.
     const input: EventStageInput = {
       event_id: 2,
       status: 'submitted',
@@ -35,25 +40,17 @@ describe('computeEventStage (SG2-38)', () => {
 
     const result = computeEventStage(input);
 
-    assert.equal(result.stage, 'Submitted');
-    assert.equal(result.stage_key, 'submitted');
+    assert.equal(result.stage, 'Under Review');
+    assert.equal(result.stage_key, 'under_review');
     assert.deepEqual(result.waiting_on, {
-      persona: 'ConnectSphere Staff',
-      action: 'Assign event coordinator',
+      persona: 'Event Coordinator',
+      action: 'Review and assess event request',
       user_id: null
     });
     assert.equal(result.stepper_steps[0].status, 'completed');
-    assert.equal(result.stepper_steps[1].status, 'current');
-    assert.equal(result.stepper_steps[2].status, 'upcoming');
-  });
-
-  test('[BOUNDARY] [SG2-100:AC2] submitted with coordinator_id null still lands at the Awaiting Assignment step, matching Unit 2\'s post-removal behaviour', () => {
-    const result = computeEventStage({
-      event_id: 2,
-      status: 'submitted',
-      coordinator_id: null
-    });
-    assert.equal(result.stepper_steps[1].status, 'current');
+    assert.equal(result.stepper_steps[1].status, 'completed');
+    assert.equal(result.stepper_steps[2].status, 'current');
+    assert.equal(result.stepper_steps[3].status, 'upcoming');
   });
 
   test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] unassigned status returns "Awaiting Assignment" stage waiting on the Event Coordinator Lead', () => {

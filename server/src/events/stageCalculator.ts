@@ -33,10 +33,9 @@ export interface EventStageResult {
   outstanding_arrangements: string[];
 }
 
-// SG2-100 Unit 1: 7 steps, up from 5. `submitted` no longer has its own step —
-// after Unit 2's submission redirect lands, `submitted` always means
-// "assigned, awaiting review" and sits at the `under_review` step; until
-// then both branches of the `submitted` case below point at that same step.
+// SG2-100: 7 steps, up from 5. `submitted` has no step of its own — it means
+// "assigned, awaiting review" and sits at the `under_review` step, now that
+// submission writes `unassigned` instead.
 const STEPPER_DEFINITIONS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'draft', label: 'Draft' },
   { key: 'unassigned', label: 'Awaiting Assignment' },
@@ -93,34 +92,21 @@ export function computeEventStage(event: EventStageInput): EventStageResult {
       break;
 
     case 'submitted':
-      // Kept for Unit 1: pre-existing rows may still carry 'submitted' with
-      // no coordinator (sniffed below). Unit 2 removes this branch once
-      // submission writes 'unassigned' and 'submitted' always means
-      // "assigned, awaiting review". Both branches share the same stepper
-      // position — there is no dedicated "Submitted" step any more.
-      if (event.coordinator_id) {
-        // Coordinator has already been assigned — request is under intake review
-        stage = 'Under Review';
-        stageKey = 'under_review';
-        description = 'Event request under review by the assigned coordinator.';
-        waitingOn = {
-          persona: coordinatorPersona,
-          action: 'Review and assess event request',
-          user_id: event.coordinator_id
-        };
-        activeStepIndex = 2;
-      } else {
-        // Awaiting coordinator assignment by staff
-        stage = 'Submitted';
-        stageKey = 'submitted';
-        description = 'Event request submitted and awaiting coordinator assignment.';
-        waitingOn = {
-          persona: 'ConnectSphere Staff',
-          action: 'Assign event coordinator',
-          user_id: null
-        };
-        activeStepIndex = 1;
-      }
+      // SG2-100 Unit 2: `submitted` now means one thing only — a coordinator
+      // has been assigned and has not yet opened the request. Submission
+      // writes `unassigned` instead, and 202610060002 backfilled the old
+      // `submitted` + null-coordinator rows, so the null-coordinator branch
+      // that used to live here has no rows left to serve. There is no
+      // dedicated "Submitted" step; it shares the Under Review step.
+      stage = 'Under Review';
+      stageKey = 'under_review';
+      description = 'Event request under review by the assigned coordinator.';
+      waitingOn = {
+        persona: coordinatorPersona,
+        action: 'Review and assess event request',
+        user_id: event.coordinator_id ?? null
+      };
+      activeStepIndex = 2;
       break;
 
     case 'under_review':

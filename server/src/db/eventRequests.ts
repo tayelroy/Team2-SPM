@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DraftValues } from '../events/fields';
+import type { DraftValues, EventStatus } from '../events/fields';
 
 /** An event request row as returned to the API caller. */
 export interface EventRequestRecord extends DraftValues {
@@ -59,6 +59,16 @@ export type UpdateDraftResult =
 export type AssignCoordinatorResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'not_assignable' | 'unavailable'; message: string };
+
+/**
+ * A status move applied in the same write as a coordinator assignment
+ * (SG2-100). `from` guards the write so the move cannot land on a row that
+ * has since changed status; `to` is the value written.
+ */
+export interface AssignStatusTransition {
+  from: EventStatus;
+  to: EventStatus;
+}
 
 export type StartReviewResult =
   | { ok: true; request: EventRequestRecord }
@@ -343,9 +353,16 @@ const SUBMITTABLE_STATUSES = ['draft', 'rejected', 'needs_clarification'];
 const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
 
 /**
- * Transitions an event request from `draft` or `rejected` to `submitted`
- * (SG2-30). Rejected requests may be revised and resubmitted rather than
- * being a dead end.
+ * Transitions an event request from `draft`, `rejected` or
+ * `needs_clarification` to `unassigned` (SG2-30, retargeted by SG2-100).
+ * Rejected requests may be revised and resubmitted rather than being a dead
+ * end.
+ *
+ * SG2-100: submission now lands in `unassigned`, not `submitted`. The
+ * organiser's request is visible as *Awaiting Assignment* until the Event
+ * Coordinator Lead assigns a coordinator, which is what writes `submitted`.
+ * That gives the assignment queue an indexable predicate instead of the old
+ * `status = 'submitted' and coordinator_id is null` sniff.
  *
  * The status filter is repeated here as a second guard alongside the
  * caller's own status check, so a concurrent submission cannot race two
@@ -358,7 +375,7 @@ export async function submitEventRequest(
 ): Promise<SubmitEventRequestResult> {
   const { data, error } = await admin
     .from('events')
-    .update({ status: 'submitted' })
+    .update({ status: 'unassigned' })
     .eq('event_id', eventId)
     .in('status', SUBMITTABLE_STATUSES)
     .select(RETURNED_COLUMNS);
@@ -581,12 +598,26 @@ export async function fetchEventRequestById(
   return { ok: true, request };
 }
 
-/** Statuses a request may have its coordinator assigned or reassigned in (SG2-33/SG2-34). */
+/**
+ * Statuses a request may have its coordinator assigned or reassigned in
+ * (SG2-33/SG2-34, widened by SG2-100 to the Week 7 lifecycle).
+ *
+ * `unassigned` is the status submission now lands in, so it has to be here
+ * or nothing would ever be assignable. The three post-arrangements statuses
+ * are here because a coordinator can leave the team at any point in an
+ * event's life and the replacement has to be recordable — reassignment is
+ * allowed in every live status, and must never move the event's own status
+ * (see assignEventCoordinator).
+ */
 export const COORDINATOR_ASSIGNABLE_STATUSES = [
+  'unassigned',
   'submitted',
   'under_review',
   'approved',
   'planning',
+  'awaiting_safety_check',
+  'safety_rejected',
+  'preparation',
   'confirmed'
 ];
 
@@ -605,18 +636,29 @@ export const COORDINATOR_ASSIGNABLE_STATUSES = [
  * caller writes next (SG2-33/34 AC4) always names the real previous
  * coordinator. Passing `coordinatorId: null` clears the assignment, which
  * is how an assignment that could not be recorded is undone.
+ *
+ * SG2-100: `statusTransition` moves the event's status in the same write.
+ * The caller passes `{ from: 'unassigned', to: 'submitted' }` for a first
+ * assignment, and the inverse to undo one whose history row could not be
+ * written. When it is omitted — every reassignment of an event already in
+ * review, arrangements, safety check, preparation or confirmed — the update
+ * payload carries no `status` key at all, so no reassignment can rewind a
+ * live event. `from` is a condition on the write rather than a pre-check,
+ * so a row whose status moved on in between matches zero rows instead.
  */
 export async function assignEventCoordinator(
   admin: SupabaseClient,
   eventId: number,
   coordinatorId: string | null,
-  expectedCurrent: string | null
+  expectedCurrent: string | null,
+  statusTransition?: AssignStatusTransition
 ): Promise<AssignCoordinatorResult> {
-  const guarded = admin
-    .from('events')
-    .update({ coordinator_id: coordinatorId })
-    .eq('event_id', eventId)
-    .in('status', COORDINATOR_ASSIGNABLE_STATUSES);
+  const update: { coordinator_id: string | null; status?: EventStatus } = { coordinator_id: coordinatorId };
+  if (statusTransition) update.status = statusTransition.to;
+  const byEvent = admin.from('events').update(update).eq('event_id', eventId);
+  const guarded = statusTransition
+    ? byEvent.eq('status', statusTransition.from)
+    : byEvent.in('status', COORDINATOR_ASSIGNABLE_STATUSES);
   const { data, error } = await (expectedCurrent === null
     ? guarded.is('coordinator_id', null)
     : guarded.eq('coordinator_id', expectedCurrent)
