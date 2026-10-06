@@ -381,7 +381,7 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 });
 
 // SG2-86: Event Coordinator Lead and Safety Officer — Week 7 customer changes.
-for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+for (const role of ['safety_officer'] as const) {
   test(`[NORMAL] [SG2-86:AC1] GET /api/auth/me for ${role} returns only the universal profile grants`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
@@ -391,6 +391,22 @@ for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
   });
 }
 
+test('[NORMAL] [SG2-86:AC1] [SG2-97:AC1] GET /api/auth/me for the Event Coordinator Lead adds assignment and its history to the profile grants', async () => {
+  const fetchMock = provider({ role: 'event_coordinator_lead' });
+  const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, {
+    userId, role: 'event_coordinator_lead',
+    permissions: ['event_request.assign_coordinator', 'event_request.history.view', 'profile.read', 'profile.update']
+  });
+  assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('[FAILURE] [SG2-97:AC1] no role but the Event Coordinator Lead holds the assign-coordinator grant', () => {
+  const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('event_request.assign_coordinator'));
+  assert.deepEqual(holders, ['event_coordinator_lead']);
+});
+
 test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejecting near misses', () => {
   assert.equal(isRole('event_coordinator_lead'), true);
   assert.equal(isRole('safety_officer'), true);
@@ -398,7 +414,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] permissionsFor every existing role is unchanged by the new roles', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] permissionsFor every existing role is unchanged by the new roles, except assignment leaving Technical Support', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -418,7 +434,7 @@ test('[NORMAL] [SG2-86:AC4] permissionsFor every existing role is unchanged by t
       'venue_booking.request.view', 'venue_booking.conflicts.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
-      'work_queue.read', 'venues.availability.view', 'users.role.update', 'event_request.assign_coordinator',
+      'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
       'venue_booking.capacity_exception.approve', 'venues.holds.read', 'profile.read', 'profile.update'
     ],

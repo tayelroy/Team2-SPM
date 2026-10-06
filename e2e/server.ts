@@ -196,6 +196,10 @@ app.post('/__e2e/coordinator-access', (_req, res) => {
   database.seedCoordinatorAccess();
   res.status(204).end();
 });
+app.post('/__e2e/legacy-assignment', (_req, res) => {
+  database.seedLegacyAssignment();
+  res.status(204).end();
+});
 app.post('/__e2e/under-review', (_req, res) => {
   database.seedUnderReview();
   res.status(204).end();

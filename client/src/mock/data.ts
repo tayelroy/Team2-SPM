@@ -114,7 +114,6 @@ export const NAV: Record<Role, [Screen, string][]> = {
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
-    ['assign', 'Assign coordinators'],
     ['calendar', 'Venue Availability'],
   ],
   Attendee: [
@@ -124,8 +123,10 @@ export const NAV: Record<Role, [Screen, string][]> = {
   // SG2-86: deliberately minimal — a nav item pointing at a screen the role
   // has no permission for would render a page that 403s. The assignment
   // queue and safety-check screens arrive with SG2-87/SG2-100.
+  // SG2-97: assignment moved here from Technical Support Staff.
   'Event Coordinator Lead': [
     ['dashboard', 'Dashboard'],
+    ['assign', 'Assign coordinators'],
     ['events', 'All events'],
   ],
   'Safety Officer': [
@@ -179,7 +180,7 @@ export const HEAD: Record<
   'Event Coordinator Lead': {
     eyebrow: 'Event Coordinator Lead',
     title: 'Coordination lead desk',
-    blurb: 'Assignment tools arrive with the assignment queue.',
+    blurb: 'Assign and reassign Event Coordinators from Assign coordinators.',
   },
   'Safety Officer': {
     eyebrow: 'Safety Officer',
