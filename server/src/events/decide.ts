@@ -36,7 +36,7 @@ export interface DecideEventRequestDependencies {
  * two coordinators cannot record conflicting decisions.
  *
  * Approval sets `approved` rather than `planning`: SG2-38's stage calculator
- * already reads `approved` as "Approved — In Planning", so planning becomes
+ * already reads `approved` as "Arrangements" (SG2-100), so planning becomes
  * available through the shipped tracker without this story inventing a
  * second meaning for the status.
  */

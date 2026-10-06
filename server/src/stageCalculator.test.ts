@@ -42,9 +42,100 @@ describe('computeEventStage (SG2-38)', () => {
       action: 'Assign event coordinator',
       user_id: null
     });
+    assert.equal(result.stepper_steps[1].status, 'completed');
+    assert.equal(result.stepper_steps[2].status, 'current');
+    assert.equal(result.stepper_steps[3].status, 'upcoming');
+  });
+
+  test('[BOUNDARY] [SG2-100:AC2] submitted with coordinator_id null still lands at the under_review step, matching Unit 2\'s post-removal behaviour', () => {
+    const result = computeEventStage({
+      event_id: 2,
+      status: 'submitted',
+      coordinator_id: null
+    });
+    assert.equal(result.stepper_steps[2].status, 'current');
+  });
+
+  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] unassigned status returns "Awaiting Assignment" stage waiting on the Event Coordinator Lead', () => {
+    const result = computeEventStage({
+      event_id: 20,
+      status: 'unassigned',
+      organiser_id: 'org-123'
+    });
+
+    assert.equal(result.stage, 'Awaiting Assignment');
+    assert.equal(result.stage_key, 'unassigned');
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Event Coordinator Lead',
+      action: 'Assign an event coordinator',
+      user_id: null
+    });
     assert.equal(result.stepper_steps[0].status, 'completed');
     assert.equal(result.stepper_steps[1].status, 'current');
     assert.equal(result.stepper_steps[2].status, 'upcoming');
+  });
+
+  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] awaiting_safety_check status waits on the Safety Officer at the safety_check step', () => {
+    const result = computeEventStage({
+      event_id: 21,
+      status: 'awaiting_safety_check',
+      coordinator_id: 'coord-456',
+      coordinator_name: 'Sarah Tan'
+    });
+
+    assert.equal(result.stage, 'Awaiting Safety Check');
+    assert.equal(result.stage_key, 'awaiting_safety_check');
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Safety Officer',
+      action: 'Complete the operational safety check',
+      user_id: null
+    });
+    assert.equal(result.stepper_steps[4].key, 'safety_check');
+    assert.equal(result.stepper_steps[4].status, 'current');
+  });
+
+  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] safety_rejected status has no waiting_on and stays at the safety_check step', () => {
+    const result = computeEventStage({
+      event_id: 22,
+      status: 'safety_rejected',
+      coordinator_id: 'coord-456',
+      coordinator_name: 'Sarah Tan'
+    });
+
+    assert.equal(result.stage, 'Safety Rejected');
+    assert.equal(result.stage_key, 'safety_rejected');
+    assert.equal(result.waiting_on, null);
+    assert.equal(result.stepper_steps[4].key, 'safety_check');
+    assert.equal(result.stepper_steps[4].status, 'current');
+  });
+
+  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] preparation status waits on the named coordinator at the preparation step', () => {
+    const result = computeEventStage({
+      event_id: 23,
+      status: 'preparation',
+      coordinator_id: 'coord-456',
+      coordinator_name: 'Sarah Tan'
+    });
+
+    assert.equal(result.stage, 'Preparation');
+    assert.equal(result.stage_key, 'preparation');
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Event Coordinator (Sarah Tan)',
+      action: 'Complete final preparations and confirm the event',
+      user_id: 'coord-456'
+    });
+    assert.equal(result.stepper_steps[5].key, 'preparation');
+    assert.equal(result.stepper_steps[5].status, 'current');
+  });
+
+  test('[BOUNDARY] [SG2-100:AC1] preparation status with no coordinator_id falls back to a null user_id', () => {
+    const result = computeEventStage({
+      event_id: 24,
+      status: 'preparation'
+    });
+
+    assert.equal(result.waiting_on?.persona, 'Event Coordinator');
+    assert.equal(result.waiting_on?.user_id, null);
   });
 
   test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] submitted state with coordinator assigned returns "Under Review" waiting on named coordinator', () => {
@@ -121,7 +212,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[2].status, 'current');
   });
 
-  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] approved status returns unified "Approved — In Planning" stage waiting on coordinator arrangements', () => {
+  test('[NORMAL] [SG2-100:D1] approved status returns relabelled "Arrangements" stage waiting on coordinator arrangements', () => {
     const input: EventStageInput = {
       event_id: 5,
       status: 'approved',
@@ -132,7 +223,7 @@ describe('computeEventStage (SG2-38)', () => {
 
     const result = computeEventStage(input);
 
-    assert.equal(result.stage, 'Approved — In Planning');
+    assert.equal(result.stage, 'Arrangements');
     assert.equal(result.stage_key, 'in_planning');
     assert.deepEqual(result.waiting_on, {
       persona: 'Event Coordinator (Sarah Tan)',
@@ -146,7 +237,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[4].status, 'upcoming');
   });
 
-  test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] planning status also maps to "Approved — In Planning" stage', () => {
+  test('[NORMAL] [SG2-100:D1] planning status also maps to "Arrangements" stage with stage_key unchanged at in_planning', () => {
     const input: EventStageInput = {
       event_id: 6,
       status: 'planning',
@@ -159,7 +250,7 @@ describe('computeEventStage (SG2-38)', () => {
 
     const result = computeEventStage(input);
 
-    assert.equal(result.stage, 'Approved — In Planning');
+    assert.equal(result.stage, 'Arrangements');
     assert.equal(result.stage_key, 'in_planning');
     assert.equal(result.arrangements_recheck_needed, true);
     assert.deepEqual(result.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
@@ -180,8 +271,16 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stage_key, 'confirmed');
     assert.equal(result.waiting_on, null);
     assert.deepEqual(result.stepper_steps.map(step => [step.key, step.status]), [
-      ['draft', 'completed'], ['submitted', 'completed'], ['under_review', 'completed'], ['in_planning', 'completed'], ['confirmed', 'completed']
+      ['draft', 'completed'], ['unassigned', 'completed'], ['under_review', 'completed'],
+      ['in_planning', 'completed'], ['safety_check', 'completed'], ['preparation', 'completed'],
+      ['confirmed', 'completed']
     ]);
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] confirmed status produces a stepper array of exactly 7 steps, all completed', () => {
+    const result = computeEventStage({ event_id: 7, status: 'confirmed' });
+    assert.equal(result.stepper_steps.length, 7);
+    assert.ok(result.stepper_steps.every(step => step.status === 'completed'));
   });
 
   test('[NORMAL] [SG2-38:AC1] [SG2-38:AC2] [SG2-38:AC3] completed status maps to "Completed" terminal stage with all steps completed', () => {
@@ -197,7 +296,9 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stage_key, 'completed');
     assert.equal(result.waiting_on, null);
     assert.deepEqual(result.stepper_steps.map(step => [step.key, step.status]), [
-      ['draft', 'completed'], ['submitted', 'completed'], ['under_review', 'completed'], ['in_planning', 'completed'], ['confirmed', 'completed']
+      ['draft', 'completed'], ['unassigned', 'completed'], ['under_review', 'completed'],
+      ['in_planning', 'completed'], ['safety_check', 'completed'], ['preparation', 'completed'],
+      ['confirmed', 'completed']
     ]);
   });
 
