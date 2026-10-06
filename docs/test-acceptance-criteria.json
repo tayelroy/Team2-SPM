@@ -450,6 +450,18 @@
         "AC3": "Once an event is reassigned, the previous coordinator can no longer act on it",
         "AC4": "Events in the unassigned queue cannot be acted on by any Event Coordinator"
       }
+    },
+    {
+      "id": "SG2-97",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-97",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "Technical Support Staff can no longer assign or reassign Event Coordinators; any such attempt is refused on the server side",
+        "AC2": "Assignments already made under SG2-33/34 stay in place, and their history is kept",
+        "AC3": "The Event Organiser can still see who their coordinator is and how to contact them (SG2-33, AC3 still holds)",
+        "AC4": "Tests from SG2-33/34 are updated to the new role and pass"
+      }
     }
   ]
 }

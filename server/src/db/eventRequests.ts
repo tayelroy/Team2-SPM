@@ -386,7 +386,7 @@ const REVIEWABLE_STATUSES = ['submitted', 'under_review'];
  * pre-check, matching the atomic-ownership shape the SG2-32 IDOR review
  * established: a request assigned to a different coordinator cannot be
  * touched by event id alone, even if a future caller skips the lookup.
- * Assignment is made by Technical Support Staff (SG2-33), never claimed
+ * Assignment is made by the Event Coordinator Lead (SG2-97), never claimed
  * here, so an unassigned request matches zero rows and stays untouched.
  */
 export async function startEventReview(
@@ -556,7 +556,7 @@ export async function deleteEventRequestDraft(
 /**
  * Reads an event request by id, unscoped by organiser (SG2-33/SG2-34).
  *
- * Technical Support Staff act across every organisation, unlike
+ * The Event Coordinator Lead acts across every organisation, unlike
  * fetchOwnEventRequest's organiser-scoped lookup — there is no owning
  * caller to scope this to.
  */
@@ -673,7 +673,7 @@ export async function updateEventRequestDraft(
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }
 
-/** A request Technical Support Staff can assign or reassign (SG2-33/34). */
+/** A request the Event Coordinator Lead can assign or reassign (SG2-33/34/97). */
 export interface AssignableRequestRecord {
   event_id: number;
   name: string;
@@ -689,7 +689,7 @@ export type FetchAssignableRequestsResult =
 
 /**
  * Lists every request in a status a coordinator can be assigned to, across
- * all organisations — Technical Support Staff act on the whole platform, so
+ * all organisations — the Event Coordinator Lead acts on the whole platform, so
  * this is deliberately not organisation-scoped. Newest first.
  */
 export async function fetchAssignableRequests(admin: SupabaseClient): Promise<FetchAssignableRequestsResult> {

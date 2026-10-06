@@ -57,7 +57,7 @@ export function createStartEventReviewHandler({
     const reviewed = await startReview(admin, eventId, principal.userId);
     if (!reviewed.ok) {
       if (reviewed.reason === 'not_found') {
-        // Assignment is made by Technical Support Staff (SG2-33). A request
+        // Assignment is made by the Event Coordinator Lead (SG2-97). A request
         // assigned to another coordinator, still unassigned, or already past
         // review all answer identically so assignments cannot be probed for.
         res.status(404).json({ error: 'No reviewable event request is assigned to this account.' });

@@ -317,11 +317,12 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     Object.assign(dbConfig, originalConfig);
   });
 
-  test('[NORMAL] [SG2-40:AC3] policy grants event_request.history.view to organisers and internal staff, excluding attendees', () => {
+  test('[NORMAL] [SG2-40:AC3] [SG2-97:AC2] policy grants event_request.history.view to organisers and internal staff, the Event Coordinator Lead included, excluding attendees', () => {
     const rolesWithPermission = PERMISSIONS['event_request.history.view'];
     assert.ok(rolesWithPermission, 'event_request.history.view permission must exist');
     assert.deepEqual([...rolesWithPermission].sort(), [
       'event_coordinator',
+      'event_coordinator_lead',
       'event_organiser',
       'technical_support_staff',
       'venue_staff'

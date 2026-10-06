@@ -83,9 +83,12 @@ accounts or expose an endpoint for changing roles.
 | Safety Officer | `safety_officer` |
 
 Event Coordinator Lead and Safety Officer (SG2-86, Week 7 customer changes)
-currently hold only `profile.read`/`profile.update` — the same grants every
-role gets automatically. Further grants arrive with the stories that define
-their functions (SG2-87/88/97 for assignment, SG2-100 for safety review).
+start with only `profile.read`/`profile.update`, the grants every role gets.
+SG2-97 gives the Event Coordinator Lead `event_request.assign_coordinator`,
+taken away from Technical Support Staff, so the Lead is the only role that
+assigns or reassigns coordinators, plus `event_request.history.view` to see
+previous assignments. Existing assignments and their history are unchanged.
+The Safety Officer's grants arrive with SG2-100.
 Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
 mirrored in the `event_audit_logs` RLS policy
 (`supabase/migrations/202610050004_week7_roles.sql`), and the two must change

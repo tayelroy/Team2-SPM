@@ -57,13 +57,13 @@ test('[NORMAL] [SG2-35:AC2] opening a submitted request assigned to me moves it 
   });
 });
 
-test('[CONFLICT] [SG2-35:AC3] a request awaiting assignment is readable but never transitions (SG2-35)', async () => {
+test('[CONFLICT] [SG2-35:AC3] [SG2-97:AC1] a request awaiting assignment is readable, never transitions, and names the Event Coordinator Lead as the assigner', async () => {
   const unassigned = { ...review, status: 'submitted', assigned_to_me: false };
   const fetch = vi.fn(async () => Response.json({ items: [unassigned] }));
   vi.stubGlobal('fetch', fetch);
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
-  expect(await screen.findByText(/Awaiting assignment/)).toBeVisible();
+  expect(await screen.findByText('Awaiting assignment. The Event Coordinator Lead assigns a coordinator before it can be reviewed.')).toBeVisible();
   expect(screen.getByText('submitted')).toBeVisible();
   expect(fetch).not.toHaveBeenCalledWith('/api/event-requests/12/review', expect.anything());
 });

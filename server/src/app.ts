@@ -171,7 +171,7 @@ export function createApp(
     access.requirePermission('event_request.history.view'),
     getEventHistoryHandler
   );
-  // SG2-33/SG2-34: what Technical Support Staff pick from when assigning. Must
+  // SG2-33/SG2-34/SG2-97: what the Event Coordinator Lead picks from when assigning. Must
   // be registered before '/:eventId', which would otherwise capture it.
   eventRequests.get(
     '/assignable',
@@ -180,7 +180,7 @@ export function createApp(
   );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
-  // SG2-33/SG2-34: Technical Support Staff assign or reassign a coordinator.
+  // SG2-33/SG2-34/SG2-97: the Event Coordinator Lead assigns or reassigns a coordinator.
   eventRequests.patch(
     '/:eventId/coordinator',
     access.requirePermission('event_request.assign_coordinator'),

@@ -606,9 +606,10 @@ test('SG2-35-N01 | [SG2-35:AC3] [CONFLICT] a request awaiting assignment is read
   expect((await detail.json()).items[0].status).toBe('submitted');
 });
 
-test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] an assignment and a reassignment are recorded and the previous coordinator stays in the history', async ({ page, request }) => {
+test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [SG2-97:AC4] [NORMAL] an assignment and a reassignment are recorded and the previous coordinator stays in the history', async ({ page, request }) => {
   expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
-  await signIn(page, 'support');
+  // SG2-97: assignment belongs to the Event Coordinator Lead.
+  await signIn(page, 'lead');
   await nav(page, 'Assign coordinators');
 
   const picker = page.getByLabel('Coordinator for Assignment Forum', { exact: true });
@@ -625,7 +626,7 @@ test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] 
   const drawer = page.getByRole('dialog', { name: 'Event Change History' });
   const entries = drawer.getByTestId(/^audit-entry-/);
   await expect(entries).toHaveCount(2);
-  await expect(entries.nth(0)).toContainText('Regression support');
+  await expect(entries.nth(0)).toContainText('Regression lead');
   await expect(entries.nth(0)).toContainText('Regression coordinator');
   await expect(entries.nth(0)).toContainText('Regression second coordinator');
   await expect(entries.nth(1)).toContainText('(empty)');
@@ -636,8 +637,8 @@ test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] 
   expect(history.status()).toBe(200);
   expect((await history.json()).history.map((entry: Record<string, unknown>) =>
     [entry.actor_id, entry.field_name, entry.old_value, entry.new_value])).toEqual([
-    ['user-support', 'coordinator_id', 'Regression coordinator', 'Regression second coordinator'],
-    ['user-support', 'coordinator_id', null, 'Regression coordinator']
+    ['user-lead', 'coordinator_id', 'Regression coordinator', 'Regression second coordinator'],
+    ['user-lead', 'coordinator_id', null, 'Regression coordinator']
   ]);
 
   const tokenFor = async (account: string) => {
@@ -662,6 +663,7 @@ test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] 
   };
   const coordinator = await tokenFor('coordinator');
   const support = await tokenFor('support');
+  const lead = await tokenFor('lead');
 
   // Every action a coordinator can take on an event, attempted directly on the API.
   const attempt = async (eventId: number) => ({
@@ -694,9 +696,9 @@ test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] 
     event_id: 81, venue_id: 1, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T10:00:00.000Z', layout: 'theatre' } });
   expect(venue.status()).toBe(201);
 
-  // SG2-90 AC3: once Technical Support hands each event on, the previous coordinator is refused everywhere.
+  // SG2-90 AC3: once the Event Coordinator Lead hands each event on, the previous coordinator is refused everywhere.
   for (const eventId of [81, 90, 91]) {
-    const reassign = await request.patch(`/api/event-requests/${eventId}/coordinator`, { headers: support, data: { coordinatorId: 'user-coordinator2' } });
+    const reassign = await request.patch(`/api/event-requests/${eventId}/coordinator`, { headers: lead, data: { coordinatorId: 'user-coordinator2' } });
     expect(reassign.status()).toBe(200);
     expect({ eventId, ...await attempt(eventId) }).toEqual({ eventId, ...refused });
   }
@@ -711,8 +713,9 @@ test('SG2-90-P02 | [SG2-90:AC1] [SG2-90:AC3] [BOUNDARY] rights follow the curren
   };
   const coordinator = await tokenFor('coordinator');
   const support = await tokenFor('support');
+  const lead = await tokenFor('lead');
   const assignTo = async (coordinatorId: string) =>
-    (await request.patch('/api/event-requests/81/coordinator', { headers: support, data: { coordinatorId } })).status();
+    (await request.patch('/api/event-requests/81/coordinator', { headers: lead, data: { coordinatorId } })).status();
   const plan = async (notes: string) =>
     (await request.patch('/api/event-requests/81/planning', { headers: coordinator, data: { planning_notes: notes } })).status();
 
@@ -1451,6 +1454,73 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   await expect(page.getByText('Safety Officer', { exact: true }).last()).toBeVisible();
 
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
+});
+
+test('SG2-97-P01 | [SG2-97:AC1] [SG2-97:AC2] [SG2-97:AC3] [NORMAL] [FAILURE] assignment moves to the Event Coordinator Lead while earlier assignments, their history and the organiser contact stay', async ({ page, request }) => {
+  expect((await request.post('/__e2e/legacy-assignment')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const support = await tokenFor('support');
+
+  // AC1: Technical Support Staff are refused on the server for listing and for assigning, and the event is untouched.
+  expect((await request.get('/api/event-requests/assignable', { headers: support })).status()).toBe(403);
+  expect((await request.patch('/api/event-requests/95/coordinator', { headers: support, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(403);
+
+  // AC2: the assignment Technical Support made earlier is still in place, with its history.
+  const history = await request.get('/api/event-requests/95/history', { headers: support });
+  expect((await history.json()).history.map((entry: Record<string, unknown>) =>
+    [entry.actor_id, entry.field_name, entry.old_value, entry.new_value])).toEqual([
+    ['user-support', 'coordinator_id', null, 'Regression coordinator']
+  ]);
+
+  // AC3: the organiser still sees who their coordinator is and how to reach them.
+  const detail = await request.get('/api/event-requests/95', { headers: await tokenFor('organiser') });
+  expect(detail.status()).toBe(200);
+  const event = (await detail.json()).request;
+  expect([event.coordinator_name, event.coordinator_phone]).toEqual(['Regression coordinator', '+6581234567']);
+
+  // AC1: the Event Coordinator Lead is offered the assignment screen and it lists the event,
+  // laid out cleanly on a phone and on a laptop (DoD v2.1).
+  await signIn(page, 'lead');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await nav(page, 'Assign coordinators');
+    await expect(page.getByRole('heading', { name: 'Legacy Forum' })).toBeVisible();
+    await expect(page.getByLabel('Coordinator for Legacy Forum', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
+
+test('SG2-97-P02 | [SG2-97:AC2] [CONFLICT] the Event Coordinator Lead takes over an assignment Technical Support made, keeping its history', async ({ request }) => {
+  expect((await request.post('/__e2e/legacy-assignment')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
+  const lead = await tokenFor('lead');
+  const coordinator = await tokenFor('coordinator');
+
+  // Before: the coordinator Technical Support assigned can plan the event.
+  const plan = async () => (await request.patch('/api/event-requests/95/planning', { headers: coordinator, data: { planning_notes: 'Mine?' } })).status();
+  expect(await plan()).toBe(200);
+
+  // The Lead reassigns it under the new rules; the earlier coordinator loses it at once.
+  expect((await request.patch('/api/event-requests/95/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } })).status()).toBe(200);
+  expect(await plan()).toBe(403);
+
+  // Both assignments stay in the history, the earlier one still credited to Technical Support.
+  const history = await request.get('/api/event-requests/95/history', { headers: lead });
+  expect((await history.json()).history
+    .filter((entry: Record<string, unknown>) => entry.field_name === 'coordinator_id')
+    .map((entry: Record<string, unknown>) => [entry.actor_id, entry.old_value, entry.new_value])).toEqual([
+    ['user-lead', 'Regression coordinator', 'Regression second coordinator'],
+    ['user-support', null, 'Regression coordinator']
+  ]);
 });
 
 async function openVenueDecision(page: Page, requestId: number) {

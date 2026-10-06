@@ -35,10 +35,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-29: an organiser can edit their own request's fields while it is
   // still a draft.
   'event_request.update': ['event_organiser'],
-  // SG2-33/SG2-34: only Technical Support Staff assign or reassign the
-  // coordinator on a submitted event request — same grant shape as
-  // 'users.role.update'.
-  'event_request.assign_coordinator': ['technical_support_staff'],
+  // SG2-33/SG2-34 built assignment and reassignment; SG2-97 (Week 7 change
+  // #5) moved it from Technical Support Staff to the Event Coordinator Lead,
+  // who is now the only role that assigns or reassigns a coordinator.
+  'event_request.assign_coordinator': ['event_coordinator_lead'],
   // SG2-35: a coordinator opens a request for review. Which request is
   // enforced per-row by the assignment made in SG2-33, not by this grant.
   'event_request.review': ['event_coordinator'],
@@ -54,7 +54,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-38: see what stage an event has reached
   'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
   // SG2-40: see who changed what on an event
-  'event_request.history.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
+  // SG2-97: the Event Coordinator Lead opens an event's history from the
+  // assignment screen to see previous coordinators (SG2-34 AC4).
+  'event_request.history.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead'],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],
