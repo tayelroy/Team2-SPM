@@ -1522,3 +1522,108 @@ test('SG2-97-P02 | [SG2-97:AC2] [CONFLICT] the Event Coordinator Lead takes over
     ['user-support', null, 'Regression coordinator']
   ]);
 });
+
+async function openVenueDecision(page: Page, requestId: number) {
+  await page.getByRole('region', { name: 'Booking requests awaiting decision' })
+    .getByRole('button', { name: new RegExp(`Venue booking request #${requestId}\\b`) }).click();
+  return page.getByRole('article', { name: 'Venue booking request' });
+}
+
+async function switchAccount(page: Page, account: string) {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, account);
+}
+
+test('SG2-49-P01 | [SG2-49:AC1] [SG2-49:AC3] [NORMAL] venue staff approve a clear request; the venue is committed and the coordinator is notified', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-decision')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const detail = await openVenueDecision(page, 101);
+  await expect(detail.getByText('This venue fits the event.', { exact: true })).toBeVisible();
+  const approve = detail.getByRole('button', { name: 'Approve booking', exact: true });
+  await expect(approve).toBeEnabled();
+  await approve.click();
+  await expect(detail.getByText('Approved. The venue is committed to this event and the coordinator has been notified.', { exact: true })).toBeVisible();
+  await expect(detail.locator('.work-queue-status')).toHaveText('approved');
+
+  // AC1: the venue is now committed for that period, shown as a confirmed booking.
+  const period = `from=${encodeURIComponent('2030-06-20T00:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T06:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${period}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries).toEqual([expect.objectContaining({ kind: 'booking', label: 'confirmed · event 91',
+    start: '2030-06-20T01:00:00.000Z', end: '2030-06-20T04:00:00.000Z' })]);
+  // The decided request leaves the queue.
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Venue booking request #101\b/ })).toHaveCount(0);
+
+  // AC1 and AC3: the coordinator is notified and sees who approved it and when.
+  await switchAccount(page, 'coordinator');
+  await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue request approved', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Regression Hall was approved for Venue Request Forum.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+  await openVenueRequestSearch(page);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText(/^Approved by Regression venue on /)).toBeVisible();
+});
+
+test('SG2-49-P02 | [SG2-49:AC2] [SG2-49:AC3] [NORMAL] venue staff reject a request with a reason the coordinator can see', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-decision')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const detail = await openVenueDecision(page, 102);
+  await detail.getByLabel('Decision note (required to reject; shared with the coordinator)').fill('The floor is being resurfaced that week.');
+  await detail.getByRole('button', { name: 'Reject with reason', exact: true }).click();
+  await expect(detail.getByText('Rejected. The coordinator has been notified and can see your reason.', { exact: true })).toBeVisible();
+  await expect(detail.locator('.work-queue-status')).toHaveText('rejected');
+
+  await switchAccount(page, 'coordinator');
+  await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue request rejected', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Regression Hall was rejected for Venue Request Forum: The floor is being resurfaced that week.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+  await openVenueRequestSearch(page);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText('Rejected', { exact: true })).toBeVisible();
+  await expect(list.getByText(/^Rejected by Regression venue on .*\. Reason: The floor is being resurfaced that week\.$/)).toBeVisible();
+  // A rejection books nothing.
+  const period = `from=${encodeURIComponent('2030-06-21T00:00:00.000Z')}&to=${encodeURIComponent('2030-06-21T06:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${period}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries).toEqual([]);
+});
+
+test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an uncovered capacity shortfall, a missing reason or another role cannot decide', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-decision')).status()).toBe(204);
+  await signIn(page, 'venue');
+
+  // AC1: Quiet Room is too small for 80 guests and no capacity exception is approved.
+  let detail = await openVenueDecision(page, 103);
+  await expect(detail.getByText('Approve a capacity exception above before approving the booking.', { exact: true })).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Approve booking', exact: true })).toBeDisabled();
+  // AC2: a rejection needs a reason.
+  await detail.getByRole('button', { name: 'Reject with reason', exact: true }).click();
+  await expect(detail.getByRole('alert')).toHaveText('Give a reason for rejecting this request. The coordinator will see it.');
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+
+  // AC1: Regression Hall is already booked for the Planning workshop then.
+  detail = await openVenueDecision(page, 104);
+  await detail.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(detail.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(detail.locator('.work-queue-status')).toHaveText('pending');
+
+  // A request decided once cannot be decided again.
+  const headers = await authHeaders(page);
+  expect((await page.request.post('/api/venue-booking-requests/101/decision', { headers, data: { decision: 'approve' } })).status()).toBe(200);
+  const again = await page.request.post('/api/venue-booking-requests/101/decision', { headers, data: { decision: 'reject', reason: 'Changed mind' } });
+  expect([again.status(), (await again.json()).error]).toEqual([409, 'This request has already been approved.']);
+
+  // Only Venue Staff decide.
+  for (const account of ['coordinator', 'organiser', 'support']) {
+    await test.step(account, async () => {
+      await switchAccount(page, account);
+      const refused = await page.request.post('/api/venue-booking-requests/102/decision', { headers: await authHeaders(page), data: { decision: 'reject', reason: 'Not mine' } });
+      expect(refused.status()).toBe(403);
+    });
+  }
+  expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
+});

@@ -10,7 +10,7 @@ const terrace = { venue_id: 3, name: 'Rooftop Terrace', layouts: [
   { layout: 'banquet' as const, other_description: null }, { layout: 'other' as const, other_description: 'Cocktail standing' }] };
 const pending: VenueRequest = { request_id: 41, event_id: 10, venue_id: 3, venue_name: 'Rooftop Terrace', status: 'pending',
   starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', layout: 'banquet',
-  venue_requirements: 'A bar', requester_name: 'Casey Coordinator', requested_at: '2030-01-01T00:00:00.000Z' };
+  venue_requirements: 'A bar', requester_name: 'Casey Coordinator', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null };
 
 function form(overrides: Partial<Parameters<typeof VenueRequestForm>[0]> = {}) {
   const props = { accessToken: 'token', eventId: 10, venue: terrace, period: { from: '2030-06-15T10:00', until: '2030-06-15T18:00' },
@@ -122,4 +122,16 @@ test('[BOUNDARY] [FAILURE] [SG2-48:AC3] an event with no requests says so; an un
   unmount();
   await act(async () => reply(Response.json({ requests: [pending] })));
   expect(screen.queryByText('Rooftop Terrace')).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-49:AC2] [SG2-49:AC3] the coordinator sees who decided each request, when, and why it was rejected', async () => {
+  const rejected = { ...pending, status: 'rejected', decider_name: 'Vera Venue', decided_at: '2030-01-02T02:00:00.000Z', decision_reason: 'The hall is being rewired' };
+  const approved = { ...pending, request_id: 42, venue_name: 'Quiet Room', status: 'approved', decider_name: null, decided_at: '2030-01-03T02:00:00.000Z', decision_reason: 'Bring your own projector' };
+  const plain = { ...pending, request_id: 43, venue_name: 'Annex', status: 'approved', decider_name: 'Vera Venue', decided_at: '2030-01-03T02:00:00.000Z' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ requests: [rejected, approved, plain] })));
+  render(<EventVenueRequests accessToken="token" eventId={10} eventName="Meridian Forum" refresh={0} />);
+  expect(await screen.findByText('Rejected by Vera Venue on 2 Jan 2030, 10:00 am. Reason: The hall is being rewired')).toBeVisible();
+  expect(screen.getByText('Approved by an unnamed account on 3 Jan 2030, 10:00 am. Note: Bring your own projector')).toBeVisible();
+  expect(screen.getByText('Approved by Vera Venue on 3 Jan 2030, 10:00 am')).toBeVisible();
+  expect(screen.queryByText(/Awaiting a Venue Staff decision/)).not.toBeInTheDocument();
 });

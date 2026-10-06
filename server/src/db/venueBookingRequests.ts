@@ -2,10 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { AccessError } from '../auth/policy';
 import type { Layout } from '../venues/layoutFields';
 import type { VenueBookingRequestValues } from '../venues/bookingRequestFields';
-import { createVenueSuitabilityStore, type SuitabilityEventRow, type SuitabilityVenueRow } from './venueSuitability';
+import { createVenueSuitabilityStore, type CapacityExceptionRecord, type SuitabilityEventRow, type SuitabilityVenueRow } from './venueSuitability';
 
-/** A venue request as people see it: the venue and requester by name. The
- * requester's account id is not sent to clients. */
+/** A venue request as people see it: the venue, requester and decider by
+ * name. Their account ids are not sent to clients. */
 export interface VenueBookingRequestRecord {
   request_id: number;
   event_id: number;
@@ -18,6 +18,10 @@ export interface VenueBookingRequestRecord {
   venue_requirements: string | null;
   requester_name: string | null;
   requested_at: string;
+  /** SG2-49 AC2/AC3: who decided, when, and why (required for a rejection). */
+  decider_name: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
 }
 
 export type NewVenueBookingRequest = VenueBookingRequestValues & {
@@ -39,12 +43,18 @@ export interface VenueBookingRequestStore {
   create(values: NewVenueBookingRequest): Promise<VenueBookingRequestRecord | null>;
   /** The event's requests, earliest first. */
   list(eventId: number): Promise<VenueBookingRequestRecord[]>;
+  /** SG2-49: one request, with names. */
+  request(requestId: number): Promise<VenueBookingRequestRecord | null>;
+  /** SG2-49: the tentative hold (SG2-84) that created this request, if any. */
+  hold(requestId: number): Promise<number | null>;
+  /** SG2-47: capacity exceptions approved for the request. */
+  exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
 }
 
-const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at';
+const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason';
 const LIVE_STATUSES = ['pending', 'approved'];
 
-type Row = Omit<VenueBookingRequestRecord, 'venue_name' | 'requester_name'> & { requested_by: string | null };
+type Row = Omit<VenueBookingRequestRecord, 'venue_name' | 'requester_name' | 'decider_name'> & { requested_by: string | null; decided_by: string | null };
 
 /** Reads and writes with the service role: booking requests are not readable
  * by any client under RLS, so the routes check the caller's relationship to
@@ -62,10 +72,11 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
   async function present(rows: Row[]): Promise<VenueBookingRequestRecord[]> {
     if (rows.length === 0) return [];
     const venues = await names('venues', 'venue_id', rows.map(row => row.venue_id));
-    const requesters = rows.map(row => row.requested_by).filter(id => id !== null);
-    const users = requesters.length === 0 ? new Map() : await names('users', 'user_id', requesters);
-    return rows.map(({ requested_by, ...row }) => ({
-      ...row, venue_name: venues.get(row.venue_id) ?? null, requester_name: users.get(requested_by) ?? null
+    const people = rows.flatMap(row => [row.requested_by, row.decided_by]).filter(id => id !== null);
+    const users = people.length === 0 ? new Map() : await names('users', 'user_id', people);
+    return rows.map(({ requested_by, decided_by, ...row }) => ({
+      ...row, venue_name: venues.get(row.venue_id) ?? null,
+      requester_name: users.get(requested_by) ?? null, decider_name: users.get(decided_by) ?? null
     }));
   }
   return {
@@ -97,6 +108,17 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
         .eq('event_id', eventId).order('requested_at').order('request_id');
       check(error);
       return present(data as Row[]);
-    }
+    },
+    async request(requestId) {
+      const { data, error } = await admin.from('venue_booking_requests').select(REQUEST_COLUMNS).eq('request_id', requestId).maybeSingle();
+      check(error);
+      return data ? (await present([data as Row]))[0] : null;
+    },
+    async hold(requestId) {
+      const { data, error } = await admin.from('venue_holds').select('hold_id').eq('request_id', requestId).maybeSingle();
+      check(error);
+      return (data as { hold_id: number } | null)?.hold_id ?? null;
+    },
+    exceptions: requestId => suitability.exceptions(requestId)
   };
 }

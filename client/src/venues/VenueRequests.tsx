@@ -140,6 +140,11 @@ export function EventVenueRequests({ accessToken, eventId, eventName, refresh }:
                   Awaiting a Venue Staff decision. The venue is not held until the request is approved.
                 </p> : null}
                 <p style={{ margin: 0, color: color.slate, fontSize: '13px' }}>Requested by {request.requester_name ?? 'an unnamed account'}</p>
+                {/* SG2-49 AC2/AC3: who decided, when, and why a request was rejected. */}
+                {request.decided_at ? <p style={{ margin: 0, color: color.silver, fontSize: '13px' }}>
+                  {STATUS[request.status].text} by {request.decider_name ?? 'an unnamed account'} on {formatSgt(request.decided_at)}
+                  {request.decision_reason ? <>{request.status === 'rejected' ? '. Reason: ' : '. Note: '}{request.decision_reason}</> : null}
+                </p> : null}
               </Card>;
             })}
           </div>}

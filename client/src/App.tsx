@@ -7,7 +7,6 @@ import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import CoordinatorAssignment from './screens/CoordinatorAssignment';
-import BookingApproval from './screens/BookingApproval';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
@@ -186,7 +185,7 @@ export default function App() {
         }}
       />
     ),
-    venues: <Venues accessToken={session!.accessToken} onBook={() => setScreen('booking')} />,
+    venues: <Venues accessToken={session!.accessToken} />,
     drafts: (
       <DraftRequests
         accessToken={session!.accessToken}
@@ -209,7 +208,6 @@ export default function App() {
       />
     ),
     calendar: <AvailabilityCalendar />,
-    booking: <BookingApproval />,
     holds: <VenueHolds key={session!.accessToken} role={role} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk />,
     attendee: <AttendeeEvent />,

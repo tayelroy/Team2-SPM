@@ -2835,5 +2835,123 @@
     "execution_date": "6 Oct 2026",
     "executed_by": "Marcus Chua",
     "execution_evidence": "npx playwright test on feature/SG2-97-move-assignment-to-lead working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
+    "id": "SG2-49-P01",
+    "title": "Venue staff approve a clear request; the venue is committed and the coordinator is notified",
+    "type": "Positive",
+    "story": "SG2-49",
+    "purpose": "Verify AC1 and AC3: approving a request with no conflict, the required facilities and enough capacity commits the venue as a confirmed booking, records who approved it and when, and notifies the coordinator.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Decisions use the in-memory equivalent of decide_venue_booking_request(); its SQL locking evidence is in supabase/tests/venue_booking_decisions.sql and test-venue-decisions-concurrency.mjs.",
+    "steps": [
+      "Seed the venue decision fixture, sign in as venue staff and open venue booking request #101 from the work queue.",
+      "Check the venue fits the event and Approve booking is enabled, then approve it.",
+      "Read Regression Hall's availability for 20 June 2030 through the API and return to the work queue.",
+      "Sign in as the coordinator, open the notifications drawer, then open venue search from Venue Request Forum."
+    ],
+    "data": "Event 91 (approved, 80 guests, \"A projector\"); request 101 for Regression Hall, 20 Jun 2030 09:00–12:00 SGT",
+    "expected": "The request shows approved with the confirmation; availability shows a confirmed booking for event 91 over the requested period; the request leaves the queue; the coordinator's drawer shows \"Venue request approved — Regression Hall was approved for Venue Request Forum.\" and the request list shows who approved it and when.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 51-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request merged with main at 8d34dc1 (SG2-97); npm run test:e2e; 51/51 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "6 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-49:AC1",
+      "SG2-49:AC3"
+    ],
+    "method_id": "TC-3258b6383300",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 49-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request working tree on main at acb0c17; npm run test:e2e; 49/49 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "6 Oct 2026"
+      }
+    ]
+  },
+  {
+    "id": "SG2-49-P02",
+    "title": "Venue staff reject a request with a reason the coordinator can see",
+    "type": "Positive",
+    "story": "SG2-49",
+    "purpose": "Verify AC2 and AC3: a rejection carries a reason, marks the request rejected with who decided and when, books nothing, and the coordinator sees the reason.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Decisions use the in-memory equivalent of decide_venue_booking_request(); its SQL locking evidence is in supabase/tests/venue_booking_decisions.sql and test-venue-decisions-concurrency.mjs.",
+    "steps": [
+      "Seed the venue decision fixture, sign in as venue staff and open venue booking request #102.",
+      "Enter a decision note and reject the request.",
+      "Sign in as the coordinator, open the notifications drawer, then open venue search from Venue Request Forum.",
+      "Read Regression Hall's availability for 21 June 2030 through the API."
+    ],
+    "data": "Event 91; request 102 for Regression Hall, 21 Jun 2030 09:00–12:00 SGT; reason \"The floor is being resurfaced that week.\"",
+    "expected": "The request shows rejected with the confirmation; the coordinator's drawer shows \"Venue request rejected\" with the reason; the request list shows Rejected, who rejected it, when, and the reason; availability for that day is empty.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 51-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request merged with main at 8d34dc1 (SG2-97); npm run test:e2e; 51/51 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "6 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-49:AC2",
+      "SG2-49:AC3"
+    ],
+    "method_id": "TC-6c6474000fac",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 49-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request working tree on main at acb0c17; npm run test:e2e; 49/49 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "6 Oct 2026"
+      }
+    ]
+  },
+  {
+    "id": "SG2-49-N01",
+    "title": "A clash, an uncovered capacity shortfall, a missing reason or another role cannot decide",
+    "type": "Negative / role isolation",
+    "story": "SG2-49",
+    "purpose": "Verify AC1 and AC2: approval is refused while a capacity exception is missing or the venue is already booked, a rejection needs a reason, a decided request cannot be decided again, and only Venue Staff decide.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Decisions use the in-memory equivalent of decide_venue_booking_request(); its SQL locking evidence is in supabase/tests/venue_booking_decisions.sql and test-venue-decisions-concurrency.mjs.",
+    "steps": [
+      "Seed the venue decision fixture, sign in as venue staff and open request #103 (Quiet Room); try to reject without a reason.",
+      "Open request #104 (Regression Hall, 15 June) and approve it.",
+      "Through the API, approve request #101 and then try to reject it.",
+      "Sign in as coordinator, organiser and technical support and try to decide request #102 through the API; then try without credentials."
+    ],
+    "data": "Event 91 (80 guests); Quiet Room capacity 20 with no exception; request 104 overlapping booking 1 (Planning workshop, 15 Jun 2030)",
+    "expected": "Quiet Room shows the capacity-exception hint with Approve disabled, and rejecting without a reason is refused; #104 is refused naming the Planning workshop booking and stays pending; the second decision on #101 answers 409; other roles receive 403 and an unauthenticated call 401.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 51-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request merged with main at 8d34dc1 (SG2-97); npm run test:e2e; 51/51 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+    "execution_date": "6 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-49:AC1",
+      "SG2-49:AC2"
+    ],
+    "method_id": "TC-a05d282f10a1",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 49-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request working tree on main at acb0c17; npm run test:e2e; 49/49 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "6 Oct 2026"
+      }
+    ]
   }
 ]

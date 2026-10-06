@@ -86,6 +86,12 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-48 AC2/AC3: the assigned coordinator follows their requests while
   // they await a decision, and Venue Staff, who decide them, see them too.
   'venue_booking.request.view': ['event_coordinator', 'venue_staff'],
+  // SG2-49 AC1/AC2: Venue Staff approve or reject a venue request.
+  'venue_booking.decide': ['venue_staff'],
+  // SG2-49 AC1/AC2: the roles with a notifications drawer read their own
+  // notices; the rows are limited to the caller by the handler and by row
+  // level security.
+  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],

@@ -29,10 +29,9 @@ function api(identity = staff, initial = [venue]) {
 }
 async function open(identity = staff, initial = [venue]) {
   const fetch = api(identity, initial);
-  const book = vi.fn();
-  const view = render(<Venues accessToken="test-token" onBook={book} />);
+  const view = render(<Venues accessToken="test-token" />);
   await screen.findByRole('searchbox');
-  return { fetch, book, ...view };
+  return { fetch, ...view };
 }
 function fill(name = 'Harbour Room') {
   for (const [label, value] of Object.entries({ 'Venue name': name, Location: 'Roof', Capacity: '80', Facilities: 'Bar',
@@ -49,7 +48,7 @@ function deferred() {
 
 test('[FAILURE] [SG2-42:AC3] no token never loads data or exposes write controls', () => {
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
-  render(<Venues onBook={vi.fn()} />);
+  render(<Venues />);
   expect(screen.getByText(/Sign in with your account/)).toBeInTheDocument();
   expect(fetch).not.toHaveBeenCalled();
   expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
@@ -68,7 +67,7 @@ test('[NORMAL] [SG2-42:AC1] staff creates a venue, searches its saved fields and
     body: JSON.stringify({ name: 'Harbour Room', location: 'Roof', capacity: 80, facilities: 'Bar',
       accessibility_features: 'Lift', operating_information: 'Every day, 10:00–21:00' }) }));
   unmount();
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   expect(await screen.findByRole('heading', { name: 'Harbour Room' })).toBeInTheDocument();
 });
 
@@ -104,20 +103,20 @@ test('[NORMAL] [SG2-42:AC1] editing updates search results and does not duplicat
     operating_information: 'Every day, 10:00–21:00'
   }) }));
   unmount();
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   expect(await screen.findByRole('heading', { name: 'Renamed Hall' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Atrium Hall' })).not.toBeInTheDocument();
 });
 
-test('[FAILURE] [SG2-42:AC3] coordinators can read and use the existing request link but cannot create/edit', async () => {
-  const { book } = await open(coordinator);
+test('[FAILURE] [SG2-42:AC3] coordinators can read the catalogue but cannot create or edit venues', async () => {
+  await open(coordinator);
   for (const text of ['Atrium Hall', 'North Wing', '100', 'Stage', 'Hearing loop', 'Weekdays, 09:00–18:00']) {
     expect(screen.getByText(text)).toBeInTheDocument();
   }
   expect(screen.queryByRole('button', { name: /Edit Atrium/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Request Atrium Hall' }));
-  expect(book).toHaveBeenCalledOnce();
+  // Venues are requested from an event's venue search (SG2-48), not from the catalogue.
+  expect(screen.queryByRole('button', { name: 'Request Atrium Hall' })).not.toBeInTheDocument();
 });
 
 test('[BOUNDARY] [SG2-42:AC1] cancel discards an unsaved form and the empty state explains there are no venues', async () => {
@@ -132,7 +131,7 @@ test('[BOUNDARY] [SG2-42:AC1] cancel discards an unsaved form and the empty stat
 
 test('[FAILURE] [SG2-42:AC3] unauthorized roles never see returned venue data or write controls', async () => {
   const fetch = api({ userId: 'attendee', role: 'attendee', permissions: [] });
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   expect(await screen.findByRole('alert')).toHaveTextContent('permission');
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
@@ -143,7 +142,7 @@ test.each(['permissions', 'catalogue'] as const)('[CONFLICT] [SG2-42:AC1] loads 
   const identity = deferred(); const catalogue = deferred();
   const fetch = vi.fn((url: string) => url === '/api/auth/me' ? identity.promise : catalogue.promise);
   vi.stubGlobal('fetch', fetch);
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   // Neither response has arrived: both protected requests must already be in flight.
   expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/auth/me', '/api/venues']);
   await act(async () => {
@@ -165,7 +164,7 @@ test.each([401, 403])('[FAILURE] [SG2-42:AC3] a %s catalogue response hides data
   const fetch = api();
   fetch.mockResolvedValueOnce(Response.json(staff))
     .mockResolvedValueOnce(Response.json({}, { status }));
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   expect(await screen.findByRole('alert')).toHaveTextContent(status === 401 ? 'session has expired' : 'permission');
   expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
@@ -173,7 +172,7 @@ test.each([401, 403])('[FAILURE] [SG2-42:AC3] a %s catalogue response hides data
 
 test('[FAILURE] [SG2-42:AC1] network failure offers retry and recovers', async () => {
   const fetch = api(); fetch.mockRejectedValueOnce(new Error('offline'));
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load venues');
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   expect(await screen.findByRole('heading', { name: 'Atrium Hall' })).toBeInTheDocument();
@@ -181,7 +180,7 @@ test('[FAILURE] [SG2-42:AC1] network failure offers retry and recovers', async (
 
 test('[CONFLICT] [SG2-42:catalogue-isolation] shows loading and ignores a rejected request after unmount', async () => {
   const load = deferred(); const fetch = vi.fn((_url: string, _init?: RequestInit) => load.promise); vi.stubGlobal('fetch', fetch);
-  const { unmount } = render(<Venues accessToken="token" onBook={vi.fn()} />);
+  const { unmount } = render(<Venues accessToken="token" />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading venue catalogue');
   const signal = fetch.mock.calls[0][1]!.signal!;
   expect(signal.aborted).toBe(false);
@@ -194,9 +193,9 @@ test('[CONFLICT] [SG2-42:catalogue-isolation] shows loading and ignores a reject
 test('[CONFLICT] [SG2-42:catalogue-isolation] a stale successful load cannot restore another user’s catalogue', async () => {
   const fetch = api(); const load = deferred();
   fetch.mockResolvedValueOnce(Response.json(staff)).mockImplementationOnce(() => load.promise);
-  const { rerender } = render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  const { rerender } = render(<Venues accessToken="test-token" />);
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-  rerender(<Venues accessToken={null} onBook={vi.fn()} />);
+  rerender(<Venues accessToken={null} />);
   await act(async () => load.resolve(Response.json({ venues: [venue] })));
   expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
 });
@@ -264,7 +263,7 @@ describe('saving', () => {
     const { fetch, rerender } = await open(); const save = deferred(); fetch.mockImplementationOnce(() => save.promise);
     fireEvent.click(screen.getByRole('button', { name: 'Add venue' })); fill(); fireEvent.submit(screen.getByRole('form'));
     const init = fetch.mock.calls[2][1]!;
-    rerender(<Venues accessToken={null} onBook={vi.fn()} />);
+    rerender(<Venues accessToken={null} />);
     expect(init.signal!.aborted).toBe(true);
     await act(async () => succeeds ? save.resolve(Response.json({ venue })) : save.reject(new Error('aborted')));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

@@ -32,6 +32,8 @@ function mockLoginResponse(role: Role) {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
       if (url === '/api/venue-holds') return Response.json({ holds: [] });
       if (url === '/api/venue-holds/options') return Response.json({ events: [], venues: [] });
+      // SG2-49: venue request decision notices share the notification drawer.
+      if (url === '/api/notifications') return Response.json({ notifications: [] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
@@ -193,7 +195,6 @@ test.each([
 
 // SG2-41: sample-data prototypes sit behind a Preview menu, apart from the live queue.
 test.each([
-  ['Venue Staff', 'Booking requests', 'Booking approval'],
   ['Technical Support Staff', 'Equipment requests', 'Equipment requests'],
 ] as const)('[NORMAL] [SG2-41:preview-separation] %s reach sample-data screens only through the Preview menu', async (role, label, heading) => {
   await signInAs(role);
@@ -210,13 +211,13 @@ test.each([
 
 // Outside-click and focus dismissal share useDismissOutside, covered by the profile options test.
 test('[NORMAL] [SG2-41:preview-separation] the Preview menu toggles and closes with Escape, returning focus', async () => {
-  await signInAs('Venue Staff');
+  await signInAs('Technical Support Staff');
   const preview = within(header()).getByRole('button', { name: 'Preview' });
   fireEvent.click(preview);
   fireEvent.click(preview);
   expect(preview).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(preview);
-  const option = screen.getByRole('button', { name: 'Booking requests' });
+  const option = screen.getByRole('button', { name: 'Equipment requests' });
   fireEvent.keyDown(option, { key: 'Tab' });
   expect(option).toBeInTheDocument();
   fireEvent.keyDown(option, { key: 'Escape' });
@@ -224,8 +225,8 @@ test('[NORMAL] [SG2-41:preview-separation] the Preview menu toggles and closes w
   expect(preview).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('[NORMAL] [SG2-41:preview-separation] roles without sample-data screens have no Preview menu', async () => {
-  await signInAs('Event Coordinator');
+test.each(['Event Coordinator', 'Venue Staff'] as const)('[NORMAL] [SG2-41:preview-separation] %s, with no sample-data screens, has no Preview menu', async role => {
+  await signInAs(role);
   expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
 });
 
@@ -712,13 +713,6 @@ describe('editing a draft (SG2-29)', () => {
       headers: { Authorization: 'Bearer test-access-token' },
     });
   });
-});
-
-test('[NORMAL] [SG2-20:prototype-booking] requesting a venue opens the booking approval screen', async () => {
-  await signInAs('Event Coordinator');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Venues' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Request Atrium Hall' }));
-  expect(screen.getByRole('heading', { name: 'Booking approval' })).toBeInTheDocument();
 });
 
 test('[NORMAL] [SG2-42:AC1] signed-in Venue Staff navigate to the catalogue and open an editor populated from the API', async () => {

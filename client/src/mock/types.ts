@@ -26,7 +26,6 @@ export type Screen =
   | 'form'
   | 'venues'
   | 'calendar'
-  | 'booking'
   | 'holds'
   | 'equipment'
   | 'attendee'
