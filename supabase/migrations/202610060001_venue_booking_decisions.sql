@@ -214,5 +214,10 @@ from public.equipment_requests r
 join public.events e on e.event_id = r.event_id
 join public.equipment q on q.equipment_id = r.equipment_id
 where r.status = 'pending' and e.status in ('submitted', 'under_review', 'approved', 'planning', 'confirmed');
+-- The view reads past RLS as its owner, so only the server may read it; the
+-- API then limits rows to the caller's role and assignments (SG2-41).
+-- Replacing a view keeps its privileges; restated here so the rule is visible.
+revoke all on public.internal_work_items from public, anon, authenticated;
+grant select on public.internal_work_items to service_role;
 
 commit;
