@@ -9,12 +9,12 @@ import { VenueError, venueRequest, type Venue, type VenueValues } from '../venue
 import { NO_OPERATIONS, VenueOperationsError, describeTimes, fetchVenueOperations, saveVenueOperations, type VenueOperationValues, type VenueOperations } from '../venues/operationsApi';
 
 /** Use the signed-in token and server permissions to load and maintain records. */
-export default function Venues({ accessToken = null, onBook }: { accessToken?: string | null; onBook: () => void }) {
+export default function Venues({ accessToken = null }: { accessToken?: string | null }) {
   // Remount on identity changes, immediately removing the previous user's data/form.
-  return <VenueCatalogue key={accessToken} token={accessToken} onBook={onBook} />;
+  return <VenueCatalogue key={accessToken} token={accessToken} />;
 }
 
-function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () => void }) {
+function VenueCatalogue({ token }: { token: string | null }) {
   const [access, setAccess] = useState<Access | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(Boolean(token));
@@ -174,7 +174,6 @@ function VenueCatalogue({ token, onBook }: { token: string | null; onBook: () =>
           <div style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {can(access, 'venues.update') ? <GhostButton onClick={() => { setSaved(''); setEditing(venue); }}>Edit {venue.name}</GhostButton> : null}
             {can(access, 'venues.blocks.manage') ? <GhostButton onClick={() => { setSaved(''); setBlocking(venue); }}>Block {venue.name}</GhostButton> : null}
-            {access.role === 'event_coordinator' ? <GhostButton onClick={onBook}>Request {venue.name}</GhostButton> : null}
           </div>
         </Card>)}
       </div>
