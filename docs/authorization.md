@@ -88,7 +88,7 @@ role gets automatically. Further grants arrive with the stories that define
 their functions (SG2-87/88/97 for assignment, SG2-100 for safety review).
 Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
 mirrored in the `event_audit_logs` RLS policy
-(`supabase/migrations/202610050001_week7_roles.sql`), and the two must change
+(`supabase/migrations/202610050004_week7_roles.sql`), and the two must change
 together.
 
 Permissions map an action name to the roles allowed to perform it. Define them
@@ -104,6 +104,19 @@ Actions without a grant return `403`, including for Technical Support Staff. Use
 the same action name in the backend guard and the page helper. Restart the
 backend after changing the map; each module instance takes a copy of the policy
 when it starts.
+
+### Event Coordinators act only on their own events
+
+The `event_coordinator` role grants the right to *attempt* review, decision,
+planning, clarification and venue-request actions. Which event they may act on
+is decided per row: the event's `coordinator_id` must be the caller. Events
+assigned to someone else and events with no coordinator are refused on the
+server in every status, and a coordinator an event is reassigned away from is
+refused from that moment. State-changing writes repeat the
+`coordinator_id` condition inside the update itself, so a write that races with
+a reassignment matches no row instead of overwriting the new assignment. Any
+new coordinator action must carry the same per-row check; the SG2-90 regression
+case in `docs/regression-cases.json` exercises every existing one.
 
 ## Protect a backend route
 

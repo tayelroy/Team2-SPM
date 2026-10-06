@@ -53,7 +53,8 @@ export interface UpdateEventPlanningDependencies {
   updatePlanningFields?: (
     admin: SupabaseClient,
     eventId: number,
-    fields: UpdatePlanningFieldsInput
+    fields: UpdatePlanningFieldsInput,
+    coordinatorId: string
   ) => Promise<UpdateEventPlanningResult>;
   insertAudit?: (
     admin: SupabaseClient,
@@ -445,10 +446,12 @@ export function createUpdateEventPlanningHandler({
       validated.values
     );
 
-    const updateResult = await updatePlanningFields(admin, eventId, fieldsToUpdate);
+    const updateResult = await updatePlanningFields(admin, eventId, fieldsToUpdate, principal.userId);
     if (!updateResult.ok) {
       if (updateResult.reason === 'not_found') {
-        res.status(404).json({ error: 'Event request not found.' });
+        // The event was read as this coordinator's moments ago, so a write that
+        // matches no row means it was reassigned in between (SG2-90).
+        res.status(409).json({ error: 'This event is no longer assigned to you. Refresh and try again.' });
         return;
       }
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });

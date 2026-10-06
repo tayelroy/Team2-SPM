@@ -134,6 +134,34 @@ export class MemoryDatabase {
     });
   }
 
+  /** SG2-90: events in every state a coordinator can act on, for each
+   * assignment state they can meet. Status matters: review and decision also
+   * guard on status, so each assignment guard needs an event that is otherwise
+   * actionable. Ids: 81 approved, 88/90 submitted, 89/91 under review are the
+   * signed-in coordinator's own; 82-87 are approved/submitted/under review
+   * pairs assigned to a second coordinator (no sign-in account) and unassigned. */
+  seedCoordinatorAccess() {
+    this.tables.users.push({
+      user_id: 'user-coordinator2', name: 'Regression second coordinator', organisation: 'Regression Organisation',
+      phone: null, communication_preferences: [], department: 'Operations'
+    });
+    this.tables.account_roles.push({ user_id: 'user-coordinator2', role: 'event_coordinator' });
+    const base = { ...this.tables.events[0], proposed_date: '2030-06-20T02:00:00.000Z',
+      expected_attendance: 80, venue_requirements: 'A projector' };
+    const own = 'user-coordinator', other = 'user-coordinator2';
+    const rows: [number, string, string, string | null][] = [
+      [81, 'Own Forum', 'approved', own], [82, 'Colleague Forum', 'approved', other], [83, 'Queued Forum', 'approved', null],
+      [84, 'Colleague Review', 'submitted', other], [85, 'Queued Review', 'submitted', null],
+      [86, 'Colleague Decision', 'under_review', other], [87, 'Queued Decision', 'under_review', null],
+      [88, 'Own Review', 'submitted', own], [89, 'Own Decision', 'under_review', own],
+      [90, 'Handover Review', 'submitted', own], [91, 'Handover Decision', 'under_review', own]
+    ];
+    for (const [event_id, name, status, coordinator_id] of rows) {
+      this.tables.events.push({ ...base, event_id, name, status, coordinator_id });
+    }
+    this.tables.venue_layouts.push({ venue_id: 1, layout: 'theatre', other_description: null });
+  }
+
   /** SG2-48: an approved event assigned to the coordinator, for 80 people
    * needing a projector on 20 June 2030, when both venues are free. Regression
    * Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
