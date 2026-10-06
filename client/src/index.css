@@ -173,6 +173,9 @@ a:hover {
 .organisation-detail-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .organisation-button { background: #011d1c; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 12px 18px; color: #edfffe; font-size: 14px; cursor: pointer; }
 .organisation-button-primary { background: rgba(203,255,252,.16); border-color: rgba(203,255,252,.5); }
+/* A disabled action must look unavailable, e.g. Approve booking until the
+   venue is ready (SG2-49). */
+.organisation-button:disabled { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); color: #707777; cursor: not-allowed; }
 .organisation-detail-hint { color: #bbc7c6; font-size: 13px; line-height: 1.5; margin: 0; }
 @media (max-width: 900px) { .organisation-detail-facts { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) {
