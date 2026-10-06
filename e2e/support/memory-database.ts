@@ -12,7 +12,10 @@ export const accounts = [
   { key: 'coordinator', email: 'coordinator@example.test', role: 'event_coordinator' },
   { key: 'venue', email: 'venue@example.test', role: 'venue_staff' },
   { key: 'support', email: 'support@example.test', role: 'technical_support_staff' },
-  { key: 'attendee', email: 'attendee@example.test', role: 'attendee' }
+  { key: 'attendee', email: 'attendee@example.test', role: 'attendee' },
+  // SG2-86: Week 7 customer changes — new internal roles alongside the five.
+  { key: 'lead', email: 'lead@example.test', role: 'event_coordinator_lead' },
+  { key: 'safety', email: 'safety@example.test', role: 'safety_officer' }
 ] as const;
 
 type Row = Record<string, unknown>;

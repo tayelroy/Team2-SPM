@@ -2,7 +2,7 @@
  * account_roles.role (SG2-25) stores snake_case ('event_organiser'); the UI
  * and the rest of this app's API contract use Title Case ('Event Organiser',
  * matching public.roles.role_name and client/src/mock/types.ts's ROLES).
- * Both five-role lists round-trip cleanly through these, so no lookup table
+ * Both seven-role lists round-trip cleanly through these, so no lookup table
  * is needed — just verified against auth/policy.ts's ROLES at the call site.
  */
 

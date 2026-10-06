@@ -132,7 +132,10 @@ test('[NORMAL] [SG2-23:AC1] an attendee lands on the event page rather than a da
 });
 
 describe('every role can reach every screen in its navigation', () => {
-  const expectedRoles = ['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const;
+  const expectedRoles = [
+    'Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee',
+    'Event Coordinator Lead', 'Safety Officer'
+  ] as const;
   // Keep expected destinations independent of the navigation data under test.
   // A wrong destination or a removed menu item must fail this contract.
   const destinations: Record<Role, [string, string][]> = {
@@ -158,8 +161,12 @@ describe('every role can reach every screen in its navigation', () => {
       ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
+    // SG2-86: deliberately minimal nav — only the screens these roles are
+    // actually permitted to use today.
+    'Event Coordinator Lead': [['Dashboard', 'Coordination lead desk'], ['All events', 'All events']],
+    'Safety Officer': [['Dashboard', 'Safety desk'], ['All events', 'All events']],
   };
-  test('[NORMAL] [SG2-24:AC1] the role catalogue contains all five documented roles', () => {
+  test('[NORMAL] [SG2-24:AC1] [SG2-86:AC1] the role catalogue contains all seven documented roles', () => {
     expect(ROLES).toEqual(expectedRoles);
   });
   test.each(expectedRoles)('[NORMAL] [SG2-23:AC1] %s', async (role) => {
@@ -217,6 +224,31 @@ test('[FAILURE] [SG2-24:AC2] the role shown in the header is a read-only label, 
   // Only Technical Support Staff can change a role (SG2-24) — not the user
   // themselves, so this must not be an interactive control.
   expect(roleLabel.tagName).not.toBe('SELECT');
+});
+
+test('[NORMAL] [SG2-86:AC3] a Safety Officer sees their own role in the header, not another role', async () => {
+  await signInAs('Safety Officer');
+  const roleLabel = screen.getByLabelText('Your role');
+  expect(roleLabel).toHaveTextContent('Safety Officer');
+});
+
+test('[FAILURE] [SG2-86:fallback] a session with a role the client does not recognise renders the Attendee shell without throwing', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: 'chief_vibes_officer', permissions: [] });
+      return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role: 'Chief Vibes Officer' } });
+    })
+  );
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+  await screen.findByRole('banner');
+  const roleLabel = screen.getByLabelText('Your role');
+  expect(roleLabel).toHaveTextContent('Attendee');
+  expect(roleLabel).not.toHaveTextContent('Chief Vibes Officer');
 });
 
 test('[NORMAL] [SG2-23:session-resume] a persisted session resumes straight into the app on the next visit', async () => {

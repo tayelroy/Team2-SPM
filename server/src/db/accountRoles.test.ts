@@ -225,4 +225,18 @@ describe('listCoordinators', () => {
     const admin = fakeListAdmin({ data: [{ user_id: 'a' }], error: null }, { data: null, error: { message: 'users down' } });
     assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'users down' });
   });
+
+  // SG2-86: adding the Event Coordinator Lead role does not widen who is
+  // assignable as a coordinator. fakeListAdmin's eq() above hard-asserts the
+  // queried role is the exact literal 'event_coordinator' (not a value
+  // derived from the implementation), so this fails if listCoordinators is
+  // ever changed to also match event_coordinator_lead. Deliberate — see the
+  // SG2-86 plan of record; SG2-87 decides lead assignability, if ever.
+  test('[BOUNDARY] [SG2-86:AC4] queries the exact literal event_coordinator, excluding event_coordinator_lead', async () => {
+    const admin = fakeListAdmin(
+      { data: [{ user_id: 'a' }], error: null },
+      { data: [{ user_id: 'a', name: 'Amy' }], error: null }
+    );
+    assert.deepEqual(await listCoordinators(admin), { ok: true, coordinators: [{ user_id: 'a', name: 'Amy' }] });
+  });
 });

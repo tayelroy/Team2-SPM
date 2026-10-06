@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { fetchProfile, updateProfile, type ProfileRecord } from '../api/profile';
+import type { Role } from '../mock/types';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import { Card, Fact, GradientButton } from '../ui';
 
@@ -64,7 +65,7 @@ function ControlledField({
  * field appears, matching the "internal users additionally see their
  * department" acceptance criterion.
  */
-export default function Profile() {
+export default function Profile({ role }: { role: Role }) {
   const baseId = useId();
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [loadMessage, setLoadMessage] = useState('');
@@ -134,6 +135,7 @@ export default function Profile() {
 
   return (
     <Card style={{ gap: '24px', maxWidth: '560px' }}>
+      <Fact label="Role" value={role} />
       <Fact label="Organisation" value={profile?.organisation ?? '—'} />
 
       <ControlledField id={`${baseId}-name`} label="Name" value={name} onChange={(e) => setName(e.target.value)} />

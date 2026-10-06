@@ -2733,5 +2733,27 @@
         "source": "supabase/tests/venue_operations.sql"
       }
     }
+  },
+  {
+    "id": "SG2-86-P01",
+    "title": "a new Week 7 role signs in, sees its own role and is denied ungranted operations",
+    "type": "Positive / role isolation / responsive",
+    "story": "SG2-86",
+    "purpose": "Prove Event Coordinator Lead and Safety Officer — the two Week 7 customer-change roles — work end to end: sign-in resolves the role, the role is shown to the user, internal profile fields are visible, and operations the role was not granted are refused server-side.",
+    "preconditions": "Built React app and Express API on loopback with disposable identity/storage providers, fresh browser context and fixed clock. No hosted Supabase.",
+    "steps": [
+      "Sign in as the Safety Officer fixture account.",
+      "Verify the header role badge reads 'Safety Officer'.",
+      "Open My Profile and verify the Role fact and the Department field are both shown (internal-role profile scoping, SG2-27).",
+      "Call GET /api/work-queue directly with the signed-in session's token and verify it is refused."
+    ],
+    "data": "Fixture account 'safety' (safety_officer) from e2e/support/memory-database.ts.",
+    "expected": "Header shows 'Safety Officer'; profile page shows Role and Department; GET /api/work-queue returns 403.",
+    "evidence": "e2e/regression.spec.ts; server/src/authorization.test.ts; server/src/profile.test.ts; client/src/App.test.tsx",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in local Playwright e2e suite with other regression journeys.",
+    "execution_evidence": "6 Oct 2026; feature/SG2-86-event-coordinator-lead-and-safety-officer; npm run ci green locally with 100% per-file coverage in server and client.",
+    "execution_date": "6 Oct 2026"
   }
 ]

@@ -6,9 +6,16 @@ export const ROLES = [
   'Venue Staff',
   'Technical Support Staff',
   'Attendee',
+  'Event Coordinator Lead',
+  'Safety Officer',
 ] as const;
 
 export type Role = (typeof ROLES)[number];
+
+/** SG2-86: narrows an arbitrary server role string to the known client union. */
+export function isRole(value: string): value is Role {
+  return (ROLES as readonly string[]).includes(value);
+}
 
 export type Screen =
   | 'landing'

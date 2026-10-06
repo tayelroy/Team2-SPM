@@ -44,7 +44,7 @@ afterEach(() => {
 
 test('[NORMAL] [SG2-27:AC1] shows a loading state, then the profile once it arrives', async () => {
   stubFetch(EXTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading your profile…');
 
   expect(await screen.findByLabelText('Name')).toHaveValue('Alex Tan');
@@ -56,7 +56,7 @@ test('[NORMAL] [SG2-27:AC1] shows a loading state, then the profile once it arri
 
 test('[FAILURE] [SG2-27:AC1] shows the load error and no form when the profile cannot be fetched', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('oops', { status: 503 })));
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach your profile (HTTP 503).');
   expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
@@ -64,14 +64,14 @@ test('[FAILURE] [SG2-27:AC1] shows the load error and no form when the profile c
 
 test('[NORMAL] [SG2-27:AC4] hides department for an external role (profile has no department key)', async () => {
   stubFetch(EXTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');
   expect(screen.queryByLabelText('Department')).not.toBeInTheDocument();
 });
 
 test('[NORMAL] [SG2-27:AC4] shows department for an internal role and saves it', async () => {
   const fetchMock = stubFetch(INTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
 
   expect(await screen.findByLabelText('Department')).toHaveValue('Facilities');
   fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Operations' } });
@@ -84,7 +84,7 @@ test('[NORMAL] [SG2-27:AC4] shows department for an internal role and saves it',
 
 test('[NORMAL] [SG2-27:AC2] edits name, phone and toggles a communication preference, then saves', async () => {
   const fetchMock = stubFetch(EXTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');
 
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Alex T.' } });
@@ -112,7 +112,7 @@ test('[FAILURE] [SG2-27:AC3] shows server validation details without reporting a
       .mockResolvedValueOnce(jsonResponse({ profile: EXTERNAL_PROFILE }))
       .mockResolvedValueOnce(jsonResponse({ error: 'Invalid profile details', details: ['name is required.'] }, 400))
   );
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');
 
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -124,7 +124,7 @@ test('[FAILURE] [SG2-27:AC3] shows server validation details without reporting a
 
 test('[BOUNDARY] [SG2-27:AC1] falls back to placeholders when organisation and phone are unset', async () => {
   stubFetch({ user_id: 'user-1', name: 'Alex Tan', organisation: null, phone: null, communication_preferences: [] });
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
 
   expect(await screen.findByText('—')).toBeInTheDocument();
   expect(screen.getByLabelText('Phone')).toHaveValue('');
@@ -132,7 +132,7 @@ test('[BOUNDARY] [SG2-27:AC1] falls back to placeholders when organisation and p
 
 test('[BOUNDARY] [SG2-27:AC2] unchecking an already-selected preference removes it', async () => {
   const fetchMock = stubFetch(EXTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');
 
   fireEvent.click(screen.getByLabelText('Email'));
@@ -145,7 +145,7 @@ test('[BOUNDARY] [SG2-27:AC2] unchecking an already-selected preference removes 
 
 test('[BOUNDARY] [SG2-27:AC4] clearing department sends null', async () => {
   const fetchMock = stubFetch(INTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Department');
 
   fireEvent.change(screen.getByLabelText('Department'), { target: { value: '' } });
@@ -165,7 +165,7 @@ test('[FAILURE] [SG2-27:AC2] shows the plain server message when a save failure 
       .mockResolvedValueOnce(new Response(JSON.stringify({ profile: EXTERNAL_PROFILE }), { status: 200 }))
       .mockResolvedValueOnce(new Response('oops', { status: 503 }))
   );
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');
 
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -179,7 +179,7 @@ test('[CONFLICT] [SG2-27:load-isolation] a cancelled StrictMode load cannot over
     .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveGet = resolve; }))
     .mockResolvedValueOnce(jsonResponse({ profile: { ...EXTERNAL_PROFILE, name: 'Current profile' } })));
 
-  render(<StrictMode><Profile /></StrictMode>);
+  render(<StrictMode><Profile role="Attendee" /></StrictMode>);
   expect(await screen.findByLabelText('Name')).toHaveValue('Current profile');
   await act(async () => resolveGet(jsonResponse({ profile: EXTERNAL_PROFILE })));
   expect(screen.getByLabelText('Name')).toHaveValue('Current profile');
@@ -187,7 +187,7 @@ test('[CONFLICT] [SG2-27:load-isolation] a cancelled StrictMode load cannot over
 
 test('[CONFLICT] [SG2-27:duplicate-save] a second click while saving does not submit twice', async () => {
   stubFetch(EXTERNAL_PROFILE);
-  render(<Profile />);
+  render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');
 
   let resolvePut!: (response: Response) => void;
@@ -201,4 +201,19 @@ test('[CONFLICT] [SG2-27:duplicate-save] a second click while saving does not su
   resolvePut(jsonResponse({ profile: EXTERNAL_PROFILE }));
   await screen.findByText('Profile updated.');
   expect(fetchMock).toHaveBeenCalledOnce();
+});
+
+test('[NORMAL] [SG2-86:AC3] shows the Role fact for Safety Officer alongside their department', async () => {
+  stubFetch(INTERNAL_PROFILE);
+  render(<Profile role="Safety Officer" />);
+  await screen.findByLabelText('Department');
+  expect(screen.getByText('Safety Officer')).toBeInTheDocument();
+});
+
+test('[BOUNDARY] [SG2-86:AC3] shows the Role fact for an unaffected existing role with no department', async () => {
+  stubFetch(EXTERNAL_PROFILE);
+  render(<Profile role="Attendee" />);
+  await screen.findByLabelText('Name');
+  expect(screen.getByText('Attendee')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Department')).not.toBeInTheDocument();
 });

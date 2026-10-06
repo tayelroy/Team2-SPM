@@ -79,6 +79,17 @@ accounts or expose an endpoint for changing roles.
 | Venue Staff | `venue_staff` |
 | Technical Support Staff | `technical_support_staff` |
 | Attendee | `attendee` |
+| Event Coordinator Lead | `event_coordinator_lead` |
+| Safety Officer | `safety_officer` |
+
+Event Coordinator Lead and Safety Officer (SG2-86, Week 7 customer changes)
+currently hold only `profile.read`/`profile.update` — the same grants every
+role gets automatically. Further grants arrive with the stories that define
+their functions (SG2-87/88/97 for assignment, SG2-100 for safety review).
+Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
+mirrored in the `event_audit_logs` RLS policy
+(`supabase/migrations/202610050004_week7_roles.sql`), and the two must change
+together.
 
 Permissions map an action name to the roles allowed to perform it. Define them
 in `PERMISSIONS` in `server/src/auth/policy.ts`. The current policy is:

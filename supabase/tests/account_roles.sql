@@ -116,6 +116,71 @@ begin
   end loop;
 end $$;
 
+-- SG2-86: Event Coordinator Lead and Safety Officer alongside the five
+-- existing roles. Fresh fixtures (not reused from the blocks above).
+reset role;
+insert into auth.users (id) values
+  ('50000000-0000-4000-8000-000000000005'),
+  ('60000000-0000-4000-8000-000000000006'),
+  ('70000000-0000-4000-8000-000000000007');
+
+set local role service_role;
+insert into public.users (user_id, name, organisation, role_id) values
+  ('70000000-0000-4000-8000-000000000007', 'Organiser Seven', 'Acme Corp', 1);
+insert into public.events (event_id, organiser_id, organisation, name, status) values
+  (97001, '70000000-0000-4000-8000-000000000007', 'Acme Corp', 'Week 7 Event', 'planning');
+insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value) values
+  (97001, '70000000-0000-4000-8000-000000000007', 'name', 'Draft', 'Week 7 Event');
+
+do $$
+begin
+  insert into public.account_roles (user_id, role) values ('50000000-0000-4000-8000-000000000005', 'event_coordinator_lead');
+  if (select role from public.account_roles where user_id = '50000000-0000-4000-8000-000000000005')
+      is distinct from 'event_coordinator_lead' then
+    raise exception '[SG2-86:lead-role-accepted] [SG2-86:AC1] [NORMAL] Event Coordinator Lead role was not stored';
+  end if;
+  insert into public.account_roles (user_id, role) values ('60000000-0000-4000-8000-000000000006', 'safety_officer');
+  if (select role from public.account_roles where user_id = '60000000-0000-4000-8000-000000000006')
+      is distinct from 'safety_officer' then
+    raise exception '[SG2-86:safety-role-accepted] [SG2-86:AC1] [NORMAL] Safety Officer role was not stored';
+  end if;
+  begin
+    update public.account_roles set role = 'safety_officer ' where user_id = '50000000-0000-4000-8000-000000000005';
+    raise exception '[SG2-86:role-value-exact] [BOUNDARY] Trailing-whitespace role variant accepted';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.account_roles set role = 'event_coordinator_leads' where user_id = '50000000-0000-4000-8000-000000000005';
+    raise exception '[SG2-86:unknown-role-rejected] [BOUNDARY] Near-miss unknown role accepted';
+  exception when check_violation then null;
+  end;
+end $$;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '60000000-0000-4000-8000-000000000006', true);
+select set_config('request.jwt.claims', '{"sub":"60000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    update public.account_roles set role = 'technical_support_staff'
+      where user_id = '60000000-0000-4000-8000-000000000006';
+    raise exception '[SG2-86:new-role-no-self-promotion] [SG2-86:AC2] [FAILURE] Safety Officer could promote themselves';
+  exception when insufficient_privilege then null;
+  end;
+  if not exists (select 1 from public.event_audit_logs where event_id = 97001) then
+    raise exception '[SG2-86:safety-officer-audit-read] [SG2-86:AC3] [NORMAL] Safety Officer could not read audit logs for an event they do not organise';
+  end if;
+end $$;
+
+select set_config('request.jwt.claim.sub', '20000000-0000-4000-8000-000000000002', true);
+select set_config('request.jwt.claims', '{"sub":"20000000-0000-4000-8000-000000000002","role":"authenticated"}', true);
+do $$
+begin
+  if exists (select 1 from public.event_audit_logs where event_id = 97001) then
+    raise exception '[SG2-86:external-audit-still-denied] [SG2-86:AC4] [FAILURE] Attendee could read event audit logs for an event they do not own';
+  end if;
+end $$;
+
 reset role;
 do $$
 begin
