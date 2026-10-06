@@ -124,10 +124,10 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     expect(await screen.findByRole('heading', { name: 'Partner Forum' })).toBeInTheDocument();
   });
 
-  test('[FAILURE] [SG2-33:AC1] explains a refusal to a signed-in account that is not Technical Support', async () => {
+  test('[FAILURE] [SG2-33:AC1] [SG2-97:AC1] explains a refusal to a signed-in account that is not the Event Coordinator Lead', async () => {
     api(() => new Response(null, { status: 403 }));
     render(<CoordinatorAssignment accessToken="tok" />);
-    expect(await screen.findByRole('alert')).toHaveTextContent('Only Technical Support Staff can assign coordinators.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only the Event Coordinator Lead can assign coordinators.');
   });
 
   test('[BOUNDARY] [SG2-33:AC1] says so when there is nothing to assign', async () => {
@@ -145,7 +145,7 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     await waitFor(() => expect(screen.queryByRole('heading')).not.toBeInTheDocument());
   });
 
-  test('[NORMAL] [SG2-34:AC4] Technical Support can open the history and see the previous coordinator after a reassignment', async () => {
+  test('[NORMAL] [SG2-34:AC4] [SG2-97:AC2] the Event Coordinator Lead can open the history and still see assignments Technical Support made', async () => {
     const fetchMock = api(undefined, undefined, (url) => {
       expect(url).toBe('/api/event-requests/8/history');
       return Response.json({

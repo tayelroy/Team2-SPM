@@ -162,6 +162,19 @@ export class MemoryDatabase {
     this.tables.venue_layouts.push({ venue_id: 1, layout: 'theatre', other_description: null });
   }
 
+  /** SG2-97: an approved event whose coordinator was assigned by Technical
+   * Support Staff before assignment moved to the Event Coordinator Lead, with
+   * the history row that assignment wrote. */
+  seedLegacyAssignment() {
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 95, name: 'Legacy Forum', status: 'approved', coordinator_id: 'user-coordinator'
+    });
+    this.tables.event_audit_logs.push({
+      log_id: 1, event_id: 95, actor_id: 'user-support', field_name: 'coordinator_id',
+      old_value: null, new_value: 'Regression coordinator', created_at: '2026-10-01T02:00:00.000Z'
+    });
+  }
+
   /** SG2-48: an approved event assigned to the coordinator, for 80 people
    * needing a projector on 20 June 2030, when both venues are free. Regression
    * Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
@@ -312,8 +325,16 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     if (this.window) rows = rows.slice(this.window[0], this.window[1] + 1);
     const projected = rows.map(row => {
       if (this.columns === '*') return structuredClone(row);
-      return Object.fromEntries(this.columns.split(',').map(column => {
+      // Split on commas outside parentheses, so an embedded `(name, phone)`
+      // stays one column, and return the fields the embed asks for (SG2-97).
+      return Object.fromEntries(this.columns.split(/,(?![^(]*\))/).map(column => {
         const key = column.trim();
+        const embed = /^(coordinator|actor|sender):users!\w+\(([^)]*)\)$/.exec(key);
+        if (embed) {
+          const [, alias, fields] = embed;
+          const user = this.database.tables.users.find(candidate => candidate.user_id === row[`${alias}_id`]);
+          return [alias, user ? Object.fromEntries(fields.split(',').map(field => [field.trim(), user[field.trim()] ?? null])) : null];
+        }
         if (key.startsWith('coordinator:')) {
           const coordinator = this.database.tables.users.find(user => user.user_id === row.coordinator_id);
           return ['coordinator', coordinator ? { name: coordinator.name } : null];

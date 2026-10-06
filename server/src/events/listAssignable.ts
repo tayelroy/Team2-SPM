@@ -13,7 +13,7 @@ export interface ListAssignableDependencies {
 }
 
 /**
- * GET /api/event-requests/assignable — what Technical Support Staff need to
+ * GET /api/event-requests/assignable — what the Event Coordinator Lead needs to
  * make an assignment (SG2-33/SG2-34): the requests that can take a
  * coordinator and the coordinators to choose from. Mounted behind
  * requirePermission('event_request.assign_coordinator'), the same grant as

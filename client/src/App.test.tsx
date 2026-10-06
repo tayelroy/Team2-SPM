@@ -157,19 +157,21 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
-      ['Assign coordinators', 'Assign coordinators'],
       ['Venue Availability', 'Venue availability'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
     // SG2-86: deliberately minimal nav — only the screens these roles are
     // actually permitted to use today.
-    'Event Coordinator Lead': [['Dashboard', 'Coordination lead desk'], ['All events', 'All events']],
+    // SG2-97: assignment moved here from Technical Support Staff.
+    'Event Coordinator Lead': [
+      ['Dashboard', 'Coordination lead desk'], ['Assign coordinators', 'Assign coordinators'], ['All events', 'All events'],
+    ],
     'Safety Officer': [['Dashboard', 'Safety desk'], ['All events', 'All events']],
   };
   test('[NORMAL] [SG2-24:AC1] [SG2-86:AC1] the role catalogue contains all seven documented roles', () => {
     expect(ROLES).toEqual(expectedRoles);
   });
-  test.each(expectedRoles)('[NORMAL] [SG2-23:AC1] %s', async (role) => {
+  test.each(expectedRoles)('[NORMAL] [SG2-23:AC1] [SG2-97:AC1] %s', async (role) => {
     await signInAs(role);
     for (const [navLabel, heading] of destinations[role]) {
       fireEvent.click(within(header()).getByRole('button', { name: navLabel }));
@@ -177,6 +179,16 @@ describe('every role can reach every screen in its navigation', () => {
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     }
   });
+});
+
+// SG2-97: only the Event Coordinator Lead is offered the assignment screen.
+test.each([
+  ['Technical Support Staff', false], ['Event Coordinator', false], ['Safety Officer', false], ['Event Coordinator Lead', true],
+] as const)('[FAILURE] [SG2-97:AC1] %s sees Assign coordinators in the navigation: %s', async (role, offered) => {
+  await signInAs(role);
+  const button = within(header()).queryByRole('button', { name: 'Assign coordinators' });
+  if (offered) expect(button).toBeInTheDocument();
+  else expect(button).not.toBeInTheDocument();
 });
 
 // SG2-41: sample-data prototypes sit behind a Preview menu, apart from the live queue.
