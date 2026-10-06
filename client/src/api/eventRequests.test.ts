@@ -1585,11 +1585,11 @@ describe('assignCoordinator (SG2-33/34)', () => {
     });
   });
 
-  test.each([401, 403])('[FAILURE] [SG2-33:AC1] tells the user only Technical Support can assign on %i', async (status) => {
+  test.each([401, 403])('[FAILURE] [SG2-33:AC1] [SG2-97:AC1] tells the user only the Event Coordinator Lead can assign on %i', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({
       ok: false,
-      message: 'Only Technical Support Staff can assign a coordinator. Sign in again.',
+      message: 'Only the Event Coordinator Lead can assign a coordinator. Sign in again.',
     });
   });
 

@@ -844,7 +844,7 @@ export async function assignCoordinator(
 
   if (response.ok) return { ok: true };
   if (response.status === 401 || response.status === 403) {
-    return { ok: false, message: 'Only Technical Support Staff can assign a coordinator. Sign in again.' };
+    return { ok: false, message: 'Only the Event Coordinator Lead can assign a coordinator. Sign in again.' };
   }
   if (response.status === 400 || response.status === 404 || response.status === 409) {
     const data = await readEventRequestJson(response, {} as Record<string, unknown>);

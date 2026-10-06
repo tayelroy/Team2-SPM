@@ -16,7 +16,7 @@ function formatStatus(status: string): string {
 }
 
 /**
- * Technical Support Staff assign an Event Coordinator to a request, or hand it
+ * The Event Coordinator Lead (SG2-97) assigns an Event Coordinator to a request, or hands it
  * to a different one (SG2-33, SG2-34). Both are the same write, so one control
  * serves both; only its label changes once a coordinator is already set.
  * Each change is recorded in the event history (SG2-33/34 AC4), which opens
@@ -45,7 +45,7 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
       } else {
         setError(
           result.kind === 'unauthorized'
-            ? 'Only Technical Support Staff can assign coordinators. Sign in again.'
+            ? 'Only the Event Coordinator Lead can assign coordinators. Sign in again.'
             : 'Requests are temporarily unavailable. Please try again later.',
         );
       }
