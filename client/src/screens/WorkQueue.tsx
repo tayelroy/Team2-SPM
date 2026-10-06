@@ -6,6 +6,8 @@ import ClarificationThread from '../components/ClarificationThread';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
+import VenueDecision from '../venues/VenueDecision';
+import type { BookingReadiness } from '../venues/suitabilityApi';
 import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
 
 const GROUPS = {
@@ -111,6 +113,8 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
   const [currentStatus, setCurrentStatus] = useState(status);
   const [currentDetails, setCurrentDetails] = useState(item.details);
   const [startsAt, setStartsAt] = useState(item.starts_at);
+  // SG2-49: whether the venue request may be approved, from its suitability check.
+  const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
 
   useEffect(() => {
     setCurrentStatus(status);
@@ -218,7 +222,9 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           }}
         />
       )}
-      {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} />}
+      {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} onReadiness={setReadiness} />}
+      {item.kind === 'venue' && <VenueDecision requestId={item.item_id} accessToken={accessToken}
+        holdId={typeof currentDetails.hold_id === 'number' ? currentDetails.hold_id : null} readiness={readiness} onDecided={setStatus} />}
       {item.kind === 'event' && (
         <EventAuditDrawer
           isOpen={historyDrawerOpen}

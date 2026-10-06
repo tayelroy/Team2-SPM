@@ -23,6 +23,7 @@ import { createVenueBlocksRouter } from './venues/blocks';
 import { createVenueSearchRouter } from './venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from './venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
+import { createNotificationsRouter } from './notifications';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
@@ -53,7 +54,8 @@ export function createApp(
     profile: createProfileRouter(access),
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
-    venueRequests: createVenueBookingRequestsRouter(access)
+    venueRequests: createVenueBookingRequestsRouter(access),
+    notifications: createNotificationsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
@@ -94,6 +96,8 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  // SG2-49: each person's own notices, e.g. a venue request decision.
+  app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission

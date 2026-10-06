@@ -25,8 +25,9 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
 }
 
 const row = { request_id: 41, event_id: 7, venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
-  status: 'pending', layout: 'theatre', venue_requirements: 'A stage', requested_by: 'user-coordinator', requested_at: '2030-01-01T00:00:00.000Z' };
-const { requested_by: _requester, ...visible } = row;
+  status: 'pending', layout: 'theatre', venue_requirements: 'A stage', requested_by: 'user-coordinator', requested_at: '2030-01-01T00:00:00.000Z',
+  decided_by: null, decided_at: null, decision_reason: null };
+const { requested_by: _requester, decided_by: _decider, ...visible } = row;
 const values = { event_id: 7, venue_id: 1, starts_at: row.starts_at, ends_at: row.ends_at, layout: 'theatre' as const,
   venue_requirements: 'A stage', requested_by: 'user-coordinator' };
 
@@ -37,7 +38,7 @@ test('[NORMAL] [SG2-48:AC1] [SG2-48:AC3] making a request inserts only the reque
     venues: [{ data: [{ venue_id: 1, name: 'Atrium Hall' }], error: null }],
     users: [{ data: [{ user_id: 'user-coordinator', name: 'Casey' }], error: null }]
   }, calls));
-  assert.deepEqual(await store.create(values), { ...visible, venue_name: 'Atrium Hall', requester_name: 'Casey' });
+  assert.deepEqual(await store.create(values), { ...visible, venue_name: 'Atrium Hall', requester_name: 'Casey', decider_name: null });
   assert.deepEqual(calls.find(call => call.method === 'insert')?.args, [values]);
   assert.deepEqual([...new Set(calls.map(call => call.table))], ['venue_booking_requests', 'venues', 'users']);
 });
@@ -112,6 +113,44 @@ test('[FAILURE] [SG2-48:AC1] [SG2-48:request-unavailable] any database failure i
     ['list', { venue_booking_requests: [failure] }, store => store.list(7)],
     ['venue names', { venue_booking_requests: [{ data: [row], error: null }], venues: [failure] }, store => store.list(7)],
     ['requester names', { venue_booking_requests: [{ data: [row], error: null }], venues: [{ data: [], error: null }], users: [failure] }, store => store.list(7)]
+  ];
+  for (const [name, tables, attempt] of attempts) {
+    await assert.rejects(attempt(createVenueBookingRequestStore(fakeAdmin(tables))), (error: unknown) => error instanceof AccessError && error.status === 503, name);
+  }
+});
+
+test('[NORMAL] [SG2-49:AC2] [SG2-49:AC3] one request is read with its decision, decider and reason; requester and decider are looked up together', async () => {
+  const calls: Call[] = [];
+  const rejected = { ...row, status: 'rejected', decided_by: 'user-venue', decided_at: '2030-01-02T00:00:00.000Z', decision_reason: 'Rewiring' };
+  const store = createVenueBookingRequestStore(fakeAdmin({
+    venue_booking_requests: [{ data: rejected, error: null }, { data: null, error: null }],
+    venues: [{ data: [{ venue_id: 1, name: 'Atrium Hall' }], error: null }],
+    users: [{ data: [{ user_id: 'user-coordinator', name: 'Casey' }, { user_id: 'user-venue', name: 'Vera' }], error: null }]
+  }, calls));
+  assert.deepEqual(await store.request(41), { ...visible, status: 'rejected', decided_at: '2030-01-02T00:00:00.000Z', decision_reason: 'Rewiring',
+    venue_name: 'Atrium Hall', requester_name: 'Casey', decider_name: 'Vera' });
+  assert.deepEqual(calls.find(call => call.table === 'users' && call.method === 'in')?.args, ['user_id', ['user-coordinator', 'user-venue']]);
+  assert.equal(await store.request(99), null);
+});
+
+test('[NORMAL] [SG2-49:AC1] a request\'s tentative hold, if any, and its capacity exceptions are read by request id', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingRequestStore(fakeAdmin({
+    venue_holds: [{ data: { hold_id: 12 }, error: null }, { data: null, error: null }],
+    venue_capacity_exceptions: [{ data: [], error: null }]
+  }, calls));
+  assert.equal(await store.hold(41), 12);
+  assert.equal(await store.hold(42), null);
+  assert.deepEqual(await store.exceptions(41), []);
+  assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => [call.table, ...call.args]),
+    [['venue_holds', 'request_id', 41], ['venue_holds', 'request_id', 42], ['venue_capacity_exceptions', 'request_id', 41]]);
+});
+
+test('[FAILURE] [SG2-49:AC3] a failure reading a request or its hold is reported as temporarily unavailable', async () => {
+  const failure = { data: null, error: { message: 'offline' } };
+  const attempts: [string, Record<string, Result[]>, (store: ReturnType<typeof createVenueBookingRequestStore>) => Promise<unknown>][] = [
+    ['request', { venue_booking_requests: [failure] }, store => store.request(41)],
+    ['hold', { venue_holds: [failure] }, store => store.hold(41)]
   ];
   for (const [name, tables, attempt] of attempts) {
     await assert.rejects(attempt(createVenueBookingRequestStore(fakeAdmin(tables))), (error: unknown) => error instanceof AccessError && error.status === 503, name);

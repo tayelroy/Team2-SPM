@@ -28,6 +28,8 @@ import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createNotificationsRouter } from '../server/src/notifications';
+import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -137,7 +139,9 @@ const app = createApp(
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
-    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient }) },
+    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-49: decision notices, against the in-memory client.
+    notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.
@@ -179,6 +183,10 @@ app.post('/__e2e/assigned-review', (_req, res) => {
 });
 app.post('/__e2e/venue-suitability', (_req, res) => {
   database.seedVenueSuitability();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-decision', (_req, res) => {
+  database.seedVenueDecision();
   res.status(204).end();
 });
 app.post('/__e2e/venue-request', (_req, res) => {

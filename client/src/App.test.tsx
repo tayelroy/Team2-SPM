@@ -32,6 +32,8 @@ function mockLoginResponse(role: Role) {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
       if (url === '/api/venue-holds') return Response.json({ holds: [] });
       if (url === '/api/venue-holds/options') return Response.json({ events: [], venues: [] });
+      // SG2-49: venue request decision notices share the notification drawer.
+      if (url === '/api/notifications') return Response.json({ notifications: [] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{

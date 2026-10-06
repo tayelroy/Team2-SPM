@@ -1,19 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { loadHoldNotifications, type HoldNotification } from '../venues/holdNotificationsApi';
+import { loadNotifications, type Notification } from '../api/notificationsApi';
 import { formatSgtTimestamp } from './EventAuditDrawer';
 import { color, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, IconButton, Notice } from '../ui';
 
-const LABEL: Record<HoldNotification['kind'], string> = {
+const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: 'Tentative hold placed', warning: 'Hold expiring soon', expired: 'Hold expired',
+  // SG2-49: Venue Staff decisions on the coordinator's venue requests.
+  venue_request_approved: 'Venue request approved', venue_request_rejected: 'Venue request rejected',
 };
-const TONE: Record<HoldNotification['kind'], string> = {
+const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate,
+  venue_request_approved: color.accent, venue_request_rejected: color.silver,
 };
 
+/** One line in the drawer, whichever inbox it came from. */
+interface InboxEntry { key: string; kind: keyof typeof LABEL; message: string; created_at: string }
+
+/** Hold notices (SG2-84) and decision notices (SG2-49), newest first. */
+function inbox(holds: HoldNotification[] | null, notices: Notification[] | null): InboxEntry[] {
+  return [
+    ...(holds ?? []).map(entry => ({ ...entry, key: `hold-${entry.notification_id}` })),
+    ...(notices ?? []).map(entry => ({ ...entry, key: `notice-${entry.notification_id}` }))
+  ].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
 function HoldNotificationDrawer({ notifications, loading, error, onClose, onRetry }: {
-  notifications: HoldNotification[] | null; loading: boolean; error: string;
+  notifications: InboxEntry[] | null; loading: boolean; error: string;
   onClose: () => void; onRetry: () => void;
 }) {
   const drawer = useRef<HTMLElement>(null);
@@ -31,10 +46,10 @@ function HoldNotificationDrawer({ notifications, loading, error, onClose, onRetr
         <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 500, letterSpacing: '-0.02em', color: color.platinum }}>Notifications</h3>
         <IconButton label="Close notifications" onClick={onClose}>✕</IconButton>
       </div>
-      {loading && notifications === null ? <p role="status" style={{ color: color.silver }}>Loading hold notifications…</p> : null}
+      {loading && notifications === null ? <p role="status" style={{ color: color.silver }}>Loading notifications…</p> : null}
       {error ? <Notice role="alert"><span>{error}</span><GhostButton onClick={onRetry}>Retry</GhostButton></Notice> : null}
-      {notifications === null ? null : notifications.length === 0 ? <p style={{ color: color.silver }}>No hold notifications available.</p> :
-          notifications.map(notification => <div key={notification.notification_id}
+      {notifications === null ? null : notifications.length === 0 ? <p style={{ color: color.silver }}>No notifications yet.</p> :
+          notifications.map(notification => <div key={notification.key}
             style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', paddingBottom: '18px', borderBottom: rule.faint }}>
             <Dot tone={TONE[notification.kind]} style={{ marginTop: '7px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -50,7 +65,9 @@ function HoldNotificationDrawer({ notifications, loading, error, onClose, onRetr
 /** Keep the badge and drawer synchronized for the authenticated session. */
 function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<HoldNotification[] | null>(null);
+  // Each inbox keeps its last good list when a refresh of it fails.
+  const [holds, setHolds] = useState<HoldNotification[] | null>(null);
+  const [notices, setNotices] = useState<Notification[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const refresh = useRef<(() => void) | null>(null);
@@ -62,12 +79,13 @@ function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
       inFlight = true;
       setLoading(true);
       setError('');
-      void loadHoldNotifications(accessToken).then(result => {
+      void Promise.all([loadHoldNotifications(accessToken), loadNotifications(accessToken)]).then(([held, decided]) => {
         if (!current) return;
         inFlight = false;
         setLoading(false);
-        if (result.ok) setNotifications(result.notifications);
-        else setError(result.message);
+        if (held.ok) setHolds(held.notifications);
+        if (decided.ok) setNotices(decided.notifications);
+        setError([held, decided].flatMap(result => result.ok ? [] : [result.message]).join(' '));
       });
     };
     refresh.current = load;
@@ -80,6 +98,9 @@ function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
       window.removeEventListener('focus', load);
     };
   }, [accessToken]);
+  // The count is shown once both inboxes have loaded at least once.
+  const notifications = holds === null || notices === null ? null : inbox(holds, notices);
+  const listed = holds === null && notices === null ? null : inbox(holds, notices);
   const count = notifications === null ? (error ? 'unavailable' : 'loading') : notifications.length;
   const trigger = useRef<HTMLButtonElement>(null);
   const close = () => { setOpen(false); trigger.current!.focus(); };
@@ -90,7 +111,7 @@ function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
       ●<span style={{ position: 'absolute', top: '-6px', right: '-6px', minWidth: '18px', height: '18px', borderRadius: '9px',
         background: color.accent, color: color.abyss, fontSize: '10px', lineHeight: '18px', letterSpacing: '0.04em' }}>{notifications === null ? '…' : notifications.length}</span>
     </button>
-    {open ? createPortal(<HoldNotificationDrawer notifications={notifications} loading={loading} error={error} onClose={close} onRetry={() => refresh.current!()} />, document.body) : null}
+    {open ? createPortal(<HoldNotificationDrawer notifications={listed} loading={loading} error={error} onClose={close} onRetry={() => refresh.current!()} />, document.body) : null}
   </>;
 }
 
