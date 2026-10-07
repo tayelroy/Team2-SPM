@@ -2973,8 +2973,8 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
-    "execution_evidence": "7 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at e73f91e (local branch, not yet pushed); npm run test:e2e locally; 52/53 Chromium journeys passed including this one, installed Chromium. The one failure is the pre-existing SG2-85-P02 flake, reproduced independently on pristine origin/main and unrelated to this change. No hosted Supabase validation; regression-gate.mjs not run standalone in this evidence.",
-    "execution_date": "7 Oct 2026",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at 9df57ed (local branch, not yet pushed); npm run test:e2e locally; 58/59 Chromium journeys passed including this one, installed Chromium. The one failure is SG2-85-P02 ('Hold expired' notice not found), reproduced with the identical assertion failure on a pristine origin/main 9df57ed worktree and unrelated to this change. No hosted Supabase validation; regression-gate.mjs not run standalone in this evidence.",
+    "execution_date": "8 Oct 2026",
     "categories": [
       "NORMAL",
       "BOUNDARY"
@@ -3005,8 +3005,8 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
-    "execution_evidence": "7 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at e73f91e (local branch, not yet pushed); npm run test:e2e locally; 52/53 Chromium journeys passed including this one, installed Chromium. The one failure is the pre-existing SG2-85-P02 flake, reproduced independently on pristine origin/main and unrelated to this change. No hosted Supabase validation; regression-gate.mjs not run standalone in this evidence.",
-    "execution_date": "7 Oct 2026",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at 9df57ed (local branch, not yet pushed); npm run test:e2e locally; 58/59 Chromium journeys passed including this one, installed Chromium. The one failure is SG2-85-P02 ('Hold expired' notice not found), reproduced with the identical assertion failure on a pristine origin/main 9df57ed worktree and unrelated to this change. No hosted Supabase validation; regression-gate.mjs not run standalone in this evidence.",
+    "execution_date": "8 Oct 2026",
     "categories": [
       "NORMAL",
       "BOUNDARY"
