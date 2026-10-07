@@ -1630,7 +1630,7 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
   expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
 });
 
-test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC13] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
+test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2-100:AC13] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
   await signIn(page, 'organiser');
   // AC2: submission with no coordinator lands in unassigned, not submitted.
   expect((await request.patch('/api/event-requests/1/submit', { headers: await authHeaders(page) })).status()).toBe(200);
@@ -1639,6 +1639,22 @@ test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC13] [NO
   await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
   await expect(page.getByTestId('waiting-on-persona')).toContainText('Event Coordinator Lead');
   await expect(page.getByTestId('waiting-on-action')).toContainText('Assign an event coordinator');
+
+  // AC9: EventDetail and the 7-step stepper render without layout breakage
+  // or horizontal overflow at both a phone and a laptop viewport. The
+  // stepper track scrolls internally (EventStageTracker.tsx) rather than
+  // widening the page, so the document itself must never overflow even
+  // though all 7 steps stay present and legible.
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await expect(page.getByTestId('stage-badge')).toBeVisible();
+    const steps = page.getByTestId('stepper-track').getByRole('listitem');
+    await expect(steps).toHaveCount(7);
+    for (const label of ['Draft', 'Awaiting Assignment', 'Under Review', 'Arrangements', 'Safety Check', 'Preparation', 'Confirmed']) {
+      await expect(page.getByTestId('stepper-track').getByText(label, { exact: true })).toBeVisible();
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
   await signOut(page);
 
   // AC3: assigning a coordinator on an unassigned event moves it to submitted.
