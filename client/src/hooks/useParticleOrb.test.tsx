@@ -112,12 +112,19 @@ test('[NORMAL] [SG2-20:orb-interaction] builds the sphere and draws a frame', ()
   expect(ctx.fill).toHaveBeenCalled();
 });
 
-test('[NORMAL] [SG2-20:orb-interaction] grows the spacer so the sphere clears the hero copy', () => {
+test('[NORMAL] [SG2-20:orb-interaction] sizes the spacer for desktop and narrower geometry after resize', () => {
+  vi.stubGlobal('innerHeight', 1000);
   const { getByTestId } = render(<Harness />);
-  // The spacer's ref lands after the canvas's, so the height is set by the
-  // re-measure the hook schedules for the next frame.
+  // The initial 800px canvas reserves the full projected sphere below the copy.
+  // Fixed geometry expectations also reject a constant positive spacer height.
   tick();
-  expect(parseFloat(getByTestId('spacer').style.height)).toBeGreaterThan(0);
+  expect(getByTestId('spacer')).toHaveStyle({ height: '748px' });
+  vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 400, bottom: 600,
+    width: 400, height: 600, toJSON: () => ({}),
+  });
+  fireEvent(window, new Event('resize'));
+  expect(getByTestId('spacer')).toHaveStyle({ height: '48px' });
 });
 
 test('[BOUNDARY] [SG2-20:orb-interaction] renders without a spacer or a reported device scale', () => {

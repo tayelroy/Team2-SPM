@@ -901,24 +901,33 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(audits, 0);
   });
 
-  test('[BOUNDARY] [SG2-39:AC1] treats an absent request body as an empty update', async () => {
+  test('[BOUNDARY] [SG2-39:AC1] an absent request body preserves existing planning fields and adds no history', async () => {
     // No express.json() here, so req.body is undefined rather than {}.
+    const original = { ...BASE_EVENT, status: 'planning' };
+    let stored = { ...original };
+    const updates: { eventId: number; fields: UpdatePlanningFieldsInput; coordinatorId: string }[] = [];
+    const audits: InsertAuditLogInput[][] = [];
     const bare = express();
     bare.patch(
       '/api/event-requests/:eventId/planning',
       createUpdateEventPlanningHandler({
         getPrincipal: () => COORDINATOR,
         getAdminClient: () => ({}) as SupabaseClient,
-        fetchPlanningRecord: async () => ({ ok: true, event: { ...BASE_EVENT } }),
-        updatePlanningFields: async (_admin, _eventId, fields) => ({
-          ok: true,
-          event: { ...BASE_EVENT, ...fields }
-        }),
-        insertAudit: async () => ({ ok: true, logs: [] })
+        fetchPlanningRecord: async () => ({ ok: true, event: { ...stored } }),
+        updatePlanningFields: async (_admin, eventId, fields, coordinatorId) => {
+          updates.push({ eventId, fields, coordinatorId });
+          stored = { ...stored, ...fields };
+          return { ok: true, event: { ...stored } };
+        },
+        insertAudit: async (_admin, entries) => { audits.push(entries); return { ok: true, logs: [] }; }
       })
     );
     const response = await request(bare).patch('/api/event-requests/10/planning');
     assert.equal(response.status, 200);
+    assert.deepEqual(updates, [{ eventId: 10, fields: {}, coordinatorId: COORDINATOR_ID }]);
+    assert.deepEqual(stored, original);
+    assert.deepEqual(audits, []);
+    assert.deepEqual(response.body, { event: original, arrangements_recheck_needed: false, outstanding_arrangements: [] });
   });
 
   test('[FAILURE] [SG2-39:AC1] returns 503 when admin database client is unavailable', async () => {

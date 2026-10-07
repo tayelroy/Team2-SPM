@@ -97,6 +97,31 @@ test('SG2-52-P01 | [SG2-52:AC1] [NORMAL] support staff create, update and reload
     if (process.env.SG2_52_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_52_SCREENSHOTS}/equipment-edit-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   }
+  // Complete a separate create/edit/reload journey at the phone viewport.
+  await page.setViewportSize({ width: 390, height: 900 });
+  const mobile = { ...values, type: 'Phone-created mixer', description: 'Portable mobile mixer', quantity_held: 2, location: 'East technical store' };
+  await page.getByRole('button', { name: 'Add equipment', exact: true }).click();
+  await fillEquipment(page, mobile);
+  await page.getByRole('button', { name: 'Save equipment', exact: true }).click();
+  await expect(page.getByText('Phone-created mixer saved.', { exact: true })).toBeVisible();
+  expect((await records(page)).find(row => row.type === mobile.type)).toEqual({ ...mobile,
+    equipment_id: 3, available_quantity: 2, version: 1 });
+  const mobileEdited = { type: 'Phone-updated mixer', description: 'Needs connector repair', quantity_held: 3,
+    location: 'Repair store', operational_status: 'damaged' };
+  await page.getByRole('button', { name: `Edit ${mobile.type}`, exact: true }).click();
+  await fillEquipment(page, mobileEdited);
+  await page.getByRole('button', { name: 'Save equipment', exact: true }).click();
+  await expect(page.getByText('Phone-updated mixer saved.', { exact: true })).toBeVisible();
+  await page.reload();
+  await openEquipment(page);
+  await expect(card(page, mobile.type)).toHaveCount(0);
+  await expect(card(page, mobileEdited.type)).toContainText('Needs connector repair');
+  await expect(card(page, mobileEdited.type)).toContainText('Repair store');
+  await expect(card(page, mobileEdited.type)).toContainText('Damaged');
+  expect((await records(page)).find(row => row.equipment_id === 3)).toEqual({ ...mobileEdited,
+    equipment_id: 3, available_quantity: 0, version: 2 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (process.env.SG2_52_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_52_SCREENSHOTS}/equipment-mobile-saved.png`, fullPage: true });
   expect(errors).toEqual([]);
 });
 
