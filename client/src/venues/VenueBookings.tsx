@@ -39,7 +39,9 @@ function ReleaseForm({ booking, accessToken, onReleased, onCancel }: {
     const result = await releaseBooking(accessToken, booking.booking_id, reason);
     setBusy(false);
     if (!result.ok) { setError(result.error); return; }
-    onReleased(`${booking.venue_name ?? 'The venue'} released for ${period(booking)}. It is available again, and the coordinator and Event Organiser have been notified.`);
+    const released = `${booking.venue_name ?? 'The venue'} released for ${period(booking)}. It is available again`;
+    // Only a booking for an event has a coordinator and organiser to tell.
+    onReleased(booking.event_id === null ? `${released}.` : `${released}, and the coordinator and Event Organiser have been notified.`);
   }
 
   return <form onSubmit={submit} aria-label={`Release booking #${booking.booking_id}`} style={{ display: 'grid', gap: '10px', width: '100%' }}>
@@ -61,13 +63,15 @@ function ReleaseForm({ booking, accessToken, onReleased, onCancel }: {
  * SG2-51: bookings with their status, each confirmed one releasable with a
  * reason; released ones say who released them, when and why (AC5).
  */
-function BookingList({ accessToken, load, refresh, describe, empty, label: listLabel }: {
+function BookingList({ accessToken, load, refresh, describe, empty, label: listLabel, onReleased }: {
   accessToken: string | null | undefined;
   load: () => Promise<BookingsResult<{ bookings: VenueBooking[] }>>;
   refresh: number;
   describe: (booking: VenueBooking) => string;
   empty: string;
   label: string;
+  /** After a release, e.g. so the event's requests show the request as cancelled. */
+  onReleased?: () => void;
 }) {
   const [bookings, setBookings] = useState<VenueBooking[] | null>(null);
   const [error, setError] = useState('');
@@ -108,7 +112,7 @@ function BookingList({ accessToken, load, refresh, describe, empty, label: listL
                 </span> : null}
                 {releasable ? (releasing === booking.booking_id
                   ? <ReleaseForm booking={booking} accessToken={accessToken} onCancel={() => setReleasing(null)}
-                      onReleased={message => { setReleasing(null); setNotice(message); setVersion(value => value + 1); }} />
+                      onReleased={message => { setReleasing(null); setNotice(message); setVersion(value => value + 1); onReleased?.(); }} />
                   : <GhostButton onClick={() => { setNotice(''); setReleasing(booking.booking_id); }} style={{ alignSelf: 'flex-start' }}>
                       Release booking
                     </GhostButton>) : null}
@@ -119,15 +123,15 @@ function BookingList({ accessToken, load, refresh, describe, empty, label: listL
 }
 
 /** SG2-51 AC3: every venue booked for the event, each released on its own. */
-export function EventVenueBookings({ accessToken, eventId, eventName, refresh }: {
-  accessToken: string; eventId: number; eventName: string; refresh: number;
+export function EventVenueBookings({ accessToken, eventId, eventName, refresh, onReleased }: {
+  accessToken: string; eventId: number; eventName: string; refresh: number; onReleased?: () => void;
 }) {
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
     <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 500 }}>Booked venues for {eventName}</h2>
     <BookingList accessToken={accessToken} refresh={refresh} label={`Booked venues for ${eventName}`}
       load={() => fetchEventBookings(accessToken, eventId)}
       describe={booking => booking.venue_name ?? `Venue #${booking.venue_id}`}
-      empty="No venues are booked for this event yet." />
+      empty="No venues are booked for this event yet." onReleased={onReleased} />
   </div>;
 }
 

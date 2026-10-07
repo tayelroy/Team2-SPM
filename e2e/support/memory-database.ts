@@ -201,6 +201,11 @@ export class MemoryDatabase {
       { booking_id: 22, venue_id: 2, event_id: 91, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z', status: 'confirmed' }
     );
     this.tables.events.find(event => event.event_id === 91)!.venue_booking_id = 21;
+    // The approved SG2-49 request that committed booking #21.
+    this.tables.venue_booking_requests.push({ request_id: 31, event_id: 91, venue_id: 1, starts_at: '2030-06-20T02:00:00.000Z',
+      ends_at: '2030-06-20T04:00:00.000Z', status: 'approved', layout: 'theatre', venue_requirements: 'A projector', notes: null,
+      requested_by: 'user-coordinator', requested_at: '2030-01-01T00:00:00.000Z', decided_by: 'user-venue',
+      decided_at: '2030-01-02T00:00:00.000Z', decision_reason: null, venue_booking_id: 21 });
   }
 
   /** SG2-49: on top of seedVenueRequest, four pending requests from event 91's

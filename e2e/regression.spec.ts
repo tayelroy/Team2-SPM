@@ -1450,6 +1450,8 @@ test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:A
   const room = booked.getByRole('listitem', { name: 'Booking #22' });
   await expect(hall.getByText('Confirmed', { exact: true })).toBeVisible();
   await expect(room.getByText('Confirmed', { exact: true })).toBeVisible();
+  const requests = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(requests.getByText('Approved', { exact: true })).toBeVisible();
 
   // AC1: a reason is required, then the release goes through.
   await hall.getByRole('button', { name: 'Release booking', exact: true }).click();
@@ -1462,6 +1464,8 @@ test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:A
   await expect(hall.getByText('Released', { exact: true })).toBeVisible();
   await expect(hall.getByText(/^Released by Regression coordinator on .*: The keynote moved online$/)).toBeVisible();
   await expect(room.getByText('Confirmed', { exact: true })).toBeVisible();
+  // AC2: the request that committed the booking is no longer live, so the venue can be requested again.
+  await expect(requests.getByText('Cancelled', { exact: true })).toBeVisible();
 
   // AC2: the period is free again at Regression Hall, but not at Quiet Room.
   const period = `from=${encodeURIComponent('2030-06-20T01:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T05:00:00.000Z')}`;

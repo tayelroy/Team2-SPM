@@ -36,7 +36,8 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC3] [SG2-51:AC5] the coordinator releases o
     }
     return Response.json({ bookings: released ? [releasedHall, annex] : [hall, annex] });
   });
-  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
+  const onReleased = vi.fn();
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onReleased={onReleased} />);
   expect(await within(list()).findAllByRole('listitem')).toHaveLength(2);
   expect(within(item(12)).getByText('Confirmed')).toBeVisible();
   fireEvent.click(within(item(11)).getByRole('button', { name: 'Release booking' }));
@@ -48,6 +49,8 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC3] [SG2-51:AC5] the coordinator releases o
   expect(within(item(11)).getByText(`Released by Casey Coordinator on ${formatSgt('2030-01-02T01:00:00.000Z')}: The workshop moved online`)).toBeVisible();
   expect(within(item(11)).queryByRole('button', { name: 'Release booking' })).toBeNull();
   expect(within(item(12)).getByText('Confirmed')).toBeVisible();
+  // The page refreshes the event's requests, where the request now shows as cancelled.
+  expect(onReleased).toHaveBeenCalledTimes(1);
   const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST')!;
   expect(post[0]).toBe('/api/venue-bookings/11/release');
   expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'The workshop moved online' });
@@ -188,4 +191,18 @@ test('[NORMAL] [SG2-51:AC1] Venue Staff open a venue\'s bookings from the catalo
   expect(await screen.findByText('Leadership Summit')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Back to catalogue' }));
   expect(await screen.findByRole('button', { name: 'Bookings for Atrium Hall' })).toBeVisible();
+});
+
+test('[BOUNDARY] [SG2-51:AC4] releasing a booking with no event says nobody was notified, because nobody is', async () => {
+  let released = false;
+  serve((_url, init) => {
+    if (init?.method === 'POST') { released = true; return Response.json({ booking_id: 12, status: 'cancelled', cancelled_at: 'x', cancellation_reason: 'Legacy hold' }); }
+    return Response.json({ bookings: [released ? { ...annex, event_id: null, event_name: null, status: 'cancelled' } : { ...annex, event_id: null, event_name: null }] });
+  });
+  render(<VenueBookings token="token" venue={{ venue_id: 2, name: 'Annex' } as never} onClose={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Release booking' }));
+  fireEvent.change(screen.getByLabelText('Reason for releasing'), { target: { value: 'Legacy hold' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm release' }));
+  expect(await screen.findByRole('status')).toHaveTextContent(`Annex released for ${period}. It is available again.`);
+  expect(screen.getByRole('status')).not.toHaveTextContent('notified');
 });

@@ -3204,14 +3204,14 @@
     "purpose": "Verify the assigned coordinator releases one of an event's two venue bookings, only with a reason, and that the period is free, the other booking stays, the release is recorded and both the coordinator and the Event Organiser are notified.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
-      "Seed event 91 with confirmed bookings #21 (Regression Hall) and #22 (Quiet Room) on 20 Jun 2030, 10:00-12:00 SGT.",
+      "Seed event 91 with confirmed bookings #21 (Regression Hall) and #22 (Quiet Room) on 20 Jun 2030, 10:00-12:00 SGT, and the approved request #31 behind #21.",
       "Sign in as the coordinator, open the event's venue search and its booked venues.",
       "Try to release booking #21 without a reason, then with 'The keynote moved online'.",
       "Read both venues' availability for the period through the API.",
       "Open the coordinator's notifications; sign in as the organiser and open theirs."
     ],
     "data": "Event 91, venues 1 and 2, bookings #21 and #22; coordinator and organiser fixture accounts.",
-    "expected": "A release without a reason is stopped; with one, booking #21 shows Released by Regression coordinator with the reason; #22 stays Confirmed; Regression Hall's period is empty and Quiet Room's still occupied; both inboxes show the release with the reason.",
+    "expected": "A release without a reason is stopped; with one, booking #21 shows Released by Regression coordinator with the reason; #22 stays Confirmed; request #31 changes from Approved to Cancelled in the event's request list; Regression Hall's period is empty and Quiet Room's still occupied; both inboxes show the release with the reason.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
