@@ -34,10 +34,12 @@ and action that moves it forward:
 
 1. **Draft** — the organiser is still completing the request.
 2. **Awaiting Assignment** (`unassigned`) — submitted with no coordinator yet;
-   the Event Coordinator Lead assigns one. Submission always lands here, not
-   in `submitted`, which gives the Lead's assignment queue an indexable
-   predicate instead of a `status = 'submitted' and coordinator_id is null`
-   sniff.
+   the Event Coordinator Lead assigns one. A fresh draft's submission lands
+   here, not in `submitted`, which gives the Lead's assignment queue an
+   indexable predicate instead of a `status = 'submitted' and coordinator_id
+   is null` sniff. A request that already has a coordinator (resubmitted
+   after a clarification question or a rejection) goes straight back to
+   `submitted` instead — see step 3.
 3. **Under Review** — covers both `submitted` (assigned, not yet opened) and
    `under_review` (the coordinator has opened it); `submitted` has no step of
    its own. `needs_clarification` also sits at this step while the organiser

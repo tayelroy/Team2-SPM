@@ -766,6 +766,27 @@ describe('submitEventRequest', () => {
       if (!result.ok) assert.match(result.message, /not returned/);
     });
   }
+
+  test('[CONFLICT] [SG2-100:AC2] reports unavailable, not a lost update, when the coordinator is cleared between the two statements', async () => {
+    // A held request: the `unheld` attempt's `coordinator_id is null` filter
+    // matches nothing, because the request was still held when it ran. The
+    // Lead then clears the coordinator before the `held` attempt runs, so
+    // its `coordinator_id is not null` filter also matches nothing. Neither
+    // statement observes a coordinator_id it can act on — the known,
+    // accepted gap described on submitEventRequest, not a lost update.
+    const result = await submitEventRequest(
+      fakeSubmitEventClient([
+        { data: [], error: null },
+        { data: [], error: null }
+      ]),
+      52
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.reason, 'unavailable');
+      assert.match(result.message, /not returned/);
+    }
+  });
 });
 
 describe('startEventReview', () => {

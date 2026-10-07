@@ -422,10 +422,20 @@ const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
  * decision still holds it, and routing it to the Lead's unassigned queue
  * would ask them to assign a coordinator the request already has, locking
  * the holder out of their own review (`submitted`/`under_review` are the
- * only statuses `startEventReview` accepts). Which of the two applies is
- * read and written together in one guarded update, not decided from a
- * separate pre-read, so a coordinator assigned between the two cannot be
- * lost or used to pick the wrong branch.
+ * only statuses `startEventReview` accepts).
+ *
+ * Which of the two applies is decided by two sequential guarded `UPDATE`s,
+ * not a single atomic write: the `unheld` attempt first, and only if it
+ * matches zero rows does the `held` attempt run. Each statement's own
+ * `coordinator_id` condition protects it from mis-firing, but the window
+ * between the two statements is not covered by either — if the coordinator
+ * is cleared from the request after `unheld` runs (and matches nothing,
+ * because the request was still held at that instant) but before `held`
+ * runs, `held`'s `.not('coordinator_id', 'is', null)` then also matches
+ * nothing. Both statements report zero rows, `submitEventRequest` returns
+ * `unavailable`, and the caller gets a 503 with the request stranded in its
+ * pre-submission status. This is a known, accepted gap (see the
+ * `[CONFLICT]` test below), not a guarantee that it cannot happen.
  *
  * The status filter is repeated here as a second guard alongside the
  * caller's own status check, so a concurrent submission cannot race two
