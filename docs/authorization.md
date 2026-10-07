@@ -88,7 +88,10 @@ SG2-97 gives the Event Coordinator Lead `event_request.assign_coordinator`,
 taken away from Technical Support Staff, so the Lead is the only role that
 assigns or reassigns coordinators, plus `event_request.history.view` to see
 previous assignments. Existing assignments and their history are unchanged.
-The Safety Officer's grants arrive with SG2-100.
+SG2-87 adds `event_request.queue.view`, also the Lead's alone, for the
+**Unassigned queue** (`GET /api/assignment-queue`): submitted requests no
+coordinator holds yet. Coordinators no longer see unassigned requests in their
+work queue. The Safety Officer's grants arrive with SG2-100.
 Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
 mirrored in the `event_audit_logs` RLS policy
 (`supabase/migrations/202610050004_week7_roles.sql`), and the two must change

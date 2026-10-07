@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  displayStatus,
   fetchOwnEventDetail,
   getEventStage,
   type EventRequestDetail,
@@ -249,7 +250,7 @@ export default function EventDetail({
         <article className="organisation-detail">
           <div className="organisation-detail-header">
             <div className="organisation-detail-status">
-              <Badge bg={badge.badgeBg} fg={badge.badgeFg}>{detail.status}</Badge>
+              <Badge bg={badge.badgeBg} fg={badge.badgeFg}>{displayStatus(detail.status, detail.coordinatorId)}</Badge>
               <span className="organisation-event-ref">#{detail.eventId}</span>
             </div>
             <button className="organisation-text-button" type="button" onClick={() => onNavigate('events')}>

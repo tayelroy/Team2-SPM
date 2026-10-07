@@ -7,6 +7,7 @@ import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import CoordinatorAssignment from './screens/CoordinatorAssignment';
+import AssignmentQueue from './screens/AssignmentQueue';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
@@ -214,6 +215,7 @@ export default function App() {
     change: <ChangeRequest />,
     profile: <Profile role={role} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
+    queue: <AssignmentQueue accessToken={session!.accessToken} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
       accessToken={session!.accessToken} prefill={venuePrefill} />
   }[screen];

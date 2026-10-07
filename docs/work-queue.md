@@ -11,7 +11,7 @@ their existing behavior.
 
 | Role | Work shown |
 | --- | --- |
-| Event Coordinator | Unassigned and personally assigned `submitted` / `under_review` requests in **Awaiting review**. Personally assigned `approved`, `planning` and `confirmed` events in **My assigned events**. Each record appears once. |
+| Event Coordinator | Personally assigned `submitted` / `under_review` requests in **Awaiting review**. Personally assigned `approved`, `planning` and `confirmed` events in **My assigned events**. Each record appears once. Unassigned requests are not shown: since SG2-87 they wait in the Event Coordinator Lead's **Unassigned queue** (`GET /api/assignment-queue`). |
 | Venue Staff | Team-wide `pending` venue booking requests for active events. |
 | Technical Support Staff | Team-wide `pending` equipment requests for active events. |
 

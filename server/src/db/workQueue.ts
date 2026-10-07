@@ -48,7 +48,9 @@ export async function fetchWorkQueue(admin: SupabaseClient, principal: Principal
     } while (hasMore);
     return items;
   }
+  // SG2-87: an unassigned request waits in the Event Coordinator Lead's queue,
+  // so a coordinator reads only the events assigned to them.
   const groups = await Promise.all(principal.role === 'event_coordinator'
-    ? [read(null), read(principal.userId)] : [read(null)]);
+    ? [read(principal.userId)] : [read(null)]);
   return groups.flat();
 }

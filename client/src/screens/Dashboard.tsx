@@ -15,7 +15,7 @@ import {
   RecessedCard,
   StatFigure,
 } from '../ui';
-import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
+import { displayStatus, fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { badgeStyle } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
@@ -155,10 +155,11 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
             borderRadius: radius.card, color: color.platinum, cursor: 'pointer',
           }}
         >
-          <span><Badge bg={badge.badgeBg} fg={badge.badgeFg}>{event.status}</Badge> <span style={{ color: color.silver }}>#{event.eventId}</span></span>
+          <span><Badge bg={badge.badgeBg} fg={badge.badgeFg}>{displayStatus(event.status, event.coordinatorId)}</Badge> <span style={{ color: color.silver }}>#{event.eventId}</span></span>
           <strong style={{ fontSize: '20px', overflowWrap: 'anywhere' }}>{event.name || 'Untitled event'}</strong>
           <span style={{ color: color.silver }}>{formatProposedDate(event.proposedDate)} · {event.coordinatorName || 'Unassigned'}</span>
-          <span style={{ color: color.mist }}>{!event.canManage ? 'View only' : event.waitingOnMe ? 'Waiting on you' : 'With coordinator'}</span>
+          <span style={{ color: color.mist }}>{!event.canManage ? 'View only' : event.waitingOnMe ? 'Waiting on you'
+            : displayStatus(event.status, event.coordinatorId) === 'Unassigned' ? 'Awaiting a coordinator' : 'With coordinator'}</span>
         </button>;
       })}
     </Card>

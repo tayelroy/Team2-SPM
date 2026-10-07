@@ -996,3 +996,13 @@ export async function getEventHistory(
     history: body.history as EventAuditLogEntry[],
   };
 }
+
+/**
+ * The status an organiser sees (SG2-87 AC4): a submitted request no
+ * coordinator holds yet is waiting in the Event Coordinator Lead's queue, so
+ * it reads "Unassigned". Every other status is shown as stored. SG2-100 may
+ * later store this as a real status; until then it is derived here.
+ */
+export function displayStatus(status: string, coordinatorId: string | null): string {
+  return status === 'submitted' && !coordinatorId ? 'Unassigned' : status;
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
+import { displayStatus, fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { STATUS_FILTERS } from '../mock/data';
 import type { Role } from '../mock/types';
 import { badgeStyle } from '../mock/viewModel';
@@ -250,7 +250,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                   </span>
                   <span style={{ justifySelf: 'start' }}>
                     <Badge bg={badge.badgeBg} fg={badge.badgeFg}>
-                      {event.status}
+                      {displayStatus(event.status, event.coordinatorId)}
                     </Badge>
                   </span>
                   <span style={{ justifySelf: 'start' }}>

@@ -31,6 +31,7 @@ import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
 import { createEquipmentRouter } from './equipment';
+import { createAssignmentQueueRouter } from './assignmentQueue';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -69,7 +70,8 @@ export function createApp(
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
   venueHoldsRouter = createVenueHoldsRouter(access),
-  equipmentRouter = createEquipmentRouter(access)
+  equipmentRouter = createEquipmentRouter(access),
+  assignmentQueueRouter = createAssignmentQueueRouter(access)
 ) {
   const app = express();
 
@@ -102,6 +104,8 @@ export function createApp(
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
   app.use('/api/equipment', equipmentRouter);
+  // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
+  app.use('/api/assignment-queue', assignmentQueueRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

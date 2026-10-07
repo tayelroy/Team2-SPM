@@ -126,6 +126,8 @@ export const NAV: Record<Role, [Screen, string][]> = {
   // SG2-97: assignment moved here from Technical Support Staff.
   'Event Coordinator Lead': [
     ['dashboard', 'Dashboard'],
+    // SG2-87: the queue of submitted requests no coordinator holds yet.
+    ['queue', 'Unassigned queue'],
     ['assign', 'Assign coordinators'],
     ['events', 'All events'],
   ],
@@ -172,7 +174,7 @@ export const HEAD: Record<
   'Event Coordinator Lead': {
     eyebrow: 'Event Coordinator Lead',
     title: 'Coordination lead desk',
-    blurb: 'Assign and reassign Event Coordinators from Assign coordinators.',
+    blurb: 'See newly submitted requests in Unassigned queue, then assign them from Assign coordinators.',
   },
   'Safety Officer': {
     eyebrow: 'Safety Officer',
@@ -196,6 +198,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   editDraft: 'Edit draft request',
   profile: 'My profile',
   assign: 'Assign coordinators',
+  queue: 'Unassigned queue',
   search: 'Find venues',
 };
 
@@ -218,6 +221,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Requests you have saved but not yet submitted. Delete one you no longer intend to send.',
   editDraft: 'Update the details, then save your changes or submit when ready.',
   profile: 'View and update your contact details and communication preferences.',
+  queue: 'Submitted requests no coordinator holds yet, oldest first. Assign them from Assign coordinators.',
   assign:
     'Give each submitted request a named coordinator, or hand it to someone else when plans change.',
   search:

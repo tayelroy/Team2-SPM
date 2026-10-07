@@ -474,6 +474,19 @@
         "AC3": "Users who are not Technical Support Staff cannot edit equipment records"
       },
       "source": "Live Jira SG2-52 description verified in Google Chrome on 7 October 2026."
+    },
+    {
+      "id": "SG2-87",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-87",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-07",
+      "acceptanceCriteria": {
+        "AC1": "When an event request is submitted, it enters the unassigned queue instead of going straight to an Event Coordinator",
+        "AC2": "Only the Event Coordinator Lead can view the queue",
+        "AC3": "Each queue entry shows basic event information (name, organiser, proposed date/time, expected attendance, submitted date)",
+        "AC4": "Requests in the queue show as Unassigned to the Event Organiser",
+        "AC5": "An event leaves the queue once it has been assigned"
+      }
     }
   ]
 }

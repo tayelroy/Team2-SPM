@@ -169,14 +169,15 @@ describe('every role can reach every screen in its navigation', () => {
     // actually permitted to use today.
     // SG2-97: assignment moved here from Technical Support Staff.
     'Event Coordinator Lead': [
-      ['Dashboard', 'Coordination lead desk'], ['Assign coordinators', 'Assign coordinators'], ['All events', 'All events'],
+      ['Dashboard', 'Coordination lead desk'], ['Unassigned queue', 'Unassigned queue'],
+      ['Assign coordinators', 'Assign coordinators'], ['All events', 'All events'],
     ],
     'Safety Officer': [['Dashboard', 'Safety desk'], ['All events', 'All events']],
   };
   test('[NORMAL] [SG2-24:AC1] [SG2-86:AC1] the role catalogue contains all seven documented roles', () => {
     expect(ROLES).toEqual(expectedRoles);
   });
-  test.each(expectedRoles)('[NORMAL] [SG2-23:AC1] [SG2-97:AC1] %s', async (role) => {
+  test.each(expectedRoles)('[NORMAL] [SG2-23:AC1] [SG2-97:AC1] [SG2-87:AC2] %s', async (role) => {
     await signInAs(role);
     for (const [navLabel, heading] of destinations[role]) {
       fireEvent.click(within(header()).getByRole('button', { name: navLabel }));
@@ -184,6 +185,17 @@ describe('every role can reach every screen in its navigation', () => {
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     }
   });
+});
+
+// SG2-87: only the Event Coordinator Lead is offered the unassigned queue.
+test.each([
+  ['Event Organiser', false], ['Event Coordinator', false], ['Technical Support Staff', false], ['Safety Officer', false],
+  ['Event Coordinator Lead', true],
+] as const)('[FAILURE] [SG2-87:AC2] %s sees Unassigned queue in the navigation: %s', async (role, offered) => {
+  await signInAs(role);
+  const button = within(header()).queryByRole('button', { name: 'Unassigned queue' });
+  if (offered) expect(button).toBeInTheDocument();
+  else expect(button).not.toBeInTheDocument();
 });
 
 // SG2-97: only the Event Coordinator Lead is offered the assignment screen.
@@ -555,7 +567,7 @@ describe('the request form', () => {
     ).toBeInTheDocument();
   });
 
-  test.each([false, true])('[NORMAL] [SG2-30:AC1] submitting opens the saved event details (previous selection: %s)', async (hasPreviousSelection) => {
+  test.each([false, true])('[NORMAL] [SG2-30:AC1] [SG2-87:AC1] [SG2-87:AC4] submitting opens the saved event details, now Unassigned in the queue (previous selection: %s)', async (hasPreviousSelection) => {
     await signInAs('Event Organiser');
     if (hasPreviousSelection) {
       fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));
@@ -601,7 +613,9 @@ describe('the request form', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
     expect(await screen.findByRole('heading', { name: 'Investor Forum 2026' })).toBeInTheDocument();
-    expect(screen.getByText('submitted', { exact: true })).toBeInTheDocument();
+    // SG2-87: a freshly submitted request waits in the Lead's queue.
+    expect(screen.queryByText('submitted', { exact: true })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Unassigned', { exact: true }).length).toBeGreaterThan(0);
     expect(screen.getByText('Partner briefing', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('A half-day forum with two keynotes and a panel.', { exact: true })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();

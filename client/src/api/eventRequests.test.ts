@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  displayStatus,
   createEventRequestDraft,
   deleteEventRequestDraft,
   assignCoordinator,
@@ -1916,5 +1917,18 @@ describe('postClarification', () => {
     await expect(postClarification(42, 'Hi', 'token-1')).resolves.toEqual({
       ok: false, message: 'Could not reach the server. Please try again.',
     });
+  });
+});
+
+describe('displayStatus (SG2-87)', () => {
+  test('[NORMAL] [SG2-87:AC4] a submitted request no coordinator holds shows as Unassigned', () => {
+    expect(displayStatus('submitted', null)).toBe('Unassigned');
+  });
+
+  test('[BOUNDARY] [SG2-87:AC4] [SG2-87:AC5] only submitted and unassigned together read Unassigned', () => {
+    expect(displayStatus('submitted', 'coord-1')).toBe('submitted');
+    expect(displayStatus('draft', null)).toBe('draft');
+    expect(displayStatus('under_review', null)).toBe('under_review');
+    expect(displayStatus('needs_clarification', null)).toBe('needs_clarification');
   });
 });

@@ -354,11 +354,14 @@ const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
  */
 export async function submitEventRequest(
   admin: SupabaseClient,
-  eventId: number
+  eventId: number,
+  now: () => string = () => new Date().toISOString()
 ): Promise<SubmitEventRequestResult> {
+  // SG2-87: the submission time orders the Lead's unassigned queue and is
+  // shown on each entry; a resubmission restamps it.
   const { data, error } = await admin
     .from('events')
-    .update({ status: 'submitted' })
+    .update({ status: 'submitted', submitted_at: now() })
     .eq('event_id', eventId)
     .in('status', SUBMITTABLE_STATUSES)
     .select(RETURNED_COLUMNS);

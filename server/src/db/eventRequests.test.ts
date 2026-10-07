@@ -353,10 +353,12 @@ test('[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] a second decision cannot overwrite a 
 
 test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-32:AC2] submission stops stale draft edits and deletes', async () => {
   const db = eventDatabase({ event_id: 7, status: 'draft', organiser_id: 'user-1', name: 'Original draft' });
-  assert.equal((await submitEventRequest(db.client, 7)).ok, true);
+  assert.equal((await submitEventRequest(db.client, 7, () => '2026-10-07T01:00:00.000Z')).ok, true);
   assert.equal((await updateEventRequestDraft(db.client, 7, 'user-1', { ...EMPTY_VALUES, name: 'Stale edit' })).ok, false);
   assert.equal((await deleteEventRequestDraft(db.client, 7, 'user-1')).ok, false);
-  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'submitted', organiser_id: 'user-1', name: 'Original draft' }]);
+  assert.deepEqual(db.stored(), [{
+    event_id: 7, status: 'submitted', organiser_id: 'user-1', name: 'Original draft', submitted_at: '2026-10-07T01:00:00.000Z'
+  }]);
 });
 
 describe('fetchOrganiserOrganisation', () => {
@@ -646,18 +648,19 @@ describe('fetchOwnEventRequests', () => {
 });
 
 describe('submitEventRequest', () => {
-  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] updates status to submitted, filtered to draft, rejected or returned rows', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] [SG2-87:AC1] [SG2-87:AC3] updates status to submitted and stamps the submission time, filtered to draft, rejected or returned rows', async () => {
     let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
     const result = await submitEventRequest(
       fakeEventsUpdateClient(
         { data: [{ event_id: 7, organiser_id: 'user-1', status: 'submitted' }], error: null },
         (c) => (captured = c)
       ),
-      7
+      7,
+      () => '2026-10-07T01:00:00.000Z'
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.status, 'submitted');
-    assert.deepEqual(captured?.row, { status: 'submitted' });
+    assert.deepEqual(captured?.row, { status: 'submitted', submitted_at: '2026-10-07T01:00:00.000Z' });
     assert.equal(captured?.eventId, 7);
     assert.deepEqual(captured?.status, ['draft', 'rejected', 'needs_clarification']);
   });
