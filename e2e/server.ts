@@ -40,6 +40,8 @@ import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
+import { createEquipmentRouter } from '../server/src/equipment';
+import { createMemoryEquipmentStore } from './support/equipment';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -160,7 +162,8 @@ const app = createApp(
   // SG2-36's clarification exchange, against the in-memory client.
   createListClarificationsHandler(eventDependencies),
   createAddClarificationHandler(eventDependencies),
-  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now)
+  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
+  createEquipmentRouter(access, () => createMemoryEquipmentStore(database))
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not

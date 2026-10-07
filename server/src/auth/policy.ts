@@ -96,6 +96,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.holds.manage': ['venue_staff'],
+  // SG2-52: Technical Support Staff maintain ConnectSphere's inventory.
+  'equipment.read': ['technical_support_staff'],
+  'equipment.create': ['technical_support_staff'],
+  'equipment.update': ['technical_support_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

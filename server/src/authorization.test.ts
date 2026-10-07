@@ -414,7 +414,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] permissionsFor every existing role is unchanged by the new roles, except assignment leaving Technical Support', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] permissionsFor existing roles keeps the documented grants, including Technical Support equipment maintenance', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -436,7 +436,8 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] permissionsFor every existing role is u
     technical_support_staff: [
       'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
-      'venue_booking.capacity_exception.approve', 'notifications.read', 'venues.holds.read', 'profile.read', 'profile.update'
+      'venue_booking.capacity_exception.approve', 'notifications.read', 'venues.holds.read',
+      'equipment.read', 'equipment.create', 'equipment.update', 'profile.read', 'profile.update'
     ],
     attendee: ['profile.read', 'profile.update']
   };
