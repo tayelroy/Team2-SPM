@@ -54,7 +54,7 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/reset')).status()).toBe(204);
 });
 
-test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [NORMAL] [FAILURE] internal users open the exact events and requests waiting on their role', async ({ page, request }) => {
+test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [SG2-87:AC1] [NORMAL] [FAILURE] internal users open the exact events and requests waiting on their role', async ({ page, request }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -63,7 +63,10 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [NORMAL] 
   await expect(page.getByText('0 items in your work queue')).toBeVisible();
   expect((await request.post('/__e2e/work-queue')).status()).toBe(204);
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-  await expect(page.getByText('2 items in your work queue')).toBeVisible();
+  // SG2-87: unassigned request #41 waits in the Lead's queue, so the
+  // coordinator's queue holds only their own assignment.
+  await expect(page.getByText('1 item in your work queue')).toBeVisible();
+  await expect(page.getByText('Sustainability Leadership Forum')).toHaveCount(0);
   await expect(page.getByText('Another coordinator’s event')).toHaveCount(0);
   await expect(page.getByText('Completed event')).toHaveCount(0);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
@@ -79,10 +82,7 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [NORMAL] 
   await expect(page.getByRole('heading', { name: 'Partner Innovation Summit', exact: true })).toBeFocused();
   await expect(page.getByText('Event request #42', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
-  await page.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
-  await expect(page.getByText('Bring partners together to plan sustainable events')).toBeVisible();
-  await expect(page.getByText('Keynotes, workshops and an evening reception.')).toBeVisible();
-  await expect(page.getByText('Regression Organisation · Event #41')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
   if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/event-detail.png`, fullPage: true });
 
   for (const [account, kind, title, group, fact] of [
@@ -404,7 +404,7 @@ test('SG2-42-B02 | [SG2-42:AC1] [BOUNDARY] venue names accept 255 characters and
   expect((await (await page.request.get('/api/venues', { headers })).json()).venues).toHaveLength(3);
 });
 
-test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [NORMAL] submit a fresh request and verify its saved data and status', async ({ page }) => {
+test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [SG2-87:AC4] [NORMAL] submit a fresh request and verify its saved data and status', async ({ page }) => {
   await signIn(page);
   // A new submission must replace an earlier selected event as well.
   await nav(page, 'My events');
@@ -414,7 +414,9 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [NORMAL] submit a fres
   await fillEvent(page);
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
-  await expect(page.getByText('submitted', { exact: true })).toBeVisible();
+  // SG2-87: stored as submitted, shown to the organiser as Unassigned until the Lead assigns it.
+  await expect(page.getByText('Unassigned', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('submitted', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Team planning', { exact: true })).toBeVisible();
   await expect(page.getByText('Review the release plan', { exact: true })).toBeVisible();
   await expect(page.getByText(/Select an event from your organisation/)).toHaveCount(0);
@@ -588,22 +590,18 @@ test('SG2-35-P01 | [SG2-35:AC1] [SG2-35:AC2] [NORMAL] opening an assigned submit
   expect((await detail.json()).items[0].status).toBe('under_review');
 });
 
-test('SG2-35-N01 | [SG2-35:AC3] [CONFLICT] a request awaiting assignment is readable but never enters review', async ({ page, request }) => {
+test('SG2-35-N01 | [SG2-35:AC3] [SG2-87:AC1] [CONFLICT] a request awaiting assignment never reaches a coordinator and never enters review', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/work-queue')).status()).toBe(204);
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByText('1 item in your work queue')).toBeVisible();
 
-  await page.getByRole('region', { name: 'Awaiting review' })
-    .getByRole('button', { name: /Sustainability Leadership Forum/ }).click();
-  await expect(page.getByText(/Awaiting assignment/)).toBeVisible();
-  await expect(page.getByText('submitted')).toBeVisible();
-
-  // Assignment belongs to Technical Support Staff (SG2-33); reviewing an
-  // unassigned request is refused even when called directly.
+  // SG2-87: unassigned request #41 waits in the Lead's queue, not in a
+  // coordinator's, and reviewing it is refused even when called directly.
+  await expect(page.getByText('Sustainability Leadership Forum')).toHaveCount(0);
   const headers = await authHeaders(page);
   expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404);
-  const detail = await page.request.get('/api/work-queue/event/41', { headers });
-  expect((await detail.json()).items[0].status).toBe('submitted');
+  expect((await page.request.get('/api/work-queue/event/41', { headers })).status()).toBe(404);
 });
 
 test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [SG2-97:AC4] [NORMAL] an assignment and a reassignment are recorded and the previous coordinator stays in the history', async ({ page, request }) => {
@@ -1454,6 +1452,66 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   await expect(page.getByText('Safety Officer', { exact: true }).last()).toBeVisible();
 
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
+});
+
+test('SG2-87-P01 | [SG2-87:AC1] [SG2-87:AC2] [SG2-87:AC3] [SG2-87:AC4] [SG2-87:AC5] [NORMAL] [FAILURE] a submitted request waits in the Lead\'s unassigned queue until it is assigned', async ({ page, request }) => {
+  expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const [organiser, coordinator, lead] = [await tokenFor('organiser'), await tokenFor('coordinator'), await tokenFor('lead')];
+  const queue = async () => (await (await request.get('/api/assignment-queue', { headers: lead })).json()).entries as Record<string, unknown>[];
+
+  // AC1: the organiser submits draft #1; it enters the queue with a submission time and reaches no coordinator.
+  const before = Date.now();
+  expect((await request.patch('/api/event-requests/1/submit', { headers: organiser })).status()).toBe(200);
+  const entry = (await queue()).find(item => item.event_id === 1)!;
+  // AC3: the entry carries the basic event details.
+  expect({ ...entry, submitted_at: undefined }).toEqual({
+    event_id: 1, name: 'Planning workshop', organiser_name: 'Regression organiser',
+    proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 20, submitted_at: undefined
+  });
+  expect(Date.parse(String(entry.submitted_at))).toBeGreaterThanOrEqual(before - 1000);
+  expect(((await (await request.get('/api/work-queue', { headers: coordinator })).json()).items as Record<string, unknown>[])
+    .some(item => item.event_id === 1)).toBe(false);
+
+  // AC2: only the Event Coordinator Lead can view the queue. (Tokens are reused:
+  // the login rate limit allows ten sign-ins per window, UI sign-ins included.)
+  const others = [organiser, coordinator];
+  for (const account of ['support', 'venue', 'safety', 'attendee']) others.push(await tokenFor(account));
+  for (const headers of others) {
+    expect((await request.get('/api/assignment-queue', { headers })).status()).toBe(403);
+  }
+
+  // AC4: the organiser sees the request as Unassigned.
+  await signIn(page, 'organiser');
+  await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Planning workshop' }).getByText('Unassigned').first()).toBeVisible();
+
+  // AC3 on screen: the Lead's queue shows the entry cleanly on a phone and a laptop (DoD v2.1).
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await signIn(page, 'lead');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await nav(page, 'Unassigned queue');
+    const card = page.getByRole('article', { name: 'Planning workshop' });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Regression organiser')).toBeVisible();
+    await expect(card.getByText('15 Jun 2030, 10:00 am')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+
+  // AC5: once the Lead assigns it, it leaves the queue and the organiser no longer sees Unassigned.
+  expect((await request.patch('/api/event-requests/1/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(200);
+  expect((await queue()).some(item => item.event_id === 1)).toBe(false);
+  await nav(page, 'Dashboard');
+  await nav(page, 'Unassigned queue');
+  await expect(page.getByRole('article', { name: 'Planning workshop' })).toHaveCount(0);
+  const detail = await (await request.get('/api/event-requests/1', { headers: organiser })).json();
+  expect([detail.request.status, detail.request.coordinator_name]).toEqual(['submitted', 'Regression coordinator']);
 });
 
 test('SG2-97-P01 | [SG2-97:AC1] [SG2-97:AC2] [SG2-97:AC3] [NORMAL] [FAILURE] assignment moves to the Event Coordinator Lead while earlier assignments, their history and the organiser contact stay', async ({ page, request }) => {

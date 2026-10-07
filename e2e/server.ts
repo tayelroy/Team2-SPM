@@ -41,6 +41,7 @@ import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
+import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createMemoryEquipmentStore } from './support/equipment';
 
 // Application configuration may load a developer's .env during imports. Clear
@@ -163,7 +164,9 @@ const app = createApp(
   createListClarificationsHandler(eventDependencies),
   createAddClarificationHandler(eventDependencies),
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
-  createEquipmentRouter(access, () => createMemoryEquipmentStore(database))
+  createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
+  // SG2-87: the Lead's unassigned queue, against the in-memory client.
+  createAssignmentQueueRouter(access, { getAdminClient: getClient })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not

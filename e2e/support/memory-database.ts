@@ -349,7 +349,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
       // stays one column, and return the fields the embed asks for (SG2-97).
       return Object.fromEntries(this.columns.split(/,(?![^(]*\))/).map(column => {
         const key = column.trim();
-        const embed = /^(coordinator|actor|sender):users!\w+\(([^)]*)\)$/.exec(key);
+        const embed = /^(coordinator|actor|sender|organiser):users!\w+\(([^)]*)\)$/.exec(key);
         if (embed) {
           const [, alias, fields] = embed;
           const user = this.database.tables.users.find(candidate => candidate.user_id === row[`${alias}_id`]);
