@@ -606,9 +606,10 @@ test('SG2-35-N01 | [SG2-35:AC3] [CONFLICT] a request awaiting assignment is read
   expect((await detail.json()).items[0].status).toBe('submitted');
 });
 
-test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] an assignment and a reassignment are recorded and the previous coordinator stays in the history', async ({ page, request }) => {
+test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [SG2-97:AC4] [NORMAL] an assignment and a reassignment are recorded and the previous coordinator stays in the history', async ({ page, request }) => {
   expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
-  await signIn(page, 'support');
+  // SG2-97: assignment belongs to the Event Coordinator Lead.
+  await signIn(page, 'lead');
   await nav(page, 'Assign coordinators');
 
   const picker = page.getByLabel('Coordinator for Assignment Forum', { exact: true });
@@ -625,7 +626,7 @@ test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] 
   const drawer = page.getByRole('dialog', { name: 'Event Change History' });
   const entries = drawer.getByTestId(/^audit-entry-/);
   await expect(entries).toHaveCount(2);
-  await expect(entries.nth(0)).toContainText('Regression support');
+  await expect(entries.nth(0)).toContainText('Regression lead');
   await expect(entries.nth(0)).toContainText('Regression coordinator');
   await expect(entries.nth(0)).toContainText('Regression second coordinator');
   await expect(entries.nth(1)).toContainText('(empty)');
@@ -636,8 +637,8 @@ test('SG2-34-P01 | [SG2-33:AC4] [SG2-34:AC2] [SG2-34:AC3] [SG2-34:AC4] [NORMAL] 
   expect(history.status()).toBe(200);
   expect((await history.json()).history.map((entry: Record<string, unknown>) =>
     [entry.actor_id, entry.field_name, entry.old_value, entry.new_value])).toEqual([
-    ['user-support', 'coordinator_id', 'Regression coordinator', 'Regression second coordinator'],
-    ['user-support', 'coordinator_id', null, 'Regression coordinator']
+    ['user-lead', 'coordinator_id', 'Regression coordinator', 'Regression second coordinator'],
+    ['user-lead', 'coordinator_id', null, 'Regression coordinator']
   ]);
 
   const tokenFor = async (account: string) => {
@@ -662,6 +663,7 @@ test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] 
   };
   const coordinator = await tokenFor('coordinator');
   const support = await tokenFor('support');
+  const lead = await tokenFor('lead');
 
   // Every action a coordinator can take on an event, attempted directly on the API.
   const attempt = async (eventId: number) => ({
@@ -694,9 +696,9 @@ test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] 
     event_id: 81, venue_id: 1, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T10:00:00.000Z', layout: 'theatre' } });
   expect(venue.status()).toBe(201);
 
-  // SG2-90 AC3: once Technical Support hands each event on, the previous coordinator is refused everywhere.
+  // SG2-90 AC3: once the Event Coordinator Lead hands each event on, the previous coordinator is refused everywhere.
   for (const eventId of [81, 90, 91]) {
-    const reassign = await request.patch(`/api/event-requests/${eventId}/coordinator`, { headers: support, data: { coordinatorId: 'user-coordinator2' } });
+    const reassign = await request.patch(`/api/event-requests/${eventId}/coordinator`, { headers: lead, data: { coordinatorId: 'user-coordinator2' } });
     expect(reassign.status()).toBe(200);
     expect({ eventId, ...await attempt(eventId) }).toEqual({ eventId, ...refused });
   }
@@ -711,8 +713,9 @@ test('SG2-90-P02 | [SG2-90:AC1] [SG2-90:AC3] [BOUNDARY] rights follow the curren
   };
   const coordinator = await tokenFor('coordinator');
   const support = await tokenFor('support');
+  const lead = await tokenFor('lead');
   const assignTo = async (coordinatorId: string) =>
-    (await request.patch('/api/event-requests/81/coordinator', { headers: support, data: { coordinatorId } })).status();
+    (await request.patch('/api/event-requests/81/coordinator', { headers: lead, data: { coordinatorId } })).status();
   const plan = async (notes: string) =>
     (await request.patch('/api/event-requests/81/planning', { headers: coordinator, data: { planning_notes: notes } })).status();
 
@@ -1451,4 +1454,176 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   await expect(page.getByText('Safety Officer', { exact: true }).last()).toBeVisible();
 
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
+});
+
+test('SG2-97-P01 | [SG2-97:AC1] [SG2-97:AC2] [SG2-97:AC3] [NORMAL] [FAILURE] assignment moves to the Event Coordinator Lead while earlier assignments, their history and the organiser contact stay', async ({ page, request }) => {
+  expect((await request.post('/__e2e/legacy-assignment')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const support = await tokenFor('support');
+
+  // AC1: Technical Support Staff are refused on the server for listing and for assigning, and the event is untouched.
+  expect((await request.get('/api/event-requests/assignable', { headers: support })).status()).toBe(403);
+  expect((await request.patch('/api/event-requests/95/coordinator', { headers: support, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(403);
+
+  // AC2: the assignment Technical Support made earlier is still in place, with its history.
+  const history = await request.get('/api/event-requests/95/history', { headers: support });
+  expect((await history.json()).history.map((entry: Record<string, unknown>) =>
+    [entry.actor_id, entry.field_name, entry.old_value, entry.new_value])).toEqual([
+    ['user-support', 'coordinator_id', null, 'Regression coordinator']
+  ]);
+
+  // AC3: the organiser still sees who their coordinator is and how to reach them.
+  const detail = await request.get('/api/event-requests/95', { headers: await tokenFor('organiser') });
+  expect(detail.status()).toBe(200);
+  const event = (await detail.json()).request;
+  expect([event.coordinator_name, event.coordinator_phone]).toEqual(['Regression coordinator', '+6581234567']);
+
+  // AC1: the Event Coordinator Lead is offered the assignment screen and it lists the event,
+  // laid out cleanly on a phone and on a laptop (DoD v2.1).
+  await signIn(page, 'lead');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await nav(page, 'Assign coordinators');
+    await expect(page.getByRole('heading', { name: 'Legacy Forum' })).toBeVisible();
+    await expect(page.getByLabel('Coordinator for Legacy Forum', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
+
+test('SG2-97-P02 | [SG2-97:AC2] [CONFLICT] the Event Coordinator Lead takes over an assignment Technical Support made, keeping its history', async ({ request }) => {
+  expect((await request.post('/__e2e/legacy-assignment')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
+  const lead = await tokenFor('lead');
+  const coordinator = await tokenFor('coordinator');
+
+  // Before: the coordinator Technical Support assigned can plan the event.
+  const plan = async () => (await request.patch('/api/event-requests/95/planning', { headers: coordinator, data: { planning_notes: 'Mine?' } })).status();
+  expect(await plan()).toBe(200);
+
+  // The Lead reassigns it under the new rules; the earlier coordinator loses it at once.
+  expect((await request.patch('/api/event-requests/95/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } })).status()).toBe(200);
+  expect(await plan()).toBe(403);
+
+  // Both assignments stay in the history, the earlier one still credited to Technical Support.
+  const history = await request.get('/api/event-requests/95/history', { headers: lead });
+  expect((await history.json()).history
+    .filter((entry: Record<string, unknown>) => entry.field_name === 'coordinator_id')
+    .map((entry: Record<string, unknown>) => [entry.actor_id, entry.old_value, entry.new_value])).toEqual([
+    ['user-lead', 'Regression coordinator', 'Regression second coordinator'],
+    ['user-support', null, 'Regression coordinator']
+  ]);
+});
+
+async function openVenueDecision(page: Page, requestId: number) {
+  await page.getByRole('region', { name: 'Booking requests awaiting decision' })
+    .getByRole('button', { name: new RegExp(`Venue booking request #${requestId}\\b`) }).click();
+  return page.getByRole('article', { name: 'Venue booking request' });
+}
+
+async function switchAccount(page: Page, account: string) {
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, account);
+}
+
+test('SG2-49-P01 | [SG2-49:AC1] [SG2-49:AC3] [NORMAL] venue staff approve a clear request; the venue is committed and the coordinator is notified', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-decision')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const detail = await openVenueDecision(page, 101);
+  await expect(detail.getByText('This venue fits the event.', { exact: true })).toBeVisible();
+  const approve = detail.getByRole('button', { name: 'Approve booking', exact: true });
+  await expect(approve).toBeEnabled();
+  await approve.click();
+  await expect(detail.getByText('Approved. The venue is committed to this event and the coordinator has been notified.', { exact: true })).toBeVisible();
+  await expect(detail.locator('.work-queue-status')).toHaveText('approved');
+
+  // AC1: the venue is now committed for that period, shown as a confirmed booking.
+  const period = `from=${encodeURIComponent('2030-06-20T00:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T06:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${period}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries).toEqual([expect.objectContaining({ kind: 'booking', label: 'confirmed · event 91',
+    start: '2030-06-20T01:00:00.000Z', end: '2030-06-20T04:00:00.000Z' })]);
+  // The decided request leaves the queue.
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Venue booking request #101\b/ })).toHaveCount(0);
+
+  // AC1 and AC3: the coordinator is notified and sees who approved it and when.
+  await switchAccount(page, 'coordinator');
+  await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue request approved', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Regression Hall was approved for Venue Request Forum.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+  await openVenueRequestSearch(page);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText(/^Approved by Regression venue on /)).toBeVisible();
+});
+
+test('SG2-49-P02 | [SG2-49:AC2] [SG2-49:AC3] [NORMAL] venue staff reject a request with a reason the coordinator can see', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-decision')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const detail = await openVenueDecision(page, 102);
+  await detail.getByLabel('Decision note (required to reject; shared with the coordinator)').fill('The floor is being resurfaced that week.');
+  await detail.getByRole('button', { name: 'Reject with reason', exact: true }).click();
+  await expect(detail.getByText('Rejected. The coordinator has been notified and can see your reason.', { exact: true })).toBeVisible();
+  await expect(detail.locator('.work-queue-status')).toHaveText('rejected');
+
+  await switchAccount(page, 'coordinator');
+  await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue request rejected', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('Regression Hall was rejected for Venue Request Forum: The floor is being resurfaced that week.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
+  await openVenueRequestSearch(page);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByText('Rejected', { exact: true })).toBeVisible();
+  await expect(list.getByText(/^Rejected by Regression venue on .*\. Reason: The floor is being resurfaced that week\.$/)).toBeVisible();
+  // A rejection books nothing.
+  const period = `from=${encodeURIComponent('2030-06-21T00:00:00.000Z')}&to=${encodeURIComponent('2030-06-21T06:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${period}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries).toEqual([]);
+});
+
+test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an uncovered capacity shortfall, a missing reason or another role cannot decide', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-decision')).status()).toBe(204);
+  await signIn(page, 'venue');
+
+  // AC1: Quiet Room is too small for 80 guests and no capacity exception is approved.
+  let detail = await openVenueDecision(page, 103);
+  await expect(detail.getByText('Approve a capacity exception above before approving the booking.', { exact: true })).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Approve booking', exact: true })).toBeDisabled();
+  // AC2: a rejection needs a reason.
+  await detail.getByRole('button', { name: 'Reject with reason', exact: true }).click();
+  await expect(detail.getByRole('alert')).toHaveText('Give a reason for rejecting this request. The coordinator will see it.');
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+
+  // AC1: Regression Hall is already booked for the Planning workshop then.
+  detail = await openVenueDecision(page, 104);
+  await detail.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(detail.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(detail.locator('.work-queue-status')).toHaveText('pending');
+
+  // A request decided once cannot be decided again.
+  const headers = await authHeaders(page);
+  expect((await page.request.post('/api/venue-booking-requests/101/decision', { headers, data: { decision: 'approve' } })).status()).toBe(200);
+  const again = await page.request.post('/api/venue-booking-requests/101/decision', { headers, data: { decision: 'reject', reason: 'Changed mind' } });
+  expect([again.status(), (await again.json()).error]).toEqual([409, 'This request has already been approved.']);
+
+  // Only Venue Staff decide.
+  for (const account of ['coordinator', 'organiser', 'support']) {
+    await test.step(account, async () => {
+      await switchAccount(page, account);
+      const refused = await page.request.post('/api/venue-booking-requests/102/decision', { headers: await authHeaders(page), data: { decision: 'reject', reason: 'Not mine' } });
+      expect(refused.status()).toBe(403);
+    });
+  }
+  expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
 });

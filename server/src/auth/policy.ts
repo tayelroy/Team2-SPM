@@ -35,10 +35,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-29: an organiser can edit their own request's fields while it is
   // still a draft.
   'event_request.update': ['event_organiser'],
-  // SG2-33/SG2-34: only Technical Support Staff assign or reassign the
-  // coordinator on a submitted event request — same grant shape as
-  // 'users.role.update'.
-  'event_request.assign_coordinator': ['technical_support_staff'],
+  // SG2-33/SG2-34 built assignment and reassignment; SG2-97 (Week 7 change
+  // #5) moved it from Technical Support Staff to the Event Coordinator Lead,
+  // who is now the only role that assigns or reassigns a coordinator.
+  'event_request.assign_coordinator': ['event_coordinator_lead'],
   // SG2-35: a coordinator opens a request for review. Which request is
   // enforced per-row by the assignment made in SG2-33, not by this grant.
   'event_request.review': ['event_coordinator'],
@@ -63,8 +63,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
     'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff',
     'event_coordinator_lead', 'safety_officer'
   ],
-  // SG2-40: see who changed what on an event. Widened by SG2-100 for the
-  // same reason as the stage view.
+  // SG2-40: see who changed what on an event.
+  // SG2-97: the Event Coordinator Lead opens an event's history from the
+  // assignment screen to see previous coordinators (SG2-34 AC4).
+  // SG2-100: widened further for the Safety Officer, for the same reason as
+  // the stage view.
   'event_request.history.view': [
     'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff',
     'event_coordinator_lead', 'safety_officer'
@@ -98,6 +101,12 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-48 AC2/AC3: the assigned coordinator follows their requests while
   // they await a decision, and Venue Staff, who decide them, see them too.
   'venue_booking.request.view': ['event_coordinator', 'venue_staff'],
+  // SG2-49 AC1/AC2: Venue Staff approve or reject a venue request.
+  'venue_booking.decide': ['venue_staff'],
+  // SG2-49 AC1/AC2: the roles with a notifications drawer read their own
+  // notices; the rows are limited to the caller by the handler and by row
+  // level security.
+  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],

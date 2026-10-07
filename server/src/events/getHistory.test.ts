@@ -317,7 +317,7 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     Object.assign(dbConfig, originalConfig);
   });
 
-  test('[NORMAL] [SG2-40:AC3] [SG2-100:AC13] policy grants event_request.history.view to organisers and every internal role, excluding attendees', () => {
+  test('[NORMAL] [SG2-40:AC3] [SG2-97:AC2] [SG2-100:AC13] policy grants event_request.history.view to organisers and every internal role, excluding attendees', () => {
     const rolesWithPermission = PERMISSIONS['event_request.history.view'];
     assert.ok(rolesWithPermission, 'event_request.history.view permission must exist');
     // SG2-100 added the two Week 7 roles: the Lead assigns coordinators and

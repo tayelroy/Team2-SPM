@@ -16,7 +16,8 @@ import type {
 import type { GetAccountRoleResult } from './db/accountRoles';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 
-const STAFF: Principal = { userId: 'staff-1', role: 'technical_support_staff' };
+// SG2-97: assignment belongs to the Event Coordinator Lead.
+const STAFF: Principal = { userId: 'staff-1', role: 'event_coordinator_lead' };
 
 const SUBMITTED_REQUEST = {
   event_id: 7,
@@ -523,7 +524,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
     );
 
   test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] rejects an unauthenticated request', async () => {
-    const response = await request(appForRole('technical_support_staff')).patch(
+    const response = await request(appForRole('event_coordinator_lead')).patch(
       '/api/event-requests/7/coordinator'
     );
     assert.equal(response.status, 401);
@@ -544,8 +545,27 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
     assert.equal(response.status, 403);
   });
 
-  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] lets Technical Support Staff reach the assign-coordinator handler', async () => {
+  test('[FAILURE] [SG2-97:AC1] refuses Technical Support Staff now that assignment belongs to the Event Coordinator Lead', async () => {
     const response = await request(appForRole('technical_support_staff'))
+      .patch('/api/event-requests/7/coordinator')
+      .set('Authorization', 'Bearer token');
+    assert.equal(response.status, 403);
+    assert.equal(response.body.reached, undefined);
+  });
+
+  test('[BOUNDARY] [SG2-97:AC1] the two Week 7 roles split at assignment: the Event Coordinator Lead may assign, the Safety Officer may not', async () => {
+    const statuses = [];
+    for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+      const response = await request(appForRole(role))
+        .patch('/api/event-requests/7/coordinator')
+        .set('Authorization', 'Bearer token');
+      statuses.push([role, response.status]);
+    }
+    assert.deepEqual(statuses, [['event_coordinator_lead', 200], ['safety_officer', 403]]);
+  });
+
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] [SG2-97:AC1] [SG2-97:AC4] lets the Event Coordinator Lead reach the assign-coordinator handler', async () => {
+    const response = await request(appForRole('event_coordinator_lead'))
       .patch('/api/event-requests/7/coordinator')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 200);

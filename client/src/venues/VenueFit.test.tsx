@@ -126,3 +126,16 @@ test('[CONFLICT] [SG2-47:stale-response] leaving before the fit loads ignores th
   expect(pending).toHaveLength(2);
   await act(async () => { pending.forEach(resolve => resolve(new Response(null, { status: 503 }))); });
 });
+
+test('[NORMAL] [SG2-49:AC1] [SG2-47:AC3] the request\'s readiness is reported when it loads and again once an exception is approved', async () => {
+  api({
+    '/31/suitability': () => Response.json({ venue: theatre, exceptions: [], booking: 'needs_capacity_exception' }),
+    '/31/capacity-exception': () => Response.json({ exception: approval, booking: 'allowed' }, { status: 201 })
+  });
+  const onReadiness = vi.fn();
+  render(<BookingRequestFit accessToken="token" requestId={31} onReadiness={onReadiness} />);
+  await vi.waitFor(() => expect(onReadiness).toHaveBeenCalledWith('needs_capacity_exception'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Approve capacity exception' }));
+  await vi.waitFor(() => expect(onReadiness).toHaveBeenLastCalledWith('allowed'));
+  expect(onReadiness).toHaveBeenCalledTimes(2);
+});

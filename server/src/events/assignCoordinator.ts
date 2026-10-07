@@ -42,7 +42,8 @@ export interface AssignCoordinatorDependencies {
  * same row — the two Jira stories differ only in which acceptance criteria
  * they're demonstrating, not in the underlying operation. Mounted behind
  * requirePermission('event_request.assign_coordinator'), so only
- * Technical Support Staff ever reach this handler (SG2-33 AC1 / SG2-34 AC1).
+ * the Event Coordinator Lead ever reaches this handler (SG2-97 AC1, which
+ * moved SG2-33/34's grant away from Technical Support Staff).
  *
  * Every change is recorded in SG2-40's event history (SG2-33 AC4, SG2-34
  * AC4): who made it comes from the verified caller, when from the row's

@@ -14,6 +14,10 @@ export interface VenueRequest {
   venue_requirements: string | null;
   requester_name: string | null;
   requested_at: string;
+  /** SG2-49: who decided, when, and why (always given for a rejection). */
+  decider_name: string | null;
+  decided_at: string | null;
+  decision_reason: string | null;
 }
 
 export interface NewVenueRequest {
@@ -44,8 +48,8 @@ async function call<T>(url: string, token: string | null | undefined, read: (bod
     if (init.body) headers['Content-Type'] = 'application/json';
     const response = await fetch(url, { ...init, headers, cache: 'no-store' });
     if (response.status === 401) return { ok: false, error: EXPIRED };
-    if (response.status === 403) return { ok: false, error: 'Your account cannot request venues.' };
-    if (response.status === 404) return { ok: false, error: 'This event or venue is no longer available to you.' };
+    if (response.status === 403) return { ok: false, error: 'Your account cannot do this.' };
+    if (response.status === 404) return { ok: false, error: 'This event, venue or request is no longer available to you.' };
     const body = await response.json().catch(() => null);
     if ((response.status === 400 || response.status === 409) && typeof body?.error === 'string') return { ok: false, error: body.error };
     const value = response.ok ? read(body) : null;
@@ -68,4 +72,11 @@ export function fetchVenueRequests(token: string | null | undefined, eventId: nu
     const requests = body?.requests;
     return Array.isArray(requests) && requests.every(isRequest) ? { requests } : null;
   });
+}
+
+/** SG2-49: Venue Staff approve or reject a request. A rejection needs a
+ * reason (AC2); the server answers with the request as now recorded (AC3). */
+export function decideVenueRequest(token: string | null | undefined, requestId: number, decision: 'approve' | 'reject', reason: string) {
+  return call(`/api/venue-booking-requests/${requestId}/decision`, token, body => isRequest(body?.request) ? { request: body.request } : null,
+    { method: 'POST', body: JSON.stringify({ decision, reason: reason.trim() || null }) });
 }

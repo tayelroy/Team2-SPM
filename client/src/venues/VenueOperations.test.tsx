@@ -40,7 +40,7 @@ function api(identity: typeof staff | typeof coordinator, operations: VenueOpera
 
 async function open(identity: typeof staff | typeof coordinator, operations: VenueOperations | number = blank, saveStatus = 200) {
   const fetch = api(identity, operations, saveStatus);
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   await screen.findByRole('searchbox');
   return fetch;
 }
@@ -148,7 +148,7 @@ test('[BOUNDARY] [SG2-77:AC3] a newly created venue shows the defaults and saves
     throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
   });
   vi.stubGlobal('fetch', fetch);
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Add venue' }));
   expect(screen.queryByLabelText('Setup time (minutes)')).not.toBeInTheDocument();
   for (const [label, value] of Object.entries({ 'Venue name': 'New Room', Location: 'Level 3', Capacity: '40',
@@ -177,7 +177,7 @@ test('[CONFLICT] [SG2-77:AC6] leaving the page while the times are saving discar
     if (url === '/api/venues/1/operations' && init?.method === 'PUT') return new Promise<Response>(resolve => { release = resolve; });
     return Response.json({ operations: recorded });
   });
-  const view = render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  const view = render(<Venues accessToken="test-token" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Atrium Hall' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(operationPuts(fetch)).toHaveLength(1));

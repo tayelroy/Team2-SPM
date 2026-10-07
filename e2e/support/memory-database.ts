@@ -57,6 +57,7 @@ export class MemoryDatabase {
       venue_capacity_exceptions: [],
       venue_holds: [],
       venue_hold_notifications: [],
+      notifications: [],
       equipment_requests: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
       events: [
@@ -162,6 +163,19 @@ export class MemoryDatabase {
     this.tables.venue_layouts.push({ venue_id: 1, layout: 'theatre', other_description: null });
   }
 
+  /** SG2-97: an approved event whose coordinator was assigned by Technical
+   * Support Staff before assignment moved to the Event Coordinator Lead, with
+   * the history row that assignment wrote. */
+  seedLegacyAssignment() {
+    this.tables.events.push({
+      ...this.tables.events[0], event_id: 95, name: 'Legacy Forum', status: 'approved', coordinator_id: 'user-coordinator'
+    });
+    this.tables.event_audit_logs.push({
+      log_id: 1, event_id: 95, actor_id: 'user-support', field_name: 'coordinator_id',
+      old_value: null, new_value: 'Regression coordinator', created_at: '2026-10-01T02:00:00.000Z'
+    });
+  }
+
   /** SG2-48: an approved event assigned to the coordinator, for 80 people
    * needing a projector on 20 June 2030, when both venues are free. Regression
    * Hall offers theatre and classroom layouts; Quiet Room a boardroom. */
@@ -174,6 +188,22 @@ export class MemoryDatabase {
       { venue_id: 1, layout: 'theatre', other_description: null },
       { venue_id: 1, layout: 'classroom', other_description: null },
       { venue_id: 2, layout: 'boardroom', other_description: null }
+    );
+  }
+
+  /** SG2-49: on top of seedVenueRequest, four pending requests from event 91's
+   * coordinator. 101 is clear to approve and 102 to reject; Quiet Room (103)
+   * is too small for 80 guests; 104 overlaps Regression Hall's confirmed
+   * booking for the Planning workshop on 15 June. */
+  seedVenueDecision() {
+    this.seedVenueRequest();
+    const request = { event_id: 91, status: 'pending', notes: null, venue_requirements: 'A projector', requested_by: 'user-coordinator',
+      requested_at: '2030-01-01T00:00:00.000Z', decided_by: null, decided_at: null, decision_reason: null, venue_booking_id: null };
+    this.tables.venue_booking_requests.push(
+      { ...request, request_id: 101, venue_id: 1, layout: 'theatre', starts_at: '2030-06-20T01:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z' },
+      { ...request, request_id: 102, venue_id: 1, layout: 'classroom', starts_at: '2030-06-21T01:00:00.000Z', ends_at: '2030-06-21T04:00:00.000Z' },
+      { ...request, request_id: 103, venue_id: 2, layout: 'boardroom', starts_at: '2030-06-20T01:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z' },
+      { ...request, request_id: 104, venue_id: 1, layout: 'theatre', starts_at: '2030-06-15T03:00:00.000Z', ends_at: '2030-06-15T05:00:00.000Z' }
     );
   }
 
@@ -207,7 +237,9 @@ export class MemoryDatabase {
             ? { location: resource.location, capacity: resource.capacity, expected_attendance: event.expected_attendance,
               venue_requirements: request.venue_requirements ?? event.venue_requirements, accessibility_needs: event.accessibility_needs, notes: request.notes,
               // SG2-48 AC2: the layout and requester, as the SQL view adds them.
-              layout: request.layout ?? null, requested_by: this.tables.users.find(user => user.user_id === request.requested_by)?.name ?? null }
+              layout: request.layout ?? null, requested_by: this.tables.users.find(user => user.user_id === request.requested_by)?.name ?? null,
+              // SG2-49: requests created by a tentative hold are decided through the hold.
+              hold_id: this.tables.venue_holds.find(hold => hold.request_id === request.request_id)?.hold_id ?? null }
             : { quantity: request.quantity, equipment_requirements: event.equipment_requirements, notes: request.notes } });
       }
     }
@@ -312,8 +344,16 @@ class MemoryQuery implements PromiseLike<QueryResult> {
     if (this.window) rows = rows.slice(this.window[0], this.window[1] + 1);
     const projected = rows.map(row => {
       if (this.columns === '*') return structuredClone(row);
-      return Object.fromEntries(this.columns.split(',').map(column => {
+      // Split on commas outside parentheses, so an embedded `(name, phone)`
+      // stays one column, and return the fields the embed asks for (SG2-97).
+      return Object.fromEntries(this.columns.split(/,(?![^(]*\))/).map(column => {
         const key = column.trim();
+        const embed = /^(coordinator|actor|sender):users!\w+\(([^)]*)\)$/.exec(key);
+        if (embed) {
+          const [, alias, fields] = embed;
+          const user = this.database.tables.users.find(candidate => candidate.user_id === row[`${alias}_id`]);
+          return [alias, user ? Object.fromEntries(fields.split(',').map(field => [field.trim(), user[field.trim()] ?? null])) : null];
+        }
         if (key.startsWith('coordinator:')) {
           const coordinator = this.database.tables.users.find(user => user.user_id === row.coordinator_id);
           return ['coordinator', coordinator ? { name: coordinator.name } : null];

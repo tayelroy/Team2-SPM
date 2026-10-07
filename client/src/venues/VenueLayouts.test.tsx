@@ -34,7 +34,7 @@ function api(identity = staff, layouts: LayoutRow[] = []) {
 
 async function open(identity = staff, layouts: LayoutRow[] = []) {
   const helpers = api(identity, layouts);
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   await screen.findByRole('searchbox');
   return helpers;
 }
@@ -65,7 +65,7 @@ test('[FAILURE] [SG2-43:AC2] a failed layouts read for one venue does not block 
     throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
   });
   vi.stubGlobal('fetch', fetch);
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   await screen.findByRole('searchbox');
   expect(screen.getByText('Supported layouts').nextSibling).toHaveTextContent('NA');
 });
@@ -178,9 +178,9 @@ test('[CONFLICT] [SG2-43:layouts-isolation] aborting while layouts are loading f
     throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
   });
   vi.stubGlobal('fetch', fetch);
-  const { rerender } = render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  const { rerender } = render(<Venues accessToken="test-token" />);
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/venues/1/layouts', expect.anything()));
-  rerender(<Venues accessToken={null} onBook={vi.fn()} />);
+  rerender(<Venues accessToken={null} />);
   await act(async () => resolveLayouts(Response.json({ layouts: [] })));
   expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
 });
@@ -197,14 +197,14 @@ test('[CONFLICT] [SG2-43:layouts-isolation] leaving mid-save after venue details
     throw new Error(`Unexpected request: ${init?.method ?? 'GET'} ${url}`);
   });
   vi.stubGlobal('fetch', fetch);
-  const { rerender } = render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  const { rerender } = render(<Venues accessToken="test-token" />);
   await screen.findByRole('searchbox');
   fireEvent.click(screen.getByRole('button', { name: 'Edit Atrium Hall' }));
   fillVenueFields();
   fireEvent.click(screen.getByRole('checkbox', { name: 'Theatre' }));
   fireEvent.submit(screen.getByRole('form'));
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/venues/1/layouts', expect.objectContaining({ method: 'PUT' })));
-  rerender(<Venues accessToken={null} onBook={vi.fn()} />);
+  rerender(<Venues accessToken={null} />);
   await act(async () => resolveLayoutsSave(Response.json({ layouts: [] })));
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });

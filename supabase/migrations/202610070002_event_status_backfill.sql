@@ -23,6 +23,11 @@ where status = 'submitted'
 -- `completed` and `cancelled` are deliberately absent from every branch:
 -- that is what keeps a completed event out of the active work list
 -- (SG2-100 AC4) without a status exclusion to maintain.
+--
+-- Rebuilt from SG2-49's post-merge body (202610060001_venue_booking_decisions.sql)
+-- so the venue item's `venue_holds` join and `hold_id` detail survive the
+-- widening below; SG2-49 ran first by filename order and this file replaces
+-- its view, so dropping the join here would silently undo it.
 create or replace view public.internal_work_items as
 select 'event'::text as kind, e.event_id::bigint as item_id, e.event_id,
   coalesce(nullif(e.name, ''), 'Untitled event')::text as title,
@@ -46,11 +51,12 @@ select 'venue', r.request_id, e.event_id, v.name::text,
     'expected_attendance', e.expected_attendance,
     'venue_requirements', coalesce(r.venue_requirements, e.venue_requirements),
     'accessibility_needs', e.accessibility_needs, 'notes', r.notes,
-    'layout', r.layout, 'requested_by', u.name)
+    'layout', r.layout, 'requested_by', u.name, 'hold_id', h.hold_id)
 from public.venue_booking_requests r
 join public.events e on e.event_id = r.event_id
 join public.venues v on v.venue_id = r.venue_id
 left join public.users u on u.user_id = r.requested_by
+left join public.venue_holds h on h.request_id = r.request_id
 where r.status = 'pending' and e.status in ('unassigned', 'submitted', 'under_review', 'approved',
   'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed')
 union all
@@ -64,5 +70,9 @@ join public.events e on e.event_id = r.event_id
 join public.equipment q on q.equipment_id = r.equipment_id
 where r.status = 'pending' and e.status in ('unassigned', 'submitted', 'under_review', 'approved',
   'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed');
+-- Replacing a view keeps its privileges; restated here, as SG2-49 did, so the
+-- rule stays visible at the point that last replaces the view.
+revoke all on public.internal_work_items from public, anon, authenticated;
+grant select on public.internal_work_items to service_role;
 
 commit;

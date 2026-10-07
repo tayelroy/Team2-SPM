@@ -24,6 +24,7 @@ import { createVenueBlocksRouter } from './venues/blocks';
 import { createVenueSearchRouter } from './venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from './venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
+import { createNotificationsRouter } from './notifications';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
@@ -54,7 +55,8 @@ export function createApp(
     profile: createProfileRouter(access),
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
-    venueRequests: createVenueBookingRequestsRouter(access)
+    venueRequests: createVenueBookingRequestsRouter(access),
+    notifications: createNotificationsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
@@ -99,6 +101,8 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  // SG2-49: each person's own notices, e.g. a venue request decision.
+  app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
@@ -180,7 +184,7 @@ export function createApp(
     access.requirePermission('event_request.history.view'),
     getEventHistoryHandler
   );
-  // SG2-33/SG2-34: what Technical Support Staff pick from when assigning. Must
+  // SG2-33/SG2-34/SG2-97: what the Event Coordinator Lead picks from when assigning. Must
   // be registered before '/:eventId', which would otherwise capture it.
   eventRequests.get(
     '/assignable',
@@ -189,7 +193,7 @@ export function createApp(
   );
   // SG2-31: view state and details of a single event request.
   eventRequests.get('/:eventId', access.requirePermission('event_request.view'), eventDetailHandler);
-  // SG2-33/SG2-34: Technical Support Staff assign or reassign a coordinator.
+  // SG2-33/SG2-34/SG2-97: the Event Coordinator Lead assigns or reassigns a coordinator.
   eventRequests.patch(
     '/:eventId/coordinator',
     access.requirePermission('event_request.assign_coordinator'),

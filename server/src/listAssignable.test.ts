@@ -113,12 +113,12 @@ describe('GET /api/event-requests/assignable authorisation wiring', () => {
   };
 
   test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] rejects an unauthenticated request', async () => {
-    const response = await request(appForRole('technical_support_staff')).get('/api/event-requests/assignable');
+    const response = await request(appForRole('event_coordinator_lead')).get('/api/event-requests/assignable');
     assert.equal(response.status, 401);
   });
 
-  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] denies roles that cannot assign a coordinator', async () => {
-    for (const role of ['event_organiser', 'event_coordinator', 'venue_staff', 'attendee'] as const) {
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] [SG2-97:AC1] denies roles that cannot assign a coordinator, Technical Support Staff included', async () => {
+    for (const role of ['event_organiser', 'event_coordinator', 'venue_staff', 'attendee', 'technical_support_staff', 'safety_officer'] as const) {
       const response = await request(appForRole(role))
         .get('/api/event-requests/assignable')
         .set('Authorization', 'Bearer token');
@@ -126,8 +126,8 @@ describe('GET /api/event-requests/assignable authorisation wiring', () => {
     }
   });
 
-  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] routes Technical Support Staff to the list, not to the single-request lookup', async () => {
-    const response = await request(appForRole('technical_support_staff'))
+  test('[NORMAL] [SG2-33:AC1] [SG2-34:AC1] [SG2-97:AC4] routes the Event Coordinator Lead to the list, not to the single-request lookup', async () => {
+    const response = await request(appForRole('event_coordinator_lead'))
       .get('/api/event-requests/assignable')
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 200);

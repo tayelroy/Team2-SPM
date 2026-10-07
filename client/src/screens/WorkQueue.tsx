@@ -6,6 +6,8 @@ import ClarificationThread from '../components/ClarificationThread';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
+import VenueDecision from '../venues/VenueDecision';
+import type { BookingReadiness } from '../venues/suitabilityApi';
 import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
 
 const GROUPS = {
@@ -47,7 +49,7 @@ function context(item: WorkItem) {
  * the act of reviewing it, so the status moves to under_review here rather
  * than behind a separate button — the organiser sees it is being looked at.
  * Requests awaiting assignment are readable but never transition: only
- * Technical Support Staff assign a coordinator (SG2-33). */
+ * the Event Coordinator Lead assigns a coordinator (SG2-97). */
 function useOpenedForReview(item: WorkItem, accessToken?: string | null) {
   const [status, setStatus] = useState(item.status);
   const [error, setError] = useState('');
@@ -111,6 +113,8 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
   const [currentStatus, setCurrentStatus] = useState(status);
   const [currentDetails, setCurrentDetails] = useState(item.details);
   const [startsAt, setStartsAt] = useState(item.starts_at);
+  // SG2-49: whether the venue request may be approved, from its suitability check.
+  const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
 
   useEffect(() => {
     setCurrentStatus(status);
@@ -132,7 +136,7 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
       </div>
       {error && <p role="alert" className="work-queue-empty">{error}</p>}
       {item.kind === 'event' && !item.assigned_to_me &&
-        <p className="work-queue-empty">Awaiting assignment. Technical Support Staff assign a coordinator before it can be reviewed.</p>}
+        <p className="work-queue-empty">Awaiting assignment. The Event Coordinator Lead assigns a coordinator before it can be reviewed.</p>}
       <div className="organisation-detail-intro">
         <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
         <p>{context(item)}</p>
@@ -218,7 +222,9 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           }}
         />
       )}
-      {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} />}
+      {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} onReadiness={setReadiness} />}
+      {item.kind === 'venue' && <VenueDecision requestId={item.item_id} accessToken={accessToken}
+        holdId={typeof currentDetails.hold_id === 'number' ? currentDetails.hold_id : null} readiness={readiness} onDecided={setStatus} />}
       {item.kind === 'event' && (
         <EventAuditDrawer
           isOpen={historyDrawerOpen}

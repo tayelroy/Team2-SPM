@@ -368,12 +368,24 @@
     {
       "id": "SG2-48",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-48",
-      "originalPullRequests": [],
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/58"
+      ],
       "acceptanceCriteria": {
         "AC1": "Can request a chosen venue for an approved event, carrying the event timing, required layout and venue requirements",
         "AC2": "The request reaches Venue Staff and awaits their decision",
         "AC3": "The request is shown as pending while awaiting a decision; it does not hold the venue or block its availability. The venue is committed to the event only when the request is approved",
         "AC4": "An event can have requests for several different venues (Week 7 change #3); a duplicate request for the same venue and an overlapping period is refused"
+      }
+    },
+    {
+      "id": "SG2-49",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-49",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Given an outstanding request with no booking conflict, all required facilities available and either sufficient capacity or a recorded capacity exception approved by Venue Staff, Technical Support Staff or the Event Organiser for the event, when I approve it, then the venue is committed to that event and the coordinator is notified",
+        "AC2": "Given an outstanding request, when I reject it, then I must give a reason, the request is marked rejected, and the coordinator can see the reason",
+        "AC3": "Given any decision, the decision, who made it and when are recorded"
       }
     },
     {
@@ -437,6 +449,18 @@
         "AC2": "Any attempt to act on an event that isn't assigned to them is refused on the server side",
         "AC3": "Once an event is reassigned, the previous coordinator can no longer act on it",
         "AC4": "Events in the unassigned queue cannot be acted on by any Event Coordinator"
+      }
+    },
+    {
+      "id": "SG2-97",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-97",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "Technical Support Staff can no longer assign or reassign Event Coordinators; any such attempt is refused on the server side",
+        "AC2": "Assignments already made under SG2-33/34 stay in place, and their history is kept",
+        "AC3": "The Event Organiser can still see who their coordinator is and how to contact them (SG2-33, AC3 still holds)",
+        "AC4": "Tests from SG2-33/34 are updated to the new role and pass"
       }
     },
     {

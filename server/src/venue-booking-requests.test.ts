@@ -5,11 +5,12 @@ import request from 'supertest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAuthorization, AccessError, type Role } from './auth';
 import { dbConfig } from './db';
-import type { SuitabilityEventRow, SuitabilityVenueRow } from './db/venueSuitability';
+import type { CapacityExceptionRecord, SuitabilityEventRow, SuitabilityVenueRow } from './db/venueSuitability';
 import type { NewVenueBookingRequest, VenueBookingRequestRecord, VenueBookingRequestStore } from './db/venueBookingRequests';
 import type { Layout } from './venues/layoutFields';
 import { validateVenueBookingRequest } from './venues/bookingRequestFields';
 import { createVenueBookingRequestsRouter, type VenueBookingRequestDependencies } from './venues/bookingRequests';
+import type { Decision, DecisionResult, VenueBookingDecisionStore } from './db/venueBookingDecisions';
 
 // Unit tests must not connect to a developer's configured database.
 before(() => {
@@ -42,11 +43,14 @@ const bare: SuitabilityVenueRow = { venue_id: 4, name: 'Empty Annex', location: 
 
 const LAYOUTS: Record<number, Layout[]> = { 1: ['theatre', 'banquet'], 2: ['theatre'], 3: ['theatre'], 4: [] };
 
+const UNDECIDED = { decider_name: null, decided_at: null, decision_reason: null };
+
 const body = (overrides: Record<string, unknown> = {}) => ({
   event_id: 7, venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', layout: 'theatre', ...overrides
 });
 
-function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean } = {}) {
+function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean;
+  holds?: Record<number, number>; exceptions?: CapacityExceptionRecord[] } = {}) {
   const events = seed.events ?? [forum];
   const venues = [atrium, theatre, seminar, bare];
   const requests: VenueBookingRequestRecord[] = seed.requests ?? [];
@@ -66,11 +70,14 @@ function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBooki
       const { requested_by: _requester, ...rest } = values;
       const record: VenueBookingRequestRecord = { ...rest, request_id: 40 + created.length, status: 'pending',
         venue_name: venues.find(venue => venue.venue_id === values.venue_id)!.name, requester_name: 'Casey Coordinator',
-        requested_at: '2030-01-01T00:00:00.000Z' };
+        requested_at: '2030-01-01T00:00:00.000Z', ...UNDECIDED };
       requests.push(record);
       return record;
     },
-    async list(id) { return requests.filter(row => row.event_id === id); }
+    async list(id) { return requests.filter(row => row.event_id === id); },
+    async request(id) { return requests.find(row => row.request_id === id) ?? null; },
+    async hold(id) { return seed.holds?.[id] ?? null; },
+    async exceptions(id) { return (seed.exceptions ?? []).filter(row => row.request_id === id); }
   };
   return { store, created, requests };
 }
@@ -103,7 +110,8 @@ test('[NORMAL] [SG2-48:AC1] [SG2-48:AC2] the assigned coordinator requests a ven
     request: {
       request_id: 41, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status: 'pending', layout: 'theatre',
       starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
-      venue_requirements: 'A stage and a projector', requester_name: 'Casey Coordinator', requested_at: '2030-01-01T00:00:00.000Z'
+      venue_requirements: 'A stage and a projector', requester_name: 'Casey Coordinator', requested_at: '2030-01-01T00:00:00.000Z',
+      decider_name: null, decided_at: null, decision_reason: null
     }
   });
   assert.deepEqual(created, [{
@@ -143,7 +151,7 @@ test('[CONFLICT] [SG2-48:AC4] a second request for the same venue over an overla
 test('[BOUNDARY] [SG2-48:AC4] a period starting as the earlier one ends is not a duplicate, nor is one duplicating a rejected request', async () => {
   const rejected: VenueBookingRequestRecord = { request_id: 30, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status: 'rejected',
     layout: 'theatre', starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
-    venue_requirements: null, requester_name: null, requested_at: '2029-12-01T00:00:00.000Z' };
+    venue_requirements: null, requester_name: null, requested_at: '2029-12-01T00:00:00.000Z', ...UNDECIDED };
   const composed = app(fakeStore({ requests: [rejected] }).store);
   assert.equal((await post(composed, 'coordinator', body())).status, 201);
   const adjacent = await post(composed, 'coordinator', body({ starts_at: '2030-06-15T10:00:00.000Z', ends_at: '2030-06-15T12:00:00.000Z' }));
@@ -155,7 +163,7 @@ test('[CONFLICT] [SG2-48:AC4] the same request made twice at once is refused by 
   assert.deepEqual([response.status, response.body], [409, { error: 'This event already requested this venue for an overlapping period.' }]);
   const unnamed: VenueBookingRequestRecord = { request_id: 30, event_id: 7, venue_id: 1, venue_name: null, status: 'approved',
     layout: null, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
-    venue_requirements: null, requester_name: null, requested_at: '2029-12-01T00:00:00.000Z' };
+    venue_requirements: null, requester_name: null, requested_at: '2029-12-01T00:00:00.000Z', ...UNDECIDED };
   const approved = await post(app(fakeStore({ requests: [unnamed] }).store), 'coordinator', body());
   assert.equal(approved.body.error, 'This event already requested this venue for an overlapping period (request #30, approved).');
 });
@@ -253,4 +261,159 @@ test('[FAILURE] [SG2-48:AC1] [SG2-48:request-unavailable] an unconfigured or fai
     const response = await post(app(failing(error)), 'coordinator', body());
     assert.deepEqual([response.status, response.body], [503, { error: new AccessError(503).message }]);
   }
+});
+
+// --- POST /api/venue-booking-requests/:requestId/decision (SG2-49) ------------
+
+const pendingRequest = (overrides: Partial<VenueBookingRequestRecord> = {}): VenueBookingRequestRecord => ({
+  request_id: 41, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status: 'pending', layout: 'theatre',
+  starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', venue_requirements: 'A stage and a projector',
+  requester_name: 'Casey Coordinator', requested_at: '2030-01-01T00:00:00.000Z', ...UNDECIDED, ...overrides
+});
+
+/** Records each decision; by default it commits it as the database would. */
+function fakeDecisions(requests: VenueBookingRequestRecord[], result?: DecisionResult) {
+  const calls: { token: string; args: [number, Decision, string | null] }[] = [];
+  const decisions = (token: string): VenueBookingDecisionStore => ({
+    async decide(requestId, decision, reason) {
+      calls.push({ token, args: [requestId, decision, reason] });
+      if (result) return result;
+      const row = requests.find(item => item.request_id === requestId)!;
+      Object.assign(row, { status: decision === 'approve' ? 'approved' : 'rejected', decider_name: 'Vera Venue',
+        decided_at: '2030-01-02T00:00:00.000Z', decision_reason: reason });
+      return { outcome: 'updated', request_id: requestId, status: row.status as 'approved' | 'rejected',
+        venue_booking_id: decision === 'approve' ? 9 : null, decided_at: '2030-01-02T00:00:00.000Z' };
+    }
+  });
+  return { decisions, calls };
+}
+
+function decisionApp(seed: Parameters<typeof fakeStore>[0] = {}, result?: DecisionResult) {
+  const { store, requests } = fakeStore({ requests: [pendingRequest()], ...seed });
+  const { decisions, calls } = fakeDecisions(requests, result);
+  return { composed: app(store, { decisions }), calls, requests };
+}
+
+const decide = (composed: express.Express, user: string, payload: unknown, id: number | string = 41) =>
+  request(composed).post(`/api/venue-booking-requests/${id}/decision`).set(as(user)).send(payload as object);
+
+test('[NORMAL] [SG2-49:AC1] [SG2-49:AC3] Venue Staff approve a clear request; the database commits it as them and the decision comes back recorded', async () => {
+  const { composed, calls } = decisionApp();
+  const response = await decide(composed, 'venue', { decision: 'approve' });
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, [{ token: 'venue', args: [41, 'approve', null] }]);
+  assert.deepEqual([response.body.request.status, response.body.request.decider_name, response.body.request.decided_at],
+    ['approved', 'Vera Venue', '2030-01-02T00:00:00.000Z']);
+});
+
+test('[NORMAL] [SG2-49:AC2] [SG2-49:AC3] a rejection carries its trimmed reason, which comes back on the request', async () => {
+  const { composed, calls } = decisionApp();
+  const response = await decide(composed, 'venue', { decision: 'reject', reason: '  The hall is being rewired.  ' });
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls[0].args, [41, 'reject', 'The hall is being rewired.']);
+  assert.deepEqual([response.body.request.status, response.body.request.decision_reason], ['rejected', 'The hall is being rewired.']);
+});
+
+test('[BOUNDARY] [SG2-49:AC2] a rejection needs a reason of at most 500 characters; an approval may carry an optional note', async () => {
+  const cases: [unknown, string][] = [
+    [{ decision: 'reject' }, 'Give a reason for rejecting this request.'],
+    [{ decision: 'reject', reason: '   ' }, 'Give a reason for rejecting this request.'],
+    [{ decision: 'reject', reason: 'x'.repeat(501) }, 'Keep the reason to 500 characters or fewer.'],
+    [{ decision: 'approve', reason: 5 }, 'The reason must be text.'],
+    [{ decision: 'maybe' }, 'Choose approve or reject.'],
+    [[], 'Choose approve or reject.']
+  ];
+  for (const [payload, error] of cases) {
+    const { composed, calls } = decisionApp();
+    const response = await decide(composed, 'venue', payload);
+    assert.deepEqual([response.status, response.body], [400, { error }], JSON.stringify(payload));
+    assert.equal(calls.length, 0);
+  }
+  const longest = decisionApp();
+  assert.equal((await decide(longest.composed, 'venue', { decision: 'reject', reason: 'x'.repeat(500) })).status, 200);
+  const noted = decisionApp();
+  assert.equal((await decide(noted.composed, 'venue', { decision: 'approve', reason: null })).status, 200);
+  assert.equal((await decide(noted.composed, 'venue', { decision: 'approve' }, 'abc')).status, 400);
+});
+
+test('[FAILURE] [SG2-49:AC1] [SG2-47:AC2] a venue missing a required facility cannot be approved, though it can be rejected', async () => {
+  const blocked = decisionApp({ requests: [pendingRequest({ venue_id: 2, venue_name: 'Seminar Room' })] });
+  const response = await decide(blocked.composed, 'venue', { decision: 'approve' });
+  assert.deepEqual([response.status, response.body], [409, { error: 'Seminar Room cannot be booked for this event. Missing required facilities: projector, stage.' }]);
+  assert.equal(blocked.calls.length, 0);
+  assert.equal((await decide(blocked.composed, 'venue', { decision: 'reject', reason: 'No stage' })).status, 200);
+});
+
+test('[FAILURE] [SG2-49:AC1] [SG2-47:AC3] a venue too small is approved only once a capacity exception covers the attendance', async () => {
+  const refused = decisionApp({ requests: [pendingRequest({ venue_id: 3, venue_name: 'Lecture Theatre' })] });
+  const response = await decide(refused.composed, 'venue', { decision: 'approve' });
+  assert.deepEqual([response.status, response.body], [409, { error: 'Approve a capacity exception for this request before approving the booking.' }]);
+  assert.equal(refused.calls.length, 0);
+  const exception: CapacityExceptionRecord = { exception_id: 1, request_id: 41, approved_by: 'user-organiser', approver_name: 'Olive',
+    approver_role: 'event_organiser', expected_attendance: 150, venue_capacity: 120, approved_at: '2030-01-01T00:00:00.000Z' };
+  const covered = decisionApp({ requests: [pendingRequest({ venue_id: 3, venue_name: 'Lecture Theatre' })], exceptions: [exception] });
+  assert.equal((await decide(covered.composed, 'venue', { decision: 'approve' })).status, 200);
+});
+
+test('[CONFLICT] [SG2-49:AC1] a period already booked, blocked or held at the moment of approval is refused and named', async () => {
+  const period = { starts_at: '2030-06-15T04:00:00.000Z', ends_at: '2030-06-15T06:00:00.000Z' };
+  const cases: [DecisionResult, number, Record<string, unknown>][] = [
+    [{ outcome: 'conflict', kind: 'booking', label: 'Board Dinner', ...period }, 409,
+      { error: 'Atrium Hall is already booked for Board Dinner during this period.', conflict: { kind: 'booking', label: 'Board Dinner', ...period } }],
+    [{ outcome: 'conflict', kind: 'block', label: 'Floor resurfacing', ...period }, 409,
+      { error: 'Atrium Hall is blocked during this period: Floor resurfacing.', conflict: { kind: 'block', label: 'Floor resurfacing', ...period } }],
+    [{ outcome: 'conflict', kind: 'hold', label: 'Open Day', ...period }, 409,
+      { error: 'Atrium Hall is on a tentative hold for Open Day during this period.', conflict: { kind: 'hold', label: 'Open Day', ...period } }],
+    [{ outcome: 'decided', status: 'rejected' }, 409, { error: 'This request has already been rejected.' }],
+    [{ outcome: 'hold', hold_id: 12 }, 409, { error: 'This request belongs to tentative hold #12. Convert or release it from Venue holds.' }],
+    [{ outcome: 'closed' }, 409, { error: 'This request can no longer be approved: the event is not approved or the requested period has passed.' }],
+    [{ outcome: 'capacity' }, 409, { error: 'Approve a capacity exception for this request before approving the booking.' }],
+    [{ outcome: 'missing' }, 404, { error: 'Booking request not found.' }],
+    [{ outcome: 'invalid' }, 400, { error: 'Choose approve or reject, and give a reason for rejecting.' }]
+  ];
+  for (const [result, status, expected] of cases) {
+    const { composed } = decisionApp({}, result);
+    const response = await decide(composed, 'venue', { decision: 'approve' });
+    assert.deepEqual([response.status, response.body], [status, expected], result.outcome);
+  }
+  const unnamed = decisionApp({ requests: [pendingRequest({ venue_name: null })] }, cases[0][0]);
+  assert.equal((await decide(unnamed.composed, 'venue', { decision: 'approve' })).body.error,
+    'This venue is already booked for Board Dinner during this period.');
+});
+
+test('[CONFLICT] [SG2-49:AC3] a request already decided is not decided again', async () => {
+  const { composed, calls } = decisionApp({ requests: [pendingRequest({ status: 'approved' })] });
+  const response = await decide(composed, 'venue', { decision: 'reject', reason: 'Too late' });
+  assert.deepEqual([response.status, response.body], [409, { error: 'This request has already been approved.' }]);
+  assert.equal(calls.length, 0);
+});
+
+test('[FAILURE] [SG2-49:AC1] a request created by a tentative hold, or an unknown one, is not decided here', async () => {
+  const held = decisionApp({ holds: { 41: 12 } });
+  const response = await decide(held.composed, 'venue', { decision: 'approve' });
+  assert.deepEqual([response.status, response.body], [409, { error: 'This request belongs to tentative hold #12. Convert or release it from Venue holds.' }]);
+  assert.equal(held.calls.length, 0);
+  const missing = await decide(held.composed, 'venue', { decision: 'approve' }, 99);
+  assert.deepEqual([missing.status, missing.body], [404, { error: 'Booking request not found.' }]);
+});
+
+test('[FAILURE] [SG2-49:AC1] [SG2-49:AC2] only signed-in Venue Staff decide venue requests', async () => {
+  const { composed, calls } = decisionApp();
+  assert.equal((await request(composed).post('/api/venue-booking-requests/41/decision').send({ decision: 'approve' })).status, 401);
+  for (const user of ['coordinator', 'organiser', 'support', 'attendee']) {
+    assert.equal((await decide(composed, user, { decision: 'approve' })).status, 403, user);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('[FAILURE] [SG2-49:AC3] a refused or failing database decision is reported without leaking details', async () => {
+  const { store } = fakeStore({ requests: [pendingRequest()] });
+  for (const [error, status] of [[new AccessError(403), 403], [new Error('offline'), 503]] as const) {
+    const failing = app(store, { decisions: () => ({ async decide(): Promise<never> { throw error; } }) });
+    const response = await decide(failing, 'venue', { decision: 'reject', reason: 'No' });
+    assert.deepEqual([response.status, response.body], [status, { error: new AccessError(status).message }]);
+  }
+  // Without a configured database the default store cannot sign in as the caller.
+  const unconfigured = await decide(app(store), 'venue', { decision: 'reject', reason: 'No' });
+  assert.equal(unconfigured.status, 503);
 });
