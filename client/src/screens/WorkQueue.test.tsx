@@ -68,19 +68,30 @@ test('[CONFLICT] [SG2-35:AC3] [SG2-97:AC1] a request awaiting assignment is read
   expect(fetch).not.toHaveBeenCalledWith('/api/event-requests/12/review', expect.anything());
 });
 
-test('[CONFLICT] [SG2-35:review-isolation] a review result arriving after leaving the request is ignored (SG2-35)', async () => {
+test('[CONFLICT] [SG2-35:review-isolation] a late review result cannot change the queue or a different selected request (SG2-35)', async () => {
   const submitted = { ...review, status: 'submitted', assigned_to_me: true };
+  const another = { ...review, item_id: 28, event_id: 28, title: 'Another forum', status: 'submitted', assigned_to_me: false };
   let resolveReview!: (response: Response) => void;
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => init?.method === 'PATCH'
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH'
     ? new Promise<Response>(yes => { resolveReview = yes; })
-    : Response.json({ items: [submitted] })));
+    : Response.json({ items: url.endsWith('/event/12') ? [submitted] : url.endsWith('/event/28') ? [another] : [submitted, another] }));
+  vi.stubGlobal('fetch', fetch);
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
   await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/12/review', expect.objectContaining({ method: 'PATCH' }));
   fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
-  await screen.findByText('1 item in your work queue');
+  await screen.findByText('2 items in your work queue');
+  fireEvent.click(screen.getByRole('button', { name: /Another forum/ }));
+  expect(await screen.findByRole('heading', { name: 'Another forum' })).toBeVisible();
   await act(async () => resolveReview(Response.json({ request: { event_id: 12, status: 'under_review' } })));
+  expect(screen.getByRole('heading', { name: 'Another forum' })).toBeVisible();
+  expect(screen.getByText('submitted', { exact: true })).toBeVisible();
+  expect(screen.queryByRole('region', { name: 'Decide this request' })).not.toBeInTheDocument();
   expect(screen.queryByText('under review')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
+  await screen.findByText('2 items in your work queue');
+  expect(within(screen.getByRole('button', { name: /Another forum/ })).getByText('submitted')).toBeVisible();
 });
 
 test('[CONFLICT] [SG2-35:AC3] a review that cannot be started says so instead of claiming the status changed (SG2-35)', async () => {
@@ -511,3 +522,35 @@ test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] coordinator opens the selected event hi
   expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
 });
 
+test('[NORMAL] [SG2-49:AC1] [SG2-49:AC3] Venue Staff approve a ready venue request from the work queue and see it recorded', async () => {
+  const request = { ...review, kind: 'venue', category: 'venue', item_id: 41, title: 'Atrium Hall', status: 'pending',
+    ends_at: '2030-06-15T10:00:00Z', details: { layout: 'theatre', requested_by: 'Casey Coordinator', hold_id: null } };
+  const fit = { venue: { venue_id: 1, name: 'Atrium Hall', location: null, capacity: 400, suitability: { suitable: true, issues: [] } }, exceptions: [], booking: 'allowed' };
+  const fetch = vi.fn(async (url: string) => {
+    if (url.endsWith('/decision')) return Response.json({ request: { request_id: 41, event_id: 12, venue_id: 1, venue_name: 'Atrium Hall', status: 'approved',
+      starts_at: '2030-06-15T02:00:00Z', ends_at: '2030-06-15T10:00:00Z', layout: 'theatre', venue_requirements: null, requester_name: 'Casey Coordinator',
+      requested_at: '2030-01-01T00:00:00Z', decider_name: 'Vera', decided_at: '2030-01-02T00:00:00Z', decision_reason: null } });
+    if (url.includes('/suitability')) return Response.json(fit);
+    return Response.json({ items: [request] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  render(<Dashboard role="Venue Staff" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Atrium Hall/ }));
+  const approve = await screen.findByRole('button', { name: 'Approve booking' });
+  await vi.waitFor(() => expect(approve).toBeEnabled());
+  fireEvent.click(approve);
+  expect(await screen.findByText('Approved. The venue is committed to this event and the coordinator has been notified.')).toBeVisible();
+  const detail = screen.getByRole('article', { name: 'Venue booking request' });
+  expect(within(detail).getByText('approved')).toBeVisible();
+  expect(fetch).toHaveBeenCalledWith('/api/venue-booking-requests/41/decision', expect.objectContaining({ method: 'POST' }));
+});
+
+test('[FAILURE] [SG2-49:AC1] a venue request created by a tentative hold is not decided from the work queue', async () => {
+  const held = { ...review, kind: 'venue', category: 'venue', item_id: 44, title: 'Quiet Room', status: 'pending',
+    ends_at: '2030-06-15T10:00:00Z', details: { layout: null, requested_by: null, hold_id: 12 } };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(url.includes('/suitability') ? {} : { items: [held] })));
+  render(<Dashboard role="Venue Staff" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Quiet Room/ }));
+  expect(await screen.findByText('This request belongs to tentative hold #12. Convert or release it from Venue holds.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Approve booking' })).not.toBeInTheDocument();
+});

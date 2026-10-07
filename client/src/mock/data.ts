@@ -103,7 +103,6 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['venues', 'Venues'],
     ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
-    ['equipment', 'Equipment'],
     ['holds', 'Venue holds'],
   ],
   'Venue Staff': [
@@ -115,6 +114,7 @@ export const NAV: Record<Role, [Screen, string][]> = {
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['calendar', 'Venue Availability'],
+    ['equipment', 'Equipment'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
@@ -133,14 +133,6 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['dashboard', 'Dashboard'],
     ['events', 'All events'],
   ],
-};
-
-/** Prototype screens still showing sample data. They sit in a "Preview" menu,
- * apart from the live work queue on the dashboard, so staff do not mistake
- * them for real pending requests (SG2-41). */
-export const PREVIEW_NAV: Partial<Record<Role, [Screen, string][]>> = {
-  'Venue Staff': [['booking', 'Booking requests']],
-  'Technical Support Staff': [['equipment', 'Equipment requests']],
 };
 
 export const HEAD: Record<
@@ -196,9 +188,8 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   form: 'Event request',
   venues: 'Venue catalogue',
   calendar: 'Venue availability',
-  booking: 'Booking approval',
   holds: 'Venue holds',
-  equipment: 'Equipment requests',
+  equipment: 'Equipment records',
   attendee: 'Event page',
   change: 'Change request',
   drafts: 'My draft requests',
@@ -217,10 +208,9 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Search venue details, facilities and accessibility features. Keep planning information current.',
   calendar:
     'Available, held, confirmed and blocked days for the selected venue.',
-  booking: 'Approve or reject with a reason. Overlaps are detected automatically.',
   holds: 'Reserve a venue while arrangements are finalised, with a clear expiry and approval decision.',
   equipment:
-    'Check availability and reserve. Reserving reduces stock for overlapping events.',
+    'Keep equipment type, stock, location and operational status current for request assessment.',
   attendee: 'Confirmed event details, registration, and your current status.',
   change:
     'Ask for a change after submission — the coordinator sees the knock-on impact.',
@@ -278,12 +268,6 @@ export const ACTIONS: Record<Role, ActionItem[]> = {
       screen: 'detail',
     },
     {
-      title: 'Atrium Hall booking overlaps E-190',
-      body: 'Requested 10:00–17:00 clashes with a 09:00–13:00 hold.',
-      dot: color.accent,
-      screen: 'booking',
-    },
-    {
       title: 'Projector shortfall for E-201',
       body: '2 requested, 1 free in the window.',
       dot: color.accent,
@@ -317,18 +301,6 @@ export const ACTIONS: Record<Role, ActionItem[]> = {
     },
   ],
   'Venue Staff': [
-    {
-      title: 'Atrium Hall — overlap flagged',
-      body: 'E-201 10:00–17:00 clashes with a 09:00–13:00 hold on 12 Oct.',
-      dot: color.accent,
-      screen: 'booking',
-    },
-    {
-      title: '3 booking requests awaiting a decision',
-      body: 'Deepwater Auditorium, Harbour Terrace and Meridian Studio.',
-      dot: color.accent,
-      screen: 'booking',
-    },
     {
       title: 'Maintenance block 24–25 Oct',
       body: 'Atrium Hall is unavailable for those two days.',
@@ -578,46 +550,6 @@ export const NEXT_STEPS = [
   {
     n: '04',
     text: "You're notified when the event is confirmed; registration then opens.",
-  },
-];
-
-export const BOOKING_FACTS = [
-  { label: 'Event', value: 'E-201 Northbridge Investor Forum' },
-  { label: 'Requested by', value: 'A. Vance (Coordinator)' },
-  { label: 'Date', value: '12 Oct 2026' },
-  { label: 'Window', value: '10:00 – 17:00' },
-  { label: 'Attendance', value: '180 of 320' },
-  { label: 'Layout', value: 'Theatre + reception' },
-];
-
-export const BOOKING_QUEUE = [
-  {
-    venue: 'Atrium Hall',
-    state: 'Conflict',
-    detail: 'E-201 · 12 Oct 10:00–17:00 · overlaps E-190',
-    bg: 'rgba(203,255,252,0.16)',
-    fg: color.mist,
-  },
-  {
-    venue: 'Deepwater Auditorium',
-    state: 'Pending',
-    detail: 'E-205 · 20 Nov 09:00–15:00',
-    bg: 'rgba(255,255,255,0.09)',
-    fg: color.mist,
-  },
-  {
-    venue: 'Harbour Terrace',
-    state: 'Pending',
-    detail: 'E-198 · 3 Nov 18:00–23:00',
-    bg: 'rgba(255,255,255,0.09)',
-    fg: color.mist,
-  },
-  {
-    venue: 'Meridian Studio',
-    state: 'Approved',
-    detail: 'E-186 · 15 Oct 09:00–16:00',
-    bg: color.teal,
-    fg: color.abyss,
   },
 ];
 

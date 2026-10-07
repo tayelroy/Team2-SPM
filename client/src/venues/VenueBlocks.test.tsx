@@ -51,7 +51,7 @@ function api(identity = staff, blocks: VenueBlock[] = [], override?: Handler) {
 
 async function openBlocks(blocks: VenueBlock[] = [], override?: Handler) {
   const fetch = api(staff, blocks, override);
-  const view = render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  const view = render(<Venues accessToken="test-token" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Block Atrium Hall' }));
   expect(screen.getByRole('heading', { name: 'Block Atrium Hall' })).toBeInTheDocument();
   return { fetch, ...view };
@@ -70,7 +70,7 @@ function abortable(_url: string, init?: RequestInit) {
 
 test('[FAILURE] [SG2-45:AC1] only callers who may manage blocks see the block control', async () => {
   api(coordinator);
-  render(<Venues accessToken="test-token" onBook={vi.fn()} />);
+  render(<Venues accessToken="test-token" />);
   await screen.findByRole('searchbox');
   expect(screen.queryByRole('button', { name: /^Block/ })).not.toBeInTheDocument();
 });
@@ -182,7 +182,7 @@ test('[NORMAL] [SG2-45:AC1] back to catalogue returns to the venue list', async 
 test('[CONFLICT] [SG2-45:block-isolation] leaving while the blocks are loading discards the stale request', async () => {
   const { fetch, rerender } = await openBlocks([], (url, init) => url === '/api/venues/1/blocks' ? abortable(url, init) : undefined);
   expect(screen.getByRole('status')).toHaveTextContent('Loading blocks…');
-  rerender(<Venues accessToken={null} onBook={vi.fn()} />);
+  rerender(<Venues accessToken={null} />);
   await waitFor(() => expect(fetch.mock.calls.find(([url]) => url === '/api/venues/1/blocks')![1]!.signal!.aborted).toBe(true));
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
@@ -193,7 +193,7 @@ test('[CONFLICT] [SG2-45:block-isolation] leaving mid-save aborts the request wi
   await screen.findByText(/No upcoming blocks/);
   fillBlock('2030-07-01T09:00', '2030-07-01T17:00', 'Carpet replacement');
   expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument();
-  rerender(<Venues accessToken={null} onBook={vi.fn()} />);
+  rerender(<Venues accessToken={null} />);
   await act(async () => {});
   const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST')!;
   expect(post[1]!.signal!.aborted).toBe(true);

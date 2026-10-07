@@ -17,6 +17,7 @@ An npm-workspaces monorepo:
   - `src/auth/` — login, logout, session verification, and the role → permission map (`policy.ts`).
   - `src/events/` — event request handlers (create, list, detail, update, delete, submit).
   - `src/venues/` — venue catalogue and availability handlers.
+  - `src/equipment/` — equipment records, operational status and eligible stock.
   - `src/profile/` — the caller's own profile.
   - `src/db/` — the actual Supabase queries behind all of the above.
 - **`supabase/`** — `migrations/` (schema history — not every table is captured yet), `seed_dev.sql`, `tests/`.
@@ -29,12 +30,13 @@ An npm-workspaces monorepo:
 | Event Organiser | Raise, edit, submit and delete their own event requests; view events and status shared by their client organisation |
 | Event Coordinator | View awaiting-review requests and their active assigned events in the dashboard; open each event's stored details |
 | Venue Staff | View pending booking requests and details in the dashboard; maintain the venue catalogue and check availability |
-| Technical Support Staff | View pending equipment requests and details in the dashboard; change a user's role via the API |
+| Technical Support Staff | View pending equipment requests and details in the dashboard; create and edit equipment records; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
 
-Every account can view and update its own profile. Booking approval and the
-equipment desk (visible in the Venue Staff / Technical Support Staff nav) are
-also still prototype screens backed by mock data, not a real API.
+Every account can view and update its own profile. Technical Support Staff's
+Equipment screen reads and writes stored equipment records, including operational
+status and the quantity eligible for use. Apply the [equipment migration](docs/equipment.md)
+before deploying it. Equipment reservations are separate work.
 The SG2-41 dashboard queue and its selected-record detail view use Supabase;
 approval/rejection mutations are separate work. See [work queue setup](docs/work-queue.md)
 for the required migration and queue rules.
@@ -126,6 +128,11 @@ independently of what the UI shows.
 
 ### As Technical Support Staff
 
+- **Equipment** to add or edit type, description, quantity held, location and
+  operational status. Damaged equipment and equipment under maintenance show
+  zero available quantity while retaining the quantity held. If another member
+  of staff saves a record you are editing, reload the record before saving again.
+
 Role changes aren't exposed in a screen yet — call
 `PATCH /api/users/:userId/role` directly with a bearer token and a JSON
 body like `{"role": "Attendee"}`. The role must be Title Case exactly as
@@ -143,7 +150,7 @@ Run `npm test` for tests without coverage, or `npm run test:coverage` for tests
 with the 100% per-file coverage gate. HTML reports are written to `server/coverage/index.html`
 and `client/coverage/index.html`.
 
-For the 19 purposeful browser regression journeys, install Chromium once with
+For the purposeful browser regression journeys, install Chromium once with
 `npx playwright install chromium`, then run `npm run test:regression`. The tests
 drive the built UI and real API routes against isolated in-memory providers;
 they do not use shared Supabase data. `npm run ci:full` runs the existing build,
@@ -155,10 +162,11 @@ uploaded as the `browser-regression` artifact.
 
 - [CI setup and validation](docs/ci.md) — SG2-22 acceptance criteria, required branch protection, and Supabase HTTPS configuration
 - [Test audit and course case guide](docs/testing.md) — test-suite breakdown and how automated checks map to 4–5 functional cases per feature
-- [Purposeful regression register](docs/regression.md) — current 29 cases, Playwright scope and historical-case consolidation
+- [Purposeful regression register](docs/regression.md) — current cases, Playwright scope and historical-case consolidation
 - [Authorisation](docs/authorization.md) — how requests are verified and permission-checked
 - [Organisation event access](docs/organisation-events.md) — SG2-26 behaviour, provisioning and database protection
 - [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API, SG2-77 setup and turnaround, SG2-50 double-booking prevention
+- [Equipment records](docs/equipment.md) — SG2-52 stock, operational status, API, migration and verification
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 

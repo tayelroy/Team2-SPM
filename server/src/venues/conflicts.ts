@@ -9,7 +9,6 @@ import {
   type VenueConflictRow,
   type VenueConflictStore
 } from '../db/venueConflicts';
-import type { BookingRequestRow } from '../db/venueSuitability';
 import { canSeeEvent, parseId } from './suitabilityRoutes';
 
 export interface VenueConflictDependencies {
@@ -31,37 +30,12 @@ export function forViewer(rows: VenueConflictRow[], principal: Principal): Venue
       : conflict);
 }
 
-// 24-hour clock, as the client shows times.
-const sgt = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23', timeZone: 'Asia/Singapore' });
-
-/** "confirmed booking #12 for Gala Night (6 Oct 2026, 09:00 – 6 Oct 2026, 17:00)". */
-export function describeConflict(conflict: VenueConflict): string {
-  const what = conflict.kind === 'hold' ? `tentative hold #${conflict.reference_id}` : `${conflict.status} booking #${conflict.reference_id}`;
-  const event = conflict.event_name ?? (conflict.event_id === null ? 'another event' : `event #${conflict.event_id}`);
-  return `${what} for ${event} (${sgt.format(new Date(conflict.starts_at))} – ${sgt.format(new Date(conflict.ends_at))})`;
-}
-
 /**
- * SG2-50 AC2: approval of a request is refused while anything else commits
- * the venue over an overlapping period. The decision step (SG2-49) calls this
- * before committing the booking and answers 409 with the refusal; the
- * venue_bookings_no_double_booking constraint refuses the write regardless.
+ * Conflicts for a period, as the caller may see them (SG2-50 AC1). Approval
+ * itself is refused by SG2-49's decide_venue_booking_request(), which checks
+ * the same confirmed bookings and live holds under the venue lock (AC2), with
+ * venue_bookings_no_double_booking as the backstop.
  */
-export async function approvalRefusal(
-  store: Pick<VenueConflictStore, 'conflicts'>,
-  request: BookingRequestRow,
-  principal: Principal,
-  now: number
-): Promise<{ error: string; conflicts: VenueConflict[] } | null> {
-  const conflicts = await conflictsFor(store, request, principal, now, request.request_id);
-  if (conflicts.length === 0) return null;
-  return {
-    error: `This request cannot be approved while it conflicts with ${conflicts.map(describeConflict).join('; ')}.`,
-    conflicts
-  };
-}
-
-/** Conflicts for a period about to be requested, as the caller may see them. */
 export async function conflictsFor(store: Pick<VenueConflictStore, 'conflicts'>, period: ConflictPeriod, principal: Principal, now: number, excludeRequestId?: number) {
   return forViewer(await store.conflicts(period, { now: new Date(now).toISOString(), excludeRequestId }), principal);
 }

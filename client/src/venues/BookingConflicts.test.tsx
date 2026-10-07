@@ -17,7 +17,7 @@ const hiddenText = `Tentative hold #3 for another event, ${formatSgt(hidden.star
 
 const pending: VenueRequest = { request_id: 41, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status: 'pending',
   starts_at: '2030-06-15T08:00:00.000Z', ends_at: '2030-06-15T11:00:00.000Z', layout: 'theatre',
-  venue_requirements: null, requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z' };
+  venue_requirements: null, requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null };
 
 function respond(response: () => Response | Promise<Response>) {
   const fetch = vi.fn(async (_url: string, _init?: RequestInit) => response());

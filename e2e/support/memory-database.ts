@@ -57,8 +57,10 @@ export class MemoryDatabase {
       venue_capacity_exceptions: [],
       venue_holds: [],
       venue_hold_notifications: [],
+      notifications: [],
       equipment_requests: [],
-      equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
+      equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
+        quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [
         { ...draft, event_id: 1, organiser_id: 'user-organiser' },
         { ...draft, event_id: 2, organiser_id: 'user-organiser2', name: 'Other organisation draft', organisation: 'Other Organisation' }
@@ -190,6 +192,22 @@ export class MemoryDatabase {
     );
   }
 
+  /** SG2-49: on top of seedVenueRequest, four pending requests from event 91's
+   * coordinator. 101 is clear to approve and 102 to reject; Quiet Room (103)
+   * is too small for 80 guests; 104 overlaps Regression Hall's confirmed
+   * booking for the Planning workshop on 15 June. */
+  seedVenueDecision() {
+    this.seedVenueRequest();
+    const request = { event_id: 91, status: 'pending', notes: null, venue_requirements: 'A projector', requested_by: 'user-coordinator',
+      requested_at: '2030-01-01T00:00:00.000Z', decided_by: null, decided_at: null, decision_reason: null, venue_booking_id: null };
+    this.tables.venue_booking_requests.push(
+      { ...request, request_id: 101, venue_id: 1, layout: 'theatre', starts_at: '2030-06-20T01:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z' },
+      { ...request, request_id: 102, venue_id: 1, layout: 'classroom', starts_at: '2030-06-21T01:00:00.000Z', ends_at: '2030-06-21T04:00:00.000Z' },
+      { ...request, request_id: 103, venue_id: 2, layout: 'boardroom', starts_at: '2030-06-20T01:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z' },
+      { ...request, request_id: 104, venue_id: 1, layout: 'theatre', starts_at: '2030-06-15T03:00:00.000Z', ends_at: '2030-06-15T05:00:00.000Z' }
+    );
+  }
+
   seedAssignedReview() {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 51, name: 'Assigned Review Forum', status: 'submitted',
@@ -220,7 +238,9 @@ export class MemoryDatabase {
             ? { location: resource.location, capacity: resource.capacity, expected_attendance: event.expected_attendance,
               venue_requirements: request.venue_requirements ?? event.venue_requirements, accessibility_needs: event.accessibility_needs, notes: request.notes,
               // SG2-48 AC2: the layout and requester, as the SQL view adds them.
-              layout: request.layout ?? null, requested_by: this.tables.users.find(user => user.user_id === request.requested_by)?.name ?? null }
+              layout: request.layout ?? null, requested_by: this.tables.users.find(user => user.user_id === request.requested_by)?.name ?? null,
+              // SG2-49: requests created by a tentative hold are decided through the hold.
+              hold_id: this.tables.venue_holds.find(hold => hold.request_id === request.request_id)?.hold_id ?? null }
             : { quantity: request.quantity, equipment_requirements: event.equipment_requirements, notes: request.notes } });
       }
     }

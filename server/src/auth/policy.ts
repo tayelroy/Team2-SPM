@@ -89,10 +89,20 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-50 AC1: what a pending request overlaps, for Venue Staff deciding it
   // and the assigned coordinator (enforced per-row).
   'venue_booking.conflicts.view': ['event_coordinator', 'venue_staff'],
+  // SG2-49 AC1/AC2: Venue Staff approve or reject a venue request.
+  'venue_booking.decide': ['venue_staff'],
+  // SG2-49 AC1/AC2: the roles with a notifications drawer read their own
+  // notices; the rows are limited to the caller by the handler and by row
+  // level security.
+  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.holds.manage': ['venue_staff'],
+  // SG2-52: Technical Support Staff maintain ConnectSphere's inventory.
+  'equipment.read': ['technical_support_staff'],
+  'equipment.create': ['technical_support_staff'],
+  'equipment.update': ['technical_support_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

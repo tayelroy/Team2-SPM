@@ -31,7 +31,7 @@ const hold = { hold_id: 3, event_id: 8, request_id: 50, starts_at: '2030-06-15T0
 
 const filters = (calls: Call[], table: string) => calls.filter(call => call.table === table && call.method !== 'select').map(call => [call.method, ...call.args]);
 
-test('[NORMAL] [SG2-50:AC1] conflicts are the held or confirmed bookings and live holds overlapping the period at the venue, earliest first, with each event', async () => {
+test('[NORMAL] [SG2-50:AC1] conflicts are the confirmed bookings and live holds overlapping the period at the venue, earliest first, with each event', async () => {
   const calls: Call[] = [];
   const store = createVenueConflictStore(fakeAdmin({
     venue_bookings: [{ data: [booking], error: null }],
@@ -44,7 +44,7 @@ test('[NORMAL] [SG2-50:AC1] conflicts are the held or confirmed bookings and liv
   ]);
   // Strictly overlapping: a period that only touches another does not conflict.
   assert.deepEqual(filters(calls, 'venue_bookings'), [
-    ['eq', 'venue_id', 1], ['in', 'status', ['held', 'confirmed']],
+    ['eq', 'venue_id', 1], ['in', 'status', ['confirmed']],
     ['lt', 'starts_at', period.ends_at], ['gt', 'ends_at', period.starts_at], ['order', 'starts_at']
   ]);
   assert.deepEqual(filters(calls, 'venue_holds'), [
@@ -54,8 +54,8 @@ test('[NORMAL] [SG2-50:AC1] conflicts are the held or confirmed bookings and liv
   assert.deepEqual(filters(calls, 'events'), [['in', 'event_id', [9, 8]]]);
 });
 
-test('[BOUNDARY] [SG2-50:AC3] only held and confirmed bookings and unexpired tentative holds count; the request\'s own hold does not', async () => {
-  assert.deepEqual(COMMITTED_BOOKING_STATUSES, ['held', 'confirmed']);
+test('[BOUNDARY] [SG2-50:AC3] only confirmed bookings and unexpired tentative holds count; the request\'s own hold does not', async () => {
+  assert.deepEqual(COMMITTED_BOOKING_STATUSES, ['confirmed']);
   const calls: Call[] = [];
   const store = createVenueConflictStore(fakeAdmin({
     venue_bookings: [{ data: [], error: null }],

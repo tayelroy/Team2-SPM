@@ -172,6 +172,8 @@ end $$;
 
 -- 6. Losing the Venue Staff role removes write access straight away:
 reset role;
+select set_config('venue_operations.before_revocation',
+  (select to_jsonb(operation)::text from public.venue_operations operation where venue_id = 97701), true);
 set local role service_role;
 update public.account_roles set role = 'attendee'
   where user_id = 'e0000000-0000-4000-8000-000000000001';
@@ -179,10 +181,16 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000001', true);
 select set_config('request.jwt.claims', '{"sub":"e0000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 do $$
+declare changed integer;
 begin
   update public.venue_operations set setup_minutes = 10 where venue_id = 97701;
-  if exists (select 1 from public.venue_operations where venue_id = 97701 and setup_minutes = 10) then
-    raise exception '[SG2-77:revoked-staff-update] [SG2-77:AC6] [CONFLICT] A user who lost the Venue Staff role must not change setup times';
+  get diagnostics changed = row_count;
+  -- The revoked caller cannot read this row. Inspect unchanged storage using
+  -- the fixture owner so a hidden row cannot conceal an unauthorized write.
+  reset role;
+  if changed <> 0 or (select to_jsonb(operation) from public.venue_operations operation where venue_id = 97701)
+      is distinct from current_setting('venue_operations.before_revocation')::jsonb then
+    raise exception '[SG2-77:revoked-staff-update] [SG2-77:AC6] [CONFLICT] A revoked staff update must affect zero rows and preserve the complete stored record';
   end if;
 end $$;
 reset role;

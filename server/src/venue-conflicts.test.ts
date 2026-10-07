@@ -9,7 +9,8 @@ import type { BookingRequestRow, SuitabilityEventRow, SuitabilityVenueRow } from
 import type { NewVenueBookingRequest, VenueBookingRequestRecord, VenueBookingRequestStore } from './db/venueBookingRequests';
 import type { ConflictOptions, ConflictPeriod, VenueConflictRow, VenueConflictStore } from './db/venueConflicts';
 import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
-import { approvalRefusal, createVenueConflictsRouter, describeConflict, type VenueConflictDependencies } from './venues/conflicts';
+import { createVenueConflictsRouter, type VenueConflictDependencies } from './venues/conflicts';
+import type { DecisionResult, VenueBookingDecisionStore } from './db/venueBookingDecisions';
 
 // Unit tests must not connect to a developer's configured database.
 before(() => {
@@ -43,6 +44,8 @@ const ownHold: VenueConflictRow = { kind: 'hold', reference_id: 3, event_id: 8, 
 
 const period = { starts_at: '2030-06-15T08:00:00.000Z', ends_at: '2030-06-15T11:00:00.000Z' };
 const pending: BookingRequestRow = { request_id: 41, event_id: 7, venue_id: 1, ...period, status: 'pending' };
+const pendingRecord: VenueBookingRequestRecord = { ...pending, venue_name: 'Atrium Hall', layout: 'theatre', venue_requirements: 'A stage',
+  requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null };
 
 function overlapping(rows: VenueConflictRow[], at: ConflictPeriod) {
   return rows.filter(row => row.starts_at < at.ends_at && row.ends_at > at.starts_at);
@@ -67,9 +70,13 @@ function requestStore(occupied: VenueConflictRow[]) {
     async duplicate() { return null; },
     async create(values: NewVenueBookingRequest): Promise<VenueBookingRequestRecord> {
       const { requested_by: _requester, ...rest } = values;
-      return { ...rest, request_id: 41, status: 'pending', venue_name: 'Atrium Hall', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z' };
+      return { ...rest, request_id: 41, status: 'pending', venue_name: 'Atrium Hall', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z',
+        decider_name: null, decided_at: null, decision_reason: null };
     },
     async list() { return []; },
+    async request(id) { return id === 41 ? { ...pendingRecord } : null; },
+    async hold() { return null; },
+    async exceptions() { return []; },
     async conflicts(at, options) {
       checked.push([at, options]);
       return overlapping(occupied, at);
@@ -80,7 +87,7 @@ function requestStore(occupied: VenueConflictRow[]) {
   composed.use('/api/venue-booking-requests', createVenueBookingRequestsRouter(access(), {
     getAdminClient: () => ({}) as SupabaseClient, store: () => store, now: () => NOW
   }));
-  return { composed, checked };
+  return { composed, checked, store };
 }
 
 const submit = (composed: express.Express, at = period) => request(composed).post('/api/venue-booking-requests').set(as('coordinator'))
@@ -95,7 +102,7 @@ test('[NORMAL] [SG2-50:AC1] a request overlapping another event\'s confirmed boo
   assert.deepEqual(response.body.conflicts, [{ kind: 'booking', reference_id: 12, event_id: null, event_name: null,
     starts_at: gala.starts_at, ends_at: gala.ends_at, status: 'confirmed' }]);
   assert.deepEqual(checked, [[{ ...pending, layout: 'theatre', venue_name: 'Atrium Hall', requester_name: 'Casey',
-    requested_at: '2030-01-01T00:00:00.000Z', venue_requirements: 'A stage' }, { now: '2030-01-01T00:00:00.000Z', excludeRequestId: 41 }]]);
+    requested_at: '2030-01-01T00:00:00.000Z', venue_requirements: 'A stage', decider_name: null, decided_at: null, decision_reason: null }, { now: '2030-01-01T00:00:00.000Z', excludeRequestId: 41 }]]);
 });
 
 test('[NORMAL] [SG2-50:AC1] a coordinator sees which of their own events holds the venue', async () => {
@@ -206,50 +213,57 @@ test('[FAILURE] [SG2-50:AC1] without injected dependencies the route uses the co
 
 // --- SG2-50 AC2: approval refused while the conflict stands --------------------
 //
-// SG2-49 (deciding a request) is not merged yet. This stand-in approve route
-// does what its approve step will: call approvalRefusal before committing.
-// Replace it with SG2-49's real route once that is merged.
+// Approval is SG2-49's POST /:requestId/decision. Its database function refuses
+// a confirmed booking or live hold over the period under the venue lock; that
+// is proven on the real function in supabase/tests/venue_double_booking.sql.
+// Here the database answers as that function does, from what occupies the venue.
 
-function approvalApp(occupied: VenueConflictRow[], principal: Principal = USERS.venue) {
-  const committed: number[] = [];
-  const store: Pick<VenueConflictStore, 'conflicts'> = { conflicts: async at => overlapping(occupied, at) };
-  const composed = express();
-  composed.post('/approve', async (_req, res) => {
-    const refusal = await approvalRefusal(store, pending, principal, NOW);
-    if (refusal) { res.status(409).json(refusal); return; }
-    committed.push(pending.request_id);
-    res.status(200).json({ status: 'approved' });
+function decisionApp(occupied: VenueConflictRow[]) {
+  const decided: number[] = [];
+  const decisions = (): VenueBookingDecisionStore => ({
+    async decide(requestId, decision): Promise<DecisionResult> {
+      const clash = decision === 'approve' ? overlapping(occupied, pending)[0] : undefined;
+      if (clash) {
+        return { outcome: 'conflict', kind: clash.kind, starts_at: clash.starts_at, ends_at: clash.ends_at, label: clash.event_name ?? 'Untitled event' };
+      }
+      decided.push(requestId);
+      return { outcome: 'updated', request_id: requestId, status: 'approved', venue_booking_id: 90, decided_at: '2030-01-01T00:00:00.000Z' };
+    }
   });
-  return { composed, committed, occupied };
+  const { store } = requestStore(occupied);
+  const composed = express();
+  composed.use(express.json());
+  composed.use('/api/venue-booking-requests', createVenueBookingRequestsRouter(access(), {
+    getAdminClient: () => ({}) as SupabaseClient, store: () => store, now: () => NOW, decisions
+  }));
+  return { composed, decided, occupied };
 }
 
-test('[CONFLICT] [SG2-50:AC2] approving a request in conflict is refused, naming every conflicting booking and hold, and nothing is committed', async () => {
-  const { composed, committed } = approvalApp([gala, ownHold]);
-  const response = await request(composed).post('/approve');
+const approve = (composed: express.Express) =>
+  request(composed).post('/api/venue-booking-requests/41/decision').set(as('venue')).send({ decision: 'approve' });
+
+test('[CONFLICT] [SG2-50:AC2] Venue Staff approving a request that overlaps a confirmed booking are refused, naming it, and nothing is decided', async () => {
+  const { composed, decided } = decisionApp([gala]);
+  const response = await approve(composed);
   assert.equal(response.status, 409);
-  assert.equal(response.body.error, 'This request cannot be approved while it conflicts with '
-    + 'confirmed booking #12 for Gala Night (15 Jun 2030, 10:00 – 15 Jun 2030, 18:00); '
-    + 'tentative hold #3 for Partner Lunch (15 Jun 2030, 17:00 – 15 Jun 2030, 20:00).');
-  assert.deepEqual(response.body.conflicts.map((row: { reference_id: number }) => row.reference_id), [12, 3]);
-  assert.deepEqual(committed, []);
+  assert.deepEqual(response.body, {
+    error: 'Atrium Hall is already booked for Gala Night during this period.',
+    conflict: { kind: 'booking', starts_at: gala.starts_at, ends_at: gala.ends_at, label: 'Gala Night' }
+  });
+  assert.deepEqual(decided, []);
 });
 
-test('[NORMAL] [SG2-50:AC2] [SG2-50:AC3] once the conflicting booking is rejected or cancelled the same request can be approved', async () => {
-  const state = approvalApp([gala]);
-  assert.equal((await request(state.composed).post('/approve')).status, 409);
-  // The booking is released: it no longer commits the venue.
+test('[CONFLICT] [SG2-50:AC2] a live tentative hold over the period refuses approval too', async () => {
+  const response = await approve(decisionApp([ownHold]).composed);
+  assert.deepEqual([response.status, response.body.error], [409, 'Atrium Hall is on a tentative hold for Partner Lunch during this period.']);
+});
+
+test('[NORMAL] [SG2-50:AC2] [SG2-50:AC3] once the conflicting booking is released the same request is approved', async () => {
+  const state = decisionApp([gala]);
+  assert.equal((await approve(state.composed)).status, 409);
+  // The booking no longer commits the venue.
   state.occupied.length = 0;
-  const response = await request(state.composed).post('/approve');
-  assert.deepEqual([response.status, response.body], [200, { status: 'approved' }]);
-  assert.deepEqual(state.committed, [41]);
-});
-
-test('[NORMAL] [SG2-50:AC1] a conflict with no event, or one hidden from a coordinator, is still described by its number and period', async () => {
-  const legacy: VenueConflictRow = { ...gala, reference_id: 2, event_id: null, event_name: null, coordinator_id: null, status: 'held' };
-  assert.equal(describeConflict(legacy), 'held booking #2 for another event (15 Jun 2030, 10:00 – 15 Jun 2030, 18:00)');
-  assert.equal(describeConflict({ ...legacy, event_id: 5 }), 'held booking #2 for event #5 (15 Jun 2030, 10:00 – 15 Jun 2030, 18:00)');
-  const coordinator = await approvalRefusal({ conflicts: async () => [gala] }, pending, USERS.other_coordinator, NOW);
-  assert.match(coordinator!.error, /confirmed booking #12 for Gala Night/);
-  const hidden = await approvalRefusal({ conflicts: async () => [gala] }, pending, USERS.coordinator, NOW);
-  assert.match(hidden!.error, /confirmed booking #12 for another event/);
+  const response = await approve(state.composed);
+  assert.equal(response.status, 200);
+  assert.deepEqual(state.decided, [41]);
 });

@@ -29,6 +29,8 @@ import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
 import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
+import { createNotificationsRouter } from '../server/src/notifications';
+import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -39,6 +41,8 @@ import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
+import { createEquipmentRouter } from '../server/src/equipment';
+import { createMemoryEquipmentStore } from './support/equipment';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -138,9 +142,11 @@ const app = createApp(
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
-    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient }),
+    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
     // SG2-50: what a pending request overlaps, against the in-memory client.
-    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }) },
+    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
+    // SG2-49: decision notices, against the in-memory client.
+    notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-38's stage handler keeps its production default here, as it does on
   // main; only the review handler below needs the in-memory client.
@@ -159,7 +165,8 @@ const app = createApp(
   // SG2-36's clarification exchange, against the in-memory client.
   createListClarificationsHandler(eventDependencies),
   createAddClarificationHandler(eventDependencies),
-  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now)
+  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
+  createEquipmentRouter(access, () => createMemoryEquipmentStore(database))
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -182,6 +189,10 @@ app.post('/__e2e/assigned-review', (_req, res) => {
 });
 app.post('/__e2e/venue-suitability', (_req, res) => {
   database.seedVenueSuitability();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-decision', (_req, res) => {
+  database.seedVenueDecision();
   res.status(204).end();
 });
 app.post('/__e2e/venue-request', (_req, res) => {

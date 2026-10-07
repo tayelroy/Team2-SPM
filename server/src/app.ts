@@ -23,6 +23,7 @@ import { createVenueBlocksRouter } from './venues/blocks';
 import { createVenueSearchRouter } from './venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from './venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
+import { createNotificationsRouter } from './notifications';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
 import { createWorkQueueRouter } from './workQueue';
@@ -30,6 +31,7 @@ import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
 import { createVenueConflictsRouter } from './venues/conflicts';
+import { createEquipmentRouter } from './equipment';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -55,7 +57,8 @@ export function createApp(
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
     venueRequests: createVenueBookingRequestsRouter(access),
-    conflicts: createVenueConflictsRouter(access)
+    conflicts: createVenueConflictsRouter(access),
+    notifications: createNotificationsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
   eventStageHandler: RequestHandler = createGetEventStageHandler({ getPrincipal: access.getPrincipal }),
@@ -67,7 +70,8 @@ export function createApp(
   getEventHistoryHandler: RequestHandler = createGetEventHistoryHandler({ getPrincipal: access.getPrincipal }),
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
-  venueHoldsRouter = createVenueHoldsRouter(access)
+  venueHoldsRouter = createVenueHoldsRouter(access),
+  equipmentRouter = createEquipmentRouter(access)
 ) {
   const app = express();
 
@@ -98,7 +102,10 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.venueRequests);
   // SG2-50: what a pending venue request overlaps.
   app.use('/api/venue-booking-requests', routers.conflicts);
+  // SG2-49: each person's own notices, e.g. a venue request decision.
+  app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
+  app.use('/api/equipment', equipmentRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

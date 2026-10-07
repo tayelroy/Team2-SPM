@@ -118,11 +118,44 @@ test('[CONFLICT] [SG2-47:AC3] a rapid double click on Approve sends one approval
   expect(screen.getAllByText(/^Capacity exception for 150 people approved by Vera/)).toHaveLength(1);
 });
 
-test('[CONFLICT] [SG2-47:stale-response] leaving before the fit loads ignores the late answer', async () => {
-  const pending: ((response: Response) => void)[] = [];
-  api({ suitability: () => new Promise<Response>(done => { pending.push(done); }) });
-  render(<EventVenueFit accessToken="token" eventId={7} eventName="Forum" />).unmount();
-  render(<BookingRequestFit accessToken="token" requestId={31} />).unmount();
-  expect(pending).toHaveLength(2);
-  await act(async () => { pending.forEach(resolve => resolve(new Response(null, { status: 503 }))); });
+test.each(['success', 'failure'] as const)('[CONFLICT] [SG2-47:stale-response] a previous event or booking response cannot overwrite the current fit after late %s', async outcome => {
+  let finishEvent!: (response: Response) => void;
+  let finishBooking!: (response: Response) => void;
+  api({
+    'event_id=7': () => new Promise<Response>(resolve => { finishEvent = resolve; }),
+    'event_id=8': () => Response.json({ venues: [atrium] }),
+    '/31/suitability': () => new Promise<Response>(resolve => { finishBooking = resolve; }),
+    '/32/suitability': () => Response.json({ venue: atrium, exceptions: [], booking: 'allowed' }),
+  });
+  const onReadiness = vi.fn();
+  const event = render(<EventVenueFit accessToken="token" eventId={7} eventName="Earlier forum" />);
+  const booking = render(<BookingRequestFit accessToken="token" requestId={31} onReadiness={onReadiness} />);
+  event.rerender(<EventVenueFit accessToken="token" eventId={8} eventName="Current forum" />);
+  booking.rerender(<BookingRequestFit accessToken="token" requestId={32} onReadiness={onReadiness} />);
+  expect(await screen.findByRole('heading', { name: 'Every venue fits Current forum' })).toBeVisible();
+  expect(await screen.findByText('This venue fits the event.')).toBeVisible();
+  expect(onReadiness).toHaveBeenCalledExactlyOnceWith('allowed');
+  await act(async () => {
+    finishEvent(outcome === 'success' ? Response.json({ venues: [theatre] }) : new Response(null, { status: 503 }));
+    finishBooking(outcome === 'success' ? Response.json({ venue: theatre, exceptions: [], booking: 'needs_capacity_exception' }) : new Response(null, { status: 503 }));
+  });
+  expect(screen.getByRole('heading', { name: 'Every venue fits Current forum' })).toBeVisible();
+  expect(screen.getByText('This venue fits the event.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Approve capacity exception' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByText('Venue suitability is unavailable right now. Please try again.')).not.toBeInTheDocument();
+  expect(onReadiness).toHaveBeenCalledExactlyOnceWith('allowed');
+});
+
+test('[NORMAL] [SG2-49:AC1] [SG2-47:AC3] the request\'s readiness is reported when it loads and again once an exception is approved', async () => {
+  api({
+    '/31/suitability': () => Response.json({ venue: theatre, exceptions: [], booking: 'needs_capacity_exception' }),
+    '/31/capacity-exception': () => Response.json({ exception: approval, booking: 'allowed' }, { status: 201 })
+  });
+  const onReadiness = vi.fn();
+  render(<BookingRequestFit accessToken="token" requestId={31} onReadiness={onReadiness} />);
+  await vi.waitFor(() => expect(onReadiness).toHaveBeenCalledWith('needs_capacity_exception'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Approve capacity exception' }));
+  await vi.waitFor(() => expect(onReadiness).toHaveBeenLastCalledWith('allowed'));
+  expect(onReadiness).toHaveBeenCalledTimes(2);
 });

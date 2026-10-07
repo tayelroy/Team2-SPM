@@ -3,7 +3,7 @@ import { AccessError } from '../auth/policy';
 import { createVenueSuitabilityStore, type BookingRequestRow, type SuitabilityEventRow } from './venueSuitability';
 
 /** Something already occupying a venue that a request overlaps (SG2-50 AC1):
- * a held or confirmed booking, or a live tentative hold (SG2-84). */
+ * a confirmed booking, or a live tentative hold (SG2-84). */
 export interface VenueConflict {
   kind: 'booking' | 'hold';
   /** booking_id or hold_id. */
@@ -44,9 +44,11 @@ export interface VenueConflictStore {
   conflicts(period: ConflictPeriod, options: ConflictOptions): Promise<VenueConflictRow[]>;
 }
 
-/** Booking statuses that commit a venue. Any other status (such as a booking
- * released under SG2-51) no longer conflicts (SG2-50 AC3). */
-export const COMMITTED_BOOKING_STATUSES = ['held', 'confirmed'];
+/** Booking statuses that commit a venue: only confirmed, as for SG2-49's
+ * approval check, venue search and blocks. A held booking is not confirmed,
+ * and any other status (such as one released under SG2-51) no longer
+ * conflicts (SG2-50 AC3). */
+export const COMMITTED_BOOKING_STATUSES = ['confirmed'];
 
 type BookingRow = { booking_id: number; event_id: number | null; starts_at: string; ends_at: string; status: string };
 type HoldRow = { hold_id: number; event_id: number; request_id: number; starts_at: string; ends_at: string; status: string };

@@ -68,20 +68,21 @@ begin
   end if;
 
   begin
-    -- The same coordinator submitting the same request twice at once.
+    -- A second sequential insert for the same coordinator; this checks
+    -- stored overlap rejection, not simultaneous sessions.
     insert into public.venue_booking_requests (event_id, venue_id, starts_at, ends_at, layout, requested_by)
       values (94801, 94801, '2030-06-15T09:59Z', '2030-06-15T11:00Z', 'theatre', 'c0000000-0000-4000-8000-000000000002');
     raise exception '[SG2-48:duplicate-overlap-refused] [SG2-48:AC4] [CONFLICT] A second request for the same venue and an overlapping period was accepted';
   exception when exclusion_violation then null; end;
 
-  update public.venue_booking_requests set status = 'approved' where request_id = 94801;
+  update public.venue_booking_requests set status = 'approved', decided_by = 'c0000000-0000-4000-8000-000000000002', decided_at = now() where request_id = 94801;
   begin
     insert into public.venue_booking_requests (event_id, venue_id, starts_at, ends_at, layout, requested_by)
       values (94801, 94801, '2030-06-15T03:00Z', '2030-06-15T04:00Z', 'theatre', 'c0000000-0000-4000-8000-000000000002');
     raise exception '[SG2-48:duplicate-of-approved-refused] [SG2-48:AC4] [CONFLICT] A request duplicating an approved one was accepted';
   exception when exclusion_violation then null; end;
 
-  update public.venue_booking_requests set status = 'rejected' where request_id = 94801;
+  update public.venue_booking_requests set status = 'rejected', decision_reason = 'Room under repair' where request_id = 94801;
   insert into public.venue_booking_requests (event_id, venue_id, starts_at, ends_at, layout, requested_by)
     values (94801, 94801, '2030-06-15T03:00Z', '2030-06-15T04:00Z', 'theatre', 'c0000000-0000-4000-8000-000000000002');
   if (select count(*) from public.venue_booking_requests where event_id = 94801 and venue_id = 94801 and status = 'pending') <> 2 then

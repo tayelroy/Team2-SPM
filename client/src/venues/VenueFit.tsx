@@ -5,6 +5,7 @@ import {
   approveCapacityException,
   fetchEventFit,
   fetchRequestFit,
+  type BookingReadiness,
   type RequestFit,
   type Suitability,
   type VenueFit
@@ -83,7 +84,12 @@ function approvalText(exception: RequestFit['exceptions'][number]) {
  * exceptions approved so far, and approval of a new one when it is needed
  * (AC3). Approving it does not approve the booking (AC5).
  */
-export function BookingRequestFit({ accessToken, requestId }: { accessToken?: string | null; requestId: number }) {
+export function BookingRequestFit({ accessToken, requestId, onReadiness }: {
+  accessToken?: string | null;
+  requestId: number;
+  /** SG2-49: whether the booking may now be approved, as it changes. */
+  onReadiness?: (booking: BookingReadiness) => void;
+}) {
   const [fit, setFit] = useState<RequestFit | null>(null);
   const [error, setError] = useState('');
   const [approving, setApproving] = useState(false);
@@ -92,10 +98,12 @@ export function BookingRequestFit({ accessToken, requestId }: { accessToken?: st
     let cancelled = false;
     fetchRequestFit(accessToken, requestId).then(result => {
       if (cancelled) return;
-      if (result.ok) setFit(result);
+      if (result.ok) { setFit(result); onReadiness?.(result.booking); }
       else setError(result.error);
     });
     return () => { cancelled = true; };
+    // onReadiness is a state setter from the parent; reloading on its identity is not wanted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, requestId]);
 
   async function approve() {
@@ -105,7 +113,10 @@ export function BookingRequestFit({ accessToken, requestId }: { accessToken?: st
     setApproving(false);
     if (!result.ok) setError(result.error);
     // The button only shows once the fit has loaded.
-    else setFit(current => ({ ...current!, booking: result.booking, exceptions: [...current!.exceptions, result.exception] }));
+    else {
+      setFit(current => ({ ...current!, booking: result.booking, exceptions: [...current!.exceptions, result.exception] }));
+      onReadiness?.(result.booking);
+    }
   }
 
   return <section className="organisation-detail-footer" aria-label="Venue suitability">

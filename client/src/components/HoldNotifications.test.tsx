@@ -1,11 +1,15 @@
 import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import HoldNotifications from './HoldNotifications';
 import AppShell from '../screens/AppShell';
 import * as api from '../venues/holdNotificationsApi';
 import type { HoldNotificationsOutcome } from '../venues/holdNotificationsApi';
+import * as notices from '../api/notificationsApi';
+import type { NotificationsOutcome } from '../api/notificationsApi';
 
+// SG2-49: the drawer also lists venue request decisions; empty unless a test says otherwise.
+beforeEach(() => { vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [] }); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 const placed = { notification_id: 1, event_id: 8, hold_id: 3, kind: 'placed' as const, message: 'Atrium is tentatively held for Tech Symposium.', created_at: '2026-10-05T02:00:00.000Z' };
@@ -41,13 +45,13 @@ test('[BOUNDARY] [SG2-84:AC6] [SG2-85:AC4] displays an empty real inbox without 
   vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [] });
   render(<HoldNotifications accessToken="token" />);
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (loading)' }));
-  expect(await screen.findByText('No hold notifications available.')).toBeInTheDocument();
+  expect(await screen.findByText('No notifications yet.')).toBeInTheDocument();
   fireEvent.keyDown(screen.getByRole('complementary'), { key: 'ArrowDown' });
   expect(screen.getByRole('complementary')).toBeInTheDocument();
   fireEvent.keyDown(screen.getByRole('complementary'), { key: 'Escape' });
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' }));
-  await screen.findByText('No hold notifications available.');
+  await screen.findByText('No notifications yet.');
   fireEvent.click(screen.getByRole('button', { name: 'Close notifications overlay' }));
   expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 });
@@ -59,7 +63,7 @@ test('[FAILURE] [SG2-84:AC6] [SG2-85:AC4] shows a loading state then a recoverab
     .mockResolvedValueOnce({ ok: true, notifications: [warning] });
   render(<HoldNotifications accessToken="token" />);
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (loading)' }));
-  expect(screen.getByRole('status')).toHaveTextContent('Loading hold notifications…');
+  expect(screen.getByRole('status')).toHaveTextContent('Loading notifications…');
   await act(async () => resolve({ ok: false, kind: 'unavailable', message: 'Could not load hold notifications. Please try again.' }));
   expect(screen.getByRole('alert')).toHaveTextContent('Could not load hold notifications. Please try again.');
   expect(screen.getByRole('button', { name: 'Notifications (unavailable)' })).toBeInTheDocument();
@@ -178,6 +182,51 @@ test('[CONFLICT] [SG2-84:AC6] [SG2-85:AC4] changing the signed-in identity clear
   rerender(<AppShell {...props} accessToken="second-token" />);
   expect(screen.queryByText(placed.message)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (loading)' }));
-  expect(await screen.findByText('No hold notifications available.')).toBeInTheDocument();
+  expect(await screen.findByText('No notifications yet.')).toBeInTheDocument();
   expect(load).toHaveBeenLastCalledWith('second-token');
+});
+
+const approved = { notification_id: 7, event_id: 8, request_id: 41, kind: 'venue_request_approved' as const,
+  message: 'Atrium Hall was approved for Tech Symposium.', created_at: '2026-10-06T02:00:00.000Z' };
+const rejected = { ...approved, notification_id: 8, kind: 'venue_request_rejected' as const,
+  message: 'Quiet Room was rejected for Tech Symposium: Under repair', created_at: '2026-10-04T02:00:00.000Z' };
+
+test('[NORMAL] [SG2-49:AC1] [SG2-49:AC2] venue request decisions appear in the same drawer as hold notices, newest first', async () => {
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [placed] });
+  const load = vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [approved, rejected] });
+  render(<HoldNotifications accessToken="coordinator-token" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (3)' }));
+  expect(load).toHaveBeenCalledWith('coordinator-token');
+  expect(screen.getByText('Venue request approved')).toBeInTheDocument();
+  expect(screen.getByText('Venue request rejected')).toBeInTheDocument();
+  const messages = screen.getAllByText(/Tech Symposium/).map(node => node.textContent);
+  expect(messages).toEqual([approved.message, placed.message, rejected.message]);
+});
+
+test('[FAILURE] [SG2-49:AC1] if decision notices cannot load, hold notices still show with a retry, and the count waits for both', async () => {
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [placed] });
+  let resolve!: (value: NotificationsOutcome) => void;
+  const load = vi.spyOn(notices, 'loadNotifications')
+    .mockResolvedValueOnce({ ok: false, message: 'Could not load notifications. Please try again.' })
+    .mockResolvedValueOnce({ ok: false, message: 'Could not load notifications. Please try again.' })
+    .mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  render(<HoldNotifications accessToken="token" />);
+  // Opening the drawer refreshes both inboxes.
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (unavailable)' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not load notifications. Please try again.');
+  expect(screen.getByText(placed.message)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  await act(async () => resolve({ ok: true, notifications: [rejected] }));
+  expect(screen.getByText(rejected.message)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Notifications (2)' })).toBeInTheDocument();
+  expect(load).toHaveBeenCalledTimes(3);
+});
+
+test('[BOUNDARY] [SG2-49:AC1] [SG2-84:AC6] both inboxes failing shows both reasons and no count', async () => {
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'Could not load hold notifications.' });
+  vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: false, message: 'Could not load notifications.' });
+  render(<HoldNotifications accessToken="token" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (unavailable)' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not load hold notifications. Could not load notifications.');
+  expect(screen.queryByText('No notifications yet.')).not.toBeInTheDocument();
 });
