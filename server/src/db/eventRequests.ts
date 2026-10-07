@@ -863,7 +863,14 @@ export async function completeEvent(
     .update({ status: 'completed', completed_by: coordinatorId, completed_at: now.toISOString() })
     .eq('event_id', eventId)
     .eq('coordinator_id', coordinatorId)
-    .in('status', COMPLETABLE_STATUSES)
+    // Pinned to the exact status just read, not merely COMPLETABLE_STATUSES:
+    // if the event moved (e.g. preparation -> confirmed) between the pre-read
+    // and this write, matching either status would let the update through
+    // with a now-stale `previousStatus`, and the audit row written from it
+    // would record the wrong old_value for the transition that actually
+    // happened. Pinning makes that race match zero rows instead, same as any
+    // other status that has moved on.
+    .eq('status', previousStatus)
     .select(DETAIL_COLUMNS);
 
   if (error) {

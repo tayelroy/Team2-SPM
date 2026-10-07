@@ -1421,7 +1421,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     assert.deepEqual(update.filters, [
       ['eq', 'event_id', 7],
       ['eq', 'coordinator_id', 'coord-1'],
-      ['in', 'status', COMPLETABLE]
+      ['eq', 'status', 'confirmed']
     ]);
   });
 
@@ -1504,6 +1504,36 @@ describe('completeEvent (SG2-100 AC4)', () => {
       assert.equal(result.ok, false);
       if (!result.ok) assert.equal(result.reason, 'not_found');
     }
+  });
+
+  test('[CONFLICT] [SG2-100:AC8] a status that moved between the read and the write is pinned out, never recorded as a stale previous_status', async () => {
+    let calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
+    // The pre-read saw `preparation`; by the time the guarded update runs the
+    // row has moved to `confirmed` (another request completed the same
+    // lifecycle step). Pinning the update to the status just read, not just
+    // COMPLETABLE_STATUSES, must make this match zero rows rather than
+    // completing the event with an audit old_value of 'preparation' that was
+    // never the status this write actually replaced.
+    const result = await completeEvent(
+      fakeCompleteClient({
+        eventResult: { data: [{ event_id: 7, status: 'preparation' }], error: null },
+        bookingResult: { data: [{ ends_at: '2026-11-05T10:00:00.000Z' }], error: null },
+        updateResult: { data: [], error: null },
+        capture: (c) => (calls = c)
+      }),
+      7,
+      'coord-1',
+      NOW
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'not_found');
+    const update = calls[2];
+    assert.deepEqual(update.filters, [
+      ['eq', 'event_id', 7],
+      ['eq', 'coordinator_id', 'coord-1'],
+      ['eq', 'status', 'preparation']
+    ]);
   });
 
   test('[FAILURE] [SG2-100:AC6] every failing query is reported as unavailable with its own message', async () => {
