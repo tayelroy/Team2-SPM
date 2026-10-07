@@ -1,6 +1,6 @@
 -- SG2-100 AC1, AC6, AC8: the public.event_status enum carries the Week 7
 -- lifecycle values and defaults, and the completion columns added by
--- 202610070003_event_completion.sql cannot be half-written.
+-- 202610080003_event_completion.sql cannot be half-written.
 -- Disposable local/CI test script. All changes are rolled back.
 begin;
 

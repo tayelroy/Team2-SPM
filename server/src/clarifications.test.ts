@@ -148,19 +148,28 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     assert.equal(audited, false);
   });
 
-  test('[NORMAL] [SG2-36:AC3] a coordinator follow-up after returning it only appends', async () => {
+  test('[NORMAL] [SG2-36:AC3] a coordinator follow-up appends the exact message without changing status or history', async () => {
+    const appended: { eventId: number; senderId: string; message: string }[] = [];
     let returned = false;
+    let audited = false;
+    const followUp = { ...MESSAGE, clarification_id: 6, message: 'Also, how many breakout rooms?' };
     const response = await request(
       postApp({
         fetchResult: { ok: true, request: { ...REQUEST_UNDER_REVIEW, status: 'needs_clarification' } },
-        captureReturn: () => (returned = true)
+        addResult: { ok: true, clarification: followUp },
+        captureAdd: (eventId, senderId, message) => { appended.push({ eventId, senderId, message }); },
+        captureReturn: () => (returned = true),
+        captureAudit: () => (audited = true)
       })
     )
       .post('/api/event-requests/7/clarifications')
-      .send({ message: 'Also, how many breakout rooms?' });
+      .send({ message: '  Also, how many breakout rooms?  ' });
 
     assert.equal(response.status, 201);
+    assert.deepEqual(response.body, { clarification: followUp, status: 'needs_clarification' });
+    assert.deepEqual(appended, [{ eventId: 7, senderId: 'coordinator-1', message: 'Also, how many breakout rooms?' }]);
     assert.equal(returned, false);
+    assert.equal(audited, false);
   });
 
   for (const [label, principal, fetchResult] of [
@@ -321,7 +330,7 @@ describe('GET /api/event-requests/:eventId/clarifications (SG2-36)', () => {
     for (const principal of [COORDINATOR, ORGANISER]) {
       const response = await request(getApp({ principal })).get('/api/event-requests/7/clarifications');
       assert.equal(response.status, 200);
-      assert.equal(response.body.clarifications.length, 1);
+      assert.deepEqual(response.body.clarifications, [MESSAGE]);
       assert.equal(response.body.status, 'under_review');
     }
   });

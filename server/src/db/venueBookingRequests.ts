@@ -3,6 +3,7 @@ import { AccessError } from '../auth/policy';
 import type { Layout } from '../venues/layoutFields';
 import type { VenueBookingRequestValues } from '../venues/bookingRequestFields';
 import { createVenueSuitabilityStore, type CapacityExceptionRecord, type SuitabilityEventRow, type SuitabilityVenueRow } from './venueSuitability';
+import { createVenueConflictStore, type VenueConflictStore } from './venueConflicts';
 
 /** A venue request as people see it: the venue, requester and decider by
  * name. Their account ids are not sent to clients. */
@@ -49,6 +50,8 @@ export interface VenueBookingRequestStore {
   hold(requestId: number): Promise<number | null>;
   /** SG2-47: capacity exceptions approved for the request. */
   exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
+  /** What else commits the venue over the period (SG2-50 AC1). */
+  conflicts: VenueConflictStore['conflicts'];
 }
 
 const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason';
@@ -61,6 +64,7 @@ type Row = Omit<VenueBookingRequestRecord, 'venue_name' | 'requester_name' | 'de
  * the event before using this store. */
 export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBookingRequestStore {
   const suitability = createVenueSuitabilityStore(admin);
+  const occupancy = createVenueConflictStore(admin);
   function check(error: unknown) {
     if (error) throw new AccessError(503);
   }
@@ -81,6 +85,7 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
   }
   return {
     event: eventId => suitability.event(eventId),
+    conflicts: (period, options) => occupancy.conflicts(period, options),
     async venue(venueId) {
       return (await suitability.venues(venueId))[0] ?? null;
     },

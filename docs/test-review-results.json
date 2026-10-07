@@ -1,37 +1,92 @@
 {
-  "reviewedBy": "LIM JUN WEI",
-  "reviewDate": "2026-10-02",
-  "sourceFiles": 87,
-  "methodDeclarations": 1191,
-  "sqlAssertionContracts": 154,
+  "reviewedBy": "Lim Jun Wei",
+  "reviewDate": "2026-10-07",
+  "reviewMethod": "Automated source and traceability review on behalf of Lim Jun Wei; not independent human peer approval.",
+  "sourceFiles": 112,
+  "methodDeclarations": 1587,
+  "sqlAssertionContracts": 379,
   "runs": {
     "build_and_coverage": {
       "command": "npm run ci",
-      "status": "Pending"
+      "status": "Pass",
+      "serverCases": 1045,
+      "clientCases": 929,
+      "reviewerToolCases": 19,
+      "inventoryGuardCases": 9,
+      "coverage": {
+        "serverFiles": 69,
+        "clientFiles": 58,
+        "perFileMetrics": {
+          "statements": 100,
+          "branches": 100,
+          "functions": 100,
+          "lines": 100
+        }
+      }
     },
     "browser": {
-      "command": "npm run test:e2e",
-      "status": "Pending"
+      "command": "tsc -p e2e/tsconfig.json; npm run test:regression:gate; playwright test --config=/tmp/test-review-playwright.config.ts; node .github/scripts/regression-gate.mjs /tmp/test-review-qa/regression.json",
+      "status": "Pass",
+      "journeys": 56,
+      "reportGateCases": 13,
+      "environment": "Installed Google Chrome, isolated browser profile, production app build and Express routes on loopback with disposable identity/storage fixtures. No retries. Video disabled; Browser plugin/downloaded Chromium unavailable."
     },
     "sql": {
-      "status": "Pending hosted CI",
-      "suites": 7,
-      "assertionContracts": 154,
-      "environment": "Local Docker daemon unavailable; fresh hosted PostgreSQL run required."
+      "status": "Pass",
+      "suites": 15,
+      "assertionContracts": 379,
+      "concurrencyScripts": 3,
+      "concurrencyScenarios": 8,
+      "migrations": 20,
+      "environment": "Disposable native PostgreSQL 17.11, network disabled, tmpfs, auth fixture and all migrations in CI order. Container removed. No hosted database testing."
     }
   },
   "localRuntime": "Node 24.10.0; npm 11.6.1",
-  "hostedEvidence": "See the current PR checks for the immutable pushed head and Node 22/PostgreSQL 17 run.",
+  "hostedEvidence": "Use PR #65 checks for the immutable pushed head; local results above do not assert that an earlier CI run executed this patch.",
   "limits": [
-    "Merged-head peer approval pending; structural review received from @tayelroy",
-    "Historical test-first TDD not reconstructed",
-    "No configured linter",
-    "No deployed Supabase/staging validation",
-    "Assignment history incomplete: SG2-33/34 AC4",
-    "Event save followed by audit insert is not atomic: SG2-39",
-    "Current branch protection/team access not independently revalidated"
+    "Independent teammate structured Test Case Peer Review & Sign-Off remains pending.",
+    "Vercel preview/deployed browser acceptance remains pending.",
+    "No configured linter.",
+    "The clarification regression was observed failing before its fix; historical test-first TDD is not reconstructed.",
+    "Assignment compensation failure can leave the assignment stored; venue-layout replacement and event-save/audit operations are not atomic. Tests document these existing limits.",
+    "Seven superseded register rows remain historical and are not current passing test claims.",
+    "No hosting-plan or database configuration changes in this follow-up."
   ],
   "previousReviews": [
+    {
+      "reviewedBy": "LIM JUN WEI",
+      "reviewDate": "2026-10-02",
+      "sourceFiles": 87,
+      "methodDeclarations": 1191,
+      "sqlAssertionContracts": 154,
+      "runs": {
+        "build_and_coverage": {
+          "command": "npm run ci",
+          "status": "Pending"
+        },
+        "browser": {
+          "command": "npm run test:e2e",
+          "status": "Pending"
+        },
+        "sql": {
+          "status": "Pending hosted CI",
+          "suites": 7,
+          "assertionContracts": 154,
+          "environment": "Local Docker daemon unavailable; fresh hosted PostgreSQL run required."
+        }
+      },
+      "localRuntime": "Node 24.10.0; npm 11.6.1",
+      "hostedEvidence": "See the current PR checks for the immutable pushed head and Node 22/PostgreSQL 17 run.",
+      "limits": [
+        "Merged-head peer approval pending; structural review received from @tayelroy",
+        "Historical test-first TDD not reconstructed",
+        "No configured linter",
+        "No deployed Supabase/staging validation",
+        "Assignment history incomplete: SG2-33/34 AC4",
+        "Event save followed by audit insert is not atomic: SG2-39",
+        "Current branch protection/team access not independently revalidated"
+      ]
+    },
     {
       "reviewedBy": "LIM JUN WEI",
       "reviewDate": "2026-10-01",

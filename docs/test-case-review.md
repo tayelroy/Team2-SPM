@@ -1,3 +1,28 @@
+# Test case review — 7 October 2026
+
+Review owner: Lim Jun Wei. Source, traceability and execution evidence were checked automatically on his behalf. This record does not represent independent teammate approval. The previous dated review is preserved below.
+
+The current ledger contains 1,587 test declarations and 379 SQL assertion contracts across 112 executable files. Standalone concurrency scripts add eight scenarios outside that parser. These counts are not independent acceptance journeys and are not a minimum required by the DoD.
+
+## Review corrections
+
+- A stronger clarification test reproduced a real defect: an older initial response replaced a reply that had just been posted. The component now preserves posted replies exactly once and ignores completions belonging to a previous conversation. The regression failed against the original component before the fix.
+- Stale-response checks now leave a different event/session mounted and assert that its visible data stays unchanged. Spacer tests assert exact desktop and resized geometry.
+- Equipment's browser journey now completes create, edit, save and reload at 390px as well as desktop, matching its declared scope.
+- Venue-layout tests assert the exact venue filters, replacement records and DELETE/POST failure stages. Coordinator compensation, clarification responses and empty planning updates assert concrete stored values and history effects.
+- Thirty-four SQL RPC assertions use null-safe comparisons. The revoked-staff update checks both zero affected rows and the unchanged complete privileged record. Sequential duplicate prevention is labeled sequentially; real concurrent behavior is proved separately with observed PostgreSQL lock waits.
+- Source mappings were reconciled against the live register. Superseded rows retain historical evidence; supporting fixtures remain classified as support. Prior approval links are historical and do not approve changed source.
+
+## Verification
+
+`npm run ci` passed: 1,045 backend cases, 929 frontend cases, nine inventory guards and 19 reviewer-tool cases. All 69 server and 58 client application files have 100% statements, branches, functions and lines. The complete browser run passed 56/56 journeys; E2E TypeScript, 13 report-gate tests and the required acceptance report gate passed. SQL validation passed all 20 migrations, 15 suites and eight concurrency scenarios in disposable PostgreSQL 17.11.
+
+Local logs: `/tmp/test-review-final-ci.log`, `/tmp/test-review-full-browser.log`, `/tmp/test-review-gate.log`, `/tmp/sg2-review-sql-validation.log`. Browser JSON: `/tmp/test-review-qa/regression.json`. The phone create/edit/reload screenshot is `/tmp/test-review-equipment-screenshots/equipment-mobile-saved.png`. Local temporary files are supplemental evidence; PR #65's current-commit CI is the durable shared execution record.
+
+No hosted negative tests or subscription changes were made. Independent teammate sign-off and deployed workflow verification remain outstanding. There is no configured linter. Existing non-atomic compensation/replacement/audit limitations remain documented rather than being disguised by passing assertions.
+
+## Historical review
+
 # Test case review — 2 October 2026
 
 Reviewed by LIM JUN WEI.

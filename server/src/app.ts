@@ -31,6 +31,8 @@ import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
+import { createVenueConflictsRouter } from './venues/conflicts';
+import { createEquipmentRouter } from './equipment';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -56,6 +58,7 @@ export function createApp(
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
     venueRequests: createVenueBookingRequestsRouter(access),
+    conflicts: createVenueConflictsRouter(access),
     notifications: createNotificationsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
@@ -69,6 +72,7 @@ export function createApp(
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
   venueHoldsRouter = createVenueHoldsRouter(access),
+  equipmentRouter = createEquipmentRouter(access),
   // SG2-100 AC4. Appended rather than grouped with the other event handlers
   // on purpose: every parameter here is positional, and inserting one in the
   // middle would silently shift every caller's later arguments.
@@ -101,9 +105,12 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  // SG2-50: what a pending venue request overlaps.
+  app.use('/api/venue-booking-requests', routers.conflicts);
   // SG2-49: each person's own notices, e.g. a venue request decision.
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
+  app.use('/api/equipment', equipmentRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

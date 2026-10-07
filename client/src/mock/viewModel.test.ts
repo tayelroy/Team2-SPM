@@ -11,7 +11,6 @@ import {
   equipmentViews,
   eventCards,
   navFor,
-  previewNavFor,
   primaryActionFor,
   scopedEvents,
   statusLabel,
@@ -156,16 +155,12 @@ describe('role-scoped chrome', () => {
   });
 });
 
-describe('navFor / previewNavFor / primaryActionFor (SG2-86)', () => {
+describe('navFor / primaryActionFor (SG2-86)', () => {
   test('[NORMAL] [SG2-86:AC1] Safety Officer has a minimal nav: dashboard and all events only', () => {
     expect(navFor('Safety Officer')).toEqual([
       { screen: 'dashboard', label: 'Dashboard' },
       { screen: 'events', label: 'All events' },
     ]);
-  });
-
-  test('[BOUNDARY] [SG2-86:AC1] Safety Officer has no preview-only screens', () => {
-    expect(previewNavFor('Safety Officer')).toEqual([]);
   });
 
   test('[NORMAL] [SG2-86:AC1] the new roles land on My profile as their one usable primary action', () => {

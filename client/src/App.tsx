@@ -209,7 +209,7 @@ export default function App() {
     ),
     calendar: <AvailabilityCalendar />,
     holds: <VenueHolds key={session!.accessToken} role={role} accessToken={session!.accessToken} />,
-    equipment: <EquipmentDesk />,
+    equipment: <EquipmentDesk accessToken={session!.accessToken} />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
     profile: <Profile role={role} />,

@@ -30,6 +30,7 @@ import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createProfileRouter } from '../server/src/profile';
@@ -42,6 +43,8 @@ import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
+import { createEquipmentRouter } from '../server/src/equipment';
+import { createMemoryEquipmentStore } from './support/equipment';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -142,6 +145,8 @@ const app = createApp(
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
     venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-50: what a pending request overlaps, against the in-memory client.
+    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
     notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
@@ -163,6 +168,7 @@ const app = createApp(
   createListClarificationsHandler(eventDependencies),
   createAddClarificationHandler(eventDependencies),
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
+  createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
   // SG2-100 AC4: Mark Completed, against the in-memory client.
   createCompleteEventHandler(eventDependencies)
 );

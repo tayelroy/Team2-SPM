@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import ClarificationThread from './ClarificationThread';
@@ -49,8 +49,9 @@ test('[BOUNDARY] [SG2-36:AC1] the send button disables while a message is in fli
   expect(screen.getByLabelText('Reply')).toHaveValue('');
 });
 
-test('[BOUNDARY] [SG2-36:AC3] a reply posted before the thread finishes loading is still kept', async () => {
+test.each([false, true])('[CONFLICT] [SG2-36:AC3] a delayed initial thread response preserves a posted reply exactly once (already included: %s)', async includesReply => {
   let load!: (value: ThreadOutcome) => void;
+  const earlier = { ...question, clarification_id: 2, message: 'Earlier question', created_at: '2026-09-29T02:00:00.000Z' };
   vi.spyOn(eventRequestsApi, 'fetchClarifications').mockReturnValue(new Promise(resolve => { load = resolve; }));
   vi.spyOn(eventRequestsApi, 'postClarification').mockResolvedValue({ ok: true, clarification: question, status: 'needs_clarification' });
   const onPosted = vi.fn();
@@ -59,15 +60,47 @@ test('[BOUNDARY] [SG2-36:AC3] a reply posted before the thread finishes loading 
   fireEvent.click(screen.getByRole('button', { name: 'Send' }));
   expect(await screen.findByText('Is the date firm?')).toBeVisible();
   expect(onPosted).toHaveBeenCalledWith('needs_clarification');
-  await act(async () => load({ ok: true, clarifications: [question], status: 'needs_clarification' }));
+  await act(async () => load({ ok: true, clarifications: includesReply ? [earlier, question] : [earlier], status: 'needs_clarification' }));
+  const messages = within(screen.getByRole('list', { name: 'Messages' })).getAllByRole('listitem');
+  expect(messages).toHaveLength(2);
+  expect(messages[0]).toHaveTextContent('Earlier question');
+  expect(messages[1]).toHaveTextContent('Is the date firm?');
+  expect(screen.getByLabelText('Reply')).toHaveValue('');
 });
 
-test('[BOUNDARY] [SG2-36:AC3] a thread that finishes loading after the screen closes is ignored', async () => {
+test('[CONFLICT] [SG2-36:AC3] a previous event response cannot replace the current conversation', async () => {
   let load!: (value: ThreadOutcome) => void;
-  const fetchThread = vi.spyOn(eventRequestsApi, 'fetchClarifications').mockReturnValue(new Promise(resolve => { load = resolve; }));
-  const { unmount } = render(<ClarificationThread eventId={9} accessToken="t" canPost={false} prompt="Reply" />);
-  unmount();
+  const current = { ...question, event_id: 10, clarification_id: 3, message: 'Current event question' };
+  const fetchThread = vi.spyOn(eventRequestsApi, 'fetchClarifications')
+    .mockReturnValueOnce(new Promise(resolve => { load = resolve; }))
+    .mockResolvedValue({ ok: true, clarifications: [current], status: 'needs_clarification' });
+  const view = render(<ClarificationThread eventId={9} accessToken="t" canPost={false} prompt="Reply" />);
+  view.rerender(<ClarificationThread eventId={10} accessToken="t" canPost={false} prompt="Reply" />);
+  expect(await screen.findByText('Current event question')).toBeVisible();
   await act(async () => load({ ok: true, clarifications: [question], status: 'needs_clarification' }));
-  expect(fetchThread).toHaveBeenCalledTimes(1);
+  expect(fetchThread).toHaveBeenCalledWith(9, 't');
+  expect(fetchThread).toHaveBeenCalledWith(10, 't');
+  expect(screen.getByText('Current event question')).toBeVisible();
   expect(screen.queryByText('Is the date firm?')).not.toBeInTheDocument();
+});
+
+test.each(['success', 'failure'] as const)('[CONFLICT] [SG2-36:AC3] a late reply %s from a previous event cannot affect the current conversation', async outcome => {
+  let post!: (value: PostOutcome) => void;
+  vi.spyOn(eventRequestsApi, 'fetchClarifications').mockResolvedValue({ ok: true, clarifications: [], status: 'under_review' });
+  vi.spyOn(eventRequestsApi, 'postClarification').mockReturnValue(new Promise(resolve => { post = resolve; }));
+  const onPosted = vi.fn();
+  const view = render(<ClarificationThread eventId={9} accessToken="t" canPost prompt="Reply" onPosted={onPosted} />);
+  await screen.findByText('No questions have been asked yet.');
+  fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'Is the date firm?' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+  expect(screen.getByRole('button', { name: 'Sending…' })).toBeDisabled();
+  view.rerender(<ClarificationThread eventId={10} accessToken="t" canPost prompt="Reply" onPosted={onPosted} />);
+  await screen.findByText('No questions have been asked yet.');
+  fireEvent.change(screen.getByLabelText('Reply'), { target: { value: 'New event draft' } });
+  await act(async () => post(outcome === 'success' ? { ok: true, clarification: question, status: 'needs_clarification' } : { ok: false, message: 'Old event failure' }));
+  expect(screen.queryByText('Is the date firm?')).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Reply')).toHaveValue('New event draft');
+  expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+  expect(onPosted).not.toHaveBeenCalled();
 });

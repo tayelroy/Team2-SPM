@@ -103,7 +103,6 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['venues', 'Venues'],
     ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
-    ['equipment', 'Equipment'],
     ['holds', 'Venue holds'],
   ],
   'Venue Staff': [
@@ -115,6 +114,7 @@ export const NAV: Record<Role, [Screen, string][]> = {
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['calendar', 'Venue Availability'],
+    ['equipment', 'Equipment'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
@@ -133,13 +133,6 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['dashboard', 'Dashboard'],
     ['events', 'All events'],
   ],
-};
-
-/** Prototype screens still showing sample data. They sit in a "Preview" menu,
- * apart from the live work queue on the dashboard, so staff do not mistake
- * them for real pending requests (SG2-41). */
-export const PREVIEW_NAV: Partial<Record<Role, [Screen, string][]>> = {
-  'Technical Support Staff': [['equipment', 'Equipment requests']],
 };
 
 export const HEAD: Record<
@@ -196,7 +189,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   venues: 'Venue catalogue',
   calendar: 'Venue availability',
   holds: 'Venue holds',
-  equipment: 'Equipment requests',
+  equipment: 'Equipment records',
   attendee: 'Event page',
   change: 'Change request',
   drafts: 'My draft requests',
@@ -217,7 +210,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Available, held, confirmed and blocked days for the selected venue.',
   holds: 'Reserve a venue while arrangements are finalised, with a clear expiry and approval decision.',
   equipment:
-    'Check availability and reserve. Reserving reduces stock for overlapping events.',
+    'Keep equipment type, stock, location and operational status current for request assessment.',
   attendee: 'Confirmed event details, registration, and your current status.',
   change:
     'Ask for a change after submission — the coordinator sees the knock-on impact.',

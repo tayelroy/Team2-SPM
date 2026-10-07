@@ -16,6 +16,7 @@ import {
 import { validateVenueBookingRequest } from './bookingRequestFields';
 import { assessSuitability, bookingReadiness } from './suitability';
 import { canSeeEvent, parseId } from './suitabilityRoutes';
+import { conflictsFor } from './conflicts';
 
 export interface VenueBookingRequestDependencies {
   getAdminClient?: () => SupabaseClient | null;
@@ -97,7 +98,10 @@ function handler(
  * pending and reaches Venue Staff through the work queue (AC2). Nothing is
  * written to venue_bookings, so the venue is neither held nor shown as
  * unavailable (AC3). Several venues may be requested for one event, but not
- * the same venue twice over an overlapping period (AC4).
+ * the same venue twice over an overlapping period (AC4). Anything already
+ * committing the venue over the period is reported with the new request, by
+ * booking or hold number (SG2-50 AC1); the request is still made, but it
+ * cannot be approved while the conflict stands (SG2-50 AC2).
  *
  * GET /?event_id= — the event's requests and where each stands (AC3).
  */
@@ -155,7 +159,8 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
       respond(409, { error: duplicateMessage(null) });
       return;
     }
-    respond(201, { request, booking });
+    const conflicts = await conflictsFor(database, request, principal, now(), request.request_id);
+    respond(201, { request, booking, conflicts });
   }));
 
   router.get('/', access.requirePermission('venue_booking.request.view'), handler(access, dependencies, async (database, principal, req, respond) => {

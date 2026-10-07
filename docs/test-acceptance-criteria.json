@@ -416,6 +416,17 @@
       }
     },
     {
+      "id": "SG2-50",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "Given a venue committed to an event for a period, when a request is raised for an overlapping period at that venue, then the conflict is reported and the conflicting booking is identified",
+        "AC2": "Given a request in conflict, when approval is attempted, then approval is refused while the conflict stands",
+        "AC3": "Given a booking that is rejected or cancelled, when the period is next checked, then it no longer causes a conflict"
+      }
+    },
+    {
       "id": "SG2-77",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-77",
       "originalPullRequests": [],
@@ -483,6 +494,18 @@
         "AC12": "The e2e regression journeys for this story pass and are registered in docs/regression-cases.json",
         "AC13": "No secrets are committed; every new route is permission-gated server-side; every new write repeats its guards as conditions on the update itself"
       }
+    },
+    {
+      "id": "SG2-52",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-52",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-07",
+      "acceptanceCriteria": {
+        "AC1": "Can create and update equipment with type, description, quantity held, location and operational status",
+        "AC2": "Equipment recorded as damaged or under maintenance is excluded from what is treated as available",
+        "AC3": "Users who are not Technical Support Staff cannot edit equipment records"
+      },
+      "source": "Live Jira SG2-52 description verified in Google Chrome on 7 October 2026."
     }
   ]
 }

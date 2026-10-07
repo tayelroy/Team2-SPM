@@ -25,13 +25,16 @@ beforeAll(() => {
 
 function mockLoginResponse(role: Role) {
   const permissions = role === 'Venue Staff' ? ['venues.read', 'venues.create', 'venues.update']
-    : role === 'Event Coordinator' ? ['venues.read'] : [];
+    : role === 'Event Coordinator' ? ['venues.read']
+    : role === 'Technical Support Staff' ? ['equipment.read', 'equipment.create', 'equipment.update'] : [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
       if (url === '/api/venue-holds') return Response.json({ holds: [] });
       if (url === '/api/venue-holds/options') return Response.json({ events: [], venues: [] });
+      if (url === '/api/equipment') return Response.json({ equipment: [{ equipment_id: 1, type: 'Wireless microphone',
+        description: 'Handheld microphone', location: 'Store A', quantity_held: 8, operational_status: 'operational', available_quantity: 8, version: 1 }] });
       // SG2-49: venue request decision notices share the notification drawer.
       if (url === '/api/notifications') return Response.json({ notifications: [] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
@@ -149,7 +152,7 @@ describe('every role can reach every screen in its navigation', () => {
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
       ['Review', 'Event detail'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
-      ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment requests'],
+      ['Venue Availability', 'Venue availability'],
       ['Venue holds', 'Venue holds'],
     ],
     'Venue Staff': [
@@ -159,7 +162,7 @@ describe('every role can reach every screen in its navigation', () => {
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
-      ['Venue Availability', 'Venue availability'],
+      ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
     // SG2-86: deliberately minimal nav — only the screens these roles are
@@ -193,41 +196,14 @@ test.each([
   else expect(button).not.toBeInTheDocument();
 });
 
-// SG2-41: sample-data prototypes sit behind a Preview menu, apart from the live queue.
-test.each([
-  ['Technical Support Staff', 'Equipment requests', 'Equipment requests'],
-] as const)('[NORMAL] [SG2-41:preview-separation] %s reach sample-data screens only through the Preview menu', async (role, label, heading) => {
-  await signInAs(role);
-  expect(within(header()).queryByRole('button', { name: label })).not.toBeInTheDocument();
-  const preview = within(header()).getByRole('button', { name: 'Preview' });
-  expect(preview).toHaveAttribute('aria-expanded', 'false');
-  fireEvent.click(preview);
-  const menu = screen.getByRole('group', { name: 'Preview screens' });
-  expect(menu).toHaveTextContent('Sample data only. Live requests are on your dashboard.');
-  fireEvent.click(within(menu).getByRole('button', { name: label }));
-  expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
-  expect(screen.queryByRole('group', { name: 'Preview screens' })).not.toBeInTheDocument();
-});
-
-// Outside-click and focus dismissal share useDismissOutside, covered by the profile options test.
-test('[NORMAL] [SG2-41:preview-separation] the Preview menu toggles and closes with Escape, returning focus', async () => {
-  await signInAs('Technical Support Staff');
-  const preview = within(header()).getByRole('button', { name: 'Preview' });
-  fireEvent.click(preview);
-  fireEvent.click(preview);
-  expect(preview).toHaveAttribute('aria-expanded', 'false');
-  fireEvent.click(preview);
-  const option = screen.getByRole('button', { name: 'Equipment requests' });
-  fireEvent.keyDown(option, { key: 'Tab' });
-  expect(option).toBeInTheDocument();
-  fireEvent.keyDown(option, { key: 'Escape' });
-  expect(preview).toHaveFocus();
-  expect(preview).toHaveAttribute('aria-expanded', 'false');
-});
-
-test.each(['Event Coordinator', 'Venue Staff'] as const)('[NORMAL] [SG2-41:preview-separation] %s, with no sample-data screens, has no Preview menu', async role => {
+test.each(['Technical Support Staff', 'Event Coordinator', 'Venue Staff'] as const)('[NORMAL] [SG2-52:AC3] %s has no obsolete equipment preview menu', async role => {
   await signInAs(role);
   expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
+});
+
+test.each(['Event Coordinator', 'Venue Staff', 'Event Organiser', 'Attendee', 'Event Coordinator Lead', 'Safety Officer'] as const)('[FAILURE] [SG2-52:AC3] %s is not offered equipment maintenance in the menu', async role => {
+  await signInAs(role);
+  expect(within(header()).queryByRole('button', { name: 'Equipment' })).not.toBeInTheDocument();
 });
 
 test('[FAILURE] [SG2-24:AC2] the role shown in the header is a read-only label, not a selector', async () => {
@@ -725,22 +701,14 @@ test('[NORMAL] [SG2-42:AC1] signed-in Venue Staff navigate to the catalogue and 
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
 });
 
-test('[NORMAL] [SG2-20:prototype-equipment] reserving equipment settles the row', async () => {
+test('[NORMAL] [SG2-52:AC1] staff navigate to persisted equipment records and open an edit', async () => {
   await signInAs('Technical Support Staff');
-  fireEvent.click(within(header()).getByRole('button', { name: 'Preview' }));
-  fireEvent.click(within(header()).getByRole('button', { name: 'Equipment requests' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'Equipment' }));
 
-  const reserveButtons = screen.getAllByRole('button', { name: 'Reserve' });
-  expect(reserveButtons.length).toBeGreaterThan(0);
-  fireEvent.click(reserveButtons[0]);
-
-  expect(screen.getAllByRole('button', { name: 'Reserve' })).toHaveLength(
-    reserveButtons.length - 1,
-  );
-  // Rows that are already settled cannot be reserved again.
-  for (const button of screen.getAllByRole('button', { name: 'Reserved' })) {
-    expect(button).toBeDisabled();
-  }
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Wireless microphone' }));
+  expect(screen.getByLabelText('Equipment type')).toHaveValue('Wireless microphone');
+  expect(screen.getByLabelText('Quantity held')).toHaveValue(8);
+  expect(screen.getByRole('button', { name: 'Save equipment' })).toBeEnabled();
 });
 
 test('[NORMAL] [SG2-44:AC1] the calendar shows the month grid with real venue availability', async () => {

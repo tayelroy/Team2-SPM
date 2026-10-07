@@ -31,7 +31,7 @@ begin
   if (select approved_at from public.venue_capacity_exceptions where request_id = 94701 limit 1) is null then
     raise exception '[SG2-47:approval-time] [SG2-47:AC3] [NORMAL] Approval time must be recorded';
   end if;
-  if (select status from public.venue_booking_requests where request_id = 94701) <> 'pending' then
+  if (select status from public.venue_booking_requests where request_id = 94701) is distinct from 'pending' then
     raise exception '[SG2-47:booking-left-pending] [SG2-47:AC5] [NORMAL] Approving an exception must not decide the booking';
   end if;
 
@@ -56,10 +56,10 @@ begin
     raise exception '[SG2-47:needs-known-approver] [SG2-47:AC3] [FAILURE] An exception without a known approver was accepted';
   exception when foreign_key_violation then null; end;
   begin
-    -- A second approver acting at the same time as the first.
+    -- Sequential duplicate insert: checks the unique constraint, not two concurrent sessions.
     insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
       values (94701, 'c0000000-0000-4000-8000-000000000002', 'venue_staff', 80);
-    raise exception '[SG2-47:concurrent-duplicate-approval] [SG2-47:AC3] [CONFLICT] The same approval was recorded twice';
+    raise exception '[SG2-47:sequential-duplicate-approval] [SG2-47:AC3] [CONFLICT] A sequential duplicate of the same approval was recorded';
   exception when unique_violation then null; end;
 
   delete from public.venue_booking_requests where request_id = 94701;

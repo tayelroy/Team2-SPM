@@ -461,19 +461,37 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
   });
 
   test('[FAILURE] [SG2-33:AC4] still answers 503 without leaking details when the undo also fails', async () => {
-    const response = await request(
-      buildApp({
-        writes: [],
-        auditResult: { ok: false, reason: 'unavailable', message: 'down' },
-        rollbackResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' }
-      })
-    )
-      .patch('/api/event-requests/7/coordinator')
-      .send({ coordinatorId: 'coord-1' });
+    const writes: [number, string | null, string | null][] = [];
+    const audits: InsertAuditLogInput[][] = [];
+    let storedCoordinator: string | null = null;
+    const app = express().use(express.json());
+    app.patch('/api/event-requests/:eventId/coordinator', createAssignCoordinatorHandler({
+      getPrincipal: () => STAFF,
+      getAdminClient: () => ({}) as SupabaseClient,
+      fetchRequest: async () => ({ ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: storedCoordinator } }),
+      lookupRole: async () => ({ ok: true, role: 'event_coordinator' }),
+      assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent) => {
+        writes.push([eventId, coordinatorId, expectedCurrent]);
+        assert.equal(expectedCurrent, storedCoordinator);
+        if (writes.length === 2) return { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' };
+        storedCoordinator = coordinatorId;
+        return { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: storedCoordinator, coordinator_name: 'Coord One' } };
+      },
+      writeHistory: async (_admin, entries) => {
+        audits.push(entries);
+        return { ok: false, reason: 'unavailable', message: 'PRIVATE_AUDIT_DETAIL' };
+      }
+    }));
+    const response = await request(app).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
 
     assert.equal(response.status, 503);
-    assert.doesNotMatch(response.text, /SENTINEL/);
+    assert.doesNotMatch(response.text, /SENTINEL|PRIVATE_AUDIT_DETAIL/);
+    assert.deepEqual(writes, [[7, 'coord-1', null], [7, null, 'coord-1']]);
+    assert.deepEqual(audits, [[{ event_id: 7, actor_id: 'staff-1', field_name: 'coordinator_id', old_value: null, new_value: 'Coord One' }]]);
+    // A failed compensating write cannot restore the already saved assignment.
+    assert.equal(storedCoordinator, 'coord-1');
   });
+
 });
 
 describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', () => {
