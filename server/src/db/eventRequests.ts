@@ -406,15 +406,26 @@ const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
 
 /**
  * Transitions an event request from `draft`, `rejected` or
- * `needs_clarification` to `unassigned` (SG2-30, retargeted by SG2-100).
- * Rejected requests may be revised and resubmitted rather than being a dead
- * end.
+ * `needs_clarification` to `unassigned` or `submitted` (SG2-30, retargeted
+ * by SG2-100). Rejected requests may be revised and resubmitted rather than
+ * being a dead end.
  *
- * SG2-100: submission now lands in `unassigned`, not `submitted`. The
- * organiser's request is visible as *Awaiting Assignment* until the Event
- * Coordinator Lead assigns a coordinator, which is what writes `submitted`.
- * That gives the assignment queue an indexable predicate instead of the old
- * `status = 'submitted' and coordinator_id is null` sniff.
+ * SG2-100: a request with no coordinator lands in `unassigned`, visible as
+ * *Awaiting Assignment* until the Event Coordinator Lead assigns one, which
+ * is what otherwise writes `submitted`. That gives the assignment queue an
+ * indexable predicate instead of the old `status = 'submitted' and
+ * coordinator_id is null` sniff.
+ *
+ * A request that already has a coordinator — returned with a question
+ * (SG2-36) or rejected (SG2-37) and then reworked — goes straight back to
+ * `submitted` instead: the coordinator who asked the question or made the
+ * decision still holds it, and routing it to the Lead's unassigned queue
+ * would ask them to assign a coordinator the request already has, locking
+ * the holder out of their own review (`submitted`/`under_review` are the
+ * only statuses `startEventReview` accepts). Which of the two applies is
+ * read and written together in one guarded update, not decided from a
+ * separate pre-read, so a coordinator assigned between the two cannot be
+ * lost or used to pick the wrong branch.
  *
  * The status filter is repeated here as a second guard alongside the
  * caller's own status check, so a concurrent submission cannot race two
@@ -425,20 +436,36 @@ export async function submitEventRequest(
   admin: SupabaseClient,
   eventId: number
 ): Promise<SubmitEventRequestResult> {
-  const { data, error } = await admin
+  const unheld = await admin
     .from('events')
     .update({ status: 'unassigned' })
     .eq('event_id', eventId)
     .in('status', SUBMITTABLE_STATUSES)
+    .is('coordinator_id', null)
     .select(RETURNED_COLUMNS);
 
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
+  if (unheld.error) {
+    return { ok: false, reason: 'unavailable', message: unheld.error.message };
   }
-  if (!data || data.length === 0) {
+  if (unheld.data && unheld.data.length > 0) {
+    return { ok: true, request: unheld.data[0] as unknown as EventRequestRecord };
+  }
+
+  const held = await admin
+    .from('events')
+    .update({ status: 'submitted' })
+    .eq('event_id', eventId)
+    .in('status', SUBMITTABLE_STATUSES)
+    .not('coordinator_id', 'is', null)
+    .select(RETURNED_COLUMNS);
+
+  if (held.error) {
+    return { ok: false, reason: 'unavailable', message: held.error.message };
+  }
+  if (!held.data || held.data.length === 0) {
     return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
   }
-  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+  return { ok: true, request: held.data[0] as unknown as EventRequestRecord };
 }
 
 /**

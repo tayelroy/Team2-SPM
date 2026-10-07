@@ -214,13 +214,21 @@ export class MemoryDatabase {
     });
   }
 
-  /** Test equivalent of the SQL view; SQL policy tests exercise the real view. */
+  /** Test equivalent of the SQL view; SQL policy tests exercise the real view.
+   * SG2-100 widened both status lists: `unassigned` joins the review bucket
+   * (submission now lands there, not `submitted`), and the awaiting-coordinator
+   * bucket grows to `awaiting_safety_check`, `safety_rejected` and
+   * `preparation` so an event does not vanish from its own coordinator's list
+   * partway through the Week 7 lifecycle. `completed`/`cancelled` stay out of
+   * both, same as the real view. */
   private workItems(): Row[] {
-    const active = this.tables.events.filter(event => ['submitted', 'under_review', 'approved', 'planning', 'confirmed'].includes(String(event.status)));
-    const items = active.filter(event => ['submitted', 'under_review'].includes(String(event.status)) || event.coordinator_id !== null).map(event => ({
+    const REVIEW_STATUSES = ['unassigned', 'submitted', 'under_review'];
+    const ASSIGNED_STATUSES = ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'];
+    const active = this.tables.events.filter(event => [...REVIEW_STATUSES, ...ASSIGNED_STATUSES].includes(String(event.status)));
+    const items = active.filter(event => REVIEW_STATUSES.includes(String(event.status)) || event.coordinator_id !== null).map(event => ({
       kind: 'event', item_id: event.event_id, event_id: event.event_id, title: event.name || 'Untitled event', event_name: event.name || 'Untitled event',
       status: event.status, starts_at: event.proposed_date, ends_at: null, audience: 'event_coordinator', assigned_to: event.coordinator_id,
-      category: ['submitted', 'under_review'].includes(String(event.status)) ? 'review' : 'assigned',
+      category: REVIEW_STATUSES.includes(String(event.status)) ? 'review' : 'assigned',
       details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed'].map(key => [key, event[key]])),
     } as Row));
     for (const [table, kind, resourceTable, resourceKey, audience] of [
@@ -296,9 +304,13 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   constructor(private database: MemoryDatabase, private table: string) {}
   select(columns = '*') { this.columns = columns; return this; }
   eq(key: string, value: unknown) { this.filters.push(row => row[key] === value); return this; }
-  is(key: string, value: null) { this.filters.push(row => row[key] === value); return this; }
+  // A column a fixture row never set is undefined, not null — but Postgres
+  // has no "undefined", so `.is(column, null)` has to match it too. A fresh
+  // draft created through the API carries no coordinator_id key at all.
+  is(key: string, value: null) { this.filters.push(row => (row[key] ?? null) === value); return this; }
   not(key: string, operator: 'is', value: null) { this.filters.push(row => (row[key] ?? null) !== value); return this; }
   range(start: number, end: number) { this.window = [start, end]; return this; }
+  limit(count: number) { this.window = [0, count - 1]; return this; }
   in(key: string, values: unknown[]) { this.filters.push(row => values.includes(row[key])); return this; }
   lt(key: string, value: string | number) { this.filters.push(row => (row[key] as string | number) < value); return this; }
   gt(key: string, value: string | number) { this.filters.push(row => (row[key] as string | number) > value); return this; }

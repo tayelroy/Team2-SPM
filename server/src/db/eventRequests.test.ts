@@ -646,26 +646,110 @@ describe('fetchOwnEventRequests', () => {
   });
 });
 
+type SubmitCall = { row: Record<string, unknown>; eventId: unknown; status: unknown; coordinatorFilter: unknown };
+
+/** submitEventRequest makes up to two update calls — an unheld attempt
+ * (coordinator_id is null) and, only if that matches nothing, a held
+ * attempt (coordinator_id is not null). Results are consumed in that order. */
+function fakeSubmitEventClient(
+  results: Result[],
+  capture?: (calls: SubmitCall[]) => void
+): SupabaseClient {
+  const calls: SubmitCall[] = [];
+  let call = 0;
+  return {
+    from(table: string) {
+      assert.equal(table, 'events');
+      return {
+        update: (row: Record<string, unknown>) => {
+          const filters: { eventId?: unknown; status?: unknown; coordinatorFilter?: unknown } = {};
+          const chain = {
+            eq(column: string, value: unknown) {
+              if (column === 'event_id') filters.eventId = value;
+              return chain;
+            },
+            in(column: string, value: unknown) {
+              if (column === 'status') filters.status = value;
+              return chain;
+            },
+            is(column: string, value: unknown) {
+              if (column === 'coordinator_id') filters.coordinatorFilter = ['is', value];
+              return chain;
+            },
+            not(column: string, operator: string, value: unknown) {
+              if (column === 'coordinator_id') filters.coordinatorFilter = [operator, value];
+              return chain;
+            },
+            select: async () => {
+              calls.push({ row, eventId: filters.eventId, status: filters.status, coordinatorFilter: filters.coordinatorFilter });
+              capture?.(calls);
+              const result = results[call] ?? results[results.length - 1];
+              call++;
+              return result;
+            }
+          };
+          return chain;
+        }
+      };
+    }
+  } as unknown as SupabaseClient;
+}
+
 describe('submitEventRequest', () => {
-  test('[NORMAL] [SG2-30:AC1] [SG2-36:AC2] [SG2-100:AC2] updates status to unassigned, filtered to draft, rejected or returned rows', async () => {
-    let captured: { row: Record<string, unknown>; eventId: unknown; status: unknown } | undefined;
+  test('[NORMAL] [SG2-30:AC1] [SG2-100:AC2] an unheld request (no coordinator) updates to unassigned in a single call', async () => {
+    let calls: SubmitCall[] = [];
     const result = await submitEventRequest(
-      fakeEventsUpdateClient(
-        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'unassigned' }], error: null },
-        (c) => (captured = c)
+      fakeSubmitEventClient(
+        [{ data: [{ event_id: 7, organiser_id: 'user-1', status: 'unassigned' }], error: null }],
+        (c) => (calls = c)
       ),
       7
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.status, 'unassigned');
-    assert.deepEqual(captured?.row, { status: 'unassigned' });
-    assert.equal(captured?.eventId, 7);
-    assert.deepEqual(captured?.status, ['draft', 'rejected', 'needs_clarification']);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].row, { status: 'unassigned' });
+    assert.equal(calls[0].eventId, 7);
+    assert.deepEqual(calls[0].status, ['draft', 'rejected', 'needs_clarification']);
+    assert.deepEqual(calls[0].coordinatorFilter, ['is', null]);
   });
 
-  test('[FAILURE] [SG2-30:AC1] reports unavailable when the update errors', async () => {
+  test('[NORMAL] [SG2-36:AC2] [SG2-100:AC2] a held request (already assigned) updates to submitted instead, never touching unassigned rows', async () => {
+    let calls: SubmitCall[] = [];
     const result = await submitEventRequest(
-      fakeEventsUpdateClient({ data: null, error: { message: 'connection reset' } }),
+      fakeSubmitEventClient(
+        [
+          { data: [], error: null },
+          { data: [{ event_id: 52, organiser_id: 'user-1', status: 'submitted', coordinator_id: 'user-coordinator' }], error: null }
+        ],
+        (c) => (calls = c)
+      ),
+      52
+    );
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.status, 'submitted');
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[1].row, { status: 'submitted' });
+    assert.deepEqual(calls[1].coordinatorFilter, ['is', null]);
+  });
+
+  test('[FAILURE] [SG2-30:AC1] reports unavailable when the unheld update errors, without attempting the held one', async () => {
+    let calls: SubmitCall[] = [];
+    const result = await submitEventRequest(
+      fakeSubmitEventClient([{ data: null, error: { message: 'connection reset' } }], (c) => (calls = c)),
+      7
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.message, 'connection reset');
+    assert.equal(calls.length, 1);
+  });
+
+  test('[FAILURE] [SG2-30:AC1] reports unavailable when the held update errors', async () => {
+    const result = await submitEventRequest(
+      fakeSubmitEventClient([
+        { data: [], error: null },
+        { data: null, error: { message: 'connection reset' } }
+      ]),
       7
     );
     assert.equal(result.ok, false);
@@ -673,8 +757,11 @@ describe('submitEventRequest', () => {
   });
 
   for (const data of [[], null]) {
-    test(`[CONFLICT] [SG2-30:AC3] reports unavailable when the update returns ${JSON.stringify(data)}`, async () => {
-      const result = await submitEventRequest(fakeEventsUpdateClient({ data, error: null }), 7);
+    test(`[CONFLICT] [SG2-30:AC3] reports unavailable when neither update returns a row (${JSON.stringify(data)})`, async () => {
+      const result = await submitEventRequest(
+        fakeSubmitEventClient([{ data, error: null }, { data, error: null }]),
+        7
+      );
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
     });

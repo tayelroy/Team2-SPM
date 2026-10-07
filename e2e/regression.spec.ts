@@ -414,13 +414,15 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [NORMAL] submit a fres
   await fillEvent(page);
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
-  await expect(page.getByText('submitted', { exact: true })).toBeVisible();
+  // SG2-100: a fresh submission with no coordinator lands in `unassigned`,
+  // shown as Awaiting Assignment, not `submitted`.
+  await expect(page.getByText('Awaiting Assignment', { exact: true })).toBeVisible();
   await expect(page.getByText('Team planning', { exact: true })).toBeVisible();
   await expect(page.getByText('Review the release plan', { exact: true })).toBeVisible();
   await expect(page.getByText(/Select an event from your organisation/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
   await test.info().attach('submitted-event-detail', { body: await page.screenshot(), contentType: 'image/png' });
-  await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('submitted');
+  await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('unassigned');
   await page.reload();
   await nav(page, 'My drafts');
   await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
@@ -433,7 +435,7 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [NORMAL] submit a fres
   expect(detail.status()).toBe(200);
   expect((await detail.json()).request).toMatchObject({ name: 'Browser workshop', purpose: 'Team planning',
     description: 'Review the release plan', proposed_date: '2030-06-15T09:00:00.000Z',
-    expected_attendance: 25, venue_requirements: 'Projector', status: 'submitted' });
+    expected_attendance: 25, venue_requirements: 'Projector', status: 'unassigned' });
 });
 
 test('SG2-28-B01 | [SG2-28:AC4] [SG2-29:AC1] [SG2-30:AC2] [BOUNDARY] [CONFLICT] an empty draft saves once but cannot be submitted', async ({ page }) => {
@@ -477,7 +479,7 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
   expect(detail.status()).toBe(200);
-  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'submitted', accessibility_needs: null });
+  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null });
 });
 
 test('SG2-32-P01 | [SG2-32:AC1] [SG2-32:AC2] [NORMAL] [FAILURE] My drafts excludes non-drafts and confirmed deletion survives reload', async ({ page, request }) => {

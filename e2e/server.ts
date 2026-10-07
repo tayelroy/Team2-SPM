@@ -15,6 +15,7 @@ import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
+import { createCompleteEventHandler } from '../server/src/events/complete';
 import { createAssignCoordinatorHandler } from '../server/src/events/assignCoordinator';
 import { createUpdateEventPlanningHandler } from '../server/src/events/updatePlanning';
 import { createListAssignableHandler } from '../server/src/events/listAssignable';
@@ -160,7 +161,9 @@ const app = createApp(
   // SG2-36's clarification exchange, against the in-memory client.
   createListClarificationsHandler(eventDependencies),
   createAddClarificationHandler(eventDependencies),
-  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now)
+  createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
+  // SG2-100 AC4: Mark Completed, against the in-memory client.
+  createCompleteEventHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
