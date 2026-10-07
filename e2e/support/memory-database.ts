@@ -192,6 +192,17 @@ export class MemoryDatabase {
     );
   }
 
+  /** SG2-51: on top of seedVenueRequest, event 91 holds both venues on 20 June
+   * 2030, 10:00-12:00 SGT (Week 7 change #3: one event, several venues). */
+  seedVenueRelease() {
+    this.seedVenueRequest();
+    this.tables.venue_bookings.push(
+      { booking_id: 21, venue_id: 1, event_id: 91, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z', status: 'confirmed' },
+      { booking_id: 22, venue_id: 2, event_id: 91, starts_at: '2030-06-20T02:00:00.000Z', ends_at: '2030-06-20T04:00:00.000Z', status: 'confirmed' }
+    );
+    this.tables.events.find(event => event.event_id === 91)!.venue_booking_id = 21;
+  }
+
   /** SG2-49: on top of seedVenueRequest, four pending requests from event 91's
    * coordinator. 101 is clear to approve and 102 to reject; Quiet Room (103)
    * is too small for 80 guests; 104 overlaps Regression Hall's confirmed
@@ -259,7 +270,8 @@ export class MemoryDatabase {
     from: (table: string) => {
       if (table === 'internal_work_items') this.tables[table] = this.workItems();
       if (table === 'venue_booking_occupancy') this.tables[table] = [
-        ...this.tables.venue_bookings,
+        // SG2-51: released bookings no longer occupy the venue.
+        ...this.tables.venue_bookings.filter(booking => booking.status === 'held' || booking.status === 'confirmed'),
         ...this.tables.venue_holds.filter(hold => hold.status === 'tentative' && Date.parse(String(hold.expires_at)) > this.venueHoldNow())
           .map(hold => ({ venue_id: hold.venue_id, event_id: hold.event_id, starts_at: hold.starts_at, ends_at: hold.ends_at, status: 'tentative' })),
       ];

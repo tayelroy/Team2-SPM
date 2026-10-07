@@ -1,12 +1,13 @@
 import { AccessError } from '../auth/policy';
 import { createUserScopedClient } from './user-client';
 
-/** A notice for one person (SG2-49): a venue request was approved or rejected. */
+/** A notice for one person: a venue request was approved or rejected (SG2-49),
+ * or a venue booking was released (SG2-51). */
 export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: 'venue_request_approved' | 'venue_request_rejected';
+  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released';
   message: string;
   created_at: string;
 }

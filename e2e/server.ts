@@ -30,6 +30,8 @@ import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } f
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
+import { createMemoryReleaseStore } from './support/venue-releases';
+import { createVenueBookingsRouter } from '../server/src/venues/bookings';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -166,7 +168,9 @@ const app = createApp(
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
   createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
   // SG2-87: the Lead's unassigned queue, against the in-memory client.
-  createAssignmentQueueRouter(access, { getAdminClient: getClient })
+  createAssignmentQueueRouter(access, { getAdminClient: getClient }),
+  // SG2-51: bookings and releases, against the in-memory client.
+  createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -197,6 +201,10 @@ app.post('/__e2e/venue-decision', (_req, res) => {
 });
 app.post('/__e2e/venue-request', (_req, res) => {
   database.seedVenueRequest();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-release', (_req, res) => {
+  database.seedVenueRelease();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {

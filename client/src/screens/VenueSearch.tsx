@@ -8,6 +8,7 @@ import { EMPTY_SEARCH, VenueSearchError, formatSgt, searchVenues, sgtToIso, type
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
 import { EventVenueFit } from '../venues/VenueFit';
 import { EventVenueRequests, VenueRequestForm, requestedNotice } from '../venues/VenueRequests';
+import { EventVenueBookings } from '../venues/VenueBookings';
 
 const TEXT_FIELDS = [
   ['location', 'Location', 'e.g. North Wing'],
@@ -194,6 +195,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
       {prefill && searched ? <EventVenueFit accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} /> : null}
       {/* SG2-48 AC3: the event's requests, each shown as pending until decided. */}
       {prefill && searched ? <EventVenueRequests accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion} /> : null}
+      {/* SG2-51: the venues booked for the event, each released on its own. */}
+      {prefill && searched ? <EventVenueBookings accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion} /> : null}
     </section>
   );
 }

@@ -787,8 +787,9 @@ test('[NORMAL] [SG2-20:prototype-amendment] standalone change-request prototype 
 
 test('[NORMAL] [SG2-26:AC1] organiser dashboard opens the selected real event and has no mock notifications', async () => {
   await signInAs('Event Organiser');
-  fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' }));
-  expect(screen.getByText('No notifications available.')).toBeInTheDocument();
+  // SG2-51 AC4: organisers have a real inbox (empty here), never the sample alerts.
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (0)' }));
+  expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
   expect(screen.queryByText('Clarification requested on E-201')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Close notifications' }));
   fireEvent.click(await screen.findByRole('button', { name: /Draft Forum/ }));

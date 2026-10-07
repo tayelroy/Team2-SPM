@@ -245,7 +245,9 @@ export default function AppShell({
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {accessToken && internalRole ? <HoldNotifications key={accessToken} accessToken={accessToken} /> : <button
+            {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released. */}
+            {accessToken && (internalRole || role === 'Event Organiser')
+              ? <HoldNotifications key={accessToken} accessToken={accessToken} holds={internalRole} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
               aria-label={`Notifications (${notifications.length})`}

@@ -421,19 +421,19 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] permissionsFor existing ro
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
       'event_request.update', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
-      'venues.suitability.view', 'venue_booking.capacity_exception.approve', 'profile.read', 'profile.update'
+      'venues.suitability.view', 'venue_booking.capacity_exception.approve', 'notifications.read', 'profile.read', 'profile.update'
     ],
     event_coordinator: [
       'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
       'event_request.decide', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
-      'venue_booking.request.view', 'notifications.read', 'venues.holds.read', 'profile.read', 'profile.update'
+      'venue_booking.request.view', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venues.holds.read', 'profile.read', 'profile.update'
     ],
     venue_staff: [
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.create', 'venues.update', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
-      'venue_booking.request.view', 'venue_booking.decide', 'notifications.read', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
+      'venue_booking.request.view', 'venue_booking.decide', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venue_bookings.by_venue', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
       'work_queue.read', 'venues.availability.view', 'users.role.update',

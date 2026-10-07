@@ -30,6 +30,7 @@ import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
+import { createVenueBookingsRouter } from './venues/bookings';
 import { createEquipmentRouter } from './equipment';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 
@@ -71,7 +72,8 @@ export function createApp(
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
   venueHoldsRouter = createVenueHoldsRouter(access),
   equipmentRouter = createEquipmentRouter(access),
-  assignmentQueueRouter = createAssignmentQueueRouter(access)
+  assignmentQueueRouter = createAssignmentQueueRouter(access),
+  venueBookingsRouter = createVenueBookingsRouter(access)
 ) {
   const app = express();
 
@@ -103,6 +105,8 @@ export function createApp(
   // SG2-49: each person's own notices, e.g. a venue request decision.
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
+  // SG2-51: an event's or venue's bookings, and releasing one.
+  app.use('/api/venue-bookings', venueBookingsRouter);
   app.use('/api/equipment', equipmentRouter);
   // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
   app.use('/api/assignment-queue', assignmentQueueRouter);

@@ -10,10 +10,13 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: 'Tentative hold placed', warning: 'Hold expiring soon', expired: 'Hold expired',
   // SG2-49: Venue Staff decisions on the coordinator's venue requests.
   venue_request_approved: 'Venue request approved', venue_request_rejected: 'Venue request rejected',
+  // SG2-51: a venue booked for the event was released.
+  venue_booking_released: 'Venue booking released',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate,
   venue_request_approved: color.accent, venue_request_rejected: color.silver,
+  venue_booking_released: color.silver,
 };
 
 /** One line in the drawer, whichever inbox it came from. */
@@ -63,7 +66,7 @@ function HoldNotificationDrawer({ notifications, loading, error, onClose, onRetr
 }
 
 /** Keep the badge and drawer synchronized for the authenticated session. */
-function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
+function HoldNotificationsSession({ accessToken, holds: withHolds }: { accessToken: string; holds: boolean }) {
   const [open, setOpen] = useState(false);
   // Each inbox keeps its last good list when a refresh of it fails.
   const [holds, setHolds] = useState<HoldNotification[] | null>(null);
@@ -79,7 +82,9 @@ function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
       inFlight = true;
       setLoading(true);
       setError('');
-      void Promise.all([loadHoldNotifications(accessToken), loadNotifications(accessToken)]).then(([held, decided]) => {
+      // Event Organisers have no hold notices (SG2-84 is internal only).
+      const holdInbox = withHolds ? loadHoldNotifications(accessToken) : Promise.resolve({ ok: true as const, notifications: [] });
+      void Promise.all([holdInbox, loadNotifications(accessToken)]).then(([held, decided]) => {
         if (!current) return;
         inFlight = false;
         setLoading(false);
@@ -97,7 +102,7 @@ function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
       window.clearInterval(timer);
       window.removeEventListener('focus', load);
     };
-  }, [accessToken]);
+  }, [accessToken, withHolds]);
   // The count is shown once both inboxes have loaded at least once.
   const notifications = holds === null || notices === null ? null : inbox(holds, notices);
   const listed = holds === null && notices === null ? null : inbox(holds, notices);
@@ -116,6 +121,6 @@ function HoldNotificationsSession({ accessToken }: { accessToken: string }) {
 }
 
 /** A token change discards recipient data synchronously, including pending responses. */
-export default function HoldNotifications({ accessToken }: { accessToken: string }) {
-  return <HoldNotificationsSession key={accessToken} accessToken={accessToken} />;
+export default function HoldNotifications({ accessToken, holds = true }: { accessToken: string; holds?: boolean }) {
+  return <HoldNotificationsSession key={accessToken} accessToken={accessToken} holds={holds} />;
 }
