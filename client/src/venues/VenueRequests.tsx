@@ -5,7 +5,7 @@ import { color, gradient, label, radius } from '../theme';
 import { inputStyle } from './VenueForm';
 import { LAYOUT_LABELS, describeLayouts, type Layout, type VenueLayout } from './layoutsApi';
 import { formatSgt, sgtToIso } from './searchApi';
-import { fetchVenueRequests, requestVenue, type VenueRequest } from './requestsApi';
+import { describeConflict, fetchVenueRequests, requestVenue, type VenueConflict, type VenueRequest } from './requestsApi';
 import type { BookingReadiness } from './suitabilityApi';
 
 const STATUS: Record<string, { text: string; bg: string; fg: string }> = {
@@ -15,12 +15,15 @@ const STATUS: Record<string, { text: string; bg: string; fg: string }> = {
   cancelled: { text: 'Cancelled', bg: 'rgba(112, 119, 119, 0.25)', fg: color.silver }
 };
 
-/** What the coordinator is told once a request has been made (AC3). */
-export function requestedNotice(venueName: string, booking: BookingReadiness): string {
-  const notice = `${venueName} requested. It is pending until Venue Staff decide, and the venue is not held until then.`;
-  return booking === 'needs_capacity_exception'
-    ? `${notice} A capacity exception must also be approved before it can be booked.`
-    : notice;
+/** What the coordinator is told once a request has been made (AC3), and
+ * anything it overlaps at the venue (SG2-50 AC1). */
+export function requestedNotice(venueName: string, booking: BookingReadiness, conflicts: VenueConflict[] = []): string {
+  let notice = `${venueName} requested. It is pending until Venue Staff decide, and the venue is not held until then.`;
+  if (booking === 'needs_capacity_exception') notice += ' A capacity exception must also be approved before it can be booked.';
+  if (conflicts.length > 0) {
+    notice += ` It overlaps ${conflicts.map(describeConflict).join('; ')}, so it cannot be approved while that conflict stands.`;
+  }
+  return notice;
 }
 
 interface RequestFormProps {
@@ -31,7 +34,7 @@ interface RequestFormProps {
   period: { from: string; until: string };
   layout: Layout | '';
   venueRequirements: string | null;
-  onRequested: (request: VenueRequest, booking: BookingReadiness) => void;
+  onRequested: (request: VenueRequest, booking: BookingReadiness, conflicts: VenueConflict[]) => void;
   onCancel: () => void;
 }
 
@@ -70,7 +73,7 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
       starts_at: sgtToIso(values.from), ends_at: sgtToIso(values.until)
     });
     setSubmitting(false);
-    if (result.ok) onRequested(result.request, result.booking);
+    if (result.ok) onRequested(result.request, result.booking, result.conflicts);
     else setError(result.error);
   }
 

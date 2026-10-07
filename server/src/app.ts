@@ -30,6 +30,7 @@ import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
+import { createVenueConflictsRouter } from './venues/conflicts';
 import { createEquipmentRouter } from './equipment';
 
 export function createApp(
@@ -56,6 +57,7 @@ export function createApp(
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
     venueRequests: createVenueBookingRequestsRouter(access),
+    conflicts: createVenueConflictsRouter(access),
     notifications: createNotificationsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
@@ -98,6 +100,8 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  // SG2-50: what a pending venue request overlaps.
+  app.use('/api/venue-booking-requests', routers.conflicts);
   // SG2-49: each person's own notices, e.g. a venue request decision.
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);

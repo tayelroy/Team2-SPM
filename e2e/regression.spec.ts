@@ -1443,6 +1443,44 @@ test('SG2-48-N01 | [SG2-48:AC1] [SG2-48:AC4] [CONFLICT] [FAILURE] a duplicate re
   expect((await page.request.post('/api/venue-booking-requests', { data: values })).status()).toBe(401);
 });
 
+test('SG2-50-P01 | [SG2-50:AC1] [SG2-50:AC2] [CONFLICT] a request overlapping a confirmed booking is reported to the coordinator and to Venue Staff, and cannot be approved while it stands', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  // Regression Hall already has confirmed booking #1 on 15 Jun 2030, 10:00-12:00.
+  await requestVenue(page, 'Regression Hall', '2030-06-15T11:00', '2030-06-15T13:00');
+  // AC1: the request is made, and the coordinator is told what it overlaps.
+  // Booking #1 is another coordinator's event, so only its number and period show.
+  // Times follow the browser's en-SG clock style ("10:00" or "10:00 am").
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText(new RegExp('^Regression Hall requested\\. It is pending until Venue Staff decide, and the venue is not held until then\\.'
+    + ' It overlaps Confirmed booking #1 for another event, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?, so it cannot be approved while that conflict stands\\.$'));
+  // A period ending as the booking starts overlaps nothing.
+  await requestVenue(page, 'Regression Hall', '2030-06-15T08:00', '2030-06-15T10:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.');
+
+  // AC1/AC2: Venue Staff see the clash, by event, before deciding.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  const conflicts = detail.getByRole('region', { name: 'Booking conflicts' });
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /11:00/ }).click();
+  await expect(conflicts.getByRole('listitem')).toHaveText([/^Confirmed booking #1 for Planning workshop, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?$/]);
+  await expect(conflicts.getByText('This request cannot be approved while this conflict stands.', { exact: true })).toBeVisible();
+  // AC2: approving it is refused while booking #1 stands, and it stays pending.
+  const decision = detail.getByRole('region', { name: 'Decide this booking request' });
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(detail.getByText('pending', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /08:00/ }).click();
+  await expect(conflicts.getByText('Nothing else is booked at this venue over the requested period.', { exact: true })).toBeVisible();
+  // The adjacent request overlaps nothing, so it can be approved.
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('status')).toHaveText('Approved. The venue is committed to this event and the coordinator has been notified.');
+});
+
 test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, sees its own role and is denied ungranted operations', async ({ page }) => {
   await signIn(page, 'safety');
   await expect(page.getByLabel('Your role', { exact: true })).toHaveText('Safety Officer');

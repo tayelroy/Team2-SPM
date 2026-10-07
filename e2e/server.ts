@@ -28,6 +28,7 @@ import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createProfileRouter } from '../server/src/profile';
@@ -142,6 +143,8 @@ const app = createApp(
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
     venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-50: what a pending request overlaps, against the in-memory client.
+    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
     notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
