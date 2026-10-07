@@ -18,7 +18,7 @@ insert into public.account_roles (user_id, role) values
 do $$
 declare values_found text[];
 begin
-  select array_agg(value order by enumsortorder) into values_found
+  select array_agg(enumlabel order by enumsortorder) into values_found
     from pg_enum where enumtypid = 'public.event_status'::regtype;
 
   if values_found <> array[
