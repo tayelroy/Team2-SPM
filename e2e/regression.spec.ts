@@ -416,7 +416,7 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [NORMAL] submit a fres
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
   // SG2-100: a fresh submission with no coordinator lands in `unassigned`,
   // shown as Awaiting Assignment, not `submitted`.
-  await expect(page.getByText('Awaiting Assignment', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
   await expect(page.getByText('Team planning', { exact: true })).toBeVisible();
   await expect(page.getByText('Review the release plan', { exact: true })).toBeVisible();
   await expect(page.getByText(/Select an event from your organisation/)).toHaveCount(0);
@@ -1628,4 +1628,104 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
     });
   }
   expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
+});
+
+test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC13] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
+  await signIn(page, 'organiser');
+  // AC2: submission with no coordinator lands in unassigned, not submitted.
+  expect((await request.patch('/api/event-requests/1/submit', { headers: await authHeaders(page) })).status()).toBe(200);
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
+  await expect(page.getByTestId('waiting-on-persona')).toContainText('Event Coordinator Lead');
+  await expect(page.getByTestId('waiting-on-action')).toContainText('Assign an event coordinator');
+  await signOut(page);
+
+  // AC3: assigning a coordinator on an unassigned event moves it to submitted.
+  await signIn(page, 'lead');
+  await nav(page, 'Assign coordinators');
+  await page.getByLabel('Coordinator for Planning workshop', { exact: true }).selectOption({ label: 'Regression coordinator' });
+  await page.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(page.getByText('Assigned to Regression coordinator.', { exact: true })).toBeVisible();
+  await signOut(page);
+
+  await signIn(page, 'organiser');
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByTestId('stage-badge')).toContainText('Under Review');
+  await expect(page.getByTestId('waiting-on-persona')).toContainText('Regression coordinator');
+  await signOut(page);
+
+  // The coordinator opening it moves it on to under_review (SG2-35), then approves it.
+  await signIn(page, 'coordinator');
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Planning workshop/ }).click();
+  await expect(page.getByRole('heading', { name: 'Planning workshop' })).toBeVisible();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(page.getByText('approved')).toBeVisible();
+  await signOut(page);
+
+  // AC5: the stepper and waiting-on card reflect the approved stage.
+  await signIn(page, 'organiser');
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByTestId('stage-badge')).toContainText('Arrangements');
+  await expect(page.getByTestId('waiting-on-action')).toContainText('Complete venue suitability check and equipment reservation');
+
+  const detail = await request.get('/api/event-requests/1', { headers: await authHeaders(page) });
+  expect(detail.status()).toBe(200);
+  expect((await detail.json()).request.status).toBe('approved');
+});
+
+// SG2-100 AC4 is exercised directly against the real HTTP routes rather than
+// through the browser: EventDetail.tsx (the only screen with a Mark as
+// Completed button) reads its data from GET /api/event-requests/:eventId,
+// which `event_request.view` restricts to Event Organisers (server/src/auth/policy.ts),
+// and no nav entry in this build sets `selectedEventId` for a Coordinator —
+// "All events" fetches through the same organiser-only path and refuses them
+// (confirmed while writing this test). Mark Completed is consequently
+// unreachable by a Coordinator through the UI today; this gap is noted for
+// the team rather than patched here, since the fix is a policy or navigation
+// decision outside this story's scope. The server behaviour this AC actually
+// specifies is still fully exercised below.
+test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ request }) => {
+  expect((await request.post('/__e2e/lifecycle')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const coordinator = await tokenFor('coordinator');
+
+  // BOUNDARY: an event whose booking has not ended yet withholds the action.
+  const tooSoon = await request.patch('/api/event-requests/121/complete', { headers: coordinator });
+  expect(tooSoon.status()).toBe(409);
+  expect((await tooSoon.json()).error).toBe('This event has not finished yet.');
+
+  // NORMAL: a held event completes, with the completing coordinator and when recorded.
+  const completed = await request.patch('/api/event-requests/120/complete', { headers: coordinator });
+  expect(completed.status()).toBe(200);
+  expect((await completed.json()).request).toMatchObject({ status: 'completed', completed_by: 'user-coordinator' });
+  expect((await completed.json()).request.completed_at).not.toBeNull();
+
+  // AC7: a completed event is absent from the work queue.
+  const queue = await request.get('/api/work-queue', { headers: coordinator });
+  expect(queue.status()).toBe(200);
+  expect((await queue.json()).items.some((item: Record<string, unknown>) => item.event_id === 120)).toBe(false);
+
+  // AC7: a completed event refuses further planning updates.
+  expect((await request.patch('/api/event-requests/120/planning', { headers: coordinator, data: { planning_notes: 'Too late' } })).status()).toBe(409);
+
+  // AC8: exactly one audit row records the transition.
+  const history = await request.get('/api/event-requests/120/history', { headers: coordinator });
+  expect(history.status()).toBe(200);
+  const statusEntries = (await history.json()).history
+    .filter((entry: Record<string, unknown>) => entry.field_name === 'status');
+  expect(statusEntries).toEqual([
+    expect.objectContaining({ old_value: 'confirmed', new_value: 'completed' })
+  ]);
+
+  // A second attempt on an already-completed event reports not found, not a repeat success.
+  expect((await request.patch('/api/event-requests/120/complete', { headers: coordinator })).status()).toBe(404);
 });

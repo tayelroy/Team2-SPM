@@ -214,6 +214,23 @@ export class MemoryDatabase {
     });
   }
 
+  /** SG2-100 AC4/AC6/AC7: the two ends of the Week 7 lifecycle Mark Completed
+   * acts on. 120 is confirmed, assigned to the signed-in coordinator, with
+   * its only confirmed booking already in the past — ready to be marked
+   * completed. 121 is the same shape but its booking is still ahead of the
+   * fixture clock, which is what proves the action is withheld rather than
+   * refused after the fact. */
+  seedLifecycle() {
+    this.tables.events.push(
+      { ...this.tables.events[0], event_id: 120, name: 'Held Forum', status: 'confirmed', coordinator_id: 'user-coordinator' },
+      { ...this.tables.events[0], event_id: 121, name: 'Future Forum', status: 'confirmed', coordinator_id: 'user-coordinator' },
+    );
+    this.tables.venue_bookings.push(
+      { booking_id: 120, venue_id: 1, event_id: 120, starts_at: '2026-09-20T02:00:00.000Z', ends_at: '2026-09-20T10:00:00.000Z', status: 'confirmed' },
+      { booking_id: 121, venue_id: 1, event_id: 121, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', status: 'confirmed' },
+    );
+  }
+
   /** Test equivalent of the SQL view; SQL policy tests exercise the real view.
    * SG2-100 widened both status lists: `unassigned` joins the review bucket
    * (submission now lands there, not `submitted`), and the awaiting-coordinator
