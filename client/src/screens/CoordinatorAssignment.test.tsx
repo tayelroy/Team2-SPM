@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import CoordinatorAssignment from './CoordinatorAssignment';
 
@@ -136,13 +136,21 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     expect(await screen.findByRole('heading', { name: 'Nothing to assign' })).toBeInTheDocument();
   });
 
-  test('[CONFLICT] [SG2-33:AC1] ignores a response that arrives after the screen is closed', async () => {
+  test('[CONFLICT] [SG2-33:AC1] a previous session response cannot replace the current assignment list', async () => {
     let resolve!: (response: Response) => void;
-    api(() => new Promise<Response>((r) => (resolve = r)));
-    const { unmount } = render(<CoordinatorAssignment accessToken="tok" />);
-    unmount();
-    resolve(Response.json({ requests: REQUESTS, coordinators: COORDINATORS }));
-    await waitFor(() => expect(screen.queryByRole('heading')).not.toBeInTheDocument());
+    const current = { ...REQUESTS[0], event_id: 19, name: 'Current account forum' };
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(yes => { resolve = yes; }))
+      .mockResolvedValue(Response.json({ requests: [current], coordinators: COORDINATORS }));
+    vi.stubGlobal('fetch', fetchMock);
+    const view = render(<CoordinatorAssignment accessToken="old-token" />);
+    view.rerender(<CoordinatorAssignment accessToken="new-token" />);
+    expect(await screen.findByRole('heading', { name: 'Current account forum' })).toBeVisible();
+    await act(async () => resolve(Response.json({ requests: REQUESTS, coordinators: COORDINATORS })));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/event-requests/assignable', expect.objectContaining({ headers: { Authorization: 'Bearer new-token' } }));
+    expect(screen.getByRole('heading', { name: 'Current account forum' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Partner Forum' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('[NORMAL] [SG2-34:AC4] [SG2-97:AC2] the Event Coordinator Lead can open the history and still see assignments Technical Support made', async () => {

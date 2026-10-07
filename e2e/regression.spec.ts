@@ -116,7 +116,7 @@ test('PW-AUTH-01 | [SG2-23:AC1] [SG2-24:AC1] [NORMAL] each seeded role reaches i
     { account: 'organiser', role: 'Event Organiser', action: 'New request' },
     { account: 'coordinator', role: 'Event Coordinator', action: 'Venues' },
     { account: 'venue', role: 'Venue Staff', action: 'Catalogue' },
-    { account: 'support', role: 'Technical Support Staff', action: 'Preview' },
+    { account: 'support', role: 'Technical Support Staff', action: 'Equipment' },
     { account: 'attendee', role: 'Attendee', action: 'Event page' },
   ];
   const errors: string[] = [];

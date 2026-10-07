@@ -32,32 +32,32 @@ declare result jsonb; id bigint; expiry timestamptz := clock_timestamp() + inter
 begin
  -- 
  result := public.create_venue_hold(98401,98401,now()+interval '10 days',now()+interval '10 days 2 hours',expiry);
- if result->>'outcome' <> 'created' or result#>>'{hold,status}' <> 'tentative'
-   or (result#>>'{hold,expires_at}')::timestamptz <> expiry then raise exception '[SG2-84:placement-failed] [NORMAL] [SG2-84:AC1] [SG2-84:AC4] placement failed: %',result; end if;
+ if result->>'outcome' is distinct from 'created' or result#>>'{hold,status}' is distinct from 'tentative'
+   or (result#>>'{hold,expires_at}')::timestamptz is distinct from expiry then raise exception '[SG2-84:placement-failed] [NORMAL] [SG2-84:AC1] [SG2-84:AC4] placement failed: %',result; end if;
  id := (result#>>'{hold,hold_id}')::bigint; perform set_config('holds.primary',id::text,true);
  if not exists(select 1 from public.venue_booking_occupancy where venue_id = 98401 and status = 'tentative') then raise exception '[SG2-84:occupancy-missing] [NORMAL] [SG2-84:AC3] occupancy missing'; end if;
  if exists(select 1 from public.venue_bookings where venue_id = 98401) then raise exception '[SG2-84:tentative-placement-confirmed-a-booking] [FAILURE] [SG2-84:AC4] Tentative placement confirmed a booking'; end if;
  -- 
- if public.create_venue_hold(98401,98401,now()+interval '10 days 1 hour',now()+interval '10 days 3 hours',expiry)->>'outcome' <> 'conflict' then raise exception '[SG2-84:overlapping-hold-accepted] [CONFLICT] [SG2-84:AC3] overlapping hold accepted'; end if;
+ if public.create_venue_hold(98401,98401,now()+interval '10 days 1 hour',now()+interval '10 days 3 hours',expiry)->>'outcome' is distinct from 'conflict' then raise exception '[SG2-84:overlapping-hold-accepted] [CONFLICT] [SG2-84:AC3] overlapping hold accepted'; end if;
  -- touching periods do not overlap.
  result := public.create_venue_hold(98401,98401,now()+interval '10 days 2 hours',now()+interval '10 days 3 hours',expiry);
- if result->>'outcome' <> 'created' then raise exception '[SG2-84:adjacent-hold-refused] [BOUNDARY] [SG2-84:AC3] adjacent hold refused'; end if;
- if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'release')->>'outcome' <> 'updated' then raise exception '[SG2-84:release-failed] [NORMAL] [SG2-84:AC5] release failed'; end if;
- if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert')->>'outcome' <> 'inactive' then raise exception '[SG2-84:released-hold-approved] [CONFLICT] [SG2-84:AC5] released hold approved'; end if;
+ if result->>'outcome' is distinct from 'created' then raise exception '[SG2-84:adjacent-hold-refused] [BOUNDARY] [SG2-84:AC3] adjacent hold refused'; end if;
+ if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'release')->>'outcome' is distinct from 'updated' then raise exception '[SG2-84:release-failed] [NORMAL] [SG2-84:AC5] release failed'; end if;
+ if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert')->>'outcome' is distinct from 'inactive' then raise exception '[SG2-84:released-hold-approved] [CONFLICT] [SG2-84:AC5] released hold approved'; end if;
  -- exact deadline and mandatory expiry.
- if public.create_venue_hold(98401,98401,now()+interval '11 days',now()+interval '12 days',null)->>'outcome' <> 'invalid'
-   or public.create_venue_hold(98401,98401,now()+interval '11 days',now()+interval '12 days',clock_timestamp())->>'outcome' <> 'invalid'
+ if public.create_venue_hold(98401,98401,now()+interval '11 days',now()+interval '12 days',null)->>'outcome' is distinct from 'invalid'
+   or public.create_venue_hold(98401,98401,now()+interval '11 days',now()+interval '12 days',clock_timestamp())->>'outcome' is distinct from 'invalid'
    then raise exception '[SG2-84:invalid-expiry-accepted] [BOUNDARY] [SG2-84:AC2] invalid expiry accepted'; end if;
  -- public SQL seam validates finite instants and eligible events.
- if public.create_venue_hold(98402,98401,now()+interval '11 days',now()+interval '12 days',expiry)->>'outcome' <> 'invalid'
-   or public.create_venue_hold(98401,98401,'-infinity',now()+interval '12 days',expiry)->>'outcome' <> 'invalid'
-   or public.create_venue_hold(98401,98401,now()+interval '11 days','infinity',expiry)->>'outcome' <> 'invalid'
-   or public.create_venue_hold(98401,98401,now()+interval '11 days',now()+interval '12 days','infinity')->>'outcome' <> 'invalid'
+ if public.create_venue_hold(98402,98401,now()+interval '11 days',now()+interval '12 days',expiry)->>'outcome' is distinct from 'invalid'
+   or public.create_venue_hold(98401,98401,'-infinity',now()+interval '12 days',expiry)->>'outcome' is distinct from 'invalid'
+   or public.create_venue_hold(98401,98401,now()+interval '11 days','infinity',expiry)->>'outcome' is distinct from 'invalid'
+   or public.create_venue_hold(98401,98401,now()+interval '11 days',now()+interval '12 days','infinity')->>'outcome' is distinct from 'invalid'
    then raise exception '[SG2-84:invalid-event-or-finite-instant-guard-failed] [FAILURE] [SG2-84:AC1] invalid event or finite instant guard failed'; end if;
- if public.create_venue_hold(-1,98401,now()+interval '11 days',now()+interval '12 days',expiry)->>'outcome' <> 'missing'
-   or public.create_venue_hold(98401,-1,now()+interval '11 days',now()+interval '12 days',expiry)->>'outcome' <> 'missing'
-   or public.change_venue_hold(-1,'convert')->>'outcome' <> 'missing'
-   or public.change_venue_hold(id,'unknown')->>'outcome' <> 'invalid'
+ if public.create_venue_hold(-1,98401,now()+interval '11 days',now()+interval '12 days',expiry)->>'outcome' is distinct from 'missing'
+   or public.create_venue_hold(98401,-1,now()+interval '11 days',now()+interval '12 days',expiry)->>'outcome' is distinct from 'missing'
+   or public.change_venue_hold(-1,'convert')->>'outcome' is distinct from 'missing'
+   or public.change_venue_hold(id,'unknown')->>'outcome' is distinct from 'invalid'
    then raise exception '[SG2-84:missing-or-invalid-selection-guard-failed] [FAILURE] [SG2-84:AC1] missing or invalid selection guard failed'; end if;
  begin
    update public.venue_holds set status = 'converted' where hold_id = id;
@@ -110,12 +110,12 @@ select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001'
 do $$
 declare result jsonb;
 begin
- if public.change_venue_hold(current_setting('holds.primary')::bigint,'convert')->>'outcome' <> 'inactive' then raise exception '[SG2-85:deadline-hold-was-approved] [CONFLICT] [SG2-85:AC3] deadline hold was approved'; end if;
+ if public.change_venue_hold(current_setting('holds.primary')::bigint,'convert')->>'outcome' is distinct from 'inactive' then raise exception '[SG2-85:deadline-hold-was-approved] [CONFLICT] [SG2-85:AC3] deadline hold was approved'; end if;
  result := public.create_venue_hold(98401,98401,now()+interval '10 days',now()+interval '10 days 2 hours',clock_timestamp()+interval '2 days');
- if result->>'outcome' <> 'created' then raise exception '[SG2-85:expired-period-cannot-accept-new-request] [NORMAL] [SG2-85:AC2] expired period cannot accept new request'; end if;
+ if result->>'outcome' is distinct from 'created' then raise exception '[SG2-85:expired-period-cannot-accept-new-request] [NORMAL] [SG2-85:AC2] expired period cannot accept new request'; end if;
  perform set_config('holds.convert',(result#>>'{hold,hold_id}'),true);
  result := public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert');
- if result->>'outcome' <> 'updated' or result#>>'{hold,status}' <> 'converted' then raise exception '[SG2-84:normal-approval-conversion-failed] [NORMAL] [SG2-84:AC5] normal approval conversion failed: %',result; end if;
+ if result->>'outcome' is distinct from 'updated' or result#>>'{hold,status}' is distinct from 'converted' then raise exception '[SG2-84:normal-approval-conversion-failed] [NORMAL] [SG2-84:AC5] normal approval conversion failed: %',result; end if;
 end;
 $$;
 reset role;
@@ -141,9 +141,9 @@ declare result jsonb;
 begin
  result := public.create_venue_hold(98403,98402,now()+interval '10 days',now()+interval '11 days',clock_timestamp()+interval '2 days');
  perform set_config('holds.capacity',result#>>'{hold,hold_id}',true);
- if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert')->>'outcome' <> 'capacity' then raise exception '[SG2-84:oversized-booking-approved-without-exception] [CONFLICT] [SG2-84:AC5] oversized booking approved without exception'; end if;
+ if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert')->>'outcome' is distinct from 'capacity' then raise exception '[SG2-84:oversized-booking-approved-without-exception] [CONFLICT] [SG2-84:AC5] oversized booking approved without exception'; end if;
  result := public.create_venue_hold(98401,98403,now()+interval '10 days',now()+interval '11 days',clock_timestamp()+interval '2 days');
- if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert')->>'outcome' <> 'suitability' then raise exception '[SG2-84:missing-facility-approved] [CONFLICT] [SG2-84:AC5] missing facility approved'; end if;
+ if public.change_venue_hold((result#>>'{hold,hold_id}')::bigint,'convert')->>'outcome' is distinct from 'suitability' then raise exception '[SG2-84:missing-facility-approved] [CONFLICT] [SG2-84:AC5] missing facility approved'; end if;
  perform set_config('holds.stale',result#>>'{hold,hold_id}',true);
 end;
 $$;
@@ -154,8 +154,8 @@ update public.venue_holds set starts_at = now()-interval '2 hours',ends_at = now
 set local role authenticated;
 do $$
 begin
- if public.change_venue_hold(current_setting('holds.capacity')::bigint,'convert')->>'outcome' <> 'updated' then raise exception '[SG2-84:approved-capacity-exception-did-not-authorize-booking] [NORMAL] [SG2-84:AC5] approved capacity exception did not authorize booking'; end if;
- if public.change_venue_hold(current_setting('holds.stale')::bigint,'convert')->>'outcome' <> 'invalid' then raise exception '[SG2-84:finished-booking-period-was-converted] [BOUNDARY] [SG2-84:AC5] finished booking period was converted'; end if;
+ if public.change_venue_hold(current_setting('holds.capacity')::bigint,'convert')->>'outcome' is distinct from 'updated' then raise exception '[SG2-84:approved-capacity-exception-did-not-authorize-booking] [NORMAL] [SG2-84:AC5] approved capacity exception did not authorize booking'; end if;
+ if public.change_venue_hold(current_setting('holds.stale')::bigint,'convert')->>'outcome' is distinct from 'invalid' then raise exception '[SG2-84:finished-booking-period-was-converted] [BOUNDARY] [SG2-84:AC5] finished booking period was converted'; end if;
 end;
 $$;
 
@@ -274,9 +274,11 @@ begin
  end loop;
 end;
 $$;
--- notification failure rolls back hold, request and history.
+-- Notification failure rolls back hold, request and history. The tagged
+-- trigger failure below is an injection fixture, not an independent assertion;
+-- the expected-error and unchanged-state checks establish the test result.
 create function pg_temp.reject_hold_notice() returns trigger language plpgsql as $$
-begin raise exception using errcode = 'P0001',message = '[SG2-84:notification-failure-injection] [FAILURE] [SG2-84:AC6] injected_notification_failure'; end;
+begin raise exception using errcode = 'P0001',message = '[SG2-84:notification-failure-injection] [FAILURE] [SG2-84:AC6] Supporting failure-injection fixture: injected_notification_failure'; end;
 $$;
 create trigger reject_hold_notice before insert on public.venue_hold_notifications for each row execute function pg_temp.reject_hold_notice();
 select set_config('holds.before_requests',(select count(*)::text from public.venue_booking_requests),true);
@@ -313,12 +315,12 @@ select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001'
 do $$
 declare result jsonb;
 begin
- if public.create_venue_hold(98401,98401,now()+interval '30 days 1 hour',now()+interval '30 days 2 hours',clock_timestamp()+interval '2 days')->>'outcome' <> 'conflict'
+ if public.create_venue_hold(98401,98401,now()+interval '30 days 1 hour',now()+interval '30 days 2 hours',clock_timestamp()+interval '2 days')->>'outcome' is distinct from 'conflict'
   then raise exception '[SG2-84:placement-confirmed-booking-conflict] [CONFLICT] [SG2-84:AC3] Placement overlapped an existing confirmed booking'; end if;
- if public.create_venue_hold(98401,98401,now()+interval '32 days 1 hour',now()+interval '32 days 2 hours',clock_timestamp()+interval '2 days')->>'outcome' <> 'conflict'
+ if public.create_venue_hold(98401,98401,now()+interval '32 days 1 hour',now()+interval '32 days 2 hours',clock_timestamp()+interval '2 days')->>'outcome' is distinct from 'conflict'
   then raise exception '[SG2-84:placement-unavailability-conflict] [CONFLICT] [SG2-84:AC3] Placement overlapped existing venue unavailability'; end if;
  result := public.create_venue_hold(98401,98401,now()+interval '34 days',now()+interval '35 days',clock_timestamp()+interval '2 days');
- if result->>'outcome' <> 'created' then raise exception '[SG2-84:late-block-hold-fixture] [NORMAL] [SG2-84:AC1] Hold required for the late block test was not created'; end if;
+ if result->>'outcome' is distinct from 'created' then raise exception '[SG2-84:late-block-hold-fixture] [NORMAL] [SG2-84:AC1] Hold required for the late block test was not created'; end if;
  perform set_config('holds.late_block',result#>>'{hold,hold_id}',true);
 end;
 $$;
@@ -328,7 +330,7 @@ insert into public.venue_unavailability(venue_id,starts_at,ends_at,reason)
 set local role authenticated;
 do $$
 begin
- if public.change_venue_hold(current_setting('holds.late_block')::bigint,'convert')->>'outcome' <> 'conflict'
+ if public.change_venue_hold(current_setting('holds.late_block')::bigint,'convert')->>'outcome' is distinct from 'conflict'
   then raise exception '[SG2-84:conversion-new-unavailability-conflict] [CONFLICT] [SG2-84:AC5] Conversion approved a period made unavailable after placement'; end if;
 end;
 $$;
@@ -343,12 +345,14 @@ end;
 $$;
 
 -- A failed expiry notice must not partially expire the hold or its request.
+-- The tagged trigger failure is supporting injection setup; the subsequent
+-- expected-error, rollback and retry checks are the assertions.
 set local role authenticated;
 do $$
 declare result jsonb;
 begin
  result := public.create_venue_hold(98401,98401,now()+interval '50 days',now()+interval '51 days',clock_timestamp()+interval '2 days');
- if result->>'outcome' <> 'created' then raise exception '[SG2-85:expiry-rollback-hold-fixture] [NORMAL] [SG2-85:AC1] Hold required for expiry rollback was not created'; end if;
+ if result->>'outcome' is distinct from 'created' then raise exception '[SG2-85:expiry-rollback-hold-fixture] [NORMAL] [SG2-85:AC1] Hold required for expiry rollback was not created'; end if;
  perform set_config('holds.expiry_rollback',result#>>'{hold,hold_id}',true);
 end;
 $$;
@@ -357,7 +361,7 @@ update public.venue_holds set expires_at = created_at+interval '1 microsecond' w
 create function pg_temp.reject_expiry_notice() returns trigger language plpgsql as $$
 begin
  if new.kind = 'expired' and new.hold_id = current_setting('holds.expiry_rollback')::bigint then
-  raise exception using errcode = 'P0001',message = '[SG2-85:expiry-notice-failure-injection] [FAILURE] [SG2-85:AC4] injected_expiry_notice_failure';
+  raise exception using errcode = 'P0001',message = '[SG2-85:expiry-notice-failure-injection] [FAILURE] [SG2-85:AC4] Supporting failure-injection fixture: injected_expiry_notice_failure';
  end if;
  return new;
 end;
@@ -390,12 +394,14 @@ begin
 end;
 $$;
 -- Warning delivery and its once-only marker share the same transaction.
+-- The tagged trigger failure supplies the fixture error; the later expected-
+-- error, marker rollback and once-only retry checks establish the result.
 set local role authenticated;
 do $$
 declare result jsonb;
 begin
  result := public.create_venue_hold(98401,98401,now()+interval '52 days',now()+interval '53 days',clock_timestamp()+interval '4 days');
- if result->>'outcome' <> 'created' then raise exception '[SG2-85:warning-rollback-hold-fixture] [NORMAL] [SG2-85:AC4] Hold required for warning rollback was not created'; end if;
+ if result->>'outcome' is distinct from 'created' then raise exception '[SG2-85:warning-rollback-hold-fixture] [NORMAL] [SG2-85:AC4] Hold required for warning rollback was not created'; end if;
  perform set_config('holds.warning_rollback',result#>>'{hold,hold_id}',true);
 end;
 $$;
@@ -404,7 +410,7 @@ update public.venue_holds set expires_at = clock_timestamp()+interval '2 days' w
 create function pg_temp.reject_warning_notice() returns trigger language plpgsql as $$
 begin
  if new.kind = 'warning' and new.hold_id = current_setting('holds.warning_rollback')::bigint then
-  raise exception using errcode = 'P0001',message = '[SG2-85:warning-notice-failure-injection] [FAILURE] [SG2-85:AC4] injected_warning_notice_failure';
+  raise exception using errcode = 'P0001',message = '[SG2-85:warning-notice-failure-injection] [FAILURE] [SG2-85:AC4] Supporting failure-injection fixture: injected_warning_notice_failure';
  end if;
  return new;
 end;

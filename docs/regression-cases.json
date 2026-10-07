@@ -13,7 +13,7 @@
       "Sign in as venue and technical support staff; open each pending request and verify its identity, event, time window and stored facts.",
       "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
     ],
-    "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
+    "data": "Events 41\u201344; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
     "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; event cards show the client organisation, not a repeated title; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
     "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
     "layer": "Playwright browser + fixture API",
@@ -246,7 +246,7 @@
       "Rename it Updated Browser Hall and change capacity to 125.",
       "Reload, search for Updated Browser, and read the venue API."
     ],
-    "data": "North Wing; capacity 100 then 125; Projector; Lift; 09:00–18:00",
+    "data": "North Wing; capacity 100 then 125; Projector; Lift; 09:00\u201318:00",
     "expected": "Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -390,7 +390,7 @@
       "Verify the error and repeat that invalid request through the fixture API.",
       "Change to 255 characters and submit; read the venue count."
     ],
-    "data": "Name = 界 repeated 256 then 255 times; other fields valid",
+    "data": "Name = \u754c repeated 256 then 255 times; other fields valid",
     "expected": "256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -964,7 +964,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1004,7 +1004,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1087,7 +1087,7 @@
       "Check My drafts and reload."
     ],
     "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
-    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller\u2019s own requests.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -1107,7 +1107,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller\u2019s own requests.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1134,7 +1134,7 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as an organiser in another organisation.",
-      "Inspect My events and request another organisation’s event directly.",
+      "Inspect My events and request another organisation\u2019s event directly.",
       "Compare with a nonexistent event.",
       "Sign in with no organisation and inspect list and detail."
     ],
@@ -1208,7 +1208,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1321,12 +1321,12 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
-      "Block 20 June 2030 09:00–17:00 with reason Carpet replacement.",
+      "Block 20 June 2030 09:00\u201317:00 with reason Carpet replacement.",
       "Open Venue Availability for June 2030 and inspect the calendar.",
       "Return to the block screen, remove the block, and re-check the API and calendar."
     ],
     "data": "Seeded Regression Hall with its existing Scheduled maintenance block; 20 June 2030",
-    "expected": "The new block is listed and appears as Regression Hall · Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
+    "expected": "The new block is listed and appears as Regression Hall \u00b7 Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -1369,12 +1369,12 @@
     "purpose": "Verify AC2 and the Venue Staff-only permission for blocking and removing blocks.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Sign in as Venue Staff and try to block 14–16 June 2030, which covers confirmed booking #1.",
+      "Sign in as Venue Staff and try to block 14\u201316 June 2030, which covers confirmed booking #1.",
       "Repeat the overlapping block through the API.",
       "Sign in as coordinator, technical support, organiser and attendee; try to list, create and remove blocks through the API; check the coordinator catalogue has no block control.",
       "Call the create endpoint without credentials."
     ],
-    "data": "Seeded confirmed booking #1 for event 1 on 15 June 2030 02:00–04:00 UTC; all fixture roles",
+    "data": "Seeded confirmed booking #1 for event 1 on 15 June 2030 02:00\u201304:00 UTC; all fixture roles",
     "expected": "The UI and API refuse the block with 409 and identify booking #1 for event 1; other roles receive 403, unauthenticated calls 401; no block is written.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1456,7 +1456,7 @@
     "title": "an approved event opens a pre-filled venue search that leaves out busy venues",
     "type": "Positive",
     "story": "SG2-46",
-    "purpose": "Verify AC1–AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
+    "purpose": "Verify AC1\u2013AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, seed a request under review, approve it and choose Find venues for this event.",
@@ -1763,7 +1763,7 @@
       "Same-coordinator reassignment returns 200 and the coordinator's planning update still returns 200",
       "While assigned away the planning update returns 403",
       "After the event is handed back the planning update returns 200",
-      "History holds exactly two coordinator entries, newest first: second coordinator → Regression coordinator, then Regression coordinator → second coordinator"
+      "History holds exactly two coordinator entries, newest first: second coordinator \u2192 Regression coordinator, then Regression coordinator \u2192 second coordinator"
     ],
     "evidence": "e2e/regression.spec.ts:707",
     "layer": "Playwright fixture API",
@@ -1933,7 +1933,7 @@
       "Seed event 52 under review by the signed-in coordinator; open it from Awaiting review.",
       "Send a question from the Clarification panel; verify the status becomes needs clarification and the decision panel disappears.",
       "Sign in as the organiser; open the event from My events; verify the 'Your coordinator has a question' notice and the question text.",
-      "Answer in the thread, then Edit request → My drafts → Edit; change the purpose and submit.",
+      "Answer in the thread, then Edit request \u2192 My drafts \u2192 Edit; change the purpose and submit.",
       "Sign in as the coordinator again; open the request from Awaiting review."
     ],
     "data": "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; question and answer texts fixed in the spec.",
@@ -2241,7 +2241,7 @@
       "Frontend: mock getEventHistory to resolve with pre-ordered mock entries and render EventAuditDrawer with isOpen=true.",
       "Check each entry's actor name, humanized field label, SGT-formatted timestamp and old-to-new diff values, including null old/new values rendered as (empty)."
     ],
-    "data": "Three mock audit entries for event 42: expected_attendance 100→250, venue_requirements null→'Auditorium with stage lighting', accessibility_needs 'Wheelchair ramp'→null",
+    "data": "Three mock audit entries for event 42: expected_attendance 100\u2192250, venue_requirements null\u2192'Auditorium with stage lighting', accessibility_needs 'Wheelchair ramp'\u2192null",
     "expected": "Entries render newest-first with correct actor names, humanized field labels, SGT timestamps and old/new diffs; null values render as (empty).",
     "evidence": "server/src/db/auditLogs.test.ts; server/src/events/getHistory.test.ts; client/src/components/EventAuditDrawer.test.tsx",
     "layer": "Backend API/unit tests; Frontend component tests",
@@ -2317,7 +2317,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2353,7 +2353,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2384,7 +2384,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2408,20 +2408,20 @@
     ],
     "purpose": "Prove recipient isolation, default 24-hour warning, exact deadline expiry and recorded history.",
     "steps": [
-      "Place holds on two coordinators’ events and sign in as the first coordinator.",
+      "Place holds on two coordinators\u2019 events and sign in as the first coordinator.",
       "Verify assigned holds and placement notification; no warning one millisecond before the 24-hour threshold.",
       "At the threshold receive one warning; at exact expiry receive Expired status and one expiry notice.",
       "Open the existing event history and inspect its System/Automatic expiry entry.",
       "Sign in as staff; refuse overdue conversion and place a new request for the freed period."
     ],
-    "expected": "Another coordinator’s holds/notices stay hidden; warnings and expiry are idempotent; expired holds are unapprovable; history records the transition; a new request succeeds.",
+    "expected": "Another coordinator\u2019s holds/notices stay hidden; warnings and expiry are idempotent; expired holds are unapprovable; history records the transition; a new request succeeds.",
     "execution_date": "5 Oct 2026",
     "execution_evidence": "Local: installed Chrome; temporary /tmp/sg2-holds-playwright.config.ts (video disabled, repository browser config unchanged); /tmp/spm-holds-final-browser.log and /tmp/spm-holds-final-gate.log. e2e tsc, all 13 report-gate checks and required SG2-26 report gate pass. 1440px/390px hold layout and full-height desktop/mobile notification portal inspected; screenshots /tmp/sg2-holds-qa. No hosted Supabase is claimed.",
     "executed_by": "Codex (automated local verification)"
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2453,7 +2453,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2563,7 +2563,7 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
-      "Open the request form on Regression Hall, check the default layout and the venue requirements shown, and request 09:00–12:00 on 20 June 2030.",
+      "Open the request form on Regression Hall, check the default layout and the venue requirements shown, and request 09:00\u201312:00 on 20 June 2030.",
       "Check the event's venue requests and read the venue's availability and the venue search for that period through the API.",
       "Sign in as venue staff and open the Regression Hall request from the work queue."
     ],
@@ -2604,7 +2604,7 @@
     "steps": [
       "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
       "Clear the attendance and search again so both venues are listed.",
-      "Request Regression Hall, then Quiet Room, for 09:00–12:00 on 20 June 2030."
+      "Request Regression Hall, then Quiet Room, for 09:00\u201312:00 on 20 June 2030."
     ],
     "data": "Event 91; Regression Hall (theatre) and Quiet Room (boardroom)",
     "expected": "Both requests are accepted and the event's venue requests list both venues as Pending, Quiet Room with its Boardroom layout.",
@@ -2639,8 +2639,8 @@
     "purpose": "Verify AC4 and AC1: a second request for the same venue over an overlapping period is refused, only a layout the venue offers can be requested, and only the event's coordinator can request.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Seed the venue request fixture, sign in as coordinator and request Regression Hall 09:00–12:00 on 20 June 2030.",
-      "Request Regression Hall again for 11:00–14:00 the same day.",
+      "Seed the venue request fixture, sign in as coordinator and request Regression Hall 09:00\u201312:00 on 20 June 2030.",
+      "Request Regression Hall again for 11:00\u201314:00 the same day.",
       "Through the API, request a banquet layout, an event the coordinator does not coordinate, and an empty period.",
       "Sign in as venue staff, organiser and attendee and try to request through the API; then try without credentials."
     ],
@@ -2740,7 +2740,7 @@
     "title": "a new Week 7 role signs in, sees its own role and is denied ungranted operations",
     "type": "Positive / role isolation / responsive",
     "story": "SG2-86",
-    "purpose": "Prove Event Coordinator Lead and Safety Officer — the two Week 7 customer-change roles — work end to end: sign-in resolves the role, the role is shown to the user, internal profile fields are visible, and operations the role was not granted are refused server-side.",
+    "purpose": "Prove Event Coordinator Lead and Safety Officer \u2014 the two Week 7 customer-change roles \u2014 work end to end: sign-in resolves the role, the role is shown to the user, internal profile fields are visible, and operations the role was not granted are refused server-side.",
     "preconditions": "Built React app and Express API on loopback with disposable identity/storage providers, fresh browser context and fixed clock. No hosted Supabase.",
     "steps": [
       "Sign in as the Safety Officer fixture account.",
@@ -2849,8 +2849,8 @@
       "Read Regression Hall's availability for 20 June 2030 through the API and return to the work queue.",
       "Sign in as the coordinator, open the notifications drawer, then open venue search from Venue Request Forum."
     ],
-    "data": "Event 91 (approved, 80 guests, \"A projector\"); request 101 for Regression Hall, 20 Jun 2030 09:00–12:00 SGT",
-    "expected": "The request shows approved with the confirmation; availability shows a confirmed booking for event 91 over the requested period; the request leaves the queue; the coordinator's drawer shows \"Venue request approved — Regression Hall was approved for Venue Request Forum.\" and the request list shows who approved it and when.",
+    "data": "Event 91 (approved, 80 guests, \"A projector\"); request 101 for Regression Hall, 20 Jun 2030 09:00\u201312:00 SGT",
+    "expected": "The request shows approved with the confirmation; availability shows a confirmed booking for event 91 over the requested period; the request leaves the queue; the coordinator's drawer shows \"Venue request approved \u2014 Regression Hall was approved for Venue Request Forum.\" and the request list shows who approved it and when.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2888,7 +2888,7 @@
       "Sign in as the coordinator, open the notifications drawer, then open venue search from Venue Request Forum.",
       "Read Regression Hall's availability for 21 June 2030 through the API."
     ],
-    "data": "Event 91; request 102 for Regression Hall, 21 Jun 2030 09:00–12:00 SGT; reason \"The floor is being resurfaced that week.\"",
+    "data": "Event 91; request 102 for Regression Hall, 21 Jun 2030 09:00\u201312:00 SGT; reason \"The floor is being resurfaced that week.\"",
     "expected": "The request shows rejected with the confirmation; the coordinator's drawer shows \"Venue request rejected\" with the reason; the request list shows Rejected, who rejected it, when, and the reason; availability for that day is empty.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -2953,5 +2953,189 @@
         "execution_date": "6 Oct 2026"
       }
     ]
+  },
+  {
+    "id": "SG2-52-P01",
+    "title": "support staff create, update and reload every equipment field on phone and desktop",
+    "type": "NORMAL",
+    "story": "SG2-52",
+    "purpose": "Create and edit all five fields through the rendered screen, then reload persistent values and check phone/desktop layouts.",
+    "preconditions": "Production React build and real Express equipment routes on loopback; reset disposable identity/storage fixture and fresh browser context. Browser clock fixed at 7 Oct 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as Technical Support Staff and open Equipment.",
+      "Add Browser projectors with all five fields.",
+      "Edit every field to Conference displays, quantity 4, Under maintenance, then reload.",
+      "Check the unrelated microphone record and catalogue/editor at 390px and 1440px, with runtime/console/overlay/overflow assertions.",
+      "At 390px, create Phone-created mixer, edit every field to Phone-updated mixer with quantity 3 and Damaged status, save and reload; assert record 3 has version 2 and zero available quantity."
+    ],
+    "data": "Browser projectors: 7 operational units in North technical store; Conference displays: 4 maintenance units in South technical store. Phone-created mixer: 2 operational units in East technical store; Phone-updated mixer: 3 damaged units in Repair store, description Needs connector repair.",
+    "expected": "Both desktop and phone records survive reload with all five edited fields, version 2 and zero available quantity; prior names disappear; original microphone remains unchanged; clean console and responsive layouts.",
+    "evidence": "e2e/equipment.spec.ts; docs/equipment.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-52:AC1"
+    ],
+    "method_id": "TC-dbe41c267a89",
+    "status": "Pass",
+    "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
+    "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-52-P02",
+    "title": "damaged and maintenance stock remain held but contribute no available quantity",
+    "type": "NORMAL",
+    "story": "SG2-52",
+    "purpose": "Verify stock eligibility is based on operational status while quantity held is retained.",
+    "preconditions": "Production React build and real Express equipment routes on loopback; reset disposable identity/storage fixture and fresh browser context. Browser clock fixed at 7 Oct 2026. No hosted Supabase.",
+    "steps": [
+      "Create operational, damaged and maintenance records through the real API.",
+      "Open Equipment and check Quantity held, Available quantity and Operational status on each card.",
+      "Edit damaged stock back to Operational and read it back."
+    ],
+    "data": "Working projectors 7; Damaged projectors 3; Serviced projectors 5.",
+    "expected": "Cards show held/available 7/7, 3/0 and 5/0; repairing the damaged record restores availability 3 and advances its version.",
+    "evidence": "e2e/equipment.spec.ts; docs/equipment.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-52:AC2"
+    ],
+    "method_id": "TC-27dbfa1a4369",
+    "status": "Pass",
+    "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
+    "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-52-N01",
+    "title": "zero and the maximum whole quantity save while incomplete and out-of-range records are refused",
+    "type": "BOUNDARY / FAILURE",
+    "story": "SG2-52",
+    "purpose": "Verify the inclusive quantity bounds, required form fields and invalid API quantities.",
+    "preconditions": "Production React build and real Express equipment routes on loopback; reset disposable identity/storage fixture and fresh browser context. Browser clock fixed at 7 Oct 2026. No hosted Supabase.",
+    "steps": [
+      "Try saving an empty equipment form.",
+      "Create a complete record with quantity zero.",
+      "Create through the API with quantity 2147483647.",
+      "Try -1, 0.5 and 2147483648 through the API; read the final catalogue."
+    ],
+    "data": "Quantities 0, 2147483647, -1, 0.5 and 2147483648; blank required type.",
+    "expected": "Incomplete form is refused visibly without creating stock; zero and maximum succeed; invalid quantities return 400 and the quantity explanation; only accepted records exist.",
+    "evidence": "e2e/equipment.spec.ts; docs/equipment.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-52:AC1"
+    ],
+    "method_id": "TC-e806e73f7326",
+    "status": "Pass",
+    "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
+    "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-52-C01",
+    "title": "rapid save sends one request and a stale editor cannot overwrite a newer record",
+    "type": "CONFLICT",
+    "story": "SG2-52",
+    "purpose": "Verify duplicate-save protection and conflict recovery against the real route and disposable storage.",
+    "preconditions": "Production React build and real Express equipment routes on loopback; reset disposable identity/storage fixture and fresh browser context. Browser clock fixed at 7 Oct 2026. No hosted Supabase.",
+    "steps": [
+      "Fill Add equipment, briefly hold outbound POST transport, click Save twice, and verify disabled saving plus one POST.",
+      "Continue the POST to the real API and check one stored equipment row.",
+      "Open Edit, enter an unsaved description, then save newer quantity/description through a second API operation.",
+      "Attempt the stale form save, inspect retained values and persisted record, then Reload records and reopen Edit."
+    ],
+    "data": "Browser projectors at version 1; concurrent API save sets quantity 9 and description Saved by another staff session at version 2.",
+    "expected": "One creation request; stale update receives 409, retains form input and disables saving; the newer record is untouched; reload exposes quantity 9 and version 2.",
+    "evidence": "e2e/equipment.spec.ts; docs/equipment.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-52:AC1"
+    ],
+    "method_id": "TC-f6d9993b3831",
+    "status": "Pass",
+    "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
+    "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-52-N02",
+    "title": "every other role and unsigned caller are denied equipment writes by the API",
+    "type": "FAILURE",
+    "story": "SG2-52",
+    "purpose": "Verify equipment write authorization is enforced independently of navigation controls.",
+    "preconditions": "Production React build and real Express equipment routes on loopback; reset disposable identity/storage fixture and fresh browser context. Browser clock fixed at 7 Oct 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as each ungranted role; inspect navigation and send direct POST/PATCH requests.",
+      "Send unsigned POST/PATCH requests.",
+      "Sign in as support and read back untouched stock."
+    ],
+    "data": "Organiser, Coordinator, Venue Staff, Attendee, Event Coordinator Lead and Safety Officer fixture identities; microphone record 1.",
+    "expected": "All six other roles have no Equipment navigation and receive 403 on both write endpoints; unsigned requests receive 401; microphone quantity 20 and version 1 remain unchanged.",
+    "evidence": "e2e/equipment.spec.ts; docs/equipment.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-52:AC3"
+    ],
+    "method_id": "TC-35413aed754a",
+    "status": "Pass",
+    "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
+    "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-52-DB01",
+    "title": "Equipment storage enforces operational availability, optimistic versions and direct-client permissions",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "story": "SG2-52",
+    "purpose": "Verify the actual migration and database rules independently of browser fixture behaviour.",
+    "preconditions": "Disposable PostgreSQL with auth fixture and all committed migrations; synthetic transaction-local data; rollback after assertions. No hosted Supabase.",
+    "steps": [
+      "Create equipment with all operational statuses and read generated availability.",
+      "Update a record and attempt a stale-version update.",
+      "Reject invalid quantities, status and text; test direct read/write permissions and restricted generated/version columns.",
+      "Run two competing updates over separate database connections, observe the row-lock wait and assert a single version-matched winner."
+    ],
+    "data": "Synthetic equipment IDs and fixture identities only.",
+    "expected": "Operational availability equals stock held; damaged/maintenance availability is zero; versions advance atomically; stale predicates affect no rows; constraints and role/column restrictions refuse invalid or unauthorized writes.",
+    "evidence": "supabase/tests/equipment_records.sql; .github/scripts/test-equipment-concurrency.mjs; supabase/migrations/202610070001_equipment_records.sql; .github/workflows/ci.yml",
+    "layer": "PostgreSQL policy test",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-52:AC1",
+      "SG2-52:AC2",
+      "SG2-52:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed against native PostgreSQL 17.11: all 19 migrations, all 14 SQL suites and all three concurrency scripts (eight scenarios), including the equipment policy/constraint suite and both competing/refreshed equipment edit scenarios.",
+    "execution_evidence": "7 Oct 2026; disposable postgres:17 container sg2-52-validation-20261007, PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2). Auth fixture then filename-ordered migrations and transactional SQL suites via docker exec psql -v ON_ERROR_STOP=1; POSTGRES_CONTAINER points the concurrency scripts at the same isolated container. Final suite log /private/tmp/sg2-52-sql-suites.log and concurrency log /private/tmp/sg2-52-sql-concurrency.log contain all passing markers and no errors. Container and volume removed. No hosted Supabase.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Codex (local automated execution)"
   }
 ]

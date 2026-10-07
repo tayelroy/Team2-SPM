@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
 import type { Notification, Role, Screen } from '../mock/types';
-import { navFor, previewNavFor, primaryActionFor } from '../mock/viewModel';
+import { navFor, primaryActionFor } from '../mock/viewModel';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
@@ -161,17 +161,12 @@ export default function AppShell({
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const profileButton = useRef<HTMLButtonElement>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const previewButton = useRef<HTMLButtonElement>(null);
   const head = HEAD[role];
   const internalRole = role === 'Event Coordinator' || role === 'Venue Staff' || role === 'Technical Support Staff';
   const notifications = internalRole ? NOTIFICATIONS : [];
   const primary = primaryActionFor(role);
-  const preview = previewNavFor(role);
 
   useDismissOutside(profileOpen, profileRef, setProfileOpen);
-  useDismissOutside(previewOpen, previewRef, setPreviewOpen);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -247,42 +242,6 @@ export default function AppShell({
                 </button>
               );
             })}
-            {preview.length > 0 && (
-              <div
-                ref={previewRef}
-                // Flex lets the trigger stretch to the row height like its sibling nav buttons.
-                style={{ position: 'relative', display: 'flex' }}
-                onKeyDown={event => {
-                  if (event.key === 'Escape') {
-                    setPreviewOpen(false);
-                    previewButton.current!.focus();
-                  }
-                }}
-              >
-                <button
-                  ref={previewButton}
-                  type="button"
-                  aria-expanded={previewOpen}
-                  aria-controls="preview-options"
-                  onClick={() => setPreviewOpen(open => !open)}
-                  style={navItemStyle(preview.some(item => item.screen === screen))}
-                >
-                  Preview <span aria-hidden="true">▾</span>
-                </button>
-                {previewOpen && (
-                  <div id="preview-options" role="group" aria-label="Preview screens"
-                    style={{ ...menuStyle, left: 0, width: '240px' }}>
-                    {preview.map(item => (
-                      <GhostButton key={item.screen} onClick={() => { setPreviewOpen(false); onNavigate(item.screen); }}
-                        style={{ width: '100%', padding: '10px 16px', textAlign: 'left' }}>{item.label}</GhostButton>
-                    ))}
-                    <p style={{ margin: '4px 8px', fontSize: '12px', lineHeight: 1.4, color: color.silver }}>
-                      Sample data only. Live requests are on your dashboard.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>

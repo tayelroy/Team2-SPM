@@ -43,65 +43,65 @@ do $$
 declare result jsonb; booking bigint; hold jsonb;
 begin
   result := public.decide_venue_booking_request(94901, 'approve', null);
-  if result->>'outcome' <> 'updated' or result->>'status' <> 'approved' then
+  if result->>'outcome' is distinct from 'updated' or result->>'status' is distinct from 'approved' then
     raise exception '[SG2-49:approve-commits] [SG2-49:AC1] [NORMAL] A clear request was not approved: %', result;
   end if;
   booking := (result->>'venue_booking_id')::bigint;
   perform set_config('decisions.booking', booking::text, true);
 
   result := public.decide_venue_booking_request(94902, 'approve', null);
-  if result->>'outcome' <> 'conflict' or result->>'kind' <> 'booking' or result->>'label' <> 'Decision forum' then
+  if result->>'outcome' is distinct from 'conflict' or result->>'kind' is distinct from 'booking' or result->>'label' is distinct from 'Decision forum' then
     raise exception '[SG2-49:overlapping-booking-refused] [SG2-49:AC1] [CONFLICT] An approval overlapping a confirmed booking was not refused: %', result;
   end if;
-  if public.decide_venue_booking_request(94901, 'reject', 'Changed my mind')->>'outcome' <> 'decided' then
+  if public.decide_venue_booking_request(94901, 'reject', 'Changed my mind')->>'outcome' is distinct from 'decided' then
     raise exception '[SG2-49:second-decision-refused] [SG2-49:AC3] [CONFLICT] A decided request was decided again';
   end if;
 
-  if public.decide_venue_booking_request(94903, 'approve', null)->>'outcome' <> 'capacity' then
+  if public.decide_venue_booking_request(94903, 'approve', null)->>'outcome' is distinct from 'capacity' then
     raise exception '[SG2-49:capacity-needs-exception] [SG2-49:AC1] [FAILURE] A venue too small for the attendance was approved without an exception';
   end if;
   reset role;
   insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance, venue_capacity)
     values (94903, 'c4900000-0000-4000-8000-000000000003', 'event_organiser', 80, 20);
   set local role authenticated;
-  if public.decide_venue_booking_request(94903, 'approve', 'Organiser accepted standing room')->>'outcome' <> 'updated' then
+  if public.decide_venue_booking_request(94903, 'approve', 'Organiser accepted standing room')->>'outcome' is distinct from 'updated' then
     raise exception '[SG2-49:exception-allows-approval] [SG2-49:AC1] [NORMAL] An approved capacity exception did not allow the approval';
   end if;
 
-  if public.decide_venue_booking_request(94904, 'reject', null)->>'outcome' <> 'invalid'
-      or public.decide_venue_booking_request(94904, 'reject', '   ')->>'outcome' <> 'invalid' then
+  if public.decide_venue_booking_request(94904, 'reject', null)->>'outcome' is distinct from 'invalid'
+      or public.decide_venue_booking_request(94904, 'reject', '   ')->>'outcome' is distinct from 'invalid' then
     raise exception '[SG2-49:reject-needs-reason] [SG2-49:AC2] [BOUNDARY] A rejection without a reason was accepted';
   end if;
-  if public.decide_venue_booking_request(94904, 'reject', repeat('x', 501))->>'outcome' <> 'invalid'
-      or public.decide_venue_booking_request(94904, 'reject', ' ' || repeat('x', 500) || ' ')->>'outcome' <> 'updated' then
+  if public.decide_venue_booking_request(94904, 'reject', repeat('x', 501))->>'outcome' is distinct from 'invalid'
+      or public.decide_venue_booking_request(94904, 'reject', ' ' || repeat('x', 500) || ' ')->>'outcome' is distinct from 'updated' then
     raise exception '[SG2-49:reason-length] [SG2-49:AC2] [BOUNDARY] The reason must allow exactly 500 characters after trimming, and no more';
   end if;
 
   result := public.decide_venue_booking_request(94905, 'approve', null);
-  if result->>'outcome' <> 'conflict' or result->>'kind' <> 'block' or result->>'label' <> 'Floor resurfacing' then
+  if result->>'outcome' is distinct from 'conflict' or result->>'kind' is distinct from 'block' or result->>'label' is distinct from 'Floor resurfacing' then
     raise exception '[SG2-49:block-refused] [SG2-49:AC1] [CONFLICT] An approval inside a venue block was not refused: %', result;
   end if;
 
   hold := public.create_venue_hold(94902, 94902, '2030-07-05T02:00Z', '2030-07-05T06:00Z', clock_timestamp() + interval '2 days');
   result := public.decide_venue_booking_request(94906, 'approve', null);
-  if result->>'outcome' <> 'conflict' or result->>'kind' <> 'hold' then
+  if result->>'outcome' is distinct from 'conflict' or result->>'kind' is distinct from 'hold' then
     raise exception '[SG2-49:active-hold-refused] [SG2-49:AC1] [CONFLICT] An approval overlapping an active hold was not refused: %', result;
   end if;
   result := public.decide_venue_booking_request((hold#>>'{hold,request_id}')::bigint, 'approve', null);
-  if result->>'outcome' <> 'hold' or (result->>'hold_id')::bigint <> (hold#>>'{hold,hold_id}')::bigint then
+  if result->>'outcome' is distinct from 'hold' or (result->>'hold_id')::bigint is distinct from (hold#>>'{hold,hold_id}')::bigint then
     raise exception '[SG2-49:hold-request-refused] [SG2-49:AC1] [FAILURE] A hold''s own request was decided outside the hold: %', result;
   end if;
 
-  if public.decide_venue_booking_request(94907, 'approve', null)->>'outcome' <> 'closed'
-      or public.decide_venue_booking_request(94908, 'approve', null)->>'outcome' <> 'closed' then
+  if public.decide_venue_booking_request(94907, 'approve', null)->>'outcome' is distinct from 'closed'
+      or public.decide_venue_booking_request(94908, 'approve', null)->>'outcome' is distinct from 'closed' then
     raise exception '[SG2-49:closed-request-refused] [SG2-49:AC1] [BOUNDARY] An event under review or a period already past was approved';
   end if;
-  if public.decide_venue_booking_request(94907, 'reject', 'Event not approved yet')->>'outcome' <> 'updated' then
+  if public.decide_venue_booking_request(94907, 'reject', 'Event not approved yet')->>'outcome' is distinct from 'updated' then
     raise exception '[SG2-49:reject-any-pending] [SG2-49:AC2] [NORMAL] A pending request for an unapproved event could not be rejected';
   end if;
-  if public.decide_venue_booking_request(-1, 'approve', null)->>'outcome' <> 'missing'
-      or public.decide_venue_booking_request(94902, 'maybe', null)->>'outcome' <> 'invalid'
-      or public.decide_venue_booking_request(94902, null, null)->>'outcome' <> 'invalid' then
+  if public.decide_venue_booking_request(-1, 'approve', null)->>'outcome' is distinct from 'missing'
+      or public.decide_venue_booking_request(94902, 'maybe', null)->>'outcome' is distinct from 'invalid'
+      or public.decide_venue_booking_request(94902, null, null)->>'outcome' is distinct from 'invalid' then
     raise exception '[SG2-49:unknown-input-refused] [SG2-49:AC3] [FAILURE] An unknown request or decision was not refused';
   end if;
 end $$;

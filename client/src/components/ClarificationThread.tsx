@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { fetchClarifications, postClarification, type Clarification } from '../api/eventRequests';
 
 function when(value: string) {
@@ -37,26 +37,42 @@ export default function ClarificationThread({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const threadRef = useRef({ active: true, posted: [] as Clarification[] });
 
   useEffect(() => {
-    let cancelled = false;
+    const thread = { active: true, posted: [] as Clarification[] };
+    threadRef.current = thread;
+    setMessages(null);
+    setLoadError('');
+    setSending(false);
+    setSendError('');
+    setDraft('');
     fetchClarifications(eventId, accessToken).then(result => {
-      if (cancelled) return;
-      if (result.ok) setMessages(result.clarifications);
+      if (!thread.active) return;
+      if (result.ok) {
+        // A reply may finish posting while this initial snapshot is in flight.
+        // Keep the server order and append replies absent from that snapshot.
+        const messagesById = new Map(result.clarifications.map(message => [message.clarification_id, message]));
+        for (const message of thread.posted) messagesById.set(message.clarification_id, message);
+        setMessages([...messagesById.values()]);
+      }
       else setLoadError(result.message);
     });
-    return () => { cancelled = true; };
+    return () => { thread.active = false; };
   }, [eventId, accessToken]);
 
   async function send() {
+    const thread = threadRef.current;
     setSendError('');
     setSending(true);
     const result = await postClarification(eventId, draft, accessToken);
+    if (!thread.active) return;
     setSending(false);
     if (!result.ok) {
       setSendError(result.message);
       return;
     }
+    thread.posted.push(result.clarification);
     setMessages(current => [...(current ?? []), result.clarification]);
     setDraft('');
     onPosted?.(result.status);

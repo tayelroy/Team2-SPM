@@ -59,7 +59,8 @@ export class MemoryDatabase {
       venue_hold_notifications: [],
       notifications: [],
       equipment_requests: [],
-      equipment: [{ equipment_id: 1, name: 'Wireless microphones', quantity_total: 20 }],
+      equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
+        quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [
         { ...draft, event_id: 1, organiser_id: 'user-organiser' },
         { ...draft, event_id: 2, organiser_id: 'user-organiser2', name: 'Other organisation draft', organisation: 'Other Organisation' }
