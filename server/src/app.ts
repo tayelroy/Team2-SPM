@@ -35,6 +35,7 @@ import { createVenueHoldsRouter } from './venues/holds';
 import { createVenueConflictsRouter } from './venues/conflicts';
 import { createEquipmentRouter } from './equipment';
 import { createEquipmentRequirementsRouter } from './equipment/requirements';
+import { createAssignmentQueueRouter } from './assignmentQueue';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -82,7 +83,9 @@ export function createApp(
   completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal }),
   // SG2-57. Appended for the same positional-parameter reason as
   // completeEventHandler above.
-  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal })
+  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-87: appended last for the same reason.
+  assignmentQueueRouter = createAssignmentQueueRouter(access)
 ) {
   const app = express();
 
@@ -118,6 +121,8 @@ export function createApp(
   app.use('/api/venue-holds', venueHoldsRouter);
   app.use('/api/equipment', equipmentRouter);
   app.use('/api/equipment-requests', equipmentRequirementsRouter);
+  // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
+  app.use('/api/assignment-queue', assignmentQueueRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

@@ -406,14 +406,14 @@ for (const role of ['safety_officer'] as const) {
   });
 }
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] GET /api/auth/me for the Event Coordinator Lead adds assignment, stage and history to the profile grants', async () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, stage and history to the profile grants', async () => {
   const fetchMock = provider({ role: 'event_coordinator_lead' });
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, {
     userId, role: 'event_coordinator_lead',
     permissions: [
-      'event_request.assign_coordinator', 'event_request.stage.view', 'event_request.history.view',
+      'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view', 'event_request.history.view',
       'profile.read', 'profile.update'
     ]
   });
@@ -479,11 +479,12 @@ test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] the Safety Officer holds exactly the 
   assert.deepEqual(permissionsFor('safety_officer', PERMISSIONS).sort(), [...EXPECTED].sort());
 });
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] the Event Coordinator Lead holds exactly the profile grants plus assignment, stage and history', () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] the Event Coordinator Lead holds exactly the profile grants plus assignment, the unassigned queue, stage and history', () => {
   // Written as an independent literal, never computed from PERMISSIONS, for
   // the same reason as the Safety Officer's test above.
   const EXPECTED = [
     'event_request.assign_coordinator',
+    'event_request.queue.view',
     'event_request.stage.view',
     'event_request.history.view',
     'profile.read',

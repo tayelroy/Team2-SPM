@@ -44,6 +44,7 @@ import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
+import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createMemoryEquipmentStore } from './support/equipment';
 import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
@@ -173,7 +174,9 @@ const app = createApp(
   createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
   createEquipmentRequirementsRouter(access, token => createMemoryRequirementsStore(database, token)),
   // SG2-100 AC4: Mark Completed, against the in-memory client.
-  createCompleteEventHandler(eventDependencies)
+  createCompleteEventHandler(eventDependencies),
+  // SG2-87: the Lead's unassigned queue, against the in-memory client.
+  createAssignmentQueueRouter(access, { getAdminClient: getClient })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not

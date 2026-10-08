@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventsTable, { formatProposedDate } from './EventsTable';
@@ -279,4 +279,24 @@ test('[NORMAL] [SG2-26:AC3] colleague events remain visible but never show a per
   expect(screen.queryByText('Waiting on you')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'View Colleague event' }));
   expect(open).toHaveBeenCalledWith(77);
+});
+
+test('[NORMAL] [SG2-87:AC4] [SG2-87:AC5] a request in the queue reads Awaiting Assignment and Unassigned; once assigned it reads Submitted', async () => {
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({
+    ok: true,
+    requests: [
+      { eventId: 201, name: 'Queued forum', proposedDate: null, status: 'unassigned', coordinatorId: null,
+        coordinatorName: null, canManage: true, waitingOnMe: false },
+      { eventId: 202, name: 'Assigned forum', proposedDate: null, status: 'submitted', coordinatorId: 'coord-1',
+        coordinatorName: 'A. Vance', canManage: true, waitingOnMe: false },
+    ],
+  });
+  render(<EventsTable role="Event Organiser" accessToken="t" onOpenEvent={vi.fn()} />);
+  const queued = await screen.findByRole('button', { name: 'View Queued forum' });
+  const assigned = screen.getByRole('button', { name: 'View Assigned forum' });
+  // SG2-100 names the status; the coordinator column says nobody holds it yet.
+  expect(within(queued).getByText('Awaiting Assignment')).toBeInTheDocument();
+  expect(within(queued).getByText('Unassigned')).toBeInTheDocument();
+  expect(within(assigned).getByText('Submitted')).toBeInTheDocument();
+  expect(within(assigned).queryByText('Unassigned')).not.toBeInTheDocument();
 });

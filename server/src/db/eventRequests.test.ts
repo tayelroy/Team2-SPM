@@ -354,10 +354,12 @@ test('[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] a second decision cannot overwrite a 
 
 test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-32:AC2] submission stops stale draft edits and deletes', async () => {
   const db = eventDatabase({ event_id: 7, status: 'draft', organiser_id: 'user-1', name: 'Original draft' });
-  assert.equal((await submitEventRequest(db.client, 7)).ok, true);
+  assert.equal((await submitEventRequest(db.client, 7, () => '2026-10-07T01:00:00.000Z')).ok, true);
   assert.equal((await updateEventRequestDraft(db.client, 7, 'user-1', { ...EMPTY_VALUES, name: 'Stale edit' })).ok, false);
   assert.equal((await deleteEventRequestDraft(db.client, 7, 'user-1')).ok, false);
-  assert.deepEqual(db.stored(), [{ event_id: 7, status: 'unassigned', organiser_id: 'user-1', name: 'Original draft' }]);
+  assert.deepEqual(db.stored(), [{
+    event_id: 7, status: 'unassigned', organiser_id: 'user-1', name: 'Original draft', submitted_at: '2026-10-07T01:00:00.000Z'
+  }]);
 });
 
 describe('fetchOrganiserOrganisation', () => {
@@ -696,25 +698,26 @@ function fakeSubmitEventClient(
 }
 
 describe('submitEventRequest', () => {
-  test('[NORMAL] [SG2-30:AC1] [SG2-100:AC2] an unheld request (no coordinator) updates to unassigned in a single call', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-100:AC2] [SG2-87:AC1] [SG2-87:AC3] an unheld request (no coordinator) updates to unassigned in a single call, stamping the submission time', async () => {
     let calls: SubmitCall[] = [];
     const result = await submitEventRequest(
       fakeSubmitEventClient(
         [{ data: [{ event_id: 7, organiser_id: 'user-1', status: 'unassigned' }], error: null }],
         (c) => (calls = c)
       ),
-      7
+      7,
+      () => '2026-10-07T01:00:00.000Z'
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.status, 'unassigned');
     assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].row, { status: 'unassigned' });
+    assert.deepEqual(calls[0].row, { status: 'unassigned', submitted_at: '2026-10-07T01:00:00.000Z' });
     assert.equal(calls[0].eventId, 7);
     assert.deepEqual(calls[0].status, ['draft', 'rejected', 'needs_clarification']);
     assert.deepEqual(calls[0].coordinatorFilter, ['is', null]);
   });
 
-  test('[NORMAL] [SG2-36:AC2] [SG2-100:AC2] a held request (already assigned) updates to submitted instead, never touching unassigned rows', async () => {
+  test('[NORMAL] [SG2-36:AC2] [SG2-100:AC2] [SG2-87:AC3] a held request (already assigned) updates to submitted instead, never touching unassigned rows, with the same submission time', async () => {
     let calls: SubmitCall[] = [];
     const result = await submitEventRequest(
       fakeSubmitEventClient(
@@ -724,12 +727,14 @@ describe('submitEventRequest', () => {
         ],
         (c) => (calls = c)
       ),
-      52
+      52,
+      () => '2026-10-07T01:00:00.000Z'
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.status, 'submitted');
     assert.equal(calls.length, 2);
-    assert.deepEqual(calls[1].row, { status: 'submitted' });
+    assert.deepEqual(calls[0].row, { status: 'unassigned', submitted_at: '2026-10-07T01:00:00.000Z' });
+    assert.deepEqual(calls[1].row, { status: 'submitted', submitted_at: '2026-10-07T01:00:00.000Z' });
     assert.deepEqual(calls[1].coordinatorFilter, ['is', null]);
   });
 

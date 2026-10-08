@@ -531,6 +531,19 @@
         "AC2": "Each required arrangement is labelled ready or outstanding; equipment and registration are labelled not required when they are not needed",
         "AC3": "When all required arrangements are ready, the event is shown as ready for confirmation"
       }
+    },
+    {
+      "id": "SG2-87",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-87",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-07",
+      "acceptanceCriteria": {
+        "AC1": "When an event request is submitted, it enters the unassigned queue instead of going straight to an Event Coordinator",
+        "AC2": "Only the Event Coordinator Lead can view the queue",
+        "AC3": "Each queue entry shows basic event information (name, organiser, proposed date/time, expected attendance, submitted date)",
+        "AC4": "Requests in the queue show as Unassigned to the Event Organiser",
+        "AC5": "An event leaves the queue once it has been assigned"
+      }
     }
   ]
 }

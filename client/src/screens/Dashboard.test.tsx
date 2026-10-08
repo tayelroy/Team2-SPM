@@ -7,7 +7,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const requests = [
   { event_id: 1, name: 'My draft', status: 'draft', can_manage: true },
   { event_id: 2, name: 'Colleague draft', status: 'draft', can_manage: false },
-  { event_id: 3, name: '', status: 'submitted', can_manage: true, coordinator_name: 'A. Coordinator' },
+  { event_id: 3, name: '', status: 'submitted', can_manage: true, coordinator_id: 'coord-1', coordinator_name: 'A. Coordinator' },
 ];
 
 test('[NORMAL] [SG2-26:AC1] organisation dashboard shows real shared events, owned draft count and correct navigation', async () => {
@@ -82,4 +82,16 @@ test('[NORMAL] [SG2-20:prototype-dashboard] attendee retains its prototype event
   fireEvent.click(screen.getByRole('button', { name: 'See all events' }));
   expect(onNavigate).toHaveBeenCalledWith('events');
   for (const button of screen.getAllByRole('button', { name: /^Open:/ })) fireEvent.click(button);
+});
+
+test('[NORMAL] [SG2-87:AC4] the organisation dashboard shows a queued request as awaiting assignment, not with a coordinator', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
+    { event_id: 5, name: 'Queued forum', status: 'unassigned', can_manage: true, coordinator_id: null },
+  ] })));
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
+  const card = await screen.findByRole('button', { name: /Queued forum/ });
+  expect(within(card).getByText('Awaiting Assignment')).toBeInTheDocument();
+  expect(within(card).getByText(/Unassigned/)).toBeInTheDocument();
+  expect(within(card).getByText('Awaiting a coordinator')).toBeInTheDocument();
+  expect(within(card).queryByText('With coordinator')).not.toBeInTheDocument();
 });

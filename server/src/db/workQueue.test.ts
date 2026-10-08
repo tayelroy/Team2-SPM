@@ -28,11 +28,11 @@ function fixture(rows: Record<string, unknown>[], failure?: 'error' | 'null') {
 }
 
 /** SG2-35 flags which rows the caller may act on: only their own assignments.
- * Shared rows stay readable but are never reviewable. */
+ * Since SG2-87 a coordinator reads only their own; other roles' rows are shared. */
 const mine = (row: Record<string, unknown>) => ({ ...row, assigned_to_me: true });
 const shared = (row: Record<string, unknown>) => ({ ...row, assigned_to_me: false });
 
-test('[NORMAL] [SG2-41:AC1] [SG2-41:AC4] [SG2-35:AC3] coordinator list and detail include shared reviews and own assignments, never another coordinator or role', async () => {
+test('[NORMAL] [SG2-41:AC1] [SG2-41:AC4] [SG2-35:AC3] [SG2-87:AC1] coordinator list and detail include only their own assignments: never unassigned requests, another coordinator or another role', async () => {
   const rows = [
     { kind: 'event', item_id: 1, audience: 'event_coordinator', assigned_to: null },
     { kind: 'event', item_id: 2, audience: 'event_coordinator', assigned_to: 'coordinator-1' },
@@ -41,13 +41,13 @@ test('[NORMAL] [SG2-41:AC1] [SG2-41:AC4] [SG2-35:AC3] coordinator list and detai
   ];
   const { client, calls } = fixture(rows);
   const principal = { userId: 'coordinator-1', role: 'event_coordinator' as const };
-  assert.deepEqual(await fetchWorkQueue(client, principal), [shared(rows[0]), mine(rows[1])]);
+  assert.deepEqual(await fetchWorkQueue(client, principal), [mine(rows[1])]);
   assert.deepEqual(calls, [
-    [[['audience', 'event_coordinator'], ['assigned_to', null]], 0, 999],
     [[['audience', 'event_coordinator'], ['assigned_to', 'coordinator-1']], 0, 999],
   ]);
   assert.deepEqual(await fetchWorkQueue(client, principal, { kind: 'event', item_id: 2 }), [mine(rows[1])]);
-  for (const selection of [{ kind: 'event' as const, item_id: 3 }, { kind: 'venue' as const, item_id: 1 }]) {
+  // SG2-87: an unassigned request waits in the Lead's queue, not in any coordinator's.
+  for (const selection of [{ kind: 'event' as const, item_id: 1 }, { kind: 'event' as const, item_id: 3 }, { kind: 'venue' as const, item_id: 1 }]) {
     assert.deepEqual(await fetchWorkQueue(client, principal, selection), []);
   }
 });

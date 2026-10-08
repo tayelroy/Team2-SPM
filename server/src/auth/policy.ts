@@ -41,6 +41,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // #5) moved it from Technical Support Staff to the Event Coordinator Lead,
   // who is now the only role that assigns or reassigns a coordinator.
   'event_request.assign_coordinator': ['event_coordinator_lead'],
+  // SG2-87: only the Event Coordinator Lead sees the queue of unassigned requests.
+  'event_request.queue.view': ['event_coordinator_lead'],
   // SG2-35: a coordinator opens a request for review. Which request is
   // enforced per-row by the assignment made in SG2-33, not by this grant.
   'event_request.review': ['event_coordinator'],
