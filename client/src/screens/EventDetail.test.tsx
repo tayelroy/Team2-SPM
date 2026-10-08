@@ -20,7 +20,7 @@ test.each(['approved', 'planning', 'confirmed'])('[NORMAL] [SG2-53:AC1] [SG2-53:
     purpose: 'Technical demonstration', description: '', proposedDate: null, expectedAttendance: 50,
     venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null, registrationNeeded: false,
     coordinatorId: 'coord-1', coordinatorName: 'Assigned coordinator', canManage: false, waitingOnMe: false,
-    decisionReason: null, decidedAt: null,
+    decisionReason: null, decidedAt: null, completedBy: null, completedAt: null, endsAt: null,
   } });
   vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
   render(<EventDetail role="Event Coordinator" currentUserId="coord-1" selectedEventId={53} accessToken="token" onNavigate={vi.fn()} />);

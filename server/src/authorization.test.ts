@@ -466,12 +466,13 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
   }
 });
 
-test('[NORMAL] [SG2-100:AC13] the Safety Officer holds exactly the profile grants plus the SG2-100 reads', () => {
+test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] the Safety Officer holds exactly the profile grants plus the SG2-100 reads and read-only equipment placement', () => {
   // Written as an independent literal, never computed from PERMISSIONS: this
   // file's snapshot went stale during SG2-86 for exactly that reason.
   const EXPECTED = [
     'event_request.stage.view',
     'event_request.history.view',
+    'equipment_requirements.read',
     'profile.read',
     'profile.update'
   ];
