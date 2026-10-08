@@ -11,9 +11,10 @@ beforeEach(() => {
 });
 afterEach(() => { mock.restoreAll(); Object.assign(dbConfig, original); });
 
-const values = { starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', reason: 'Carpet replacement' };
-const block = { unavailability_id: 4, ...values };
-const booking = { booking_id: 7, event_id: 3, starts_at: '2026-10-01T10:00:00+00:00', ends_at: '2026-10-01T12:00:00+00:00' };
+const values = { starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', category: 'maintenance' as const, reason: 'Carpet replacement' };
+const affected = { booking_id: 7, event_id: 3, event_name: 'Gala Night', event_status: 'confirmed',
+  starts_at: '2026-10-01T10:00:00+00:00', ends_at: '2026-10-01T12:00:00+00:00' };
+const block = { unavailability_id: 4, ...values, created_at: '2026-09-26T00:00:00+00:00', created_by_name: 'Vera Staff', affected: [affected] };
 
 type Call = { method: string; pathname: string; params: URLSearchParams; body?: unknown };
 
@@ -34,38 +35,27 @@ function stubFetch(respond: (call: Call) => Response) {
   return calls;
 }
 
-test('[NORMAL] [SG2-45:AC1] SG2-45: list reads the venue\'s blocks that have not yet ended, earliest first', async () => {
+test('[NORMAL] [SG2-45:AC1] [SG2-80:AC6] list reads the venue\'s unended periods, with recorder and affected events, from the definer function', async () => {
   const calls = stubFetch(() => Response.json([block]));
   assert.deepEqual(await createVenueBlockStore('staff-token').list(1, '2026-09-26T00:00:00.000Z'), [block]);
-  assert.equal(calls[0].pathname, '/rest/v1/venue_unavailability');
-  assert.equal(calls[0].params.get('select'), 'unavailability_id,starts_at,ends_at,reason');
-  assert.equal(calls[0].params.get('venue_id'), 'eq.1');
-  assert.equal(calls[0].params.get('ends_at'), 'gt.2026-09-26T00:00:00.000Z');
-  assert.equal(calls[0].params.get('order'), 'starts_at.asc');
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].pathname, '/rest/v1/rpc/list_venue_unavailability');
+  assert.deepEqual(calls[0].body, { p_venue_id: 1, p_after: '2026-09-26T00:00:00.000Z' });
 });
 
-test('[NORMAL] [SG2-45:AC1] create confirms the venue, finds no confirmed overlap, then inserts the block', async () => {
+test('[NORMAL] [SG2-80:AC2] [SG2-80:AC3] create inserts without checking for confirmed bookings, then reads back the flagged period', async () => {
   const calls = stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
-    if (call.pathname === '/rest/v1/venue_bookings') return Response.json([]);
-    return Response.json(block);
+    if (call.pathname === '/rest/v1/venue_unavailability') return Response.json({ unavailability_id: 4 });
+    return Response.json([{ ...block, unavailability_id: 3 }, block]);
   });
   assert.deepEqual(await createVenueBlockStore('staff-token').create(1, values), { outcome: 'created', block });
   assert.deepEqual(calls.map(call => `${call.method} ${call.pathname}`), [
-    'GET /rest/v1/venues', 'GET /rest/v1/venue_bookings', 'POST /rest/v1/venue_unavailability'
+    'GET /rest/v1/venues', 'POST /rest/v1/venue_unavailability', 'POST /rest/v1/rpc/list_venue_unavailability'
   ]);
-  const overlap = calls[1].params;
-  assert.equal(overlap.get('venue_id'), 'eq.1');
-  assert.equal(overlap.get('status'), 'eq.confirmed');
-  assert.equal(overlap.get('starts_at'), `lt.${values.ends_at}`);
-  assert.equal(overlap.get('ends_at'), `gt.${values.starts_at}`);
-  assert.deepEqual(calls[2].body, { venue_id: 1, ...values });
-});
-
-test('[CONFLICT] [SG2-45:AC2] create refuses a period overlapping a confirmed booking without inserting', async () => {
-  const calls = stubFetch(call => call.pathname === '/rest/v1/venues' ? Response.json({ venue_id: 1 }) : Response.json([booking]));
-  assert.deepEqual(await createVenueBlockStore('staff-token').create(1, values), { outcome: 'conflict', booking });
-  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1].body, { venue_id: 1, ...values });
+  assert.equal(calls[1].params.get('select'), 'unavailability_id');
+  assert.deepEqual(calls[2].body, { p_venue_id: 1, p_after: values.starts_at });
 });
 
 test('[FAILURE] [SG2-45:AC1] create returns missing and never writes when the venue does not exist', async () => {
@@ -74,21 +64,11 @@ test('[FAILURE] [SG2-45:AC1] create returns missing and never writes when the ve
   assert.equal(calls.length, 1);
 });
 
-test('[CONFLICT] [SG2-45:AC2] a booking confirmed between the check and the insert is named from the database trigger\'s refusal', async () => {
-  let bookingReads = 0;
+test('[CONFLICT] [SG2-80:AC6] a period removed before it can be read back fails closed instead of reporting it saved', async () => {
   stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
-    if (call.pathname === '/rest/v1/venue_bookings') return Response.json(bookingReads++ === 0 ? [] : [booking]);
-    return Response.json({ code: '23P01', message: 'overlap' }, { status: 409 });
-  });
-  assert.deepEqual(await createVenueBlockStore('staff-token').create(1, values), { outcome: 'conflict', booking });
-});
-
-test('[CONFLICT] [SG2-45:AC2] a trigger refusal whose booking can no longer be found fails closed', async () => {
-  stubFetch(call => {
-    if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
-    if (call.pathname === '/rest/v1/venue_bookings') return Response.json([]);
-    return Response.json({ code: '23P01', message: 'overlap' }, { status: 409 });
+    if (call.pathname === '/rest/v1/venue_unavailability') return Response.json({ unavailability_id: 4 });
+    return Response.json([]);
   });
   await assert.rejects(createVenueBlockStore('staff-token').create(1, values), { status: 503 });
 });
@@ -113,20 +93,20 @@ for (const status of [401, 403, 500]) test(`[FAILURE] [SG2-45:AC1] database erro
   await assert.rejects(store.remove(1, 4), expected);
 });
 
-test('[FAILURE] [SG2-25:AC2] [SG2-45:AC1] an insert refused by row level security is mapped to 403, not treated as a booking conflict', async () => {
-  const calls = stubFetch(call => {
-    if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
-    if (call.pathname === '/rest/v1/venue_bookings') return Response.json([]);
-    return Response.json({ code: '42501', message: 'row-level security' }, { status: 403 });
-  });
+test('[FAILURE] [SG2-25:AC2] [SG2-45:AC1] an insert refused by row level security is mapped to 403 and nothing is read back', async () => {
+  const calls = stubFetch(call => call.pathname === '/rest/v1/venues'
+    ? Response.json({ venue_id: 1 })
+    : Response.json({ code: '42501', message: 'row-level security' }, { status: 403 }));
   await assert.rejects(createVenueBlockStore('staff-token').create(1, values), { status: 403 });
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 2);
 });
 
-test('[FAILURE] [SG2-45:AC2] an error while checking for a confirmed booking is mapped to a safe response', async () => {
-  stubFetch(call => call.pathname === '/rest/v1/venues'
-    ? Response.json({ venue_id: 1 })
-    : Response.json({ message: 'SECRET' }, { status: 500 }));
+test('[FAILURE] [SG2-80:AC6] an error reading the saved period back is mapped to a safe response', async () => {
+  stubFetch(call => {
+    if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
+    if (call.pathname === '/rest/v1/venue_unavailability') return Response.json({ unavailability_id: 4 });
+    return Response.json({ message: 'SECRET' }, { status: 500 });
+  });
   await assert.rejects(createVenueBlockStore('staff-token').create(1, values), { status: 503 });
 });
 

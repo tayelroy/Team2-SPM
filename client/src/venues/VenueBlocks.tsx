@@ -4,12 +4,22 @@ import { Card, Eyebrow, GhostButton, Notice, RecessedCard } from '../ui';
 import { color, gradient, label, radius, rule } from '../theme';
 import { inputStyle } from './VenueForm';
 import type { Venue } from './api';
-import { VenueBlockError, createVenueBlock, describePeriod, fetchVenueBlocks, removeVenueBlock, type VenueBlock } from './blocksApi';
+import {
+  UNAVAILABILITY_CATEGORIES, VenueBlockError, createVenueBlock, describePeriod, describeRecorded, fetchVenueBlocks,
+  removeVenueBlock, type AffectedBooking, type UnavailabilityCategory, type VenueBlock
+} from './blocksApi';
 
-const EMPTY = { start: '', end: '', reason: '' };
+const EMPTY = { start: '', end: '', category: '', reason: '' };
 const MAX_REASON_LENGTH = 500;
 
-/** Venue Staff block a venue from use for a period, or remove a block (SG2-45). */
+function describeEvent(booking: AffectedBooking): string {
+  const name = booking.event_name ?? (booking.event_id === null ? `Booking #${booking.booking_id}` : `Event ${booking.event_id}`);
+  return booking.event_status ? `${name} (${booking.event_status})` : name;
+}
+
+/** Venue Staff block a venue from use for a period, or remove a block
+ * (SG2-45). SG2-80: the period may hold confirmed bookings, which are listed
+ * as affected but never cancelled. */
 export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
   token: string;
   venue: Venue;
@@ -69,16 +79,20 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
     const ends = Date.parse(values.end);
     const reason = values.reason.trim();
     const rejected = Number.isNaN(starts) || Number.isNaN(ends) || starts >= ends || ends <= Date.now() ||
-      !reason || Array.from(reason).length > MAX_REASON_LENGTH;
+      !(values.category in UNAVAILABILITY_CATEGORIES) || !reason || Array.from(reason).length > MAX_REASON_LENGTH;
     setInvalid(rejected);
     if (rejected) return;
     void run(async signal => {
       const block = await createVenueBlock(token, signal, venue.venue_id, {
-        starts_at: new Date(starts).toISOString(), ends_at: new Date(ends).toISOString(), reason
+        starts_at: new Date(starts).toISOString(), ends_at: new Date(ends).toISOString(),
+        category: values.category as UnavailabilityCategory, reason
       });
       setBlocks(current => [...current, block].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
       setValues(EMPTY);
-      setStatus(`${venue.name} is blocked ${describePeriod(block.starts_at, block.ends_at)}.`);
+      // SG2-80 AC3/AC4: say how many booked events are affected and that they stand.
+      const count = block.affected.length;
+      setStatus(`${venue.name} is blocked ${describePeriod(block.starts_at, block.ends_at)}.${count === 0 ? ''
+        : ` ${count} booked event${count === 1 ? ' is' : 's are'} flagged as affected and not cancelled.`}`);
     });
   }
 
@@ -113,7 +127,21 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
                     paddingBottom: '12px', borderBottom: rule.edge, overflowWrap: 'anywhere' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
                     <span style={{ color: color.mist, fontSize: '14px' }}>{describePeriod(block.starts_at, block.ends_at)}</span>
-                    <span style={{ color: color.silver, fontSize: '13px' }}>{block.reason}</span>
+                    <span style={{ color: color.silver, fontSize: '13px' }}>{UNAVAILABILITY_CATEGORIES[block.category]}: {block.reason}</span>
+                    <span style={{ color: color.silver, fontSize: '12px' }}>{describeRecorded(block)}</span>
+                    {block.affected.length === 0 ? null : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                        <span style={{ color: color.mist, fontSize: '13px' }}>Affected by venue unavailability (not cancelled)</span>
+                        <ul aria-label={`Events affected by ${block.reason}`}
+                          style={{ margin: 0, paddingLeft: '18px', display: 'grid', gap: '2px', color: color.silver, fontSize: '13px' }}>
+                          {block.affected.map(booking => (
+                            <li key={booking.booking_id}>
+                              {describeEvent(booking)} · {describePeriod(booking.starts_at, booking.ends_at)}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   <GhostButton onClick={() => remove(block)} disabled={busy}>Remove block</GhostButton>
                 </li>
@@ -135,13 +163,21 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
                   onChange={e => setValues(current => ({ ...current, end: e.target.value }))} />
               </div>
               <div className="venue-field-wide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
-                <label htmlFor="block-reason" style={label}>Reason</label>
-                <textarea id="block-reason" rows={3} required value={values.reason} placeholder="e.g. Scheduled maintenance"
+                <label htmlFor="block-category" style={label}>Reason</label>
+                <select id="block-category" required value={values.category} style={inputStyle}
+                  onChange={e => setValues(current => ({ ...current, category: e.target.value }))}>
+                  <option value="">Choose a reason</option>
+                  {Object.entries(UNAVAILABILITY_CATEGORIES).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                </select>
+              </div>
+              <div className="venue-field-wide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+                <label htmlFor="block-reason" style={label}>Note</label>
+                <textarea id="block-reason" rows={3} required value={values.reason} placeholder="e.g. Air conditioning being repaired"
                   style={{ ...inputStyle, resize: 'vertical' }}
                   onChange={e => setValues(current => ({ ...current, reason: e.target.value }))} />
               </div>
             </div>
-            {invalid ? <p role="alert">Enter a period that ends after it starts and has not already ended, and a reason within {MAX_REASON_LENGTH} characters.</p> : null}
+            {invalid ? <p role="alert">Enter a period that ends after it starts and has not already ended, choose a reason, and add a note within {MAX_REASON_LENGTH} characters.</p> : null}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '24px' }}>
               <button type="submit" style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',
                 background: gradient.aurora, color: '#222', fontSize: '14px', cursor: busy ? 'wait' : 'pointer' }}>
@@ -156,7 +192,8 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
         <Eyebrow>While a venue is blocked</Eyebrow>
         <p style={{ margin: 0, color: color.silver, fontSize: '14px', lineHeight: 1.6 }}>
           Blocked periods show as unavailable on the Venue Availability calendar, so the venue is not offered for events then.
-          A period that already holds a confirmed booking cannot be blocked. Removing a block makes the venue available again.
+          A period can be blocked even when events are already booked in it: those events are flagged as affected so they can be
+          rearranged, and they are not cancelled. Removing a block makes the venue available again.
         </p>
       </RecessedCard>
     </div>

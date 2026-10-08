@@ -6,10 +6,9 @@
 --
 -- Covers SG2-45 acceptance: only Venue Staff block a venue from use (insert
 -- into venue_unavailability) or remove a block (delete); other internal and
--- external roles cannot write directly; a period holding a confirmed booking
--- cannot be blocked by anyone, while a held booking or a free period can.
--- Conflicts below use committed fixture state within one transaction. They
--- do not establish safety between two simultaneous booking/block requests.
+-- external roles cannot write directly. SG2-80 replaced AC2: a period holding
+-- a confirmed booking can now be blocked; venue_temporary_unavailability.sql
+-- covers that and the flagging of the bookings inside it.
 begin;
 
 insert into auth.users (id) values
@@ -32,8 +31,7 @@ insert into public.venue_bookings (venue_id, starts_at, ends_at, status) values
 insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason) values
   (900, '2026-10-10 00:00+00', '2026-10-11 00:00+00', 'Scheduled maintenance');
 
--- Venue staff: blocks free and held periods, is refused over a confirmed
--- booking, and removes blocks directly.
+-- Venue staff: blocks free and held periods and removes blocks directly.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'c0000000-0000-4000-8000-000000000001', true);
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
@@ -51,34 +49,7 @@ begin
       and reason = 'Carpet replacement') then
     raise exception '[SG2-45:create-block] [SG2-45:AC1] [NORMAL] Free-period block must retain its venue, period and reason';
   end if;
-  begin
-    insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
-      values (900, '2026-10-01 16:00+00', '2026-10-01 18:00+00', 'Over a confirmed booking');
-    raise exception '[SG2-45:confirmed-booking-overlap] [SG2-45:AC2] [CONFLICT] A period holding a confirmed booking was blocked';
-  exception when exclusion_violation then null;
-  end;
-  begin
-    insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
-      values (900, '2026-10-01 08:00+00', '2026-10-01 09:00:00.000001+00', 'One microsecond from the left');
-    raise exception '[SG2-45:overlap-start-edge] [SG2-45:AC2] [BOUNDARY] A block extending one microsecond past booking start must be rejected';
-  exception when exclusion_violation then null;
-  end;
-  -- Touching intervals do not overlap: the booking ends as the block starts.
-  insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
-    values (900, '2026-10-01 17:00+00', '2026-10-01 18:00+00', 'Right after the booking');
-  insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
-    values (900, '2026-10-01 08:00+00', '2026-10-01 09:00+00', 'Right before the booking');
-  if (select count(*) from public.venue_unavailability where venue_id = 900
-      and reason in ('Right before the booking', 'Right after the booking')) <> 2 then
-    raise exception '[SG2-45:touching-booking-edges] [SG2-45:AC2] [BOUNDARY] Blocks ending at booking start or starting at booking end must persist';
-  end if;
-  begin
-    insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
-      values (900, '2026-10-01 16:59:59.999999+00', '2026-10-01 18:00+00', 'One microsecond overlap');
-    raise exception '[SG2-45:overlap-edge] [SG2-45:AC2] [BOUNDARY] A one-microsecond confirmed-booking overlap must be rejected';
-  exception when exclusion_violation then null;
-  end;
-  delete from public.venue_unavailability where reason in ('Carpet replacement', 'Over a held booking', 'Right after the booking', 'Right before the booking');
+  delete from public.venue_unavailability where reason in ('Carpet replacement', 'Over a held booking');
   if (select count(*) from public.venue_unavailability where venue_id = 900) <> 1 then
     raise exception '[SG2-45:remove-block] [SG2-45:AC3] [NORMAL] Venue staff could not remove a block directly';
   end if;
@@ -143,26 +114,10 @@ begin
   end;
 end $$;
 
--- The confirmed-booking rule holds regardless of caller, including on update.
+-- Row constraints hold regardless of caller.
 reset role;
 do $$
 begin
-  begin
-    insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
-      values (900, '2026-10-01 08:00+00', '2026-10-01 20:00+00', 'Privileged overlap');
-    raise exception '[SG2-45:privileged-overlap-insert] [SG2-45:AC2] [CONFLICT] A privileged insert blocked a confirmed booking';
-  exception when exclusion_violation then null;
-  end;
-  begin
-    update public.venue_unavailability set starts_at = '2026-10-01 12:00+00' where venue_id = 900;
-    raise exception '[SG2-45:privileged-overlap-update] [SG2-45:AC2] [CONFLICT] An update moved a block over a confirmed booking';
-  exception when exclusion_violation then null;
-  end;
-  if not exists (select 1 from public.venue_unavailability where venue_id = 900
-      and starts_at = '2026-10-10 00:00+00' and ends_at = '2026-10-11 00:00+00'
-      and reason = 'Scheduled maintenance') then
-    raise exception '[SG2-45:failed-change-isolation] [SG2-45:AC2] [CONFLICT] Rejected block changes must preserve the original period and reason';
-  end if;
   begin
     insert into public.venue_unavailability (venue_id, starts_at, ends_at, reason)
       values (900, '2026-12-01 09:00+00', '2026-12-01 09:00+00', 'Empty period');

@@ -336,7 +336,7 @@
       ],
       "acceptanceCriteria": {
         "AC1": "Given a venue with no booking in a period, when I block that period with a reason, then the venue is shown as unavailable then and is not returned by venue search",
-        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified",
+        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified (superseded by SG2-80, Week 7 change #2: such a period can now be blocked and its bookings are flagged as affected)",
         "AC3": "Given a block I have created, when I remove it, then the venue becomes available for that period again"
       }
     },
@@ -386,6 +386,20 @@
         "AC1": "Given an outstanding request with no booking conflict, all required facilities available and either sufficient capacity or a recorded capacity exception approved by Venue Staff, Technical Support Staff or the Event Organiser for the event, when I approve it, then the venue is committed to that event and the coordinator is notified",
         "AC2": "Given an outstanding request, when I reject it, then I must give a reason, the request is marked rejected, and the coordinator can see the reason",
         "AC3": "Given any decision, the decision, who made it and when are recorded"
+      }
+    },
+    {
+      "id": "SG2-80",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-80",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-08",
+      "acceptanceCriteria": {
+        "AC1": "I can mark a venue unavailable for a period, choosing a reason (maintenance, equipment failure, renovation, safety concern, other) and adding a note",
+        "AC2": "Marking is allowed even when confirmed bookings fall within the period",
+        "AC3": "Bookings that fall within the period are identified and flagged as affected by venue unavailability",
+        "AC4": "Affected events are not cancelled automatically, and their original event information is kept",
+        "AC5": "During the period, the venue appears as unavailable and is not returned by venue search",
+        "AC6": "The unavailability, its reason, who recorded it and when are all recorded"
       }
     },
     {
