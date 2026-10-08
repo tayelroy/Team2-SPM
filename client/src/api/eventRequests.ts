@@ -610,6 +610,78 @@ export async function getEventStage(
   return { ok: true, stage: body as EventStageResult };
 }
 
+export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
+export type ArrangementKey = 'venue' | 'equipment' | 'registration';
+
+export interface ArrangementStatus {
+  key: ArrangementKey;
+  label: string;
+  state: ArrangementState;
+  detail: string;
+}
+
+export interface EventArrangementsResult {
+  event_id: number;
+  arrangements: ArrangementStatus[];
+  outstanding: ArrangementKey[];
+  ready_for_confirmation: boolean;
+}
+
+export type GetEventArrangementsOutcome =
+  | { ok: true; arrangements: EventArrangementsResult }
+  | {
+      ok: false;
+      kind: 'unauthorized' | 'forbidden' | 'not_found' | 'unavailable' | 'error';
+      message: string;
+    };
+
+/**
+ * Retrieves which of an event's arrangements (venue, equipment, registration)
+ * are ready or outstanding and whether it is ready for confirmation (SG2-57).
+ * Maps to `GET /api/event-requests/:eventId/arrangements`.
+ */
+export async function getEventArrangements(
+  eventId: string | number,
+  token: string
+): Promise<GetEventArrangementsOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/arrangements`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { ok: false, kind: 'unauthorized', message: body?.error ?? 'Authentication required' };
+    }
+    if (response.status === 403) {
+      return { ok: false, kind: 'forbidden', message: body?.error ?? 'Access forbidden' };
+    }
+    if (response.status === 404) {
+      return { ok: false, kind: 'not_found', message: body?.error ?? 'Event not found.' };
+    }
+    if (response.status === 503) {
+      return { ok: false, kind: 'unavailable', message: body?.error ?? UNAVAILABLE };
+    }
+    return {
+      ok: false,
+      kind: 'error',
+      message: body?.error ?? `Failed to fetch event arrangements (HTTP ${response.status}).`
+    };
+  }
+
+  if (!body || typeof body !== 'object' || !Array.isArray(body.arrangements)) {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  return { ok: true, arrangements: body as EventArrangementsResult };
+}
+
 export interface PlanningUpdatePayload {
   expected_attendance?: number | null;
   proposed_date?: string | null;

@@ -8,6 +8,12 @@ vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId }: {
   <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}</section>
 ) }));
 
+// SG2-57: stubbed like EquipmentRequirements so its own fetch does not change
+// the fetch counts and sequences these queue tests assert.
+vi.mock('../components/EventArrangements', () => ({ default: ({ eventId }: { eventId: number }) => (
+  <section aria-label="Arrangement readiness integration">Arrangements for event {eventId}</section>
+) }));
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Leadership Forum',
   event_name: 'Leadership Forum', status: 'under_review', starts_at: '2030-06-15T02:00:00Z', ends_at: null,

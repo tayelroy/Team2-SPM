@@ -5,6 +5,7 @@ import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
 import ClarificationThread from '../components/ClarificationThread';
 import EquipmentRequirements from '../components/EquipmentRequirements';
+import EventArrangements from '../components/EventArrangements';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
@@ -197,6 +198,13 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
         <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} />
+      )}
+      {/* SG2-57: the assigned coordinator sees which arrangements are still
+          outstanding before the event can be confirmed, through the same
+          arrangement-through-confirmed window as the requirements above. */}
+      {item.kind === 'event' && item.assigned_to_me
+        && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
+        <EventArrangements eventId={item.event_id} accessToken={accessToken} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread

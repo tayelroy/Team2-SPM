@@ -521,6 +521,16 @@
       },
       "originalPullRequests": [],
       "source": "Live Jira SG2-53 description verified in the in-app browser on 8 October 2026. AC numbering follows displayed bullet order."
+    },
+    {
+      "id": "SG2-57",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-57",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "The event shows whether every venue booking it needs is approved (an event may have several, per Week 7 change #3), whether any requested equipment is reserved, and whether registration capacity and opening/closing times are set when registration is needed",
+        "AC2": "Each required arrangement is labelled ready or outstanding; equipment and registration are labelled not required when they are not needed",
+        "AC3": "When all required arrangements are ready, the event is shown as ready for confirmation"
+      }
     }
   ]
 }

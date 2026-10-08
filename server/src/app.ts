@@ -27,6 +27,7 @@ import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
 import { createNotificationsRouter } from './notifications';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
+import { createGetEventArrangementsHandler } from './events/getArrangements';
 import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
@@ -78,7 +79,10 @@ export function createApp(
   // SG2-100 AC4. Appended rather than grouped with the other event handlers
   // on purpose: every parameter here is positional, and inserting one in the
   // middle would silently shift every caller's later arguments.
-  completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal })
+  completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-57. Appended for the same positional-parameter reason as
+  // completeEventHandler above.
+  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -187,6 +191,12 @@ export function createApp(
     '/:eventId/stage',
     access.requirePermission('event_request.stage.view'),
     eventStageHandler
+  );
+  // SG2-57: the assigned coordinator sees which arrangements are outstanding.
+  eventRequests.get(
+    '/:eventId/arrangements',
+    access.requirePermission('event_request.arrangements.view'),
+    eventArrangementsHandler
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(
