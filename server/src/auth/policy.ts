@@ -1,6 +1,5 @@
-// SG2-86 adds the two Week 7 roles below. Their only grants today are
-// profile.read/profile.update (inherited via [...ROLES]); further grants
-// arrive with SG2-87/88/97/100.
+// SG2-86 adds the two Week 7 roles below. Feature-specific grants are
+// listed explicitly alongside their universal profile permissions.
 export const ROLES = [
   'event_organiser',
   'event_coordinator',
@@ -103,6 +102,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment.read': ['technical_support_staff'],
   'equipment.create': ['technical_support_staff'],
   'equipment.update': ['technical_support_staff'],
+  // SG2-53: assigned coordinators request; support records arrangements;
+  // Safety Officers read placements for the SG2-91 review workflow.
+  'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],
+  'equipment_requirements.request': ['event_coordinator'],
+  'equipment_requirements.arrange': ['technical_support_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

@@ -783,13 +783,17 @@ test('[NORMAL] [SG2-26:AC1] organiser dashboard opens the selected real event an
 });
 
 // SG2-46: an approved event opens venue search pre-filled; the menu opens it blank.
-test('[NORMAL] [SG2-46:AC1] a coordinator opens venue search from an approved event, and from the menu without it', async () => {
+test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] a coordinator opens equipment requirements and venue search from the same approved event', async () => {
   const approved = { kind: 'event', item_id: 10, event_id: 10, title: 'Approved Forum', event_name: 'Approved Forum',
     status: 'approved', starts_at: '2030-06-15T02:00:00.000Z', ends_at: null, category: 'assigned', assigned_to_me: true,
     details: { expected_attendance: 40, accessibility_needs: null } };
   const fetch = vi.fn(async (url: string) => {
     if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: 'event_coordinator', permissions: ['venues.search'] });
     if (url.startsWith('/api/work-queue')) return Response.json({ items: [approved] });
+    if (url === '/api/equipment-requests?event_id=10') return Response.json({
+      event: { event_id: 10, name: 'Approved Forum', status: 'approved' }, requests: [], equipment: [], venues: [],
+      can_request: true, can_arrange: false,
+    });
     if (url.startsWith('/api/venues/search')) return Response.json({ venues: [] });
     return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role: 'Event Coordinator' } });
   });
@@ -800,6 +804,8 @@ test('[NORMAL] [SG2-46:AC1] a coordinator opens venue search from an approved ev
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
   fireEvent.click(await screen.findByRole('button', { name: /Approved Forum/ }));
+  expect(await screen.findByRole('region', { name: 'Equipment requirements' })).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Add equipment requirement' })).toBeVisible();
   fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
   expect(screen.getByRole('heading', { level: 1, name: 'Find venues' })).toBeInTheDocument();
   expect(screen.getByText('For: Approved Forum (#10)')).toBeInTheDocument();

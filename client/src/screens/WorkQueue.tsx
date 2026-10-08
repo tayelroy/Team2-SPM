@@ -3,6 +3,7 @@ import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, ty
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
 import ClarificationThread from '../components/ClarificationThread';
+import EquipmentRequirements from '../components/EquipmentRequirements';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
@@ -150,6 +151,10 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
         })}
       </dl>
+      {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
+        && ['approved', 'planning', 'confirmed'].includes(currentStatus))) && (
+        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} />
+      )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread
         eventId={item.event_id}

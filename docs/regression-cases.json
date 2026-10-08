@@ -3199,5 +3199,176 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-53-P01",
+    "title": "coordinator requests reach support and saved shortfall and placement return to the coordinator",
+    "type": "NORMAL",
+    "story": "SG2-53",
+    "purpose": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Create four microphone requirements at 1440px, reload, arrange a shortfall of two with venue/position as support, read as Safety Officer and coordinator, then amend to six."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC1",
+      "SG2-53:AC2",
+      "SG2-53:AC4",
+      "SG2-53:AC5",
+      "SG2-53:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-P02",
+    "title": "phone users save requirements and support shortfall while missing placement is Not recorded",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-53",
+    "purpose": "Replacement notes and shortfall 1 persist; venue/position both say Not recorded; no horizontal overflow.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "At 390px request one maintenance projector, record a shortfall of one without placement as support, then reload."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Replacement notes and shortfall 1 persist; venue/position both say Not recorded; no horizontal overflow.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC1",
+      "SG2-53:AC5",
+      "SG2-53:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-B01",
+    "title": "zero and fractional quantities are refused and a corrected positive quantity saves",
+    "type": "BOUNDARY / FAILURE",
+    "story": "SG2-53",
+    "purpose": "Visible validation, HTTP 400, no stored request until corrected; exact quantity 1 persisted.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Attempt zero in the editor and 0.5 through HTTP, verify no saved request, then save quantity 1."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Visible validation, HTTP 400, no stored request until corrected; exact quantity 1 persisted.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-C01",
+    "title": "a stale coordinator save preserves the newer support update and duplicate requests are refused",
+    "type": "CONFLICT",
+    "story": "SG2-53",
+    "purpose": "HTTP 409 for duplicate; stale draft remains visible but cannot overwrite version 2 arrangement; reload reveals support data.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Create a requirement, refuse its duplicate, begin an amendment, save a newer support update, attempt stale amendment, reload."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "HTTP 409 for duplicate; stale draft remains visible but cannot overwrite version 2 arrangement; reload reveals support data.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC2",
+      "SG2-53:AC5"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-N01",
+    "title": "role guards refuse unauthorized requests and outages retain drafts for retry",
+    "type": "FAILURE",
+    "story": "SG2-53",
+    "purpose": "HTTP 401/403/404; generic error hides provider details, draft stays intact and retry saves the exact request.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Refuse unsigned/other-role/unassigned requests, simulate HTTP 503 during save, then retry with the same draft."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "HTTP 401/403/404; generic error hides provider details, draft stays intact and retry saves the exact request.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC1",
+      "SG2-53:AC5",
+      "SG2-53:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
   }
 ]
