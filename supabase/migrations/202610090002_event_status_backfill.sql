@@ -24,10 +24,12 @@ where status = 'submitted'
 -- that is what keeps a completed event out of the active work list
 -- (SG2-100 AC4) without a status exclusion to maintain.
 --
--- Rebuilt from SG2-49's post-merge body (202610060001_venue_booking_decisions.sql)
--- so the venue item's `venue_holds` join and `hold_id` detail survive the
--- widening below; SG2-49 ran first by filename order and this file replaces
--- its view, so dropping the join here would silently undo it.
+-- Rebuilt from SG2-53's body (202610080001_equipment_requirements.sql), which
+-- itself carries SG2-49's `venue_holds` join and `hold_id` detail. Both ran
+-- first by filename order and this file replaces their view, so the venue
+-- hold detail and SG2-53's equipment arrangement, shortfall, placement and
+-- version details must all survive the widening below — dropping any of them
+-- here would silently undo that story.
 --
 -- An event item's `ends_at` is the event's end time: the latest of its
 -- confirmed venue bookings, the same rule `completeEvent` enforces. The
@@ -70,12 +72,15 @@ where r.status = 'pending' and e.status in ('unassigned', 'submitted', 'under_re
 union all
 select 'equipment', r.request_id, e.event_id, q.name::text,
   coalesce(nullif(e.name, ''), 'Untitled event')::text,
-  r.status, r.starts_at, r.ends_at, 'technical_support_staff', null::uuid, 'equipment',
+  r.status, coalesce(r.starts_at, e.proposed_date), r.ends_at, 'technical_support_staff', null::uuid, 'equipment',
   jsonb_build_object('quantity', r.quantity, 'equipment_requirements', e.equipment_requirements,
-    'notes', r.notes)
+    'notes', r.notes, 'arrangement_notes', r.arrangement_notes, 'shortfall', r.shortfall,
+    'placement_venue_id', r.placement_venue_id, 'placement_venue_name', placement.name,
+    'placement_position', r.placement_position, 'version', r.version)
 from public.equipment_requests r
 join public.events e on e.event_id = r.event_id
 join public.equipment q on q.equipment_id = r.equipment_id
+left join public.venues placement on placement.venue_id = r.placement_venue_id
 where r.status = 'pending' and e.status in ('unassigned', 'submitted', 'under_review', 'approved',
   'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed');
 -- Replacing a view keeps its privileges; restated here, as SG2-49 did, so the

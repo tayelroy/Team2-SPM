@@ -384,11 +384,12 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 // SG2-97 gives the Lead its own dedicated test below, so this loop now covers
 // only the Safety Officer.
 for (const role of ['safety_officer'] as const) {
-  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads`, async () => {
+  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads and read-only equipment placement`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, 200);
-    // SG2-100 added the stage and history reads both roles need; the queues
+    // SG2-100 added the stage and history reads both Week 7 roles need, and
+    // SG2-53 lets the Safety Officer read equipment placement; the queues
     // they act on arrive with SG2-87/88/91/97.
     assert.deepEqual(res.body, {
       userId,
@@ -396,6 +397,7 @@ for (const role of ['safety_officer'] as const) {
       permissions: [
         'event_request.stage.view',
         'event_request.history.view',
+        'equipment_requirements.read',
         'profile.read',
         'profile.update'
       ]
@@ -430,7 +432,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] permissionsFor existing roles keeps the documented grants, including Technical Support equipment maintenance', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] permissionsFor existing roles separates requesting equipment from arranging it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -442,7 +444,8 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] permissionsFor existing ro
       'event_request.decide', 'event_request.clarify', 'event_request.complete',
       'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
-      'venue_booking.request.view', 'venue_booking.conflicts.view', 'notifications.read', 'venues.holds.read', 'profile.read', 'profile.update'
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'notifications.read', 'venues.holds.read',
+      'equipment_requirements.read', 'equipment_requirements.request', 'profile.read', 'profile.update'
     ],
     venue_staff: [
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
@@ -454,7 +457,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] permissionsFor existing ro
       'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
       'venue_booking.capacity_exception.approve', 'notifications.read', 'venues.holds.read',
-      'equipment.read', 'equipment.create', 'equipment.update', 'profile.read', 'profile.update'
+      'equipment.read', 'equipment.create', 'equipment.update', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
     ],
     attendee: ['profile.read', 'profile.update']
   };

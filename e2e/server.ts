@@ -45,6 +45,8 @@ import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
 import { createMemoryEquipmentStore } from './support/equipment';
+import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
+import { createMemoryRequirementsStore } from './support/equipment-requirements';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -169,6 +171,7 @@ const app = createApp(
   createAddClarificationHandler(eventDependencies),
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
   createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
+  createEquipmentRequirementsRouter(access, token => createMemoryRequirementsStore(database, token)),
   // SG2-100 AC4: Mark Completed, against the in-memory client.
   createCompleteEventHandler(eventDependencies)
 );
@@ -185,6 +188,13 @@ app.post('/__e2e/reset', (_req, res) => {
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
 app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
+  res.status(204).end();
+});
+app.post('/__e2e/equipment-requirements', (_req, res) => {
+  database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
+    coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });
+  database.tables.equipment.push({ equipment_id: 2, name: 'Portable projector', description: 'HDMI projector',
+    quantity_total: 2, location: 'Store B', operational_status: 'maintenance', version: 1 });
   res.status(204).end();
 });
 app.post('/__e2e/assigned-review', (_req, res) => {
@@ -234,5 +244,6 @@ app.post('/__e2e/hold-time', (req, res) => {
 const buildDirectory = path.resolve(__dirname, '../client/dist');
 app.use(express.static(buildDirectory));
 app.get('*', (_req, res) => res.sendFile(path.join(buildDirectory, 'index.html')));
-const server = app.listen(4173, '127.0.0.1', () => console.log('Regression server: http://127.0.0.1:4173 (in-memory fixtures)'));
+const fixturePort = Number(process.env.E2E_PORT ?? 4173);
+const server = app.listen(fixturePort, '127.0.0.1', () => console.log(`Regression server: http://127.0.0.1:${fixturePort} (in-memory fixtures)`));
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => server.close(() => process.exit(0)));

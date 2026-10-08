@@ -99,11 +99,11 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [NORMAL] 
     await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
     if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-desktop.png`, fullPage: true });
     await region.getByRole('button', { name: new RegExp(title) }).click();
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: title, exact: true, level: 2 })).toBeVisible();
     await expect(page.getByText('Sustainability Leadership Forum · Event #41')).toBeVisible();
     await expect(page.getByText(/15 Jun 2030, 10:00 – 15 Jun 2030, 18:00/)).toBeVisible();
-    await expect(page.getByText(fact, { exact: true })).toBeVisible();
-    await expect(page.getByText('Set up before guests arrive.')).toBeVisible();
+    await expect(page.getByRole('term').filter({ hasText: new RegExp(`^${fact}$`) })).toBeVisible();
+    await expect(page.getByRole('definition').filter({ hasText: /^Set up before guests arrive\.$/ })).toBeVisible();
     const headers = await authHeaders(page);
     expect((await page.request.get('/api/work-queue/event/41', { headers })).status()).toBe(404);
     if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-detail.png`, fullPage: true });
@@ -1296,7 +1296,20 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await page.clock.fastForward(30_000);
     await expect(page.getByRole('button', { name: 'Notifications (2)', exact: true })).toBeVisible();
     await capture(page, 'coordinator-automatic-warning-badge', false);
+    // Opening shows cached notices immediately and also refreshes both inboxes.
+    // Finish that refresh before advancing expiry, otherwise its in-flight guard
+    // can correctly skip our only simulated polling tick on a slower CI runner.
+    const openingRefresh = Promise.all([
+      page.waitForResponse(response => response.url().endsWith('/api/venue-holds/notifications') && response.request().method() === 'GET'),
+      page.waitForResponse(response => response.url().endsWith('/api/notifications') && response.request().method() === 'GET'),
+    ]);
     await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+    for (const response of await openingRefresh) {
+      expect(response.status()).toBe(200);
+      expect(await response.finished()).toBeNull();
+    }
+    // Let response-consumption microtasks settle before simulating the next tick.
+    await page.clock.runFor(1);
     await expect(page.getByText('Hold expiring soon', { exact: true })).toBeVisible();
 
     // Leave the drawer open: expiry must arrive without closing/reopening it.

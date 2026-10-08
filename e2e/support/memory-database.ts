@@ -268,7 +268,7 @@ export class MemoryDatabase {
         if (request.status !== 'pending' || !event) continue;
         const resource = this.tables[resourceTable].find(resource => resource[resourceKey] === request[resourceKey])!;
         items.push({ kind, item_id: request.request_id, event_id: event.event_id, title: resource.name,
-          event_name: event.name || 'Untitled event', status: request.status, starts_at: request.starts_at, ends_at: request.ends_at,
+          event_name: event.name || 'Untitled event', status: request.status, starts_at: request.starts_at ?? event.proposed_date, ends_at: request.ends_at,
           audience, assigned_to: null, category: kind, details: kind === 'venue'
             ? { location: resource.location, capacity: resource.capacity, expected_attendance: event.expected_attendance,
               venue_requirements: request.venue_requirements ?? event.venue_requirements, accessibility_needs: event.accessibility_needs, notes: request.notes,

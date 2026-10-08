@@ -1,6 +1,8 @@
-// SG2-86 added the two Week 7 roles below. SG2-100 gives them the stage and
-// history reads they cannot work without; the queues they act on arrive with
-// SG2-87/88/91/97.
+// SG2-86 added the two Week 7 roles below. Feature-specific grants are
+// listed explicitly alongside their universal profile permissions: SG2-100
+// gives both the stage and history reads they cannot work without, SG2-53
+// gives the Safety Officer read-only equipment placement, and the queues
+// they act on arrive with SG2-87/88/91/97.
 export const ROLES = [
   'event_organiser',
   'event_coordinator',
@@ -118,6 +120,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment.read': ['technical_support_staff'],
   'equipment.create': ['technical_support_staff'],
   'equipment.update': ['technical_support_staff'],
+  // SG2-53: assigned coordinators request; support records arrangements;
+  // Safety Officers read placements for the SG2-91 review workflow.
+  'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],
+  'equipment_requirements.request': ['event_coordinator'],
+  'equipment_requirements.arrange': ['technical_support_staff'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

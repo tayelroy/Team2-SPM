@@ -506,6 +506,21 @@
         "AC3": "Users who are not Technical Support Staff cannot edit equipment records"
       },
       "source": "Live Jira SG2-52 description verified in Google Chrome on 7 October 2026."
+    },
+    {
+      "id": "SG2-53",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-53",
+      "summary": "Record what equipment an event needs",
+      "acceptanceCriteria": {
+        "AC1": "Can record required equipment against an approved event, with type, quantity and technical notes",
+        "AC2": "Can amend the requirements while they are still being arranged",
+        "AC3": "A quantity that is not a positive number is refused",
+        "AC4": "The request reaches Technical Support Staff",
+        "AC5": "Technical Support Staff can record updates on the request as equipment is arranged, including any shortfall, and the coordinator can see these updates",
+        "AC6": "For each requested item, Technical Support Staff can record where it will be placed (which venue and position within it), for the Safety Officer review (Week 7 change #6, SG2-91); an item with no placement recorded is shown as Not recorded"
+      },
+      "originalPullRequests": [],
+      "source": "Live Jira SG2-53 description verified in the in-app browser on 8 October 2026. AC numbering follows displayed bullet order."
     }
   ]
 }

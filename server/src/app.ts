@@ -33,6 +33,7 @@ import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
 import { createVenueConflictsRouter } from './venues/conflicts';
 import { createEquipmentRouter } from './equipment';
+import { createEquipmentRequirementsRouter } from './equipment/requirements';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -73,6 +74,7 @@ export function createApp(
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
   venueHoldsRouter = createVenueHoldsRouter(access),
   equipmentRouter = createEquipmentRouter(access),
+  equipmentRequirementsRouter = createEquipmentRequirementsRouter(access),
   // SG2-100 AC4. Appended rather than grouped with the other event handlers
   // on purpose: every parameter here is positional, and inserting one in the
   // middle would silently shift every caller's later arguments.
@@ -111,6 +113,7 @@ export function createApp(
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
   app.use('/api/equipment', equipmentRouter);
+  app.use('/api/equipment-requests', equipmentRequirementsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

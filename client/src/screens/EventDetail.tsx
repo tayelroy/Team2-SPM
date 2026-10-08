@@ -11,6 +11,7 @@ import EventAuditDrawer from '../components/EventAuditDrawer';
 import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
 import ClarificationThread from '../components/ClarificationThread';
+import EquipmentRequirements from '../components/EquipmentRequirements';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -377,6 +378,9 @@ export default function EventDetail({
               </div>
             ))}
           </dl>
+          {isAssignedCoordinator && ['approved', 'planning', 'confirmed'].includes(detail.status.toLowerCase()) && (
+            <EquipmentRequirements eventId={detail.eventId} accessToken={accessToken} />
+          )}
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
             {!detail.canManage && !isCoordinator ? (
