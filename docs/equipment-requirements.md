@@ -132,3 +132,23 @@ stored definition fields. One coverage run stalled in an existing venue test and
 was stopped; the complete retry passed. A browser run overlapped that rebuild and
 lost the generated page briefly; the final browser run began after the build and
 passed without retries. These attempts are not counted as passing evidence.
+
+Hosted run 181 exposed a timing race in the existing SG2-85-P02 browser test:
+cached drawer notices were visible before the opening refresh finished, so its
+single simulated polling tick could be skipped by the in-flight guard. The test
+now waits for both HTTP response bodies before advancing that tick. Five normal
+repetitions passed; a temporary 500ms response delay reproduced the original
+failure and passed with the correction. The delay was removed, and the complete
+62-journey suite and report gate passed again. No notification production code or
+automatic-poll assertion changed. Logs: `/tmp/sg2-85-p02-delayed-before.log`,
+`/tmp/sg2-85-p02-delayed-after.log` and
+`/tmp/sg2-53-browser-synchronized.log`.
+
+The [SPM Test Cases register](https://docs.google.com/spreadsheets/d/1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o/edit?gid=19761001&range=A1984:Y2082#gid=19761001)
+has 99 new SG2-53 rows in **Main Test Cases A1984:Y2082** and three expanded rows
+at 79, 1692 and 1838. Together these map 54 method declarations, 42 SQL contracts
+and six real-session concurrency scenarios. All 2,550 written main-grid values
+were read back. Reviewed By is Lim Jun Wei and Review Date is 8 Oct 2026; the
+Validation record states automated review on his behalf, with independent teammate
+approval pending. [PR #67](https://github.com/tayelroy/Team2-SPM/pull/67) contains
+the filled DoD inventory and verification checklist.
