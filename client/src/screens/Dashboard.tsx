@@ -158,7 +158,9 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
           <span><Badge bg={badge.badgeBg} fg={badge.badgeFg}>{statusLabel(event.status)}</Badge> <span style={{ color: color.silver }}>#{event.eventId}</span></span>
           <strong style={{ fontSize: '20px', overflowWrap: 'anywhere' }}>{event.name || 'Untitled event'}</strong>
           <span style={{ color: color.silver }}>{formatProposedDate(event.proposedDate)} · {event.coordinatorName || 'Unassigned'}</span>
-          <span style={{ color: color.mist }}>{!event.canManage ? 'View only' : event.waitingOnMe ? 'Waiting on you' : 'With coordinator'}</span>
+          <span style={{ color: color.mist }}>{!event.canManage ? 'View only' : event.waitingOnMe ? 'Waiting on you'
+            // SG2-87: a request in the Lead's queue is not with a coordinator yet.
+            : event.status === 'unassigned' ? 'Awaiting a coordinator' : 'With coordinator'}</span>
         </button>;
       })}
     </Card>

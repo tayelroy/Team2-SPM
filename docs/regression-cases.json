@@ -48,9 +48,11 @@
       "SG2-41:AC1",
       "SG2-41:AC2",
       "SG2-41:AC3",
-      "SG2-41:AC4"
+      "SG2-41:AC4",
+      "SG2-87:AC1"
     ],
-    "method_id": "TC-0ade7cc1c1aa"
+    "method_id": "TC-0ade7cc1c1aa",
+    "notes": "Since SG2-87 the coordinator's queue holds only their own assignment (#42); unassigned #41 waits in the Lead's queue."
   },
   {
     "id": "SG2-41-DB01",
@@ -472,9 +474,11 @@
     "mapped_acs": [
       "SG2-28:AC1",
       "SG2-30:AC1",
-      "SG2-31:AC3"
+      "SG2-31:AC3",
+      "SG2-87:AC4"
     ],
-    "method_id": "TC-6cea16b8d437"
+    "method_id": "TC-6cea16b8d437",
+    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4."
   },
   {
     "id": "SG2-28-B01",
@@ -1584,7 +1588,7 @@
       "expect(detail.status()).toBe(200)",
       "expect((await detail.json()).items[0].status).toBe('under_review')"
     ],
-    "evidence": "e2e/regression.spec.ts:571",
+    "evidence": "e2e/regression.spec.ts:573",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1599,16 +1603,17 @@
   },
   {
     "id": "SG2-35-N01",
-    "title": "a request awaiting assignment is readable but never enters review",
+    "title": "a request awaiting assignment never reaches a coordinator and never enters review",
     "story": "SG2-35",
     "categories": [
       "CONFLICT"
     ],
     "mapped_acs": [
-      "SG2-35:AC3"
+      "SG2-35:AC3",
+      "SG2-87:AC1"
     ],
-    "method_id": "TC-0aa7b559f8cc",
-    "purpose": "Verify the named user journey through the real application routes.",
+    "method_id": "TC-25650768086e",
+    "purpose": "Verify that an unassigned submitted request does not appear in any coordinator's work queue (SG2-87) and that reviewing it is refused even when called directly.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
       "(await request.post('/__e2e/work-queue')).status()",
@@ -1624,13 +1629,11 @@
       "detail = await page.request.get('/api/work-queue/event/41', { headers })"
     ],
     "expected": [
-      "expect((await request.post('/__e2e/work-queue')).status()).toBe(204)",
-      "expect(page.getByText(/Awaiting assignment/)).toBeVisible()",
-      "expect(page.getByText('submitted')).toBeVisible()",
-      "expect((await page.request.patch('/api/event-requests/41/review', { headers })).status()).toBe(404)",
-      "expect((await detail.json()).items[0].status).toBe('submitted')"
+      "Coordinator's queue shows 1 item, without Sustainability Leadership Forum (#41)",
+      "PATCH /api/event-requests/41/review returns 404",
+      "GET /api/work-queue/event/41 returns 404"
     ],
-    "evidence": "e2e/regression.spec.ts:591",
+    "evidence": "e2e/regression.spec.ts:593",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1681,7 +1684,7 @@
       "Previous coordinator's review call returns 404",
       "Organiser's detail returns coordinator_name 'Regression second coordinator'"
     ],
-    "evidence": "e2e/regression.spec.ts:609",
+    "evidence": "e2e/regression.spec.ts:607",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 34-journey Chromium run (npm run test:e2e exit 0, regression gate green).",
@@ -1725,7 +1728,7 @@
       "The assigned coordinator's own review (200), decision (200), planning update (200) and venue request (201) succeed",
       "After each reassignment the previous coordinator is refused on every action exactly as for an unassigned event"
     ],
-    "evidence": "e2e/regression.spec.ts:657",
+    "evidence": "e2e/regression.spec.ts:655",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "SG2-90-P01 passed in the 43-journey Chromium run (42 passed, 1 failed). The one failure, SG2-85-P02 (tentative-hold notices), fails identically on a clean origin/main at 5531afa, so it predates this story; npm run test:e2e therefore exits 1 until that is fixed.",
@@ -1765,7 +1768,7 @@
       "After the event is handed back the planning update returns 200",
       "History holds exactly two coordinator entries, newest first: second coordinator → Regression coordinator, then Regression coordinator → second coordinator"
     ],
-    "evidence": "e2e/regression.spec.ts:707",
+    "evidence": "e2e/regression.spec.ts:705",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed alongside SG2-90-P01 in the Chromium run; removing the same-coordinator no-op in assignCoordinator.ts makes it fail.",
@@ -1804,7 +1807,7 @@
       "expect(page.getByText('approved')).toBeVisible()",
       "expect((await item.json()).items[0].status).toBe('approved')"
     ],
-    "evidence": "e2e/regression.spec.ts:742",
+    "evidence": "e2e/regression.spec.ts:740",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1858,7 +1861,7 @@
       "expect(decided.decision_reason).toBe('Clashes with the AGM on the same evening.')",
       "expect(page.getByRole('region', { name: 'Why this request was rejected' })) .toContainText('Clashes with the AGM on the same evening.')"
     ],
-    "evidence": "e2e/regression.spec.ts:761",
+    "evidence": "e2e/regression.spec.ts:759",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1901,7 +1904,7 @@
       "expect(refused.status()).toBe(404)",
       "expect(unassigned.status()).toBe(404)"
     ],
-    "evidence": "e2e/regression.spec.ts:795",
+    "evidence": "e2e/regression.spec.ts:793",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the current 28-journey Chromium run.",
@@ -1938,7 +1941,7 @@
     ],
     "data": "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; question and answer texts fixed in the spec.",
     "expected": "Status needs_clarification after the question; organiser notice and question visible; answer appended; event 52 stored as submitted after resubmission; the coordinator sees it under review with both messages (2 list items) and the decision panel back.",
-    "evidence": "e2e/regression.spec.ts:819",
+    "evidence": "e2e/regression.spec.ts:817",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
@@ -1972,7 +1975,7 @@
     ],
     "data": "Event 52; colleague, venue and organiser fixture accounts.",
     "expected": "Colleague GET and POST return 404; venue staff GET returns 403; the organiser's POST returns 201 with status still under_review.",
-    "evidence": "e2e/regression.spec.ts:867",
+    "evidence": "e2e/regression.spec.ts:865",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the 30-journey Chromium run.",
@@ -2758,6 +2761,52 @@
     "execution_date": "6 Oct 2026"
   },
   {
+    "id": "SG2-87-P01",
+    "title": "a submitted request waits in the Lead's unassigned queue until it is assigned",
+    "story": "SG2-87",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-87:AC1",
+      "SG2-87:AC2",
+      "SG2-87:AC3",
+      "SG2-87:AC4",
+      "SG2-87:AC5"
+    ],
+    "method_id": "TC-8efde3a21345",
+    "purpose": "Verify that a submitted request enters the Event Coordinator Lead's unassigned queue with its basic details and submission time instead of any coordinator's work queue, that only the Lead can read the queue, that the organiser sees it as awaiting assignment with no coordinator, that the Lead's queue screen lays out cleanly on phone and laptop widths, and that the request leaves the queue once assigned.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment (adds a second coordinator); draft #1 'Planning workshop' belongs to organiser@example.test. Submission lands in SG2-100's unassigned status; assignment moves it to submitted.",
+    "steps": [
+      "As organiser@example.test: PATCH /api/event-requests/1/submit",
+      "As lead@example.test: GET /api/assignment-queue",
+      "As coordinator@example.test: GET /api/work-queue",
+      "As organiser, coordinator, support, venue, safety and attendee: GET /api/assignment-queue",
+      "Sign in as organiser@example.test and open My events",
+      "Sign in as lead@example.test; at 390px and 1440px open Unassigned queue",
+      "As lead@example.test: PATCH /api/event-requests/1/coordinator to user-coordinator; reopen Unassigned queue"
+    ],
+    "data": [
+      "Event 1 'Planning workshop', organiser Regression organiser, proposed 2030-06-15T02:00:00.000Z, expected attendance 20"
+    ],
+    "expected": [
+      "Submission returns 200; the queue entry equals {event_id 1, name 'Planning workshop', organiser_name 'Regression organiser', proposed_date 2030-06-15T02:00:00.000Z, expected_attendance 20} with a submitted_at at or after the submission",
+      "The coordinator's work queue does not contain event 1",
+      "Every role but the Lead receives 403",
+      "The organiser's My events row for Planning workshop shows coordinator Unassigned",
+      "The Lead's queue card shows the organiser and '15 Jun 2030, 10:00 am' at both widths, with no horizontal overflow",
+      "After assignment the queue no longer contains event 1, the card is gone and the organiser's detail shows status submitted with coordinator Regression coordinator"
+    ],
+    "evidence": "e2e/regression.spec.ts:1508",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in Chromium; dropping the coordinator_id filter from the queue query makes it fail.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "Marcus Chua",
+    "execution_evidence": "npx playwright test on feature/SG2-87-unassigned-request-queue working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
     "id": "SG2-97-P01",
     "title": "assignment moves to the Event Coordinator Lead while earlier assignments, their history and the organiser contact stay",
     "story": "SG2-97",
@@ -2790,7 +2839,7 @@
       "The organiser's detail shows coordinator_name 'Regression coordinator' and coordinator_phone '+6581234567'",
       "The Lead sees Legacy Forum with its coordinator picker at both widths, with no horizontal overflow"
     ],
-    "evidence": "e2e/regression.spec.ts:1459",
+    "evidence": "e2e/regression.spec.ts:1568",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
@@ -2828,7 +2877,7 @@
       "Planning by the original coordinator returns 403 after it",
       "History, newest first: [user-lead, Regression coordinator, Regression second coordinator], [user-support, null, Regression coordinator]"
     ],
-    "evidence": "e2e/regression.spec.ts:1497",
+    "evidence": "e2e/regression.spec.ts:1606",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",

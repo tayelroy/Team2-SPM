@@ -34,6 +34,7 @@ export type Screen =
   | 'editDraft'
   | 'profile'
   | 'assign'
+  | 'queue'
   | 'search';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */

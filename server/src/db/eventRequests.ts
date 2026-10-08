@@ -444,11 +444,15 @@ const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
  */
 export async function submitEventRequest(
   admin: SupabaseClient,
-  eventId: number
+  eventId: number,
+  now: () => string = () => new Date().toISOString()
 ): Promise<SubmitEventRequestResult> {
+  // SG2-87: both paths stamp the submission time, which orders the Lead's
+  // unassigned queue and is shown on each entry; a resubmission restamps it.
+  const submittedAt = now();
   const unheld = await admin
     .from('events')
-    .update({ status: 'unassigned' })
+    .update({ status: 'unassigned', submitted_at: submittedAt })
     .eq('event_id', eventId)
     .in('status', SUBMITTABLE_STATUSES)
     .is('coordinator_id', null)
@@ -463,7 +467,7 @@ export async function submitEventRequest(
 
   const held = await admin
     .from('events')
-    .update({ status: 'submitted' })
+    .update({ status: 'submitted', submitted_at: submittedAt })
     .eq('event_id', eventId)
     .in('status', SUBMITTABLE_STATUSES)
     .not('coordinator_id', 'is', null)

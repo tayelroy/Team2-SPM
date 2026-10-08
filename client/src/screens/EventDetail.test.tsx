@@ -127,6 +127,25 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
+  test('[NORMAL] [SG2-87:AC4] a request in the queue shows its organiser it is awaiting assignment, with no coordinator', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 103, organiserId: 'org-1', organisation: 'Acme Corp', status: 'unassigned',
+        name: 'Queued offsite', purpose: 'p', description: 'd', proposedDate: null, expectedAttendance: null,
+        venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null,
+        registrationNeeded: false, coordinatorId: null, coordinatorName: null,
+        coordinatorPhone: null, canManage: true, waitingOnMe: false, decisionReason: null, decidedAt: null,
+        completedBy: null, completedAt: null, endsAt: null,
+      },
+    });
+    render(<EventDetail role="Event Organiser" selectedEventId={103} accessToken="t" onNavigate={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Queued offsite' });
+    expect(screen.getAllByText('Awaiting Assignment').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+    expect(screen.queryByText('Submitted')).not.toBeInTheDocument();
+  });
+
   test('[BOUNDARY] [SG2-33:AC3] says when the coordinator has no phone number on file (SG2-33 AC3)', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,

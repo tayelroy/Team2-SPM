@@ -88,6 +88,10 @@ SG2-97 gives the Event Coordinator Lead `event_request.assign_coordinator`,
 taken away from Technical Support Staff, so the Lead is the only role that
 assigns or reassigns coordinators, plus `event_request.history.view` to see
 previous assignments. Existing assignments and their history are unchanged.
+SG2-87 adds `event_request.queue.view`, also the Lead's alone, for the
+**Unassigned queue** (`GET /api/assignment-queue`): requests in SG2-100's
+`unassigned` status. Coordinators no longer see unassigned requests in their
+work queue.
 
 SG2-100 widens both new roles' reads so each can see where an event has got
 to without being able to act beyond its own grant: `event_request.stage.view`
