@@ -93,6 +93,15 @@ test('[CONFLICT] [SG2-45:AC1] [SG2-46:AC2] AC2: a blocked venue or one with a co
   }), ['Rooftop Terrace', 'Unrecorded Room']);
 });
 
+test('[CONFLICT] [SG2-80:AC5] a venue marked unavailable over its own confirmed booking is not returned for any part of the period', async () => {
+  for (const [from, to] of [[FROM, TO], ['2030-06-15T11:59:59.999Z', '2030-06-15T13:00:00.000Z']]) {
+    assert.deepEqual(await names({ starts_at: from, ends_at: to }, {
+      venue_unavailability: { data: [{ venue_id: 3, starts_at: FROM, ends_at: TO }], error: null },
+      venue_booking_occupancy: { data: [{ venue_id: 3, starts_at: FROM, ends_at: TO, status: 'confirmed' }], error: null }
+    }), ['Atrium Hall', 'Seminar Room A', 'Unrecorded Room']);
+  }
+});
+
 test('[CONFLICT] [SG2-84:AC3] active tentative holds exclude a venue from available search results', async () => {
   const result = await searchVenues(criteria(), catalogue({ venue_booking_occupancy: { data: [
     { venue_id: 3, starts_at: FROM, ends_at: TO, status: 'tentative' }

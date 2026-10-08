@@ -5,15 +5,18 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import Venues from '../screens/Venues';
 import type { Venue } from './api';
-import { type VenueBlock } from './blocksApi';
+import { type AffectedBooking, type VenueBlock } from './blocksApi';
 
 const venue: Venue = { venue_id: 1, name: 'Atrium Hall', location: 'North Wing', capacity: 100,
   facilities: 'Stage', accessibility_features: 'Hearing loop', operating_information: 'Weekdays, 09:00–18:00' };
 const staff = { userId: 'staff', role: 'venue_staff',
   permissions: ['venues.read', 'venues.create', 'venues.update', 'venues.blocks.manage'] };
 const coordinator = { userId: 'coordinator', role: 'event_coordinator', permissions: ['venues.read'] };
-const existing: VenueBlock = { unavailability_id: 1, starts_at: '2030-08-01T01:00:00.000Z', ends_at: '2030-08-02T01:00:00.000Z', reason: 'Scheduled maintenance' };
-const booking = { booking_id: 7, event_id: 3, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z' };
+const recorded = { created_at: '2026-10-05T01:00:00.000Z', created_by_name: 'Vera Staff' };
+const existing: VenueBlock = { unavailability_id: 1, starts_at: '2030-08-01T01:00:00.000Z', ends_at: '2030-08-02T01:00:00.000Z',
+  category: 'maintenance', reason: 'Scheduled maintenance', ...recorded, affected: [] };
+const gala: AffectedBooking = { booking_id: 7, event_id: 3, event_name: 'Gala Night', event_status: 'confirmed',
+  starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z' };
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -34,7 +37,7 @@ function api(identity = staff, blocks: VenueBlock[] = [], override?: Handler) {
     if (url === '/api/venues') return Response.json({ venues: [venue] });
     if (url === '/api/venues/1/blocks' && !init?.method) return Response.json({ blocks: rows });
     if (url === '/api/venues/1/blocks' && init?.method === 'POST') {
-      const block = { unavailability_id: nextId++, ...JSON.parse(init.body as string) };
+      const block = { unavailability_id: nextId++, ...JSON.parse(init.body as string), ...recorded, affected: [] };
       rows.push(block);
       return Response.json({ block }, { status: 201 });
     }
@@ -57,10 +60,11 @@ async function openBlocks(blocks: VenueBlock[] = [], override?: Handler) {
   return { fetch, ...view };
 }
 
-function fillBlock(start: string, end: string, reason: string) {
+function fillBlock(start: string, end: string, reason: string, category = 'maintenance') {
   fireEvent.change(screen.getByLabelText('Unavailable from'), { target: { value: start } });
   fireEvent.change(screen.getByLabelText('Unavailable until'), { target: { value: end } });
-  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: reason } });
+  fireEvent.change(screen.getByLabelText('Reason'), { target: { value: category } });
+  fireEvent.change(screen.getByLabelText('Note'), { target: { value: reason } });
   fireEvent.submit(screen.getByRole('form', { name: 'Block venue' }));
 }
 
@@ -75,37 +79,64 @@ test('[FAILURE] [SG2-45:AC1] only callers who may manage blocks see the block co
   expect(screen.queryByRole('button', { name: /^Block/ })).not.toBeInTheDocument();
 });
 
-test('[BOUNDARY] [SG2-45:AC1] the block screen lists the venue\'s upcoming blocks, or says there are none', async () => {
-  await openBlocks([existing]);
+test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC6] the block screen lists upcoming blocks with reason, note, recorder and time, or says there are none', async () => {
+  await openBlocks([existing, { ...existing, unavailability_id: 2, category: 'other', reason: 'Legacy closure', created_at: null, created_by_name: null }]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   expect(item).toHaveTextContent('1 Aug 2030, 1:00 am – 2 Aug 2030, 1:00 am');
+  expect(item).toHaveTextContent('Maintenance: Scheduled maintenance');
+  expect(item).toHaveTextContent('Recorded by Vera Staff on 5 Oct 2026, 1:00 am');
+  expect(within(item).queryByRole('list')).not.toBeInTheDocument();
+  expect(screen.getByRole('listitem', { name: 'Legacy closure' })).toHaveTextContent('Other: Legacy closureRecorded before who and when were kept');
   cleanup();
   await openBlocks([]);
   expect(await screen.findByText(/No upcoming blocks/)).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-45:AC1] AC1: blocking a free period with a reason records it and shows it in the list, earliest first', async () => {
+test('[NORMAL] [SG2-45:AC1] [SG2-80:AC1] blocking a free period with a reason and a note records it and shows it in the list, earliest first', async () => {
   const { fetch } = await openBlocks([existing]);
   await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
-  fillBlock('2030-07-01T09:00', '2030-07-01T17:00', '  Carpet replacement ');
+  fillBlock('2030-07-01T09:00', '2030-07-01T17:00', '  Carpet replacement ', 'renovation');
   const starts = '2030-07-01T09:00:00.000Z';
   const ends = '2030-07-01T17:00:00.000Z';
   expect(await screen.findByRole('status')).toHaveTextContent('Atrium Hall is blocked 1 Jul 2030, 9:00 am – 1 Jul 2030, 5:00 pm.');
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({
-    method: 'POST', body: JSON.stringify({ starts_at: starts, ends_at: ends, reason: 'Carpet replacement' })
+    method: 'POST', body: JSON.stringify({ starts_at: starts, ends_at: ends, category: 'renovation', reason: 'Carpet replacement' })
   }));
   expect(screen.getAllByRole('listitem').map(item => item.getAttribute('aria-label'))).toEqual(['Carpet replacement', 'Scheduled maintenance']);
+  expect(screen.getByRole('listitem', { name: 'Carpet replacement' })).toHaveTextContent('Renovation: Carpet replacement');
   expect(screen.getByLabelText('Reason')).toHaveValue('');
+  expect(screen.getByLabelText('Note')).toHaveValue('');
 });
 
-test('[CONFLICT] [SG2-45:AC2] AC2: a period holding a confirmed booking is refused and the booking is identified', async () => {
+test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] a period holding confirmed bookings is accepted and lists each affected event as not cancelled', async () => {
+  const affected: AffectedBooking[] = [
+    gala,
+    { ...gala, booking_id: 8, event_id: 4, event_name: null, event_status: null },
+    { ...gala, booking_id: 9, event_id: null, event_name: null, event_status: null }
+  ];
   await openBlocks([], (url, init) => url === '/api/venues/1/blocks' && init?.method === 'POST'
-    ? Response.json({ error: 'conflict', booking }, { status: 409 }) : undefined);
+    ? Response.json({ block: { unavailability_id: 5, ...JSON.parse(init.body as string), ...recorded, affected } }, { status: 201 }) : undefined);
   await screen.findByText(/No upcoming blocks/);
-  fillBlock('2030-06-15T09:00', '2030-06-15T13:00', 'Deep clean');
-  expect(await screen.findByRole('alert')).toHaveTextContent('booking #7 for event 3, 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am');
-  expect(screen.getByText(/No upcoming blocks/)).toBeInTheDocument();
-  expect(screen.getByLabelText('Reason')).toHaveValue('Deep clean');
+  fillBlock('2030-06-15T00:00', '2030-06-16T00:00', 'Air conditioning failed', 'equipment_failure');
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'Atrium Hall is blocked 15 Jun 2030, 12:00 am – 16 Jun 2030, 12:00 am. 3 booked events are flagged as affected and not cancelled.');
+  const item = screen.getByRole('listitem', { name: 'Air conditioning failed' });
+  expect(item).toHaveTextContent('Equipment failure: Air conditioning failed');
+  expect(item).toHaveTextContent('Affected by venue unavailability (not cancelled)');
+  expect(within(screen.getByRole('list', { name: 'Events affected by Air conditioning failed' })).getAllByRole('listitem').map(row => row.textContent)).toEqual([
+    'Gala Night (confirmed) · 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am',
+    'Event 4 · 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am',
+    'Booking #9 · 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am'
+  ]);
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('[BOUNDARY] [SG2-80:AC3] a single affected event is reported in the singular', async () => {
+  await openBlocks([], (url, init) => url === '/api/venues/1/blocks' && init?.method === 'POST'
+    ? Response.json({ block: { unavailability_id: 5, ...JSON.parse(init.body as string), ...recorded, affected: [gala] } }, { status: 201 }) : undefined);
+  await screen.findByText(/No upcoming blocks/);
+  fillBlock('2030-06-15T03:59', '2030-06-15T05:00', 'Safety inspection', 'safety_concern');
+  expect(await screen.findByRole('status')).toHaveTextContent('1 booked event is flagged as affected and not cancelled.');
 });
 
 test('[NORMAL] [SG2-45:AC3] AC3: removing a block makes the venue available for that period again', async () => {
@@ -117,10 +148,10 @@ test('[NORMAL] [SG2-45:AC3] AC3: removing a block makes the venue available for 
   expect(screen.getByText(/No upcoming blocks/)).toBeInTheDocument();
 });
 
-test('[BOUNDARY] [SG2-45:AC1] an invalid period or missing reason is caught before any request', async () => {
+test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC1] an invalid period, missing reason or missing note is caught before any request', async () => {
   const { fetch } = await openBlocks();
   await screen.findByText(/No upcoming blocks/);
-  for (const [start, end, reason] of [
+  for (const [start, end, reason, category = 'other'] of [
     ['', '2030-07-01T17:00', 'Reason'],
     ['2030-07-01T09:00', '', 'Reason'],
     ['2030-07-01T17:00', '2030-07-01T09:00', 'Reason'],
@@ -128,10 +159,11 @@ test('[BOUNDARY] [SG2-45:AC1] an invalid period or missing reason is caught befo
     ['2026-09-30T23:59', '2026-10-01T00:00', 'Reason'],
     ['2020-07-01T09:00', '2020-07-01T17:00', 'Reason'],
     ['2030-07-01T09:00', '2030-07-01T17:00', '   '],
-    ['2030-07-01T09:00', '2030-07-01T17:00', 'x'.repeat(501)]
+    ['2030-07-01T09:00', '2030-07-01T17:00', 'x'.repeat(501)],
+    ['2030-07-01T09:00', '2030-07-01T17:00', 'Reason', '']
   ]) {
-    fillBlock(start, end, reason);
-    expect(screen.getByRole('alert')).toHaveTextContent('reason within 500 characters');
+    fillBlock(start, end, reason, category);
+    expect(screen.getByRole('alert')).toHaveTextContent('choose a reason, and add a note within 500 characters');
   }
   expect(fetch).not.toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({ method: 'POST' }));
 });
@@ -143,7 +175,7 @@ test('[BOUNDARY] [SG2-45:AC1] a one-minute free period accepts a reason of exact
   fillBlock('2030-07-01T09:00', '2030-07-01T09:01', reason);
   expect(await screen.findByRole('listitem', { name: reason })).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({
-    method: 'POST', body: JSON.stringify({ starts_at: '2030-07-01T09:00:00.000Z', ends_at: '2030-07-01T09:01:00.000Z', reason }),
+    method: 'POST', body: JSON.stringify({ starts_at: '2030-07-01T09:00:00.000Z', ends_at: '2030-07-01T09:01:00.000Z', category: 'maintenance', reason }),
   }));
 });
 
@@ -161,7 +193,7 @@ test('[FAILURE] [SG2-45:AC1] a network failure while saving keeps the form and r
   await screen.findByText(/No upcoming blocks/);
   fillBlock('2030-07-01T09:00', '2030-07-01T17:00', 'Carpet replacement');
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to reach the venue service. Please try again.');
-  expect(screen.getByLabelText('Reason')).toHaveValue('Carpet replacement');
+  expect(screen.getByLabelText('Note')).toHaveValue('Carpet replacement');
 });
 
 test('[FAILURE] [SG2-45:AC1] a lost session drops the catalogue and asks the user to sign in again', async () => {

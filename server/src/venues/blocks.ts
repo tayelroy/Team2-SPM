@@ -14,9 +14,11 @@ function parseVenueId(raw: string): number | null {
 }
 
 /**
- * Router for blocking a venue from use (SG2-45). Blocks are rows in
- * venue_unavailability, so they appear on the SG2-44 availability calendar as
- * soon as they are created. Mounted alongside the other venue routers at
+ * Router for blocking a venue from use (SG2-45) or marking it temporarily
+ * unavailable (SG2-80). Blocks are rows in venue_unavailability, so they
+ * appear on the SG2-44 availability calendar as soon as they are created.
+ * SG2-80 AC2: a period holding confirmed bookings is accepted; the database
+ * flags those bookings and the response lists them. Mounted alongside the other venue routers at
  * /api/venues; the route pattern (/:venueId/blocks) does not overlap them.
  */
 export function createVenueBlocksRouter(
@@ -37,7 +39,7 @@ export function createVenueBlocksRouter(
       const values = operation === 'create' ? validateVenueBlock(req.body, now()) : null;
       if (operation === 'create' && !values) {
         res.status(400).json({
-          error: `Enter a start and an end, with the end after the start and not in the past, and a reason within ${MAX_REASON_LENGTH} characters.`
+          error: `Enter a start and an end, with the end after the start and not in the past, a listed reason, and a note within ${MAX_REASON_LENGTH} characters.`
         });
         return;
       }
@@ -58,10 +60,6 @@ export function createVenueBlocksRouter(
       const result = await database.create(venueId, values!);
       if (result.outcome === 'missing') {
         res.status(404).json({ error: 'Venue not found.' });
-        return;
-      }
-      if (result.outcome === 'conflict') {
-        res.status(409).json({ error: 'This period already holds a confirmed booking.', booking: result.booking });
         return;
       }
       res.status(201).json({ block: result.block });
