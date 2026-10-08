@@ -78,7 +78,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     const res = await request(app).get('/api/event-requests/101/stage');
 
     assert.equal(res.status, 200);
-    assert.equal(res.body.stage, 'Approved — In Planning');
+    assert.equal(res.body.stage, 'Arrangements');
     assert.equal(res.body.stage_key, 'in_planning');
     assert.equal(res.body.event_id, 101);
     assert.deepEqual(res.body.waiting_on, {
@@ -88,9 +88,11 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     });
     assert.deepEqual(res.body.stepper_steps, [
       { key: 'draft', label: 'Draft', status: 'completed' },
-      { key: 'submitted', label: 'Submitted', status: 'completed' },
+      { key: 'unassigned', label: 'Awaiting Assignment', status: 'completed' },
       { key: 'under_review', label: 'Under Review', status: 'completed' },
-      { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+      { key: 'in_planning', label: 'Arrangements', status: 'current' },
+      { key: 'safety_check', label: 'Safety Check', status: 'upcoming' },
+      { key: 'preparation', label: 'Preparation', status: 'upcoming' },
       { key: 'confirmed', label: 'Confirmed', status: 'upcoming' }
     ]);
   });
@@ -100,7 +102,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     const res = await request(app).get('/api/event-requests/101/stage');
 
     assert.equal(res.status, 200);
-    assert.equal(res.body.stage, 'Approved — In Planning');
+    assert.equal(res.body.stage, 'Arrangements');
   });
 
   test('[NORMAL] [SG2-38:AC1] returns 200 for venue staff', async () => {
@@ -108,7 +110,7 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     const res = await request(app).get('/api/event-requests/101/stage');
 
     assert.equal(res.status, 200);
-    assert.equal(res.body.stage, 'Approved — In Planning');
+    assert.equal(res.body.stage, 'Arrangements');
   });
 
   test('[FAILURE] [SG2-25:AC1] [SG2-38:AC1] returns 403 Forbidden for attendee', async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  displayStatus,
+  completeEvent,
   fetchOwnEventDetail,
   getEventStage,
   type EventRequestDetail,
@@ -11,11 +11,13 @@ import EventAuditDrawer from '../components/EventAuditDrawer';
 import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
 import ClarificationThread from '../components/ClarificationThread';
+import EquipmentRequirements from '../components/EquipmentRequirements';
 import type { Role, Screen } from '../mock/types';
-import { badgeStyle } from '../mock/viewModel';
+import { badgeStyle, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
 import { Badge, Card, Notice, NoticeMark } from '../ui';
 import { formatProposedDate } from './EventsTable';
+import { formatSgtTimestamp } from '../components/EventAuditDrawer';
 
 export interface EventDetailProps {
   role: Role;
@@ -28,6 +30,11 @@ export interface EventDetailProps {
   selectedEventId?: number;
   accessToken?: string;
   currentUserId?: string;
+  /**
+   * Current instant, injected so "has the event finished?" is testable
+   * without a real clock (SG2-100 AC4). Defaults to now.
+   */
+  now?: () => Date;
 }
 
 const ARRANGEMENT_LABELS: Record<string, string> = {
@@ -46,6 +53,7 @@ export default function EventDetail({
   selectedEventId,
   accessToken,
   currentUserId,
+  now = () => new Date(),
 }: EventDetailProps) {
   const isOrganiser = role === 'Event Organiser';
   const isCoordinator = role === 'Event Coordinator';
@@ -59,6 +67,10 @@ export default function EventDetail({
   const [reloadKey, setReloadKey] = useState(0);
   const [isPlanningDrawerOpen, setIsPlanningDrawerOpen] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
+  // SG2-100 AC4: one in-flight completion at a time, so a double-click sends
+  // one request rather than two.
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthorizedRole || !selectedEventId || !accessToken) {
@@ -226,6 +238,34 @@ export default function EventDetail({
         );
       const canEditPlanning = isAssignedCoordinator && !isTerminal;
 
+      // SG2-100 AC4: an event can be closed out once it has actually been
+      // held. `endsAt` is the latest of its confirmed venue bookings; null
+      // means nothing says when it ends, which reads as "not finished",
+      // never as finished. The server re-checks all of this — this only
+      // decides whether to offer the action.
+      const isCompletable = ['confirmed', 'preparation'].includes(detail.status.toLowerCase());
+      const hasFinished = detail.endsAt !== null && Date.parse(detail.endsAt) <= now().getTime();
+      const canComplete = isAssignedCoordinator && isCompletable && hasFinished;
+
+      // No re-entrancy guard here: `completing` disables the button, so a
+      // second click never reaches this at all (the [CONFLICT] test in
+      // EventDetail.test.tsx asserts one request for three clicks). A token
+      // check would be dead for the same reason — this whole branch sits
+      // inside the `selectedEventId && accessToken` gate above.
+      const markCompleted = async () => {
+        setCompleting(true);
+        setCompleteError(null);
+        const result = await completeEvent(detail.eventId, accessToken);
+        if (result.ok) {
+          // Re-read rather than patching local state: the completion also
+          // moves the stage and the history, and both come from the server.
+          setReloadKey((key) => key + 1);
+        } else {
+          setCompleteError(result.message);
+        }
+        setCompleting(false);
+      };
+
       const facts = [
         { label: 'Organisation', value: detail.organisation || '—' },
         { label: 'Proposed date', value: formatProposedDate(detail.proposedDate) },
@@ -244,13 +284,20 @@ export default function EventDetail({
           value: detail.equipmentRequirements || 'None specified',
         },
         { label: 'Registration required', value: detail.registrationNeeded ? 'Yes' : 'No' },
+        // SG2-100 AC4: a completed event says who closed it out and when.
+        ...(detail.completedAt
+          ? [
+              { label: 'Completed at', value: formatSgtTimestamp(detail.completedAt) },
+              { label: 'Completed by', value: detail.completedBy ?? '—' },
+            ]
+          : []),
       ];
 
       return (
         <article className="organisation-detail">
           <div className="organisation-detail-header">
             <div className="organisation-detail-status">
-              <Badge bg={badge.badgeBg} fg={badge.badgeFg}>{displayStatus(detail.status, detail.coordinatorId)}</Badge>
+              <Badge bg={badge.badgeBg} fg={badge.badgeFg}>{statusLabel(detail.status)}</Badge>
               <span className="organisation-event-ref">#{detail.eventId}</span>
             </div>
             <button className="organisation-text-button" type="button" onClick={() => onNavigate('events')}>
@@ -331,6 +378,9 @@ export default function EventDetail({
               </div>
             ))}
           </dl>
+          {isAssignedCoordinator && ['approved', 'planning', 'confirmed'].includes(detail.status.toLowerCase()) && (
+            <EquipmentRequirements eventId={detail.eventId} accessToken={accessToken} />
+          )}
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
             {!detail.canManage && !isCoordinator ? (
@@ -362,6 +412,9 @@ export default function EventDetail({
                     <p>This request was returned by your coordinator. Please review the details, make necessary amendments, and resubmit.</p>
                   </div>
                 ) : null}
+                {completeError ? (
+                  <p role="alert" className="organisation-detail-notice">{completeError}</p>
+                ) : null}
                 {isLocked && isOrganiser ? (
                   <p role="status" aria-label="Editing disabled: request submitted" className="organisation-detail-notice">
                     This request has been submitted and is now with your coordinator. Contact your coordinator if an amendment is needed.
@@ -378,6 +431,16 @@ export default function EventDetail({
                       onClick={() => setIsPlanningDrawerOpen(true)}
                     >
                       Edit Planning Information
+                    </button>
+                  ) : null}
+                  {canComplete ? (
+                    <button
+                      className="organisation-button organisation-button-primary"
+                      type="button"
+                      onClick={markCompleted}
+                      disabled={completing}
+                    >
+                      {completing ? 'Marking as Completed…' : 'Mark as Completed'}
                     </button>
                   ) : null}
                   <button

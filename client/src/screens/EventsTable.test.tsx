@@ -87,7 +87,9 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     expect(screen.getByText('#101')).toBeInTheDocument();
     expect(screen.getByText(/15 Oct 2026/)).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
-    expect(screen.getByText('draft')).toBeInTheDocument();
+    // SG2-100: the row badge shows the plain-language name. 'Draft' also
+    // names a filter pill, so scope the lookup to the row's own badge.
+    expect(screen.getByTestId('event-status-101')).toHaveTextContent('Draft');
     expect(screen.getByText('Waiting on you')).toBeInTheDocument();
 
     // Second row: blank name fallback, null date, coordinator name, with coordinator chip
@@ -95,7 +97,7 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     expect(screen.getByText('#102')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.getByText('A. Vance')).toBeInTheDocument();
-    expect(screen.getByText('submitted')).toBeInTheDocument();
+    expect(screen.getByTestId('event-status-102')).toHaveTextContent('Submitted');
     expect(screen.getByText('With coordinator')).toBeInTheDocument();
 
     // TC-SG2-31-04: Row selection routing
@@ -138,14 +140,17 @@ describe('EventsTable for Event Organiser (API consumption)', () => {
     );
 
     expect(await screen.findByText('Strategy Session')).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledWith('test-token', 'All');
+    expect(fetchSpy).toHaveBeenCalledWith('test-token', 'all');
 
     // Click Draft filter pill
     const draftButton = screen.getByRole('button', { name: 'Draft' });
     fireEvent.click(draftButton);
     expect(draftButton).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByText('No draft events found.')).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledWith('test-token', 'Draft');
+    // SG2-100: the pill sends the stored status, not its label. Before that
+    // split, 'Under review' reached the API as `under review` and came back
+    // 400 — see STATUS_FILTERS.
+    expect(fetchSpy).toHaveBeenCalledWith('test-token', 'draft');
 
     // Click All to restore
     const allButton = screen.getByRole('button', { name: 'All' });
@@ -276,11 +281,11 @@ test('[NORMAL] [SG2-26:AC3] colleague events remain visible but never show a per
   expect(open).toHaveBeenCalledWith(77);
 });
 
-test('[NORMAL] [SG2-87:AC4] [SG2-87:AC5] a submitted request in the queue reads Unassigned; once assigned it reads submitted', async () => {
+test('[NORMAL] [SG2-87:AC4] [SG2-87:AC5] a request in the queue reads Awaiting Assignment and Unassigned; once assigned it reads Submitted', async () => {
   vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({
     ok: true,
     requests: [
-      { eventId: 201, name: 'Queued forum', proposedDate: null, status: 'submitted', coordinatorId: null,
+      { eventId: 201, name: 'Queued forum', proposedDate: null, status: 'unassigned', coordinatorId: null,
         coordinatorName: null, canManage: true, waitingOnMe: false },
       { eventId: 202, name: 'Assigned forum', proposedDate: null, status: 'submitted', coordinatorId: 'coord-1',
         coordinatorName: 'A. Vance', canManage: true, waitingOnMe: false },
@@ -289,8 +294,9 @@ test('[NORMAL] [SG2-87:AC4] [SG2-87:AC5] a submitted request in the queue reads 
   render(<EventsTable role="Event Organiser" accessToken="t" onOpenEvent={vi.fn()} />);
   const queued = await screen.findByRole('button', { name: 'View Queued forum' });
   const assigned = screen.getByRole('button', { name: 'View Assigned forum' });
-  expect(within(queued).getAllByText('Unassigned')).toHaveLength(2);
-  expect(within(queued).queryByText('submitted')).not.toBeInTheDocument();
-  expect(within(assigned).getByText('submitted')).toBeInTheDocument();
+  // SG2-100 names the status; the coordinator column says nobody holds it yet.
+  expect(within(queued).getByText('Awaiting Assignment')).toBeInTheDocument();
+  expect(within(queued).getByText('Unassigned')).toBeInTheDocument();
+  expect(within(assigned).getByText('Submitted')).toBeInTheDocument();
   expect(within(assigned).queryByText('Unassigned')).not.toBeInTheDocument();
 });

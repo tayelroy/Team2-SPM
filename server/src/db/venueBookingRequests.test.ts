@@ -156,3 +156,13 @@ test('[FAILURE] [SG2-49:AC3] a failure reading a request or its hold is reported
     await assert.rejects(attempt(createVenueBookingRequestStore(fakeAdmin(tables))), (error: unknown) => error instanceof AccessError && error.status === 503, name);
   }
 });
+
+test('[NORMAL] [SG2-50:AC1] the request store reads conflicts from the venue\'s bookings and holds', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingRequestStore(fakeAdmin({
+    venue_bookings: [{ data: [{ booking_id: 12, event_id: null, starts_at: row.starts_at, ends_at: row.ends_at, status: 'confirmed' }], error: null }]
+  }, calls));
+  const conflicts = await store.conflicts(row, { now: '2030-01-01T00:00:00.000Z', excludeRequestId: 41 });
+  assert.deepEqual(conflicts.map(conflict => [conflict.kind, conflict.reference_id]), [['booking', 12]]);
+  assert.deepEqual([...new Set(calls.map(call => call.table))], ['venue_bookings', 'venue_holds']);
+});

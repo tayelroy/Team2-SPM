@@ -124,6 +124,15 @@ export interface EventRequestDetail {
   /** Why the coordinator rejected it, and when they decided (SG2-37). */
   decisionReason: string | null;
   decidedAt: string | null;
+  /** Who marked the event completed, and when (SG2-100 AC4). */
+  completedBy: string | null;
+  completedAt: string | null;
+  /**
+   * When the event finishes — the latest end of its confirmed venue bookings
+   * (SG2-100 AC4). Null while nothing confirms when it ends, which must be
+   * read as "not known to have finished", never as finished.
+   */
+  endsAt: string | null;
 }
 
 export type SubmitResult =
@@ -199,6 +208,9 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     waitingOnMe: raw.can_manage === true && isWaitingOnOrganiser(status),
     decisionReason: typeof raw.decision_reason === 'string' ? raw.decision_reason : null,
     decidedAt: typeof raw.decided_at === 'string' ? raw.decided_at : null,
+    completedBy: typeof raw.completed_by === 'string' ? raw.completed_by : null,
+    completedAt: typeof raw.completed_at === 'string' ? raw.completed_at : null,
+    endsAt: typeof raw.ends_at === 'string' ? raw.ends_at : null,
   };
 }
 
@@ -856,6 +868,50 @@ export async function assignCoordinator(
   return unavailable;
 }
 
+export type CompleteEventOutcome = { ok: true } | { ok: false; message: string };
+
+/**
+ * Marks an event that has been held as completed (SG2-100 AC4). Maps to
+ * `PATCH /api/event-requests/:eventId/complete`.
+ *
+ * The server owns the clock, so its 409 is surfaced verbatim rather than
+ * second-guessed: the caller may believe the event is over and be wrong.
+ */
+export async function completeEvent(
+  eventId: number,
+  token: string,
+): Promise<CompleteEventOutcome> {
+  const unavailable = {
+    ok: false,
+    message: 'Could not mark the event completed. Please try again.',
+  } as const;
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return unavailable;
+  }
+
+  if (response.ok) return { ok: true };
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      message: 'Only the assigned Event Coordinator can mark this event completed.',
+    };
+  }
+  if (response.status === 400 || response.status === 404 || response.status === 409) {
+    const data = await readEventRequestJson(response, {} as Record<string, unknown>);
+    return {
+      ok: false,
+      message: typeof data.error === 'string' ? data.error : 'That change was not accepted.',
+    };
+  }
+  return unavailable;
+}
+
 /** One message in an event's clarification thread (SG2-36). */
 export interface Clarification {
   clarification_id: number;
@@ -995,14 +1051,4 @@ export async function getEventHistory(
     ok: true,
     history: body.history as EventAuditLogEntry[],
   };
-}
-
-/**
- * The status an organiser sees (SG2-87 AC4): a submitted request no
- * coordinator holds yet is waiting in the Event Coordinator Lead's queue, so
- * it reads "Unassigned". Every other status is shown as stored. SG2-100 may
- * later store this as a real status; until then it is derived here.
- */
-export function displayStatus(status: string, coordinatorId: string | null): string {
-  return status === 'submitted' && !coordinatorId ? 'Unassigned' : status;
 }

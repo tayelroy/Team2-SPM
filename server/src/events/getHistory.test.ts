@@ -317,16 +317,22 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     Object.assign(dbConfig, originalConfig);
   });
 
-  test('[NORMAL] [SG2-40:AC3] [SG2-97:AC2] policy grants event_request.history.view to organisers and internal staff, the Event Coordinator Lead included, excluding attendees', () => {
+  test('[NORMAL] [SG2-40:AC3] [SG2-97:AC2] [SG2-100:AC13] policy grants event_request.history.view to organisers and every internal role, excluding attendees', () => {
     const rolesWithPermission = PERMISSIONS['event_request.history.view'];
     assert.ok(rolesWithPermission, 'event_request.history.view permission must exist');
+    // SG2-100 added the two Week 7 roles: the Lead assigns coordinators and
+    // the Safety Officer answers a safety check, and neither can do so
+    // without seeing what has already changed on the event. Attendees stay
+    // out.
     assert.deepEqual([...rolesWithPermission].sort(), [
       'event_coordinator',
       'event_coordinator_lead',
       'event_organiser',
+      'safety_officer',
       'technical_support_staff',
       'venue_staff'
     ]);
+    assert.equal(rolesWithPermission.includes('attendee' as never), false);
   });
 
   const appForRole = (role: Role) => {

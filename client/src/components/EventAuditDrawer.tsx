@@ -5,6 +5,7 @@ import {
   type EventAuditLogEntry,
 } from '../api/eventRequests';
 import { loadSession } from '../auth/session';
+import { statusLabel } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import {
   Badge,
@@ -48,6 +49,17 @@ export function formatSgtTimestamp(iso: string | null | undefined): string {
 /** Humanizes database column names to user-facing labels. */
 export function humanizeFieldName(field: string): string {
   return FIELD_LABELS[field] ?? field;
+}
+
+/**
+ * The reader-facing form of a recorded value (SG2-100 AC5). Only `status`
+ * rows are translated: every other field's values are already free text or
+ * numbers, and passing those through `statusLabel` would rewrite anything
+ * that happened to collide with a status name.
+ */
+export function humanizeFieldValue(field: string, value: string | null): string {
+  if (value === null) return '(empty)';
+  return field === 'status' ? statusLabel(value) : value;
 }
 
 export interface EventAuditDrawerProps {
@@ -325,7 +337,7 @@ export function EventAuditDrawer({
                       wordBreak: 'break-word',
                     }}
                   >
-                    {entry.old_value ?? '(empty)'}
+                    {humanizeFieldValue(entry.field_name, entry.old_value)}
                   </span>
                   <span style={{ color: color.silver }}>→</span>
                   <span
@@ -336,7 +348,7 @@ export function EventAuditDrawer({
                       wordBreak: 'break-word',
                     }}
                   >
-                    {entry.new_value ?? '(empty)'}
+                    {humanizeFieldValue(entry.field_name, entry.new_value)}
                   </span>
                 </div>
               </div>

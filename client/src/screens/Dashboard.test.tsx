@@ -84,13 +84,14 @@ test('[NORMAL] [SG2-20:prototype-dashboard] attendee retains its prototype event
   for (const button of screen.getAllByRole('button', { name: /^Open:/ })) fireEvent.click(button);
 });
 
-test('[NORMAL] [SG2-87:AC4] the organisation dashboard shows a queued request as Unassigned and awaiting a coordinator', async () => {
+test('[NORMAL] [SG2-87:AC4] the organisation dashboard shows a queued request as awaiting assignment, not with a coordinator', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
-    { event_id: 5, name: 'Queued forum', status: 'submitted', can_manage: true, coordinator_id: null },
+    { event_id: 5, name: 'Queued forum', status: 'unassigned', can_manage: true, coordinator_id: null },
   ] })));
   render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
   const card = await screen.findByRole('button', { name: /Queued forum/ });
-  expect(within(card).getAllByText(/Unassigned/)).toHaveLength(2);
+  expect(within(card).getByText('Awaiting Assignment')).toBeInTheDocument();
+  expect(within(card).getByText(/Unassigned/)).toBeInTheDocument();
   expect(within(card).getByText('Awaiting a coordinator')).toBeInTheDocument();
   expect(within(card).queryByText('With coordinator')).not.toBeInTheDocument();
 });

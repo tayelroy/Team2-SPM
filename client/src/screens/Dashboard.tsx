@@ -15,8 +15,8 @@ import {
   RecessedCard,
   StatFigure,
 } from '../ui';
-import { displayStatus, fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
-import { badgeStyle } from '../mock/viewModel';
+import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
+import { badgeStyle, statusLabel } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
 
@@ -47,7 +47,7 @@ function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) 
         }}
       >
         <Badge bg={event.badgeBg} fg={event.badgeFg}>
-          {event.status}
+          {statusLabel(event.status)}
         </Badge>
         <span
           style={{
@@ -155,11 +155,12 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
             borderRadius: radius.card, color: color.platinum, cursor: 'pointer',
           }}
         >
-          <span><Badge bg={badge.badgeBg} fg={badge.badgeFg}>{displayStatus(event.status, event.coordinatorId)}</Badge> <span style={{ color: color.silver }}>#{event.eventId}</span></span>
+          <span><Badge bg={badge.badgeBg} fg={badge.badgeFg}>{statusLabel(event.status)}</Badge> <span style={{ color: color.silver }}>#{event.eventId}</span></span>
           <strong style={{ fontSize: '20px', overflowWrap: 'anywhere' }}>{event.name || 'Untitled event'}</strong>
           <span style={{ color: color.silver }}>{formatProposedDate(event.proposedDate)} · {event.coordinatorName || 'Unassigned'}</span>
           <span style={{ color: color.mist }}>{!event.canManage ? 'View only' : event.waitingOnMe ? 'Waiting on you'
-            : displayStatus(event.status, event.coordinatorId) === 'Unassigned' ? 'Awaiting a coordinator' : 'With coordinator'}</span>
+            // SG2-87: a request in the Lead's queue is not with a coordinator yet.
+            : event.status === 'unassigned' ? 'Awaiting a coordinator' : 'With coordinator'}</span>
         </button>;
       })}
     </Card>

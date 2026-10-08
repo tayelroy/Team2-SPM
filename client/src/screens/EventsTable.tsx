@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { displayStatus, fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
+import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { STATUS_FILTERS } from '../mock/data';
 import type { Role } from '../mock/types';
-import { badgeStyle } from '../mock/viewModel';
+import { badgeStyle, statusLabel } from '../mock/viewModel';
 import { color, radius, surface } from '../theme';
 import { Badge, Notice, NoticeMark } from '../ui';
 
@@ -29,7 +29,7 @@ export interface EventsTableProps {
 
 /** Full event list with status filtering. Rows open the detail screen. */
 export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTableProps) {
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState('all');
   const [requests, setRequests] = useState<EventRequestSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,12 +88,12 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
         style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}
       >
         {STATUS_FILTERS.map((f) => {
-          const active = f === filter;
+          const active = f.value === filter;
           return (
             <button
-              key={f}
+              key={f.value}
               type="button"
-              onClick={() => setFilter(f)}
+              onClick={() => setFilter(f.value)}
               aria-pressed={active}
               style={{
                 background: active ? 'rgba(203,255,252,0.16)' : 'rgba(255,255,255,0.05)',
@@ -106,7 +106,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                 cursor: 'pointer',
               }}
             >
-              {f}
+              {f.label}
             </button>
           );
         })}
@@ -161,9 +161,9 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
               border: '1px solid rgba(255,255,255,0.06)',
             }}
           >
-            {filter === 'All'
+            {filter === 'all'
               ? 'No event requests found.'
-              : `No ${filter.toLowerCase()} events found.`}
+              : `No ${statusLabel(filter).toLowerCase()} events found.`}
           </div>
         ) : (
           <div className="organisation-events" style={{ background: color.kelp, borderRadius: radius.card, overflow: 'hidden' }}>
@@ -248,9 +248,9 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                   >
                     {event.coordinatorName || 'Unassigned'}
                   </span>
-                  <span style={{ justifySelf: 'start' }}>
+                  <span style={{ justifySelf: 'start' }} data-testid={`event-status-${event.eventId}`}>
                     <Badge bg={badge.badgeBg} fg={badge.badgeFg}>
-                      {displayStatus(event.status, event.coordinatorId)}
+                      {statusLabel(event.status)}
                     </Badge>
                   </span>
                   <span style={{ justifySelf: 'start' }}>

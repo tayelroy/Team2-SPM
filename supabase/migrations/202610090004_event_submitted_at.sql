@@ -9,7 +9,8 @@ alter table public.events
 comment on column public.events.submitted_at is
   'When the request was last submitted for review (SG2-87). NULL for requests submitted before this column existed.';
 
--- The queue reads submitted, unassigned requests oldest first.
+-- The queue reads SG2-100's `unassigned` requests oldest first. Numbered
+-- after 202610090001_event_status_flow, which adds that enum value.
 create index if not exists events_unassigned_queue_idx
   on public.events (submitted_at, event_id)
-  where status = 'submitted' and coordinator_id is null;
+  where status = 'unassigned' and coordinator_id is null;

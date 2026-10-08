@@ -15,10 +15,12 @@ import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
+import { createCompleteEventHandler } from '../server/src/events/complete';
 import { createAssignCoordinatorHandler } from '../server/src/events/assignCoordinator';
 import { createUpdateEventPlanningHandler } from '../server/src/events/updatePlanning';
 import { createListAssignableHandler } from '../server/src/events/listAssignable';
 import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
+import { createGetEventStageHandler } from '../server/src/events/getStage';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
@@ -28,6 +30,7 @@ import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createProfileRouter } from '../server/src/profile';
@@ -43,6 +46,8 @@ import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createMemoryEquipmentStore } from './support/equipment';
+import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
+import { createMemoryRequirementsStore } from './support/equipment-requirements';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -143,12 +148,14 @@ const app = createApp(
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
     venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-50: what a pending request overlaps, against the in-memory client.
+    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
     notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
-  // SG2-38's stage handler keeps its production default here, as it does on
-  // main; only the review handler below needs the in-memory client.
-  undefined,
+  // SG2-100: the stage tracker's own regression journey (SG2-100-P01) reads
+  // this endpoint directly, so it now runs against the in-memory client too.
+  createGetEventStageHandler(eventDependencies),
   createStartEventReviewHandler(eventDependencies),
   // SG2-33/34: assignment, the assignable list and SG2-40's history run
   // against the in-memory client so the assignment history can be checked
@@ -165,6 +172,9 @@ const app = createApp(
   createAddClarificationHandler(eventDependencies),
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
   createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
+  createEquipmentRequirementsRouter(access, token => createMemoryRequirementsStore(database, token)),
+  // SG2-100 AC4: Mark Completed, against the in-memory client.
+  createCompleteEventHandler(eventDependencies),
   // SG2-87: the Lead's unassigned queue, against the in-memory client.
   createAssignmentQueueRouter(access, { getAdminClient: getClient })
 );
@@ -181,6 +191,13 @@ app.post('/__e2e/reset', (_req, res) => {
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
 app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
+  res.status(204).end();
+});
+app.post('/__e2e/equipment-requirements', (_req, res) => {
+  database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
+    coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });
+  database.tables.equipment.push({ equipment_id: 2, name: 'Portable projector', description: 'HDMI projector',
+    quantity_total: 2, location: 'Store B', operational_status: 'maintenance', version: 1 });
   res.status(204).end();
 });
 app.post('/__e2e/assigned-review', (_req, res) => {
@@ -215,6 +232,10 @@ app.post('/__e2e/under-review', (_req, res) => {
   database.seedUnderReview();
   res.status(204).end();
 });
+app.post('/__e2e/lifecycle', (_req, res) => {
+  database.seedLifecycle();
+  res.status(204).end();
+});
 app.post('/__e2e/venue-holds', (_req, res) => {
   venueHolds.seed();
   res.status(204).end();
@@ -226,5 +247,6 @@ app.post('/__e2e/hold-time', (req, res) => {
 const buildDirectory = path.resolve(__dirname, '../client/dist');
 app.use(express.static(buildDirectory));
 app.get('*', (_req, res) => res.sendFile(path.join(buildDirectory, 'index.html')));
-const server = app.listen(4173, '127.0.0.1', () => console.log('Regression server: http://127.0.0.1:4173 (in-memory fixtures)'));
+const fixturePort = Number(process.env.E2E_PORT ?? 4173);
+const server = app.listen(fixturePort, '127.0.0.1', () => console.log(`Regression server: http://127.0.0.1:${fixturePort} (in-memory fixtures)`));
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => server.close(() => process.exit(0)));

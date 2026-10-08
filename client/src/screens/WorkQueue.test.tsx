@@ -4,11 +4,39 @@ import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import type { WorkItem } from '../api/workQueue';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId }: { eventId: number }) => (
+  <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}</section>
+) }));
+
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Leadership Forum',
   event_name: 'Leadership Forum', status: 'under_review', starts_at: '2030-06-15T02:00:00Z', ends_at: null,
   category: 'review', assigned_to_me: false, details: { purpose: 'Share ideas', description: 'A community forum',
     expected_attendance: 0, accessibility_needs: null, registration_needed: true } };
+
+test.each(['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'])('[NORMAL] [SG2-53:AC1] [SG2-53:AC5] [SG2-100:AC5] the assigned coordinator opens equipment requirements from a %s event', async status => {
+  const item = { ...review, status, assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  expect(await screen.findByRole('region', { name: 'Equipment requirement integration' })).toHaveTextContent('Equipment requests for event 12');
+});
+
+test('[NORMAL] [SG2-53:AC4] [SG2-53:AC5] support opens the equipment workflow for the selected queue request', async () => {
+  const item = { ...review, kind: 'equipment', category: 'equipment', status: 'pending', item_id: 53, event_id: 91, title: 'Microphones' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role="Technical Support Staff" accessToken="support-token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Microphones/ }));
+  expect(await screen.findByRole('region', { name: 'Equipment requirement integration' })).toHaveTextContent('Equipment requests for event 91');
+});
+
+test.each([false, true])('[FAILURE] [SG2-53:AC1] equipment requirements are hidden before approval even when assigned: %s', async assigned_to_me => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [{ ...review, assigned_to_me }] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(screen.queryByRole('region', { name: 'Equipment requirement integration' })).not.toBeInTheDocument();
+});
 
 test('[NORMAL] [SG2-41:AC4] coordinator queue groups distinct records, opens the exact assignment and refreshes when returning', async () => {
   const assigned = { ...review, item_id: 28, event_id: 28, title: 'Assigned workshop', category: 'assigned', status: 'planning',
@@ -553,4 +581,89 @@ test('[FAILURE] [SG2-49:AC1] a venue request created by a tentative hold is not 
   fireEvent.click(await screen.findByRole('button', { name: /Quiet Room/ }));
   expect(await screen.findByText('This request belongs to tentative hold #12. Convert or release it from Venue holds.')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Approve booking' })).not.toBeInTheDocument();
+});
+
+// SG2-100 AC4: the coordinator closes out a held event from their own work
+// queue. `ends_at` is the latest of the event's confirmed venue bookings
+// (internal_work_items); only Date is faked, so findBy* polling still runs.
+const NOW = '2030-06-15T12:00:00.000Z';
+const held: WorkItem = { ...review, item_id: 28, event_id: 28, title: 'Held Forum', category: 'assigned',
+  status: 'confirmed', assigned_to_me: true, ends_at: '2030-06-15T10:00:00.000Z' };
+
+function completionFetch(item: WorkItem, complete: () => Promise<Response> | Response) {
+  return vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/complete')
+    ? complete()
+    : Response.json({ items: [item] }));
+}
+
+async function openHeld(item: WorkItem, fetch: ReturnType<typeof vi.fn>) {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(NOW));
+  vi.stubGlobal('fetch', fetch);
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(item.title) }));
+  await screen.findByRole('heading', { name: item.title });
+}
+
+test('[NORMAL] [SG2-100:AC6] the assigned coordinator marks a held event completed from the work queue', async () => {
+  const fetch = completionFetch(held, () => Response.json({ request: { event_id: 28, status: 'completed' } }));
+  await openHeld(held, fetch);
+  expect(screen.getByText(/This event ended on 15 Jun 2030, 18:00 \(Singapore time\)/)).toBeVisible();
+  // The proposed date and the booking end come from different records, so
+  // they are never shown as one range.
+  expect(screen.queryByText(/ – 15 Jun 2030, 18:00/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Mark as Completed' }));
+  expect(await screen.findByText('Marked as completed. This event has left your active work queue.')).toBeVisible();
+  expect(screen.getByText('completed', { exact: true })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+  // A completed event is read-only, so planning can no longer be edited.
+  expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/28/complete', {
+    method: 'PATCH', headers: { Authorization: 'Bearer token' },
+  });
+});
+
+test('[NORMAL] [SG2-100:AC6] an event in preparation can also be marked completed once held', async () => {
+  const preparation = { ...held, status: 'preparation' };
+  await openHeld(preparation, completionFetch(preparation, () => Response.json({})));
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Mark as Completed' })).toBeEnabled();
+});
+
+test('[BOUNDARY] [SG2-100:AC6] completion is offered from the exact end time, never before it or with no confirmed booking', async () => {
+  for (const [ends_at, offered] of [[NOW, true], ['2030-06-15T12:00:00.001Z', false], [null, false]] as const) {
+    const item = { ...held, ends_at };
+    await openHeld(item, completionFetch(item, () => Response.json({})));
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' }) !== null).toBe(offered);
+    cleanup();
+  }
+});
+
+test('[CONFLICT] [SG2-100:AC6] a rapid double-click sends one completion and disables the button while it is in flight', async () => {
+  let resolve!: (response: Response) => void;
+  const fetch = completionFetch(held, () => new Promise<Response>(yes => { resolve = yes; }));
+  await openHeld(held, fetch);
+  const button = screen.getByRole('button', { name: 'Mark as Completed' });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(screen.getByRole('button', { name: 'Marking as Completed…' })).toBeDisabled();
+  await act(async () => resolve(Response.json({ request: { event_id: 28, status: 'completed' } })));
+  expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/complete'))).toHaveLength(1);
+});
+
+test('[FAILURE] [SG2-100:AC6] a refused completion is explained and leaves the action available to retry', async () => {
+  await openHeld(held, completionFetch(held, () => Response.json({ error: 'This event has not finished yet.' }, { status: 409 })));
+  fireEvent.click(screen.getByRole('button', { name: 'Mark as Completed' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('This event has not finished yet.');
+  expect(screen.getByRole('button', { name: 'Mark as Completed' })).toBeEnabled();
+  expect(screen.getByText('confirmed', { exact: true })).toBeVisible();
+});
+
+test('[FAILURE] [SG2-100:AC6] completion is never offered on someone else\'s event or before the event is confirmed or in preparation', async () => {
+  for (const item of [{ ...held, assigned_to_me: false }, { ...held, status: 'approved' }, { ...held, status: 'planning' }]) {
+    await openHeld(item, completionFetch(item, () => Response.json({})));
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+    cleanup();
+  }
 });
