@@ -32,6 +32,7 @@ import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
 import { createVenueConflictsRouter } from './venues/conflicts';
 import { createEquipmentRouter } from './equipment';
+import { createEquipmentRequirementsRouter } from './equipment/requirements';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -71,7 +72,8 @@ export function createApp(
   listClarificationsHandler: RequestHandler = createListClarificationsHandler({ getPrincipal: access.getPrincipal }),
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
   venueHoldsRouter = createVenueHoldsRouter(access),
-  equipmentRouter = createEquipmentRouter(access)
+  equipmentRouter = createEquipmentRouter(access),
+  equipmentRequirementsRouter = createEquipmentRequirementsRouter(access)
 ) {
   const app = express();
 
@@ -106,6 +108,7 @@ export function createApp(
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
   app.use('/api/equipment', equipmentRouter);
+  app.use('/api/equipment-requests', equipmentRequirementsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
