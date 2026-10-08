@@ -26,6 +26,51 @@ cached browser value cannot select the organisation to read.
   Coordinators, venue staff, technical support and attendees receive 403 from
   these endpoints. Coordinator assignment and review remain separate stories.
 
+## Event status lifecycle (SG2-100)
+
+An event moves through a 7-step stepper, shown on the event detail screen
+alongside a plain-language stage and a "waiting on" card naming the persona
+and action that moves it forward:
+
+1. **Draft** — the organiser is still completing the request.
+2. **Awaiting Assignment** (`unassigned`) — submitted with no coordinator yet;
+   the Event Coordinator Lead assigns one. A fresh draft's submission lands
+   here, not in `submitted`, which gives the Lead's assignment queue an
+   indexable predicate instead of a `status = 'submitted' and coordinator_id
+   is null` sniff. A request that already has a coordinator (resubmitted
+   after a clarification question or a rejection) goes straight back to
+   `submitted` instead — see step 3.
+3. **Under Review** — covers both `submitted` (assigned, not yet opened) and
+   `under_review` (the coordinator has opened it); `submitted` has no step of
+   its own. `needs_clarification` also sits at this step while the organiser
+   answers the coordinator's question and resubmits — which lands back in
+   `submitted`, preserving the coordinator's hold on the request, not in
+   `unassigned`.
+4. **Arrangements** (`approved`/`planning`, `stage_key: 'in_planning'`) — the
+   coordinator arranges the venue and equipment.
+5. **Safety Check** (`awaiting_safety_check`) — the Safety Officer completes
+   the operational safety check; `safety_rejected` is a stop at this step with
+   no waiting-on card, not a recoverable state.
+6. **Preparation** (`preparation`) — arrangements and the safety check are
+   done; the event is being readied.
+7. **Confirmed** (`confirmed`) — ready to be held. Once its end time has
+   passed — derived from `max(venue_bookings.ends_at)` over its confirmed
+   bookings, since `public.events` has no end-time column of its own — the
+   assigned coordinator marks it **Completed**, which records who and when
+   and removes it from the active work queue.
+
+   The coordinator does this from their **Work Queue**: opening the event
+   under **My assigned events** shows a **Mark as Completed** step once the
+   event's end time has passed, and the event leaves the queue when it is
+   done. The queue's event items carry that end time as `ends_at`
+   (`internal_work_items`), so the button is only offered once it applies;
+   the server re-checks ownership, status and the end time on every call.
+
+`cancelled` and `rejected` are terminal off-stepper outcomes, same as
+`completed`. The legal transition table enforcing which of these moves are
+allowed lives in `server/src/events/fields.ts` (`STATUS_TRANSITIONS`,
+`canTransition`).
+
 ## Provisioning and rollout
 
 Apply the SG2-26 migration in `supabase/migrations` alongside the application

@@ -11,14 +11,22 @@ their existing behavior.
 
 | Role | Work shown |
 | --- | --- |
-| Event Coordinator | Unassigned and personally assigned `submitted` / `under_review` requests in **Awaiting review**. Personally assigned `approved`, `planning` and `confirmed` events in **My assigned events**. Each record appears once. |
+| Event Coordinator | `unassigned`, and personally assigned `submitted` / `under_review`, requests in **Awaiting review**. Personally assigned `approved`, `planning`, `awaiting_safety_check`, `safety_rejected`, `preparation` and `confirmed` events in **My assigned events** (SG2-100, Week 7 lifecycle). Each record appears once. |
 | Venue Staff | Team-wide `pending` venue booking requests for active events. |
 | Technical Support Staff | Team-wide `pending` equipment requests for active events. |
 
-Draft, completed, cancelled and rejected events do not produce queue work. A
-request returned for clarification (`needs_clarification`, SG2-36) is waiting
-on its organiser and reappears in **Awaiting review** once resubmitted; see
-[Clarification exchange](clarifications.md).
+Draft, completed, cancelled and rejected events do not produce queue work.
+`completed` and `cancelled` are structurally absent from `internal_work_items`
+(SG2-100) — they are not in either status list the view's `where` clause
+checks, so a completed event leaves the active work list the moment it is
+marked, with no separate exclusion filter to keep in sync as the lifecycle
+grows. An event item's `ends_at` is the event's end time — the latest of its
+confirmed venue bookings, or null with none — which is when the assigned
+coordinator is offered **Mark as Completed** in the item's detail (SG2-100).
+An event's `starts_at` is its proposed date, so the two are not shown as one
+range. A request returned for clarification (`needs_clarification`, SG2-36)
+is waiting on its organiser and reappears in **Awaiting review** once
+resubmitted; see [Clarification exchange](clarifications.md).
 Another coordinator's assigned event is excluded. Decided/cancelled resource
 requests disappear immediately. Queue and detail reads apply the same verified
 role and assignment constraints; client-supplied identity or role cannot widen

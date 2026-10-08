@@ -6,7 +6,8 @@ import {
   fetchEventRequestById,
   assignEventCoordinator,
   type FetchEventRequestResult,
-  type AssignCoordinatorResult
+  type AssignCoordinatorResult,
+  type AssignStatusTransition
 } from '../db/eventRequests';
 import { getAccountRole, type GetAccountRoleResult } from '../db/accountRoles';
 import { insertAuditLogs } from '../db/auditLogs';
@@ -26,7 +27,8 @@ export interface AssignCoordinatorDependencies {
     admin: SupabaseClient,
     eventId: number,
     coordinatorId: string | null,
-    expectedCurrent: string | null
+    expectedCurrent: string | null,
+    statusTransition?: AssignStatusTransition
   ) => Promise<AssignCoordinatorResult>;
   writeHistory?: typeof insertAuditLogs;
 }
@@ -124,7 +126,15 @@ export function createAssignCoordinatorHandler({
       return;
     }
 
-    const assigned = await assignCoordinator(admin, eventId, coordinatorId, previousId);
+    // SG2-100 AC1: assigning a coordinator to a request still awaiting
+    // assignment is what moves it into review. Every other reassignment
+    // leaves the status exactly where it was — an event in arrangements,
+    // safety check, preparation or confirmed must not be rewound by a
+    // change of coordinator.
+    const transition: AssignStatusTransition | undefined =
+      current.status === 'unassigned' ? { from: 'unassigned', to: 'submitted' } : undefined;
+
+    const assigned = await assignCoordinator(admin, eventId, coordinatorId, previousId, transition);
     if (!assigned.ok) {
       if (assigned.reason === 'not_assignable') {
         // The status was assignable when read, so the request was reassigned
@@ -146,7 +156,16 @@ export function createAssignCoordinatorHandler({
       }
     ]);
     if (!recorded.ok) {
-      await assignCoordinator(admin, eventId, previousId, coordinatorId);
+      // Undo the status move too, or a request whose assignment was rolled
+      // back would be left in `submitted` with no coordinator — the exact
+      // state SG2-100's backfill removed.
+      await assignCoordinator(
+        admin,
+        eventId,
+        previousId,
+        coordinatorId,
+        transition ? { from: transition.to, to: transition.from } : undefined
+      );
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }

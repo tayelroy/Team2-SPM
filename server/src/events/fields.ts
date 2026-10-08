@@ -192,12 +192,50 @@ export const EVENT_STATUSES = [
   'cancelled',
   'rejected',
   // SG2-36: returned to the organiser with a question; still live.
-  'needs_clarification'
+  'needs_clarification',
+  // SG2-100: assignment-queue status — submitted but not yet assigned a coordinator.
+  'unassigned',
+  // SG2-100: arrangements complete, waiting on the Safety Officer (writer lands in SG2-91/92).
+  'awaiting_safety_check',
+  // SG2-100: the Safety Officer did not pass the check (writer lands in SG2-92).
+  'safety_rejected',
+  // SG2-100: safety approved, coordinator finalising ahead of confirmation.
+  'preparation'
 ] as const;
 
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 export function isEventStatus(value: unknown): value is EventStatus {
   return typeof value === 'string' && (EVENT_STATUSES as readonly string[]).includes(value);
+}
+
+/**
+ * Legal status transitions for the Week 7 event lifecycle (SG2-100).
+ *
+ * Single source of truth so later stories (Units 2-5, SG2-91/92/93/94) read
+ * one table instead of scattering `.in('status', [...])` literals. `completed`
+ * and `cancelled` are terminal — their entries are empty, which is what makes
+ * `canTransition('completed', x)` false for every status (AC4's read-only
+ * guarantee for a completed event).
+ */
+export const STATUS_TRANSITIONS: Readonly<Record<EventStatus, readonly EventStatus[]>> = {
+  draft: ['unassigned', 'cancelled'],
+  unassigned: ['submitted'],
+  submitted: ['under_review'],
+  under_review: ['needs_clarification', 'rejected', 'approved'],
+  needs_clarification: ['unassigned'],
+  rejected: ['unassigned'],
+  approved: ['planning'],
+  planning: ['awaiting_safety_check', 'cancelled'],
+  awaiting_safety_check: ['preparation', 'safety_rejected', 'planning', 'cancelled'],
+  safety_rejected: ['cancelled'],
+  preparation: ['confirmed', 'completed', 'cancelled'],
+  confirmed: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: []
+};
+
+export function canTransition(from: EventStatus, to: EventStatus): boolean {
+  return (STATUS_TRANSITIONS[from] ?? []).includes(to);
 }
 

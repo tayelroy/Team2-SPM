@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, cleanup, act, within } from '@testing-library/react';
-import { EventAuditDrawer, formatSgtTimestamp, humanizeFieldName } from './EventAuditDrawer';
+import { EventAuditDrawer, formatSgtTimestamp, humanizeFieldName, humanizeFieldValue } from './EventAuditDrawer';
 import * as eventRequestsApi from '../api/eventRequests';
 import type { EventAuditLogEntry, GetEventHistoryOutcome } from '../api/eventRequests';
 
@@ -449,5 +449,28 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.queryByText('Expected Attendance')).not.toBeInTheDocument();
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
+  });
+});
+
+
+describe('humanizeFieldValue (SG2-100 AC5)', () => {
+  test('[NORMAL] [SG2-100:AC5] a status row reads in plain language, not as a stored value', () => {
+    expect(humanizeFieldValue('status', 'awaiting_safety_check')).toBe('Awaiting Safety Check');
+    expect(humanizeFieldValue('status', 'unassigned')).toBe('Awaiting Assignment');
+    expect(humanizeFieldValue('status', 'completed')).toBe('Completed');
+  });
+
+  test('[BOUNDARY] [SG2-100:AC5] every other field is passed through untouched', () => {
+    // Deliberately a value that collides with a status name: only `status`
+    // rows are translated, so a note that happens to say "preparation" is
+    // not rewritten.
+    expect(humanizeFieldValue('planning_notes', 'preparation')).toBe('preparation');
+    expect(humanizeFieldValue('coordinator_id', 'Jane Doe')).toBe('Jane Doe');
+    expect(humanizeFieldValue('expected_attendance', '120')).toBe('120');
+  });
+
+  test('[FAILURE] [SG2-100:AC5] an absent value reads as empty for any field', () => {
+    expect(humanizeFieldValue('status', null)).toBe('(empty)');
+    expect(humanizeFieldValue('planning_notes', null)).toBe('(empty)');
   });
 });

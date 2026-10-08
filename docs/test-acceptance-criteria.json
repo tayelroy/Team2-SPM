@@ -475,6 +475,27 @@
       }
     },
     {
+      "id": "SG2-100",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-100",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "public.event_status contains unassigned, awaiting_safety_check, safety_rejected and preparation, with all 14 values present in a fresh CI database",
+        "AC2": "Submitting a complete draft returns 200 with request.status === 'unassigned'; no row is left in 'submitted' with a null coordinator_id after the backfill",
+        "AC3": "Assigning a coordinator on an unassigned event moves it to submitted; assigning on an already-advanced event leaves its status unchanged",
+        "AC4": "canTransition returns true for exactly the edges in the status flow diagram and false for every other ordered pair, including every pair whose source is completed or cancelled",
+        "AC5": "GET the event stage returns the exact stage, stage_key and waiting_on values for unassigned, awaiting_safety_check, safety_rejected and preparation, and a stepper_steps array of length 7; planning returns stage 'Arrangements' with stage_key 'in_planning'",
+        "AC6": "Marking an event Completed by the assigned coordinator on a confirmed or preparation event whose end time has passed returns 200 with status 'completed' and completed_by/completed_at populated",
+        "AC7": "A completed event is refused by further planning updates, is absent from the work queue, and remains readable via the event and history endpoints",
+        "AC8": "Each new lifecycle transition appends exactly one event_audit_logs row with the correct old_value/new_value/actor_id; a failed audit insert does not fail the transition",
+        "AC9": "EventDetail and the 7-step stepper render without layout breakage or horizontal overflow at 390x844 and 1440x900",
+        "AC10": "npm run ci is green with 100% per-file statement, branch, line and function coverage in both server and client",
+        "AC11": "All four DoD category tags appear in the new tests and in the PR Test Case Inventory table; every commit carries [SG2-100]",
+        "AC12": "The e2e regression journeys for this story pass and are registered in docs/regression-cases.json",
+        "AC13": "No secrets are committed; every new route is permission-gated server-side; every new write repeats its guards as conditions on the update itself"
+      }
+    },
+    {
       "id": "SG2-52",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-52",
       "originalPullRequests": [],

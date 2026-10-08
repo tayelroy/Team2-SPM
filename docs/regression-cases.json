@@ -2955,6 +2955,71 @@
     ]
   },
   {
+    "id": "SG2-100-P01",
+    "title": "a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop",
+    "type": "Positive",
+    "story": "SG2-100",
+    "purpose": "Verify AC2, AC3 and AC5: submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
+    "steps": [
+      "Sign in as organiser and submit the seeded draft; open My events and read the stage badge and waiting-on card.",
+      "Sign in as the Event Coordinator Lead and assign a coordinator; sign back in as organiser and read the stage badge and waiting-on persona.",
+      "Sign in as the coordinator, open the request from Awaiting review (moves it to under_review) and approve it.",
+      "Sign back in as organiser and read the stage badge and waiting-on action for the approved stage."
+    ],
+    "data": "Event 1 (Planning workshop, seeded draft owned by the organiser); lead and coordinator fixture accounts.",
+    "expected": "Awaiting Assignment / Event Coordinator Lead / \"Assign an event coordinator\" after submission; Under Review / the assigned coordinator's name after assignment; approved status after the coordinator's decision; Arrangements / \"Complete venue suitability check and equipment reservation\" once approved.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at c0d8265 (SG2-53 integrated); npm run test:e2e locally in Chromium: 64/64 journeys passed including this one, and the required SG2-26 regression gate passed. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC2",
+      "SG2-100:AC3",
+      "SG2-100:AC5",
+      "SG2-100:AC13"
+    ]
+  },
+  {
+    "id": "SG2-100-P02",
+    "title": "marking a held event completed makes it read-only, clears it from the work queue and is recorded in history",
+    "type": "Positive / boundary",
+    "story": "SG2-100",
+    "purpose": "Verify AC6, AC7, AC8 and AC9: the coordinator is not offered completion on an event whose confirmed booking has not ended (and the server refuses it with 409); a held event is completed from the coordinator's work queue, recording who and when; it then leaves the queue, refuses further planning updates and has exactly one audit row; the completion panel fits phone and laptop viewports.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
+    "steps": [
+      "Seed two confirmed events assigned to the coordinator, one with a past confirmed booking and one with a future one; sign in as the coordinator.",
+      "Open the future-booking event from My assigned events; confirm no Mark as Completed action, and that PATCH /:eventId/complete returns 409.",
+      "Open the held event; at 390x844 and 1440x900 confirm Mark as Completed is visible and the page does not overflow horizontally.",
+      "Click Mark as Completed; confirm the 200 response, the completion notice, and that the action and planning edit are gone.",
+      "Return to the work queue; read the event's history, a planning update attempt, a second completion attempt, and the organiser's view of the event."
+    ],
+    "data": "Events 120 (Held Forum, confirmed, booking ended 20 Sep 2026) and 121 (Future Forum, confirmed, booking ends 15 Jun 2030), both assigned to the coordinator.",
+    "expected": "No completion action and 409 'This event has not finished yet.' for event 121; for event 120 a 200 completion from the screen, the notice 'Marked as completed. This event has left your active work queue.', the event absent from My assigned events while 121 remains, exactly one status history row confirmed -> completed by the coordinator, a further planning update refused with 409, a second completion attempt 404, and the organiser's read showing status completed with completed_by the coordinator and a populated completed_at.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at c0d8265 (SG2-53 integrated); npm run test:e2e locally in Chromium: 64/64 journeys passed including this one, and the required SG2-26 regression gate passed. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC6",
+      "SG2-100:AC7",
+      "SG2-100:AC8",
+      "SG2-100:AC9"
+    ]
+  },
+  {
     "id": "SG2-52-P01",
     "title": "support staff create, update and reload every equipment field on phone and desktop",
     "type": "NORMAL",

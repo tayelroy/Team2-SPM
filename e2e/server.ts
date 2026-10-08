@@ -15,10 +15,12 @@ import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
+import { createCompleteEventHandler } from '../server/src/events/complete';
 import { createAssignCoordinatorHandler } from '../server/src/events/assignCoordinator';
 import { createUpdateEventPlanningHandler } from '../server/src/events/updatePlanning';
 import { createListAssignableHandler } from '../server/src/events/listAssignable';
 import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
+import { createGetEventStageHandler } from '../server/src/events/getStage';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
@@ -150,9 +152,9 @@ const app = createApp(
     // SG2-49: decision notices, against the in-memory client.
     notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
-  // SG2-38's stage handler keeps its production default here, as it does on
-  // main; only the review handler below needs the in-memory client.
-  undefined,
+  // SG2-100: the stage tracker's own regression journey (SG2-100-P01) reads
+  // this endpoint directly, so it now runs against the in-memory client too.
+  createGetEventStageHandler(eventDependencies),
   createStartEventReviewHandler(eventDependencies),
   // SG2-33/34: assignment, the assignable list and SG2-40's history run
   // against the in-memory client so the assignment history can be checked
@@ -169,7 +171,9 @@ const app = createApp(
   createAddClarificationHandler(eventDependencies),
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
   createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
-  createEquipmentRequirementsRouter(access, token => createMemoryRequirementsStore(database, token))
+  createEquipmentRequirementsRouter(access, token => createMemoryRequirementsStore(database, token)),
+  // SG2-100 AC4: Mark Completed, against the in-memory client.
+  createCompleteEventHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -223,6 +227,10 @@ app.post('/__e2e/legacy-assignment', (_req, res) => {
 });
 app.post('/__e2e/under-review', (_req, res) => {
   database.seedUnderReview();
+  res.status(204).end();
+});
+app.post('/__e2e/lifecycle', (_req, res) => {
+  database.seedLifecycle();
   res.status(204).end();
 });
 app.post('/__e2e/venue-holds', (_req, res) => {

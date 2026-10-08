@@ -601,7 +601,8 @@ describe('the request form', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
     expect(await screen.findByRole('heading', { name: 'Investor Forum 2026' })).toBeInTheDocument();
-    expect(screen.getByText('submitted', { exact: true })).toBeInTheDocument();
+    // SG2-100: badges show the plain-language name, never the stored value.
+    expect(screen.getByText('Submitted', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('Partner briefing', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('A half-day forum with two keynotes and a panel.', { exact: true })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();

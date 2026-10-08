@@ -1004,7 +1004,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(auditCalled, false);
   });
 
-  test('[CONFLICT] [SG2-39:AC5] AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
+  test('[CONFLICT] [SG2-39:AC5] [SG2-100:AC7] AC 5: refuses update on cancelled, completed, and rejected events with 409 without executing updates or audits', async () => {
     for (const status of ['cancelled', 'completed', 'rejected']) {
       let updateCalled = false;
       let auditCalled = false;
@@ -1113,7 +1113,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     // The stage reads the saved response, including the newly stale arrangements.
     const stage = computeEventStage(response.body.event);
     assert.equal(stage.raw_status, 'planning');
-    assert.equal(stage.stage, 'Approved — In Planning');
+    assert.equal(stage.stage, 'Arrangements');
     assert.equal(stage.stage_key, 'in_planning');
     assert.equal(stage.arrangements_recheck_needed, true);
     assert.deepEqual(stage.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
@@ -1123,8 +1123,9 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       user_id: COORDINATOR_ID
     });
     assert.deepEqual(stage.stepper_steps.map(step => [step.key, step.status]), [
-      ['draft', 'completed'], ['submitted', 'completed'], ['under_review', 'completed'],
-      ['in_planning', 'current'], ['confirmed', 'upcoming']
+      ['draft', 'completed'], ['unassigned', 'completed'], ['under_review', 'completed'],
+      ['in_planning', 'current'], ['safety_check', 'upcoming'], ['preparation', 'upcoming'],
+      ['confirmed', 'upcoming']
     ]);
 
     // Check captured audit diffs

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { DraftValues } from '../events/fields';
+import type { DraftValues, EventStatus } from '../events/fields';
 
 /** An event request row as returned to the API caller. */
 export interface EventRequestRecord extends DraftValues {
@@ -15,6 +15,15 @@ export interface EventRequestRecord extends DraftValues {
   /** Who decided, when, and why it was rejected (SG2-37). */
   decided_at?: string | null;
   decision_reason?: string | null;
+  /** Who marked the event completed and when (SG2-100 AC4). */
+  completed_by?: string | null;
+  completed_at?: string | null;
+  /**
+   * When the event finishes: the latest end of its confirmed venue bookings
+   * (SG2-100 AC4). Null while it has none. Derived rather than stored, so it
+   * cannot drift from the bookings it describes.
+   */
+  ends_at?: string | null;
 }
 
 /** An event request row in summary format for list views (SG2-31). */
@@ -60,6 +69,25 @@ export type AssignCoordinatorResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'not_assignable' | 'unavailable'; message: string };
 
+/**
+ * SG2-100 AC4. `previous_status` is the status the event held before
+ * completion, so the caller can write a truthful audit row without a second
+ * read; the guarded update is what established it.
+ */
+export type CompleteEventResult =
+  | { ok: true; request: EventRequestRecord; previous_status: string }
+  | { ok: false; reason: 'not_found' | 'not_finished' | 'unavailable'; message: string };
+
+/**
+ * A status move applied in the same write as a coordinator assignment
+ * (SG2-100). `from` guards the write so the move cannot land on a row that
+ * has since changed status; `to` is the value written.
+ */
+export interface AssignStatusTransition {
+  from: EventStatus;
+  to: EventStatus;
+}
+
 export type StartReviewResult =
   | { ok: true; request: EventRequestRecord }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
@@ -88,7 +116,10 @@ const DETAIL_COLUMNS =
   'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
   'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
   // SG2-37: the organiser sees the outcome and, for a rejection, why.
-  'decided_at, decision_reason';
+  'decided_at, decision_reason, ' +
+  // SG2-100 AC4: who marked the event completed and when, plus the bookings
+  // the event's end time is derived from.
+  'completed_by, completed_at, venue_bookings(ends_at, status)';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {
@@ -110,6 +141,39 @@ function extractCoordinatorPhone(row: Record<string, unknown>): string | null {
   const joined = Array.isArray(row.coordinator) ? row.coordinator[0] : row.coordinator;
   const phone = (joined as Record<string, unknown> | null | undefined)?.phone;
   return typeof phone === 'string' && phone.trim() ? phone : null;
+}
+
+/**
+ * The event's end time: the latest `ends_at` among its confirmed venue
+ * bookings (SG2-100 AC4). `public.events` has no end-time column, an event
+ * may occupy several venues, and the last booking ending is the real signal
+ * that the event is over. Null when nothing confirms when it ends — callers
+ * must read that as "not known to have finished", never as finished.
+ */
+function extractEndsAt(row: Record<string, unknown>): string | null {
+  const bookings = Array.isArray(row.venue_bookings) ? row.venue_bookings : [];
+  let latest: string | null = null;
+  for (const entry of bookings as Record<string, unknown>[]) {
+    if (entry?.status !== 'confirmed' || typeof entry.ends_at !== 'string') continue;
+    if (latest === null || entry.ends_at > latest) latest = entry.ends_at;
+  }
+  return latest;
+}
+
+/**
+ * Turns a DETAIL_COLUMNS row into the record the API returns. The embedded
+ * `venue_bookings` rows exist only to derive `ends_at`, so they are dropped
+ * rather than sent on: the client is told when the event finishes, not which
+ * bookings said so.
+ */
+function toDetailRecord(row: Record<string, unknown>): EventRequestRecord {
+  const { venue_bookings: _bookings, ...rest } = row;
+  return {
+    ...(rest as unknown as EventRequestRecord),
+    coordinator_id: extractCoordinatorId(row),
+    coordinator_name: extractCoordinatorName(row),
+    ends_at: extractEndsAt(row)
+  };
 }
 
 function extractCoordinatorId(row: Record<string, unknown>): string | null {
@@ -327,9 +391,7 @@ export async function fetchOwnEventRequest(
   }
   const row = data[0] as unknown as Record<string, unknown>;
   const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row),
+    ...toDetailRecord(row),
     coordinator_phone: extractCoordinatorPhone(row)
   };
   return { ok: true, request };
@@ -343,9 +405,37 @@ const SUBMITTABLE_STATUSES = ['draft', 'rejected', 'needs_clarification'];
 const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
 
 /**
- * Transitions an event request from `draft` or `rejected` to `submitted`
- * (SG2-30). Rejected requests may be revised and resubmitted rather than
+ * Transitions an event request from `draft`, `rejected` or
+ * `needs_clarification` to `unassigned` or `submitted` (SG2-30, retargeted
+ * by SG2-100). Rejected requests may be revised and resubmitted rather than
  * being a dead end.
+ *
+ * SG2-100: a request with no coordinator lands in `unassigned`, visible as
+ * *Awaiting Assignment* until the Event Coordinator Lead assigns one, which
+ * is what otherwise writes `submitted`. That gives the assignment queue an
+ * indexable predicate instead of the old `status = 'submitted' and
+ * coordinator_id is null` sniff.
+ *
+ * A request that already has a coordinator — returned with a question
+ * (SG2-36) or rejected (SG2-37) and then reworked — goes straight back to
+ * `submitted` instead: the coordinator who asked the question or made the
+ * decision still holds it, and routing it to the Lead's unassigned queue
+ * would ask them to assign a coordinator the request already has, locking
+ * the holder out of their own review (`submitted`/`under_review` are the
+ * only statuses `startEventReview` accepts).
+ *
+ * Which of the two applies is decided by two sequential guarded `UPDATE`s,
+ * not a single atomic write: the `unheld` attempt first, and only if it
+ * matches zero rows does the `held` attempt run. Each statement's own
+ * `coordinator_id` condition protects it from mis-firing, but the window
+ * between the two statements is not covered by either — if the coordinator
+ * is cleared from the request after `unheld` runs (and matches nothing,
+ * because the request was still held at that instant) but before `held`
+ * runs, `held`'s `.not('coordinator_id', 'is', null)` then also matches
+ * nothing. Both statements report zero rows, `submitEventRequest` returns
+ * `unavailable`, and the caller gets a 503 with the request stranded in its
+ * pre-submission status. This is a known, accepted gap (see the
+ * `[CONFLICT]` test below), not a guarantee that it cannot happen.
  *
  * The status filter is repeated here as a second guard alongside the
  * caller's own status check, so a concurrent submission cannot race two
@@ -356,20 +446,36 @@ export async function submitEventRequest(
   admin: SupabaseClient,
   eventId: number
 ): Promise<SubmitEventRequestResult> {
-  const { data, error } = await admin
+  const unheld = await admin
+    .from('events')
+    .update({ status: 'unassigned' })
+    .eq('event_id', eventId)
+    .in('status', SUBMITTABLE_STATUSES)
+    .is('coordinator_id', null)
+    .select(RETURNED_COLUMNS);
+
+  if (unheld.error) {
+    return { ok: false, reason: 'unavailable', message: unheld.error.message };
+  }
+  if (unheld.data && unheld.data.length > 0) {
+    return { ok: true, request: unheld.data[0] as unknown as EventRequestRecord };
+  }
+
+  const held = await admin
     .from('events')
     .update({ status: 'submitted' })
     .eq('event_id', eventId)
     .in('status', SUBMITTABLE_STATUSES)
+    .not('coordinator_id', 'is', null)
     .select(RETURNED_COLUMNS);
 
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
+  if (held.error) {
+    return { ok: false, reason: 'unavailable', message: held.error.message };
   }
-  if (!data || data.length === 0) {
+  if (!held.data || held.data.length === 0) {
     return { ok: false, reason: 'unavailable', message: 'The request was not returned after update.' };
   }
-  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+  return { ok: true, request: held.data[0] as unknown as EventRequestRecord };
 }
 
 /**
@@ -412,11 +518,7 @@ export async function startEventReview(
     return { ok: false, reason: 'not_found', message: 'No reviewable event request is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -464,11 +566,7 @@ export async function decideEventRequest(
     return { ok: false, reason: 'not_found', message: 'No event request under review is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -508,11 +606,7 @@ export async function requestClarification(
     return { ok: false, reason: 'not_found', message: 'No event request under review is assigned to this account.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -573,20 +667,30 @@ export async function fetchEventRequestById(
     return { ok: false, reason: 'not_found', message: 'No event request found with that id.' };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
-/** Statuses a request may have its coordinator assigned or reassigned in (SG2-33/SG2-34). */
+/**
+ * Statuses a request may have its coordinator assigned or reassigned in
+ * (SG2-33/SG2-34, widened by SG2-100 to the Week 7 lifecycle).
+ *
+ * `unassigned` is the status submission now lands in, so it has to be here
+ * or nothing would ever be assignable. The three post-arrangements statuses
+ * are here because a coordinator can leave the team at any point in an
+ * event's life and the replacement has to be recordable — reassignment is
+ * allowed in every live status, and must never move the event's own status
+ * (see assignEventCoordinator).
+ */
 export const COORDINATOR_ASSIGNABLE_STATUSES = [
+  'unassigned',
   'submitted',
   'under_review',
   'approved',
   'planning',
+  'awaiting_safety_check',
+  'safety_rejected',
+  'preparation',
   'confirmed'
 ];
 
@@ -605,18 +709,29 @@ export const COORDINATOR_ASSIGNABLE_STATUSES = [
  * caller writes next (SG2-33/34 AC4) always names the real previous
  * coordinator. Passing `coordinatorId: null` clears the assignment, which
  * is how an assignment that could not be recorded is undone.
+ *
+ * SG2-100: `statusTransition` moves the event's status in the same write.
+ * The caller passes `{ from: 'unassigned', to: 'submitted' }` for a first
+ * assignment, and the inverse to undo one whose history row could not be
+ * written. When it is omitted — every reassignment of an event already in
+ * review, arrangements, safety check, preparation or confirmed — the update
+ * payload carries no `status` key at all, so no reassignment can rewind a
+ * live event. `from` is a condition on the write rather than a pre-check,
+ * so a row whose status moved on in between matches zero rows instead.
  */
 export async function assignEventCoordinator(
   admin: SupabaseClient,
   eventId: number,
   coordinatorId: string | null,
-  expectedCurrent: string | null
+  expectedCurrent: string | null,
+  statusTransition?: AssignStatusTransition
 ): Promise<AssignCoordinatorResult> {
-  const guarded = admin
-    .from('events')
-    .update({ coordinator_id: coordinatorId })
-    .eq('event_id', eventId)
-    .in('status', COORDINATOR_ASSIGNABLE_STATUSES);
+  const update: { coordinator_id: string | null; status?: EventStatus } = { coordinator_id: coordinatorId };
+  if (statusTransition) update.status = statusTransition.to;
+  const byEvent = admin.from('events').update(update).eq('event_id', eventId);
+  const guarded = statusTransition
+    ? byEvent.eq('status', statusTransition.from)
+    : byEvent.in('status', COORDINATOR_ASSIGNABLE_STATUSES);
   const { data, error } = await (expectedCurrent === null
     ? guarded.is('coordinator_id', null)
     : guarded.eq('coordinator_id', expectedCurrent)
@@ -633,11 +748,7 @@ export async function assignEventCoordinator(
     };
   }
   const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...(row as unknown as EventRequestRecord),
-    coordinator_id: extractCoordinatorId(row),
-    coordinator_name: extractCoordinatorName(row)
-  };
+  const request: EventRequestRecord = toDetailRecord(row);
   return { ok: true, request };
 }
 
@@ -714,4 +825,102 @@ export async function fetchAssignableRequests(admin: SupabaseClient): Promise<Fe
       coordinator_name: extractCoordinatorName(row)
     }))
   };
+}
+
+/**
+ * Statuses an event can be marked completed from (SG2-100 AC4). An event is
+ * only ever held once its arrangements are done, so `preparation` and
+ * `confirmed` are the two live statuses an event can be in when its end
+ * time passes. `approved`, `planning`, `cancelled` and `rejected` are not
+ * here, which is what makes completing one of those a `not_found`.
+ */
+export const COMPLETABLE_STATUSES = ['preparation', 'confirmed'];
+
+/**
+ * Marks an event this coordinator is assigned to as completed (SG2-100 AC4).
+ *
+ * "The event's end time" is `max(venue_bookings.ends_at)` over the event's
+ * confirmed bookings: `public.events` has no end-time column, an event may
+ * occupy several venues, and the last booking ending is the real signal that
+ * the event is over. An event with no confirmed booking has no end time to
+ * have passed, so it fails closed as `not_finished` — never as finished.
+ *
+ * Ownership and status are checked before the clock so the only error a
+ * coordinator can distinguish is the actionable one: "not yours / not
+ * completable" and "does not exist" share a single `not_found`, while
+ * `not_finished` is safe to disclose to the coordinator the event is
+ * actually assigned to.
+ *
+ * Both guards are then repeated as conditions on the update itself, not only
+ * as pre-checks — the IDOR-hardening shape from SG2-32/SG2-35. That is also
+ * what makes a double-click idempotent (the second call matches zero rows
+ * and reports `not_found`) and stops two coordinators racing one completion.
+ */
+export async function completeEvent(
+  admin: SupabaseClient,
+  eventId: number,
+  coordinatorId: string,
+  now: Date
+): Promise<CompleteEventResult> {
+  const existing = await admin
+    .from('events')
+    .select('event_id, status')
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .in('status', COMPLETABLE_STATUSES);
+
+  if (existing.error) {
+    return { ok: false, reason: 'unavailable', message: existing.error.message };
+  }
+  const found = (existing.data as Record<string, unknown>[] | null) ?? [];
+  if (found.length === 0) {
+    return { ok: false, reason: 'not_found', message: 'No completable event is assigned to this account.' };
+  }
+  const previousStatus = typeof found[0].status === 'string' ? found[0].status : '';
+
+  const bookings = await admin
+    .from('venue_bookings')
+    .select('ends_at')
+    .eq('event_id', eventId)
+    .eq('status', 'confirmed')
+    .order('ends_at', { ascending: false })
+    .limit(1);
+
+  if (bookings.error) {
+    return { ok: false, reason: 'unavailable', message: bookings.error.message };
+  }
+  const latest = ((bookings.data as Record<string, unknown>[] | null) ?? [])[0]?.ends_at;
+  const endsAt = typeof latest === 'string' ? Date.parse(latest) : NaN;
+  if (!Number.isFinite(endsAt) || endsAt > now.getTime()) {
+    return { ok: false, reason: 'not_finished', message: 'This event has not finished yet.' };
+  }
+
+  const { data, error } = await admin
+    .from('events')
+    .update({ status: 'completed', completed_by: coordinatorId, completed_at: now.toISOString() })
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    // Pinned to the exact status just read, not merely COMPLETABLE_STATUSES:
+    // if the event moved (e.g. preparation -> confirmed) between the pre-read
+    // and this write, matching either status would let the update through
+    // with a now-stale `previousStatus`, and the audit row written from it
+    // would record the wrong old_value for the transition that actually
+    // happened. Pinning makes that race match zero rows instead, same as any
+    // other status that has moved on.
+    .eq('status', previousStatus)
+    .select(DETAIL_COLUMNS);
+
+  if (error) {
+    return { ok: false, reason: 'unavailable', message: error.message };
+  }
+  const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
+  if (rows.length === 0) {
+    // The event moved on between the read and the write — a second
+    // double-click, or another coordinator taking it over. One reason, so
+    // neither can be told which.
+    return { ok: false, reason: 'not_found', message: 'No completable event is assigned to this account.' };
+  }
+  const row = rows[0];
+  const request: EventRequestRecord = toDetailRecord(row);
+  return { ok: true, request, previous_status: previousStatus };
 }

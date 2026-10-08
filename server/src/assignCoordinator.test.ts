@@ -8,7 +8,11 @@ import { createAuthorization } from './auth';
 import type { Role, Principal } from './auth/policy';
 import { dbConfig } from './db/config';
 import { createAssignCoordinatorHandler } from './events/assignCoordinator';
-import type { AssignCoordinatorResult, FetchEventRequestResult } from './db/eventRequests';
+import type {
+  AssignCoordinatorResult,
+  AssignStatusTransition,
+  FetchEventRequestResult
+} from './db/eventRequests';
 import type { GetAccountRoleResult } from './db/accountRoles';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 
@@ -47,6 +51,8 @@ interface HarnessOptions {
   captureAssign?: (eventId: number, coordinatorId: string) => void;
   /** Every coordinator write, including a rollback: [eventId, to, expectedCurrent]. */
   writes?: [number, string | null, string | null][];
+  /** SG2-100: the status move each coordinator write carried, in order. */
+  transitions?: (AssignStatusTransition | undefined)[];
   audits?: InsertAuditLogInput[][];
 }
 
@@ -66,8 +72,9 @@ function buildApp(options: HarnessOptions = {}) {
         options.captureRole?.(userId);
         return options.roleResult ?? { ok: true, role: 'event_coordinator' };
       },
-      assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent) => {
+      assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent, statusTransition) => {
         options.writes?.push([eventId, coordinatorId, expectedCurrent]);
+        options.transitions?.push(statusTransition);
         const isRollback = (options.writes?.length ?? 0) > 1;
         if (isRollback) {
           return options.rollbackResult ?? { ok: true, request: SUBMITTED_REQUEST };
@@ -314,6 +321,75 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     assert.deepEqual(audits[0][0], {
       event_id: 7, actor_id: 'staff-1', field_name: 'coordinator_id', old_value: 'coord-old', new_value: 'coord-new'
     });
+  });
+
+  test('[NORMAL] [SG2-100:AC3] assigning a request awaiting assignment also moves it into review', async () => {
+    const transitions: (AssignStatusTransition | undefined)[] = [];
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(
+      buildApp({
+        writes,
+        transitions,
+        fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status: 'unassigned' } },
+        assignResult: {
+          ok: true,
+          request: { ...SUBMITTED_REQUEST, status: 'submitted', coordinator_id: 'coord-1', coordinator_name: 'Sarah Tan' }
+        }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-1' });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'submitted');
+    assert.deepEqual(transitions, [{ from: 'unassigned', to: 'submitted' }]);
+    assert.deepEqual(writes, [[7, 'coord-1', null]]);
+  });
+
+  test('[CONFLICT] [SG2-100:AC3] reassigning a live event carries no status move, so the event is never rewound', async () => {
+    for (const status of ['under_review', 'approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed']) {
+      const transitions: (AssignStatusTransition | undefined)[] = [];
+      const response = await request(
+        buildApp({
+          transitions,
+          fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status, coordinator_id: 'coord-old', coordinator_name: 'Old' } },
+          assignResult: {
+            ok: true,
+            request: { ...SUBMITTED_REQUEST, status, coordinator_id: 'coord-new', coordinator_name: 'New' }
+          }
+        })
+      )
+        .patch('/api/event-requests/7/coordinator')
+        .send({ coordinatorId: 'coord-new' });
+
+      assert.equal(response.status, 200, status);
+      assert.equal(response.body.request.status, status);
+      assert.deepEqual(transitions, [undefined], status);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-100:AC3] an unrecorded first assignment is undone status and all', async () => {
+    const transitions: (AssignStatusTransition | undefined)[] = [];
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(
+      buildApp({
+        writes,
+        transitions,
+        fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status: 'unassigned' } },
+        auditResult: { ok: false, reason: 'unavailable', message: 'down' }
+      })
+    )
+      .patch('/api/event-requests/7/coordinator')
+      .send({ coordinatorId: 'coord-1' });
+
+    assert.equal(response.status, 503);
+    // Without the inverse move the row would be left in `submitted` with no
+    // coordinator — the state 202610060002 backfilled away.
+    assert.deepEqual(transitions, [
+      { from: 'unassigned', to: 'submitted' },
+      { from: 'submitted', to: 'unassigned' }
+    ]);
+    assert.deepEqual(writes, [[7, 'coord-1', null], [7, null, 'coord-1']]);
   });
 
   test('[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] refuses a request that is not in an assignable status before any write', async () => {

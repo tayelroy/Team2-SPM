@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { completeEvent } from '../api/eventRequests';
 import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
@@ -106,6 +107,36 @@ function DecisionPanel({ eventId, accessToken, onDecided }: {
   </section>;
 }
 
+/** SG2-100 AC4: the assigned coordinator closes out an event once it has been
+ * held. The button's disabled state is what makes a double-click send one
+ * request; the server re-checks ownership, status and the end time itself. */
+function CompletePanel({ eventId, endsAt, accessToken, onCompleted }: {
+  eventId: number;
+  endsAt: string | null;
+  accessToken: string;
+  onCompleted: (status: string) => void;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+
+  async function complete() {
+    setError('');
+    setPending(true);
+    const result = await completeEvent(eventId, accessToken);
+    setPending(false);
+    if (result.ok) onCompleted('completed');
+    else setError(result.message);
+  }
+
+  return <footer className="organisation-detail-footer" aria-label="Close out this event">
+    <h3>Next step</h3>
+    <p className="organisation-detail-hint">This event ended on {dateTime(endsAt)} (Singapore time). Mark it completed to close it out; it then leaves your active work queue and can no longer be changed.</p>
+    {error && <p role="alert" className="organisation-detail-notice">{error}</p>}
+    <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
+      disabled={pending} onClick={complete}>{pending ? 'Marking as Completed…' : 'Mark as Completed'}</button>
+  </footer>;
+}
+
 export type FindVenues = (prefill: VenueSearchPrefill) => void;
 
 function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
@@ -129,6 +160,13 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
   // returned, they can add follow-ups until the organiser resubmits.
   const canClarify = item.kind === 'event' && item.assigned_to_me
     && (currentStatus === 'under_review' || currentStatus === 'needs_clarification');
+  // SG2-100 AC4: `ends_at` is the latest of the event's confirmed venue
+  // bookings (internal_work_items); null means nothing says when it ends,
+  // which reads as "not finished", never as finished. This only decides
+  // whether to offer the action — the server re-checks all of it.
+  const canComplete = item.kind === 'event' && item.assigned_to_me
+    && (currentStatus === 'confirmed' || currentStatus === 'preparation')
+    && item.ends_at !== null && Date.parse(item.ends_at) <= Date.now();
 
   return (
     <article className="organisation-detail" aria-label={KINDS[item.kind]}>
@@ -142,7 +180,9 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
       <div className="organisation-detail-intro">
         <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
         <p>{context(item)}</p>
-        <p>{dateTime(startsAt)}{item.ends_at ? ` – ${dateTime(item.ends_at)}` : ''} (Singapore time)</p>
+        {/* An event's start is its proposed date but its end is its latest
+            confirmed booking (SG2-100), so the two are not shown as one range. */}
+        <p>{dateTime(startsAt)}{item.kind !== 'event' && item.ends_at ? ` – ${dateTime(item.ends_at)}` : ''} (Singapore time)</p>
       </div>
       <dl className="organisation-detail-facts">
         {Object.entries(DETAIL_LABELS).filter(([key]) => key in currentDetails).map(([key, label]) => {
@@ -151,8 +191,11 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           return <div key={key}><dt>{label}</dt><dd>{typeof value === 'boolean' ? (value ? 'Yes' : 'No') : value ?? 'Not provided'}</dd></div>;
         })}
       </dl>
+      {/* SG2-100: the safety-check and preparation stages sit between
+          planning and confirmed, so the requirements stay visible through
+          them; the RPC decides what is still editable. */}
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
-        && ['approved', 'planning', 'confirmed'].includes(currentStatus))) && (
+        && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
         <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
@@ -191,6 +234,10 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
             onClick={() => onFindVenues(prefillFromEvent({ ...item, starts_at: startsAt, details: currentDetails }))}>Find venues for this event</button>
         </footer>
       )}
+      {canComplete && accessToken && <CompletePanel eventId={item.event_id} endsAt={item.ends_at} accessToken={accessToken} onCompleted={setStatus} />}
+      {item.kind === 'event' && currentStatus === 'completed' && <footer className="organisation-detail-footer">
+        <p role="status" className="organisation-detail-notice">Marked as completed. This event has left your active work queue.</p>
+      </footer>}
       {canEditPlanning && (
         <EventPlanningDrawer
           isOpen={drawerOpen}

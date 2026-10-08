@@ -1,5 +1,8 @@
-// SG2-86 adds the two Week 7 roles below. Feature-specific grants are
-// listed explicitly alongside their universal profile permissions.
+// SG2-86 added the two Week 7 roles below. Feature-specific grants are
+// listed explicitly alongside their universal profile permissions: SG2-100
+// gives both the stage and history reads they cannot work without, SG2-53
+// gives the Safety Officer read-only equipment placement, and the queues
+// they act on arrive with SG2-87/88/91/97.
 export const ROLES = [
   'event_organiser',
   'event_coordinator',
@@ -50,12 +53,27 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // coordinator and the organiser who raised it. Which request is enforced
   // per-row in the handler, not by this grant.
   'event_request.clarify': ['event_coordinator', 'event_organiser'],
-  // SG2-38: see what stage an event has reached
-  'event_request.stage.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff'],
-  // SG2-40: see who changed what on an event
+  // SG2-100 AC4: the assigned coordinator marks an event that has been held
+  // as completed. Which event is enforced per-row by the assignment and by
+  // the guards on the write itself, not by this grant.
+  'event_request.complete': ['event_coordinator'],
+  // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
+  // roles: the Lead assigns from the awaiting-assignment queue and the Safety
+  // Officer answers a safety check, and neither can do so without seeing
+  // where the event has got to.
+  'event_request.stage.view': [
+    'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff',
+    'event_coordinator_lead', 'safety_officer'
+  ],
+  // SG2-40: see who changed what on an event.
   // SG2-97: the Event Coordinator Lead opens an event's history from the
   // assignment screen to see previous coordinators (SG2-34 AC4).
-  'event_request.history.view': ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead'],
+  // SG2-100: widened further for the Safety Officer, for the same reason as
+  // the stage view.
+  'event_request.history.view': [
+    'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff',
+    'event_coordinator_lead', 'safety_officer'
+  ],
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],

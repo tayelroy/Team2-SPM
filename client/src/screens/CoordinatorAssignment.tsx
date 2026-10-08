@@ -6,14 +6,9 @@ import {
   type CoordinatorOption,
 } from '../api/eventRequests';
 import { EventAuditDrawer } from '../components/EventAuditDrawer';
-import { badgeStyle } from '../mock/viewModel';
+import { badgeStyle, statusLabel } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
 import { Badge, Card, Eyebrow, GhostButton, GradientButton, Notice } from '../ui';
-
-function formatStatus(status: string): string {
-  const spaced = status.replace(/_/g, ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
 
 /**
  * The Event Coordinator Lead (SG2-97) assigns an Event Coordinator to a request, or hands it
@@ -125,7 +120,7 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
                 </h2>
               </div>
               <Badge bg={badgeBg} fg={badgeFg}>
-                {formatStatus(request.status)}
+                {statusLabel(request.status)}
               </Badge>
             </div>
             <p style={{ margin: 0, color: color.silver, fontSize: '14px' }}>
