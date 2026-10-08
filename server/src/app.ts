@@ -81,11 +81,12 @@ export function createApp(
   // on purpose: every parameter here is positional, and inserting one in the
   // middle would silently shift every caller's later arguments.
   completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal }),
-  // SG2-57. Appended for the same positional-parameter reason as
-  // completeEventHandler above.
-  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal }),
   // SG2-87: appended last for the same reason.
-  assignmentQueueRouter = createAssignmentQueueRouter(access)
+  assignmentQueueRouter = createAssignmentQueueRouter(access),
+  // SG2-57. Appended after assignmentQueueRouter — every parameter here is
+  // positional, and callers (e2e/server.ts, app.test.ts) pass through
+  // assignmentQueueRouter, so this new one must come last.
+  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 

@@ -21,6 +21,7 @@ import { createUpdateEventPlanningHandler } from '../server/src/events/updatePla
 import { createListAssignableHandler } from '../server/src/events/listAssignable';
 import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
 import { createGetEventStageHandler } from '../server/src/events/getStage';
+import { createGetEventArrangementsHandler } from '../server/src/events/getArrangements';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
@@ -176,7 +177,10 @@ const app = createApp(
   // SG2-100 AC4: Mark Completed, against the in-memory client.
   createCompleteEventHandler(eventDependencies),
   // SG2-87: the Lead's unassigned queue, against the in-memory client.
-  createAssignmentQueueRouter(access, { getAdminClient: getClient })
+  createAssignmentQueueRouter(access, { getAdminClient: getClient }),
+  // SG2-57: arrangement readiness, against the in-memory client so the
+  // coordinator's event detail can load it without a 503.
+  createGetEventArrangementsHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
