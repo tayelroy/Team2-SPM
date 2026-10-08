@@ -1732,54 +1732,70 @@ test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2
   expect((await detail.json()).request.status).toBe('approved');
 });
 
-// SG2-100 AC4 is exercised directly against the real HTTP routes rather than
-// through the browser: EventDetail.tsx (the only screen with a Mark as
-// Completed button) reads its data from GET /api/event-requests/:eventId,
-// which `event_request.view` restricts to Event Organisers (server/src/auth/policy.ts),
-// and no nav entry in this build sets `selectedEventId` for a Coordinator —
-// "All events" fetches through the same organiser-only path and refuses them
-// (confirmed while writing this test). Mark Completed is consequently
-// unreachable by a Coordinator through the UI today; this gap is noted for
-// the team rather than patched here, since the fix is a policy or navigation
-// decision outside this story's scope. The server behaviour this AC actually
-// specifies is still fully exercised below.
-test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ request }) => {
+// SG2-100 AC4: the coordinator closes out a held event from their own work
+// queue — the screen they already use for every event assigned to them.
+test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [SG2-100:AC9] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ page, request }) => {
   expect((await request.post('/__e2e/lifecycle')).status()).toBe(204);
-  const tokenFor = async (account: string) => {
-    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
-    expect(login.status()).toBe(200);
-    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
-  };
-  const coordinator = await tokenFor('coordinator');
+  await signIn(page, 'coordinator');
+  const assigned = page.getByRole('region', { name: 'My assigned events' });
 
-  // BOUNDARY: an event whose booking has not ended yet withholds the action.
-  const tooSoon = await request.patch('/api/event-requests/121/complete', { headers: coordinator });
+  // BOUNDARY: an event whose confirmed booking has not ended yet does not
+  // offer the action at all.
+  await assigned.getByRole('button', { name: /Future Forum/ }).click();
+  await expect(page.getByRole('heading', { name: 'Future Forum' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark as Completed' })).toHaveCount(0);
+  // The server refuses it too, should anything call it directly.
+  const tooSoon = await page.request.patch('/api/event-requests/121/complete', { headers: await authHeaders(page) });
   expect(tooSoon.status()).toBe(409);
   expect((await tooSoon.json()).error).toBe('This event has not finished yet.');
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
 
-  // NORMAL: a held event completes, with the completing coordinator and when recorded.
-  const completed = await request.patch('/api/event-requests/120/complete', { headers: coordinator });
-  expect(completed.status()).toBe(200);
-  expect((await completed.json()).request).toMatchObject({ status: 'completed', completed_by: 'user-coordinator' });
-  expect((await completed.json()).request.completed_at).not.toBeNull();
+  // AC9: the panel with the action fits a phone and a laptop without
+  // pushing the page sideways.
+  await assigned.getByRole('button', { name: /Held Forum/ }).click();
+  await expect(page.getByRole('heading', { name: 'Held Forum' })).toBeVisible();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await expect(page.getByRole('button', { name: 'Mark as Completed' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
 
-  // AC7: a completed event is absent from the work queue.
-  const queue = await request.get('/api/work-queue', { headers: coordinator });
-  expect(queue.status()).toBe(200);
-  expect((await queue.json()).items.some((item: Record<string, unknown>) => item.event_id === 120)).toBe(false);
+  // NORMAL: the held event completes from the screen, recording who and when.
+  const completion = page.waitForResponse(response => response.url().endsWith('/api/event-requests/120/complete'));
+  await page.getByRole('button', { name: 'Mark as Completed' }).click();
+  expect((await completion).status()).toBe(200);
+  await expect(page.getByText('Marked as completed. This event has left your active work queue.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark as Completed' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit Planning Information' })).toHaveCount(0);
 
-  // AC7: a completed event refuses further planning updates.
-  expect((await request.patch('/api/event-requests/120/planning', { headers: coordinator, data: { planning_notes: 'Too late' } })).status()).toBe(409);
+  // AC7: a completed event is absent from the work queue once it refreshes.
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+  await expect(assigned.getByRole('button', { name: /Future Forum/ })).toBeVisible();
+  await expect(assigned.getByRole('button', { name: /Held Forum/ })).toHaveCount(0);
 
-  // AC8: exactly one audit row records the transition.
-  const history = await request.get('/api/event-requests/120/history', { headers: coordinator });
+  const coordinator = await authHeaders(page);
+  const history = await page.request.get('/api/event-requests/120/history', { headers: coordinator });
   expect(history.status()).toBe(200);
+  // AC8: exactly one audit row records the transition.
   const statusEntries = (await history.json()).history
     .filter((entry: Record<string, unknown>) => entry.field_name === 'status');
   expect(statusEntries).toEqual([
-    expect.objectContaining({ old_value: 'confirmed', new_value: 'completed' })
+    expect.objectContaining({ old_value: 'confirmed', new_value: 'completed', actor_id: 'user-coordinator' })
   ]);
 
+  // AC7: a completed event refuses further planning updates.
+  expect((await page.request.patch('/api/event-requests/120/planning', { headers: coordinator, data: { planning_notes: 'Too late' } })).status()).toBe(409);
+
   // A second attempt on an already-completed event reports not found, not a repeat success.
-  expect((await request.patch('/api/event-requests/120/complete', { headers: coordinator })).status()).toBe(404);
+  expect((await page.request.patch('/api/event-requests/120/complete', { headers: coordinator })).status()).toBe(404);
+
+  // AC6/AC7: the organiser can still read the completed event, with who
+  // completed it and when.
+  const login = await request.post('/api/auth/login', { data: { email: 'organiser@example.test', password } });
+  expect(login.status()).toBe(200);
+  const detail = await request.get('/api/event-requests/120', { headers: { Authorization: `Bearer ${(await login.json()).accessToken}` } });
+  expect(detail.status()).toBe(200);
+  const record = (await detail.json()).request;
+  expect(record).toMatchObject({ status: 'completed', completed_by: 'user-coordinator' });
+  expect(record.completed_at).not.toBeNull();
 });

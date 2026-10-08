@@ -59,15 +59,12 @@ and action that moves it forward:
    assigned coordinator marks it **Completed**, which records who and when
    and removes it from the active work queue.
 
-   Marking an event Completed is currently **API-only**. `event_request.view` is
-   granted to `event_organiser` alone, and the Mark as Completed control lives
-   only on `EventDetail`, which loads through that organiser-gated read — so a
-   Coordinator has no screen from which to reach it. The server-side behaviour
-   is complete and enforced (`event_request.complete` is granted to
-   `event_coordinator`, guarded on the update itself, and covered end-to-end by
-   `SG2-100-P02` against the real HTTP routes). The Coordinator-facing screen is
-   deliberately deferred to SG2-NNN; until it ships, completion is driven by
-   `PATCH /api/event-requests/:eventId/complete`.
+   The coordinator does this from their **Work Queue**: opening the event
+   under **My assigned events** shows a **Mark as Completed** step once the
+   event's end time has passed, and the event leaves the queue when it is
+   done. The queue's event items carry that end time as `ends_at`
+   (`internal_work_items`), so the button is only offered once it applies;
+   the server re-checks ownership, status and the end time on every call.
 
 `cancelled` and `rejected` are terminal off-stepper outcomes, same as
 `completed`. The legal transition table enforcing which of these moves are

@@ -98,8 +98,8 @@ Lead already had it from SG2-97) are added to both roles. SG2-100 also adds
 `event_request.complete`, held only by `event_coordinator` — the assigned
 coordinator marks an event that has been held as completed; which event is
 enforced per-row by the assignment and by the guards on the write itself, not
-by this grant. Granted server-side; no Coordinator UI path exists yet — see
-SG2-NNN.
+by this grant. The coordinator reaches it from their work queue, not from the
+organiser-only event detail read.
 Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
 mirrored in the `event_audit_logs` RLS policy
 (`supabase/migrations/202610050004_week7_roles.sql`), and the two must change

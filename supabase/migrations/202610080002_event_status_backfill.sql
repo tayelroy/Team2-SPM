@@ -28,11 +28,19 @@ where status = 'submitted'
 -- so the venue item's `venue_holds` join and `hold_id` detail survive the
 -- widening below; SG2-49 ran first by filename order and this file replaces
 -- its view, so dropping the join here would silently undo it.
+--
+-- An event item's `ends_at` is the event's end time: the latest of its
+-- confirmed venue bookings, the same rule `completeEvent` enforces. The
+-- coordinator's work queue reads it to offer Mark as Completed only once the
+-- event has been held (SG2-100 AC4); null means no confirmed booking, which
+-- reads as "not finished".
 create or replace view public.internal_work_items as
 select 'event'::text as kind, e.event_id::bigint as item_id, e.event_id,
   coalesce(nullif(e.name, ''), 'Untitled event')::text as title,
   coalesce(nullif(e.name, ''), 'Untitled event')::text as event_name,
-  e.status::text as status, e.proposed_date as starts_at, null::timestamptz as ends_at,
+  e.status::text as status, e.proposed_date as starts_at,
+  (select max(b.ends_at) from public.venue_bookings b
+    where b.event_id = e.event_id and b.status = 'confirmed') as ends_at,
   'event_coordinator'::text as audience, e.coordinator_id as assigned_to,
   case when e.status in ('unassigned', 'submitted', 'under_review') then 'review' else 'assigned' end as category,
   jsonb_build_object('organisation', e.organisation, 'purpose', e.purpose,

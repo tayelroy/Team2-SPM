@@ -239,13 +239,23 @@ export class MemoryDatabase {
    * `preparation` so an event does not vanish from its own coordinator's list
    * partway through the Week 7 lifecycle. `completed`/`cancelled` stay out of
    * both, same as the real view. */
+  /** The view's event end time: the latest confirmed venue booking, or null. */
+  private eventEndsAt(eventId: unknown): string | null {
+    let latest: string | null = null;
+    for (const booking of this.tables.venue_bookings) {
+      if (booking.event_id !== eventId || booking.status !== 'confirmed') continue;
+      if (latest === null || Date.parse(String(booking.ends_at)) > Date.parse(latest)) latest = String(booking.ends_at);
+    }
+    return latest;
+  }
+
   private workItems(): Row[] {
     const REVIEW_STATUSES = ['unassigned', 'submitted', 'under_review'];
     const ASSIGNED_STATUSES = ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'];
     const active = this.tables.events.filter(event => [...REVIEW_STATUSES, ...ASSIGNED_STATUSES].includes(String(event.status)));
     const items = active.filter(event => REVIEW_STATUSES.includes(String(event.status)) || event.coordinator_id !== null).map(event => ({
       kind: 'event', item_id: event.event_id, event_id: event.event_id, title: event.name || 'Untitled event', event_name: event.name || 'Untitled event',
-      status: event.status, starts_at: event.proposed_date, ends_at: null, audience: 'event_coordinator', assigned_to: event.coordinator_id,
+      status: event.status, starts_at: event.proposed_date, ends_at: this.eventEndsAt(event.event_id), audience: 'event_coordinator', assigned_to: event.coordinator_id,
       category: REVIEW_STATUSES.includes(String(event.status)) ? 'review' : 'assigned',
       details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed'].map(key => [key, event[key]])),
     } as Row));

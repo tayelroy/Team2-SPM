@@ -2991,21 +2991,22 @@
     "title": "marking a held event completed makes it read-only, clears it from the work queue and is recorded in history",
     "type": "Positive / boundary",
     "story": "SG2-100",
-    "purpose": "Verify AC6, AC7 and AC8: an event whose only confirmed booking has not yet ended withholds completion with 409; a held event completes and records who and when; a completed event is absent from the work queue and refuses further planning updates; exactly one audit row records the transition.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case. No hosted Supabase. Exercised directly against the real HTTP routes rather than through the browser: EventDetail.tsx is the only screen with the Mark as Completed button, it loads via GET /api/event-requests/:eventId, that route's event_request.view permission is Event-Organiser-only, and no nav entry in this build sets selectedEventId for a Coordinator either, so Mark Completed is currently unreachable by a Coordinator through the UI. Noted for the team as a gap outside this test's scope; the server behaviour the AC specifies is still fully exercised.",
+    "purpose": "Verify AC6, AC7, AC8 and AC9: the coordinator is not offered completion on an event whose confirmed booking has not ended (and the server refuses it with 409); a held event is completed from the coordinator's work queue, recording who and when; it then leaves the queue, refuses further planning updates and has exactly one audit row; the completion panel fits phone and laptop viewports.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
     "steps": [
-      "Seed two confirmed events assigned to the coordinator, one with a past confirmed booking and one with a future one.",
-      "Attempt completion on the future-booking event directly against PATCH /:eventId/complete; expect 409.",
-      "Complete the past-booking event the same way; expect 200 with completed_by and completed_at populated.",
-      "Read the work queue, a planning update attempt, the event's history and a second completion attempt."
+      "Seed two confirmed events assigned to the coordinator, one with a past confirmed booking and one with a future one; sign in as the coordinator.",
+      "Open the future-booking event from My assigned events; confirm no Mark as Completed action, and that PATCH /:eventId/complete returns 409.",
+      "Open the held event; at 390x844 and 1440x900 confirm Mark as Completed is visible and the page does not overflow horizontally.",
+      "Click Mark as Completed; confirm the 200 response, the completion notice, and that the action and planning edit are gone.",
+      "Return to the work queue; read the event's history, a planning update attempt, a second completion attempt, and the organiser's view of the event."
     ],
     "data": "Events 120 (Held Forum, confirmed, booking ended 20 Sep 2026) and 121 (Future Forum, confirmed, booking ends 15 Jun 2030), both assigned to the coordinator.",
-    "expected": "409 'This event has not finished yet.' for event 121; 200 with status completed, completed_by the coordinator and a populated completed_at for event 120; event 120 absent from GET /api/work-queue; a further planning update refused with 409; exactly one event_audit_logs-backed history row with old_value confirmed and new_value completed; a second completion attempt reports 404.",
+    "expected": "No completion action and 409 'This event has not finished yet.' for event 121; for event 120 a 200 completion from the screen, the notice 'Marked as completed. This event has left your active work queue.', the event absent from My assigned events while 121 remains, exactly one status history row confirmed -> completed by the coordinator, a further planning update refused with 409, a second completion attempt 404, and the organiser's read showing status completed with completed_by the coordinator and a populated completed_at.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
-    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at 9df57ed (local branch, not yet pushed); npm run test:e2e locally; 58/59 Chromium journeys passed including this one, installed Chromium. The one failure is SG2-85-P02 ('Hold expired' notice not found), reproduced with the identical assertion failure on a pristine origin/main 9df57ed worktree and unrelated to this change. No hosted Supabase validation; regression-gate.mjs not run standalone in this evidence.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at 9df57ed (local branch, not yet pushed); completion moved to the coordinator's work queue; npm run test:e2e locally in Chromium; the one failure in the full run is SG2-85-P02 ('Hold expired' notice not found), reproduced with the identical assertion failure on a pristine origin/main 9df57ed worktree and unrelated to this change. No hosted Supabase validation.",
     "execution_date": "8 Oct 2026",
     "categories": [
       "NORMAL",
@@ -3014,7 +3015,8 @@
     "mapped_acs": [
       "SG2-100:AC6",
       "SG2-100:AC7",
-      "SG2-100:AC8"
+      "SG2-100:AC8",
+      "SG2-100:AC9"
     ]
   },
   {
