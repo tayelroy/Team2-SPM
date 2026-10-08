@@ -71,7 +71,7 @@ export class MemoryDatabase {
         { booking_id: 2, venue_id: 1, starts_at: '2026-09-15T02:00:00.000Z', ends_at: '2026-09-15T04:00:00.000Z', status: 'confirmed', event_id: 1 }
       ],
       venue_unavailability: [
-        { unavailability_id: 1, venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', reason: 'Scheduled maintenance' }
+        { unavailability_id: 1, venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T04:00:00.000Z', category: 'maintenance', reason: 'Scheduled maintenance', created_by: 'user-venue', created_at: '2026-09-26T01:00:00.000Z' }
       ],
       venue_layouts: [],
       venue_operations: [],
@@ -298,6 +298,10 @@ export class MemoryDatabase {
         ...this.tables.venue_holds.filter(hold => hold.status === 'tentative' && Date.parse(String(hold.expires_at)) > this.venueHoldNow())
           .map(hold => ({ venue_id: hold.venue_id, event_id: hold.event_id, starts_at: hold.starts_at, ends_at: hold.ends_at, status: 'tentative' })),
       ];
+      // SG2-80: confirmed bookings inside a period the venue is marked unavailable for.
+      if (table === 'venue_affected_bookings') this.tables[table] = this.tables.venue_bookings.filter(booking =>
+        booking.status === 'confirmed' && this.tables.venue_unavailability.some(period => period.venue_id === booking.venue_id
+          && String(period.starts_at) < String(booking.ends_at) && String(period.ends_at) > String(booking.starts_at)));
       if (!(table in this.tables)) throw new Error(`Unsupported fixture table: ${table}`);
       return new MemoryQuery(this, table);
     },

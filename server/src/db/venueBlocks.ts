@@ -2,20 +2,16 @@ import { createClient } from '@supabase/supabase-js';
 import WebSocket from 'ws';
 import { dbConfig } from './config';
 import { AccessError } from '../auth/policy';
-import type { BookingConflict, VenueBlockRecord, VenueBlockValues } from '../venues/blockFields';
-
-const COLUMNS = 'unavailability_id,starts_at,ends_at,reason';
-const CONFLICT_COLUMNS = 'booking_id,event_id,starts_at,ends_at';
+import type { VenueBlockRecord, VenueBlockValues } from '../venues/blockFields';
 
 export type CreateBlockResult =
   | { outcome: 'created'; block: VenueBlockRecord }
-  | { outcome: 'conflict'; booking: BookingConflict }
   | { outcome: 'missing' };
 
 export interface VenueBlockStore {
-  /** Blocks that have not yet ended, earliest first. */
+  /** Blocks that have not yet ended, earliest first, with their affected bookings. */
   list(venueId: number, now: string): Promise<VenueBlockRecord[]>;
-  /** Refuses the block when a confirmed booking overlaps the period. */
+  /** SG2-80 AC2: allowed over confirmed bookings, which the database flags. */
   create(venueId: number, values: VenueBlockValues): Promise<CreateBlockResult>;
   /** Returns false when no such block exists for the venue. */
   remove(venueId: number, blockId: number): Promise<boolean>;
@@ -39,40 +35,29 @@ export function createVenueBlockStore(token: string): VenueBlockStore {
   function check(error: unknown, status: number) {
     if (error) throw new AccessError(status === 401 ? 401 : status === 403 ? 403 : 503);
   }
-  async function findConflict(venueId: number, values: VenueBlockValues) {
-    const { data, error, status } = await client.from('venue_bookings').select(CONFLICT_COLUMNS)
-      .eq('venue_id', venueId).eq('status', 'confirmed')
-      .lt('starts_at', values.ends_at).gt('ends_at', values.starts_at)
-      .order('starts_at').range(0, 0);
+  // SG2-80 AC1/AC3/AC6: the reason, note, recorder and affected events come
+  // from one definer function, since Venue Staff do not read events or users.
+  async function list(venueId: number, after: string) {
+    const { data, error, status } = await client.rpc('list_venue_unavailability', { p_venue_id: venueId, p_after: after });
     check(error, status);
-    return (data as BookingConflict[])[0];
+    return data as VenueBlockRecord[];
   }
   return {
-    async list(venueId, now) {
-      const { data, error, status } = await client.from('venue_unavailability').select(COLUMNS)
-        .eq('venue_id', venueId).gt('ends_at', now).order('starts_at');
-      check(error, status);
-      return data as VenueBlockRecord[];
-    },
+    list,
     async create(venueId, values) {
       const { data: venue, error: venueError, status: venueStatus } = await client.from('venues')
         .select('venue_id').eq('venue_id', venueId).maybeSingle();
       check(venueError, venueStatus);
       if (!venue) return { outcome: 'missing' };
 
-      const existing = await findConflict(venueId, values);
-      if (existing) return { outcome: 'conflict', booking: existing };
-
       const { data, error, status } = await client.from('venue_unavailability')
-        .insert({ venue_id: venueId, ...values }).select(COLUMNS).maybeSingle();
-      // A booking confirmed between the check and the insert trips the
-      // database's own overlap trigger; name that booking instead of failing.
-      if ((error as { code?: string } | null)?.code === '23P01') {
-        const raced = await findConflict(venueId, values);
-        if (raced) return { outcome: 'conflict', booking: raced };
-      }
+        .insert({ venue_id: venueId, ...values }).select('unavailability_id').single();
       check(error, status);
-      return { outcome: 'created', block: data as VenueBlockRecord };
+      // Read the new period back with what the database stamped and flagged.
+      const id = (data as { unavailability_id: number }).unavailability_id;
+      const block = (await list(venueId, values.starts_at)).find(item => item.unavailability_id === id);
+      if (!block) throw new AccessError(503);
+      return { outcome: 'created', block };
     },
     async remove(venueId, blockId) {
       const { data, error, status } = await client.from('venue_unavailability').delete()

@@ -115,6 +115,7 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // level security.
   'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
+  // SG2-80 AC1/AC6: the same Venue Staff mark it temporarily unavailable.
   'venues.blocks.manage': ['venue_staff'],
   'venues.holds.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
   'venues.holds.manage': ['venue_staff'],

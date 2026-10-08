@@ -37,7 +37,7 @@ import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
 import type { VenueLayoutRecord } from '../server/src/venues/layoutFields';
-import type { BookingConflict, VenueBlockRecord } from '../server/src/venues/blockFields';
+import type { AffectedBooking, VenueBlockRecord } from '../server/src/venues/blockFields';
 import { dbConfig } from '../server/src/db';
 import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
@@ -108,21 +108,39 @@ const operations = createVenueOperationsRouter(access, () => ({
     return result.data as VenueOperationRecord;
   }
 }));
-const BLOCK_COLUMNS = 'unavailability_id,starts_at,ends_at,reason';
-const blocks = createVenueBlocksRouter(access, () => ({
+// SG2-80: mirrors list_venue_unavailability() and the flagging triggers over
+// the in-memory tables: confirmed bookings inside a period are affected.
+function venueBlocks(venueId: number, after: string): VenueBlockRecord[] {
+  const { venue_unavailability: periods, venue_bookings: bookings, events, users } = database.tables;
+  return periods.filter(row => row.venue_id === venueId && String(row.ends_at) > after)
+    .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))
+    .map(row => ({
+      unavailability_id: row.unavailability_id, starts_at: row.starts_at, ends_at: row.ends_at,
+      category: row.category ?? 'other', reason: row.reason, created_at: row.created_at ?? null,
+      created_by_name: (users.find(user => user.user_id === row.created_by)?.name as string | undefined) ?? null,
+      affected: bookings.filter(booking => booking.venue_id === venueId && booking.status === 'confirmed'
+          && String(booking.starts_at) < String(row.ends_at) && String(booking.ends_at) > String(row.starts_at))
+        .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))
+        .map(booking => {
+          const event = events.find(item => item.event_id === booking.event_id);
+          return { booking_id: booking.booking_id, event_id: booking.event_id ?? null, event_name: event?.name ?? null,
+            event_status: event?.status ?? null, starts_at: booking.starts_at, ends_at: booking.ends_at } as AffectedBooking;
+        })
+    }) as VenueBlockRecord);
+}
+const blocks = createVenueBlocksRouter(access, token => ({
   async list(venueId, now) {
-    const result = await database.client.from('venue_unavailability').select(BLOCK_COLUMNS).eq('venue_id', venueId).gt('ends_at', now).order('starts_at');
-    return result.data as VenueBlockRecord[];
+    return venueBlocks(venueId, now);
   },
   async create(venueId, values) {
     const venueResult = await database.client.from('venues').select('venue_id').eq('venue_id', venueId).maybeSingle();
     if (!venueResult.data) return { outcome: 'missing' };
-    const conflicts = await database.client.from('venue_bookings').select('booking_id,event_id,starts_at,ends_at')
-      .eq('venue_id', venueId).eq('status', 'confirmed').lt('starts_at', values.ends_at).gt('ends_at', values.starts_at).order('starts_at').range(0, 0);
-    const booking = (conflicts.data as BookingConflict[])[0];
-    if (booking) return { outcome: 'conflict', booking };
-    const result = await database.client.from('venue_unavailability').insert({ venue_id: venueId, ...values }).select(BLOCK_COLUMNS).maybeSingle();
-    return { outcome: 'created', block: result.data as VenueBlockRecord };
+    const { userId } = await database.principal(token);
+    const result = await database.client.from('venue_unavailability')
+      .insert({ venue_id: venueId, ...values, created_by: userId, created_at: new Date().toISOString() })
+      .select('unavailability_id').maybeSingle();
+    const id = (result.data as { unavailability_id: number }).unavailability_id;
+    return { outcome: 'created', block: venueBlocks(venueId, values.starts_at).find(block => block.unavailability_id === id)! };
   },
   async remove(venueId, blockId) {
     const result = await database.client.from('venue_unavailability').delete().eq('venue_id', venueId).eq('unavailability_id', blockId).select('unavailability_id');
