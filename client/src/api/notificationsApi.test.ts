@@ -39,3 +39,10 @@ test('[BOUNDARY] [SG2-49:AC1] a response of the wrong shape is treated as unavai
   respond(() => Response.json({ notifications: [] }));
   expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [] });
 });
+
+test('[NORMAL] [SG2-88:AC4] the three coordinator-assignment notice kinds are accepted alongside the venue ones', async () => {
+  const kinds = ['coordinator_assigned', 'coordinator_removed', 'event_coordinator_changed'];
+  const notifications = kinds.map((kind, index) => ({ ...rejected, notification_id: 20 + index, kind }));
+  respond(() => Response.json({ notifications: [...notifications, rejected] }));
+  expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [...notifications, rejected] });
+});

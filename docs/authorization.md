@@ -92,6 +92,15 @@ SG2-87 adds `event_request.queue.view`, also the Lead's alone, for the
 **Unassigned queue** (`GET /api/assignment-queue`): requests in SG2-100's
 `unassigned` status. Coordinators no longer see unassigned requests in their
 work queue.
+SG2-88 uses the same Lead-only grants: the queue also returns the Event
+Coordinators to choose from, and `PATCH /api/event-requests/:eventId/coordinator`
+(`event_request.assign_coordinator`) assigns from it. After an assignment and its
+history are committed, the server writes notices to `public.notifications` with
+the service role: `coordinator_assigned` to the new coordinator,
+`coordinator_removed` to a previous one, and `event_coordinator_changed` to the
+organiser. Recipients read only their own through row level security. A failure
+to send notices does not undo the assignment; the response carries
+`notified: false` and the cause is logged on the server only.
 
 SG2-100 widens both new roles' reads so each can see where an event has got
 to without being able to act beyond its own grant: `event_request.stage.view`

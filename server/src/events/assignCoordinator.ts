@@ -11,6 +11,8 @@ import {
 } from '../db/eventRequests';
 import { getAccountRole, type GetAccountRoleResult } from '../db/accountRoles';
 import { insertAuditLogs } from '../db/auditLogs';
+import { insertAssignmentNotifications } from '../db/assignmentNotifications';
+import { assignmentNotices } from './assignmentNotices';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -31,6 +33,8 @@ export interface AssignCoordinatorDependencies {
     statusTransition?: AssignStatusTransition
   ) => Promise<AssignCoordinatorResult>;
   writeHistory?: typeof insertAuditLogs;
+  /** SG2-88 AC4: tells the people involved once an assignment is committed. */
+  notify?: typeof insertAssignmentNotifications;
 }
 
 /**
@@ -62,7 +66,8 @@ export function createAssignCoordinatorHandler({
   fetchRequest = fetchEventRequestById,
   lookupRole = getAccountRole,
   assignCoordinator = assignEventCoordinator,
-  writeHistory = insertAuditLogs
+  writeHistory = insertAuditLogs,
+  notify = insertAssignmentNotifications
 }: AssignCoordinatorDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -170,6 +175,21 @@ export function createAssignCoordinatorHandler({
       return;
     }
 
-    res.status(200).json({ request: assigned.request });
+    // SG2-88 AC4: notices go out only once the assignment and its history are
+    // committed. A failure to send them does not undo a valid assignment; the
+    // Lead is told instead, and the cause stays in the server log.
+    const notified = await notify(admin, assignmentNotices({
+      eventId,
+      eventName: current.name ?? '',
+      organiserId: current.organiser_id,
+      coordinatorId,
+      coordinatorName: assigned.request.coordinator_name ?? null,
+      previousCoordinatorId: previousId
+    }));
+    if (!notified.ok) {
+      console.error(`[SG2-88] assignment notices for event ${eventId} were not sent: ${notified.message}`);
+    }
+
+    res.status(200).json({ request: assigned.request, notified: notified.ok });
   };
 }

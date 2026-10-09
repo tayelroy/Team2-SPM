@@ -15,6 +15,7 @@ import type {
 } from './db/eventRequests';
 import type { GetAccountRoleResult } from './db/accountRoles';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
+import type { AssignmentNotice, InsertAssignmentNotificationsResult } from './db/assignmentNotifications';
 
 // SG2-97: assignment belongs to the Event Coordinator Lead.
 const STAFF: Principal = { userId: 'staff-1', role: 'event_coordinator_lead' };
@@ -54,6 +55,9 @@ interface HarnessOptions {
   /** SG2-100: the status move each coordinator write carried, in order. */
   transitions?: (AssignStatusTransition | undefined)[];
   audits?: InsertAuditLogInput[][];
+  /** SG2-88: notices sent after each committed assignment. */
+  notices?: AssignmentNotice[][];
+  notifyResult?: InsertAssignmentNotificationsResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -90,6 +94,10 @@ function buildApp(options: HarnessOptions = {}) {
       writeHistory: async (_admin, entries) => {
         options.audits?.push(entries);
         return options.auditResult ?? { ok: true, logs: [] };
+      },
+      notify: async (_admin, notices) => {
+        options.notices?.push(notices);
+        return options.notifyResult ?? { ok: true };
       }
     })
   );
@@ -588,5 +596,90 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
       .set('Authorization', 'Bearer token');
     assert.equal(response.status, 200);
     assert.equal(response.body.reached, true);
+  });
+});
+
+describe('SG2-88: assignment and reassignment notify the people involved', () => {
+  const kinds = (notices: AssignmentNotice[][]) => notices.flat().map(notice => [notice.recipient_id, notice.kind]);
+
+  test('[NORMAL] [SG2-88:AC1] [SG2-88:AC4] assigning from the queue tells the new coordinator and the organiser', async () => {
+    const notices: AssignmentNotice[][] = [];
+    const response = await request(buildApp({
+      notices,
+      fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status: 'unassigned' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.notified, true);
+    assert.deepEqual(kinds(notices), [['coord-1', 'coordinator_assigned'], ['user-1', 'event_coordinator_changed']]);
+    assert.equal(notices[0][1].message, 'Coord One is now the Event Coordinator for “Partner Forum”.');
+  });
+
+  test('[NORMAL] [SG2-88:AC2] [SG2-88:AC4] reassigning also tells the previous coordinator', async () => {
+    const notices: AssignmentNotice[][] = [];
+    const response = await request(buildApp({
+      notices,
+      fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-0', coordinator_name: 'Old Coordinator' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(kinds(notices), [
+      ['coord-1', 'coordinator_assigned'], ['coord-0', 'coordinator_removed'], ['user-1', 'event_coordinator_changed']
+    ]);
+  });
+
+  test('[BOUNDARY] [SG2-88:AC4] reassigning to the coordinator who already holds the event notifies no one', async () => {
+    const notices: AssignmentNotice[][] = [];
+    const response = await request(buildApp({
+      notices,
+      fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-1', coordinator_name: 'Coord One' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(notices, []);
+  });
+
+  test('[CONFLICT] [SG2-88:AC4] an assignment that lost a race or was rolled back sends no notices', async () => {
+    for (const options of [
+      { assignResult: { ok: false, reason: 'not_assignable', message: 'moved' } as AssignCoordinatorResult },
+      { auditResult: { ok: false, reason: 'unavailable', message: 'history down' } as InsertAuditLogsResult }
+    ]) {
+      const notices: AssignmentNotice[][] = [];
+      const response = await request(buildApp({ ...options, notices }))
+        .patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+      assert.ok([409, 503].includes(response.status));
+      assert.deepEqual(notices, []);
+    }
+  });
+
+  test('[FAILURE] [SG2-88:AC4] failing to send notices keeps the assignment and its history, and says so without leaking why', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const writes: [number, string | null, string | null][] = [];
+    const logged = mock.method(console, 'error', () => undefined);
+    try {
+      const response = await request(buildApp({
+        audits, writes, notifyResult: { ok: false, message: 'DATABASE_SECRET' }
+      })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+      assert.equal(response.status, 200);
+      assert.equal(response.body.notified, false);
+      assert.equal(response.body.request.coordinator_id, 'coord-1');
+      assert.equal(JSON.stringify(response.body).includes('DATABASE_SECRET'), false);
+      assert.equal(writes.length, 1);
+      assert.equal(audits.length, 1);
+      assert.equal(logged.mock.callCount(), 1);
+      assert.match(String(logged.mock.calls[0].arguments[0]), /event 7/);
+    } finally {
+      logged.mock.restore();
+    }
+  });
+
+  test('[BOUNDARY] [SG2-88:AC4] an event with no name is still announced, as "Untitled event"', async () => {
+    const notices: AssignmentNotice[][] = [];
+    const response = await request(buildApp({
+      notices,
+      fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, name: null as unknown as string } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(notices[0].map(notice => notice.message), [
+      'You are now the Event Coordinator for “Untitled event”.',
+      'Coord One is now the Event Coordinator for “Untitled event”.'
+    ]);
   });
 });

@@ -179,6 +179,21 @@ test('[NORMAL] [SG2-51:AC4] an Event Organiser is told when a venue for their ev
   expect(holds).not.toHaveBeenCalled();
 });
 
+test.each([
+  ['Event Organiser', 'event_coordinator_changed', 'Event Coordinator changed', 'Robin Second is now the Event Coordinator for “Leadership Summit”.'],
+  ['Event Coordinator', 'coordinator_assigned', 'Event assigned to you', 'You are now the Event Coordinator for “Leadership Summit”.'],
+  ['Event Coordinator', 'coordinator_removed', 'Event reassigned', '“Leadership Summit” has been reassigned to Robin Second. You are no longer its Event Coordinator.'],
+] as const)('[NORMAL] [SG2-88:AC4] %s sees the %s notice with its own label', async (role, kind, label, message) => {
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [] });
+  vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [
+    { notification_id: 11, event_id: 7, request_id: null, kind, message, created_at: '2026-10-10T02:00:00.000Z' },
+  ] });
+  render(<AppShell role={role} screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="tok">Dashboard</AppShell>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
+  expect(screen.getByText(label)).toBeInTheDocument();
+  expect(screen.getByText(message)).toBeInTheDocument();
+});
+
 test('[BOUNDARY] [SG2-84:AC6] [SG2-85:AC4] a prototype shell without a token preserves sample internal notifications', () => {
   const load = vi.spyOn(api, 'loadHoldNotifications');
   render(<AppShell role="Event Coordinator" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()}>Prototype</AppShell>);

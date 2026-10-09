@@ -1,13 +1,15 @@
 import { AccessError } from '../auth/policy';
 import { createUserScopedClient } from './user-client';
+import type { AssignmentNoticeKind } from './assignmentNotifications';
 
 /** A notice for one person: a venue request was approved or rejected (SG2-49),
- * or a venue booking was released (SG2-51). */
+ * a venue booking was released (SG2-51), or an event's coordinator was
+ * assigned or changed (SG2-88). */
 export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released';
+  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | AssignmentNoticeKind;
   message: string;
   created_at: string;
 }

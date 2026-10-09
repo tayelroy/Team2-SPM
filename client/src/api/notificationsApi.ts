@@ -1,10 +1,17 @@
 /** The signed-in person's own notices (SG2-49): Venue Staff decisions on their
  * venue requests. Mirrors server/src/db/notifications.ts. */
+/** Venue decisions and releases (SG2-49, SG2-51) and coordinator assignment notices (SG2-88). */
+export const NOTIFICATION_KINDS = [
+  'venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
+  'coordinator_assigned', 'coordinator_removed', 'event_coordinator_changed',
+] as const;
+export type NotificationKind = typeof NOTIFICATION_KINDS[number];
+
 export interface Notification {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released';
+  kind: NotificationKind;
   message: string;
   created_at: string;
 }
@@ -18,7 +25,7 @@ const UNAVAILABLE: NotificationsOutcome = { ok: false, message: 'Could not load 
 function isNotification(value: unknown): value is Notification {
   const entry = value as Notification | null;
   return typeof entry?.notification_id === 'number'
-    && (entry.kind === 'venue_request_approved' || entry.kind === 'venue_request_rejected' || entry.kind === 'venue_booking_released')
+    && (NOTIFICATION_KINDS as readonly string[]).includes(entry.kind)
     && typeof entry.message === 'string' && typeof entry.created_at === 'string' && Number.isFinite(Date.parse(entry.created_at));
 }
 

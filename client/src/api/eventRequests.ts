@@ -903,7 +903,8 @@ export async function fetchAssignable(token: string): Promise<FetchAssignableRes
   };
 }
 
-export type AssignCoordinatorOutcome = { ok: true } | { ok: false; message: string };
+/** `notified` is false when the assignment saved but SG2-88's notices could not be sent. */
+export type AssignCoordinatorOutcome = { ok: true; notified: boolean } | { ok: false; message: string };
 
 /**
  * Assigns (SG2-33) or reassigns (SG2-34) an event's coordinator. Maps to
@@ -926,7 +927,10 @@ export async function assignCoordinator(
     return unavailable;
   }
 
-  if (response.ok) return { ok: true };
+  if (response.ok) {
+    const data = await readEventRequestJson(response, {} as Record<string, unknown>);
+    return { ok: true, notified: data.notified !== false };
+  }
   if (response.status === 401 || response.status === 403) {
     return { ok: false, message: 'Only the Event Coordinator Lead can assign a coordinator. Sign in again.' };
   }
