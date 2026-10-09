@@ -171,6 +171,21 @@ Verification: `supabase/tests/venue_operations.sql` (CI database job), `server/s
 
 SG2-78 uses these times to widen each booking's occupied period in availability, conflict checks and search.
 
+## SG2-78: Setup and turnaround time in availability and conflict checks
+
+A booking occupies its venue from its setup time before it starts until its turnaround time after it ends (SG2-77 records both per venue). A 10:00-12:00 event at a venue with 30 minutes of setup and 45 minutes of turnaround occupies 09:30-12:45 (AC1). Two bookings at one venue clash when these effective periods overlap, which is exactly when the gap between them is shorter than setup plus turnaround. A venue with no times recorded needs no gap.
+
+- **Conflicts (AC2).** The conflicts SG2-50 reports on a request (`POST /api/venue-booking-requests`, `GET …/:requestId/conflicts`) compare effective periods, so a booking can be reported even when it ends before the request starts. Approval refuses the same clashes: `decide_venue_booking_request()` (SG2-49), and placing or converting a tentative hold (`create_venue_hold()`, `change_venue_hold()`, SG2-84), all keep the gap. Venue Staff see a note in the "Booking conflicts" panel explaining this.
+- **Availability (AC3).** `GET /api/venues/:venueId/availability` and `GET /api/venues/availability` return `setup` and `turnaround` entries next to each booking or hold, and the calendar lists them separately with their own "Setup / turnaround" style.
+- **Search (AC4).** `GET /api/venues/search` leaves out a venue when the requested time would cut into a booking's or hold's setup or turnaround.
+- **Times unchanged (AC5).** Bookings keep the event's own start and end times; only the checks widen.
+
+Venue blocks (SG2-45, SG2-80) are not padded: they are not events and need no setup or turnaround of their own. There is deliberately no database constraint on effective periods. When Venue Staff change a venue's times, existing bookings that now clash stay in place and are flagged instead (SG2-79).
+
+Migration `202610120002_setup_turnaround_checks.sql` adds `venue_preparation_gap()`, which is internal and can't be called by clients, and replaces the three functions above so that each compares effective periods.
+
+Verification: `supabase/tests/venue_setup_turnaround.sql` (CI database job), `server/src/venue-setup-turnaround.test.ts`, the updated availability, search and conflict tests, `client/src/venues/calendarView.test.ts`, `client/src/venues/availability.test.ts`, `client/src/venues/BookingConflicts.test.tsx` and browser journey `SG2-78-P01`.
+
 ## SG2-50: Preventing double-booking
 
 A venue is never committed to two overlapping events. Confirmed bookings and live tentative holds (SG2-84) commit a venue; a held booking (not yet confirmed) and a pending request do not, matching SG2-49's approval check, venue search and blocks. Periods that only touch (one ends as the next starts) do not overlap.
@@ -188,7 +203,7 @@ Migration `202610070003_venue_double_booking.sql` adds the exclusion constraint 
 
 Verification: `supabase/tests/venue_double_booking.sql` (CI database job), `server/src/venue-conflicts.test.ts`, `server/src/db/venueConflicts.test.ts`, `client/src/venues/BookingConflicts.test.tsx` and browser journey `SG2-50-P01`.
 
-SG2-78 widens each period by the venue's setup and turnaround time inside `createVenueConflictStore`, so every check above picks it up.
+SG2-78 widens each period by the venue's setup and turnaround time inside `createVenueConflictStore` and the approval check (see above).
 
 ## SG2-51: Releasing a venue booking
 

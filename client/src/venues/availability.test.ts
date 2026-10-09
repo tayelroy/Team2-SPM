@@ -72,3 +72,11 @@ test.each([
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)));
   await expect(loadAllVenuesAvailability('token', VALID.from, VALID.to)).rejects.toThrow('Invalid venue availability response');
 });
+
+test('[NORMAL] [SG2-78:AC3] accepts setup and turnaround as their own availability kinds', async () => {
+  for (const kind of ['setup', 'turnaround']) {
+    const data = { ...VALID, venues: [{ ...VALID.venues[0], entries: [{ ...VALID.venues[0].entries[0], kind, label: kind }] }] };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(data)));
+    expect(await loadAllVenuesAvailability('token', VALID.from, VALID.to)).toEqual(data);
+  }
+});

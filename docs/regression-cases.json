@@ -3846,5 +3846,72 @@
       "method_inventory": "docs/test-case-inventory.json",
       "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
     }
+  },
+  {
+    "id": "SG2-78-P01",
+    "title": "setup and turnaround widen a booking in the calendar, conflicts, approval and search, without changing its times",
+    "story": "SG2-78",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-78:AC1",
+      "SG2-78:AC2",
+      "SG2-78:AC3",
+      "SG2-78:AC4",
+      "SG2-78:AC5"
+    ],
+    "purpose": "Verify a venue's setup and turnaround time make each booking occupy a wider effective period in the availability calendar, venue search, the conflicts reported on a request and the approval check, while the booking keeps the event's own times.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "As Venue Staff, record 30 minutes setup and 45 minutes turnaround for Regression Hall through the SG2-77 API.",
+      "Read Regression Hall's availability for 15 Jun 2030 and open that month on the Venue Availability calendar.",
+      "As the coordinator, search for venues from 12:30 and from 13:15 SGT that day.",
+      "Request Regression Hall for event 91 at 12:30-13:00 and at 13:15-14:00 SGT; read each notice.",
+      "As Venue Staff, open the 12:30 request and press Approve booking; open the 13:15 request and approve it; list event 91's bookings."
+    ],
+    "data": "Venue 1 (Regression Hall) with confirmed booking #1 for event 1 (Planning workshop), 10:00-12:00 SGT on 15 Jun 2030; event 91; venue and coordinator fixture accounts.",
+    "expected": "Booking #1 shows as setup 09:30-10:00, the event 10:00-12:00 and turnaround 12:00-12:45, each listed separately on the calendar; search leaves Regression Hall out at 12:30 and returns it at 13:15; the 12:30 request is reported as clashing with booking #1 and its approval is refused naming Planning workshop; the 13:15 request reports nothing and is approved; the new booking keeps 13:15-14:00.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "9 Oct 2026; feature/SG2-78-setup-turnaround-in-checks merged with main b3de6d3 (SG2-54 #72); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite (27 CI database steps) including venue_setup_turnaround. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-09",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-PREP-01",
+    "title": "Approvals and tentative holds keep a venue's setup and turnaround time between bookings",
+    "story": "SG2-78",
+    "purpose": "Check the replaced decide_venue_booking_request(), create_venue_hold() and change_venue_hold() compare effective periods through actual stored records and refused operations, on both sides of the gap, and that bookings keep the event's own times.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed users, roles, a venue with 30 minutes setup and 45 minutes turnaround, a venue with none, events, confirmed bookings and pending requests.",
+      "As Venue Staff, approve requests 74 and 75 minutes after a booking ends, and 76 and 75 minutes before it starts; approve back-to-back requests at the venue with no times.",
+      "Place a hold inside a booking's turnaround and one clear of it; write a booking into the clear hold's turnaround directly, then try to convert the hold.",
+      "Call the gap helper as a client.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_setup_turnaround.sql",
+    "expected": "The gap is 75 minutes, or 0 with no times; requests 74 minutes after or 76 minutes before are refused naming the booking and stay pending; requests exactly 75 minutes away, and back-to-back requests at a venue with no times, are approved and keep their own times; the hold inside the turnaround is refused, the clear one placed, and converting it once a booking sits in its turnaround is refused; clients cannot call the gap helper.",
+    "evidence": "supabase/tests/venue_setup_turnaround.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: restoring SG2-49's unpadded approval failed turnaround-overlap-refused; restoring SG2-84's unpadded hold placement failed hold-in-turnaround-refused.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "9 Oct 2026; feature/SG2-78-setup-turnaround-in-checks merged with main b3de6d3 (SG2-54 #72); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite (27 CI database steps) including venue_setup_turnaround. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-09",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

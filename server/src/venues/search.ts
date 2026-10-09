@@ -5,6 +5,7 @@ import { createUserScopedClient } from '../db/user-client';
 import type { VenueRecord } from './fields';
 import type { VenueLayoutRecord } from './layoutFields';
 import { parseVenueSearch, type VenueSearchCriteria } from './searchFields';
+import { MAX_GAP_MINUTES, clashes, preparationByVenue, shiftIso, type PreparationTimes } from './preparation';
 
 const VENUE_COLUMNS = 'venue_id,name,location,capacity,facilities,accessibility_features,operating_information';
 
@@ -25,23 +26,31 @@ function includesAll(text: string | null, keywords: string[]): boolean {
 
 /**
  * Venues that meet every applied criterion and are free for the whole period
- * (SG2-46): no block, confirmed booking or active tentative hold overlaps it. Reads with
+ * (SG2-46): no block, confirmed booking or active tentative hold overlaps it.
+ * SG2-78 AC4: bookings and holds count with their setup and turnaround, so a
+ * venue is left out when the requested event would not leave that room. Reads with
  * the caller's own token, so RLS limits the occupancy tables to internal roles.
  */
 export async function searchVenues(criteria: VenueSearchCriteria, client: SupabaseClient): Promise<SearchResult> {
   const { starts_at: from, ends_at: to } = criteria;
-  const [venues, layouts, blocks, bookings] = await Promise.all([
+  const [venues, layouts, blocks, bookings, operations] = await Promise.all([
     client.from('venues').select(VENUE_COLUMNS).order('name', { ascending: true }),
     client.from('venue_layouts').select('venue_id,layout,other_description'),
     client.from('venue_unavailability').select('venue_id,starts_at,ends_at').lt('starts_at', to).gt('ends_at', from),
-    client.from('venue_booking_occupancy').select('venue_id,starts_at,ends_at,status').lt('starts_at', to).gt('ends_at', from)
+    // Wide enough for any venue's setup and turnaround; each row is then
+    // checked against its own venue's times.
+    client.from('venue_booking_occupancy').select('venue_id,starts_at,ends_at,status')
+      .lt('starts_at', shiftIso(to, MAX_GAP_MINUTES)).gt('ends_at', shiftIso(from, -MAX_GAP_MINUTES)),
+    client.from('venue_operations').select('venue_id,setup_minutes,turnaround_minutes')
   ]);
-  if (venues.error || layouts.error || blocks.error || bookings.error) return { outcome: 'unavailable' };
+  if (venues.error || layouts.error || blocks.error || bookings.error || operations.error) return { outcome: 'unavailable' };
+  const timesFor = preparationByVenue(operations.data as (PreparationTimes & { venue_id: number })[]);
 
   const occupied = new Set<number>();
   const held = new Map<number, HeldPeriod[]>();
   for (const row of blocks.data as OccupancyRow[]) occupied.add(row.venue_id);
   for (const row of bookings.data as OccupancyRow[]) {
+    if (!clashes(row, { starts_at: from, ends_at: to }, timesFor(row.venue_id))) continue;
     if (row.status === 'confirmed' || row.status === 'tentative') occupied.add(row.venue_id);
     else held.set(row.venue_id, [...(held.get(row.venue_id) ?? []), { starts_at: row.starts_at, ends_at: row.ends_at }]);
   }

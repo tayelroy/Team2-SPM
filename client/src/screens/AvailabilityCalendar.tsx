@@ -29,6 +29,7 @@ const LEGEND: { label: string; bg: string; bd: string }[] = [
   { label: 'Free', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
   { label: 'Booked', bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)' },
   { label: 'Tentative', bg: 'rgba(195,175,90,0.18)', bd: 'rgba(230,209,137,0.5)' },
+  { label: 'Setup / turnaround', bg: 'rgba(0,130,124,0.1)', bd: 'rgba(203,255,252,0.22)' },
   { label: 'Unavailable', bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)' }
 ];
 
@@ -37,6 +38,7 @@ const KIND_STYLE: Record<DayKind, { bg: string; bd: string; labelFg: string }> =
   booked: { bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)', labelFg: color.mist },
   tentative: { bg: 'rgba(195,175,90,0.18)', bd: 'rgba(230,209,137,0.5)', labelFg: color.mist },
   unavailable: { bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)', labelFg: color.silver },
+  preparation: { bg: 'rgba(0,130,124,0.1)', bd: 'rgba(203,255,252,0.22)', labelFg: color.mist },
   mixed: { bg: color.teal, bd: color.teal, labelFg: color.abyss }
 };
 
@@ -199,7 +201,8 @@ export default function AvailabilityCalendar() {
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7,minmax(0,1fr))',
-              gap: '10px',
+              // Tighter on phones so each day keeps room for its date and items.
+              gap: 'clamp(4px, 1.5vw, 10px)',
             }}
           >
             {days.map((day, i) => {
@@ -210,8 +213,9 @@ export default function AvailabilityCalendar() {
                   aria-label={day.date ? `${day.date}: ${day.kind}` : undefined}
                   style={{
                     minHeight: '96px',
+                    minWidth: 0,
                     borderRadius: radius.sm,
-                    padding: '10px',
+                    padding: 'clamp(4px, 1.5vw, 10px)',
                     background: style.bg,
                     border: `1px solid ${style.bd}`,
                     display: 'flex',
@@ -230,6 +234,9 @@ export default function AvailabilityCalendar() {
                         lineHeight: 1.3,
                         letterSpacing: '0.02em',
                         color: style.labelFg,
+                        // Narrow phone cells: break long words (e.g. "Turnaround")
+                        // inside the day instead of spilling into the next one.
+                        overflowWrap: 'anywhere',
                       }}
                     >
                       {item}
