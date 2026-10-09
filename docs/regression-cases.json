@@ -2882,9 +2882,10 @@
     ],
     "evidence": "e2e/regression.spec.ts; client/src/App.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/mock/viewModel.test.ts",
     "layer": "Playwright browser + fixture API",
-    "status": "Not Executed",
-    "actual": "Not yet run in Playwright; the matching component and App tests pass under npm run ci.",
-    "execution_evidence": "Pending a Playwright run on bugfix/SG2-86-new-role-dashboards."
+    "status": "Pass",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-86-new-role-dashboards on origin/main 88a431a; npm run test:regression locally in Chromium: 76/76 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026"
   },
   {
     "id": "SG2-87-P01",
