@@ -182,7 +182,7 @@ A booking occupies its venue from its setup time before it starts until its turn
 
 Venue blocks (SG2-45, SG2-80) are not padded: they are not events and need no setup or turnaround of their own. There is deliberately no database constraint on effective periods. When Venue Staff change a venue's times, existing bookings that now clash stay in place and are flagged instead (SG2-79).
 
-Migration `202610100003_setup_turnaround_checks.sql` adds `venue_preparation_gap()`, which is internal and can't be called by clients, and replaces the three functions above so that each compares effective periods.
+Migration `202610120002_setup_turnaround_checks.sql` adds `venue_preparation_gap()`, which is internal and can't be called by clients, and replaces the three functions above so that each compares effective periods.
 
 Verification: `supabase/tests/venue_setup_turnaround.sql` (CI database job), `server/src/venue-setup-turnaround.test.ts`, the updated availability, search and conflict tests, `client/src/venues/calendarView.test.ts`, `client/src/venues/availability.test.ts`, `client/src/venues/BookingConflicts.test.tsx` and browser journey `SG2-78-P01`.
 

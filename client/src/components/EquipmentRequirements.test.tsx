@@ -156,3 +156,10 @@ test.each(['resolve', 'reject'] as const)('[CONFLICT] [SG2-53:AC2] a late save %
   await act(async () => { if (outcome === 'resolve') pending.resolve(view); else pending.reject(new EquipmentRequirementsError(403)); });
   expect(screen.queryByRole('article')).not.toBeInTheDocument(); expect(screen.queryByRole('alert')).not.toBeInTheDocument(); expect(screen.queryByText('Equipment requirement saved.')).not.toBeInTheDocument();
 });
+
+test('[NORMAL] [SG2-54:AC1] support availability remains available on a confirmed event without arrangement edit permission', async () => {
+  vi.mocked(loadEquipmentRequirements).mockResolvedValue({ ...view, can_request: false, can_arrange: false, event: { ...view.event, status: 'confirmed' } });
+  render(<EquipmentRequirements eventId={7} accessToken="token" canCheckAvailability />);
+  expect(await screen.findByRole('button', { name: 'Check availability for Microphone' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Update arrangement for Microphone' })).not.toBeInTheDocument();
+});

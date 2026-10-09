@@ -6,6 +6,7 @@ import {
 import { Card, Fact, GhostButton, GradientButton } from '../ui';
 import { color, label } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
+import EquipmentAvailability from './EquipmentAvailability';
 
 type Editor = { kind: 'requirement'; record: EquipmentRequirement | null } | { kind: 'arrangement'; record: EquipmentRequirement };
 const optionalText = (value: string) => value.trim() || null;
@@ -13,10 +14,10 @@ const textFits = (value: string) => Array.from(value.trim()).length <= 2000;
 const whole = (value: string, minimum: number, maximum: number) => /^\d+$/.test(value) && Number(value) >= minimum && Number(value) <= maximum;
 
 /** Each event and session owns its records, drafts and cancellable requests. */
-export default function EquipmentRequirements({ eventId, accessToken = null }: { eventId: number; accessToken?: string | null }) {
-  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} />;
+export default function EquipmentRequirements({ eventId, accessToken = null, canCheckAvailability = false }: { eventId: number; accessToken?: string | null; canCheckAvailability?: boolean }) {
+  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} canCheckAvailability={canCheckAvailability} />;
 }
-function Requirements({ eventId, token }: { eventId: number; token: string | null }) {
+function Requirements({ eventId, token, canCheckAvailability }: { eventId: number; token: string | null; canCheckAvailability: boolean }) {
   const [view, setView] = useState<RequirementsView | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
   const [attempt, setAttempt] = useState(0);
@@ -77,6 +78,7 @@ function Requirements({ eventId, token }: { eventId: number; token: string | nul
       {view.requests.map(record => <article key={record.request_id} aria-label={`Equipment requirement: ${record.equipment_type}`} style={{ minWidth: 0 }}>
         <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '16px', overflowWrap: 'anywhere' }}>
           <h4 style={{ margin: 0, fontSize: '20px' }}>{record.equipment_type}</h4>
+          {canCheckAvailability ? <EquipmentAvailability eventId={eventId} requestId={record.request_id} equipmentType={record.equipment_type} accessToken={token} /> : null}
           <Fact label="Quantity requested" value={String(record.quantity)} />
           <Fact label="Technical notes" value={record.notes ?? 'Not recorded'} />
           <Fact label="Request status" value={record.status} />

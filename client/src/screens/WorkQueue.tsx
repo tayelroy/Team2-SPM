@@ -140,7 +140,7 @@ function CompletePanel({ eventId, endsAt, accessToken, onCompleted }: {
 
 export type FindVenues = (prefill: VenueSearchPrefill) => void;
 
-function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
+function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalRole; item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
   const { status, error, setStatus } = useOpenedForReview(item, accessToken);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
@@ -197,7 +197,7 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           them; the RPC decides what is still editable. */}
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
-        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} />
+        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} canCheckAvailability={role === 'Technical Support Staff'} />
       )}
       {/* SG2-57: the assigned coordinator sees which arrangements are still
           outstanding before the event can be confirmed, through the same
@@ -319,7 +319,7 @@ function QueueContent({ role, accessToken, selection, onSelect, onFindVenues }: 
 
   if (!result) return <p role="status">Loading your work queue…</p>;
   if (!result.ok) return <p role="alert">{result.error}</p>;
-  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
+  if (selection) return <ItemDetail role={role} item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
 
   return <>
     <p className="work-queue-summary" role="status">{result.items.length} {result.items.length === 1 ? 'item' : 'items'} in your work queue</p>

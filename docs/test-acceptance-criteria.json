@@ -584,6 +584,18 @@
         "AC4": "Requests in the queue show as Unassigned to the Event Organiser",
         "AC5": "An event leaves the queue once it has been assigned"
       }
+    },
+    {
+      "id": "SG2-54",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-54",
+      "summary": "Check whether the equipment is there to give",
+      "acceptanceCriteria": {
+        "AC1": "Checking availability shows the quantity held, the quantity already committed to overlapping events, and what remains",
+        "AC2": "Equipment recorded as damaged or under maintenance is not counted as available",
+        "AC3": "Where the request exceeds what remains, the shortfall is stated"
+      },
+      "originalPullRequests": [],
+      "source": "Live Jira SG2-54 description verified in the in-app browser on 9 October 2026. AC numbering follows displayed bullet order."
     }
   ]
 }
