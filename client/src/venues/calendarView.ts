@@ -35,7 +35,7 @@ export function monthRange(reference: Date): MonthRange {
   };
 }
 
-export type DayKind = 'free' | 'booked' | 'unavailable' | 'tentative' | 'mixed';
+export type DayKind = 'free' | 'booked' | 'unavailable' | 'tentative' | 'preparation' | 'mixed';
 
 export interface CalendarDay {
   /** ISO date (yyyy-mm-dd) for an in-month day, null for a leading/trailing blank. */
@@ -77,6 +77,7 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
     let hasBooking = false;
     let hasUnavailable = false;
     let hasHold = false;
+    let hasPreparation = false;
 
     for (const venue of venues) {
       for (const entry of venue.entries) {
@@ -85,6 +86,8 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
         if (entryStart < dayEnd && entryEnd > dayStart) {
           if (entry.kind === 'booking') hasBooking = true;
           else if (entry.kind === 'hold') hasHold = true;
+          // SG2-78 AC3: setup and turnaround occupy the venue but are not the event.
+          else if (entry.kind === 'setup' || entry.kind === 'turnaround') hasPreparation = true;
           else hasUnavailable = true;
           items.push(`${venue.name} · ${entry.label}`);
         }
@@ -92,7 +95,9 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
     }
 
     const occupiedKinds = Number(hasBooking) + Number(hasUnavailable) + Number(hasHold);
-    const kind: DayKind = occupiedKinds > 1 ? 'mixed' : hasBooking ? 'booked' : hasUnavailable ? 'unavailable' : hasHold ? 'tentative' : 'free';
+    // A day holding only setup or turnaround (e.g. the night before) is still occupied.
+    const kind: DayKind = occupiedKinds > 1 ? 'mixed' : hasBooking ? 'booked' : hasUnavailable ? 'unavailable'
+      : hasHold ? 'tentative' : hasPreparation ? 'preparation' : 'free';
     const shown = items.slice(0, MAX_ITEMS_PER_DAY);
     if (items.length > MAX_ITEMS_PER_DAY) shown.push(`+${items.length - MAX_ITEMS_PER_DAY} more`);
 

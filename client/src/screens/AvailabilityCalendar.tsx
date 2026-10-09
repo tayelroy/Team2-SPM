@@ -29,6 +29,7 @@ const LEGEND: { label: string; bg: string; bd: string }[] = [
   { label: 'Free', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
   { label: 'Booked', bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)' },
   { label: 'Tentative', bg: 'rgba(195,175,90,0.18)', bd: 'rgba(230,209,137,0.5)' },
+  { label: 'Setup / turnaround', bg: 'rgba(0,130,124,0.1)', bd: 'rgba(203,255,252,0.22)' },
   { label: 'Unavailable', bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)' }
 ];
 
@@ -37,6 +38,7 @@ const KIND_STYLE: Record<DayKind, { bg: string; bd: string; labelFg: string }> =
   booked: { bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)', labelFg: color.mist },
   tentative: { bg: 'rgba(195,175,90,0.18)', bd: 'rgba(230,209,137,0.5)', labelFg: color.mist },
   unavailable: { bg: 'rgba(112,119,119,0.3)', bd: 'rgba(255,255,255,0.06)', labelFg: color.silver },
+  preparation: { bg: 'rgba(0,130,124,0.1)', bd: 'rgba(203,255,252,0.22)', labelFg: color.mist },
   mixed: { bg: color.teal, bd: color.teal, labelFg: color.abyss }
 };
 

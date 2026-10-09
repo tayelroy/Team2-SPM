@@ -109,3 +109,20 @@ test('[BOUNDARY] [SG2-44:AC1] more than three entries on one day are capped with
   const day = buildCalendarDays(OCT_2026, venues).find((d) => d.date === '2026-10-12')!;
   expect(day.items).toEqual(['Atrium · slot 0', 'Atrium · slot 1', 'Atrium · slot 2', '+2 more']);
 });
+
+test('[NORMAL] [SG2-78:AC3] setup and turnaround are listed separately from the event and do not make a booked day mixed', () => {
+  const setup = { start: '2026-10-10T09:30:00.000Z', end: '2026-10-10T10:00:00.000Z', kind: 'setup' as const, label: 'Setup (30 min) for confirmed · event 7' };
+  const event = { start: '2026-10-10T10:00:00.000Z', end: '2026-10-10T12:00:00.000Z', kind: 'booking' as const, label: 'confirmed · event 7' };
+  const turnaround = { start: '2026-10-10T12:00:00.000Z', end: '2026-10-10T12:45:00.000Z', kind: 'turnaround' as const, label: 'Turnaround (45 min) after confirmed · event 7' };
+  const days = buildCalendarDays(OCT_2026, [venue('Atrium', [setup, event, turnaround])]);
+  expect(days.find(day => day.date === '2026-10-10')).toMatchObject({ kind: 'booked', items: [
+    'Atrium · Setup (30 min) for confirmed · event 7', 'Atrium · confirmed · event 7', 'Atrium · Turnaround (45 min) after confirmed · event 7'
+  ] });
+});
+
+test('[BOUNDARY] [SG2-78:AC3] a day holding only a turnaround that ran past midnight is still occupied, as setup and turnaround', () => {
+  const turnaround = { start: '2026-10-10T23:30:00.000Z', end: '2026-10-11T00:15:00.000Z', kind: 'turnaround' as const, label: 'Turnaround (45 min) after Tentative' };
+  const days = buildCalendarDays(OCT_2026, [venue('Atrium', [turnaround])]);
+  expect(days.find(day => day.date === '2026-10-11')).toMatchObject({ kind: 'preparation', items: ['Atrium · Turnaround (45 min) after Tentative'] });
+  expect(days.find(day => day.date === '2026-10-12')?.kind).toBe('free');
+});

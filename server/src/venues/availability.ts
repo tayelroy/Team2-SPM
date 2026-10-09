@@ -2,10 +2,13 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { authorization } from '../auth';
 import { createUserScopedClient } from '../db/user-client';
+import { MAX_MINUTES } from './operationFields';
+import { preparationByVenue, shiftIso, type PreparationTimes } from './preparation';
 
-export type AvailabilityKind = 'booking' | 'hold' | 'unavailable';
+export type AvailabilityKind = 'booking' | 'hold' | 'unavailable' | 'setup' | 'turnaround';
 
-/** One occupied period for a venue: a booking or a recorded unavailability. */
+/** One occupied period for a venue: a booking, a recorded unavailability, or
+ * the setup before or turnaround after a booking (SG2-78 AC3). */
 export interface AvailabilityEntry {
   start: string;
   end: string;
@@ -38,6 +41,7 @@ interface BookingRow { starts_at: string; ends_at: string; status: string; event
 interface UnavailabilityRow { starts_at: string; ends_at: string; reason: string }
 interface AffectedRow { starts_at: string; ends_at: string }
 interface VenueRow { venue_id: number; name: string }
+type PreparationRow = PreparationTimes & { venue_id: number };
 
 function parseVenueId(value: unknown): number | null {
   if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value;
@@ -93,6 +97,31 @@ function bookingEntry(row: BookingRow, affected: boolean): AvailabilityEntry {
   };
 }
 
+/** Whether [start, end) overlaps the requested range. */
+function inRange(start: string, end: string, range: { fromIso: string; toIso: string }): boolean {
+  return Date.parse(start) < Date.parse(range.toIso) && Date.parse(end) > Date.parse(range.fromIso);
+}
+
+/**
+ * A booking or hold as calendar entries: the event itself, then its setup
+ * before and turnaround after, each marked separately (SG2-78 AC3). The
+ * event keeps its own times (AC5); only entries inside the range are kept.
+ */
+function occupancyEntries(row: BookingRow, affected: boolean, times: PreparationTimes, range: { fromIso: string; toIso: string }): AvailabilityEntry[] {
+  const event = bookingEntry(row, affected);
+  const entries: AvailabilityEntry[] = [];
+  if (times.setup_minutes > 0) {
+    entries.push({ start: shiftIso(row.starts_at, -times.setup_minutes), end: event.start, kind: 'setup',
+      label: `Setup (${times.setup_minutes} min) for ${event.label}` });
+  }
+  entries.push(event);
+  if (times.turnaround_minutes > 0) {
+    entries.push({ start: event.end, end: shiftIso(row.ends_at, times.turnaround_minutes), kind: 'turnaround',
+      label: `Turnaround (${times.turnaround_minutes} min) after ${event.label}` });
+  }
+  return entries.filter(entry => inRange(entry.start, entry.end, range));
+}
+
 function unavailabilityEntry(row: UnavailabilityRow): AvailabilityEntry {
   return { start: row.starts_at, end: row.ends_at, kind: 'unavailable', label: row.reason };
 }
@@ -118,13 +147,14 @@ export async function getVenueAvailability(
   if (!range.ok) return { outcome: 'invalid', message: range.message };
   if (!client) return { outcome: 'unavailable' };
 
-  const [bookings, unavailability, affected] = await Promise.all([
+  const [bookings, unavailability, affected, operations] = await Promise.all([
+    // Wide enough to catch setup or turnaround reaching into the range.
     client
       .from('venue_booking_occupancy')
       .select('starts_at, ends_at, status, event_id')
       .eq('venue_id', id)
-      .lt('starts_at', range.toIso)
-      .gt('ends_at', range.fromIso)
+      .lt('starts_at', shiftIso(range.toIso, MAX_MINUTES))
+      .gt('ends_at', shiftIso(range.fromIso, -MAX_MINUTES))
       .order('starts_at', { ascending: true }),
     client
       .from('venue_unavailability')
@@ -138,16 +168,18 @@ export async function getVenueAvailability(
       .select('starts_at, ends_at')
       .eq('venue_id', id)
       .lt('starts_at', range.toIso)
-      .gt('ends_at', range.fromIso)
+      .gt('ends_at', range.fromIso),
+    client.from('venue_operations').select('venue_id, setup_minutes, turnaround_minutes').eq('venue_id', id)
   ]);
 
-  if (bookings.error || unavailability.error || affected.error) {
+  if (bookings.error || unavailability.error || affected.error || operations.error) {
     return { outcome: 'unavailable' };
   }
 
   const flagged = new Set(((affected.data ?? []) as AffectedRow[]).map(row => bookingKey(id, row)));
+  const times = preparationByVenue((operations.data ?? []) as PreparationRow[])(id);
   const entries: AvailabilityEntry[] = [
-    ...((bookings.data ?? []) as BookingRow[]).map(row => bookingEntry(row, flagged.has(bookingKey(id, row)))),
+    ...((bookings.data ?? []) as BookingRow[]).flatMap(row => occupancyEntries(row, flagged.has(bookingKey(id, row)), times, range)),
     ...((unavailability.data ?? []) as UnavailabilityRow[]).map(unavailabilityEntry)
   ].sort(sortByStart);
 
@@ -168,13 +200,13 @@ export async function getAllVenuesAvailability(
   if (!range.ok) return { outcome: 'invalid', message: range.message };
   if (!client) return { outcome: 'unavailable' };
 
-  const [venues, bookings, unavailability, affected] = await Promise.all([
+  const [venues, bookings, unavailability, affected, operations] = await Promise.all([
     client.from('venues').select('venue_id, name').order('name', { ascending: true }),
     client
       .from('venue_booking_occupancy')
       .select('venue_id, starts_at, ends_at, status, event_id')
-      .lt('starts_at', range.toIso)
-      .gt('ends_at', range.fromIso),
+      .lt('starts_at', shiftIso(range.toIso, MAX_MINUTES))
+      .gt('ends_at', shiftIso(range.fromIso, -MAX_MINUTES)),
     client
       .from('venue_unavailability')
       .select('venue_id, starts_at, ends_at, reason')
@@ -184,10 +216,11 @@ export async function getAllVenuesAvailability(
       .from('venue_affected_bookings')
       .select('venue_id, starts_at, ends_at')
       .lt('starts_at', range.toIso)
-      .gt('ends_at', range.fromIso)
+      .gt('ends_at', range.fromIso),
+    client.from('venue_operations').select('venue_id, setup_minutes, turnaround_minutes')
   ]);
 
-  if (venues.error || bookings.error || unavailability.error || affected.error) {
+  if (venues.error || bookings.error || unavailability.error || affected.error || operations.error) {
     return { outcome: 'unavailable' };
   }
 
@@ -199,8 +232,11 @@ export async function getAllVenuesAvailability(
   };
 
   const flagged = new Set(((affected.data ?? []) as (AffectedRow & { venue_id: number })[]).map(row => bookingKey(row.venue_id, row)));
+  const timesFor = preparationByVenue((operations.data ?? []) as PreparationRow[]);
   for (const row of (bookings.data ?? []) as (BookingRow & { venue_id: number })[]) {
-    addEntry(row.venue_id, bookingEntry(row, flagged.has(bookingKey(row.venue_id, row))));
+    for (const entry of occupancyEntries(row, flagged.has(bookingKey(row.venue_id, row)), timesFor(row.venue_id), range)) {
+      addEntry(row.venue_id, entry);
+    }
   }
   for (const row of (unavailability.data ?? []) as (UnavailabilityRow & { venue_id: number })[]) {
     addEntry(row.venue_id, unavailabilityEntry(row));

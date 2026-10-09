@@ -4,7 +4,9 @@
  * failure, and never trust the response shape without checking it first.
  */
 
-export type AvailabilityKind = 'booking' | 'unavailable' | 'hold';
+/** SG2-78: setup before and turnaround after a booking are their own entries. */
+export type AvailabilityKind = 'booking' | 'unavailable' | 'hold' | 'setup' | 'turnaround';
+const KINDS: readonly unknown[] = ['booking', 'unavailable', 'hold', 'setup', 'turnaround'];
 
 export interface AvailabilityEntry {
   start: string;
@@ -34,7 +36,7 @@ function isEntry(value: unknown): value is AvailabilityEntry {
     isRecord(value) &&
     typeof value.start === 'string' &&
     typeof value.end === 'string' &&
-    (value.kind === 'booking' || value.kind === 'unavailable' || value.kind === 'hold') &&
+    KINDS.includes(value.kind) &&
     typeof value.label === 'string'
   );
 }
