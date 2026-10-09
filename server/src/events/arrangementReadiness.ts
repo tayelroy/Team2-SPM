@@ -45,6 +45,10 @@ export interface ArrangementReadinessResult {
   /** Keys of the arrangements still outstanding, in display order. */
   outstanding: ArrangementKey[];
   ready_for_confirmation: boolean;
+  /** Whether the event has any live venue booking request (pending — including
+   * one placed by a tentative hold — or approved). The coordinator's "find
+   * venues" next step and SG2-39's planning recheck both key off this. */
+  venue_requested: boolean;
 }
 
 // A venue or equipment request that has been decided against (or withdrawn) no
@@ -175,6 +179,7 @@ export function computeArrangementReadiness(
     event_id: input.event_id,
     arrangements,
     outstanding,
-    ready_for_confirmation: outstanding.length === 0
+    ready_for_confirmation: outstanding.length === 0,
+    venue_requested: input.venue_requests.some(isLive)
   };
 }

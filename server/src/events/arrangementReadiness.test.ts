@@ -76,6 +76,17 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.equal(result.ready_for_confirmation, false);
   });
 
+  test('[BOUNDARY] [SG2-39:AC2] a venue counts as requested only while a pending or approved request is live', () => {
+    for (const [requests, requested] of [
+      [[], false],
+      [[{ status: 'rejected' }, { status: 'cancelled' }], false],
+      [[{ status: 'cancelled' }, { status: 'pending' }], true],
+      [[{ status: 'approved' }], true]
+    ] as const) {
+      assert.equal(computeArrangementReadiness(baseInput({ venue_requests: [...requests] })).venue_requested, requested);
+    }
+  });
+
   test('[BOUNDARY] [SG2-57:AC2] a rejected venue request is ignored, so an approved one still reads ready', () => {
     const result = computeArrangementReadiness(
       baseInput({ venue_requests: [{ status: 'rejected' }, { status: 'approved' }] })
