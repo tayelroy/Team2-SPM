@@ -38,7 +38,7 @@ async function fillVenue(page: Page, name = venueValues.name, capacity = '100') 
 
 async function fillEvent(page: Page, name = 'Browser workshop') {
   for (const [label, value] of Object.entries({ 'Event name': name, Purpose: 'Team planning',
-    Description: 'Review the release plan', Date: '2030-06-15T09:00:00Z',
+    Description: 'Review the release plan', Date: '2030-06-15T17:00',
     'Expected attendance': '25', 'Venue requirements': 'Projector' })) {
     await page.getByLabel(new RegExp(`^${label}`)).fill(value);
   }
@@ -417,6 +417,7 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [SG2-87:AC4] [NORMAL] 
   await nav(page, 'New request');
   await fillEvent(page);
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Browser workshop has been submitted for review.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
   // SG2-100: a fresh submission with no coordinator lands in `unassigned`,
   // shown as Awaiting Assignment, not `submitted`.
@@ -472,18 +473,26 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await nav(page, 'My drafts');
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByLabel(/^Event name/)).toHaveValue('Planning workshop');
+  // The stored 02:00 UTC instant shows as 10:00 Singapore time in a date-time input.
+  await expect(page.getByLabel(/^Date/)).toHaveValue('2030-06-15T10:00');
   await expect(page.getByLabel('Accessibility needs (optional)', { exact: true })).toHaveValue('Step-free entrance');
+  // No prototype requirement chips or canned suitability banner on a real draft.
+  await expect(page.getByRole('button', { name: 'Hearing loop', exact: true })).toHaveCount(0);
+  await expect(page.getByText(/expected attendance rules out/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Check venue fit', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /fit this request$/ })).toBeVisible();
   await page.getByLabel(/^Event name/).fill('Revised workshop');
   await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
-  await nav(page, 'My events');
-  await page.getByRole('button', { name: 'View Revised workshop', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Revised workshop has been submitted for review.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Revised workshop', exact: true })).toBeVisible();
+  await nav(page, 'My drafts');
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
   expect(detail.status()).toBe(200);
-  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null });
+  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null,
+    proposed_date: '2030-06-15T02:00:00.000Z' });
 });
 
 test('SG2-32-P01 | [SG2-32:AC1] [SG2-32:AC2] [NORMAL] [FAILURE] My drafts excludes non-drafts and confirmed deletion survives reload', async ({ page, request }) => {
