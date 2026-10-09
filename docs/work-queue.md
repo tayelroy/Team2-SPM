@@ -48,6 +48,13 @@ The **Edit Planning Information** and **View Change History** actions sit in
 the detail card's footer (`organisation-detail-footer` /
 `organisation-detail-actions`), inset like the rest of the card's content.
 
+**Drawer.** Each opening starts from the event's saved values; closing with
+**Cancel**, ✕, Escape or the backdrop discards unsaved edits. The drawer
+scrolls, and its messages (validation errors, a server refusal, or
+**Arrangements Require Rechecking**) render above the form, so each new message
+is scrolled into view and focused (`role="alert"`), including a repeat of the
+same message on another failed save.
+
 **Dates.** The server and the drawer apply the same rules, using the value being
 saved for each date when the edit changes it and the stored value otherwise:
 

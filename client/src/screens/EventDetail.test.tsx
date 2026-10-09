@@ -8,6 +8,10 @@ vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId }: {
   <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}</section>
 ) }));
 
+// jsdom has no scrollIntoView; the planning drawer scrolls its messages into
+// view (SG2-39), so the impact-confirmation journey below needs it defined.
+Element.prototype.scrollIntoView = vi.fn();
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

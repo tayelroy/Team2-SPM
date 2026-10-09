@@ -1,7 +1,7 @@
 vi.hoisted(() => vi.stubEnv('TZ', 'UTC'));
 
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventPlanningDrawer, {
@@ -206,6 +206,8 @@ describe('EventPlanningDrawer Component', () => {
     // Only the clock is pinned; promises and waitFor keep real timers.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'));
+    // jsdom has no scrollIntoView; the drawer scrolls each new message into view.
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   afterEach(() => {
@@ -213,6 +215,74 @@ describe('EventPlanningDrawer Component', () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
     sessionStorage.clear();
+  });
+
+  test('[NORMAL] [SG2-39:AC1] cancelling discards unsaved edits, so reopening shows the saved values', () => {
+    const saved = { expected_attendance: 100, planning_notes: 'Catering booked', status: 'planning' };
+    const onClose = vi.fn();
+    const { rerender } = render(<EventPlanningDrawer isOpen eventId={91} onClose={onClose} initialValues={saved} />);
+    fireEvent.change(screen.getByLabelText('Expected Attendance'), { target: { value: '999' } });
+    fireEvent.change(screen.getByLabelText(/Planning Notes/i), { target: { value: 'Draft thought' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<EventPlanningDrawer isOpen={false} eventId={91} onClose={onClose} initialValues={saved} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerender(<EventPlanningDrawer isOpen eventId={91} onClose={onClose} initialValues={saved} />);
+    expect(screen.getByLabelText('Expected Attendance')).toHaveValue(100);
+    expect(screen.getByLabelText(/Planning Notes/i)).toHaveValue('Catering booked');
+  });
+
+  test('[FAILURE] [SG2-39:AC4] a validation error is scrolled into view and focused, again on every failed save', () => {
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    render(<EventPlanningDrawer eventId={91} onClose={vi.fn()} initialValues={{ expected_attendance: 100 }} />);
+    fireEvent.change(screen.getByLabelText('Expected Attendance'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+
+    const alert = within(screen.getByTestId('client-validation-errors')).getByRole('alert');
+    expect(alert).toHaveTextContent('Expected attendance must be a positive whole number.');
+    expect(alert).toHaveFocus();
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(alert);
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+
+    // The same error again still brings the message back into view.
+    screen.getByRole('button', { name: 'Save Planning Details' }).focus();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(alert).toHaveFocus();
+  });
+
+  test('[CONFLICT] [SG2-39:AC2] the arrangements warning is scrolled into view and focused when the server asks to confirm', async () => {
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+      ok: false, kind: 'confirmation_required', message: 'Arrangements require rechecking.',
+      affected_arrangements: ['venue_recheck'],
+      impact_notes: ['Expected attendance increased from 100 to 120. Existing venue booking must be rechecked.'],
+    });
+    render(<EventPlanningDrawer eventId={91} accessToken="token" onClose={vi.fn()} initialValues={{ expected_attendance: 100 }} />);
+    fireEvent.change(screen.getByLabelText('Expected Attendance'), { target: { value: '120' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+
+    const warning = await within(await screen.findByTestId('impact-confirmation-banner')).findByRole('alert');
+    expect(warning).toHaveTextContent('Arrangements Require Rechecking');
+    await waitFor(() => expect(warning).toHaveFocus());
+    expect(scroll.mock.contexts).toEqual([warning]);
+  });
+
+  test('[FAILURE] [SG2-39:AC4] a refusal from the server is scrolled into view and focused', async () => {
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+      ok: false, kind: 'validation', message: 'Invalid planning details',
+      details: ['registration_closes_at must be before the event starts (proposed_date).'],
+    });
+    render(<EventPlanningDrawer eventId={91} accessToken="token" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+
+    const alert = await within(await screen.findByTestId('server-error-notice')).findByRole('alert');
+    expect(alert).toHaveTextContent('registration_closes_at must be before the event starts (proposed_date).');
+    await waitFor(() => expect(alert).toHaveFocus());
+    expect(scroll.mock.contexts).toEqual([alert]);
   });
 
   test('[FAILURE] [SG2-39:AC4] a past proposed date or a registration window after the start is refused before saving', () => {
