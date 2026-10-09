@@ -149,9 +149,6 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
-  // SG2-57's readiness read, shared with the "find venues" step below: null
-  // until it loads (or if it fails), then whether a venue request is live.
-  const [venueRequested, setVenueRequested] = useState<boolean | null>(null);
 
   useEffect(() => {
     setCurrentStatus(status);
@@ -207,8 +204,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           arrangement-through-confirmed window as the requirements above. */}
       {item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
-        <EventArrangements eventId={item.event_id} accessToken={accessToken}
-          onLoaded={arrangements => setVenueRequested(arrangements.venue_requested)} />
+        <EventArrangements eventId={item.event_id} accessToken={accessToken} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread
@@ -240,12 +236,12 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           </div>
         </footer>
       )}
-      {/* SG2-48: finding a venue stays the next step until one is requested.
-          A planning edit moves an approved event to planning (SG2-39), which
-          must not hide the step; once a pending, held or approved request
-          exists it is gone. If the readiness cannot be read the step stays. */}
+      {/* SG2-48: finding venues is the next step throughout arrangements. A
+          planning edit moves an approved event to planning (SG2-39), which
+          must not hide it, and an event may need several venues or a new
+          request after a release or rejection, so existing requests do not. */}
       {item.kind === 'event' && item.assigned_to_me && (currentStatus === 'approved' || currentStatus === 'planning')
-        && venueRequested !== true && onFindVenues && (
+        && onFindVenues && (
         <footer className="organisation-detail-footer">
           <h3>Next step</h3>
           <p className="organisation-detail-hint">Find venues that fit this event and are free on its date.</p>

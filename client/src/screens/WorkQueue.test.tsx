@@ -3,29 +3,18 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import type { WorkItem } from '../api/workQueue';
-import type { EventArrangementsResult } from '../api/eventRequests';
 
 vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId, canCheckAvailability }: { eventId: number; canCheckAvailability?: boolean }) => (
   <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}{canCheckAvailability ? <button>Check equipment availability</button> : null}</section>
 ) }));
 
 // SG2-57: stubbed like EquipmentRequirements so its own fetch does not change
-// the fetch counts and sequences these queue tests assert. A test can set
-// `readinessStub.venueRequested` to have the stub report a loaded reading.
-const readinessStub = vi.hoisted(() => ({ venueRequested: undefined as boolean | undefined }));
-vi.mock('../components/EventArrangements', async () => {
-  const { useEffect } = await import('react');
-  return { default: ({ eventId, onLoaded }: { eventId: number; onLoaded?: (result: EventArrangementsResult) => void }) => {
-    useEffect(() => {
-      if (readinessStub.venueRequested === undefined) return;
-      onLoaded?.({ event_id: eventId, arrangements: [], outstanding: [], ready_for_confirmation: false,
-        venue_requested: readinessStub.venueRequested });
-    }, [eventId]);
-    return <section aria-label="Arrangement readiness integration">Arrangements for event {eventId}</section>;
-  } };
-});
+// the fetch counts and sequences these queue tests assert.
+vi.mock('../components/EventArrangements', () => ({ default: ({ eventId }: { eventId: number }) => (
+  <section aria-label="Arrangement readiness integration">Arrangements for event {eventId}</section>
+) }));
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); readinessStub.venueRequested = undefined; });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Leadership Forum',
   event_name: 'Leadership Forum', status: 'under_review', starts_at: '2030-06-15T02:00:00Z', ends_at: null,
   category: 'review', assigned_to_me: false, details: { purpose: 'Share ideas', description: 'A community forum',
@@ -459,32 +448,21 @@ test('[FAILURE] [SG2-46:AC1] an approved event that is not assigned to the coord
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-39:AC3] [SG2-46:AC1] a planning event with no venue requested still offers finding venues', async () => {
-  readinessStub.venueRequested = false;
+test('[NORMAL] [SG2-39:AC3] [SG2-46:AC1] a planning event with a venue already requested still offers finding venues', async () => {
+  // The queue item carries no venue-request state; the step depends on status
+  // alone, so an event that already has a request (several venues, a release,
+  // a re-request after rejection) can still search.
   const planning = { ...review, status: 'planning', assigned_to_me: true, category: 'assigned' };
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [planning] })));
   const onFindVenues = vi.fn();
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={onFindVenues} />);
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
-  await screen.findByRole('region', { name: 'Arrangement readiness integration' });
-  fireEvent.click(screen.getByRole('button', { name: 'Find venues for this event' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
   expect(onFindVenues).toHaveBeenCalledWith(expect.objectContaining({ eventId: 12, eventName: 'Leadership Forum' }));
 });
 
-test.each(['approved', 'planning'])('[CONFLICT] [SG2-39:AC3] [SG2-46:AC1] a %s event whose venue is already requested no longer offers finding venues', async status => {
-  readinessStub.venueRequested = true;
+test.each(['awaiting_safety_check', 'preparation', 'confirmed'])('[BOUNDARY] [SG2-39:AC3] [SG2-46:AC1] finding venues is not offered once the event has moved past planning to %s', async status => {
   const item = { ...review, status, assigned_to_me: true, category: 'assigned' };
-  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
-  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
-  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
-  await screen.findByRole('region', { name: 'Arrangement readiness integration' });
-  expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
-  expect(screen.queryByText('Next step')).not.toBeInTheDocument();
-});
-
-test('[BOUNDARY] [SG2-39:AC3] [SG2-46:AC1] finding venues is not offered past planning even without a venue request', async () => {
-  readinessStub.venueRequested = false;
-  const item = { ...review, status: 'awaiting_safety_check', assigned_to_me: true, category: 'assigned' };
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
@@ -493,7 +471,6 @@ test('[BOUNDARY] [SG2-39:AC3] [SG2-46:AC1] finding venues is not offered past pl
 });
 
 test('[NORMAL] [SG2-39:AC1] [SG2-39:AC3] a planning save that moves an approved event to planning keeps the venue step', async () => {
-  readinessStub.venueRequested = false;
   const approved = { ...review, status: 'approved', assigned_to_me: true, category: 'assigned',
     details: { ...review.details, expected_attendance: 40 } };
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/planning')

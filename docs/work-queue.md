@@ -80,12 +80,11 @@ request yet) saves at once and marks nothing outstanding; an `approved` event
 still moves to `planning`. If the arrangements cannot be read the edit is not
 saved (503).
 
-**Next step.** While an assigned event is `approved` or `planning` and has no
-live venue booking request, its detail shows **Next step — Find venues for this
-event**. The detail learns this from the readiness panel's own read
-(`venue_requested`), so a planning save that moves the event to `planning`
-keeps the step, and it disappears once a request exists. If the readiness read
-fails, the step stays available.
+**Next step.** While an assigned event is `approved` or `planning`, its detail
+shows **Next step — Find venues for this event**, so a planning save that moves
+the event to `planning` keeps the step. Existing venue booking requests do not
+hide it: an event may need several venues, or a new request after a release or
+rejection. The step is not offered once the event has moved past planning.
 
 ## Supabase deployment
 

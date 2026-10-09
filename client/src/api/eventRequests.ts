@@ -625,8 +625,6 @@ export interface EventArrangementsResult {
   arrangements: ArrangementStatus[];
   outstanding: ArrangementKey[];
   ready_for_confirmation: boolean;
-  /** Whether a pending (including held) or approved venue booking request exists. */
-  venue_requested: boolean;
 }
 
 export type GetEventArrangementsOutcome =

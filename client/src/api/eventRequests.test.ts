@@ -257,7 +257,6 @@ describe('getEventArrangements', () => {
     ],
     outstanding: [],
     ready_for_confirmation: true,
-    venue_requested: true,
   };
 
   test('[NORMAL] [SG2-57:AC1] [SG2-57:AC3] returns the readiness payload on 200', async () => {

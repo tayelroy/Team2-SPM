@@ -21,8 +21,7 @@ const READY: EventArrangementsResult = {
     }
   ],
   outstanding: [],
-  ready_for_confirmation: true,
-  venue_requested: true
+  ready_for_confirmation: true
 };
 
 const OUTSTANDING: EventArrangementsResult = {
@@ -33,8 +32,7 @@ const OUTSTANDING: EventArrangementsResult = {
     { key: 'registration', label: 'Registration', state: 'not_required', detail: 'Registration not required.' }
   ],
   outstanding: ['venue'],
-  ready_for_confirmation: false,
-  venue_requested: true
+  ready_for_confirmation: false
 };
 
 describe('EventArrangementsPanel (SG2-57)', () => {
