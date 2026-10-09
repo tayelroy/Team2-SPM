@@ -20,11 +20,45 @@ export interface BadgeStyle {
   badgeFg: string;
 }
 
+/**
+ * Plain-language names for the stored statuses (SG2-100 AC5). The database
+ * values are snake_case and several of them — `unassigned`,
+ * `awaiting_safety_check`, `preparation` — mean nothing to a reader as
+ * written, so nothing renders a raw status.
+ */
+export const STATUS_LABELS: Readonly<Record<string, string>> = {
+  draft: 'Draft',
+  unassigned: 'Awaiting Assignment',
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  needs_clarification: 'Clarification Needed',
+  approved: 'Approved',
+  planning: 'Arrangements',
+  awaiting_safety_check: 'Awaiting Safety Check',
+  safety_rejected: 'Safety Rejected',
+  preparation: 'Preparation',
+  confirmed: 'Confirmed',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  rejected: 'Rejected',
+};
+
+/**
+ * The reader-facing name for a status. An unrecognised value falls back to
+ * itself rather than to a guess, so a status added server-side shows up as
+ * something odd rather than as the wrong thing.
+ */
+export function statusLabel(status: string): string {
+  return STATUS_LABELS[status.trim().toLowerCase()] ?? status;
+}
+
 /** Status pill colours. Confirmed reads as solid teal; dead states go grey. */
 export function badgeStyle(status: string): BadgeStyle {
   const key = status.toLowerCase();
   if (key === 'confirmed') return { badgeBg: color.teal, badgeFg: color.abyss };
-  if (key === 'rejected' || key === 'cancelled' || key === 'draft') {
+  // SG2-100: a failed safety check is a stop, not a step — it gets the same
+  // grey as the other states nothing follows from.
+  if (key === 'rejected' || key === 'cancelled' || key === 'draft' || key === 'safety_rejected') {
     return { badgeBg: 'rgba(112,119,119,0.35)', badgeFg: color.silver };
   }
   return { badgeBg: 'rgba(255,255,255,0.09)', badgeFg: color.mist };

@@ -99,11 +99,11 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [SG2-87:A
     await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
     if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-desktop.png`, fullPage: true });
     await region.getByRole('button', { name: new RegExp(title) }).click();
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: title, exact: true, level: 2 })).toBeVisible();
     await expect(page.getByText('Sustainability Leadership Forum · Event #41')).toBeVisible();
     await expect(page.getByText(/15 Jun 2030, 10:00 – 15 Jun 2030, 18:00/)).toBeVisible();
-    await expect(page.getByText(fact, { exact: true })).toBeVisible();
-    await expect(page.getByText('Set up before guests arrive.')).toBeVisible();
+    await expect(page.getByRole('term').filter({ hasText: new RegExp(`^${fact}$`) })).toBeVisible();
+    await expect(page.getByRole('definition').filter({ hasText: /^Set up before guests arrive\.$/ })).toBeVisible();
     const headers = await authHeaders(page);
     expect((await page.request.get('/api/work-queue/event/41', { headers })).status()).toBe(404);
     if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/${kind}-detail.png`, fullPage: true });
@@ -414,15 +414,15 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [SG2-87:AC4] [NORMAL] 
   await fillEvent(page);
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
-  // SG2-87: stored as submitted, shown to the organiser as Unassigned until the Lead assigns it.
-  await expect(page.getByText('Unassigned', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('submitted', { exact: true })).toHaveCount(0);
+  // SG2-100: a fresh submission with no coordinator lands in `unassigned`,
+  // shown as Awaiting Assignment, not `submitted`.
+  await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
   await expect(page.getByText('Team planning', { exact: true })).toBeVisible();
   await expect(page.getByText('Review the release plan', { exact: true })).toBeVisible();
   await expect(page.getByText(/Select an event from your organisation/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
   await test.info().attach('submitted-event-detail', { body: await page.screenshot(), contentType: 'image/png' });
-  await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('submitted');
+  await expect.poll(async () => (await eventRecords(page)).find(row => row.name === 'Browser workshop')?.status).toBe('unassigned');
   await page.reload();
   await nav(page, 'My drafts');
   await expect(page.getByRole('heading', { name: 'Planning workshop', exact: true })).toBeVisible();
@@ -435,7 +435,7 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [SG2-87:AC4] [NORMAL] 
   expect(detail.status()).toBe(200);
   expect((await detail.json()).request).toMatchObject({ name: 'Browser workshop', purpose: 'Team planning',
     description: 'Review the release plan', proposed_date: '2030-06-15T09:00:00.000Z',
-    expected_attendance: 25, venue_requirements: 'Projector', status: 'submitted' });
+    expected_attendance: 25, venue_requirements: 'Projector', status: 'unassigned' });
 });
 
 test('SG2-28-B01 | [SG2-28:AC4] [SG2-29:AC1] [SG2-30:AC2] [BOUNDARY] [CONFLICT] an empty draft saves once but cannot be submitted', async ({ page }) => {
@@ -479,7 +479,7 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
   expect(detail.status()).toBe(200);
-  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'submitted', accessibility_needs: null });
+  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null });
 });
 
 test('SG2-32-P01 | [SG2-32:AC1] [SG2-32:AC2] [NORMAL] [FAILURE] My drafts excludes non-drafts and confirmed deletion survives reload', async ({ page, request }) => {
@@ -894,7 +894,8 @@ test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period,
   await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
   await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
   await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
-  await page.getByLabel('Reason', { exact: true }).fill('Carpet replacement');
+  await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
+  await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
   await page.getByRole('button', { name: 'Block venue', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
   await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
@@ -920,24 +921,10 @@ test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period,
   await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
 });
 
-test('SG2-45-N01 | [SG2-45:AC2] [SG2-25:AC1] [CONFLICT] [FAILURE] a confirmed booking cannot be blocked and other roles cannot block', async ({ page }) => {
+test('SG2-45-N01 | [SG2-45:AC1] [SG2-45:AC3] [SG2-25:AC1] [FAILURE] other roles cannot block or remove a block', async ({ page }) => {
   await signIn(page, 'venue');
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  // Seeded confirmed booking #1 for event 1 runs 02:00–04:00 UTC on 15 June 2030.
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-14T00:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-16T00:00');
-  await page.getByLabel('Reason', { exact: true }).fill('Deep clean');
-  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('already holds a confirmed booking: booking #1 for event 1');
-  await expect(page.getByRole('listitem', { name: 'Deep clean' })).toHaveCount(0);
   const staffHeaders = await authHeaders(page);
-  const refused = await page.request.post('/api/venues/1/blocks', { headers: staffHeaders,
-    data: { starts_at: '2030-06-15T03:00:00Z', ends_at: '2030-06-15T05:00:00Z', reason: 'Deep clean' } });
-  expect(refused.status()).toBe(409);
-  expect((await refused.json()).booking).toMatchObject({ booking_id: 1, event_id: 1 });
-
-  const block = { starts_at: '2030-07-01T00:00:00Z', ends_at: '2030-07-02T00:00:00Z', reason: 'Not allowed' };
+  const block = { starts_at: '2030-07-01T00:00:00Z', ends_at: '2030-07-02T00:00:00Z', category: 'other', reason: 'Not allowed' };
   for (const account of ['coordinator', 'support', 'organiser', 'attendee']) {
     await test.step(account, async () => {
       await page.goto('/');
@@ -957,6 +944,94 @@ test('SG2-45-N01 | [SG2-45:AC2] [SG2-25:AC1] [CONFLICT] [FAILURE] a confirmed bo
   expect((await page.request.post('/api/venues/1/blocks', { data: block })).status()).toBe(401);
   const remaining = await page.request.get('/api/venues/1/blocks', { headers: staffHeaders });
   expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance']);
+});
+
+test('SG2-80-P01 | [SG2-80:AC1] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-80:AC5] [SG2-80:AC6] [NORMAL] staff mark a booked venue unavailable; the booking is flagged, kept and the venue leaves search', async ({ page }) => {
+  // AC5 baseline: the coordinator can find Regression Hall at 05:00–06:00 on 15 June 2030, after booking #1 ends.
+  const freeSlot = `/api/venues/search?from=${encodeURIComponent('2030-06-15T05:00:00Z')}&to=${encodeURIComponent('2030-06-15T06:00:00Z')}`;
+  await signIn(page, 'coordinator');
+  const searchNames = async () => ((await (await page.request.get(freeSlot, { headers: await authHeaders(page) })).json()).venues as { name: string }[]).map(venue => venue.name);
+  expect(await searchNames()).toContain('Regression Hall');
+
+  // AC1/AC2: Venue Staff mark 14–16 June 2030 unavailable over confirmed booking #1 (event 1, 15 June 02:00–04:00 UTC).
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-14T00:00');
+  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-16T00:00');
+  await page.getByLabel('Reason', { exact: true }).selectOption('equipment_failure');
+  await page.getByLabel('Note', { exact: true }).fill('Air conditioning failed');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+
+  // AC3/AC4: the booked event is flagged and reported as not cancelled.
+  await expect(page.getByRole('status')).toContainText('1 booked event is flagged as affected and not cancelled.');
+  const item = page.getByRole('listitem', { name: 'Air conditioning failed' });
+  await expect(item).toContainText('Equipment failure: Air conditioning failed');
+  // AC6: who recorded it and when.
+  await expect(item).toContainText(/Recorded by Regression venue on \d{1,2} \w+ 20\d\d/);
+  await expect(page.getByRole('list', { name: 'Events affected by Air conditioning failed' }))
+    .toContainText(/^Planning workshop \(draft\) · 15 Jun 2030, /);
+  const listed = (await (await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) })).json()).blocks
+    .find((block: { reason: string }) => block.reason === 'Air conditioning failed');
+  expect(listed).toMatchObject({ category: 'equipment_failure', created_by_name: 'Regression venue',
+    affected: [{ booking_id: 1, event_id: 1, event_name: 'Planning workshop', event_status: 'draft',
+      starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z' }] });
+
+  // AC3/AC5: the coordinator sees the period as unavailable, the booking kept and flagged, and the venue gone from search.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByText('Regression Hall · Air conditioning failed', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Regression Hall · confirmed · event 1 · affected by venue unavailability', { exact: true })).toBeVisible();
+  expect(await searchNames()).not.toContain('Regression Hall');
+});
+
+test('SG2-80-N01 | [SG2-80:AC1] [SG2-80:AC6] [SG2-25:AC1] [BOUNDARY] [FAILURE] a mark needs a listed reason and a note, and only Venue Staff can make one', async ({ page }) => {
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
+  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-07-01T09:00');
+  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-07-01T17:00');
+  await page.getByLabel('Note', { exact: true }).fill('No reason chosen');
+  // Bypass the browser's required-field check so the screen's own validation runs.
+  await page.getByRole('form', { name: 'Block venue' }).evaluate(form => (form as HTMLFormElement).noValidate = true);
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('choose a reason, and add a note within 500 characters');
+  await page.getByLabel('Reason', { exact: true }).selectOption('safety_concern');
+  await page.getByLabel('Note', { exact: true }).fill('   ');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('choose a reason, and add a note within 500 characters');
+  await expect(page.getByRole('listitem', { name: 'No reason chosen' })).toHaveCount(0);
+
+  const staffHeaders = await authHeaders(page);
+  const period = { starts_at: '2030-07-01T09:00:00Z', ends_at: '2030-07-01T17:00:00Z' };
+  for (const data of [{ ...period, reason: 'Flooded' }, { ...period, category: 'flood', reason: 'Flooded' }, { ...period, category: 'maintenance', reason: ' ' }]) {
+    expect((await page.request.post('/api/venues/1/blocks', { headers: staffHeaders, data })).status()).toBe(400);
+  }
+  // AC6: a recorder or time supplied by the caller is ignored.
+  const created = await page.request.post('/api/venues/1/blocks', { headers: staffHeaders,
+    data: { ...period, category: 'other', reason: 'Spoof attempt', created_by_name: 'Someone else', created_at: '2000-01-01T00:00:00Z' } });
+  expect(created.status()).toBe(201);
+  expect((await created.json()).block).toMatchObject({ created_by_name: 'Regression venue', affected: [] });
+  expect((await created.json()).block.created_at).not.toBe('2000-01-01T00:00:00Z');
+
+  for (const account of ['coordinator', 'support']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const headers = await authHeaders(page);
+      expect((await page.request.post('/api/venues/1/blocks', { headers, data: { ...period, category: 'maintenance', reason: 'Not allowed' } })).status()).toBe(403);
+    });
+  }
+  const remaining = await page.request.get('/api/venues/1/blocks', { headers: staffHeaders });
+  expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance', 'Spoof attempt']);
 });
 
 test('SG2-46-P01 | [SG2-46:AC1] [SG2-46:AC2] [SG2-46:AC3] [SG2-46:AC4] [NORMAL] an approved event opens a pre-filled venue search that leaves out busy venues', async ({ page, request }) => {
@@ -1292,7 +1367,20 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await page.clock.fastForward(30_000);
     await expect(page.getByRole('button', { name: 'Notifications (2)', exact: true })).toBeVisible();
     await capture(page, 'coordinator-automatic-warning-badge', false);
+    // Opening shows cached notices immediately and also refreshes both inboxes.
+    // Finish that refresh before advancing expiry, otherwise its in-flight guard
+    // can correctly skip our only simulated polling tick on a slower CI runner.
+    const openingRefresh = Promise.all([
+      page.waitForResponse(response => response.url().endsWith('/api/venue-holds/notifications') && response.request().method() === 'GET'),
+      page.waitForResponse(response => response.url().endsWith('/api/notifications') && response.request().method() === 'GET'),
+    ]);
     await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+    for (const response of await openingRefresh) {
+      expect(response.status()).toBe(200);
+      expect(await response.finished()).toBeNull();
+    }
+    // Let response-consumption microtasks settle before simulating the next tick.
+    await page.clock.runFor(1);
     await expect(page.getByText('Hold expiring soon', { exact: true })).toBeVisible();
 
     // Leave the drawer open: expiry must arrive without closing/reopening it.
@@ -1439,6 +1527,44 @@ test('SG2-48-N01 | [SG2-48:AC1] [SG2-48:AC4] [CONFLICT] [FAILURE] a duplicate re
     });
   }
   expect((await page.request.post('/api/venue-booking-requests', { data: values })).status()).toBe(401);
+});
+
+test('SG2-50-P01 | [SG2-50:AC1] [SG2-50:AC2] [CONFLICT] a request overlapping a confirmed booking is reported to the coordinator and to Venue Staff, and cannot be approved while it stands', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  // Regression Hall already has confirmed booking #1 on 15 Jun 2030, 10:00-12:00.
+  await requestVenue(page, 'Regression Hall', '2030-06-15T11:00', '2030-06-15T13:00');
+  // AC1: the request is made, and the coordinator is told what it overlaps.
+  // Booking #1 is another coordinator's event, so only its number and period show.
+  // Times follow the browser's en-SG clock style ("10:00" or "10:00 am").
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText(new RegExp('^Regression Hall requested\\. It is pending until Venue Staff decide, and the venue is not held until then\\.'
+    + ' It overlaps Confirmed booking #1 for another event, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?, so it cannot be approved while that conflict stands\\.$'));
+  // A period ending as the booking starts overlaps nothing.
+  await requestVenue(page, 'Regression Hall', '2030-06-15T08:00', '2030-06-15T10:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.');
+
+  // AC1/AC2: Venue Staff see the clash, by event, before deciding.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  const conflicts = detail.getByRole('region', { name: 'Booking conflicts' });
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /11:00/ }).click();
+  await expect(conflicts.getByRole('listitem')).toHaveText([/^Confirmed booking #1 for Planning workshop, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?$/]);
+  await expect(conflicts.getByText('This request cannot be approved while this conflict stands.', { exact: true })).toBeVisible();
+  // AC2: approving it is refused while booking #1 stands, and it stays pending.
+  const decision = detail.getByRole('region', { name: 'Decide this booking request' });
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(detail.getByText('pending', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /08:00/ }).click();
+  await expect(conflicts.getByText('Nothing else is booked at this venue over the requested period.', { exact: true })).toBeVisible();
+  // The adjacent request overlaps nothing, so it can be approved.
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('status')).toHaveText('Approved. The venue is committed to this event and the coordinator has been notified.');
 });
 
 test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:AC5] [NORMAL] a coordinator releases one of two venues with a reason; the period is free, the other venue stays and both coordinator and organiser are told', async ({ page, request }) => {
@@ -1760,4 +1886,136 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
     });
   }
   expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
+});
+
+test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2-100:AC13] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
+  await signIn(page, 'organiser');
+  // AC2: submission with no coordinator lands in unassigned, not submitted.
+  expect((await request.patch('/api/event-requests/1/submit', { headers: await authHeaders(page) })).status()).toBe(200);
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
+  await expect(page.getByTestId('waiting-on-persona')).toContainText('Event Coordinator Lead');
+  await expect(page.getByTestId('waiting-on-action')).toContainText('Assign an event coordinator');
+
+  // AC9: EventDetail and the 7-step stepper render without layout breakage
+  // or horizontal overflow at both a phone and a laptop viewport. The
+  // stepper track scrolls internally (EventStageTracker.tsx) rather than
+  // widening the page, so the document itself must never overflow even
+  // though all 7 steps stay present and legible.
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await expect(page.getByTestId('stage-badge')).toBeVisible();
+    const steps = page.getByTestId('stepper-track').getByRole('listitem');
+    await expect(steps).toHaveCount(7);
+    for (const label of ['Draft', 'Awaiting Assignment', 'Under Review', 'Arrangements', 'Safety Check', 'Preparation', 'Confirmed']) {
+      await expect(page.getByTestId('stepper-track').getByText(label, { exact: true })).toBeVisible();
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  await signOut(page);
+
+  // AC3: assigning a coordinator on an unassigned event moves it to submitted.
+  await signIn(page, 'lead');
+  await nav(page, 'Assign coordinators');
+  await page.getByLabel('Coordinator for Planning workshop', { exact: true }).selectOption({ label: 'Regression coordinator' });
+  await page.getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(page.getByText('Assigned to Regression coordinator.', { exact: true })).toBeVisible();
+  await signOut(page);
+
+  await signIn(page, 'organiser');
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByTestId('stage-badge')).toContainText('Under Review');
+  await expect(page.getByTestId('waiting-on-persona')).toContainText('Regression coordinator');
+  await signOut(page);
+
+  // The coordinator opening it moves it on to under_review (SG2-35), then approves it.
+  await signIn(page, 'coordinator');
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('region', { name: 'Awaiting review' })
+    .getByRole('button', { name: /Planning workshop/ }).click();
+  await expect(page.getByRole('heading', { name: 'Planning workshop' })).toBeVisible();
+  await page.getByRole('button', { name: 'Approve', exact: true }).click();
+  await expect(page.getByText('approved')).toBeVisible();
+  await signOut(page);
+
+  // AC5: the stepper and waiting-on card reflect the approved stage.
+  await signIn(page, 'organiser');
+  await nav(page, 'My events');
+  await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
+  await expect(page.getByTestId('stage-badge')).toContainText('Arrangements');
+  await expect(page.getByTestId('waiting-on-action')).toContainText('Complete venue suitability check and equipment reservation');
+
+  const detail = await request.get('/api/event-requests/1', { headers: await authHeaders(page) });
+  expect(detail.status()).toBe(200);
+  expect((await detail.json()).request.status).toBe('approved');
+});
+
+// SG2-100 AC4: the coordinator closes out a held event from their own work
+// queue — the screen they already use for every event assigned to them.
+test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [SG2-100:AC9] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ page, request }) => {
+  expect((await request.post('/__e2e/lifecycle')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  const assigned = page.getByRole('region', { name: 'My assigned events' });
+
+  // BOUNDARY: an event whose confirmed booking has not ended yet does not
+  // offer the action at all.
+  await assigned.getByRole('button', { name: /Future Forum/ }).click();
+  await expect(page.getByRole('heading', { name: 'Future Forum' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark as Completed' })).toHaveCount(0);
+  // The server refuses it too, should anything call it directly.
+  const tooSoon = await page.request.patch('/api/event-requests/121/complete', { headers: await authHeaders(page) });
+  expect(tooSoon.status()).toBe(409);
+  expect((await tooSoon.json()).error).toBe('This event has not finished yet.');
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+
+  // AC9: the panel with the action fits a phone and a laptop without
+  // pushing the page sideways.
+  await assigned.getByRole('button', { name: /Held Forum/ }).click();
+  await expect(page.getByRole('heading', { name: 'Held Forum' })).toBeVisible();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await expect(page.getByRole('button', { name: 'Mark as Completed' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+
+  // NORMAL: the held event completes from the screen, recording who and when.
+  const completion = page.waitForResponse(response => response.url().endsWith('/api/event-requests/120/complete'));
+  await page.getByRole('button', { name: 'Mark as Completed' }).click();
+  expect((await completion).status()).toBe(200);
+  await expect(page.getByText('Marked as completed. This event has left your active work queue.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mark as Completed' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit Planning Information' })).toHaveCount(0);
+
+  // AC7: a completed event is absent from the work queue once it refreshes.
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+  await expect(assigned.getByRole('button', { name: /Future Forum/ })).toBeVisible();
+  await expect(assigned.getByRole('button', { name: /Held Forum/ })).toHaveCount(0);
+
+  const coordinator = await authHeaders(page);
+  const history = await page.request.get('/api/event-requests/120/history', { headers: coordinator });
+  expect(history.status()).toBe(200);
+  // AC8: exactly one audit row records the transition.
+  const statusEntries = (await history.json()).history
+    .filter((entry: Record<string, unknown>) => entry.field_name === 'status');
+  expect(statusEntries).toEqual([
+    expect.objectContaining({ old_value: 'confirmed', new_value: 'completed', actor_id: 'user-coordinator' })
+  ]);
+
+  // AC7: a completed event refuses further planning updates.
+  expect((await page.request.patch('/api/event-requests/120/planning', { headers: coordinator, data: { planning_notes: 'Too late' } })).status()).toBe(409);
+
+  // A second attempt on an already-completed event reports not found, not a repeat success.
+  expect((await page.request.patch('/api/event-requests/120/complete', { headers: coordinator })).status()).toBe(404);
+
+  // AC6/AC7: the organiser can still read the completed event, with who
+  // completed it and when.
+  const login = await request.post('/api/auth/login', { data: { email: 'organiser@example.test', password } });
+  expect(login.status()).toBe(200);
+  const detail = await request.get('/api/event-requests/120', { headers: { Authorization: `Bearer ${(await login.json()).accessToken}` } });
+  expect(detail.status()).toBe(200);
+  const record = (await detail.json()).request;
+  expect(record).toMatchObject({ status: 'completed', completed_by: 'user-coordinator' });
+  expect(record.completed_at).not.toBeNull();
 });

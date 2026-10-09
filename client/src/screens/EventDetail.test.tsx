@@ -4,10 +4,27 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventDetail from './EventDetail';
 
+vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId }: { eventId: number }) => (
+  <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}</section>
+) }));
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   sessionStorage.clear();
+});
+
+test.each(['approved', 'planning', 'confirmed'])('[NORMAL] [SG2-53:AC1] [SG2-53:AC5] assigned coordinators access requirements from the %s event detail', async status => {
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: {
+    eventId: 53, organiserId: 'organiser-1', organisation: 'Harbour Trust', name: 'Equipment Forum', status,
+    purpose: 'Technical demonstration', description: '', proposedDate: null, expectedAttendance: 50,
+    venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null, registrationNeeded: false,
+    coordinatorId: 'coord-1', coordinatorName: 'Assigned coordinator', canManage: false, waitingOnMe: false,
+    decisionReason: null, decidedAt: null, completedBy: null, completedAt: null, endsAt: null,
+  } });
+  vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+  render(<EventDetail role="Event Coordinator" currentUserId="coord-1" selectedEventId={53} accessToken="token" onNavigate={vi.fn()} />);
+  expect(await screen.findByRole('region', { name: 'Equipment requirement integration' })).toHaveTextContent('Equipment requests for event 53');
 });
 
 describe('EventDetail access boundaries', () => {
@@ -63,6 +80,9 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         waitingOnMe: false,
         decisionReason: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
 
@@ -107,21 +127,23 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(onNavigate).toHaveBeenCalledWith('events');
   });
 
-  test('[NORMAL] [SG2-87:AC4] a submitted request no coordinator holds shows the Unassigned status to its organiser', async () => {
+  test('[NORMAL] [SG2-87:AC4] a request in the queue shows its organiser it is awaiting assignment, with no coordinator', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
-        eventId: 103, organiserId: 'org-1', organisation: 'Acme Corp', status: 'submitted',
+        eventId: 103, organiserId: 'org-1', organisation: 'Acme Corp', status: 'unassigned',
         name: 'Queued offsite', purpose: 'p', description: 'd', proposedDate: null, expectedAttendance: null,
         venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null,
         registrationNeeded: false, coordinatorId: null, coordinatorName: null,
         coordinatorPhone: null, canManage: true, waitingOnMe: false, decisionReason: null, decidedAt: null,
+        completedBy: null, completedAt: null, endsAt: null,
       },
     });
     render(<EventDetail role="Event Organiser" selectedEventId={103} accessToken="t" onNavigate={vi.fn()} />);
     await screen.findByRole('heading', { name: 'Queued offsite' });
-    expect(screen.queryByText('submitted')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Unassigned').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Awaiting Assignment').length).toBeGreaterThan(0);
+    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+    expect(screen.queryByText('Submitted')).not.toBeInTheDocument();
   });
 
   test('[BOUNDARY] [SG2-33:AC3] says when the coordinator has no phone number on file (SG2-33 AC3)', async () => {
@@ -133,6 +155,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null,
         registrationNeeded: false, coordinatorId: 'coord-2', coordinatorName: 'Sarah Jenkins',
         coordinatorPhone: null, canManage: true, waitingOnMe: false, decisionReason: null, decidedAt: null,
+        completedBy: null, completedAt: null, endsAt: null,
       },
     });
     render(<EventDetail role="Event Organiser" selectedEventId={102} accessToken="t" onNavigate={vi.fn()} />);
@@ -163,6 +186,9 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         waitingOnMe: true,
         decisionReason: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
 
@@ -216,6 +242,9 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
         waitingOnMe: true,
         decisionReason: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
 
@@ -327,6 +356,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
       expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
       equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
       coordinatorName: null, canManage: true, waitingOnMe: true, decisionReason: null, decidedAt: null,
+      completedBy: null, completedAt: null, endsAt: null,
     };
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
       .mockImplementationOnce(() => new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject; }))
@@ -352,6 +382,7 @@ test.each(['draft', 'rejected', 'submitted'])('[FAILURE] [SG2-26:AC3] colleague 
     expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
     equipmentRequirements: null, registrationNeeded: false, coordinatorId: null,
     coordinatorName: null, canManage: false, waitingOnMe: false, decisionReason: null, decidedAt: null,
+    completedBy: null, completedAt: null, endsAt: null,
   } });
   render(<EventDetail role="Event Organiser" accessToken="token" selectedEventId={77} onNavigate={vi.fn()} />);
   expect(await screen.findByText(/View only. This event/)).toBeInTheDocument();
@@ -386,6 +417,9 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         waitingOnMe: false,
         decisionReason: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
 
@@ -394,7 +428,7 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
       stage: {
         event_id: 101,
         raw_status: 'approved',
-        stage: 'Approved — In Planning',
+        stage: 'Arrangements',
         stage_key: 'in_planning',
         description: 'Event approved; coordinator is actively arranging venue and equipment.',
         waiting_on: {
@@ -403,9 +437,11 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         },
         stepper_steps: [
           { key: 'draft', label: 'Draft', status: 'completed' },
-          { key: 'submitted', label: 'Submitted', status: 'completed' },
+          { key: 'unassigned', label: 'Awaiting Assignment', status: 'completed' },
           { key: 'under_review', label: 'Under Review', status: 'completed' },
-          { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+          { key: 'in_planning', label: 'Arrangements', status: 'current' },
+          { key: 'safety_check', label: 'Safety Check', status: 'upcoming' },
+          { key: 'preparation', label: 'Preparation', status: 'upcoming' },
           { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
         ],
         arrangements_recheck_needed: true,
@@ -423,7 +459,7 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Annual Tech Summit' })).toBeInTheDocument();
-    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Approved — In Planning');
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Arrangements');
     expect(screen.getByText('Event approved; coordinator is actively arranging venue and equipment.')).toBeInTheDocument();
     expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('Event Coordinator (Sarah Jenkins)');
     expect(screen.getByTestId('waiting-on-action')).toHaveTextContent('Next step: Complete venue suitability check and equipment reservation');
@@ -461,6 +497,9 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         waitingOnMe: true,
         decisionReason: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
 
@@ -506,6 +545,9 @@ describe('EventDetail EventStageTracker integration (SG2-38)', () => {
         waitingOnMe: true,
         decisionReason: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
 
@@ -546,6 +588,9 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     waitingOnMe: false,
     decisionReason: null,
     decidedAt: null,
+    completedBy: null,
+    completedAt: null,
+    endsAt: null,
   };
 
   const baseStage: eventRequestsApi.EventStageResult = {
@@ -859,6 +904,9 @@ test('[NORMAL] [SG2-37:AC2] a rejected request shows the organiser why it was re
       coordinatorName: 'Jane Doe', canManage: true, waitingOnMe: true,
       decisionReason: 'Clashes with the AGM on the same evening.',
       decidedAt: '2026-09-25T02:00:00.000Z',
+      completedBy: null,
+      completedAt: null,
+      endsAt: null,
     },
   });
   render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={101} accessToken="token" />);
@@ -876,6 +924,7 @@ test('[BOUNDARY] [SG2-37:legacy-rejection] a rejection recorded without a stored
       equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
       coordinatorName: 'Jane Doe', canManage: true, waitingOnMe: true,
       decisionReason: null, decidedAt: null,
+      completedBy: null, completedAt: null, endsAt: null,
     },
   });
   render(<EventDetail role="Event Organiser" onNavigate={vi.fn()} selectedEventId={102} accessToken="token" />);
@@ -898,6 +947,7 @@ describe('EventDetail clarification exchange (SG2-36)', () => {
         expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
         equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
         coordinatorName: 'Jane Doe', canManage, waitingOnMe, decisionReason: null, decidedAt: null,
+        completedBy: null, completedAt: null, endsAt: null,
       },
     });
   }
@@ -974,6 +1024,9 @@ describe('EventDetail change history integration (SG2-40)', () => {
     waitingOnMe: false,
     decisionReason: null,
     decidedAt: null,
+    completedBy: null,
+    completedAt: null,
+    endsAt: null,
   };
 
   test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] opens the selected organiser event history with its actor, timestamp and old/new values', async () => {
@@ -1106,3 +1159,218 @@ describe('EventDetail change history integration (SG2-40)', () => {
   });
 });
 
+
+describe('marking an event completed (SG2-100 AC4)', () => {
+  /** Fixed instants: nothing in this block reads the real clock. */
+  const NOW = new Date('2026-11-05T12:00:00.000Z');
+
+  function showEvent(overrides: Partial<eventRequestsApi.EventRequestDetail> = {}) {
+    const request: eventRequestsApi.EventRequestDetail = {
+      eventId: 104, organiserId: 'org-1', organisation: 'Acme Corp', status: 'confirmed',
+      name: 'Partner Forum', purpose: 'Networking', description: '', proposedDate: null,
+      expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+      equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
+      coordinatorName: 'Jane Doe', coordinatorPhone: null, canManage: false, waitingOnMe: false,
+      decisionReason: null, decidedAt: null,
+      completedBy: null, completedAt: null, endsAt: '2026-11-05T10:00:00.000Z',
+      ...overrides,
+    };
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request });
+    return request;
+  }
+
+  function renderAsCoordinator(userId = 'coord-1') {
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        onNavigate={vi.fn()}
+        selectedEventId={104}
+        accessToken="token"
+        currentUserId={userId}
+        now={() => NOW}
+      />,
+    );
+  }
+
+  test('[NORMAL] [SG2-100:AC6] the assigned coordinator can close out an event that has finished', async () => {
+    showEvent();
+    const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockResolvedValue({ ok: true });
+    renderAsCoordinator();
+
+    const button = await screen.findByRole('button', { name: 'Mark as Completed' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(complete).toHaveBeenCalledWith(104, 'token');
+  });
+
+  test('[NORMAL] [SG2-100:AC6] a completed event shows who closed it out and when, and offers the action no more', async () => {
+    showEvent({
+      status: 'completed',
+      completedBy: 'coord-1',
+      completedAt: '2026-11-05T12:00:00.000Z',
+    });
+    renderAsCoordinator();
+
+    await screen.findByRole('heading', { name: 'Partner Forum' });
+    const facts = screen.getByText('Completed at').closest('div')!;
+    expect(facts).toHaveTextContent('5 Nov 2026, 20:00 SGT');
+    expect(screen.getByText('Completed by').closest('div')).toHaveTextContent('coord-1');
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] an end time exactly now counts as finished; one millisecond later does not', async () => {
+    showEvent({ endsAt: NOW.toISOString() });
+    renderAsCoordinator();
+    expect(await screen.findByRole('button', { name: 'Mark as Completed' })).toBeVisible();
+
+    cleanup();
+    vi.restoreAllMocks();
+    showEvent({ endsAt: '2026-11-05T12:00:00.001Z' });
+    renderAsCoordinator();
+    await screen.findByRole('heading', { name: 'Partner Forum' });
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] an event with no confirmed booking is not offered as finished', async () => {
+    // Null `endsAt` means nothing says when the event ends, which must read
+    // as "not finished" rather than as finished.
+    showEvent({ endsAt: null });
+    renderAsCoordinator();
+    await screen.findByRole('heading', { name: 'Partner Forum' });
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] the action appears in preparation and confirmed, and in no other status', async () => {
+    for (const status of ['confirmed', 'preparation']) {
+      cleanup();
+      vi.restoreAllMocks();
+      showEvent({ status });
+      renderAsCoordinator();
+      expect(await screen.findByRole('button', { name: 'Mark as Completed' })).toBeVisible();
+    }
+
+    for (const status of ['draft', 'unassigned', 'submitted', 'under_review', 'approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'completed', 'cancelled', 'rejected']) {
+      cleanup();
+      vi.restoreAllMocks();
+      showEvent({ status });
+      renderAsCoordinator();
+      await screen.findByRole('heading', { name: 'Partner Forum' });
+      expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+    }
+  });
+
+  test('[CONFLICT] [SG2-100:AC6] rapid clicking sends exactly one request and disables the button', async () => {
+    showEvent();
+    let release!: (value: eventRequestsApi.CompleteEventOutcome) => void;
+    const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockReturnValue(
+      new Promise<eventRequestsApi.CompleteEventOutcome>((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderAsCoordinator();
+
+    const button = await screen.findByRole('button', { name: 'Mark as Completed' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    const pending = await screen.findByRole('button', { name: 'Marking as Completed…' });
+    expect(pending).toBeDisabled();
+    expect(complete).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      release({ ok: true });
+    });
+  });
+
+  test('[FAILURE] [SG2-100:AC6] a coordinator the event is not assigned to never sees the action', async () => {
+    showEvent();
+    renderAsCoordinator('coord-other');
+    await screen.findByRole('heading', { name: 'Partner Forum' });
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+  });
+
+  test('[FAILURE] [SG2-100:AC6] a refused completion is reported verbatim and the button comes back', async () => {
+    showEvent();
+    vi.spyOn(eventRequestsApi, 'completeEvent').mockResolvedValue({
+      ok: false,
+      message: 'This event has not finished yet.',
+    });
+    renderAsCoordinator();
+
+    const button = await screen.findByRole('button', { name: 'Mark as Completed' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('This event has not finished yet.');
+    expect(screen.getByRole('button', { name: 'Mark as Completed' })).toBeEnabled();
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] with no injected clock the real one decides, so a long-past event is still offered', async () => {
+    // The only test that leaves `now` at its default. The end time is years
+    // in the past, so the assertion does not depend on when it runs.
+    showEvent({ endsAt: '2020-01-01T00:00:00.000Z' });
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        onNavigate={vi.fn()}
+        selectedEventId={104}
+        accessToken="token"
+        currentUserId="coord-1"
+      />,
+    );
+    expect(await screen.findByRole('button', { name: 'Mark as Completed' })).toBeVisible();
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] a completed event with no recorded actor shows a dash, not a blank', async () => {
+    showEvent({
+      status: 'completed',
+      completedBy: null,
+      completedAt: '2026-11-05T12:00:00.000Z',
+    });
+    renderAsCoordinator();
+    await screen.findByRole('heading', { name: 'Partner Forum' });
+    expect(screen.getByText('Completed by').closest('div')).toHaveTextContent('—');
+  });
+
+  test('[FAILURE] [SG2-100:AC6] a session that expires while the page is open takes the whole detail away, action included', async () => {
+    showEvent();
+    const complete = vi.spyOn(eventRequestsApi, 'completeEvent');
+    const props = {
+      role: 'Event Coordinator' as const,
+      onNavigate: vi.fn(),
+      selectedEventId: 104,
+      currentUserId: 'coord-1',
+      now: () => NOW,
+    };
+    const { rerender } = render(<EventDetail {...props} accessToken="token" />);
+    await screen.findByRole('button', { name: 'Mark as Completed' });
+
+    // There is no half-state where the action is clickable without a token:
+    // the detail is gated on one, so losing it removes the action with it.
+    rerender(<EventDetail {...props} accessToken={undefined} />);
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  test('[FAILURE] [SG2-100:AC6] with no access token nothing is sent', async () => {
+    showEvent();
+    const complete = vi.spyOn(eventRequestsApi, 'completeEvent');
+    render(
+      <EventDetail
+        role="Event Coordinator"
+        onNavigate={vi.fn()}
+        selectedEventId={104}
+        currentUserId="coord-1"
+        now={() => NOW}
+      />,
+    );
+    // Without a token there is nothing to read and nothing to send: no
+    // detail loads, so the action is never offered in the first place.
+    expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
+    expect(complete).not.toHaveBeenCalled();
+  });
+});

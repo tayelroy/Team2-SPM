@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Badge, Card, Eyebrow, GhostButton, Notice } from '../ui';
 import { color, rule } from '../theme';
-import { badgeStyle } from '../mock/viewModel';
+import { badgeStyle, statusLabel } from '../mock/viewModel';
 import {
   deleteEventRequestDraft,
   fetchEventRequestDraft,
@@ -9,11 +9,6 @@ import {
   type DraftListItem,
   type EventRequestDraft
 } from '../api/eventRequests';
-
-function formatStatus(status: string): string {
-  const spaced = status.replace(/_/g, ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
 
 /**
  * "My draft requests" — SG2-32's minimal slice of SG2-31: enough to see,
@@ -151,7 +146,7 @@ function MyDraftRequests({ token, onEdit }: { token: string | null; onEdit: (req
                 </h2>
               </div>
               <Badge bg={badgeBg} fg={badgeFg}>
-                {formatStatus(request.status)}
+                {statusLabel(request.status)}
               </Badge>
             </div>
             {/* SG2-36: a request returned with a question is editable and

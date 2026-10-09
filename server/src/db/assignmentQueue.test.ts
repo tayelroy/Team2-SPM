@@ -46,9 +46,9 @@ function eventsTable(rows: Record<string, unknown>[] | null, failure?: string) {
 
 const base = { organiser_id: 'org-1', proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 120 };
 
-test('[NORMAL] [SG2-87:AC1] [SG2-87:AC3] the queue holds submitted, unassigned requests with the basic event details', async () => {
+test('[NORMAL] [SG2-87:AC1] [SG2-87:AC3] the queue holds unassigned requests with the basic event details', async () => {
   const { client } = eventsTable([
-    { ...base, event_id: 1, name: 'Leadership Forum', status: 'submitted', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' }
+    { ...base, event_id: 1, name: 'Leadership Forum', status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' }
   ]);
   assert.deepEqual(await fetchUnassignedQueue(client), {
     ok: true,
@@ -59,9 +59,9 @@ test('[NORMAL] [SG2-87:AC1] [SG2-87:AC3] the queue holds submitted, unassigned r
   });
 });
 
-test('[CONFLICT] [SG2-87:AC5] an event leaves the queue once assigned, and drafts or reviewed requests never enter it', async () => {
+test('[CONFLICT] [SG2-87:AC5] an event leaves the queue once assigned (moved to submitted), and drafts or reviewed requests never enter it', async () => {
   const { client } = eventsTable([
-    { ...base, event_id: 1, name: 'Queued', status: 'submitted', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' },
+    { ...base, event_id: 1, name: 'Queued', status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' },
     { ...base, event_id: 2, name: 'Just assigned', status: 'submitted', coordinator_id: 'coord-1', submitted_at: '2026-10-06T00:00:00.000Z' },
     { ...base, event_id: 3, name: 'Draft', status: 'draft', coordinator_id: null, submitted_at: null },
     { ...base, event_id: 4, name: 'Under review', status: 'under_review', coordinator_id: 'coord-1', submitted_at: '2026-10-05T00:00:00.000Z' },
@@ -73,11 +73,11 @@ test('[CONFLICT] [SG2-87:AC5] an event leaves the queue once assigned, and draft
 
 test('[BOUNDARY] [SG2-87:AC3] oldest submission first, ties by event id, and a request with no recorded submission time last', async () => {
   const { client } = eventsTable([
-    { ...base, event_id: 9, name: 'Before submitted_at existed', status: 'submitted', coordinator_id: null, submitted_at: null },
-    { ...base, event_id: 7, name: 'Second, same instant', status: 'submitted', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' },
-    { ...base, event_id: 8, name: 'Newest', status: 'submitted', coordinator_id: null, submitted_at: '2026-10-06T02:00:00.000Z' },
-    { ...base, event_id: 6, name: 'First, same instant', status: 'submitted', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' },
-    { ...base, event_id: 5, name: '', organiser_id: null, status: 'submitted', coordinator_id: null, submitted_at: '2026-10-05T23:59:59.999Z',
+    { ...base, event_id: 9, name: 'Before submitted_at existed', status: 'unassigned', coordinator_id: null, submitted_at: null },
+    { ...base, event_id: 7, name: 'Second, same instant', status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' },
+    { ...base, event_id: 8, name: 'Newest', status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-06T02:00:00.000Z' },
+    { ...base, event_id: 6, name: 'First, same instant', status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' },
+    { ...base, event_id: 5, name: '', organiser_id: null, status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-05T23:59:59.999Z',
       proposed_date: null, expected_attendance: null }
   ]);
   const result = await fetchUnassignedQueue(client);
@@ -90,7 +90,7 @@ test('[BOUNDARY] [SG2-87:AC3] oldest submission first, ties by event id, and a r
 
 test('[BOUNDARY] [SG2-87:AC3] a request with no name reads as an empty name, and no rows at all read as an empty queue', async () => {
   const unnamed = eventsTable([
-    { ...base, event_id: 3, name: null, status: 'submitted', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' }
+    { ...base, event_id: 3, name: null, status: 'unassigned', coordinator_id: null, submitted_at: '2026-10-06T01:00:00.000Z' }
   ]);
   const result = await fetchUnassignedQueue(unnamed.client);
   assert.deepEqual(result.ok && result.entries.map(entry => [entry.event_id, entry.name]), [[3, '']]);

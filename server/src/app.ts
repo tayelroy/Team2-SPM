@@ -15,6 +15,7 @@ import { createAssignCoordinatorHandler } from './events/assignCoordinator';
 import { createListAssignableHandler } from './events/listAssignable';
 import { createStartEventReviewHandler } from './events/review';
 import { createDecideEventRequestHandler } from './events/decide';
+import { createCompleteEventHandler } from './events/complete';
 import { createAddClarificationHandler, createListClarificationsHandler } from './events/clarifications';
 import { createVenuesRouter } from './venues';
 import { createVenueLayoutsRouter } from './venues/layouts';
@@ -26,12 +27,15 @@ import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
 import { createNotificationsRouter } from './notifications';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
+import { createGetEventArrangementsHandler } from './events/getArrangements';
 import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
+import { createVenueConflictsRouter } from './venues/conflicts';
 import { createVenueBookingsRouter } from './venues/bookings';
 import { createEquipmentRouter } from './equipment';
+import { createEquipmentRequirementsRouter } from './equipment/requirements';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 
 export function createApp(
@@ -58,6 +62,7 @@ export function createApp(
     suitability: createVenueSuitabilityRouter(access),
     bookingRequests: createBookingRequestSuitabilityRouter(access),
     venueRequests: createVenueBookingRequestsRouter(access),
+    conflicts: createVenueConflictsRouter(access),
     notifications: createNotificationsRouter(access)
   },
   workQueueRouter = createWorkQueueRouter(access),
@@ -72,7 +77,18 @@ export function createApp(
   addClarificationHandler: RequestHandler = createAddClarificationHandler({ getPrincipal: access.getPrincipal }),
   venueHoldsRouter = createVenueHoldsRouter(access),
   equipmentRouter = createEquipmentRouter(access),
+  equipmentRequirementsRouter = createEquipmentRequirementsRouter(access),
+  // SG2-100 AC4. Appended rather than grouped with the other event handlers
+  // on purpose: every parameter here is positional, and inserting one in the
+  // middle would silently shift every caller's later arguments.
+  completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-87: appended last for the same reason.
   assignmentQueueRouter = createAssignmentQueueRouter(access),
+  // SG2-57. Appended after assignmentQueueRouter — every parameter here is
+  // positional, and callers (e2e/server.ts, app.test.ts) pass through
+  // assignmentQueueRouter, so this new one must come last.
+  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-51: appended last for the same reason.
   venueBookingsRouter = createVenueBookingsRouter(access)
 ) {
   const app = express();
@@ -102,12 +118,15 @@ export function createApp(
   app.use('/api/venue-booking-requests', routers.bookingRequests);
   // SG2-48: coordinators request a venue for an approved event.
   app.use('/api/venue-booking-requests', routers.venueRequests);
+  // SG2-50: what a pending venue request overlaps.
+  app.use('/api/venue-booking-requests', routers.conflicts);
   // SG2-49: each person's own notices, e.g. a venue request decision.
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
   // SG2-51: an event's or venue's bookings, and releasing one.
   app.use('/api/venue-bookings', venueBookingsRouter);
   app.use('/api/equipment', equipmentRouter);
+  app.use('/api/equipment-requests', equipmentRequirementsRouter);
   // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
   app.use('/api/assignment-queue', assignmentQueueRouter);
 
@@ -158,6 +177,14 @@ export function createApp(
     access.requirePermission('event_request.decide'),
     decideEventRequestHandler
   );
+  // SG2-100 AC4: the assigned coordinator marks an event that has been held
+  // as completed. Registered before '/:eventId', which would otherwise
+  // capture it.
+  eventRequests.patch(
+    '/:eventId/complete',
+    access.requirePermission('event_request.complete'),
+    completeEventHandler
+  );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(
     '/:eventId',
@@ -175,6 +202,12 @@ export function createApp(
     '/:eventId/stage',
     access.requirePermission('event_request.stage.view'),
     eventStageHandler
+  );
+  // SG2-57: the assigned coordinator sees which arrangements are outstanding.
+  eventRequests.get(
+    '/:eventId/arrangements',
+    access.requirePermission('event_request.arrangements.view'),
+    eventArrangementsHandler
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

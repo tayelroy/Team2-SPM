@@ -36,6 +36,7 @@ const BEARER = /^Bearer ([A-Za-z0-9._~+/-]+=*)$/i;
 
 interface BookingRow { starts_at: string; ends_at: string; status: string; event_id: number | null }
 interface UnavailabilityRow { starts_at: string; ends_at: string; reason: string }
+interface AffectedRow { starts_at: string; ends_at: string }
 interface VenueRow { venue_id: number; name: string }
 
 function parseVenueId(value: unknown): number | null {
@@ -74,12 +75,21 @@ function sortByStart(a: AvailabilityEntry, b: AvailabilityEntry): number {
   return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
 }
 
-function bookingEntry(row: BookingRow): AvailabilityEntry {
+/** Two confirmed bookings at one venue never overlap (SG2-50), so a venue
+ * and period identify a confirmed booking. */
+function bookingKey(venueId: number, row: AffectedRow): string {
+  return `${venueId}|${row.starts_at}|${row.ends_at}`;
+}
+
+function bookingEntry(row: BookingRow, affected: boolean): AvailabilityEntry {
+  const label = row.event_id === null ? (row.status === 'tentative' ? 'Tentative' : row.status) : `${row.status === 'tentative' ? 'Tentative' : row.status} · event ${row.event_id}`;
   return {
     start: row.starts_at,
     end: row.ends_at,
     kind: row.status === 'tentative' ? 'hold' : 'booking',
-    label: row.event_id === null ? (row.status === 'tentative' ? 'Tentative' : row.status) : `${row.status === 'tentative' ? 'Tentative' : row.status} · event ${row.event_id}`
+    // SG2-80 AC3: a confirmed booking inside a period the venue was later
+    // marked unavailable for is flagged so its event can be rearranged.
+    label: affected && row.status === 'confirmed' ? `${label} · affected by venue unavailability` : label
   };
 }
 
@@ -108,7 +118,7 @@ export async function getVenueAvailability(
   if (!range.ok) return { outcome: 'invalid', message: range.message };
   if (!client) return { outcome: 'unavailable' };
 
-  const [bookings, unavailability] = await Promise.all([
+  const [bookings, unavailability, affected] = await Promise.all([
     client
       .from('venue_booking_occupancy')
       .select('starts_at, ends_at, status, event_id')
@@ -122,15 +132,22 @@ export async function getVenueAvailability(
       .eq('venue_id', id)
       .lt('starts_at', range.toIso)
       .gt('ends_at', range.fromIso)
-      .order('starts_at', { ascending: true })
+      .order('starts_at', { ascending: true }),
+    client
+      .from('venue_affected_bookings')
+      .select('starts_at, ends_at')
+      .eq('venue_id', id)
+      .lt('starts_at', range.toIso)
+      .gt('ends_at', range.fromIso)
   ]);
 
-  if (bookings.error || unavailability.error) {
+  if (bookings.error || unavailability.error || affected.error) {
     return { outcome: 'unavailable' };
   }
 
+  const flagged = new Set(((affected.data ?? []) as AffectedRow[]).map(row => bookingKey(id, row)));
   const entries: AvailabilityEntry[] = [
-    ...((bookings.data ?? []) as BookingRow[]).map(bookingEntry),
+    ...((bookings.data ?? []) as BookingRow[]).map(row => bookingEntry(row, flagged.has(bookingKey(id, row)))),
     ...((unavailability.data ?? []) as UnavailabilityRow[]).map(unavailabilityEntry)
   ].sort(sortByStart);
 
@@ -151,7 +168,7 @@ export async function getAllVenuesAvailability(
   if (!range.ok) return { outcome: 'invalid', message: range.message };
   if (!client) return { outcome: 'unavailable' };
 
-  const [venues, bookings, unavailability] = await Promise.all([
+  const [venues, bookings, unavailability, affected] = await Promise.all([
     client.from('venues').select('venue_id, name').order('name', { ascending: true }),
     client
       .from('venue_booking_occupancy')
@@ -162,10 +179,15 @@ export async function getAllVenuesAvailability(
       .from('venue_unavailability')
       .select('venue_id, starts_at, ends_at, reason')
       .lt('starts_at', range.toIso)
+      .gt('ends_at', range.fromIso),
+    client
+      .from('venue_affected_bookings')
+      .select('venue_id, starts_at, ends_at')
+      .lt('starts_at', range.toIso)
       .gt('ends_at', range.fromIso)
   ]);
 
-  if (venues.error || bookings.error || unavailability.error) {
+  if (venues.error || bookings.error || unavailability.error || affected.error) {
     return { outcome: 'unavailable' };
   }
 
@@ -176,8 +198,9 @@ export async function getAllVenuesAvailability(
     else entriesByVenue.set(venueId, [entry]);
   };
 
+  const flagged = new Set(((affected.data ?? []) as (AffectedRow & { venue_id: number })[]).map(row => bookingKey(row.venue_id, row)));
   for (const row of (bookings.data ?? []) as (BookingRow & { venue_id: number })[]) {
-    addEntry(row.venue_id, bookingEntry(row));
+    addEntry(row.venue_id, bookingEntry(row, flagged.has(bookingKey(row.venue_id, row))));
   }
   for (const row of (unavailability.data ?? []) as (UnavailabilityRow & { venue_id: number })[]) {
     addEntry(row.venue_id, unavailabilityEntry(row));

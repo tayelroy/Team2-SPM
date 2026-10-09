@@ -179,9 +179,9 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
                     ? <VenueRequestForm accessToken={accessToken} eventId={prefill.eventId} venue={venue}
                         period={{ from: searched.from, until: searched.until }} layout={searched.layout}
                         venueRequirements={prefill.venueRequirements} onCancel={() => setRequesting(null)}
-                        onRequested={(_request, booking) => {
+                        onRequested={(_request, booking, conflicts) => {
                           setRequesting(null);
-                          setNotice(requestedNotice(venue.name, booking));
+                          setNotice(requestedNotice(venue.name, booking, conflicts));
                           refreshRequests();
                         }} />
                     : <GhostButton onClick={() => { setNotice(''); setRequesting(venue.venue_id); }} style={{ alignSelf: 'flex-start' }}>

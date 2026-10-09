@@ -146,6 +146,64 @@ test('[FAILURE] [SG2-44:AC1] is unavailable when the unavailability query fails'
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, client), { outcome: 'unavailable' });
 });
 
+// --- SG2-80: bookings inside a period the venue was marked unavailable for ---
+
+const A = { starts_at: '2026-10-02T09:00:00+00:00', ends_at: '2026-10-02T12:00:00+00:00' };
+const B = { starts_at: '2026-10-03T09:00:00+00:00', ends_at: '2026-10-03T12:00:00+00:00' };
+
+test('[NORMAL] [SG2-80:AC3] [SG2-80:AC5] a flagged confirmed booking is labelled as affected beside the unavailable period', async () => {
+  const calls: QueryCall[] = [];
+  const result = await getVenueAvailability(1, FROM, TO, fakeClient({
+    venue_booking_occupancy: { data: [
+      { ...A, status: 'confirmed', event_id: 12 }, { ...B, status: 'confirmed', event_id: null }
+    ], error: null },
+    venue_unavailability: { data: [{ starts_at: FROM, ends_at: TO, reason: 'Air conditioning failed' }], error: null },
+    venue_affected_bookings: { data: [A], error: null }
+  }, calls));
+  assert.deepEqual(result, { outcome: 'ok', entries: [
+    { start: FROM, end: TO, kind: 'unavailable', label: 'Air conditioning failed' },
+    { start: A.starts_at, end: A.ends_at, kind: 'booking', label: 'confirmed · event 12 · affected by venue unavailability' },
+    { start: B.starts_at, end: B.ends_at, kind: 'booking', label: 'confirmed' }
+  ] });
+  assert.deepEqual(calls.filter(call => call.table === 'venue_affected_bookings').map(call => [call.method, ...call.args]), [
+    ['select', 'starts_at, ends_at'], ['eq', 'venue_id', 1], ['lt', 'starts_at', TO], ['gt', 'ends_at', FROM]
+  ]);
+});
+
+test('[BOUNDARY] [SG2-80:AC3] only the confirmed booking is flagged, not a held booking or another venue\'s booking with the same period', async () => {
+  const single = await getVenueAvailability(1, FROM, TO, fakeClient({
+    venue_booking_occupancy: { data: [{ ...A, status: 'held', event_id: 4 }], error: null },
+    venue_affected_bookings: { data: [A], error: null }
+  }));
+  assert.deepEqual(single, { outcome: 'ok', entries: [{ start: A.starts_at, end: A.ends_at, kind: 'booking', label: 'held · event 4' }] });
+  const all = await getAllVenuesAvailability(FROM, TO, fakeClient({
+    venues: { data: [{ venue_id: 1, name: 'Atrium' }, { venue_id: 2, name: 'Hall' }], error: null },
+    venue_booking_occupancy: { data: [{ ...A, venue_id: 1, status: 'confirmed', event_id: 5 }, { ...A, venue_id: 2, status: 'confirmed', event_id: 6 }], error: null },
+    venue_affected_bookings: { data: [{ ...A, venue_id: 2 }], error: null }
+  }));
+  assert.deepEqual(all, { outcome: 'ok', venues: [
+    { venueId: 1, name: 'Atrium', entries: [{ start: A.starts_at, end: A.ends_at, kind: 'booking', label: 'confirmed · event 5' }] },
+    { venueId: 2, name: 'Hall', entries: [{ start: A.starts_at, end: A.ends_at, kind: 'booking', label: 'confirmed · event 6 · affected by venue unavailability' }] }
+  ] });
+});
+
+test('[BOUNDARY] [SG2-80:AC3] null affected-booking data flags nothing', async () => {
+  const booking = { ...A, status: 'confirmed', event_id: 5 };
+  assert.deepEqual(await getVenueAvailability(1, FROM, TO, fakeClient({
+    venue_booking_occupancy: { data: [booking], error: null }, venue_affected_bookings: { data: null, error: null }
+  })), { outcome: 'ok', entries: [{ start: A.starts_at, end: A.ends_at, kind: 'booking', label: 'confirmed · event 5' }] });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, fakeClient({
+    venues: { data: [{ venue_id: 1, name: 'Atrium' }], error: null },
+    venue_booking_occupancy: { data: [{ ...booking, venue_id: 1 }], error: null }, venue_affected_bookings: { data: null, error: null }
+  })), { outcome: 'ok', venues: [{ venueId: 1, name: 'Atrium', entries: [{ start: A.starts_at, end: A.ends_at, kind: 'booking', label: 'confirmed · event 5' }] }] });
+});
+
+test('[FAILURE] [SG2-80:AC3] both reads are unavailable when the affected-booking query fails', async () => {
+  const failing = { venue_affected_bookings: { data: null, error: { message: 'boom' } } };
+  assert.deepEqual(await getVenueAvailability('5', FROM, TO, fakeClient(failing)), { outcome: 'unavailable' });
+  assert.deepEqual(await getAllVenuesAvailability(FROM, TO, fakeClient(failing)), { outcome: 'unavailable' });
+});
+
 test('[FAILURE] [SG2-44:AC1] is unavailable without a Supabase client', async () => {
   assert.deepEqual(await getVenueAvailability('5', FROM, TO, null), { outcome: 'unavailable' });
 });

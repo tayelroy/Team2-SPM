@@ -336,7 +336,7 @@
       ],
       "acceptanceCriteria": {
         "AC1": "Given a venue with no booking in a period, when I block that period with a reason, then the venue is shown as unavailable then and is not returned by venue search",
-        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified",
+        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified (superseded by SG2-80, Week 7 change #2: such a period can now be blocked and its bookings are flagged as affected)",
         "AC3": "Given a block I have created, when I remove it, then the venue becomes available for that period again"
       }
     },
@@ -389,6 +389,20 @@
       }
     },
     {
+      "id": "SG2-80",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-80",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-08",
+      "acceptanceCriteria": {
+        "AC1": "I can mark a venue unavailable for a period, choosing a reason (maintenance, equipment failure, renovation, safety concern, other) and adding a note",
+        "AC2": "Marking is allowed even when confirmed bookings fall within the period",
+        "AC3": "Bookings that fall within the period are identified and flagged as affected by venue unavailability",
+        "AC4": "Affected events are not cancelled automatically, and their original event information is kept",
+        "AC5": "During the period, the venue appears as unavailable and is not returned by venue search",
+        "AC6": "The unavailability, its reason, who recorded it and when are all recorded"
+      }
+    },
+    {
       "id": "SG2-84",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-84",
       "originalPullRequests": [],
@@ -413,6 +427,17 @@
         "AC3": "An expired hold is never treated as a confirmed booking and cannot be approved; a new request is needed",
         "AC4": "The Event Coordinator is warned before the hold expires (e.g. 24 hours before; confirm the lead time with the customer) and notified again when it expires",
         "AC5": "The expiry is recorded in the event's history"
+      }
+    },
+    {
+      "id": "SG2-50",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "Given a venue committed to an event for a period, when a request is raised for an overlapping period at that venue, then the conflict is reported and the conflicting booking is identified",
+        "AC2": "Given a request in conflict, when approval is attempted, then approval is refused while the conflict stands",
+        "AC3": "Given a booking that is rejected or cancelled, when the period is next checked, then it no longer causes a conflict"
       }
     },
     {
@@ -477,6 +502,27 @@
       }
     },
     {
+      "id": "SG2-100",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-100",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-06",
+      "acceptanceCriteria": {
+        "AC1": "public.event_status contains unassigned, awaiting_safety_check, safety_rejected and preparation, with all 14 values present in a fresh CI database",
+        "AC2": "Submitting a complete draft returns 200 with request.status === 'unassigned'; no row is left in 'submitted' with a null coordinator_id after the backfill",
+        "AC3": "Assigning a coordinator on an unassigned event moves it to submitted; assigning on an already-advanced event leaves its status unchanged",
+        "AC4": "canTransition returns true for exactly the edges in the status flow diagram and false for every other ordered pair, including every pair whose source is completed or cancelled",
+        "AC5": "GET the event stage returns the exact stage, stage_key and waiting_on values for unassigned, awaiting_safety_check, safety_rejected and preparation, and a stepper_steps array of length 7; planning returns stage 'Arrangements' with stage_key 'in_planning'",
+        "AC6": "Marking an event Completed by the assigned coordinator on a confirmed or preparation event whose end time has passed returns 200 with status 'completed' and completed_by/completed_at populated",
+        "AC7": "A completed event is refused by further planning updates, is absent from the work queue, and remains readable via the event and history endpoints",
+        "AC8": "Each new lifecycle transition appends exactly one event_audit_logs row with the correct old_value/new_value/actor_id; a failed audit insert does not fail the transition",
+        "AC9": "EventDetail and the 7-step stepper render without layout breakage or horizontal overflow at 390x844 and 1440x900",
+        "AC10": "npm run ci is green with 100% per-file statement, branch, line and function coverage in both server and client",
+        "AC11": "All four DoD category tags appear in the new tests and in the PR Test Case Inventory table; every commit carries [SG2-100]",
+        "AC12": "The e2e regression journeys for this story pass and are registered in docs/regression-cases.json",
+        "AC13": "No secrets are committed; every new route is permission-gated server-side; every new write repeats its guards as conditions on the update itself"
+      }
+    },
+    {
       "id": "SG2-52",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-52",
       "originalPullRequests": [],
@@ -487,6 +533,31 @@
         "AC3": "Users who are not Technical Support Staff cannot edit equipment records"
       },
       "source": "Live Jira SG2-52 description verified in Google Chrome on 7 October 2026."
+    },
+    {
+      "id": "SG2-53",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-53",
+      "summary": "Record what equipment an event needs",
+      "acceptanceCriteria": {
+        "AC1": "Can record required equipment against an approved event, with type, quantity and technical notes",
+        "AC2": "Can amend the requirements while they are still being arranged",
+        "AC3": "A quantity that is not a positive number is refused",
+        "AC4": "The request reaches Technical Support Staff",
+        "AC5": "Technical Support Staff can record updates on the request as equipment is arranged, including any shortfall, and the coordinator can see these updates",
+        "AC6": "For each requested item, Technical Support Staff can record where it will be placed (which venue and position within it), for the Safety Officer review (Week 7 change #6, SG2-91); an item with no placement recorded is shown as Not recorded"
+      },
+      "originalPullRequests": [],
+      "source": "Live Jira SG2-53 description verified in the in-app browser on 8 October 2026. AC numbering follows displayed bullet order."
+    },
+    {
+      "id": "SG2-57",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-57",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "The event shows whether every venue booking it needs is approved (an event may have several, per Week 7 change #3), whether any requested equipment is reserved, and whether registration capacity and opening/closing times are set when registration is needed",
+        "AC2": "Each required arrangement is labelled ready or outstanding; equipment and registration are labelled not required when they are not needed",
+        "AC3": "When all required arrangements are ready, the event is shown as ready for confirmation"
+      }
     },
     {
       "id": "SG2-87",

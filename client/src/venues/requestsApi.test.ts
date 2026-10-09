@@ -16,7 +16,7 @@ function respond(response: () => Response) {
 
 test('[NORMAL] [SG2-48:AC1] a venue is requested with a JSON POST carrying the event, venue, period and layout', async () => {
   const fetch = respond(() => Response.json({ request: pending, booking: 'allowed' }, { status: 201 }));
-  expect(await requestVenue('token', values)).toEqual({ ok: true, request: pending, booking: 'allowed' });
+  expect(await requestVenue('token', values)).toEqual({ ok: true, request: pending, booking: 'allowed', conflicts: [] });
   expect(fetch).toHaveBeenCalledWith('/api/venue-booking-requests', {
     method: 'POST', body: JSON.stringify(values), cache: 'no-store',
     headers: { Authorization: 'Bearer token', 'Content-Type': 'application/json' }

@@ -28,15 +28,18 @@ An npm-workspaces monorepo:
 | Role | What's actually wired up today |
 | --- | --- |
 | Event Organiser | Raise, edit, submit and delete their own event requests; view events and status shared by their client organisation |
-| Event Coordinator | View awaiting-review requests and their active assigned events in the dashboard; open each event's stored details |
+| Event Coordinator | View awaiting-review requests and active assigned events; record and amend equipment requirements for approved/planning events |
 | Venue Staff | View pending booking requests and details in the dashboard; maintain the venue catalogue and check availability |
-| Technical Support Staff | View pending equipment requests and details in the dashboard; create and edit equipment records; change a user's role via the API |
+| Technical Support Staff | View pending equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
 
 Every account can view and update its own profile. Technical Support Staff's
 Equipment screen reads and writes stored equipment records, including operational
 status and the quantity eligible for use. Apply the [equipment migration](docs/equipment.md)
 before deploying it. Equipment reservations are separate work.
+Coordinators and support staff share the [equipment requirements workflow](docs/equipment-requirements.md).
+Apply its migration before deploying SG2-53. It preserves existing request periods
+and does not change quantities held or reserve stock.
 The SG2-41 dashboard queue and its selected-record detail view use Supabase;
 approval/rejection mutations are separate work. See [work queue setup](docs/work-queue.md)
 for the required migration and queue rules.
@@ -132,6 +135,9 @@ independently of what the UI shows.
   operational status. Damaged equipment and equipment under maintenance show
   zero available quantity while retaining the quantity held. If another member
   of staff saves a record you are editing, reload the record before saving again.
+- Open a pending **Equipment request** from the dashboard to record an arrangement
+  update, shortfall and placement venue/position. The assigned coordinator sees the
+  saved update; an amended requirement clears that update for support to recheck.
 
 Role changes aren't exposed in a screen yet — call
 `PATCH /api/users/:userId/role` directly with a bearer token and a JSON
@@ -165,8 +171,9 @@ uploaded as the `browser-regression` artifact.
 - [Purposeful regression register](docs/regression.md) — current cases, Playwright scope and historical-case consolidation
 - [Authorisation](docs/authorization.md) — how requests are verified and permission-checked
 - [Organisation event access](docs/organisation-events.md) — SG2-26 behaviour, provisioning and database protection
-- [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API, SG2-77 setup and turnaround, SG2-51 releasing a booking
+- [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API, SG2-77 setup and turnaround, SG2-50 double-booking prevention, SG2-51 releasing a booking
 - [Equipment records](docs/equipment.md) — SG2-52 stock, operational status, API, migration and verification
+- [Equipment requirements](docs/equipment-requirements.md) — SG2-53 coordinator requests, support updates, placement and migration
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 

@@ -124,6 +124,15 @@ export interface EventRequestDetail {
   /** Why the coordinator rejected it, and when they decided (SG2-37). */
   decisionReason: string | null;
   decidedAt: string | null;
+  /** Who marked the event completed, and when (SG2-100 AC4). */
+  completedBy: string | null;
+  completedAt: string | null;
+  /**
+   * When the event finishes — the latest end of its confirmed venue bookings
+   * (SG2-100 AC4). Null while nothing confirms when it ends, which must be
+   * read as "not known to have finished", never as finished.
+   */
+  endsAt: string | null;
 }
 
 export type SubmitResult =
@@ -199,6 +208,9 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     waitingOnMe: raw.can_manage === true && isWaitingOnOrganiser(status),
     decisionReason: typeof raw.decision_reason === 'string' ? raw.decision_reason : null,
     decidedAt: typeof raw.decided_at === 'string' ? raw.decided_at : null,
+    completedBy: typeof raw.completed_by === 'string' ? raw.completed_by : null,
+    completedAt: typeof raw.completed_at === 'string' ? raw.completed_at : null,
+    endsAt: typeof raw.ends_at === 'string' ? raw.ends_at : null,
   };
 }
 
@@ -598,6 +610,78 @@ export async function getEventStage(
   return { ok: true, stage: body as EventStageResult };
 }
 
+export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
+export type ArrangementKey = 'venue' | 'equipment' | 'registration';
+
+export interface ArrangementStatus {
+  key: ArrangementKey;
+  label: string;
+  state: ArrangementState;
+  detail: string;
+}
+
+export interface EventArrangementsResult {
+  event_id: number;
+  arrangements: ArrangementStatus[];
+  outstanding: ArrangementKey[];
+  ready_for_confirmation: boolean;
+}
+
+export type GetEventArrangementsOutcome =
+  | { ok: true; arrangements: EventArrangementsResult }
+  | {
+      ok: false;
+      kind: 'unauthorized' | 'forbidden' | 'not_found' | 'unavailable' | 'error';
+      message: string;
+    };
+
+/**
+ * Retrieves which of an event's arrangements (venue, equipment, registration)
+ * are ready or outstanding and whether it is ready for confirmation (SG2-57).
+ * Maps to `GET /api/event-requests/:eventId/arrangements`.
+ */
+export async function getEventArrangements(
+  eventId: string | number,
+  token: string
+): Promise<GetEventArrangementsOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/arrangements`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  } catch {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { ok: false, kind: 'unauthorized', message: body?.error ?? 'Authentication required' };
+    }
+    if (response.status === 403) {
+      return { ok: false, kind: 'forbidden', message: body?.error ?? 'Access forbidden' };
+    }
+    if (response.status === 404) {
+      return { ok: false, kind: 'not_found', message: body?.error ?? 'Event not found.' };
+    }
+    if (response.status === 503) {
+      return { ok: false, kind: 'unavailable', message: body?.error ?? UNAVAILABLE };
+    }
+    return {
+      ok: false,
+      kind: 'error',
+      message: body?.error ?? `Failed to fetch event arrangements (HTTP ${response.status}).`
+    };
+  }
+
+  if (!body || typeof body !== 'object' || !Array.isArray(body.arrangements)) {
+    return { ok: false, kind: 'unavailable', message: UNAVAILABLE };
+  }
+
+  return { ok: true, arrangements: body as EventArrangementsResult };
+}
+
 export interface PlanningUpdatePayload {
   expected_attendance?: number | null;
   proposed_date?: string | null;
@@ -856,6 +940,50 @@ export async function assignCoordinator(
   return unavailable;
 }
 
+export type CompleteEventOutcome = { ok: true } | { ok: false; message: string };
+
+/**
+ * Marks an event that has been held as completed (SG2-100 AC4). Maps to
+ * `PATCH /api/event-requests/:eventId/complete`.
+ *
+ * The server owns the clock, so its 409 is surfaced verbatim rather than
+ * second-guessed: the caller may believe the event is over and be wrong.
+ */
+export async function completeEvent(
+  eventId: number,
+  token: string,
+): Promise<CompleteEventOutcome> {
+  const unavailable = {
+    ok: false,
+    message: 'Could not mark the event completed. Please try again.',
+  } as const;
+  let response: Response;
+  try {
+    response = await fetch(`/api/event-requests/${eventId}/complete`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return unavailable;
+  }
+
+  if (response.ok) return { ok: true };
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      message: 'Only the assigned Event Coordinator can mark this event completed.',
+    };
+  }
+  if (response.status === 400 || response.status === 404 || response.status === 409) {
+    const data = await readEventRequestJson(response, {} as Record<string, unknown>);
+    return {
+      ok: false,
+      message: typeof data.error === 'string' ? data.error : 'That change was not accepted.',
+    };
+  }
+  return unavailable;
+}
+
 /** One message in an event's clarification thread (SG2-36). */
 export interface Clarification {
   clarification_id: number;
@@ -995,14 +1123,4 @@ export async function getEventHistory(
     ok: true,
     history: body.history as EventAuditLogEntry[],
   };
-}
-
-/**
- * The status an organiser sees (SG2-87 AC4): a submitted request no
- * coordinator holds yet is waiting in the Event Coordinator Lead's queue, so
- * it reads "Unassigned". Every other status is shown as stored. SG2-100 may
- * later store this as a real status; until then it is derived here.
- */
-export function displayStatus(status: string, coordinatorId: string | null): string {
-  return status === 'submitted' && !coordinatorId ? 'Unassigned' : status;
 }

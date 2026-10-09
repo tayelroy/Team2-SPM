@@ -15,10 +15,13 @@ import { submitEventRequestHandler } from '../server/src/events/submit';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from '../server/src/events/list';
 import { createStartEventReviewHandler } from '../server/src/events/review';
 import { createDecideEventRequestHandler } from '../server/src/events/decide';
+import { createCompleteEventHandler } from '../server/src/events/complete';
 import { createAssignCoordinatorHandler } from '../server/src/events/assignCoordinator';
 import { createUpdateEventPlanningHandler } from '../server/src/events/updatePlanning';
 import { createListAssignableHandler } from '../server/src/events/listAssignable';
 import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
+import { createGetEventStageHandler } from '../server/src/events/getStage';
+import { createGetEventArrangementsHandler } from '../server/src/events/getArrangements';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import { createVenuesRouter } from '../server/src/venues';
 import { createVenueLayoutsRouter } from '../server/src/venues/layouts';
@@ -28,6 +31,7 @@ import { createVenueBlocksRouter } from '../server/src/venues/blocks';
 import { createVenueSearchHandler, createVenueSearchRouter } from '../server/src/venues/search';
 import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createMemoryReleaseStore } from './support/venue-releases';
@@ -36,7 +40,7 @@ import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
 import type { VenueLayoutRecord } from '../server/src/venues/layoutFields';
-import type { BookingConflict, VenueBlockRecord } from '../server/src/venues/blockFields';
+import type { AffectedBooking, VenueBlockRecord } from '../server/src/venues/blockFields';
 import { dbConfig } from '../server/src/db';
 import { MemoryDatabase } from './support/memory-database';
 import { createWorkQueueRouter } from '../server/src/workQueue';
@@ -45,6 +49,8 @@ import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createMemoryEquipmentStore } from './support/equipment';
+import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
+import { createMemoryRequirementsStore } from './support/equipment-requirements';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -105,21 +111,39 @@ const operations = createVenueOperationsRouter(access, () => ({
     return result.data as VenueOperationRecord;
   }
 }));
-const BLOCK_COLUMNS = 'unavailability_id,starts_at,ends_at,reason';
-const blocks = createVenueBlocksRouter(access, () => ({
+// SG2-80: mirrors list_venue_unavailability() and the flagging triggers over
+// the in-memory tables: confirmed bookings inside a period are affected.
+function venueBlocks(venueId: number, after: string): VenueBlockRecord[] {
+  const { venue_unavailability: periods, venue_bookings: bookings, events, users } = database.tables;
+  return periods.filter(row => row.venue_id === venueId && String(row.ends_at) > after)
+    .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))
+    .map(row => ({
+      unavailability_id: row.unavailability_id, starts_at: row.starts_at, ends_at: row.ends_at,
+      category: row.category ?? 'other', reason: row.reason, created_at: row.created_at ?? null,
+      created_by_name: (users.find(user => user.user_id === row.created_by)?.name as string | undefined) ?? null,
+      affected: bookings.filter(booking => booking.venue_id === venueId && booking.status === 'confirmed'
+          && String(booking.starts_at) < String(row.ends_at) && String(booking.ends_at) > String(row.starts_at))
+        .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))
+        .map(booking => {
+          const event = events.find(item => item.event_id === booking.event_id);
+          return { booking_id: booking.booking_id, event_id: booking.event_id ?? null, event_name: event?.name ?? null,
+            event_status: event?.status ?? null, starts_at: booking.starts_at, ends_at: booking.ends_at } as AffectedBooking;
+        })
+    }) as VenueBlockRecord);
+}
+const blocks = createVenueBlocksRouter(access, token => ({
   async list(venueId, now) {
-    const result = await database.client.from('venue_unavailability').select(BLOCK_COLUMNS).eq('venue_id', venueId).gt('ends_at', now).order('starts_at');
-    return result.data as VenueBlockRecord[];
+    return venueBlocks(venueId, now);
   },
   async create(venueId, values) {
     const venueResult = await database.client.from('venues').select('venue_id').eq('venue_id', venueId).maybeSingle();
     if (!venueResult.data) return { outcome: 'missing' };
-    const conflicts = await database.client.from('venue_bookings').select('booking_id,event_id,starts_at,ends_at')
-      .eq('venue_id', venueId).eq('status', 'confirmed').lt('starts_at', values.ends_at).gt('ends_at', values.starts_at).order('starts_at').range(0, 0);
-    const booking = (conflicts.data as BookingConflict[])[0];
-    if (booking) return { outcome: 'conflict', booking };
-    const result = await database.client.from('venue_unavailability').insert({ venue_id: venueId, ...values }).select(BLOCK_COLUMNS).maybeSingle();
-    return { outcome: 'created', block: result.data as VenueBlockRecord };
+    const { userId } = await database.principal(token);
+    const result = await database.client.from('venue_unavailability')
+      .insert({ venue_id: venueId, ...values, created_by: userId, created_at: new Date().toISOString() })
+      .select('unavailability_id').maybeSingle();
+    const id = (result.data as { unavailability_id: number }).unavailability_id;
+    return { outcome: 'created', block: venueBlocks(venueId, values.starts_at).find(block => block.unavailability_id === id)! };
   },
   async remove(venueId, blockId) {
     const result = await database.client.from('venue_unavailability').delete().eq('venue_id', venueId).eq('unavailability_id', blockId).select('unavailability_id');
@@ -145,12 +169,14 @@ const app = createApp(
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
     venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-50: what a pending request overlaps, against the in-memory client.
+    conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
     notifications: createNotificationsRouter(access, memoryNotifications(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
-  // SG2-38's stage handler keeps its production default here, as it does on
-  // main; only the review handler below needs the in-memory client.
-  undefined,
+  // SG2-100: the stage tracker's own regression journey (SG2-100-P01) reads
+  // this endpoint directly, so it now runs against the in-memory client too.
+  createGetEventStageHandler(eventDependencies),
   createStartEventReviewHandler(eventDependencies),
   // SG2-33/34: assignment, the assignable list and SG2-40's history run
   // against the in-memory client so the assignment history can be checked
@@ -167,8 +193,14 @@ const app = createApp(
   createAddClarificationHandler(eventDependencies),
   createVenueHoldsRouter(access, venueHolds.store, () => venueHolds.now),
   createEquipmentRouter(access, () => createMemoryEquipmentStore(database)),
+  createEquipmentRequirementsRouter(access, token => createMemoryRequirementsStore(database, token)),
+  // SG2-100 AC4: Mark Completed, against the in-memory client.
+  createCompleteEventHandler(eventDependencies),
   // SG2-87: the Lead's unassigned queue, against the in-memory client.
   createAssignmentQueueRouter(access, { getAdminClient: getClient }),
+  // SG2-57: arrangement readiness, against the in-memory client so the
+  // coordinator's event detail can load it without a 503.
+  createGetEventArrangementsHandler(eventDependencies),
   // SG2-51: bookings and releases, against the in-memory client.
   createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) })
 );
@@ -185,6 +217,13 @@ app.post('/__e2e/reset', (_req, res) => {
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
 app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
+  res.status(204).end();
+});
+app.post('/__e2e/equipment-requirements', (_req, res) => {
+  database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
+    coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });
+  database.tables.equipment.push({ equipment_id: 2, name: 'Portable projector', description: 'HDMI projector',
+    quantity_total: 2, location: 'Store B', operational_status: 'maintenance', version: 1 });
   res.status(204).end();
 });
 app.post('/__e2e/assigned-review', (_req, res) => {
@@ -223,6 +262,10 @@ app.post('/__e2e/under-review', (_req, res) => {
   database.seedUnderReview();
   res.status(204).end();
 });
+app.post('/__e2e/lifecycle', (_req, res) => {
+  database.seedLifecycle();
+  res.status(204).end();
+});
 app.post('/__e2e/venue-holds', (_req, res) => {
   venueHolds.seed();
   res.status(204).end();
@@ -234,5 +277,6 @@ app.post('/__e2e/hold-time', (req, res) => {
 const buildDirectory = path.resolve(__dirname, '../client/dist');
 app.use(express.static(buildDirectory));
 app.get('*', (_req, res) => res.sendFile(path.join(buildDirectory, 'index.html')));
-const server = app.listen(4173, '127.0.0.1', () => console.log('Regression server: http://127.0.0.1:4173 (in-memory fixtures)'));
+const fixturePort = Number(process.env.E2E_PORT ?? 4173);
+const server = app.listen(fixturePort, '127.0.0.1', () => console.log(`Regression server: http://127.0.0.1:${fixturePort} (in-memory fixtures)`));
 for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => server.close(() => process.exit(0)));

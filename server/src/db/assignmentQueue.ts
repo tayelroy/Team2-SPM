@@ -23,16 +23,17 @@ function organiserName(row: Record<string, unknown>): string | null {
 }
 
 /**
- * The unassigned queue (SG2-87): every submitted request that no coordinator
- * holds yet, across all organisations, oldest submission first. Assigning a
- * coordinator sets `coordinator_id`, so an event leaves the queue by that
- * write alone (AC5). Requests submitted before `submitted_at` existed sort last.
+ * The unassigned queue (SG2-87): every request in SG2-100's `unassigned`
+ * status, across all organisations, oldest submission first. Assigning a
+ * coordinator moves a request to `submitted` (SG2-100), so it leaves the queue
+ * by that write alone (AC5); the `coordinator_id` filter is a second guard.
+ * Requests submitted before `submitted_at` existed sort last.
  */
 export async function fetchUnassignedQueue(admin: SupabaseClient): Promise<FetchUnassignedQueueResult> {
   const { data, error } = await admin
     .from('events')
     .select(QUEUE_COLUMNS)
-    .eq('status', 'submitted')
+    .eq('status', 'unassigned')
     .is('coordinator_id', null)
     .order('submitted_at', { ascending: true, nullsFirst: false })
     .order('event_id', { ascending: true });

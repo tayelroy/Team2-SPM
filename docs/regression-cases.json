@@ -478,7 +478,7 @@
       "SG2-87:AC4"
     ],
     "method_id": "TC-6cea16b8d437",
-    "notes": "Since SG2-87 the organiser sees the freshly submitted request as Unassigned; the stored status remains submitted."
+    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4."
   },
   {
     "id": "SG2-28-B01",
@@ -1325,7 +1325,7 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
-      "Block 20 June 2030 09:00–17:00 with reason Carpet replacement.",
+      "Block 20 June 2030 09:00–17:00 with reason Renovation and note Carpet replacement.",
       "Open Venue Availability for June 2030 and inspect the calendar.",
       "Return to the block screen, remove the block, and re-check the API and calendar."
     ],
@@ -1367,25 +1367,23 @@
   },
   {
     "id": "SG2-45-N01",
-    "title": "a confirmed booking cannot be blocked and other roles cannot block",
+    "title": "other roles cannot block or remove a block",
     "type": "Negative / role isolation",
     "story": "SG2-45",
-    "purpose": "Verify AC2 and the Venue Staff-only permission for blocking and removing blocks.",
+    "purpose": "Verify the Venue Staff-only permission for listing, creating and removing blocks. SG2-80 replaced AC2, so the confirmed-booking refusal is no longer tested here (see SG2-80-P01).",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Sign in as Venue Staff and try to block 14–16 June 2030, which covers confirmed booking #1.",
-      "Repeat the overlapping block through the API.",
       "Sign in as coordinator, technical support, organiser and attendee; try to list, create and remove blocks through the API; check the coordinator catalogue has no block control.",
-      "Call the create endpoint without credentials."
+      "Call the create endpoint without credentials, then list the blocks as Venue Staff."
     ],
-    "data": "Seeded confirmed booking #1 for event 1 on 15 June 2030 02:00–04:00 UTC; all fixture roles",
-    "expected": "The UI and API refuse the block with 409 and identify booking #1 for event 1; other roles receive 403, unauthenticated calls 401; no block is written.",
+    "data": "Seeded Regression Hall block; all fixture roles",
+    "expected": "Other roles receive 403, unauthenticated calls 401; only the seeded block remains.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
-    "execution_date": "1 Oct 2026",
+    "actual": "Passed in the full Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-80-venue-temporary-unavailability working tree; npm run test:e2e; local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -1399,6 +1397,12 @@
     "previous_executions": [
       {
         "status": "Pass",
+        "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+        "execution_date": "1 Oct 2026"
+      },
+      {
+        "status": "Pass",
         "actual": "Current browser assertions passed as expected.",
         "execution_evidence": "26 Sep 2026; feature/SG2-45-block-venue working tree; npm run test:regression; installed Chromium; 23/23 passed; required SG2-26 gate passed.",
         "execution_date": "26 Sep 2026"
@@ -1406,30 +1410,30 @@
     ],
     "executed_by": "LIM JUN WEI",
     "categories": [
-      "CONFLICT",
       "FAILURE"
     ],
     "mapped_acs": [
-      "SG2-45:AC2",
+      "SG2-45:AC1",
+      "SG2-45:AC3",
       "SG2-25:AC1"
     ],
     "method_id": "TC-3d0422f68056"
   },
   {
     "id": "DB-BLOCK-01",
-    "title": "Venue block SQL policies and confirmed-booking trigger hold",
+    "title": "Venue block SQL policies hold",
     "type": "Positive / negative / integrity",
     "story": "SG2-45",
-    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff and that no caller can block a confirmed booking.",
+    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff. SG2-80 removed the confirmed-booking trigger; DB-SG2-80-01 covers the replacement.",
     "preconditions": "Disposable postgres:17 container; supabase/tests/fixtures/auth.sql followed by every migration in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Run venue_blocks.sql with ON_ERROR_STOP=1.",
-      "As Venue Staff, block free, held and touching periods, attempt a confirmed overlap, remove blocks, attempt an update.",
+      "As Venue Staff, block free and held periods, remove blocks, attempt an update.",
       "As every other role and anonymously, attempt direct inserts and deletes.",
-      "As the privileged owner, attempt a confirmed overlap by insert and by update; roll back."
+      "As the privileged owner, attempt an empty period, an unknown venue and a missing reason; roll back."
     ],
     "data": "Venue 900; one confirmed and one held booking; one seeded block; one account per role",
-    "expected": "Only Venue Staff insert and delete; updates are not granted; other roles and anonymous callers cannot write; any confirmed overlap raises exclusion_violation regardless of caller.",
+    "expected": "Only Venue Staff insert and delete; updates are not granted; other roles and anonymous callers cannot write; row constraints hold for every caller.",
     "evidence": "supabase/tests/venue_blocks.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
@@ -1454,6 +1458,95 @@
       }
     ],
     "executed_by": "LIM JUN WEI"
+  },
+  {
+    "id": "SG2-80-P01",
+    "title": "staff mark a booked venue unavailable; the booking is flagged, kept and the venue leaves search",
+    "type": "Positive",
+    "story": "SG2-80",
+    "purpose": "Verify AC1–AC6: a period over a confirmed booking is accepted with a reason and note, the booking is flagged but kept, the recorder and time are shown, and the venue is unavailable on the calendar and absent from search.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "As coordinator, search 15 June 2030 05:00–06:00 UTC and confirm Regression Hall is returned.",
+      "As Venue Staff, block Regression Hall 14–16 June 2030 with reason Equipment failure and note Air conditioning failed.",
+      "Check the status message, the listed reason, note, recorder and the affected-events list, and the blocks API.",
+      "As coordinator, open Venue Availability for June 2030 and repeat the search."
+    ],
+    "data": "Seeded confirmed booking #1 for event 1 (Planning workshop, draft) on 15 June 2030 02:00–04:00 UTC; Regression venue and Regression coordinator accounts",
+    "expected": "The block is saved (201) and one booked event is reported as flagged and not cancelled; event 1 keeps its name and status; the period is recorded by Regression venue with a time; the calendar shows the period and 'confirmed · event 1 · affected by venue unavailability'; search no longer returns Regression Hall.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-80:AC1",
+      "SG2-80:AC2",
+      "SG2-80:AC3",
+      "SG2-80:AC4",
+      "SG2-80:AC5",
+      "SG2-80:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the full Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-80-venue-temporary-unavailability working tree; npm run test:e2e; local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-80-N01",
+    "title": "a mark needs a listed reason and a note, and only Venue Staff can make one",
+    "type": "Negative / boundary / role isolation",
+    "story": "SG2-80",
+    "purpose": "Verify AC1 and AC6 refusals: no reason, an unlisted reason or a blank note is refused; a caller-supplied recorder or time is ignored; other roles cannot mark a venue unavailable.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "As Venue Staff, submit a period with a note but no reason, then a reason with a blank note.",
+      "Through the API, post a period with no reason, an unlisted reason and a blank note.",
+      "Post a valid period that also supplies created_by_name and created_at.",
+      "As coordinator and technical support, try to create a period; list the blocks as Venue Staff."
+    ],
+    "data": "Regression Hall; 1 July 2030 09:00–17:00 UTC; fixture roles",
+    "expected": "The screen shows the validation alert and saves nothing; the API returns 400 for each invalid body; the valid post returns 201 recorded by Regression venue with the server's time; other roles receive 403; only the seeded block and the valid post remain.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-80:AC1",
+      "SG2-80:AC6",
+      "SG2-25:AC1"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the full Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-80-venue-temporary-unavailability working tree; npm run test:e2e; local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "DB-SG2-80-01",
+    "title": "Temporary unavailability flags bookings and stamps the recorder in SQL",
+    "type": "Positive / negative / integrity",
+    "story": "SG2-80",
+    "purpose": "Test that the database accepts a period over confirmed bookings, flags exactly those bookings by any write path, never changes the events, stamps who and when from the session, and limits the flags and listing to the right roles.",
+    "preconditions": "Disposable postgres:17 container; supabase/tests/fixtures/auth.sql followed by every migration in filename order. No shared database or deployed Supabase.",
+    "steps": [
+      "Run venue_temporary_unavailability.sql with ON_ERROR_STOP=1.",
+      "As Venue Staff, mark a period over two confirmed bookings with a spoofed recorder and time; mark touching and one-microsecond periods.",
+      "List the periods as Venue Staff; read flags as coordinator, organiser, attendee and anonymously.",
+      "As the privileged owner, confirm, move and release bookings, move and delete the period; roll back."
+    ],
+    "data": "Venues 980 and 981; three events; confirmed, held and moved bookings; one account per role",
+    "expected": "The period is saved with its reason, note and session-stamped recorder and time; exactly the overlapping confirmed bookings are flagged and kept; flags follow later booking and period changes; only internal roles read flags and only Venue Staff list periods.",
+    "evidence": "supabase/tests/venue_temporary_unavailability.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "All disposable PostgreSQL suites in the ci.yml order passed, including this one.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-80-venue-temporary-unavailability working tree; Docker postgres:17; ci.yml database-tests steps reproduced locally.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner"
   },
   {
     "id": "SG2-46-P01",
@@ -2776,8 +2869,8 @@
       "SG2-87:AC5"
     ],
     "method_id": "TC-8efde3a21345",
-    "purpose": "Verify that a submitted request enters the Event Coordinator Lead's unassigned queue with its basic details and submission time instead of any coordinator's work queue, that only the Lead can read the queue, that the organiser sees it as Unassigned, that the Lead's queue screen lays out cleanly on phone and laptop widths, and that the request leaves the queue once assigned.",
-    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment (adds a second coordinator); draft #1 'Planning workshop' belongs to organiser@example.test.",
+    "purpose": "Verify that a submitted request enters the Event Coordinator Lead's unassigned queue with its basic details and submission time instead of any coordinator's work queue, that only the Lead can read the queue, that the organiser sees it as awaiting assignment with no coordinator, that the Lead's queue screen lays out cleanly on phone and laptop widths, and that the request leaves the queue once assigned.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment (adds a second coordinator); draft #1 'Planning workshop' belongs to organiser@example.test. Submission lands in SG2-100's unassigned status; assignment moves it to submitted.",
     "steps": [
       "As organiser@example.test: PATCH /api/event-requests/1/submit",
       "As lead@example.test: GET /api/assignment-queue",
@@ -2794,11 +2887,11 @@
       "Submission returns 200; the queue entry equals {event_id 1, name 'Planning workshop', organiser_name 'Regression organiser', proposed_date 2030-06-15T02:00:00.000Z, expected_attendance 20} with a submitted_at at or after the submission",
       "The coordinator's work queue does not contain event 1",
       "Every role but the Lead receives 403",
-      "The organiser's My events row for Planning workshop shows Unassigned",
+      "The organiser's My events row for Planning workshop shows coordinator Unassigned",
       "The Lead's queue card shows the organiser and '15 Jun 2030, 10:00 am' at both widths, with no horizontal overflow",
       "After assignment the queue no longer contains event 1, the card is gone and the organiser's detail shows status submitted with coordinator Regression coordinator"
     ],
-    "evidence": "e2e/regression.spec.ts:1457",
+    "evidence": "e2e/regression.spec.ts:1508",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; dropping the coordinator_id filter from the queue query makes it fail.",
@@ -2839,7 +2932,7 @@
       "The organiser's detail shows coordinator_name 'Regression coordinator' and coordinator_phone '+6581234567'",
       "The Lead sees Legacy Forum with its coordinator picker at both widths, with no horizontal overflow"
     ],
-    "evidence": "e2e/regression.spec.ts:1517",
+    "evidence": "e2e/regression.spec.ts:1568",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
@@ -2877,7 +2970,7 @@
       "Planning by the original coordinator returns 403 after it",
       "History, newest first: [user-lead, Regression coordinator, Regression second coordinator], [user-support, null, Regression coordinator]"
     ],
-    "evidence": "e2e/regression.spec.ts:1555",
+    "evidence": "e2e/regression.spec.ts:1606",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
@@ -3001,6 +3094,71 @@
         "execution_evidence": "6 Oct 2026; feature/SG2-49-decide-venue-booking-request working tree on main at acb0c17; npm run test:e2e; 49/49 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
         "execution_date": "6 Oct 2026"
       }
+    ]
+  },
+  {
+    "id": "SG2-100-P01",
+    "title": "a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop",
+    "type": "Positive",
+    "story": "SG2-100",
+    "purpose": "Verify AC2, AC3 and AC5: submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
+    "steps": [
+      "Sign in as organiser and submit the seeded draft; open My events and read the stage badge and waiting-on card.",
+      "Sign in as the Event Coordinator Lead and assign a coordinator; sign back in as organiser and read the stage badge and waiting-on persona.",
+      "Sign in as the coordinator, open the request from Awaiting review (moves it to under_review) and approve it.",
+      "Sign back in as organiser and read the stage badge and waiting-on action for the approved stage."
+    ],
+    "data": "Event 1 (Planning workshop, seeded draft owned by the organiser); lead and coordinator fixture accounts.",
+    "expected": "Awaiting Assignment / Event Coordinator Lead / \"Assign an event coordinator\" after submission; Under Review / the assigned coordinator's name after assignment; approved status after the coordinator's decision; Arrangements / \"Complete venue suitability check and equipment reservation\" once approved.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at c0d8265 (SG2-53 integrated); npm run test:e2e locally in Chromium: 64/64 journeys passed including this one, and the required SG2-26 regression gate passed. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC2",
+      "SG2-100:AC3",
+      "SG2-100:AC5",
+      "SG2-100:AC13"
+    ]
+  },
+  {
+    "id": "SG2-100-P02",
+    "title": "marking a held event completed makes it read-only, clears it from the work queue and is recorded in history",
+    "type": "Positive / boundary",
+    "story": "SG2-100",
+    "purpose": "Verify AC6, AC7, AC8 and AC9: the coordinator is not offered completion on an event whose confirmed booking has not ended (and the server refuses it with 409); a held event is completed from the coordinator's work queue, recording who and when; it then leaves the queue, refuses further planning updates and has exactly one audit row; the completion panel fits phone and laptop viewports.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
+    "steps": [
+      "Seed two confirmed events assigned to the coordinator, one with a past confirmed booking and one with a future one; sign in as the coordinator.",
+      "Open the future-booking event from My assigned events; confirm no Mark as Completed action, and that PATCH /:eventId/complete returns 409.",
+      "Open the held event; at 390x844 and 1440x900 confirm Mark as Completed is visible and the page does not overflow horizontally.",
+      "Click Mark as Completed; confirm the 200 response, the completion notice, and that the action and planning edit are gone.",
+      "Return to the work queue; read the event's history, a planning update attempt, a second completion attempt, and the organiser's view of the event."
+    ],
+    "data": "Events 120 (Held Forum, confirmed, booking ended 20 Sep 2026) and 121 (Future Forum, confirmed, booking ends 15 Jun 2030), both assigned to the coordinator.",
+    "expected": "No completion action and 409 'This event has not finished yet.' for event 121; for event 120 a 200 completion from the screen, the notice 'Marked as completed. This event has left your active work queue.', the event absent from My assigned events while 121 remains, exactly one status history row confirmed -> completed by the coordinator, a further planning update refused with 409, a second completion attempt 404, and the organiser's read showing status completed with completed_by the coordinator and a populated completed_at.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
+    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at c0d8265 (SG2-53 integrated); npm run test:e2e locally in Chromium: 64/64 journeys passed including this one, and the required SG2-26 regression gate passed. No hosted Supabase validation.",
+    "execution_date": "8 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC6",
+      "SG2-100:AC7",
+      "SG2-100:AC8",
+      "SG2-100:AC9"
     ]
   },
   {
@@ -3188,6 +3346,239 @@
     "executed_by": "Codex (local automated execution)"
   },
   {
+    "id": "SG2-50-P01",
+    "title": "a request overlapping a confirmed booking is reported to the coordinator and to Venue Staff, and cannot be approved while it stands",
+    "story": "SG2-50",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-50:AC1",
+      "SG2-50:AC2"
+    ],
+    "purpose": "Verify a coordinator's request that overlaps another event's confirmed booking is still made but reports the booking by number and period, that Venue Staff see the clash by event, and that approving it is refused while an adjacent request is approved.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Sign in as the coordinator, open Venue Request Forum and search for venues.",
+      "Request Regression Hall for 15 Jun 2030 11:00-13:00 (overlapping confirmed booking #1, 10:00-12:00); read the notice.",
+      "Request Regression Hall for 08:00-10:00 the same day (ending as booking #1 starts); read the notice.",
+      "Sign in as Venue Staff, open the overlapping request and press Approve booking.",
+      "Open the adjacent request and press Approve booking."
+    ],
+    "data": "Venue 1 (Regression Hall) with confirmed booking #1 for event 1 (Planning workshop); event 91; coordinator and venue fixture accounts.",
+    "expected": "The overlapping request is pending and its notice names confirmed booking #1 for another event; Venue Staff see booking #1 for Planning workshop and their approval is refused naming it, leaving the request pending; the adjacent request reports no conflict and is approved.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "7 Oct 2026; feature/SG2-50-prevent-double-booking merged with main 9c3427b (SG2-49 #63, SG2-52 #65); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_double_booking. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-07",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-DOUBLE-BOOKING-01",
+    "title": "Confirmed bookings for the same venue never overlap, and approval waits for a conflict to clear",
+    "story": "SG2-50",
+    "purpose": "Check the committed exclusion constraint refuses overlapping confirmed bookings on every write path, accepts touching periods, other venues and held bookings, frees a period once its booking is gone, and that SG2-49's decide_venue_booking_request() refuses then allows the same approval.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed venues, a confirmed booking, users, events and a coordinator's request as the superuser.",
+      "Insert, move and confirm bookings into, beside and away from that period; remove it and book the period again.",
+      "As Venue Staff, approve the overlapping request through decide_venue_booking_request(); remove the conflicting booking and approve again.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_double_booking.sql",
+    "expected": "Overlapping confirmed bookings, a booking moved into an overlap and a held booking confirmed into one are refused; a booking starting as another ends, the same period at another venue and a held booking are accepted; one microsecond of overlap is refused; a removed booking's period can be booked again; the rule covers exactly confirmed bookings; approval is refused naming Gala Night while its booking stands and succeeds once it is gone.",
+    "evidence": "supabase/tests/venue_double_booking.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: dropping the constraint failed overlapping-confirmed-refused; widening it to held bookings failed held-not-committed.",
+    "execution_date": "7 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "7 Oct 2026; feature/SG2-50-prevent-double-booking merged with main 9c3427b (SG2-49 #63, SG2-52 #65); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_double_booking. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-07",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-53-P01",
+    "title": "coordinator requests reach support and saved shortfall and placement return to the coordinator",
+    "type": "NORMAL",
+    "story": "SG2-53",
+    "purpose": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Create four microphone requirements at 1440px, reload, arrange a shortfall of two with venue/position as support, read as Safety Officer and coordinator, then amend to six."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Exact stored versions 1/2/3, all fields persisted, stock remains 20/version 1 and amendment resets arrangement fields.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC1",
+      "SG2-53:AC2",
+      "SG2-53:AC4",
+      "SG2-53:AC5",
+      "SG2-53:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-P02",
+    "title": "phone users save requirements and support shortfall while missing placement is Not recorded",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-53",
+    "purpose": "Replacement notes and shortfall 1 persist; venue/position both say Not recorded; no horizontal overflow.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "At 390px request one maintenance projector, record a shortfall of one without placement as support, then reload."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Replacement notes and shortfall 1 persist; venue/position both say Not recorded; no horizontal overflow.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC1",
+      "SG2-53:AC5",
+      "SG2-53:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-B01",
+    "title": "zero and fractional quantities are refused and a corrected positive quantity saves",
+    "type": "BOUNDARY / FAILURE",
+    "story": "SG2-53",
+    "purpose": "Visible validation, HTTP 400, no stored request until corrected; exact quantity 1 persisted.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Attempt zero in the editor and 0.5 through HTTP, verify no saved request, then save quantity 1."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "Visible validation, HTTP 400, no stored request until corrected; exact quantity 1 persisted.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-C01",
+    "title": "a stale coordinator save preserves the newer support update and duplicate requests are refused",
+    "type": "CONFLICT",
+    "story": "SG2-53",
+    "purpose": "HTTP 409 for duplicate; stale draft remains visible but cannot overwrite version 2 arrangement; reload reveals support data.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Create a requirement, refuse its duplicate, begin an amendment, save a newer support update, attempt stale amendment, reload."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "HTTP 409 for duplicate; stale draft remains visible but cannot overwrite version 2 arrangement; reload reveals support data.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC2",
+      "SG2-53:AC5"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-53-N01",
+    "title": "role guards refuse unauthorized requests and outages retain drafts for retry",
+    "type": "FAILURE",
+    "story": "SG2-53",
+    "purpose": "HTTP 401/403/404; generic error hides provider details, draft stays intact and retry saves the exact request.",
+    "preconditions": "Production React build and real Express API on loopback, disposable identity/storage, approved event 53 assigned to coordinator, existing equipment/venue fixtures. No hosted Supabase.",
+    "steps": [
+      "Refuse unsigned/other-role/unassigned requests, simulate HTTP 503 during save, then retry with the same draft."
+    ],
+    "data": "Event 53; equipment 1 microphones (20 units), equipment 2 projector under maintenance; venue 1 Regression Hall; coordinator/support/Safety Officer synthetic identities.",
+    "expected": "HTTP 401/403/404; generic error hides provider details, draft stays intact and retry saves the exact request.",
+    "evidence": "e2e/equipment-requirements.spec.ts; docs/equipment-requirements.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC1",
+      "SG2-53:AC5",
+      "SG2-53:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Passed in the five-journey SG2-53 focused Chromium run; exact persisted fields and visible outcomes checked.",
+    "execution_evidence": "8 Oct 2026; isolated Playwright Chromium; /tmp/sg2-53-browser-focused.log. Full-suite and hosted results are recorded in the PR.",
+    "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-08",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
     "id": "SG2-51-P01",
     "title": "a coordinator releases one of two venues with a reason; the period is free, the other venue stays and both coordinator and organiser are told",
     "story": "SG2-51",
@@ -3216,11 +3607,11 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the Chromium run with the other venue journeys.",
-    "execution_date": "7 Oct 2026",
+    "execution_date": "9 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "7 Oct 2026; feature/SG2-51-release-venue-booking on main 9c3427b plus approved SG2-87 (#66); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-07",
+      "date": "2026-10-09",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
@@ -3251,11 +3642,11 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the Chromium run with the other venue journeys.",
-    "execution_date": "7 Oct 2026",
+    "execution_date": "9 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "7 Oct 2026; feature/SG2-51-release-venue-booking on main 9c3427b plus approved SG2-87 (#66); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-07",
+      "date": "2026-10-09",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
@@ -3278,12 +3669,12 @@
     "evidence": "supabase/tests/venue_booking_release.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Suite passed. Mutation checks recorded in the PR.",
-    "execution_date": "7 Oct 2026",
+    "actual": "Suite passed. Mutation checks: restoring released bookings to the occupancy view failed period-freed; dropping the reason constraint failed release-without-reason.",
+    "execution_date": "9 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "7 Oct 2026; feature/SG2-51-release-venue-booking on main 9c3427b plus approved SG2-87 (#66); server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-07",
+      "date": "2026-10-09",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }

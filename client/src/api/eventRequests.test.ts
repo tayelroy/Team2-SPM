@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
-  displayStatus,
   createEventRequestDraft,
   deleteEventRequestDraft,
   assignCoordinator,
+  completeEvent,
   fetchAssignable,
   fetchClarifications,
   fetchEventRequestDraft,
@@ -15,6 +15,7 @@ import {
   submitEventRequest,
   updateEventRequestDraft,
   getEventStage,
+  getEventArrangements,
   updateEventPlanning,
   getEventHistory,
   type EventAuditLogEntry,
@@ -245,6 +246,117 @@ describe('isWaitingOnOrganiser', () => {
     'unknown',
   ])('[NORMAL] [SG2-31:AC4] returns false for coordinator/system status %s', (status) => {
     expect(isWaitingOnOrganiser(status)).toBe(false);
+  });
+});
+
+describe('getEventArrangements', () => {
+  const READY_BODY = {
+    event_id: 101,
+    arrangements: [
+      { key: 'venue', label: 'Venue booking', state: 'ready', detail: '1 venue booking approved.' }
+    ],
+    outstanding: [],
+    ready_for_confirmation: true,
+  };
+
+  test('[NORMAL] [SG2-57:AC1] [SG2-57:AC3] returns the readiness payload on 200', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(READY_BODY, 200));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({ ok: true, arrangements: READY_BODY });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/event-requests/101/arrangements',
+      { headers: { Authorization: 'Bearer token-1' } },
+    );
+  });
+
+  test('[FAILURE] [SG2-57:AC1] maps 401 to an unauthorized outcome', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Authentication required' }, 401)));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({ ok: false, kind: 'unauthorized', message: 'Authentication required' });
+  });
+
+  test('[FAILURE] [SG2-57:AC1] maps 503 to an unavailable outcome', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('[FAILURE] [SG2-57:AC1] maps any other status to a generic error outcome', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({
+      ok: false,
+      kind: 'error',
+      message: 'Failed to fetch event arrangements (HTTP 500).',
+    });
+  });
+
+  test.each([
+    [401, 'unauthorized', 'Authentication required'],
+    [403, 'forbidden', 'Access forbidden'],
+    [404, 'not_found', 'Event not found.'],
+  ] as const)(
+    '[FAILURE] [SG2-57:AC1] falls back to a default message on %i with no error body',
+    async (status, kind, message) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
+
+      const result = await getEventArrangements(101, 'token-1');
+
+      expect(result).toEqual({ ok: false, kind, message });
+    },
+  );
+
+  test('[FAILURE] [SG2-57:AC1] maps 403 to a forbidden outcome', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'denied' }, 403)));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({ ok: false, kind: 'forbidden', message: 'denied' });
+  });
+
+  test('[FAILURE] [SG2-57:AC1] maps 404 to a not_found outcome', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Event not found.' }, 404)));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({ ok: false, kind: 'not_found', message: 'Event not found.' });
+  });
+
+  test('[FAILURE] [SG2-57:AC1] treats a malformed success body as unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ event_id: 101 }, 200)));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
+  });
+
+  test('[FAILURE] [SG2-57:AC1] maps a network failure to unavailable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    const result = await getEventArrangements(101, 'token-1');
+
+    expect(result).toEqual({
+      ok: false,
+      kind: 'unavailable',
+      message: 'Could not reach the server. Please try again.',
+    });
   });
 });
 
@@ -516,6 +628,9 @@ describe('fetchOwnEventDetail', () => {
       decisionReason: 'Clashes with the AGM.',
       coordinatorPhone: '+65 9123 4567',
       decidedAt: '2026-09-25T02:00:00.000Z',
+      completedBy: null,
+      completedAt: null,
+      endsAt: null,
     };
 
     expect(result).toEqual({ ok: true, request: expected });
@@ -560,6 +675,9 @@ describe('fetchOwnEventDetail', () => {
         decisionReason: null,
         coordinatorPhone: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
   });
@@ -599,6 +717,9 @@ describe('fetchOwnEventDetail', () => {
         decisionReason: null,
         coordinatorPhone: null,
         decidedAt: null,
+        completedBy: null,
+        completedAt: null,
+        endsAt: null,
       },
     });
   });
@@ -1003,7 +1124,7 @@ describe('getEventStage (SG2-38)', () => {
     const mockStage: EventStageResult = {
       event_id: 101,
       raw_status: 'planning',
-      stage: 'Approved — In Planning',
+      stage: 'Arrangements',
       stage_key: 'in_planning',
       description: 'Event approved; coordinator is actively arranging venue and equipment.',
       waiting_on: {
@@ -1013,9 +1134,11 @@ describe('getEventStage (SG2-38)', () => {
       },
       stepper_steps: [
         { key: 'draft', label: 'Draft', status: 'completed' },
-        { key: 'submitted', label: 'Submitted', status: 'completed' },
+        { key: 'unassigned', label: 'Awaiting Assignment', status: 'completed' },
         { key: 'under_review', label: 'Under Review', status: 'completed' },
-        { key: 'in_planning', label: 'Approved — In Planning', status: 'current' },
+        { key: 'in_planning', label: 'Arrangements', status: 'current' },
+        { key: 'safety_check', label: 'Safety Check', status: 'upcoming' },
+        { key: 'preparation', label: 'Preparation', status: 'upcoming' },
         { key: 'confirmed', label: 'Confirmed', status: 'upcoming' },
       ],
       arrangements_recheck_needed: false,
@@ -1920,15 +2043,111 @@ describe('postClarification', () => {
   });
 });
 
-describe('displayStatus (SG2-87)', () => {
-  test('[NORMAL] [SG2-87:AC4] a submitted request no coordinator holds shows as Unassigned', () => {
-    expect(displayStatus('submitted', null)).toBe('Unassigned');
+describe('completeEvent (SG2-100 AC4)', () => {
+  function respond(status: number, body: unknown = {}) {
+    return vi.fn(async () =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+  }
+
+  test('[NORMAL] [SG2-100:AC6] sends a bodyless PATCH with the bearer token', async () => {
+    const fetchMock = respond(200, { request: { event_id: 7, status: 'completed' } });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(completeEvent(7, 'test-token')).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/complete', {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer test-token' },
+    });
   });
 
-  test('[BOUNDARY] [SG2-87:AC4] [SG2-87:AC5] only submitted and unassigned together read Unassigned', () => {
-    expect(displayStatus('submitted', 'coord-1')).toBe('submitted');
-    expect(displayStatus('draft', null)).toBe('draft');
-    expect(displayStatus('under_review', null)).toBe('under_review');
-    expect(displayStatus('needs_clarification', null)).toBe('needs_clarification');
+  test('[CONFLICT] [SG2-100:AC6] the server owns the clock, so its 409 is surfaced verbatim', async () => {
+    vi.stubGlobal('fetch', respond(409, { error: 'This event has not finished yet.' }));
+    await expect(completeEvent(7, 'test-token')).resolves.toEqual({
+      ok: false,
+      message: 'This event has not finished yet.',
+    });
+  });
+
+  test('[BOUNDARY] [SG2-100:AC6] a 404 or 400 without a readable error falls back to a neutral message', async () => {
+    for (const status of [400, 404]) {
+      vi.stubGlobal('fetch', respond(status, { nothing: true }));
+      await expect(completeEvent(7, 'test-token')).resolves.toEqual({
+        ok: false,
+        message: 'That change was not accepted.',
+      });
+    }
+  });
+
+  test('[FAILURE] [SG2-100:AC6] 401 and 403 both say who may do this', async () => {
+    for (const status of [401, 403]) {
+      vi.stubGlobal('fetch', respond(status));
+      await expect(completeEvent(7, 'test-token')).resolves.toEqual({
+        ok: false,
+        message: 'Only the assigned Event Coordinator can mark this event completed.',
+      });
+    }
+  });
+
+  test('[FAILURE] [SG2-100:AC6] a transport failure or a 503 is reported as retryable', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    await expect(completeEvent(7, 'test-token')).resolves.toEqual({
+      ok: false,
+      message: 'Could not mark the event completed. Please try again.',
+    });
+
+    vi.stubGlobal('fetch', respond(503));
+    await expect(completeEvent(7, 'test-token')).resolves.toEqual({
+      ok: false,
+      message: 'Could not mark the event completed. Please try again.',
+    });
+  });
+
+  test('[FAILURE] [SG2-100:AC6] an unreadable error body does not throw', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not json', { status: 409 })));
+    await expect(completeEvent(7, 'test-token')).resolves.toEqual({
+      ok: false,
+      message: 'That change was not accepted.',
+    });
+  });
+});
+
+describe('the completion record on a detail read (SG2-100 AC4)', () => {
+  test('[NORMAL] [SG2-100:AC6] completed_by, completed_at and ends_at are carried through', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      request: {
+        event_id: 7, organiser_id: 'org-1', status: 'completed', can_manage: false,
+        completed_by: 'coord-1', completed_at: '2026-11-05T12:00:00.000Z',
+        ends_at: '2026-11-05T10:00:00.000Z',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    const result = await fetchOwnEventDetail(7, 'test-token');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.request.completedBy).toBe('coord-1');
+      expect(result.request.completedAt).toBe('2026-11-05T12:00:00.000Z');
+      expect(result.request.endsAt).toBe('2026-11-05T10:00:00.000Z');
+    }
+  });
+
+  test('[FAILURE] [SG2-100:AC6] a non-string or absent value reads as unknown, never as a guess', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      request: {
+        event_id: 7, organiser_id: 'org-1', status: 'confirmed', can_manage: false,
+        completed_by: 42, completed_at: null,
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    const result = await fetchOwnEventDetail(7, 'test-token');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.request.completedBy).toBeNull();
+      expect(result.request.completedAt).toBeNull();
+      expect(result.request.endsAt).toBeNull();
+    }
   });
 });

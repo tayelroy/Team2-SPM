@@ -5,7 +5,7 @@ import request from 'supertest';
 import { AccessError, createAuthorization, type Role } from './auth';
 import { createApp } from './app';
 import { createVenueBlocksRouter } from './venues/blocks';
-import { validateVenueBlock } from './venues/blockFields';
+import { UNAVAILABILITY_CATEGORIES, validateVenueBlock } from './venues/blockFields';
 import type { CreateBlockResult, VenueBlockStore } from './db/venueBlocks';
 import type { VenueBlockRecord, VenueBlockValues } from './venues/blockFields';
 
@@ -14,8 +14,10 @@ const ACCOUNT_ROLES = [
 ] as const;
 
 const NOW = Date.parse('2026-09-26T00:00:00.000Z');
-const period = { starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', reason: 'Carpet replacement' };
-const confirmed = { booking_id: 7, event_id: 3, starts_at: '2026-10-02T10:00:00.000Z', ends_at: '2026-10-02T12:00:00.000Z' };
+const period = { starts_at: '2026-10-01T09:00:00.000Z', ends_at: '2026-10-01T17:00:00.000Z', category: 'renovation' as const, reason: 'Carpet replacement' };
+const confirmed = { booking_id: 7, event_id: 3, event_name: 'Gala Night', event_status: 'confirmed',
+  starts_at: '2026-10-02T10:00:00.000Z', ends_at: '2026-10-02T12:00:00.000Z' };
+const recorded = { created_at: '2026-09-26T00:00:00.000Z', created_by_name: 'Vera Staff' };
 
 function fixture(role: Role = 'venue_staff', override?: VenueBlockStore) {
   let blocks: (VenueBlockRecord & { venue_id: number })[] = [];
@@ -31,8 +33,8 @@ function fixture(role: Role = 'venue_staff', override?: VenueBlockStore) {
     create: async (venueId: number, values: VenueBlockValues): Promise<CreateBlockResult> => {
       calls.push('create');
       if (venueId !== 1) return { outcome: 'missing' };
-      if (values.starts_at < confirmed.ends_at && values.ends_at > confirmed.starts_at) return { outcome: 'conflict', booking: confirmed };
-      const block = { unavailability_id: nextId++, ...values };
+      const affected = values.starts_at < confirmed.ends_at && values.ends_at > confirmed.starts_at ? [confirmed] : [];
+      const block = { unavailability_id: nextId++, ...values, ...recorded, affected };
       blocks.push({ ...block, venue_id: venueId });
       return { outcome: 'created', block };
     },
@@ -76,19 +78,20 @@ test('[NORMAL] [SG2-45:AC1] AC1: blocking a free period records it with its reas
   const created = await request(app).post('/api/venues/1/blocks').set(auth).send(period);
   assert.equal(created.status, 201);
   assert.equal(created.headers['cache-control'], 'no-store');
-  assert.deepEqual(created.body, { block: { unavailability_id: 1, ...period } });
+  assert.deepEqual(created.body, { block: { unavailability_id: 1, ...period, ...recorded, affected: [] } });
   const list = await request(app).get('/api/venues/1/blocks').set(auth);
-  assert.deepEqual(list.body, { blocks: [{ unavailability_id: 1, ...period }] });
+  assert.deepEqual(list.body, { blocks: [{ unavailability_id: 1, ...period, ...recorded, affected: [] }] });
   assert.deepEqual(listed, [new Date(NOW).toISOString()]);
 });
 
-test('[CONFLICT] [SG2-45:AC2] AC2: a period holding a confirmed booking is refused and the booking is identified', async () => {
+test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] a period holding a confirmed booking is accepted and the booking is flagged with its event unchanged', async () => {
   const { app } = fixture();
-  const response = await request(app).post('/api/venues/1/blocks').set(auth)
-    .send({ ...period, starts_at: '2026-10-02T11:00:00Z', ends_at: '2026-10-02T13:00:00Z' });
-  assert.equal(response.status, 409);
-  assert.deepEqual(response.body, { error: 'This period already holds a confirmed booking.', booking: confirmed });
-  assert.deepEqual((await request(app).get('/api/venues/1/blocks').set(auth)).body, { blocks: [] });
+  const overlapping = { ...period, category: 'safety_concern', starts_at: '2026-10-02T11:00:00Z', ends_at: '2026-10-02T13:00:00Z' };
+  const response = await request(app).post('/api/venues/1/blocks').set(auth).send(overlapping);
+  assert.equal(response.status, 201);
+  assert.deepEqual(response.body.block.affected, [confirmed]);
+  assert.equal(response.body.block.category, 'safety_concern');
+  assert.deepEqual((await request(app).get('/api/venues/1/blocks').set(auth)).body.blocks.map((block: { affected: unknown[] }) => block.affected), [[confirmed]]);
 });
 
 test('[CONFLICT] [SG2-45:AC3] AC3: removing a block frees the period; removing it again is 404', async () => {
@@ -130,7 +133,7 @@ test('[FAILURE] [SG2-45:AC1] POST rejects invalid block bodies without writing',
   for (const body of [{}, { ...period, reason: ' ' }, { ...period, ends_at: period.starts_at }, { ...period, ends_at: '2026-09-25T00:00:00Z', starts_at: '2026-09-24T00:00:00Z' }]) {
     const response = await request(app).post('/api/venues/1/blocks').set(auth).send(body);
     assert.equal(response.status, 400, JSON.stringify(body));
-    assert.match(response.body.error, /reason within 500 characters/);
+    assert.match(response.body.error, /a listed reason, and a note within 500 characters/);
   }
   assert.deepEqual(calls, []);
 });
@@ -138,7 +141,7 @@ test('[FAILURE] [SG2-45:AC1] POST rejects invalid block bodies without writing',
 test('[BOUNDARY] [NORMAL] [FAILURE] [SG2-45:AC1] validateVenueBlock normalises a valid block and rejects malformed input', (t) => {
   t.mock.method(Date, 'now', () => NOW);
   for (const input of [null, undefined, 'bad', 1, [], true]) assert.equal(validateVenueBlock(input, NOW), null);
-  for (const [key, value] of [['starts_at', ''], ['starts_at', 'not a date'], ['starts_at', 5], ['ends_at', undefined], ['reason', 5], ['reason', undefined], ['reason', '   ']] as const) {
+  for (const [key, value] of [['starts_at', ''], ['starts_at', 'not a date'], ['starts_at', 5], ['ends_at', undefined], ['category', undefined], ['category', 'other '], ['reason', 5], ['reason', undefined], ['reason', '   ']] as const) {
     assert.equal(validateVenueBlock({ ...period, [key]: value }, NOW), null, `${key}=${String(value)}`);
   }
   assert.equal(validateVenueBlock({ ...period, starts_at: period.ends_at, ends_at: period.starts_at }, NOW), null, 'end before start');
@@ -147,8 +150,8 @@ test('[BOUNDARY] [NORMAL] [FAILURE] [SG2-45:AC1] validateVenueBlock normalises a
   assert.equal(validateVenueBlock({ ...period, reason: '🏛'.repeat(501) }, NOW), null, 'reason too long');
   assert.deepEqual(validateVenueBlock({ ...period, reason: '🏛'.repeat(500) }, NOW), { ...period, reason: '🏛'.repeat(500) });
   assert.deepEqual(
-    validateVenueBlock({ starts_at: '2026-09-25T09:00:00+08:00', ends_at: '2026-10-01T17:00:00+08:00', reason: ' Deep clean ' }, NOW),
-    { starts_at: '2026-09-25T01:00:00.000Z', ends_at: '2026-10-01T09:00:00.000Z', reason: 'Deep clean' },
+    validateVenueBlock({ starts_at: '2026-09-25T09:00:00+08:00', ends_at: '2026-10-01T17:00:00+08:00', category: 'other', reason: ' Deep clean ' }, NOW),
+    { starts_at: '2026-09-25T01:00:00.000Z', ends_at: '2026-10-01T09:00:00.000Z', category: 'other', reason: 'Deep clean' },
     'a block already under way is allowed and times are normalised to UTC'
   );
   assert.deepEqual(validateVenueBlock(period), period, 'the default clock uses the fixed test instant');
@@ -159,8 +162,24 @@ test('[BOUNDARY] [SG2-45:AC1] a block must end at least one millisecond after th
   assert.equal(validateVenueBlock({ ...period, starts_at, ends_at: '2026-09-25T23:59:59.999Z' }, NOW), null);
   assert.equal(validateVenueBlock({ ...period, starts_at, ends_at: '2026-09-26T00:00:00.000Z' }, NOW), null);
   assert.deepEqual(validateVenueBlock({ ...period, starts_at, ends_at: '2026-09-26T00:00:00.001Z' }, NOW), {
-    starts_at, ends_at: '2026-09-26T00:00:00.001Z', reason: 'Carpet replacement'
+    starts_at, ends_at: '2026-09-26T00:00:00.001Z', category: 'renovation', reason: 'Carpet replacement'
   });
+});
+
+test('[FAILURE] [SG2-80:AC1] a missing or unlisted reason is refused without writing', async () => {
+  const { app, calls } = fixture();
+  for (const category of [undefined, '', 'flood', 'Maintenance', 5]) {
+    const response = await request(app).post('/api/venues/1/blocks').set(auth).send({ ...period, category });
+    assert.equal(response.status, 400, String(category));
+  }
+  assert.deepEqual(calls, []);
+});
+
+test('[BOUNDARY] [SG2-80:AC1] every listed reason is accepted with its note', () => {
+  assert.deepEqual([...UNAVAILABILITY_CATEGORIES], ['maintenance', 'equipment_failure', 'renovation', 'safety_concern', 'other']);
+  for (const category of UNAVAILABILITY_CATEGORIES) {
+    assert.deepEqual(validateVenueBlock({ ...period, category }, NOW), { ...period, category });
+  }
 });
 
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET')]) {

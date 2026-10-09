@@ -35,7 +35,7 @@ test('[NORMAL] [SG2-48:AC1] the request form starts from the searched period and
   send();
   expect(await screen.findByRole('button', { name: 'Requesting…' })).toBeDisabled();
   await act(async () => reply(Response.json({ request: pending, booking: 'needs_capacity_exception' }, { status: 201 })));
-  await vi.waitFor(() => expect(onRequested).toHaveBeenCalledWith(pending, 'needs_capacity_exception'));
+  await vi.waitFor(() => expect(onRequested).toHaveBeenCalledWith(pending, 'needs_capacity_exception', []));
   expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toEqual({
     event_id: 10, venue_id: 3, layout: 'banquet', starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T04:00:00.000Z'
   });
