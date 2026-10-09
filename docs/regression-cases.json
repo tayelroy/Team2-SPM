@@ -8,13 +8,13 @@
     "preconditions": "Built React app and Express API on loopback with disposable identity/storage providers, fresh browser context and fixed clock. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, observe an empty queue, seed disposable pending work and refresh.",
-      "Verify shared review and own assignment groups exclude another coordinator and completed work.",
-      "Check desktop/mobile layout, then open the assignment with the keyboard and the review with a click.",
+      "Verify the coordinator has exactly their own assignment, an empty Awaiting review section, and no unassigned, other-coordinator or completed events.",
+      "Check desktop/mobile layout, open assignment #42 with the keyboard, then return and wait for the loaded one-item queue before checking both sections.",
       "Sign in as venue and technical support staff; open each pending request and verify its identity, event, time window and stored facts.",
       "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
     ],
     "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
-    "expected": "Accurate 0/2/1 counts; role-appropriate groups and exact detail records; event cards show the client organisation, not a repeated title; readable desktop/mobile layout; keyboard focus on selected detail; no runtime errors.",
+    "expected": "Coordinator counts 0 before seeding and 1 after refresh and return; zero buttons in Awaiting review; exactly Partner Innovation Summit in My assigned events; exact venue/support detail records; readable desktop/mobile layout; focused selected detail; no runtime errors.",
     "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -52,7 +52,7 @@
       "SG2-87:AC1"
     ],
     "method_id": "TC-0ade7cc1c1aa",
-    "notes": "Since SG2-87 the coordinator's queue holds only their own assignment (#42); unassigned #41 waits in the Lead's queue."
+    "notes": "Since SG2-87 the coordinator's queue holds only their own assignment (#42); unassigned #41 waits in the Lead's queue. PR #72 corrects the stale absent-section assertion to wait for the loaded queue and assert its exact contents. The old assertion could pass only during the loading gap and failed in hosted CI run 197."
   },
   {
     "id": "SG2-41-DB01",
