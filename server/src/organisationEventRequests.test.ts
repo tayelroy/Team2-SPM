@@ -208,7 +208,7 @@ describe('SG2-26 organisation membership on writes', () => {
     app.patch('/events/:eventId/submit', submitEventRequestHandler({ ...deps, submitRequest: async () => {
       writes++;
       return { ok: true, request: { ...completeEvent, status: 'submitted' } };
-    } }));
+    }, writeHistory: async () => ({ ok: true, logs: [] }) }));
     return { app, writes: () => writes };
   }
 

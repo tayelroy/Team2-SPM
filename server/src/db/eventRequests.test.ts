@@ -189,43 +189,35 @@ function fakeEventsDecisionClient(
   } as unknown as SupabaseClient;
 }
 
-function fakeEventsReviewClient(
-  result: Result,
-  capture?: (update: {
-    row: Record<string, unknown>;
-    eventId: unknown;
-    coordinatorId: unknown;
-    status: unknown;
-  }) => void
-): SupabaseClient {
+type ReviewCall = { kind: 'update' | 'read'; row?: Record<string, unknown>; filters: Record<string, unknown> };
+
+/** startEventReview makes up to two calls — the guarded `submitted` update
+ * and, only if that matches nothing, a read of an `under_review` request.
+ * Results are consumed in that order. */
+function fakeEventsReviewClient(results: Result[], calls: ReviewCall[] = []): SupabaseClient {
+  let call = 0;
+  const query = (kind: ReviewCall['kind'], row?: Record<string, unknown>) => {
+    const filters: Record<string, unknown> = {};
+    const finish = () => {
+      calls.push({ kind, row, filters });
+      return Promise.resolve(results[call++]);
+    };
+    const chain = {
+      eq(column: string, value: unknown) {
+        filters[column] = value;
+        // The read ends on its last filter; the update ends on select().
+        return kind === 'read' && column === 'status' ? finish() : chain;
+      },
+      select: async () => finish()
+    };
+    return chain;
+  };
   return {
     from(table: string) {
       assert.equal(table, 'events');
       return {
-        update: (row: Record<string, unknown>) => {
-          const filters: { eventId?: unknown; coordinatorId?: unknown; status?: unknown } = {};
-          const chain = {
-            eq(column: string, value: unknown) {
-              if (column === 'event_id') filters.eventId = value;
-              if (column === 'coordinator_id') filters.coordinatorId = value;
-              return chain;
-            },
-            in(column: string, value: unknown) {
-              if (column === 'status') filters.status = value;
-              return chain;
-            },
-            select: async () => {
-              capture?.({
-                row,
-                eventId: filters.eventId,
-                coordinatorId: filters.coordinatorId,
-                status: filters.status
-              });
-              return result;
-            }
-          };
-          return chain;
-        }
+        update: (row: Record<string, unknown>) => query('update', row),
+        select: () => query('read')
       };
     }
   } as unknown as SupabaseClient;
@@ -795,26 +787,18 @@ describe('submitEventRequest', () => {
 });
 
 describe('startEventReview', () => {
-  test('[NORMAL] [SG2-35:AC2] [SG2-35:AC3] updates status to under_review, filtered to the event, its coordinator and reviewable rows', async () => {
-    let captured:
-      | { row: Record<string, unknown>; eventId: unknown; coordinatorId: unknown; status: unknown }
-      | undefined;
+  const REVIEWED_ROW = {
+    event_id: 7,
+    organiser_id: 'user-1',
+    status: 'under_review',
+    coordinator_id: 'coordinator-1',
+    coordinator: { name: 'Casey Coordinator' }
+  };
+
+  test('[NORMAL] [SG2-35:AC2] [SG2-35:AC3] [SG2-40:AC2] opens a submitted request with one guarded write and reports it was submitted', async () => {
+    const calls: ReviewCall[] = [];
     const result = await startEventReview(
-      fakeEventsReviewClient(
-        {
-          data: [
-            {
-              event_id: 7,
-              organiser_id: 'user-1',
-              status: 'under_review',
-              coordinator_id: 'coordinator-1',
-              coordinator: { name: 'Casey Coordinator' }
-            }
-          ],
-          error: null
-        },
-        (c) => (captured = c)
-      ),
+      fakeEventsReviewClient([{ data: [REVIEWED_ROW], error: null }], calls),
       7,
       'coordinator-1'
     );
@@ -822,29 +806,70 @@ describe('startEventReview', () => {
     if (result.ok) {
       assert.equal(result.request.status, 'under_review');
       assert.equal(result.request.coordinator_name, 'Casey Coordinator');
+      assert.equal(result.previous_status, 'submitted');
     }
-    assert.deepEqual(captured?.row, { status: 'under_review' });
-    assert.equal(captured?.eventId, 7);
-    assert.equal(captured?.coordinatorId, 'coordinator-1');
-    assert.deepEqual(captured?.status, ['submitted', 'under_review']);
+    assert.deepEqual(calls, [{
+      kind: 'update',
+      row: { status: 'under_review' },
+      filters: { event_id: 7, coordinator_id: 'coordinator-1', status: 'submitted' }
+    }]);
   });
 
-  test('[FAILURE] [SG2-35:AC2] reports unavailable when the update errors', async () => {
+  for (const data of [[], null]) {
+    test(`[CONFLICT] [SG2-35:AC2] [SG2-40:AC2] reopening a review already in progress reads it back and reports it was already under review (update matched ${JSON.stringify(data)})`, async () => {
+      const calls: ReviewCall[] = [];
+      const result = await startEventReview(
+        fakeEventsReviewClient([{ data, error: null }, { data: [REVIEWED_ROW], error: null }], calls),
+        7,
+        'coordinator-1'
+      );
+      assert.equal(result.ok, true);
+      if (result.ok) {
+        assert.equal(result.request.status, 'under_review');
+        assert.equal(result.previous_status, 'under_review');
+      }
+      assert.deepEqual(calls[1], {
+        kind: 'read',
+        row: undefined,
+        filters: { event_id: 7, coordinator_id: 'coordinator-1', status: 'under_review' }
+      });
+    });
+  }
+
+  test('[FAILURE] [SG2-35:AC2] reports unavailable when the update errors, without reading', async () => {
+    const calls: ReviewCall[] = [];
     const result = await startEventReview(
-      fakeEventsReviewClient({ data: null, error: { message: 'connection reset' } }),
+      fakeEventsReviewClient([{ data: null, error: { message: 'connection reset' } }], calls),
       7,
       'coordinator-1'
     );
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
+    assert.equal(calls.length, 1);
+  });
+
+  test('[FAILURE] [SG2-35:AC2] reports unavailable when the in-progress read errors', async () => {
+    const result = await startEventReview(
+      fakeEventsReviewClient([{ data: [], error: null }, { data: null, error: { message: 'read timeout' } }]),
+      7,
+      'coordinator-1'
+    );
+    assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'read timeout' });
   });
 
   for (const data of [[], null]) {
-    test(`[CONFLICT] [SG2-35:AC3] reports not_found when the update matches ${JSON.stringify(data)}`, async () => {
+    test(`[CONFLICT] [SG2-35:AC3] reports not_found when neither the update nor the read matches (read ${JSON.stringify(data)})`, async () => {
       // A request assigned elsewhere, already decided, or absent must all look
       // identical so assignments cannot be probed for.
-      const result = await startEventReview(fakeEventsReviewClient({ data, error: null }), 7, 'coordinator-1');
-      assert.equal(result.ok, false);
-      if (!result.ok) assert.equal(result.reason, 'not_found');
+      const result = await startEventReview(
+        fakeEventsReviewClient([{ data: [], error: null }, { data, error: null }]),
+        7,
+        'coordinator-1'
+      );
+      assert.deepEqual(result, {
+        ok: false,
+        reason: 'not_found',
+        message: 'No reviewable event request is assigned to this account.'
+      });
     });
   }
 });

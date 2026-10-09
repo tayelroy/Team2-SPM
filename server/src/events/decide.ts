@@ -2,6 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import { decideEventRequest, type DecideEventRequestResult } from '../db/eventRequests';
+import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -23,6 +24,7 @@ export interface DecideEventRequestDependencies {
     decision: Decision,
     reason: string | null
   ) => Promise<DecideEventRequestResult>;
+  writeHistory?: typeof insertAuditLogs;
 }
 
 /**
@@ -39,11 +41,18 @@ export interface DecideEventRequestDependencies {
  * already reads `approved` as "Arrangements" (SG2-100), so planning becomes
  * available through the shipped tracker without this story inventing a
  * second meaning for the status.
+ *
+ * The `under_review → approved/rejected` transition is recorded in SG2-40's
+ * history with the deciding coordinator as actor. `decideEventRequest` only
+ * matches an `under_review` row, so that is always the old value. As in the
+ * clarification handler, a history row that cannot be written answers 503
+ * rather than reporting a change the history does not show.
  */
 export function createDecideEventRequestHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  decide = decideEventRequest
+  decide = decideEventRequest,
+  writeHistory = insertAuditLogs
 }: DecideEventRequestDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -100,6 +109,14 @@ export function createDecideEventRequestHandler({
         res.status(404).json({ error: 'No event request under review is assigned to this account.' });
         return;
       }
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    const recorded = await writeHistory(admin, [
+      statusChange(eventId, principal.userId, 'under_review', decided.request.status)
+    ]);
+    if (!recorded.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
