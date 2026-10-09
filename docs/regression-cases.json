@@ -2854,6 +2854,39 @@
     "execution_date": "6 Oct 2026"
   },
   {
+    "id": "SG2-86-P02",
+    "title": "the Week 7 desks show no prototype events and offer only their own screens",
+    "story": "SG2-86",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-86:AC2"
+    ],
+    "purpose": "Guard the browser walkthrough bug where the Event Coordinator Lead and Safety Officer dashboards listed prototype events (E-205 'Product Launch — Tideline' with organiser copy), a click on one opened the Attendee event page, and the menu offered All events, which only says it is for Event Organisers. Each desk must show only real data for that role and the menu only the screens its server permissions allow.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Fixture accounts safety@example.test (safety_officer) and lead@example.test (event_coordinator_lead).",
+    "steps": [
+      "Sign in as safety@example.test",
+      "Wait for the menu to finish loading permissions (navigation aria-busy=false) and read its items",
+      "Log out; sign in as lead@example.test and read the menu and the desk",
+      "Click Open unassigned queue"
+    ],
+    "data": [
+      "Prototype event name 'Product Launch — Tideline' (must not appear)"
+    ],
+    "expected": [
+      "Safety desk heading, a 'No safety checks yet' empty state, a menu of exactly [Dashboard] and no prototype event",
+      "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
+      "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
+    ],
+    "evidence": "e2e/regression.spec.ts; client/src/App.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/mock/viewModel.test.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Not Executed",
+    "actual": "Not yet run in Playwright; the matching component and App tests pass under npm run ci.",
+    "execution_evidence": "Pending a Playwright run on bugfix/SG2-86-new-role-dashboards."
+  },
+  {
     "id": "SG2-87-P01",
     "title": "a submitted request waits in the Lead's unassigned queue until it is assigned",
     "story": "SG2-87",

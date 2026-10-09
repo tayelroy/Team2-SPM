@@ -6,7 +6,6 @@ import {
   calendarDays,
   chipStyle,
   currentEvent,
-  dashboardListTitle,
   detailActions,
   equipmentViews,
   eventCards,
@@ -136,35 +135,48 @@ describe('role-scoped chrome', () => {
     expect(showsPipeline('Attendee')).toBe(false);
   });
 
-  test('[NORMAL] [SG2-20:prototype-view-model] the dashboard list is titled for the role', () => {
-    expect(dashboardListTitle('Event Organiser')).toBe('My events & drafts');
-    expect(dashboardListTitle('Attendee')).toBe('Events I can register for');
-    expect(dashboardListTitle('Venue Staff')).toBe('Events needing attention');
-  });
-
   // SG2-86: the two new roles fall through every one of these role branches
   // to the "all other staff" default — no new case needed, confirmed here.
   test('[NORMAL] [SG2-86:AC4] the new Week 7 roles are not treated as operational for the pipeline', () => {
     expect(showsPipeline('Event Coordinator Lead')).toBe(false);
     expect(showsPipeline('Safety Officer')).toBe(false);
   });
-
-  test('[NORMAL] [SG2-86:AC4] the new Week 7 roles get the generic dashboard list title', () => {
-    expect(dashboardListTitle('Event Coordinator Lead')).toBe('Events needing attention');
-    expect(dashboardListTitle('Safety Officer')).toBe('Events needing attention');
-  });
 });
 
 describe('navFor / primaryActionFor (SG2-86)', () => {
-  test('[NORMAL] [SG2-86:AC1] Safety Officer has a minimal nav: dashboard and all events only', () => {
-    expect(navFor('Safety Officer')).toEqual([
+  const leadAccess = (permissions: string[]) => ({ userId: 'user-lead', role: 'event_coordinator_lead', permissions });
+
+  test('[NORMAL] [SG2-86:AC2] the Safety Officer is offered only its dashboard, not the organiser-only All events', () => {
+    expect(navFor('Safety Officer', { userId: 'user-safety', role: 'safety_officer', permissions: ['event_request.stage.view'] }))
+      .toEqual([{ screen: 'dashboard', label: 'Dashboard' }]);
+  });
+
+  test('[NORMAL] [SG2-86:AC2] the Lead is offered the queue and assignment screens once the server grants them', () => {
+    expect(navFor('Event Coordinator Lead', leadAccess(['event_request.queue.view', 'event_request.assign_coordinator']))).toEqual([
       { screen: 'dashboard', label: 'Dashboard' },
-      { screen: 'events', label: 'All events' },
+      { screen: 'queue', label: 'Unassigned queue' },
+      { screen: 'assign', label: 'Assign coordinators' },
     ]);
   });
 
-  test('[NORMAL] [SG2-86:AC1] the new roles land on My profile as their one usable primary action', () => {
-    expect(primaryActionFor('Event Coordinator Lead')).toEqual({ label: 'My profile', screen: 'profile' });
+  test.each([
+    ['still loading', undefined, ['Dashboard']],
+    ['unavailable', null, ['Dashboard']],
+    ['granted only the queue', leadAccess(['event_request.queue.view']), ['Dashboard', 'Unassigned queue']],
+  ] as const)('[FAILURE] [SG2-86:AC2] a Lead whose permissions are %s is not offered the screens they would be refused', (_, access, labels) => {
+    expect(navFor('Event Coordinator Lead', access).map((item) => item.label)).toEqual(labels);
+  });
+
+  test.each(['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)(
+    '[NORMAL] [SG2-86:AC4] %s navigation does not wait on loaded permissions',
+    (role) => {
+      expect(navFor(role)).toEqual(navFor(role, { userId: 'user-1', role: 'any', permissions: [] }));
+      expect(navFor(role).length).toBeGreaterThan(1);
+    },
+  );
+
+  test('[NORMAL] [SG2-86:AC2] the Lead\'s primary action is assigning coordinators; the Safety Officer\'s is their profile', () => {
+    expect(primaryActionFor('Event Coordinator Lead')).toEqual({ label: 'Assign coordinators', screen: 'assign' });
     expect(primaryActionFor('Safety Officer')).toEqual({ label: 'My profile', screen: 'profile' });
   });
 });

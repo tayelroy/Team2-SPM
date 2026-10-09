@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { isRole, type Role, type Screen } from './mock/types';
 import { clearSession, loadSession, saveSession } from './auth/session';
 import type { StoredSession } from './auth/session';
+import { loadAccess, type Access } from './auth/access';
 import type { EventRequestDraft } from './api/eventRequests';
 import AppShell from './screens/AppShell';
 import AttendeeEvent from './screens/AttendeeEvent';
@@ -70,24 +71,36 @@ export default function App() {
   const [editingRequest, setEditingRequest] = useState<EventRequestDraft | null>(null);
   // The approved event venue search was opened from, if any (SG2-46).
   const [venuePrefill, setVenuePrefill] = useState<VenueSearchPrefill | null>(null);
+  // The server's permissions for the signed-in account (SG2-86 AC2), tagged
+  // with the token they were loaded for so a previous session's never leak
+  // into the next one's navigation.
+  const [loadedAccess, setLoadedAccess] = useState<{ token: string; access: Access | null } | null>(null);
 
-  // Best-effort background check that a persisted session is still valid.
-  // Trusts the cached session for the current render (no loading flash);
-  // a network hiccup doesn't kick the user out, only a confirmed 401/403 does.
+  // Best-effort background check that a persisted session is still valid,
+  // which also loads the permissions the navigation is gated on. Trusts the
+  // cached session for the current render (no loading flash); a network
+  // hiccup doesn't kick the user out, only a confirmed 401/403 does.
   useEffect(() => {
     if (!session) return;
-    let cancelled = false;
-    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${session.accessToken}` } })
-      .then((response) => {
-        if (cancelled || (response.status !== 401 && response.status !== 403)) return;
+    const token = session.accessToken;
+    const controller = new AbortController();
+    const settle = (apply: () => void) => {
+      if (!controller.signal.aborted) apply();
+    };
+    loadAccess(token, controller.signal).then(
+      (access) => settle(() => {
+        if (access) {
+          setLoadedAccess({ token, access });
+          return;
+        }
         clearSession();
         setSession(null);
         setScreen('landing');
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+      }),
+      // Unknown permissions gate like none: ungated items stay, gated ones wait.
+      () => settle(() => setLoadedAccess({ token, access: null })),
+    );
+    return () => controller.abort();
     // Re-check only when the signed-in identity actually changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.accessToken]);
@@ -141,6 +154,8 @@ export default function App() {
   // (same). The assertion documents that invariant rather than adding an
   // unreachable branch just to satisfy the type checker.
   const role = toRole(session!.user.role);
+  // `undefined` while this session's permissions are still loading.
+  const access = loadedAccess?.token === session!.accessToken ? loadedAccess.access : undefined;
 
   const body = {
     dashboard: (
@@ -221,7 +236,7 @@ export default function App() {
   }[screen];
 
   return (
-    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
+    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} access={access} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event.
       setVenuePrefill(null);
       setScreen(nextScreen);

@@ -109,6 +109,26 @@ mirrored in the `event_audit_logs` RLS policy
 (`supabase/migrations/202610050004_week7_roles.sql`), and the two must change
 together.
 
+In the client, each role reaches only its own functions (SG2-86 AC2). The
+Event Coordinator Lead's desk shows a live count of the unassigned queue
+(`GET /api/assignment-queue`) with a way into it, and its primary action is
+**Assign coordinators**. The Safety Officer's desk is an empty state until
+the safety review flow adds safety checks. Neither desk shows prototype events
+or opens an Attendee screen. Neither role holds `event_request.view`, so
+neither is offered **All events**, which is only for Event Organisers.
+
+Navigation items can name the permission their screen needs (`NavEntry` in
+`client/src/mock/data.ts`). The app loads the account's permissions from
+`GET /api/auth/me` (the same call that checks a restored session is still
+valid), and `navFor` shows a gated item only when `can()` from
+`client/src/auth/access.ts` confirms the grant. The Lead's **Unassigned queue**
+(`event_request.queue.view`) and **Assign coordinators**
+(`event_request.assign_coordinator`) are gated this way. While permissions are
+loading the header `<nav>` has `aria-busy="true"`, and gated items stay hidden
+if the permissions cannot be loaded. The five existing roles' menus have no
+gated items, so they are unchanged (AC4). The server still enforces every
+route; hiding a menu item is not access control.
+
 Permissions map an action name to the roles allowed to perform it. Define them
 in `PERMISSIONS` in `server/src/auth/policy.ts`. The current policy is:
 

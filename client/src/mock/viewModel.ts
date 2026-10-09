@@ -6,7 +6,8 @@
  */
 
 import { color } from '../theme';
-import { ACTIONS, EVENTS, NAV, EQUIPMENT, PRIMARY_ACTION } from './data';
+import { can, type Access } from '../auth/access';
+import { EVENTS, NAV, EQUIPMENT, PRIMARY_ACTION } from './data';
 import type {
   EquipmentRequest,
   EventCard,
@@ -127,12 +128,16 @@ export function currentEvent(role: Role): EventCard {
   return cards.find((e) => e.ref === 'E-201') ?? cards[0];
 }
 
-export function navFor(role: Role): { screen: Screen; label: string }[] {
-  return NAV[role].map(([screen, label]) => ({ screen, label }));
-}
-
-export function actionsFor(role: Role) {
-  return ACTIONS[role];
+/**
+ * The role's nav items the signed-in account can use (SG2-86 AC2). An item
+ * that names a permission is left out until `access` — the server's own
+ * answer from `/api/auth/me` — includes it, so while permissions are still
+ * loading, or could not be loaded, only ungated items are offered.
+ */
+export function navFor(role: Role, access?: Access | null): { screen: Screen; label: string }[] {
+  return NAV[role]
+    .filter(([, , permission]) => permission === undefined || can(access, permission))
+    .map(([screen, label]) => ({ screen, label }));
 }
 
 export function primaryActionFor(role: Role) {
@@ -146,12 +151,6 @@ export function showsPipeline(role: Role): boolean {
     role === 'Venue Staff' ||
     role === 'Technical Support Staff'
   );
-}
-
-export function dashboardListTitle(role: Role): string {
-  if (role === 'Event Organiser') return 'My events & drafts';
-  if (role === 'Attendee') return 'Events I can register for';
-  return 'Events needing attention';
 }
 
 export interface DetailAction {
