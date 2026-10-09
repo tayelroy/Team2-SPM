@@ -1643,6 +1643,73 @@ test('SG2-51-P02 | [SG2-51:AC1] [SG2-51:AC3] [NORMAL] [FAILURE] Venue Staff rele
   expect((await page.request.post('/api/venue-bookings/21/release', { data: { reason: 'x' } })).status()).toBe(401);
 });
 
+test('SG2-78-P01 | [SG2-78:AC1] [SG2-78:AC2] [SG2-78:AC3] [SG2-78:AC4] [SG2-78:AC5] [NORMAL] [CONFLICT] setup and turnaround widen a booking in the calendar, conflicts, approval and search, without changing its times', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  // Venue Staff record 30 minutes setup and 45 minutes turnaround for Regression Hall (SG2-77).
+  await signIn(page, 'venue');
+  const times = await page.request.put('/api/venues/1/operations', { headers: await authHeaders(page),
+    data: { setup_minutes: 30, turnaround_minutes: 45, emergency_access: null, known_restrictions: null } });
+  expect(times.status()).toBe(200);
+
+  // AC1: booking #1 (15 Jun 2030, 10:00-12:00 SGT) occupies 09:30-12:45.
+  // AC3: its setup and turnaround are occupied, marked separately from the event.
+  const day = `from=${encodeURIComponent('2030-06-15T00:00:00.000Z')}&to=${encodeURIComponent('2030-06-16T00:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${day}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries.map((entry: { kind: string; start: string; end: string }) => [entry.kind, entry.start, entry.end])).toEqual([
+    ['setup', '2030-06-15T01:30:00.000Z', '2030-06-15T02:00:00.000Z'],
+    ['booking', '2030-06-15T02:00:00.000Z', '2030-06-15T04:00:00.000Z'],
+    ['turnaround', '2030-06-15T04:00:00.000Z', '2030-06-15T04:45:00.000Z']
+  ]);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  for (const item of ['Setup (30 min) for confirmed · event 1', 'confirmed · event 1', 'Turnaround (45 min) after confirmed · event 1']) {
+    await expect(page.getByText(`Regression Hall · ${item}`, { exact: true })).toBeVisible();
+  }
+
+  // AC4: search leaves Regression Hall out while the requested time cuts into its
+  // setup or turnaround, and returns it once the 75 minutes are clear.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  const search = async (from: string, to: string) => {
+    const found = await page.request.get(`/api/venues/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers: await authHeaders(page) });
+    return (await found.json()).venues.map((venue: { name: string }) => venue.name);
+  };
+  expect(await search('2030-06-15T04:30:00.000Z', '2030-06-15T05:00:00.000Z')).toEqual(['Quiet Room']);
+  expect(await search('2030-06-15T05:15:00.000Z', '2030-06-15T06:00:00.000Z')).toEqual(['Quiet Room', 'Regression Hall']);
+
+  // AC2: a request starting 30 minutes after booking #1 ends is reported as clashing with it.
+  await openVenueRequestSearch(page);
+  await requestVenue(page, 'Regression Hall', '2030-06-15T12:30', '2030-06-15T13:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText(new RegExp('It overlaps Confirmed booking #1 for another event, '
+    + '15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?, so it cannot be approved while that conflict stands\\.$'));
+  // Exactly setup plus turnaround after it, a request is clear.
+  await requestVenue(page, 'Regression Hall', '2030-06-15T13:15', '2030-06-15T14:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.');
+
+  // AC2: Venue Staff see the clash by event and cannot approve it; the clear request is approved.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  const decision = detail.getByRole('region', { name: 'Decide this booking request' });
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /12:30/ }).click();
+  await expect(detail.getByRole('region', { name: 'Booking conflicts' }).getByRole('listitem')).toHaveText([/^Confirmed booking #1 for Planning workshop/]);
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /13:15/ }).click();
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('status')).toHaveText('Approved. The venue is committed to this event and the coordinator has been notified.');
+
+  // AC5: the booking keeps the event's own times; only the checks widen.
+  const booked = await page.request.get('/api/venue-bookings?event_id=91', { headers: await authHeaders(page) });
+  expect((await booked.json()).bookings.map((row: { starts_at: string; ends_at: string }) => [row.starts_at, row.ends_at]))
+    .toEqual([['2030-06-15T05:15:00.000Z', '2030-06-15T06:00:00.000Z']]);
+});
+
 test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, sees its own role and is denied ungranted operations', async ({ page }) => {
   await signIn(page, 'safety');
   await expect(page.getByLabel('Your role', { exact: true })).toHaveText('Safety Officer');

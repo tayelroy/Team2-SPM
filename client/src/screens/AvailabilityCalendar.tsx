@@ -201,7 +201,8 @@ export default function AvailabilityCalendar() {
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7,minmax(0,1fr))',
-              gap: '10px',
+              // Tighter on phones so each day keeps room for its date and items.
+              gap: 'clamp(4px, 1.5vw, 10px)',
             }}
           >
             {days.map((day, i) => {
@@ -212,8 +213,9 @@ export default function AvailabilityCalendar() {
                   aria-label={day.date ? `${day.date}: ${day.kind}` : undefined}
                   style={{
                     minHeight: '96px',
+                    minWidth: 0,
                     borderRadius: radius.sm,
-                    padding: '10px',
+                    padding: 'clamp(4px, 1.5vw, 10px)',
                     background: style.bg,
                     border: `1px solid ${style.bd}`,
                     display: 'flex',
@@ -232,6 +234,9 @@ export default function AvailabilityCalendar() {
                         lineHeight: 1.3,
                         letterSpacing: '0.02em',
                         color: style.labelFg,
+                        // Narrow phone cells: break long words (e.g. "Turnaround")
+                        // inside the day instead of spilling into the next one.
+                        overflowWrap: 'anywhere',
                       }}
                     >
                       {item}

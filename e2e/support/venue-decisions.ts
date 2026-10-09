@@ -7,6 +7,10 @@ type Row = Record<string, unknown>;
 const overlaps = (row: Row, request: Row) => row.venue_id === request.venue_id
   && String(row.starts_at) < String(request.ends_at) && String(row.ends_at) > String(request.starts_at);
 const nextId = (rows: Row[], key: string) => Math.max(0, ...rows.map(row => Number(row[key]))) + 1;
+/** SG2-78: bookings and holds clash when fewer than `gap` minutes apart. */
+const clashes = (row: Row, request: Row, gap: number) => row.venue_id === request.venue_id
+  && Date.parse(String(row.starts_at)) < Date.parse(String(request.ends_at)) + gap * 60_000
+  && Date.parse(String(row.ends_at)) > Date.parse(String(request.starts_at)) - gap * 60_000;
 
 /**
  * SG2-49: test equivalent of decide_venue_booking_request() for the browser
@@ -30,11 +34,12 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       if (decision === 'approve') {
         if (!['approved', 'planning'].includes(String(event.status)) || String(request.ends_at) <= now) return { outcome: 'closed' };
         const name = (eventId: unknown) => String(database.tables.events.find(row => row.event_id === eventId)?.name || 'Untitled event');
-        const confirmed = database.tables.venue_bookings.find(row => row.status === 'confirmed' && overlaps(row, request));
+        const gap = database.preparationGapMinutes(request.venue_id);
+        const confirmed = database.tables.venue_bookings.find(row => row.status === 'confirmed' && clashes(row, request, gap));
         if (confirmed) return { outcome: 'conflict', kind: 'booking', starts_at: String(confirmed.starts_at), ends_at: String(confirmed.ends_at), label: name(confirmed.event_id) };
         const block = database.tables.venue_unavailability.find(row => overlaps(row, request));
         if (block) return { outcome: 'conflict', kind: 'block', starts_at: String(block.starts_at), ends_at: String(block.ends_at), label: String(block.reason) };
-        const held = database.tables.venue_holds.find(row => row.status === 'tentative' && Date.parse(String(row.expires_at)) > database.venueHoldNow() && overlaps(row, request));
+        const held = database.tables.venue_holds.find(row => row.status === 'tentative' && Date.parse(String(row.expires_at)) > database.venueHoldNow() && clashes(row, request, gap));
         if (held) return { outcome: 'conflict', kind: 'hold', starts_at: String(held.starts_at), ends_at: String(held.ends_at), label: name(held.event_id) };
         const attendance = event.expected_attendance as number | null;
         if (attendance !== null && (venue.capacity === null || attendance > Number(venue.capacity))

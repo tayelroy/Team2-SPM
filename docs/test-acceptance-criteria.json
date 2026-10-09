@@ -467,6 +467,19 @@
       }
     },
     {
+      "id": "SG2-78",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-78",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-09",
+      "acceptanceCriteria": {
+        "AC1": "Given an event from 10:00 to 12:00 at a venue with 30 minutes of setup and 45 minutes of turnaround, the booking is treated as occupying the venue from 09:30 to 12:45",
+        "AC2": "Given a booking request whose effective period (including setup and turnaround) overlaps another booking's effective period at the same venue, the conflict is reported and the conflicting booking is identified",
+        "AC3": "The venue availability view shows setup and turnaround periods as occupied, marked separately from the event itself",
+        "AC4": "Venue search does not return a venue whose effective period clashes with the requested time",
+        "AC5": "Advertised event start and end times shown to Organisers and Attendees are unchanged"
+      }
+    },
+    {
       "id": "SG2-86",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-86",
       "originalPullRequests": [],

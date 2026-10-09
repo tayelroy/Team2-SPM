@@ -171,7 +171,7 @@ uploaded as the `browser-regression` artifact.
 - [Purposeful regression register](docs/regression.md) — current cases, Playwright scope and historical-case consolidation
 - [Authorisation](docs/authorization.md) — how requests are verified and permission-checked
 - [Organisation event access](docs/organisation-events.md) — SG2-26 behaviour, provisioning and database protection
-- [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API, SG2-77 setup and turnaround, SG2-50 double-booking prevention, SG2-51 releasing a booking
+- [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API, SG2-77 setup and turnaround, SG2-78 setup and turnaround in checks, SG2-50 double-booking prevention, SG2-51 releasing a booking
 - [Equipment records](docs/equipment.md) — SG2-52 stock, operational status, API, migration and verification
 - [Equipment requirements](docs/equipment-requirements.md) — SG2-53 coordinator requests, support updates, placement and migration
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification

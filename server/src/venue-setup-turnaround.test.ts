@@ -99,6 +99,17 @@ test('[FAILURE] [SG2-78:AC3] availability is unavailable when setup and turnarou
   assert.deepEqual(await getAllVenuesAvailability(RANGE.from, RANGE.to, fakeClient(down)), { outcome: 'unavailable' });
 });
 
+test('[BOUNDARY] [SG2-78:AC1] when no times come back at all, bookings show without setup or turnaround', async () => {
+  const empty = { venue_operations: { data: null, error: null } };
+  const single = await getVenueAvailability(1, RANGE.from, RANGE.to, fakeClient({
+    ...empty, venue_booking_occupancy: { data: [{ ...talk, status: 'confirmed', event_id: null }], error: null } }));
+  assert.deepEqual(single, { outcome: 'ok', entries: [{ start: talk.starts_at, end: talk.ends_at, kind: 'booking', label: 'confirmed' }] });
+  const all = await getAllVenuesAvailability(RANGE.from, RANGE.to, fakeClient({ ...empty,
+    venues: { data: [{ venue_id: 1, name: 'Prep Hall' }], error: null },
+    venue_booking_occupancy: { data: [{ venue_id: 1, ...talk, status: 'confirmed', event_id: null }], error: null } }));
+  assert.deepEqual(all.outcome === 'ok' ? all.venues[0].entries.map(entry => entry.kind) : all, ['booking']);
+});
+
 // --- AC4: venue search --------------------------------------------------------
 
 const prepHall = { venue_id: 1, name: 'Prep Hall', location: null, capacity: 100, facilities: null, accessibility_features: null, operating_information: null };

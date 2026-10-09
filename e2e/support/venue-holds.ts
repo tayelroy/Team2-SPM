@@ -76,8 +76,12 @@ export class VenueHoldFixture {
 
   private conflict(values: VenueHoldValues, excludeHold?: number) {
     const active = this.database.tables.venue_holds.filter(hold => hold.status === 'tentative' && hold.hold_id !== excludeHold && Date.parse(String(hold.expires_at)) > this.now);
-    return [...this.database.tables.venue_bookings, ...this.database.tables.venue_unavailability, ...active]
-      .some(row => overlaps(row, values.venue_id, values.starts_at, values.ends_at));
+    // SG2-78: bookings and holds keep the venue's setup and turnaround between them; blocks do not.
+    const gap = this.database.preparationGapMinutes(values.venue_id) * 60_000;
+    const start = new Date(Date.parse(values.starts_at) - gap).toISOString();
+    const end = new Date(Date.parse(values.ends_at) + gap).toISOString();
+    return [...this.database.tables.venue_bookings, ...active].some(row => overlaps(row, values.venue_id, start, end))
+      || this.database.tables.venue_unavailability.some(row => overlaps(row, values.venue_id, values.starts_at, values.ends_at));
   }
 
   store = (token: string): VenueHoldStore => ({

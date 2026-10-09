@@ -194,6 +194,13 @@ export class MemoryDatabase {
 
   /** SG2-51: on top of seedVenueRequest, event 91 holds both venues on 20 June
    * 2030, 10:00-12:00 SGT (Week 7 change #3: one event, several venues). */
+  /** SG2-78: setup plus turnaround (SG2-77) that bookings at the venue keep
+   * between them; 0 when the venue has no times recorded. */
+  preparationGapMinutes(venueId: unknown): number {
+    const times = this.tables.venue_operations.find(row => row.venue_id === venueId);
+    return times ? Number(times.setup_minutes) + Number(times.turnaround_minutes) : 0;
+  }
+
   seedVenueRelease() {
     this.seedVenueRequest();
     this.tables.venue_bookings.push(
