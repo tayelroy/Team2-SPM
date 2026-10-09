@@ -59,6 +59,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // as completed. Which event is enforced per-row by the assignment and by
   // the guards on the write itself, not by this grant.
   'event_request.complete': ['event_coordinator'],
+  // SG2-57: the assigned coordinator sees which arrangements (venue, equipment,
+  // registration) are still outstanding before an event can be confirmed. Which
+  // event is enforced per-row by the assignment, not by this grant.
+  'event_request.arrangements.view': ['event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing

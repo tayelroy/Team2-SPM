@@ -27,6 +27,7 @@ import { createVenueBookingRequestsRouter } from './venues/bookingRequests';
 import { createNotificationsRouter } from './notifications';
 import { createProfileRouter } from './profile';
 import { createGetEventStageHandler } from './events/getStage';
+import { createGetEventArrangementsHandler } from './events/getArrangements';
 import { createWorkQueueRouter } from './workQueue';
 import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
@@ -81,7 +82,11 @@ export function createApp(
   // middle would silently shift every caller's later arguments.
   completeEventHandler: RequestHandler = createCompleteEventHandler({ getPrincipal: access.getPrincipal }),
   // SG2-87: appended last for the same reason.
-  assignmentQueueRouter = createAssignmentQueueRouter(access)
+  assignmentQueueRouter = createAssignmentQueueRouter(access),
+  // SG2-57. Appended after assignmentQueueRouter — every parameter here is
+  // positional, and callers (e2e/server.ts, app.test.ts) pass through
+  // assignmentQueueRouter, so this new one must come last.
+  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -192,6 +197,12 @@ export function createApp(
     '/:eventId/stage',
     access.requirePermission('event_request.stage.view'),
     eventStageHandler
+  );
+  // SG2-57: the assigned coordinator sees which arrangements are outstanding.
+  eventRequests.get(
+    '/:eventId/arrangements',
+    access.requirePermission('event_request.arrangements.view'),
+    eventArrangementsHandler
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

@@ -442,7 +442,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
     event_coordinator: [
       'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
       'event_request.decide', 'event_request.clarify', 'event_request.complete',
-      'event_request.stage.view', 'event_request.history.view',
+      'event_request.arrangements.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
       'venue_booking.request.view', 'venue_booking.conflicts.view', 'notifications.read', 'venues.holds.read',
       'equipment_requirements.read', 'equipment_requirements.request', 'profile.read', 'profile.update'
