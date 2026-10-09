@@ -1716,6 +1716,66 @@ test('SG2-87-P01 | [SG2-87:AC1] [SG2-87:AC2] [SG2-87:AC3] [SG2-87:AC4] [SG2-87:A
   expect([detail.request.status, detail.request.coordinator_name]).toEqual(['submitted', 'Regression coordinator']);
 });
 
+test('SG2-88-P01 | [SG2-88:AC1] [SG2-88:AC2] [SG2-88:AC3] [SG2-88:AC4] [SG2-88:AC5] [NORMAL] [CONFLICT] [FAILURE] the Lead assigns a queued request, reassigns it, and everyone involved is told', async ({ page, request }) => {
+  expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const [organiser, coordinator, support, lead] = [await tokenFor('organiser'), await tokenFor('coordinator'), await tokenFor('support'), await tokenFor('lead')];
+  const notices = async (headers: Record<string, string>) =>
+    ((await (await request.get('/api/notifications', { headers })).json()).notifications as { kind: string; message: string; event_id: number }[])
+      .map(({ kind, message, event_id }) => [kind, message, event_id]);
+
+  // AC3: only the Event Coordinator Lead can assign; Technical Support is refused and nothing is sent.
+  expect((await request.patch('/api/event-requests/71/coordinator', { headers: support, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(403);
+  expect(await notices(coordinator)).toEqual([]);
+
+  // The organiser submits draft #1; it joins the Lead's queue.
+  expect((await request.patch('/api/event-requests/1/submit', { headers: organiser })).status()).toBe(200);
+
+  // AC1: from the queue screen, the Lead picks a coordinator and assigns. Checked at phone and laptop widths.
+  await signIn(page, 'lead');
+  await page.setViewportSize({ width: 390, height: 900 });
+  await nav(page, 'Unassigned queue');
+  const card = page.getByRole('article', { name: 'Planning workshop' });
+  await expect(card).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await card.getByLabel('Coordinator for Planning workshop').selectOption({ label: 'Regression coordinator' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await card.getByRole('button', { name: 'Assign Planning workshop' }).click();
+  await expect(page.getByRole('status')).toHaveText('Assigned Planning workshop to Regression coordinator.');
+  await expect(page.getByRole('article', { name: 'Planning workshop' })).toHaveCount(0);
+
+  // AC4: the new coordinator and the organiser are told. AC5: who and when are in the history.
+  expect(await notices(coordinator)).toEqual([['coordinator_assigned', 'You are now the Event Coordinator for “Planning workshop”.', 1]]);
+  expect(await notices(organiser)).toEqual([['event_coordinator_changed', 'Regression coordinator is now the Event Coordinator for “Planning workshop”.', 1]]);
+  const firstHistory = await (await request.get('/api/event-requests/1/history', { headers: lead })).json();
+  expect(firstHistory.history.map((entry: Record<string, unknown>) => [entry.actor_id, entry.old_value, entry.new_value]))
+    .toEqual([['user-lead', null, 'Regression coordinator']]);
+
+  // AC2: reassign to a different coordinator. The previous coordinator is told and loses the event at once.
+  const reassign = await request.patch('/api/event-requests/1/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } });
+  expect(reassign.status()).toBe(200);
+  expect((await reassign.json()).notified).toBe(true);
+  expect(await notices(coordinator)).toEqual([
+    ['coordinator_removed', '“Planning workshop” has been reassigned to Regression second coordinator. You are no longer its Event Coordinator.', 1],
+    ['coordinator_assigned', 'You are now the Event Coordinator for “Planning workshop”.', 1]
+  ]);
+  expect((await notices(organiser)).map(([kind]) => kind)).toEqual(['event_coordinator_changed', 'event_coordinator_changed']);
+  expect((await request.patch('/api/event-requests/1/review', { headers: coordinator })).status()).toBe(404);
+  const history = await (await request.get('/api/event-requests/1/history', { headers: lead })).json();
+  expect(history.history.map((entry: Record<string, unknown>) => [entry.actor_id, entry.old_value, entry.new_value])).toEqual([
+    ['user-lead', 'Regression coordinator', 'Regression second coordinator'],
+    ['user-lead', null, 'Regression coordinator']
+  ]);
+
+  // CONFLICT: assigning the coordinator who already holds the event changes nothing and tells no one.
+  expect((await request.patch('/api/event-requests/1/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } })).status()).toBe(200);
+  expect((await notices(organiser)).length).toBe(2);
+});
+
 test('SG2-97-P01 | [SG2-97:AC1] [SG2-97:AC2] [SG2-97:AC3] [NORMAL] [FAILURE] assignment moves to the Event Coordinator Lead while earlier assignments, their history and the organiser contact stay', async ({ page, request }) => {
   expect((await request.post('/__e2e/legacy-assignment')).status()).toBe(204);
   const tokenFor = async (account: string) => {

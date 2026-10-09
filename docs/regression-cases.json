@@ -2891,13 +2891,63 @@
       "The Lead's queue card shows the organiser and '15 Jun 2030, 10:00 am' at both widths, with no horizontal overflow",
       "After assignment the queue no longer contains event 1, the card is gone and the organiser's detail shows status submitted with coordinator Regression coordinator"
     ],
-    "evidence": "e2e/regression.spec.ts:1508",
+    "evidence": "e2e/regression.spec.ts:1659",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; dropping the coordinator_id filter from the queue query makes it fail.",
     "execution_date": "7 Oct 2026",
     "executed_by": "Marcus Chua",
     "execution_evidence": "npx playwright test on feature/SG2-87-unassigned-request-queue working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
+    "id": "SG2-88-P01",
+    "title": "the Lead assigns a queued request, reassigns it, and everyone involved is told",
+    "story": "SG2-88",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-88:AC1",
+      "SG2-88:AC2",
+      "SG2-88:AC3",
+      "SG2-88:AC4",
+      "SG2-88:AC5"
+    ],
+    "method_id": "TC-4ab4717e39c8",
+    "purpose": "Verify that the Event Coordinator Lead can assign a queued request from the Unassigned queue screen (laid out cleanly at 390px and 1440px), reassign it to a different coordinator, that the new coordinator, the previous coordinator and the organiser each receive the right notice, that the previous coordinator loses the event at once, that Technical Support Staff are refused, and that each change is recorded with who made it.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment (adds a second coordinator, user-coordinator2); draft #1 'Planning workshop' belongs to organiser@example.test.",
+    "steps": [
+      "As support@example.test: PATCH /api/event-requests/71/coordinator",
+      "As organiser@example.test: PATCH /api/event-requests/1/submit",
+      "Sign in as lead@example.test; at 390px open Unassigned queue and pick Regression coordinator; at 1440px click Assign",
+      "As coordinator@example.test and organiser@example.test: GET /api/notifications",
+      "As lead@example.test: GET /api/event-requests/1/history",
+      "As lead@example.test: PATCH /api/event-requests/1/coordinator to user-coordinator2, then again to the same coordinator",
+      "As coordinator@example.test: PATCH /api/event-requests/1/review"
+    ],
+    "data": [
+      "Event 1 'Planning workshop' (unassigned after submission)",
+      "Coordinators: Regression coordinator, Regression second coordinator"
+    ],
+    "expected": [
+      "Technical Support receives 403 and no notice is created",
+      "The queue card disappears and the screen says 'Assigned Planning workshop to Regression coordinator.'",
+      "The coordinator has one coordinator_assigned notice; the organiser has one event_coordinator_changed notice naming the coordinator",
+      "History holds [user-lead, empty, Regression coordinator]",
+      "After reassignment the response has notified true; the previous coordinator also has a coordinator_removed notice naming the new coordinator; the organiser has two notices",
+      "The previous coordinator's review call returns 404",
+      "History holds both changes newest first, each by user-lead",
+      "Reassigning to the coordinator who already holds the event returns 200 and sends no further notice"
+    ],
+    "evidence": "e2e/regression.spec.ts:1719",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in Chromium. It first failed because assigning the last queued request replaced the screen and dropped the confirmation; that is fixed and covered by a unit test.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "Marcus Chua",
+    "execution_evidence": "npx playwright test on feature/SG2-88-assign-from-queue-with-notifications working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
   },
   {
     "id": "SG2-97-P01",
@@ -2932,7 +2982,7 @@
       "The organiser's detail shows coordinator_name 'Regression coordinator' and coordinator_phone '+6581234567'",
       "The Lead sees Legacy Forum with its coordinator picker at both widths, with no horizontal overflow"
     ],
-    "evidence": "e2e/regression.spec.ts:1568",
+    "evidence": "e2e/regression.spec.ts:1779",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
@@ -2970,7 +3020,7 @@
       "Planning by the original coordinator returns 403 after it",
       "History, newest first: [user-lead, Regression coordinator, Regression second coordinator], [user-support, null, Regression coordinator]"
     ],
-    "evidence": "e2e/regression.spec.ts:1606",
+    "evidence": "e2e/regression.spec.ts:1817",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
