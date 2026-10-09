@@ -480,7 +480,9 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await expect(page.getByRole('button', { name: 'Hearing loop', exact: true })).toHaveCount(0);
   await expect(page.getByText(/expected attendance rules out/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Check venue fit', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /fit this request$/ })).toBeVisible();
+  // The 20-person draft fits every fixture venue, so the real check says so.
+  const fit = page.getByRole('region', { name: 'Venues that do not fit this request', exact: true });
+  await expect(fit.getByRole('heading', { name: 'Every venue fits this request', exact: true })).toBeVisible();
   await page.getByLabel(/^Event name/).fill('Revised workshop');
   await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
