@@ -36,6 +36,7 @@ import { createVenueConflictsRouter } from './venues/conflicts';
 import { createVenueBookingsRouter } from './venues/bookings';
 import { createEquipmentRouter } from './equipment';
 import { createEquipmentRequirementsRouter } from './equipment/requirements';
+import { createEquipmentAvailabilityRouter } from './equipment/availability';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 
 export function createApp(
@@ -89,7 +90,9 @@ export function createApp(
   // assignmentQueueRouter, so this new one must come last.
   eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal }),
   // SG2-51: appended last for the same reason.
-  venueBookingsRouter = createVenueBookingsRouter(access)
+  venueBookingsRouter = createVenueBookingsRouter(access),
+  // SG2-54: append to preserve every existing positional dependency.
+  equipmentAvailabilityRouter = createEquipmentAvailabilityRouter(access)
 ) {
   const app = express();
 
@@ -126,6 +129,7 @@ export function createApp(
   // SG2-51: an event's or venue's bookings, and releasing one.
   app.use('/api/venue-bookings', venueBookingsRouter);
   app.use('/api/equipment', equipmentRouter);
+  app.use('/api/equipment-requests', equipmentAvailabilityRouter);
   app.use('/api/equipment-requests', equipmentRequirementsRouter);
   // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
   app.use('/api/assignment-queue', assignmentQueueRouter);

@@ -432,7 +432,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] permissionsFor existing roles separates requesting equipment from arranging it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] permissionsFor existing roles separates requesting equipment from arranging it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -458,7 +458,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
       'venue_booking.capacity_exception.approve', 'notifications.read', 'venues.holds.read',
-      'equipment.read', 'equipment.create', 'equipment.update', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
+      'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
     ],
     attendee: ['profile.read', 'profile.update']
   };
@@ -594,4 +594,8 @@ test('[CONFLICT] [SG2-86:AC1] two concurrent /api/auth/me requests resolving dif
     request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`)));
   assert.equal(lead.body.role, 'event_coordinator_lead');
   assert.equal(safety.body.role, 'safety_officer');
+});
+
+test('[FAILURE] [SG2-54:AC1] only Technical Support holds the equipment availability read grant', () => {
+  assert.deepEqual(SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('equipment.availability.read')), ['technical_support_staff']);
 });

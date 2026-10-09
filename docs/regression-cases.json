@@ -3678,5 +3678,173 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-54-P01",
+    "title": "support sees peak commitments, shortfall and unavailable stock without altering the ledger",
+    "type": "NORMAL",
+    "story": "SG2-54",
+    "purpose": "Microphone held 20/peak 14 / remaining 6 / requested 10 / shortfall 4; maintenance held 5 / remaining 0 / shortfall 3; damaged held 7 / remaining 0 / shortfall 2; stored ledger unchanged.",
+    "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
+    "steps": [
+      "At 1440px sign in as support, open microphone request, check all three types and compare complete ledger before/after."
+    ],
+    "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
+    "expected": "Microphone held 20/peak 14 / remaining 6 / requested 10 / shortfall 4; maintenance held 5 / remaining 0 / shortfall 3; damaged held 7 / remaining 0 / shortfall 2; stored ledger unchanged.",
+    "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-54:AC1",
+      "SG2-54:AC2",
+      "SG2-54:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed with exact visible quantities, safe failures and unchanged storage assertions in the focused five-journey run and the complete 74-journey browser suite.",
+    "execution_evidence": "9 Oct 2026 (SGT); isolated Playwright Chromium; /tmp/sg2-54-browser-focused.log (5/5) and /tmp/sg2-54-browser-full.log (74/74), e2e TypeScript and 13 gate tests passed. Required SG2-26 regressions passed. Hosted application verification is pending.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-09",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-54-P02",
+    "title": "mobile support supplies missing dates and conservatively includes undated commitments",
+    "type": "NORMAL",
+    "story": "SG2-54",
+    "purpose": "Missing period prompts both dates, proposed start10:00/end blank; selected period yieldspeak 17 / remaining 3 / shortfall 7;1 undated warning;no horizontal overflow.",
+    "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
+    "steps": [
+      "At 390px use undated/missing-period fixture; check default, then select 10:00–14:00 Singapore time."
+    ],
+    "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
+    "expected": "Missing period prompts both dates, proposed start10:00/end blank; selected period yieldspeak 17 / remaining 3 / shortfall 7;1 undated warning;no horizontal overflow.",
+    "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-54:AC1",
+      "SG2-54:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed with exact visible quantities, safe failures and unchanged storage assertions in the focused five-journey run and the complete 74-journey browser suite.",
+    "execution_evidence": "9 Oct 2026 (SGT); isolated Playwright Chromium; /tmp/sg2-54-browser-focused.log (5/5) and /tmp/sg2-54-browser-full.log (74/74), e2e TypeScript and 13 gate tests passed. Required SG2-26 regressions passed. Hosted application verification is pending.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-09",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-54-B01",
+    "title": "equal endpoints are refused and reservations ending at the chosen start do not overlap",
+    "type": "BOUNDARY",
+    "story": "SG2-54",
+    "purpose": "Equal range shows an alert and removes the old result; range 14:00–15:00 haspeak 0 / remaining 20 / shortfall 0.",
+    "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
+    "steps": [
+      "Check default; submit equal 14:00 dates, verify 400 from the public API; correct the end to 15:00."
+    ],
+    "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
+    "expected": "Equal range shows an alert and removes the old result; range 14:00–15:00 haspeak 0 / remaining 20 / shortfall 0.",
+    "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-54:AC1",
+      "SG2-54:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed with exact visible quantities, safe failures and unchanged storage assertions in the focused five-journey run and the complete 74-journey browser suite.",
+    "execution_evidence": "9 Oct 2026 (SGT); isolated Playwright Chromium; /tmp/sg2-54-browser-focused.log (5/5) and /tmp/sg2-54-browser-full.log (74/74), e2e TypeScript and 13 gate tests passed. Required SG2-26 regressions passed. Hosted application verification is pending.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-09",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-54-C01",
+    "title": "refreshing a confirmed event reflects a newly committed quantity without recording an arrangement shortfall",
+    "type": "CONFLICT",
+    "story": "SG2-54",
+    "purpose": "Availability reads remain enabled with arrangement editing off; request periodselected; peak 14→18 / remaining 6→2 / shortfall 4→8; manual shortfall remains null and version remains 1.",
+    "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
+    "steps": [
+      "Open confirmed fixture with explicit request period; check; another event raises reservation 14→18; refresh."
+    ],
+    "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
+    "expected": "Availability reads remain enabled with arrangement editing off; request periodselected; peak 14→18 / remaining 6→2 / shortfall 4→8; manual shortfall remains null and version remains 1.",
+    "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-54:AC1",
+      "SG2-54:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed with exact visible quantities, safe failures and unchanged storage assertions in the focused five-journey run and the complete 74-journey browser suite.",
+    "execution_evidence": "9 Oct 2026 (SGT); isolated Playwright Chromium; /tmp/sg2-54-browser-focused.log (5/5) and /tmp/sg2-54-browser-full.log (74/74), e2e TypeScript and 13 gate tests passed. Required SG2-26 regressions passed. Hosted application verification is pending.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-09",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
+  },
+  {
+    "id": "SG2-54-N01",
+    "title": "role guards deny access and a failed refresh clears the old calculation before successful retry",
+    "type": "FAILURE",
+    "story": "SG2-54",
+    "purpose": "401 and 403 deny access; 503 shows a recoverable error and removes the old shortfall; retry shows 4 again.",
+    "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
+    "steps": [
+      "GET unsigned and as coordinator; check as support, then force a 503 refresh; remove the outage and retry."
+    ],
+    "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
+    "expected": "401 and 403 deny access; 503 shows a recoverable error and removes the old shortfall; retry shows 4 again.",
+    "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-54:AC1",
+      "SG2-54:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed with exact visible quantities, safe failures and unchanged storage assertions in the focused five-journey run and the complete 74-journey browser suite.",
+    "execution_evidence": "9 Oct 2026 (SGT); isolated Playwright Chromium; /tmp/sg2-54-browser-focused.log (5/5) and /tmp/sg2-54-browser-full.log (74/74), e2e TypeScript and 13 gate tests passed. Required SG2-26 regressions passed. Hosted application verification is pending.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-09",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
+    }
   }
 ]
