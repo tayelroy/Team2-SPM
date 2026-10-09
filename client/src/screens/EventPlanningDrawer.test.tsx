@@ -45,6 +45,8 @@ describe('Helper functions', () => {
   describe('validatePlanningForm', () => {
     const baseValid = {
       proposedDate: '2026-11-15T09:00',
+      initialProposedDate: '2026-11-15T09:00',
+      now: Date.parse('2026-10-01T00:00:00.000Z'),
       expectedAttendance: '150',
       registrationNeeded: false,
       registrationCapacity: '',
@@ -157,6 +159,33 @@ describe('Helper functions', () => {
       expect(equalWindow).toContain('Registration closing time must be after opening time.');
     });
 
+    test('[BOUNDARY] [SG2-39:AC4] a newly chosen proposed date must be in the future', () => {
+      const past = 'Proposed date must be in the future.';
+      expect(validatePlanningForm({ ...baseValid, proposedDate: '2020-01-01T01:00' })).toEqual([past]);
+      expect(validatePlanningForm({ ...baseValid, proposedDate: '2026-10-01T00:00' })).toEqual([past]);
+      expect(validatePlanningForm({ ...baseValid, proposedDate: '2026-10-01T00:01' })).toEqual([]);
+      // A date the event already had is not re-judged against the clock.
+      expect(validatePlanningForm({ ...baseValid, proposedDate: '2020-01-01T01:00',
+        initialProposedDate: '2020-01-01T01:00' })).toEqual([]);
+    });
+
+    test('[FAILURE] [SG2-39:AC4] registration must open and close before the event starts', () => {
+      const event = { ...baseValid, proposedDate: '2030-06-20T01:00', initialProposedDate: '2030-06-20T01:00',
+        registrationNeeded: true, registrationCapacity: '50' };
+      expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-01T01:00',
+        registrationClosesAt: '2030-12-31T01:00' })).toEqual(['Registration closing time must be before the event starts.']);
+      expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-20T01:00',
+        registrationClosesAt: '2030-06-21T01:00' })).toEqual([
+        'Registration opening time must be before the event starts.',
+        'Registration closing time must be before the event starts.',
+      ]);
+      expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-01T01:00',
+        registrationClosesAt: '2030-06-20T00:59' })).toEqual([]);
+      // Without an event date there is no start to compare against.
+      expect(validatePlanningForm({ ...event, proposedDate: '', registrationOpensAt: '2030-06-01T01:00',
+        registrationClosesAt: '2030-12-31T01:00' })).toEqual([]);
+    });
+
     test('[NORMAL] [SG2-39:AC4] ignores registration fields when registrationNeeded is false', () => {
       const errors = validatePlanningForm({
         ...baseValid,
@@ -174,12 +203,42 @@ describe('EventPlanningDrawer Component', () => {
   beforeEach(() => {
     sessionStorage.clear();
     setMockSession();
+    // Only the clock is pinned; promises and waitFor keep real timers.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-01T00:00:00.000Z'));
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
     sessionStorage.clear();
+  });
+
+  test('[FAILURE] [SG2-39:AC4] a past proposed date or a registration window after the start is refused before saving', () => {
+    const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning');
+    render(
+      <EventPlanningDrawer
+        eventId={91}
+        onClose={vi.fn()}
+        initialValues={{ proposed_date: '2030-06-20T01:00:00.000Z', expected_attendance: 100, status: 'approved' }}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Proposed Date & Time'), { target: { value: '2020-01-01T01:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    expect(screen.getByTestId('client-validation-errors')).toHaveTextContent('Proposed date must be in the future.');
+
+    fireEvent.change(screen.getByLabelText('Proposed Date & Time'), { target: { value: '2030-06-20T01:00' } });
+    fireEvent.click(screen.getByText('Registration Disabled'));
+    fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText('Opens At'), { target: { value: '2030-06-01T01:00' } });
+    fireEvent.change(screen.getByLabelText('Closes At'), { target: { value: '2030-12-31T01:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    const errors = screen.getByTestId('client-validation-errors');
+    expect(errors).toHaveTextContent('Registration closing time must be before the event starts.');
+    expect(errors).not.toHaveTextContent('Proposed date must be in the future.');
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   test('[BOUNDARY] [SG2-39:AC1] renders nothing when isOpen is false', () => {

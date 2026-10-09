@@ -18,7 +18,8 @@ const RESULT: EventArrangementsResult = {
     { key: 'registration', label: 'Registration', state: 'not_required', detail: 'Registration not required.' }
   ],
   outstanding: [],
-  ready_for_confirmation: true
+  ready_for_confirmation: true,
+  venue_requested: true
 };
 
 describe('EventArrangements (SG2-57)', () => {
@@ -29,6 +30,16 @@ describe('EventArrangements (SG2-57)', () => {
 
     await waitFor(() => expect(screen.getByTestId('arrangements-panel')).toBeInTheDocument());
     expect(api.getEventArrangements).toHaveBeenCalledWith(101, 'token-1');
+  });
+
+  test('[NORMAL] [SG2-39:AC3] hands the loaded readiness to the surrounding detail', async () => {
+    vi.spyOn(api, 'getEventArrangements').mockResolvedValue({ ok: true, arrangements: RESULT });
+    const onLoaded = vi.fn();
+
+    render(<EventArrangements eventId={101} accessToken="token-1" onLoaded={onLoaded} />);
+
+    await waitFor(() => expect(onLoaded).toHaveBeenCalledWith(RESULT));
+    expect(onLoaded).toHaveBeenCalledTimes(1);
   });
 
   test('[FAILURE] [SG2-57:AC1] stays silent when the readiness read fails', async () => {

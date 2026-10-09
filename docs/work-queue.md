@@ -40,6 +40,53 @@ returned records, and session changes discard previous selections and late
 responses. Cards support keyboard activation; opening details moves focus to
 the selected record's heading. The layout stacks at narrow widths.
 
+## Coordinator planning edits (SG2-39)
+
+The assigned coordinator edits an event's planning information from its detail
+with **Edit Planning Information** (`PATCH /api/event-requests/:eventId/planning`).
+The **Edit Planning Information** and **View Change History** actions sit in
+the detail card's footer (`organisation-detail-footer` /
+`organisation-detail-actions`), inset like the rest of the card's content.
+
+**Dates.** The server and the drawer apply the same rules, using the value being
+saved for each date when the edit changes it and the stored value otherwise:
+
+- A newly chosen proposed date must be in the future (`proposed_date must be in
+  the future.`). An unchanged date is not re-judged against the clock, because
+  the drawer resends every field.
+- Registration must close after it opens, and both its opening and closing
+  times must be before the event starts. Moving the event before a stored
+  registration close is refused the same way.
+
+**Arrangement rechecks.** A later date, a higher expected attendance or a higher
+registration capacity can invalidate arrangements, but only arrangements that
+exist. The handler reads them through SG2-57's readiness data
+(`fetchEventArrangementFacts` and `computeArrangementReadiness`, see
+[Event arrangement readiness](event-arrangements.md)):
+
+| Change | Flags | Only when the event has |
+| --- | --- | --- |
+| Proposed date moved, or expected attendance increased | `venue_recheck` | a live venue booking request (pending, placed by a hold, or approved) |
+| Proposed date moved, or expected attendance increased | `equipment_recheck` | a live equipment request |
+| Registration capacity increased | `registration_recheck` | registration needed |
+
+If anything is flagged and the request lacks `confirm_impact: true`, the server
+answers 409 with `affected_arrangements` and `impact_notes`, and the drawer
+shows exactly those as **Arrangements Require Rechecking** before saving. A
+confirmed save marks them outstanding (`arrangements_recheck_needed`,
+`outstanding_arrangements`) and keeps the event in `planning`. An edit to an
+event with nothing arranged (for example an approved event with no venue
+request yet) saves at once and marks nothing outstanding; an `approved` event
+still moves to `planning`. If the arrangements cannot be read the edit is not
+saved (503).
+
+**Next step.** While an assigned event is `approved` or `planning` and has no
+live venue booking request, its detail shows **Next step — Find venues for this
+event**. The detail learns this from the readiness panel's own read
+(`venue_requested`), so a planning save that moves the event to `planning`
+keeps the step, and it disappears once a request exists. If the readiness read
+fails, the step stays available.
+
 ## Supabase deployment
 
 Apply `supabase/migrations/202609220001_internal_work_queue.sql` to the configured

@@ -75,10 +75,15 @@ export function toIsoOrNull(val: string): string | null {
 }
 
 /**
- * Validates coordinator planning drawer input before dispatching (AC 4).
+ * Validates coordinator planning drawer input before dispatching (AC 4). Mirrors
+ * the server's date rules: a newly chosen proposed date must be in the future
+ * (an unchanged one is not re-judged), and registration must open and close
+ * before the event starts.
  */
 export function validatePlanningForm({
   proposedDate,
+  initialProposedDate,
+  now,
   expectedAttendance,
   registrationNeeded,
   registrationCapacity,
@@ -90,6 +95,10 @@ export function validatePlanningForm({
   planningNotes,
 }: {
   proposedDate: string;
+  /** The proposed date the drawer opened with, in the same input format. */
+  initialProposedDate: string;
+  /** Current time in epoch milliseconds. */
+  now: number;
   expectedAttendance: string;
   registrationNeeded: boolean;
   registrationCapacity: string;
@@ -101,11 +110,17 @@ export function validatePlanningForm({
   planningNotes: string;
 }): string[] {
   const errors: string[] = [];
+  let startTime: number | null = null;
 
   if (proposedDate.trim()) {
     const d = new Date(proposedDate.trim());
     if (isNaN(d.getTime())) {
       errors.push('Proposed date must be a valid date and time.');
+    } else {
+      startTime = d.getTime();
+      if (proposedDate.trim() !== initialProposedDate && startTime <= now) {
+        errors.push('Proposed date must be in the future.');
+      }
     }
   }
 
@@ -164,6 +179,13 @@ export function validatePlanningForm({
 
     if (openTime !== null && closeTime !== null && closeTime <= openTime) {
       errors.push('Registration closing time must be after opening time.');
+    }
+
+    if (startTime !== null && openTime !== null && openTime >= startTime) {
+      errors.push('Registration opening time must be before the event starts.');
+    }
+    if (startTime !== null && closeTime !== null && closeTime >= startTime) {
+      errors.push('Registration closing time must be before the event starts.');
     }
   }
 
@@ -238,6 +260,8 @@ export default function EventPlanningDrawer({
 
     const validationErrors = validatePlanningForm({
       proposedDate,
+      initialProposedDate: formatForDateTimeInput(initialValues?.proposed_date),
+      now: Date.now(),
       expectedAttendance,
       registrationNeeded,
       registrationCapacity,

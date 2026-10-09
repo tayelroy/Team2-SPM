@@ -55,9 +55,18 @@ details.
     { "key": "registration", "label": "Registration", "state": "not_required", "detail": "Registration not required." }
   ],
   "outstanding": ["equipment"],
-  "ready_for_confirmation": false
+  "ready_for_confirmation": false,
+  "venue_requested": true
 }
 ```
+
+`venue_requested` is true while the event has any live venue booking request
+(pending — including one placed by a tentative hold — or approved). A venue
+that is `outstanding` may have nothing requested yet or a request awaiting a
+decision; this flag tells the two apart. The Work Queue uses it to keep
+**Find venues for this event** available only until a venue is requested, and
+SG2-39 planning edits use the same facts and computation to decide which
+arrangements need rechecking (see [Work queue](work-queue.md#coordinator-planning-edits-sg2-39)).
 
 The readiness facts are read with the service role
 (`fetchEventArrangementFacts`), since the child tables are not client-readable

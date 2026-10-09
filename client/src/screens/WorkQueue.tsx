@@ -149,6 +149,9 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
+  // SG2-57's readiness read, shared with the "find venues" step below: null
+  // until it loads (or if it fails), then whether a venue request is live.
+  const [venueRequested, setVenueRequested] = useState<boolean | null>(null);
 
   useEffect(() => {
     setCurrentStatus(status);
@@ -204,7 +207,8 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           arrangement-through-confirmed window as the requirements above. */}
       {item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
-        <EventArrangements eventId={item.event_id} accessToken={accessToken} />
+        <EventArrangements eventId={item.event_id} accessToken={accessToken}
+          onLoaded={arrangements => setVenueRequested(arrangements.venue_requested)} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread
@@ -215,26 +219,33 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
         onPosted={setStatus}
       />}
       {item.kind === 'event' && (
-        <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-          {canEditPlanning && (
+        <footer className="organisation-detail-footer">
+          <div className="organisation-detail-actions">
+            {canEditPlanning && (
+              <button
+                type="button"
+                className="organisation-button organisation-button-primary"
+                onClick={() => setDrawerOpen(true)}
+              >
+                Edit Planning Information
+              </button>
+            )}
             <button
               type="button"
-              className="organisation-button organisation-button-primary"
-              onClick={() => setDrawerOpen(true)}
+              className="organisation-button"
+              onClick={() => setHistoryDrawerOpen(true)}
             >
-              Edit Planning Information
+              View Change History
             </button>
-          )}
-          <button
-            type="button"
-            className="organisation-button"
-            onClick={() => setHistoryDrawerOpen(true)}
-          >
-            View Change History
-          </button>
-        </div>
+          </div>
+        </footer>
       )}
-      {item.kind === 'event' && item.assigned_to_me && currentStatus === 'approved' && onFindVenues && (
+      {/* SG2-48: finding a venue stays the next step until one is requested.
+          A planning edit moves an approved event to planning (SG2-39), which
+          must not hide the step; once a pending, held or approved request
+          exists it is gone. If the readiness cannot be read the step stays. */}
+      {item.kind === 'event' && item.assigned_to_me && (currentStatus === 'approved' || currentStatus === 'planning')
+        && venueRequested !== true && onFindVenues && (
         <footer className="organisation-detail-footer">
           <h3>Next step</h3>
           <p className="organisation-detail-hint">Find venues that fit this event and are free on its date.</p>
