@@ -71,6 +71,41 @@ and action that moves it forward:
 allowed lives in `server/src/events/fields.ts` (`STATUS_TRANSITIONS`,
 `canTransition`).
 
+## Who an event is waiting on (SG2-38, SG2-31)
+
+The dashboard cards and the **Action** column of **My events** use one helper,
+`eventActionLabel` in `client/src/mock/viewModel.ts`, so both screens say the
+same thing. It follows the stage API's waiting-on persona
+(`server/src/events/stageCalculator.ts`) from the request's status and
+coordinator:
+
+| Request | Action text |
+| --- | --- |
+| A colleague's event (`can_manage` false) | View only |
+| Waiting on its creator (`draft`, `needs_clarification`, `rejected`) | Waiting on you |
+| `confirmed`, `completed`, `cancelled`, `rejected`, `safety_rejected` | No action needed |
+| `awaiting_safety_check` | With safety officer |
+| `unassigned`, or any other active status with no coordinator | Awaiting coordinator assignment |
+| Any other active status with a coordinator | With coordinator |
+
+On the detail screen, a request its creator can no longer edit explains where
+it is (`lockedRequestNotice`, same module) — awaiting assignment, with the
+coordinator for review, being arranged, at the safety check, in preparation,
+confirmed, completed or cancelled — instead of always saying it was just
+submitted to a coordinator.
+
+A colleague's view-only detail does not show **View Change History** or the
+stage tracker, and does not request `GET /:eventId/stage` or
+`GET /:eventId/history`: the server refuses both to any organiser other than
+the event's creator, so asking would only return 403. The stage is requested
+only after the detail confirms the viewer is the creator or a coordinator.
+
+On a phone the seven steps are wider than the stepper track, which scrolls on
+its own. The track scrolls its current step to its centre on render and on
+every window resize — by setting the track's `scrollLeft`, never by scrolling
+the page — fades out whichever end hides more steps, and shows
+"Swipe sideways to see all 7 steps." while any step is out of view.
+
 ## Provisioning and rollout
 
 Apply the SG2-26 migration in `supabase/migrations` alongside the application
@@ -90,8 +125,11 @@ backfilled: review and provision them explicitly before expecting shared access.
 Backend tests cover organisation scoping and unavailable membership lookups.
 The browser cases `SG2-26-P01` and `SG2-26-N01` exercise colleague visibility,
 read-only details, owner-only drafts, unrelated direct reads and an unassigned
-account through the real application with isolated test providers. Database
-policy tests separately verify the Postgres boundary; the in-memory browser
+account through the real application with isolated test providers.
+`SG2-26-P02` also checks that a colleague's detail makes no stage or history
+request, and `SG2-100-P01` checks the **My events** action text, the locked
+notice and the phone stepper position as a request moves through its stages.
+Database policy tests separately verify the Postgres boundary; the in-memory browser
 fixture does not emulate row-level security.
 
 SG2-26 is organisation isolation. The older regression register incorrectly

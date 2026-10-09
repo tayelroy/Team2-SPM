@@ -300,3 +300,29 @@ test('[NORMAL] [SG2-87:AC4] [SG2-87:AC5] a request in the queue reads Awaiting A
   expect(within(assigned).getByText('Submitted')).toBeInTheDocument();
   expect(within(assigned).queryByText('Unassigned')).not.toBeInTheDocument();
 });
+
+test('[NORMAL] [SG2-31:AC1] [SG2-31:AC4] [SG2-38:AC2] the Action column agrees with each row\'s status and coordinator', async () => {
+  const row = (eventId: number, name: string, status: string, coordinatorName: string | null, canManage = true, waitingOnMe = false) => ({
+    eventId, name, proposedDate: null, status, coordinatorId: coordinatorName ? `coord-${eventId}` : null,
+    coordinatorName, canManage, waitingOnMe,
+  });
+  vi.spyOn(eventRequestsApi, 'fetchOwnEventRequests').mockResolvedValue({
+    ok: true,
+    requests: [
+      row(41, 'Queued forum', 'unassigned', null),
+      row(42, 'Planning forum', 'planning', 'A. Vance'),
+      row(44, 'Finished forum', 'completed', 'A. Vance'),
+      row(45, 'Returned forum', 'needs_clarification', 'A. Vance', true, true),
+      row(46, 'Colleague forum', 'planning', 'A. Vance', false),
+    ],
+  });
+  render(<EventsTable role="Event Organiser" accessToken="t" onOpenEvent={vi.fn()} />);
+  const action = async (name: string) => within(await screen.findByRole('button', { name: `View ${name}` })).getByText(
+    /^(Awaiting coordinator assignment|With coordinator|No action needed|Waiting on you|View only)$/,
+  );
+  expect(await action('Queued forum')).toHaveTextContent('Awaiting coordinator assignment');
+  expect(await action('Planning forum')).toHaveTextContent('With coordinator');
+  expect(await action('Finished forum')).toHaveTextContent('No action needed');
+  expect(await action('Returned forum')).toHaveTextContent('Waiting on you');
+  expect(await action('Colleague forum')).toHaveTextContent('View only');
+});

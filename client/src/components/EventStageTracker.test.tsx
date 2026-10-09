@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, test } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import EventStageTracker from './EventStageTracker';
 import type { EventStageResult } from '../api/eventRequests';
 
@@ -214,5 +214,107 @@ describe('EventStageTracker at seven steps (SG2-100 AC9)', () => {
     render(<EventStageTracker stage={{ ...safetyStage, stepper_steps: [] }} />);
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
     expect(screen.getByTestId('stage-badge')).toHaveTextContent('Awaiting Safety Check');
+  });
+});
+
+describe('EventStageTracker on a phone-width track (SG2-38)', () => {
+  // jsdom has no layout, so the track and step geometry of a 390px phone
+  // (measured in Chromium: a 274px track holding seven 95px steps with 8px
+  // gaps, 713px in all) is supplied through the element size getters.
+  const STEP = 95;
+  const GAP = 8;
+  const CONTENT = 7 * STEP + 6 * GAP;
+  let trackWidth = 274;
+
+  beforeEach(() => {
+    trackWidth = 274;
+    vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute('role') === 'listitem'
+        ? Array.from(this.parentElement!.children).indexOf(this) * (STEP + GAP)
+        : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute('role') === 'listitem' ? STEP : 0;
+    });
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(function (this: Element) {
+      return this.getAttribute('data-testid') === 'stepper-track' ? trackWidth : 0;
+    });
+    vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockImplementation(function (this: Element) {
+      return this.getAttribute('data-testid') === 'stepper-track' ? Math.max(CONTENT, trackWidth) : 0;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const stageAt = (current: number): EventStageResult => ({
+    event_id: 42,
+    raw_status: 'planning',
+    stage: 'Arrangements',
+    stage_key: 'in_planning',
+    description: 'Event approved; coordinator is actively arranging venue and equipment.',
+    waiting_on: null,
+    stepper_steps: ['draft', 'unassigned', 'under_review', 'in_planning', 'safety_check', 'preparation', 'confirmed']
+      .map((key, idx) => ({
+        key,
+        label: key,
+        status: idx < current ? 'completed' : idx === current ? 'current' : 'upcoming',
+      })),
+    arrangements_recheck_needed: false,
+    outstanding_arrangements: [],
+  });
+
+  test('[NORMAL] [SG2-38:AC1] [SG2-100:AC9] the current step is scrolled to the middle of the track, never by scrolling the page', () => {
+    const pageScroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    render(<EventStageTracker stage={stageAt(3)} />);
+    const track = screen.getByTestId('stepper-track');
+    // Arrangements starts at 3 × 103 = 309px, past the 274px track; centred
+    // it sits at 309 − (274 − 95) / 2.
+    expect(track.scrollLeft).toBe(219.5);
+    expect(pageScroll).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stepper-scroll-hint')).toHaveTextContent('Swipe sideways to see all 7 steps.');
+  });
+
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-100:AC9] the hint follows the track as it is scrolled to an end and as the window resizes', () => {
+    render(<EventStageTracker stage={stageAt(1)} />);
+    const track = screen.getByTestId('stepper-track');
+    // Awaiting Assignment: 103 − (274 − 95) / 2.
+    expect(track.scrollLeft).toBe(13.5);
+    expect(screen.getByTestId('stepper-scroll-hint')).toBeInTheDocument();
+    expect(track.style.maskImage).toBe('linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent)');
+
+    // Scrolled fully to the end: only the start fades, where steps are hidden.
+    track.scrollLeft = CONTENT - trackWidth;
+    fireEvent.scroll(track);
+    expect(screen.getByTestId('stepper-scroll-hint')).toBeInTheDocument();
+    expect(track.style.maskImage).toBe('linear-gradient(to right, transparent, #000 40px, #000)');
+
+    // Back at the very start: only the end fades.
+    track.scrollLeft = 0;
+    fireEvent.scroll(track);
+    expect(screen.getByTestId('stepper-scroll-hint')).toBeInTheDocument();
+    expect(track.style.maskImage).toBe('linear-gradient(to right, #000, #000 calc(100% - 40px), transparent)');
+
+    // Turned to a laptop width the steps all fit: nothing scrolls, fades or hints.
+    trackWidth = 1200;
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(track.scrollLeft).toBe(0);
+    expect(track.style.maskImage).toBe('');
+    expect(screen.queryByTestId('stepper-scroll-hint')).not.toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-38:AC1] a last current step is scrolled no further than the end of the track', () => {
+    render(<EventStageTracker stage={stageAt(6)} />);
+    // Centring Confirmed would ask for 618 − 89.5 = 528.5; the track ends at 713 − 274.
+    expect(screen.getByTestId('stepper-track').scrollLeft).toBe(439);
+  });
+
+  test('[FAILURE] [SG2-38:AC1] with no current step the track is left where it is', () => {
+    render(<EventStageTracker stage={stageAt(7)} />);
+    expect(screen.getByTestId('stepper-track').scrollLeft).toBe(0);
+    expect(screen.getByTestId('stepper-scroll-hint')).toBeInTheDocument();
   });
 });
