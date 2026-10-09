@@ -30,7 +30,7 @@ An npm-workspaces monorepo:
 | Event Organiser | Raise, edit, submit and delete their own event requests; view events and status shared by their client organisation |
 | Event Coordinator | View awaiting-review requests and active assigned events; record and amend equipment requirements for approved/planning events |
 | Venue Staff | View pending booking requests and details in the dashboard; maintain the venue catalogue and check availability |
-| Technical Support Staff | View pending equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; change a user's role via the API |
+| Technical Support Staff | View pending equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
 
 Every account can view and update its own profile. Technical Support Staff's
@@ -38,6 +38,8 @@ Equipment screen reads and writes stored equipment records, including operationa
 status and the quantity eligible for use. Apply the [equipment migration](docs/equipment.md)
 before deploying it. Equipment reservations are separate work.
 Coordinators and support staff share the [equipment requirements workflow](docs/equipment-requirements.md).
+Technical Support can [check equipment availability](docs/equipment-availability.md)
+for request, booking or selected dates before committing stock.
 Apply its migration before deploying SG2-53. It preserves existing request periods
 and does not change quantities held or reserve stock.
 The SG2-41 dashboard queue and its selected-record detail view use Supabase;
@@ -174,6 +176,7 @@ uploaded as the `browser-regression` artifact.
 - [Venues](docs/venues.md) — SG2-42 venue catalogue acceptance criteria and API, SG2-77 setup and turnaround, SG2-50 double-booking prevention, SG2-51 releasing a booking
 - [Equipment records](docs/equipment.md) — SG2-52 stock, operational status, API, migration and verification
 - [Equipment requirements](docs/equipment-requirements.md) — SG2-53 coordinator requests, support updates, placement and migration
+- [Equipment availability](docs/equipment-availability.md) — SG2-54 dated commitments, remaining stock, shortfall and migration
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 

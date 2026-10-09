@@ -82,7 +82,11 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [SG2-87:A
   await expect(page.getByRole('heading', { name: 'Partner Innovation Summit', exact: true })).toBeFocused();
   await expect(page.getByText('Event request #42', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
+  await expect(page.getByText('1 item in your work queue')).toBeVisible();
+  // The coordinator keeps an empty review section. Wait for the loaded queue
+  // before checking its contents, rather than passing during the loading gap.
+  await expect(page.getByRole('region', { name: 'Awaiting review' }).getByRole('button')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'My assigned events' }).getByRole('button')).toHaveText(/Partner Innovation Summit/);
   if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/event-detail.png`, fullPage: true });
 
   for (const [account, kind, title, group, fact] of [

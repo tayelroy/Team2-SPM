@@ -4,8 +4,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import type { WorkItem } from '../api/workQueue';
 
-vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId }: { eventId: number }) => (
-  <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}</section>
+vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId, canCheckAvailability }: { eventId: number; canCheckAvailability?: boolean }) => (
+  <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}{canCheckAvailability ? <button>Check equipment availability</button> : null}</section>
 ) }));
 
 // SG2-57: stubbed like EquipmentRequirements so its own fetch does not change
@@ -672,4 +672,17 @@ test('[FAILURE] [SG2-100:AC6] completion is never offered on someone else\'s eve
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
     cleanup();
   }
+});
+
+test.each(['Technical Support Staff', 'Event Coordinator'] as const)('[NORMAL] [SG2-54:AC1] availability capability follows the %s role for a pending equipment request or confirmed event', async role => {
+  const item = { ...review, kind: role === 'Technical Support Staff' ? 'equipment' : 'event', category: role === 'Technical Support Staff' ? 'equipment' : 'assigned', status: role === 'Technical Support Staff' ? 'pending' : 'confirmed', assigned_to_me: true };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role={role} accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('region', { name: 'Equipment requirement integration' });
+  expect(screen.getByText(role === 'Technical Support Staff' ? 'pending' : 'confirmed', { exact: true })).toBeVisible();
+  // Confirmed-event can_arrange=false is exercised by the real component suite;
+  // this seam proves the queue forwards only the verified support capability.
+  if (role === 'Technical Support Staff') expect(screen.getByRole('button', { name: 'Check equipment availability' })).toBeVisible();
+  else expect(screen.queryByRole('button', { name: 'Check equipment availability' })).not.toBeInTheDocument();
 });
