@@ -5,7 +5,7 @@ import request from 'supertest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApp } from '../app';
 import { createAuthorization } from '../auth';
-import { PERMISSIONS, type Principal, type Role } from '../auth/policy';
+import { INTERNAL_ONLY_AUDIT_FIELDS, PERMISSIONS, type Principal, type Role } from '../auth/policy';
 import { dbConfig } from '../db/config';
 import { createGetEventHistoryHandler } from './getHistory';
 import type { EventAuditLogRecord, FetchEventAuditLogsResult } from '../db/auditLogs';
@@ -156,6 +156,57 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+    });
+  });
+
+  describe('Internal-only planning notes (AC 3)', () => {
+    const NOTES_LOG: EventAuditLogRecord = {
+      log_id: 3,
+      event_id: 101,
+      actor_id: COORDINATOR_ID,
+      actor_name: 'Alex Coordinator',
+      field_name: 'planning_notes',
+      old_value: null,
+      new_value: 'Client is difficult about catering',
+      created_at: '2026-09-25T15:00:00.000Z'
+    };
+
+    test('[NORMAL] [SG2-40:AC3] policy marks planning notes as the only internal-only history field', () => {
+      assert.deepEqual([...INTERNAL_ONLY_AUDIT_FIELDS], ['planning_notes']);
+    });
+
+    test('[FAILURE] [SG2-40:AC3] owning organiser never receives planning-notes entries, while their other changes keep their order', async () => {
+      const { app } = buildApp({ principal: ORGANISER, historyResult: { ok: true, logs: [NOTES_LOG, ...SAMPLE_LOGS] } });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.equal(JSON.stringify(res.body).includes('Client is difficult about catering'), false);
+    });
+
+    test('[BOUNDARY] [SG2-40:AC3] organiser whose event history holds only planning notes receives an empty history', async () => {
+      const { app } = buildApp({ principal: ORGANISER, historyResult: { ok: true, logs: [NOTES_LOG] } });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body, { event_id: 101, history: [] });
+    });
+
+    test('[NORMAL] [SG2-40:AC3] every internal role still receives planning-notes entries in full', async () => {
+      const internalRoles: Role[] = [
+        'event_coordinator',
+        'event_coordinator_lead',
+        'safety_officer',
+        'technical_support_staff',
+        'venue_staff'
+      ];
+      for (const role of internalRoles) {
+        const { app } = buildApp({
+          principal: { userId: 'internal-user', role },
+          historyResult: { ok: true, logs: [NOTES_LOG, ...SAMPLE_LOGS] }
+        });
+        const res = await request(app).get('/api/event-requests/101/history');
+        assert.equal(res.status, 200, role);
+        assert.deepEqual(res.body, { event_id: 101, history: [NOTES_LOG, ...SAMPLE_LOGS] }, role);
+      }
     });
   });
 

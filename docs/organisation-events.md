@@ -71,6 +71,24 @@ and action that moves it forward:
 allowed lives in `server/src/events/fields.ts` (`STATUS_TRANSITIONS`,
 `canTransition`).
 
+## Event change history (SG2-40)
+
+`GET /api/event-requests/:eventId/history` returns the event's
+`event_audit_logs` rows, newest first, each with the actor, the time and the
+old and new values. The owning organiser and every internal role may read it;
+attendees and unrelated organisers receive 403.
+
+**Internal-only fields.** Some entries are internal to ConnectSphere staff.
+`INTERNAL_ONLY_AUDIT_FIELDS` in `server/src/auth/policy.ts` lists them —
+currently `planning_notes`, the coordinators' internal planning log. A caller
+whose role is not internal (`isInternalRole`) never receives those rows: the
+handler reads with the admin client, so it filters them itself, and the
+`event_audit_logs_read` RLS policy
+(`supabase/migrations/202610130001_event_history_internal_fields.sql`)
+excludes them from the organiser branch as well. Both lists must change
+together; `supabase/tests/event_history_internal_fields.sql` proves an
+organiser cannot select a planning-notes row while internal staff can.
+
 ## Provisioning and rollout
 
 Apply the SG2-26 migration in `supabase/migrations` alongside the application

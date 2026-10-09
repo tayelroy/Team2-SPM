@@ -9,7 +9,7 @@ import {
   fetchEventAuditLogs,
   type FetchEventAuditLogsResult
 } from '../db/auditLogs';
-import type { Principal } from '../auth/policy';
+import { INTERNAL_ONLY_AUDIT_FIELDS, isInternalRole, type Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event history service is temporarily unavailable. Please try again later.';
 
@@ -85,7 +85,14 @@ export function createGetEventHistoryHandler({
       return;
     }
 
-    const history = historyResult.logs.map((log) => ({
+    // The audit read uses the admin client, so RLS does not apply here: an
+    // organiser must not receive the coordinators' internal-only entries.
+    const internal = isInternalRole(principal.role);
+    const visible = historyResult.logs.filter(
+      (log) => internal || !INTERNAL_ONLY_AUDIT_FIELDS.includes(log.field_name)
+    );
+
+    const history = visible.map((log) => ({
       log_id: log.log_id,
       event_id: log.event_id,
       actor_id: log.actor_id,
