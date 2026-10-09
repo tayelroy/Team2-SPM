@@ -189,3 +189,31 @@ Migration `202610070003_venue_double_booking.sql` adds the exclusion constraint 
 Verification: `supabase/tests/venue_double_booking.sql` (CI database job), `server/src/venue-conflicts.test.ts`, `server/src/db/venueConflicts.test.ts`, `client/src/venues/BookingConflicts.test.tsx` and browser journey `SG2-50-P01`.
 
 SG2-78 widens each period by the venue's setup and turnaround time inside `createVenueConflictStore`, so every check above picks it up.
+
+## SG2-51: Releasing a venue booking
+
+Venue Staff, or the coordinator assigned to the event, release a confirmed booking the event no longer needs.
+
+- **With a reason (AC1).** The reason is required, trimmed and at most 500 characters. Held, already released and already ended bookings cannot be released.
+- **Free again (AC2).** A released booking's status becomes `cancelled`, and it no longer appears in `venue_booking_occupancy`, so availability, search and every conflict check treat the period as free. The SG2-49 request that committed it becomes `cancelled`, so the venue can be requested again.
+- **Other venues kept (AC3).** Only that booking changes. If it was the event's main venue, the event moves to its earliest other confirmed booking that hasn't ended, or to none.
+- **Notified (AC4).** The coordinator and the Event Organiser each get a `venue_booking_released` notice with the venue, period and reason. Event Organisers now have the notifications drawer too (decision notices only; hold notices stay internal).
+- **Recorded (AC5).** The booking keeps `cancelled_by`, `cancelled_at` and `cancellation_reason`, and the release is added to the event's history.
+
+| Route | Who | Result |
+| --- | --- | --- |
+| `GET /api/venue-bookings?event_id=` | Venue Staff; the event's assigned coordinator | `200 { bookings }`: the event's confirmed and released bookings, with venue, event and releaser by name. `404` for an event the caller may not see |
+| `GET /api/venue-bookings?venue_id=` | Venue Staff | `200 { bookings }`: the venue's confirmed and released bookings that have not yet ended |
+| `POST /api/venue-bookings/:bookingId/release` | Venue Staff; the event's assigned coordinator | `{ reason }` → `200 { booking_id, status, cancelled_at, cancellation_reason }`; `400` missing or long reason, `404` unknown or not the coordinator's event, `409` already released, held or ended |
+
+In the app, coordinators see "Booked venues" under the event's venue requests in venue search. Venue Staff open **Bookings for {venue}** from the catalogue.
+
+Migration `202610100002_venue_booking_release.sql`:
+- adds `cancelled` to the booking statuses and the three cancellation columns, with checks that a cancelled booking always has a time and a reason;
+- rebuilds `venue_booking_occupancy` to leave released bookings out;
+- allows the `venue_booking_released` notification kind;
+- adds `release_venue_booking()`, which runs as the caller and locks the venue row, then the booking.
+
+Clients still cannot write `venue_bookings` directly.
+
+Verification: `supabase/tests/venue_booking_release.sql` (CI database job), `server/src/venue-bookings.test.ts`, `server/src/db/venueBookings.test.ts`, `server/src/notifications.test.ts`, `client/src/venues/VenueBookings.test.tsx`, `client/src/components/HoldNotifications.test.tsx` and browser journeys `SG2-51-P01` and `SG2-51-P02`.

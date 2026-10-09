@@ -117,7 +117,15 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-49 AC1/AC2: the roles with a notifications drawer read their own
   // notices; the rows are limited to the caller by the handler and by row
   // level security.
-  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff'],
+  // SG2-51 AC4: Event Organisers are told when a venue for their event is
+  // released, so they read their own notices too.
+  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_organiser'],
+  // SG2-51: Venue Staff, or the event's assigned coordinator (enforced
+  // per-row), see an event's bookings and release one with a reason. Only
+  // Venue Staff list a whole venue's bookings (enforced by the handler).
+  'venue_bookings.view': ['venue_staff', 'event_coordinator'],
+  'venue_bookings.release': ['venue_staff', 'event_coordinator'],
+  'venue_bookings.by_venue': ['venue_staff'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   // SG2-80 AC1/AC6: the same Venue Staff mark it temporarily unavailable.
   'venues.blocks.manage': ['venue_staff'],

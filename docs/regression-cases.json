@@ -3577,5 +3577,106 @@
       "method_inventory": "docs/test-case-inventory.json",
       "note": "Automated source/traceability review on behalf of Lim Jun Wei. Independent teammate formal validation remains pending."
     }
+  },
+  {
+    "id": "SG2-51-P01",
+    "title": "a coordinator releases one of two venues with a reason; the period is free, the other venue stays and both coordinator and organiser are told",
+    "story": "SG2-51",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-51:AC1",
+      "SG2-51:AC2",
+      "SG2-51:AC3",
+      "SG2-51:AC4",
+      "SG2-51:AC5"
+    ],
+    "purpose": "Verify the assigned coordinator releases one of an event's two venue bookings, only with a reason, and that the period is free, the other booking stays, the release is recorded and both the coordinator and the Event Organiser are notified.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Seed event 91 with confirmed bookings #21 (Regression Hall) and #22 (Quiet Room) on 20 Jun 2030, 10:00-12:00 SGT, and the approved request #31 behind #21.",
+      "Sign in as the coordinator, open the event's venue search and its booked venues.",
+      "Try to release booking #21 without a reason, then with 'The keynote moved online'.",
+      "Read both venues' availability for the period through the API.",
+      "Open the coordinator's notifications; sign in as the organiser and open theirs."
+    ],
+    "data": "Event 91, venues 1 and 2, bookings #21 and #22; coordinator and organiser fixture accounts.",
+    "expected": "A release without a reason is stopped; with one, booking #21 shows Released by Regression coordinator with the reason; #22 stays Confirmed; request #31 changes from Approved to Cancelled in the event's request list; Regression Hall's period is empty and Quiet Room's still occupied; both inboxes show the release with the reason.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-09",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-51-P02",
+    "title": "Venue Staff release a booking from the catalogue; other roles cannot release",
+    "story": "SG2-51",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-51:AC1",
+      "SG2-51:AC3"
+    ],
+    "purpose": "Verify Venue Staff release a venue's booking from the catalogue with a reason, a second release is refused, the event's other booking is unchanged, and organisers, Technical Support Staff, attendees and anonymous callers cannot release.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Seed event 91 with bookings #21 and #22.",
+      "Sign in as Venue Staff, open Catalogue, then Bookings for Quiet Room; release #22 with 'Flooded floor'.",
+      "Release #22 again through the API and list event 91's bookings.",
+      "Sign in as organiser, Technical Support Staff and attendee and try to release #21; try without credentials."
+    ],
+    "data": "Event 91, venues 1 and 2, bookings #21 and #22; venue, organiser, support and attendee fixture accounts.",
+    "expected": "#22 shows Released by Regression venue with the reason; the second release gets 409; #21 stays confirmed; other roles get 403 and no credentials get 401.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-09",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-RELEASE-01",
+    "title": "Releasing a venue booking frees it, keeps the event's other venues and records and announces the release",
+    "story": "SG2-51",
+    "purpose": "Check release_venue_booking() and the new venue_bookings constraints through actual stored records, notifications, history and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed users, roles, an event with two confirmed venue bookings and a past one, and the approved request behind the first.",
+      "Try releases as an unassigned coordinator, Technical Support Staff, with no or too long a reason, on a past or unknown booking.",
+      "Release as the assigned coordinator, then as Venue Staff; book the freed period again.",
+      "Write a cancelled status directly as the superuser and as a client.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_booking_release.sql",
+    "expected": "Unassigned coordinators see missing, other roles are refused, blank and 501-character reasons are invalid, past and unknown bookings are refused; a release records who, when and the trimmed 498-character reason, leaves the occupancy view, cancels the approved request, keeps the other booking as the event's main venue, notifies coordinator and organiser and writes history; a second release is refused; the freed period can be booked again; direct cancellations without a time or reason, or by a client, are refused.",
+    "evidence": "supabase/tests/venue_booking_release.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: restoring released bookings to the occupancy view failed period-freed; dropping the reason constraint failed release-without-reason.",
+    "execution_date": "9 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-09",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

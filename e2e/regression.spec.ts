@@ -1567,6 +1567,82 @@ test('SG2-50-P01 | [SG2-50:AC1] [SG2-50:AC2] [CONFLICT] a request overlapping a 
   await expect(decision.getByRole('status')).toHaveText('Approved. The venue is committed to this event and the coordinator has been notified.');
 });
 
+test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:AC5] [NORMAL] a coordinator releases one of two venues with a reason; the period is free, the other venue stays and both coordinator and organiser are told', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-release')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  const booked = page.getByRole('region', { name: 'Booked venues for Venue Request Forum' });
+  const hall = booked.getByRole('listitem', { name: 'Booking #21' });
+  const room = booked.getByRole('listitem', { name: 'Booking #22' });
+  await expect(hall.getByText('Confirmed', { exact: true })).toBeVisible();
+  await expect(room.getByText('Confirmed', { exact: true })).toBeVisible();
+  const requests = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(requests.getByText('Approved', { exact: true })).toBeVisible();
+
+  // AC1: a reason is required, then the release goes through.
+  await hall.getByRole('button', { name: 'Release booking', exact: true }).click();
+  await hall.getByRole('button', { name: 'Confirm release', exact: true }).click();
+  await expect(hall.getByRole('alert')).toHaveText('Give a reason for releasing this booking. The coordinator and Event Organiser will see it.');
+  await hall.getByLabel('Reason for releasing').fill('The keynote moved online');
+  await hall.getByRole('button', { name: 'Confirm release', exact: true }).click();
+  await expect(booked.getByRole('status')).toContainText('Regression Hall released for');
+  // AC5: who released it and why; AC3: the other venue is untouched.
+  await expect(hall.getByText('Released', { exact: true })).toBeVisible();
+  await expect(hall.getByText(/^Released by Regression coordinator on .*: The keynote moved online$/)).toBeVisible();
+  await expect(room.getByText('Confirmed', { exact: true })).toBeVisible();
+  // AC2: the request that committed the booking is no longer live, so the venue can be requested again.
+  await expect(requests.getByText('Cancelled', { exact: true })).toBeVisible();
+
+  // AC2: the period is free again at Regression Hall, but not at Quiet Room.
+  const period = `from=${encodeURIComponent('2030-06-20T01:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T05:00:00.000Z')}`;
+  const headers = await authHeaders(page);
+  expect((await (await page.request.get(`/api/venues/1/availability?${period}`, { headers })).json()).entries).toEqual([]);
+  expect((await (await page.request.get(`/api/venues/2/availability?${period}`, { headers })).json()).entries).toHaveLength(1);
+
+  // AC4: the coordinator and the Event Organiser are told, with the reason.
+  await page.reload();
+  await page.getByRole('button', { name: /^Notifications \(1\)$/ }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue booking released', { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/^Regression Hall was released for Venue Request Forum \(.*\): The keynote moved online$/)).toBeVisible();
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'organiser');
+  await page.getByRole('button', { name: /^Notifications \(1\)$/ }).click();
+  await expect(page.getByRole('complementary', { name: 'Notifications' }).getByText(/The keynote moved online$/)).toBeVisible();
+});
+
+test('SG2-51-P02 | [SG2-51:AC1] [SG2-51:AC3] [NORMAL] [FAILURE] Venue Staff release a booking from the catalogue; other roles cannot release', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-release')).status()).toBe(204);
+  await signIn(page, 'venue');
+  await page.getByRole('button', { name: 'Catalogue', exact: true }).click();
+  await page.getByRole('button', { name: 'Bookings for Quiet Room', exact: true }).click();
+  const upcoming = page.getByRole('region', { name: 'Upcoming bookings for Quiet Room' });
+  const booking = upcoming.getByRole('listitem', { name: 'Booking #22' });
+  await expect(booking.getByText('Venue Request Forum', { exact: true })).toBeVisible();
+  await booking.getByRole('button', { name: 'Release booking', exact: true }).click();
+  await booking.getByLabel('Reason for releasing').fill('Flooded floor');
+  await booking.getByRole('button', { name: 'Confirm release', exact: true }).click();
+  await expect(booking.getByText(/^Released by Regression venue on .*: Flooded floor$/)).toBeVisible();
+  // Releasing it again is refused; the event's other venue is still booked.
+  const again = await page.request.post('/api/venue-bookings/22/release', { headers: await authHeaders(page), data: { reason: 'Again' } });
+  expect([again.status(), (await again.json()).error]).toEqual([409, 'This booking has already been released.']);
+  const listed = await page.request.get('/api/venue-bookings?event_id=91', { headers: await authHeaders(page) });
+  expect((await listed.json()).bookings.map((row: { booking_id: number; status: string }) => [row.booking_id, row.status]))
+    .toEqual([[21, 'confirmed'], [22, 'cancelled']]);
+
+  for (const account of ['organiser', 'support', 'attendee']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      const refused = await page.request.post('/api/venue-bookings/21/release', { headers: await authHeaders(page), data: { reason: 'Not mine' } });
+      expect(refused.status()).toBe(403);
+    });
+  }
+  expect((await page.request.post('/api/venue-bookings/21/release', { data: { reason: 'x' } })).status()).toBe(401);
+});
+
 test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, sees its own role and is denied ungranted operations', async ({ page }) => {
   await signIn(page, 'safety');
   await expect(page.getByLabel('Your role', { exact: true })).toHaveText('Safety Officer');

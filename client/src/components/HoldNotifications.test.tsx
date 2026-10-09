@@ -155,13 +155,28 @@ test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff'] as con
   expect(screen.queryByText('No notifications available.')).not.toBeInTheDocument();
 });
 
-test.each(['Event Organiser', 'Attendee'] as const)('[NORMAL] [SG2-84:AC6] [SG2-85:AC4] %s sees an empty inbox without forbidden API requests or mock alerts', role => {
+test('[NORMAL] [SG2-84:AC6] [SG2-85:AC4] an Attendee sees an empty inbox without forbidden API requests or mock alerts', () => {
   const load = vi.spyOn(api, 'loadHoldNotifications');
-  render(<AppShell role={role} screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="public-role-token">Dashboard</AppShell>);
+  render(<AppShell role="Attendee" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="public-role-token">Dashboard</AppShell>);
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' }));
   expect(screen.getByText('No notifications available.')).toBeInTheDocument();
   expect(screen.queryByText('Clarification requested on E-201')).not.toBeInTheDocument();
   expect(load).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Close notifications' }));
+  expect(screen.queryByText('No notifications available.')).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-51:AC4] an Event Organiser is told when a venue for their event is released, without asking for hold notices', async () => {
+  const holds = vi.spyOn(api, 'loadHoldNotifications');
+  const released = { notification_id: 9, event_id: 7, request_id: null, kind: 'venue_booking_released' as const,
+    message: 'Atrium Hall was released for Leadership Summit: Moved online', created_at: '2026-10-07T02:00:00.000Z' };
+  vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [released] });
+  render(<AppShell role="Event Organiser" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="organiser-token">Dashboard</AppShell>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
+  expect(screen.getByText('Venue booking released')).toBeInTheDocument();
+  expect(screen.getByText('Atrium Hall was released for Leadership Summit: Moved online')).toBeInTheDocument();
+  expect(screen.queryByText('Clarification requested on E-201')).not.toBeInTheDocument();
+  expect(holds).not.toHaveBeenCalled();
 });
 
 test('[BOUNDARY] [SG2-84:AC6] [SG2-85:AC4] a prototype shell without a token preserves sample internal notifications', () => {

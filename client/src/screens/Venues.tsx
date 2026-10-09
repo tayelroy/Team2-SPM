@@ -4,6 +4,7 @@ import { Card, Eyebrow, Fact, GhostButton, GradientButton, Notice, RecessedCard 
 import { color, rule } from '../theme';
 import VenueForm, { inputStyle } from '../venues/VenueForm';
 import VenueBlocks from '../venues/VenueBlocks';
+import VenueBookings from '../venues/VenueBookings';
 import { VenueLayoutError, describeLayouts, fetchVenueLayouts, saveVenueLayouts, type VenueLayout, type VenueLayoutValues } from '../venues/layoutsApi';
 import { VenueError, venueRequest, type Venue, type VenueValues } from '../venues/api';
 import { NO_OPERATIONS, VenueOperationsError, describeTimes, fetchVenueOperations, saveVenueOperations, type VenueOperationValues, type VenueOperations } from '../venues/operationsApi';
@@ -23,6 +24,7 @@ function VenueCatalogue({ token }: { token: string | null }) {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Venue | null | undefined>(undefined);
   const [blocking, setBlocking] = useState<Venue | undefined>(undefined);
+  const [bookings, setBookings] = useState<Venue | undefined>(undefined);
   const [layoutsByVenue, setLayoutsByVenue] = useState<Record<number, VenueLayout[]>>({});
   // null marks a venue whose details failed to load (shown as Unavailable).
   const [operationsByVenue, setOperationsByVenue] = useState<Record<number, VenueOperations | null>>({});
@@ -118,6 +120,7 @@ function VenueCatalogue({ token }: { token: string | null }) {
   if (!token) return <Notice><Eyebrow>Sign in required</Eyebrow><span>Sign in with your account to view venue records.</span></Notice>;
   if (loading) return <p role="status">Loading venue catalogue…</p>;
   if (!access) return <Notice><p role="alert">{error}</p><GhostButton onClick={() => setAttempt(n => n + 1)}>Retry</GhostButton></Notice>;
+  if (bookings) return <VenueBookings token={token} venue={bookings} onClose={() => setBookings(undefined)} />;
   if (blocking) return <VenueBlocks token={token} venue={blocking} onClose={() => setBlocking(undefined)}
     onAccessLost={message => { setAccess(null); setVenues([]); setBlocking(undefined); setError(message); }} />;
   if (editing !== undefined) return <VenueForm venue={editing}
@@ -174,6 +177,7 @@ function VenueCatalogue({ token }: { token: string | null }) {
           <div style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
             {can(access, 'venues.update') ? <GhostButton onClick={() => { setSaved(''); setEditing(venue); }}>Edit {venue.name}</GhostButton> : null}
             {can(access, 'venues.blocks.manage') ? <GhostButton onClick={() => { setSaved(''); setBlocking(venue); }}>Block {venue.name}</GhostButton> : null}
+            {can(access, 'venue_bookings.by_venue') ? <GhostButton onClick={() => { setSaved(''); setBookings(venue); }}>Bookings for {venue.name}</GhostButton> : null}
           </div>
         </Card>)}
       </div>

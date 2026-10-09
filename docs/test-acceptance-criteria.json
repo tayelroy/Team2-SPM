@@ -441,6 +441,19 @@
       }
     },
     {
+      "id": "SG2-51",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-51",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-07",
+      "acceptanceCriteria": {
+        "AC1": "Can cancel a committed booking, giving a reason",
+        "AC2": "The venue becomes available for that period again",
+        "AC3": "On an event with several venue bookings (Week 7 change #3), releasing one booking leaves the event's other bookings unchanged",
+        "AC4": "The coordinator and Event Organiser are notified",
+        "AC5": "The cancellation and its reason are recorded"
+      }
+    },
+    {
       "id": "SG2-77",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-77",
       "originalPullRequests": [],

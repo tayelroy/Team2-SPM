@@ -8,6 +8,7 @@ import { EMPTY_SEARCH, VenueSearchError, formatSgt, searchVenues, sgtToIso, type
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
 import { EventVenueFit } from '../venues/VenueFit';
 import { EventVenueRequests, VenueRequestForm, requestedNotice } from '../venues/VenueRequests';
+import { EventVenueBookings } from '../venues/VenueBookings';
 
 const TEXT_FIELDS = [
   ['location', 'Location', 'e.g. North Wing'],
@@ -40,6 +41,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   const [requesting, setRequesting] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
   const [requestsVersion, setRequestsVersion] = useState(0);
+  // A new request, or a released booking (SG2-51), changes the event's requests.
+  const refreshRequests = () => setRequestsVersion(version => version + 1);
   const pending = useRef<AbortController | null>(null);
 
   async function run(criteria: VenueSearchValues) {
@@ -179,7 +182,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
                         onRequested={(_request, booking, conflicts) => {
                           setRequesting(null);
                           setNotice(requestedNotice(venue.name, booking, conflicts));
-                          setRequestsVersion(version => version + 1);
+                          refreshRequests();
                         }} />
                     : <GhostButton onClick={() => { setNotice(''); setRequesting(venue.venue_id); }} style={{ alignSelf: 'flex-start' }}>
                         Request this venue
@@ -194,6 +197,9 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
       {prefill && searched ? <EventVenueFit accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} /> : null}
       {/* SG2-48 AC3: the event's requests, each shown as pending until decided. */}
       {prefill && searched ? <EventVenueRequests accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion} /> : null}
+      {/* SG2-51: the venues booked for the event, each released on its own. */}
+      {prefill && searched ? <EventVenueBookings accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion}
+          onReleased={refreshRequests} /> : null}
     </section>
   );
 }

@@ -33,6 +33,7 @@ import { createUpdateEventPlanningHandler } from './events/updatePlanning';
 import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
 import { createVenueConflictsRouter } from './venues/conflicts';
+import { createVenueBookingsRouter } from './venues/bookings';
 import { createEquipmentRouter } from './equipment';
 import { createEquipmentRequirementsRouter } from './equipment/requirements';
 import { createAssignmentQueueRouter } from './assignmentQueue';
@@ -86,7 +87,9 @@ export function createApp(
   // SG2-57. Appended after assignmentQueueRouter — every parameter here is
   // positional, and callers (e2e/server.ts, app.test.ts) pass through
   // assignmentQueueRouter, so this new one must come last.
-  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal })
+  eventArrangementsHandler: RequestHandler = createGetEventArrangementsHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-51: appended last for the same reason.
+  venueBookingsRouter = createVenueBookingsRouter(access)
 ) {
   const app = express();
 
@@ -120,6 +123,8 @@ export function createApp(
   // SG2-49: each person's own notices, e.g. a venue request decision.
   app.use('/api/notifications', routers.notifications);
   app.use('/api/venue-holds', venueHoldsRouter);
+  // SG2-51: an event's or venue's bookings, and releasing one.
+  app.use('/api/venue-bookings', venueBookingsRouter);
   app.use('/api/equipment', equipmentRouter);
   app.use('/api/equipment-requests', equipmentRequirementsRouter);
   // SG2-87: the Event Coordinator Lead's queue of unassigned requests.

@@ -15,7 +15,8 @@ before(() => {
 const USERS: Record<string, { userId: string; role: Role }> = {
   coordinator: { userId: 'user-coordinator', role: 'event_coordinator' },
   support: { userId: 'user-support', role: 'technical_support_staff' },
-  organiser: { userId: 'user-organiser', role: 'event_organiser' }
+  organiser: { userId: 'user-organiser', role: 'event_organiser' },
+  attendee: { userId: 'user-attendee', role: 'attendee' }
 };
 
 const notice: NotificationRecord = { notification_id: 3, event_id: 7, request_id: 41, kind: 'venue_request_approved',
@@ -47,11 +48,20 @@ test('[BOUNDARY] [SG2-49:AC2] someone with no notifications gets an empty list',
 
 test('[FAILURE] [SG2-49:AC1] notifications need a sign-in and a role with a notifications drawer; an unavailable store is reported without details', async () => {
   assert.equal((await request(app(async () => [notice])).get('/api/notifications')).status, 401);
-  assert.equal((await request(app(async () => [notice])).get('/api/notifications').set('Authorization', 'Bearer organiser')).status, 403);
+  assert.equal((await request(app(async () => [notice])).get('/api/notifications').set('Authorization', 'Bearer attendee')).status, 403);
   for (const [error, status] of [[new AccessError(403), 403], [new Error('offline'), 503]] as const) {
     const response = await request(app(async () => { throw error; })).get('/api/notifications').set('Authorization', 'Bearer coordinator');
     assert.deepEqual([response.status, response.body], [status, { error: new AccessError(status).message }]);
   }
   // The default store cannot read without a configured database.
   assert.equal((await request(app()).get('/api/notifications').set('Authorization', 'Bearer coordinator')).status, 503);
+});
+
+test('[NORMAL] [SG2-51:AC4] an Event Organiser reads their own notices, such as a released venue', async () => {
+  const released = { ...notice, kind: 'venue_booking_released' as const, message: 'Atrium Hall was released for Leadership Forum: Moved online' };
+  let asked: unknown[] = [];
+  const response = await request(app(async (...args) => { asked = args; return [released]; }))
+    .get('/api/notifications').set('Authorization', 'Bearer organiser');
+  assert.deepEqual([response.status, response.body], [200, { notifications: [released] }]);
+  assert.deepEqual(asked, ['organiser', 'user-organiser']);
 });
