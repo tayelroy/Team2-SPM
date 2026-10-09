@@ -109,6 +109,15 @@ attendees and unrelated organisers receive 403.
   same one SG2-39 planning edits already have); completion keeps its 200
   because `completed_by`/`completed_at` on the row are authoritative.
 
+Each entry also carries `actor_role`: the actor's current role from
+`account_roles` in Title Case (e.g. `Event Coordinator Lead`), or null for a
+system row or an account without a role. The history drawer
+(`client/src/components/EventAuditDrawer.tsx`) shows it as a badge next to
+the actor's name — **Automatic** for system rows, no badge when the role is
+unknown — and renders `status` values with the client's shared
+`statusLabel` mapping (`draft` → Draft, `unassigned` → Awaiting Assignment,
+`planning` → Arrangements, …).
+
 **Internal-only fields.** Some entries are internal to ConnectSphere staff.
 `INTERNAL_ONLY_AUDIT_FIELDS` in `server/src/auth/policy.ts` lists them —
 currently `planning_notes`, the coordinators' internal planning log. A caller

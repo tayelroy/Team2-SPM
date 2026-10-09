@@ -9,7 +9,9 @@ import {
   fetchEventAuditLogs,
   type FetchEventAuditLogsResult
 } from '../db/auditLogs';
+import { getAccountRoles, type GetAccountRolesResult } from '../db/accountRoles';
 import { INTERNAL_ONLY_AUDIT_FIELDS, isInternalRole, type Principal } from '../auth/policy';
+import { toDisplayRole } from '../auth/roleFormat';
 
 const UNAVAILABLE_MESSAGE = 'Event history service is temporarily unavailable. Please try again later.';
 
@@ -25,16 +27,23 @@ export interface GetEventHistoryDependencies {
     client: SupabaseClient,
     eventId: number
   ) => Promise<FetchEventAuditLogsResult>;
+  fetchActorRoles?: (client: SupabaseClient, userIds: string[]) => Promise<GetAccountRolesResult>;
 }
 
 /**
  * GET /api/event-requests/:eventId/history — returns change history for an event (SG2-40).
+ *
+ * Each entry names the actor's role (`actor_role`, Title Case, from the
+ * authoritative `account_roles` store), so the drawer can say who acted in
+ * what capacity. It is the actor's current role; system-written rows have no
+ * actor and so no role.
  */
 export function createGetEventHistoryHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchEventRequest = fetchEventRequestById,
-  fetchAuditLogs = fetchEventAuditLogs
+  fetchAuditLogs = fetchEventAuditLogs,
+  fetchActorRoles = getAccountRoles
 }: GetEventHistoryDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -92,16 +101,31 @@ export function createGetEventHistoryHandler({
       (log) => internal || !INTERNAL_ONLY_AUDIT_FIELDS.includes(log.field_name)
     );
 
-    const history = visible.map((log) => ({
-      log_id: log.log_id,
-      event_id: log.event_id,
-      actor_id: log.actor_id,
-      actor_name: log.actor_name ?? 'Unknown',
-      field_name: log.field_name,
-      old_value: log.old_value,
-      new_value: log.new_value,
-      created_at: log.created_at
-    }));
+    const actorIds = [...new Set(visible.flatMap((log) => (log.actor_id === null ? [] : [log.actor_id])))];
+    let roles = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const rolesResult = await fetchActorRoles(admin, actorIds);
+      if (!rolesResult.ok) {
+        res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+        return;
+      }
+      roles = rolesResult.roles;
+    }
+
+    const history = visible.map((log) => {
+      const role = log.actor_id === null ? undefined : roles.get(log.actor_id);
+      return {
+        log_id: log.log_id,
+        event_id: log.event_id,
+        actor_id: log.actor_id,
+        actor_name: log.actor_name ?? 'Unknown',
+        actor_role: role === undefined ? null : toDisplayRole(role),
+        field_name: log.field_name,
+        old_value: log.old_value,
+        new_value: log.new_value,
+        created_at: log.created_at
+      };
+    });
 
     res.status(200).json({
       event_id: eventId,
