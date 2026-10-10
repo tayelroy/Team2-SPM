@@ -26,6 +26,31 @@ cached browser value cannot select the organisation to read.
   Coordinators, venue staff, technical support and attendees receive 403 from
   these endpoints. Coordinator assignment and review remain separate stories.
 
+## Request form: new requests and draft edits (SG2-28, SG2-29, SG2-30)
+
+**New request** and **My drafts → Edit** open the same form
+(`client/src/screens/RequestForm.tsx`).
+
+- **Date** is a `datetime-local` input in Singapore time. The form keeps the
+  stored ISO instant and converts it only for display, so a stored
+  `2030-06-15T02:00:00.000Z` shows as `15 Jun 2030, 10:00` and is sent back
+  unchanged when untouched. An edited value is converted from Singapore time
+  (`07:30` on 15 June is saved as `2030-06-14T23:30:00.000Z`).
+- The form shows only what a request stores. The earlier prototype
+  requirement chips (Step-free access, Hearing loop, Stage + lectern, …) were
+  never sent to the server, so they silently discarded input and were removed;
+  venue, accessibility and equipment needs are the free-text fields.
+- **Venue fit** replaces the canned "180 expected attendance rules out 3 of 6
+  venues…" banner. Once the request has a saved id, **Check venue fit** reads
+  `GET /api/venues/suitability?event_id=` (SG2-47; organisers see only their
+  own events) and lists every venue that does not fit and why. It reflects the
+  last save, so each later save refreshes it. It checks capacity, facilities
+  and accessibility, not date availability.
+- After a successful submit, from either entry point, the organiser lands on
+  the submitted event's detail page with a status message such as
+  "Partner Forum has been submitted for review." (AC1). The message is cleared
+  when they leave that page.
+
 ## Event status lifecycle (SG2-100)
 
 An event moves through a 7-step stepper, shown on the event detail screen

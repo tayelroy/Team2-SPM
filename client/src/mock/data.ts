@@ -551,17 +551,6 @@ export const FORM_FIELDS = [
   { label: 'Registration needed', value: 'Yes — closes 8 Oct', hint: '' },
 ];
 
-export const REQUIREMENT_CHIPS = [
-  'Step-free access',
-  'Hearing loop',
-  'Stage + lectern',
-  'Catering',
-  'Livestream',
-  'Breakout room',
-  'Parking',
-  'Signage',
-];
-
 export const NEXT_STEPS = [
   { n: '01', text: 'A coordinator is assigned within one working day.' },
   {

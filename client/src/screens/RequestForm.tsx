@@ -3,9 +3,11 @@ import type { ChangeEvent } from 'react';
 import { loadSession } from '../auth/session';
 import { createEventRequestDraft, submitEventRequest, updateEventRequestDraft } from '../api/eventRequests';
 import type { EventRequestDraftInput } from '../api/eventRequests';
-import { NEXT_STEPS, REQUIREMENT_CHIPS } from '../mock/data';
+import { NEXT_STEPS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
+import { isoToSgtLocal, sgtToIso } from '../venues/searchApi';
+import { EventVenueFit } from '../venues/VenueFit';
 import {
   Card,
   Chip,
@@ -53,13 +55,6 @@ type SaveState =
 
 type FormValues = Record<RequiredField, string>;
 
-const INITIAL_REQUIREMENTS = [
-  'Step-free access',
-  'Hearing loop',
-  'Stage + lectern',
-  'Catering',
-];
-
 /**
  * Styled like Login's ControlledField — a controlled text input that follows
  * the ui.tsx Field visual contract without the `defaultValue`-only restriction.
@@ -71,6 +66,7 @@ function FormField({
   onChange,
   hint,
   hasError,
+  type = 'text',
 }: {
   label: string;
   fieldKey: RequiredField;
@@ -78,6 +74,7 @@ function FormField({
   onChange: (key: RequiredField, value: string) => void;
   hint?: string;
   hasError: boolean;
+  type?: 'text' | 'datetime-local';
 }) {
   const id = `rf-${fieldKey}`;
   const errorId = `${id}-error`;
@@ -92,7 +89,7 @@ function FormField({
       )}
       <input
         id={id}
-        type="text"
+        type={type}
         value={value}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(fieldKey, e.target.value)}
         aria-required="true"
@@ -181,11 +178,21 @@ function OptionalTextField({
  *
  * "Submit request" (SG2-30): saves the current form first, creating a draft
  * if necessary, then submits its persisted id. Only a successful server
- * submission fires `onSuccess` with that id. Failed submissions retain the saved id for retry.
+ * submission fires `onSuccess`, with that id and the submitted event name so
+ * the caller can confirm the submission by name (AC1). Failed submissions
+ * retain the saved id for retry.
  * AC2 — the submit button is disabled while any mandatory field is empty;
  * inline errors appear on a blank field once touched; server errors
  * (400/409/503) surface as a visible alert banner.
  * AC3 — not in scope for RequestForm itself; see EventDetail for immutability.
+ *
+ * The date is a `datetime-local` input in Singapore time. The form keeps the
+ * stored ISO instant and converts only for display, so an untouched date is
+ * sent back exactly as it was loaded.
+ *
+ * Venue fit (SG2-47): once the request has a saved id, the organiser can check
+ * how every venue fits the saved draft through the suitability API venue
+ * search uses. It reads the last save, so each later save refreshes it.
  */
 export default function RequestForm({
   eventId,
@@ -195,7 +202,6 @@ export default function RequestForm({
   /** @deprecated Use `onSuccess` instead. Kept for backward compatibility. */
   onSubmit,
   onSaveDraft,
-  showConflicts = true,
 }: {
   /** The event request id this form is editing. Optional: when absent, a
    *  successful "Save draft" supplies one instead (see above). */
@@ -207,21 +213,19 @@ export default function RequestForm({
   initialValues?: EventRequestDraftInput;
   /** Bearer token for the signed-in organiser. Required alongside a resolved event id. */
   accessToken?: string;
-  /** Receives the persisted event id only after the server confirms submission. */
-  onSuccess?: (eventId: number) => void;
+  /** Receives the persisted event id and submitted name only after the server confirms submission. */
+  onSuccess?: (eventId: number, name: string) => void;
   /**
    * Legacy alias for `onSuccess` — retained so existing callers that pass
    * `onSubmit` continue to work; callbacks may ignore the supplied event id.
    * @deprecated Prefer `onSuccess`.
    */
-  onSubmit?: (eventId: number) => void;
+  onSubmit?: (eventId: number, name: string) => void;
   /**
    * Overrides "Save draft" entirely when provided, instead of the built-in
    * create/update call.
    */
   onSaveDraft?: () => void;
-  /** Mirrors the mockup's `flagConflicts` prop — hides the suitability warning. */
-  showConflicts?: boolean;
 }) {
   // Resolve whichever success callback was provided (onSuccess takes priority).
   const successCallback = onSuccess ?? onSubmit;
@@ -235,7 +239,6 @@ export default function RequestForm({
       initialValues?.expected_attendance != null ? String(initialValues.expected_attendance) : '',
     venue_requirements: initialValues?.venue_requirements ?? '',
   }));
-  const [requirements, setRequirements] = useState<string[]>(INITIAL_REQUIREMENTS);
   const [accessibility, setAccessibility] = useState(initialValues?.accessibility_needs ?? '');
   const [equipment, setEquipment] = useState(initialValues?.equipment_requirements ?? '');
   const [registrationNeeded, setRegistrationNeeded] = useState(initialValues?.registration_needed ?? false);
@@ -246,6 +249,9 @@ export default function RequestForm({
   // Set once "Save draft" creates a real row, so "Submit request" in the same
   // sitting targets it even though no eventId prop was ever passed in.
   const [createdEventId, setCreatedEventId] = useState<number | null>(null);
+  const [fitShown, setFitShown] = useState(false);
+  // Bumped on every successful save so an open venue-fit check re-reads the draft.
+  const [savedVersion, setSavedVersion] = useState(0);
 
   const emptyFields = REQUIRED_FIELDS.filter((k) => !values[k].trim());
   const effectiveEventId = eventId ?? (createdEventId !== null ? String(createdEventId) : undefined);
@@ -259,13 +265,6 @@ export default function RequestForm({
     setValues((prev) => ({ ...prev, [key]: value }));
     setTouched((prev) => new Set(prev).add(key));
   }
-
-  const toggle = (name: string) =>
-    setRequirements((current) =>
-      current.includes(name)
-        ? current.filter((x) => x !== name)
-        : current.concat(name),
-    );
 
   // Both create and update replace the entire draft: omitted blank fields
   // become null on the server, so clearing a previously saved value persists.
@@ -292,7 +291,9 @@ export default function RequestForm({
     const outcome = effectiveEventId
       ? await updateEventRequestDraft(effectiveEventId, payload, token)
       : await createEventRequestDraft(payload);
-    if (outcome.ok && !effectiveEventId) setCreatedEventId(outcome.request.event_id);
+    if (!outcome.ok) return outcome;
+    if (!effectiveEventId) setCreatedEventId(outcome.request.event_id);
+    setSavedVersion((version) => version + 1);
     return outcome;
   }
 
@@ -330,7 +331,7 @@ export default function RequestForm({
 
     if (result.ok) {
       setSubmitStatus('success');
-      successCallback?.(Number(submittedEventId));
+      successCallback?.(Number(submittedEventId), values.name.trim());
       return;
     }
 
@@ -445,8 +446,10 @@ export default function RequestForm({
           <FormField
             label="Date"
             fieldKey="proposed_date"
-            value={values.proposed_date}
-            onChange={setField}
+            type="datetime-local"
+            value={values.proposed_date ? isoToSgtLocal(values.proposed_date) : ''}
+            onChange={(key, local) => setField(key, local ? sgtToIso(local) : '')}
+            hint="Singapore time (SGT)"
             hasError={touched.has('proposed_date') && !values.proposed_date.trim()}
           />
           <FormField
@@ -550,42 +553,26 @@ export default function RequestForm({
           </div>
         </div>
 
-        {/* Venue requirement chips */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Eyebrow>Requirements</Eyebrow>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {REQUIREMENT_CHIPS.map((name) => {
-              const on = requirements.includes(name);
-              return (
-                <Chip
-                  key={name}
-                  {...chipStyle(on)}
-                  pressed={on}
-                  onClick={() => toggle(name)}
-                >
-                  {name}
-                </Chip>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Suitability warning (prototype) */}
-        {showConflicts ? (
-          <Notice
-            style={{
-              flexDirection: 'row',
-              gap: '14px',
-              alignItems: 'flex-start',
-              padding: '20px 24px',
-            }}
-          >
-            <NoticeMark />
-            <span style={{ fontSize: '14px', lineHeight: 1.43, color: color.mist }}>
-              180 expected attendance rules out 3 of 6 venues. Atrium Hall and
-              Deepwater Auditorium remain suitable on 12 October.
+        {/* Venue fit for the saved draft (SG2-47 suitability API) */}
+        {effectiveEventId ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <Eyebrow>Venue fit</Eyebrow>
+            <span style={{ fontSize: '13px', color: color.silver }}>
+              Checked against the last saved version of this request. Save first to include recent changes.
             </span>
-          </Notice>
+            {fitShown ? (
+              <EventVenueFit
+                key={savedVersion}
+                accessToken={accessToken ?? loadSession()?.accessToken}
+                eventId={Number(effectiveEventId)}
+                eventName="this request"
+              />
+            ) : (
+              <GhostButton onClick={() => setFitShown(true)} style={{ alignSelf: 'flex-start' }}>
+                Check venue fit
+              </GhostButton>
+            )}
+          </div>
         ) : null}
 
         {/* Actions row */}

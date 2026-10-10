@@ -37,9 +37,10 @@ export function FitIssues({ suitability }: { suitability: Suitability }) {
 /**
  * Shown under a venue search opened from an event: each venue that does not
  * fit the event and why (AC1, AC2, AC4). Search hides venues that miss its
- * criteria; this says what is wrong with them.
+ * criteria; this says what is wrong with them. The organiser's request form
+ * shows the same check for a saved draft (SG2-30).
  */
-export function EventVenueFit({ accessToken, eventId, eventName }: { accessToken: string; eventId: number; eventName: string }) {
+export function EventVenueFit({ accessToken, eventId, eventName }: { accessToken: string | null | undefined; eventId: number; eventName: string }) {
   const [venues, setVenues] = useState<VenueFit[] | null>(null);
   const [error, setError] = useState('');
 
