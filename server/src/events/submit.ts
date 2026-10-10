@@ -7,6 +7,7 @@ import {
   type FetchEventRequestResult,
   type SubmitEventRequestResult
 } from '../db/eventRequests';
+import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import type { Principal } from '../auth/policy';
 import { missingForSubmission } from './fields';
 
@@ -22,6 +23,7 @@ export interface SubmitEventRequestDependencies {
     organiserId: string
   ) => Promise<FetchEventRequestResult>;
   submitRequest?: (admin: SupabaseClient, eventId: number) => Promise<SubmitEventRequestResult>;
+  writeHistory?: typeof insertAuditLogs;
 }
 
 /** Statuses a caller may submit from: a fresh draft, or a rejected request being reworked. */
@@ -37,12 +39,20 @@ const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected', 'needs_clarification'
  * `submitted` happens only here, through the admin client, so it can never be
  * forged by a direct client write to `status` — the gap the AI Security
  * Review flagged on the earlier attempt at this ticket (PR #13).
+ *
+ * The transition is recorded in SG2-40's history with the organiser as
+ * actor. The old value is the status just read: the write is guarded on the
+ * same submittable statuses and none of them can move to another submittable
+ * one in between, so it is the status the write actually replaced. As in the
+ * clarification handler, a history row that cannot be written answers 503
+ * rather than reporting a change the history does not show.
  */
 export function submitEventRequestHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchOwnRequest = fetchManageableEventRequest,
-  submitRequest = submitEventRequest
+  submitRequest = submitEventRequest,
+  writeHistory = insertAuditLogs
 }: SubmitEventRequestDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -96,6 +106,14 @@ export function submitEventRequestHandler({
 
     const submitted = await submitRequest(admin, eventId);
     if (!submitted.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    const recorded = await writeHistory(admin, [
+      statusChange(eventId, principal.userId, existing.request.status, submitted.request.status)
+    ]);
+    if (!recorded.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }

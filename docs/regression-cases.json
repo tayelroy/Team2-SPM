@@ -2223,6 +2223,27 @@
     }
   },
   {
+    "id": "DB-HISTORY-01",
+    "title": "Organisers cannot read internal planning-notes history; internal staff still can",
+    "story": "SG2-40",
+    "purpose": "Check the recreated event_audit_logs_read policy hides internal-only fields (planning_notes) from the owning organiser through actual stored rows, while internal staff keep the full history.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations including 202610130001_event_history_internal_fields.sql; synthetic transaction-local data.",
+    "steps": [
+      "Seed the owning organiser, the assigned coordinator, a Safety Officer, a planning event and history rows for planning_notes, expected_attendance and status.",
+      "As the owning organiser, select the event's history.",
+      "As the assigned coordinator and as the Safety Officer, select the same history.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/event_history_internal_fields.sql",
+    "expected": "The organiser reads the expected_attendance and status rows but no planning_notes row; the coordinator reads the planning_notes row; the Safety Officer reads all three rows.",
+    "evidence": "supabase/tests/event_history_internal_fields.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed with the other 22 CI database suites. Mutation check: without 202610130001_event_history_internal_fields.sql the suite fails on organiser-planning-notes-hidden.",
+    "execution_date": "10 Oct 2026",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-40-history-notes-and-status-changes on origin/main 88a431a; CI database job replayed on embedded PostgreSQL 17 (auth fixture, 31/31 migrations, 23/23 suites in ci.yml order). Hosted CI evidence comes from the PR check."
+  },
+  {
     "id": "SG2-47-P01",
     "title": "A coordinator sees which venues do not fit an approved event and why",
     "type": "Positive",
