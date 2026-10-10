@@ -23,6 +23,11 @@ export const EMPTY_SEARCH: VenueSearchValues = {
 const SGT_OFFSET_MS = 8 * 60 * 60 * 1000;
 const sgt = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore' });
 
+/** A datetime-local value read as Singapore time, in epoch ms; NaN when empty or invalid. */
+export function sgtToMs(local: string): number {
+  return Date.parse(`${local}:00+08:00`);
+}
+
 export function sgtToIso(local: string): string {
   return new Date(`${local}:00+08:00`).toISOString();
 }

@@ -20,12 +20,13 @@ async function open(role: 'Venue Staff' | 'Event Coordinator' = 'Venue Staff') {
   render(<VenueHolds role={role} accessToken="token" />);
   await screen.findByText('Partner forum · Event #41');
 }
-function fill(expiry = '2030-06-14T01:00', end = '2030-06-15T09:00') {
+// Typed as Singapore time (UTC+8); the browser here runs in UTC.
+function fill(expiry = '2030-06-14T09:00', end = '2030-06-15T17:00') {
   fireEvent.change(screen.getByLabelText('Event'), { target: { value: '41' } });
   fireEvent.change(screen.getByLabelText('Venue'), { target: { value: '1' } });
-  fireEvent.change(screen.getByLabelText('Period starts'), { target: { value: '2030-06-15T01:00' } });
-  fireEvent.change(screen.getByLabelText('Period ends'), { target: { value: end } });
-  fireEvent.change(screen.getByLabelText('Hold expires'), { target: { value: expiry } });
+  fireEvent.change(screen.getByLabelText('Period starts (Singapore time)'), { target: { value: '2030-06-15T09:00' } });
+  fireEvent.change(screen.getByLabelText('Period ends (Singapore time)'), { target: { value: end } });
+  fireEvent.change(screen.getByLabelText('Hold expires (Singapore time)'), { target: { value: expiry } });
 }
 
 test('[NORMAL] [SG2-84:AC1,AC4,AC6] staff create a persisted tentative hold with an explicit expiry', async () => {
@@ -38,7 +39,7 @@ test('[NORMAL] [SG2-84:AC1,AC4,AC6] staff create a persisted tentative hold with
   expect(screen.getByText('Tentative', { exact: true })).toBeInTheDocument();
   expect(screen.getByRole('status')).toHaveTextContent('Hold placed. The Event Coordinator has been notified of its expiry.');
   expect(createHold).toHaveBeenCalledWith('token', { event_id: 41, venue_id: 1, starts_at: '2030-06-15T01:00:00.000Z', ends_at: '2030-06-15T09:00:00.000Z', expires_at: '2030-06-14T01:00:00.000Z' });
-  expect(screen.getByLabelText('Hold expires')).toHaveValue('');
+  expect(screen.getByLabelText('Hold expires (Singapore time)')).toHaveValue('');
 });
 
 test('[FAILURE] [SG2-84:AC1,AC2] missing expiry or selection never dispatches a creation', async () => {
@@ -49,7 +50,7 @@ test('[FAILURE] [SG2-84:AC1,AC2] missing expiry or selection never dispatches a 
   expect(createHold).not.toHaveBeenCalled();
 });
 
-test.each(['2030-06-12T01:00', '2030-06-12T00:59'])('[BOUNDARY] [SG2-84:AC1,AC2] expiry %s is not in the future', async expiry => {
+test.each(['2030-06-12T09:00', '2030-06-12T08:59'])('[BOUNDARY] [SG2-84:AC1,AC2] expiry %s is not in the future', async expiry => {
   await open(); fill(expiry); fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
   expect(screen.getByRole('alert')).toHaveTextContent('The period must end after it starts, and the expiry must be in the future.');
   expect(createHold).not.toHaveBeenCalled();
@@ -57,10 +58,10 @@ test.each(['2030-06-12T01:00', '2030-06-12T00:59'])('[BOUNDARY] [SG2-84:AC1,AC2]
 
 test('[BOUNDARY] [SG2-84:AC1] an empty-length period is refused and a future expiry one minute after now is accepted', async () => {
   vi.mocked(createHold).mockResolvedValue({ ok: true, data: hold });
-  await open(); fill('2030-06-12T01:01', '2030-06-15T01:00');
+  await open(); fill('2030-06-12T09:01', '2030-06-15T09:00');
   fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
   expect(createHold).not.toHaveBeenCalled();
-  fill('2030-06-12T01:01'); fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
+  fill('2030-06-12T09:01'); fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
   await screen.findByText('Hold placed. The Event Coordinator has been notified of its expiry.');
   expect(createHold).toHaveBeenCalledTimes(1);
 });
@@ -69,7 +70,7 @@ test('[CONFLICT] [SG2-84:AC3] overlap errors preserve the filled form and existi
   vi.mocked(createHold).mockResolvedValue({ ok: false, error: 'Conflicts with Tentative hold #7.' });
   await open(); fill(); fireEvent.submit(screen.getByRole('form', { name: 'Place a tentative hold' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Conflicts with Tentative hold #7.');
-  expect(screen.getByLabelText('Hold expires')).toHaveValue('2030-06-14T01:00');
+  expect(screen.getByLabelText('Hold expires (Singapore time)')).toHaveValue('2030-06-14T09:00');
   expect(screen.getAllByRole('article')).toHaveLength(1);
 });
 

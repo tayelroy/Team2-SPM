@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { EMPTY_SEARCH, VenueSearchError, formatSgt, isoToSgtLocal, searchVenues, sgtToIso } from './searchApi';
+import { EMPTY_SEARCH, VenueSearchError, formatSgt, isoToSgtLocal, searchVenues, sgtToIso, sgtToMs } from './searchApi';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -17,6 +17,13 @@ test.each([
   [503, undefined, 'Venue search is unavailable right now. Please try again.']
 ] as const)('[FAILURE] [SG2-46:AC2] VenueSearchError(%i) carries a safe message', (status, detail, message) => {
   expect(new VenueSearchError(status, detail).message).toBe(message);
+});
+
+test('[BOUNDARY] [SG2-44:AC1] [SG2-45:AC1] sgtToMs reads a typed time as Singapore time and gives NaN for an empty or invalid value', () => {
+  expect(new Date(sgtToMs('2027-01-01T00:00')).toISOString()).toBe('2026-12-31T16:00:00.000Z');
+  expect(new Date(sgtToMs('2030-07-01T09:00')).toISOString()).toBe('2030-07-01T01:00:00.000Z');
+  expect(sgtToMs('')).toBeNaN();
+  expect(sgtToMs('not a time')).toBeNaN();
 });
 
 test('[NORMAL] [SG2-46:AC2] searchVenues sends only the criteria that are filled in, with the bearer token', async () => {

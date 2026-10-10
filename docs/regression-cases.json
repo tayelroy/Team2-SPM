@@ -1364,15 +1364,15 @@
     "type": "Positive",
     "story": "SG2-45",
     "purpose": "Verify AC1 and AC3: a block with a reason is recorded, shown as unavailable on the availability calendar, and removing it frees the period.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context in Singapore time (timezoneId Asia/Singapore); signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
       "Block 20 June 2030 09:00–17:00 with reason Renovation and note Carpet replacement.",
-      "Open Venue Availability for June 2030 and inspect the calendar.",
+      "Open Venue Availability for June 2030 and inspect 20 and 21 June.",
       "Return to the block screen, remove the block, and re-check the API and calendar."
     ],
     "data": "Seeded Regression Hall with its existing Scheduled maintenance block; 20 June 2030",
-    "expected": "The new block is listed and appears as Regression Hall · Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
+    "expected": "The new block is listed; on the June calendar 20 June is unavailable and lists Regression Hall · Carpet replacement, and 21 June is free. After removal only the seeded maintenance block remains in the API and on the calendar.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",

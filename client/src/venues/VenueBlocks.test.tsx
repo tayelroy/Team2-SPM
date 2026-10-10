@@ -61,8 +61,8 @@ async function openBlocks(blocks: VenueBlock[] = [], override?: Handler) {
 }
 
 function fillBlock(start: string, end: string, reason: string, category = 'maintenance') {
-  fireEvent.change(screen.getByLabelText('Unavailable from'), { target: { value: start } });
-  fireEvent.change(screen.getByLabelText('Unavailable until'), { target: { value: end } });
+  fireEvent.change(screen.getByLabelText('Unavailable from (Singapore time)'), { target: { value: start } });
+  fireEvent.change(screen.getByLabelText('Unavailable until (Singapore time)'), { target: { value: end } });
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: category } });
   fireEvent.change(screen.getByLabelText('Note'), { target: { value: reason } });
   fireEvent.submit(screen.getByRole('form', { name: 'Block venue' }));
@@ -82,9 +82,9 @@ test('[FAILURE] [SG2-45:AC1] only callers who may manage blocks see the block co
 test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC6] the block screen lists upcoming blocks with reason, note, recorder and time, or says there are none', async () => {
   await openBlocks([existing, { ...existing, unavailability_id: 2, category: 'other', reason: 'Legacy closure', created_at: null, created_by_name: null }]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
-  expect(item).toHaveTextContent('1 Aug 2030, 1:00 am – 2 Aug 2030, 1:00 am');
+  expect(item).toHaveTextContent('1 Aug 2030, 9:00 am – 2 Aug 2030, 9:00 am');
   expect(item).toHaveTextContent('Maintenance: Scheduled maintenance');
-  expect(item).toHaveTextContent('Recorded by Vera Staff on 5 Oct 2026, 1:00 am');
+  expect(item).toHaveTextContent('Recorded by Vera Staff on 5 Oct 2026, 9:00 am');
   expect(within(item).queryByRole('list')).not.toBeInTheDocument();
   expect(screen.getByRole('listitem', { name: 'Legacy closure' })).toHaveTextContent('Other: Legacy closureRecorded before who and when were kept');
   cleanup();
@@ -96,8 +96,9 @@ test('[NORMAL] [SG2-45:AC1] [SG2-80:AC1] blocking a free period with a reason an
   const { fetch } = await openBlocks([existing]);
   await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   fillBlock('2030-07-01T09:00', '2030-07-01T17:00', '  Carpet replacement ', 'renovation');
-  const starts = '2030-07-01T09:00:00.000Z';
-  const ends = '2030-07-01T17:00:00.000Z';
+  // Typed as Singapore time; the browser here runs in UTC.
+  const starts = '2030-07-01T01:00:00.000Z';
+  const ends = '2030-07-01T09:00:00.000Z';
   expect(await screen.findByRole('status')).toHaveTextContent('Atrium Hall is blocked 1 Jul 2030, 9:00 am – 1 Jul 2030, 5:00 pm.');
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({
     method: 'POST', body: JSON.stringify({ starts_at: starts, ends_at: ends, category: 'renovation', reason: 'Carpet replacement' })
@@ -124,9 +125,9 @@ test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] a period holding confirm
   expect(item).toHaveTextContent('Equipment failure: Air conditioning failed');
   expect(item).toHaveTextContent('Affected by venue unavailability (not cancelled)');
   expect(within(screen.getByRole('list', { name: 'Events affected by Air conditioning failed' })).getAllByRole('listitem').map(row => row.textContent)).toEqual([
-    'Gala Night (confirmed) · 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am',
-    'Event 4 · 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am',
-    'Booking #9 · 15 Jun 2030, 2:00 am – 15 Jun 2030, 4:00 am'
+    'Gala Night (confirmed) · 15 Jun 2030, 10:00 am – 15 Jun 2030, 12:00 pm',
+    'Event 4 · 15 Jun 2030, 10:00 am – 15 Jun 2030, 12:00 pm',
+    'Booking #9 · 15 Jun 2030, 10:00 am – 15 Jun 2030, 12:00 pm'
   ]);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
@@ -143,7 +144,7 @@ test('[NORMAL] [SG2-45:AC3] AC3: removing a block makes the venue available for 
   const { fetch } = await openBlocks([existing]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   fireEvent.click(within(item).getByRole('button', { name: 'Remove block' }));
-  expect(await screen.findByRole('status')).toHaveTextContent('Block removed. Atrium Hall is available again 1 Aug 2030, 1:00 am – 2 Aug 2030, 1:00 am.');
+  expect(await screen.findByRole('status')).toHaveTextContent('Block removed. Atrium Hall is available again 1 Aug 2030, 9:00 am – 2 Aug 2030, 9:00 am.');
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks/1', expect.objectContaining({ method: 'DELETE' }));
   expect(screen.getByText(/No upcoming blocks/)).toBeInTheDocument();
 });
@@ -156,7 +157,7 @@ test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC1] an invalid period, missing reason or 
     ['2030-07-01T09:00', '', 'Reason'],
     ['2030-07-01T17:00', '2030-07-01T09:00', 'Reason'],
     ['2030-07-01T09:00', '2030-07-01T09:00', 'Reason'],
-    ['2026-09-30T23:59', '2026-10-01T00:00', 'Reason'],
+    ['2026-10-01T07:59', '2026-10-01T08:00', 'Reason'],
     ['2020-07-01T09:00', '2020-07-01T17:00', 'Reason'],
     ['2030-07-01T09:00', '2030-07-01T17:00', '   '],
     ['2030-07-01T09:00', '2030-07-01T17:00', 'x'.repeat(501)],
@@ -175,7 +176,7 @@ test('[BOUNDARY] [SG2-45:AC1] a one-minute free period accepts a reason of exact
   fillBlock('2030-07-01T09:00', '2030-07-01T09:01', reason);
   expect(await screen.findByRole('listitem', { name: reason })).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith('/api/venues/1/blocks', expect.objectContaining({
-    method: 'POST', body: JSON.stringify({ starts_at: '2030-07-01T09:00:00.000Z', ends_at: '2030-07-01T09:01:00.000Z', category: 'maintenance', reason }),
+    method: 'POST', body: JSON.stringify({ starts_at: '2030-07-01T01:00:00.000Z', ends_at: '2030-07-01T01:01:00.000Z', category: 'maintenance', reason }),
   }));
 });
 

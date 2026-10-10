@@ -10,9 +10,9 @@ afterEach(() => vi.unstubAllGlobals());
 const values = { starts_at: '2030-07-01T01:00:00.000Z', ends_at: '2030-07-01T09:00:00.000Z', category: 'renovation' as const, reason: 'Carpet replacement' };
 const block = { unavailability_id: 4, ...values, created_at: '2026-10-05T01:00:00.000Z', created_by_name: 'Vera Staff', affected: [] };
 
-test('[NORMAL] [SG2-45:block-period] describePeriod joins the formatted start and end', () => {
+test('[NORMAL] [SG2-45:block-period] describePeriod joins the start and end in Singapore time, whatever the browser zone', () => {
   expect(describePeriod(block.starts_at, block.ends_at))
-    .toBe('1 Jul 2030, 1:00 am – 1 Jul 2030, 9:00 am');
+    .toBe('1 Jul 2030, 9:00 am – 1 Jul 2030, 5:00 pm');
 });
 
 test('[NORMAL] [SG2-80:AC1] the reasons offered are exactly the five listed in the story', () => {
@@ -20,8 +20,8 @@ test('[NORMAL] [SG2-80:AC1] the reasons offered are exactly the five listed in t
 });
 
 test('[BOUNDARY] [SG2-80:AC6] describeRecorded names the recorder and time, a removed recorder, or a period from before recording began', () => {
-  expect(describeRecorded(block)).toBe('Recorded by Vera Staff on 5 Oct 2026, 1:00 am');
-  expect(describeRecorded({ ...block, created_by_name: null })).toBe('Recorded by a former user on 5 Oct 2026, 1:00 am');
+  expect(describeRecorded(block)).toBe('Recorded by Vera Staff on 5 Oct 2026, 9:00 am');
+  expect(describeRecorded({ ...block, created_by_name: null })).toBe('Recorded by a former user on 5 Oct 2026, 9:00 am');
   expect(describeRecorded({ created_at: null, created_by_name: null })).toBe('Recorded before who and when were kept');
 });
 
