@@ -920,39 +920,46 @@ test('SG2-36-N01 | [SG2-36:AC3] [CONFLICT] only the two parties to the request c
   expect((await posted.json()).status).toBe('under_review');
 });
 
-test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
-  await signIn(page, 'venue');
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
-  await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
-  await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
-  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
-  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
+// The block form reads times in the browser's zone, so run it as a Singapore user
+// to make the day-level calendar checks exact (as the SG2-84 holds journeys do).
+test.describe('Venue blocks in Singapore time (SG2-45)', () => {
+  test.use({ timezoneId: 'Asia/Singapore' });
 
-  // AC1: the block is recorded and shown as unavailable for that period.
-  await nav(page, 'Venue Availability');
-  await page.getByLabel('Jump to year').selectOption('2030');
-  await page.getByLabel('Jump to month').selectOption('5');
-  // The times are typed in the browser's zone; in UTC the block runs past Singapore midnight onto 21 June too.
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true }).first()).toBeVisible();
+  test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
+    await signIn(page, 'venue');
+    await nav(page, 'Catalogue');
+    await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+    await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
+    await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
+    await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
+    await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
+    await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
+    await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
+    await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
 
-  // AC3: removing it makes the venue available for that period again.
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Block removed');
-  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
-  const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
-  expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
-  await nav(page, 'Venue Availability');
-  await page.getByLabel('Jump to year').selectOption('2030');
-  await page.getByLabel('Jump to month').selectOption('5');
-  await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+    // AC1: the block is recorded and shown as unavailable for that period.
+    await nav(page, 'Venue Availability');
+    await page.getByLabel('Jump to year').selectOption('2030');
+    await page.getByLabel('Jump to month').selectOption('5');
+    // 09:00–17:00 on 20 June marks that day only.
+    await expect(page.getByLabel('2030-06-20: unavailable', { exact: true })).toContainText('Regression Hall · Carpet replacement');
+    await expect(page.getByLabel('2030-06-21: free', { exact: true })).toBeVisible();
+
+    // AC3: removing it makes the venue available for that period again.
+    await nav(page, 'Catalogue');
+    await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+    await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Block removed');
+    await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
+    const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
+    expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
+    await nav(page, 'Venue Availability');
+    await page.getByLabel('Jump to year').selectOption('2030');
+    await page.getByLabel('Jump to month').selectOption('5');
+    await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
+    await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+  });
 });
 
 test('SG2-45-N01 | [SG2-45:AC1] [SG2-45:AC3] [SG2-25:AC1] [FAILURE] other roles cannot block or remove a block', async ({ page }) => {

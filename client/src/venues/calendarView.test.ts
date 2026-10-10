@@ -145,7 +145,7 @@ test('[BOUNDARY] [SG2-44:AC1] the month changes at Singapore midnight, not UTC m
   expect(monthRange(new Date('2026-12-31T16:00:00.000Z'))).toMatchObject({ year: 2027, month: 0, from: '2026-12-31T16:00:00.000Z' });
 });
 
-test('[CONFLICT] [SG2-44:AC1] an early-morning Singapore booking stays on its own day even though it is the previous day in UTC', () => {
+test('[BOUNDARY] [SG2-44:AC1] an early-morning Singapore booking stays on its own day even though it is the previous day in UTC', () => {
   const venues = [venue('Atrium', [
     { start: '2026-10-19T23:00:00.000Z', end: '2026-10-20T01:00:00.000Z', kind: 'booking', label: 'confirmed · event 3' }
   ])];
