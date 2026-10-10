@@ -113,7 +113,9 @@ independently of what the UI shows.
   delete one you no longer need.
 - Once every required field (name, purpose, description, date, expected
   attendance, venue requirements) is filled in, submit it for review from
-  the request's own screen.
+  the request's own screen. You land on the event's details with a message
+  confirming it was submitted. Dates are entered in Singapore time; **Check
+  venue fit** on a saved request lists venues that do not fit it and why.
 - **My events** shows requests belonging to your client organisation, including
   those raised by colleagues. Colleagues' requests are view-only; editing,
   submission and deletion remain with the creator. Your own drafts and rejected

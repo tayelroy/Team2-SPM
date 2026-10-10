@@ -437,18 +437,18 @@
     "steps": [
       "Sign in as Event Organiser, open My events and select Planning workshop.",
       "Open New request, fill the required event fields and submit.",
-      "Immediately check Browser workshop details, submitted status, purpose and description; check the selection prompt and edit action are absent.",
+      "Immediately check the confirmation naming Browser workshop as submitted for review, then its details, submitted status, purpose and description; check the selection prompt and edit action are absent.",
       "Check submitted status through the fixture API.",
       "Reload, open My drafts and verify the new event is listed; read its API detail and check all saved fields."
     ],
-    "data": "Browser workshop; Team planning; Review the release plan; 2030-06-15T09:00:00Z; attendance 25; Projector",
-    "expected": "The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
+    "data": "Browser workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 Singapore time (stored 2030-06-15T09:00:00.000Z); attendance 25; Projector",
+    "expected": "The immediate detail view confirms 'Browser workshop has been submitted for review.' and shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
-    "execution_date": "1 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -460,6 +460,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+        "execution_date": "1 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Current browser assertions passed. The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
@@ -478,7 +484,7 @@
       "SG2-87:AC4"
     ],
     "method_id": "TC-6cea16b8d437",
-    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4."
+    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4. Since the SG2-30 draft-form fix the date is a Singapore-time date-time input and the detail view opens with a submission confirmation; it is Not Executed until re-run."
   },
   {
     "id": "SG2-28-B01",
@@ -539,18 +545,18 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Set event 1 accessibility needs to Step-free entrance through the creator API session; verify that value appears before clearing it.",
-      "Open the seeded Planning workshop draft.",
-      "Rename it Revised workshop and clear Accessibility needs.",
-      "Submit, reload and fetch event detail."
+      "Open the seeded Planning workshop draft; verify its stored 02:00 UTC date shows as 15 Jun 2030 10:00 Singapore time, no requirement chips or canned suitability banner are shown, and Check venue fit reports real venue fit for the saved draft.",
+      "Rename it Revised workshop and clear Accessibility needs, leaving the date untouched.",
+      "Submit; verify the detail page confirms Revised workshop was submitted for review and My drafts is empty; reload and fetch event detail."
     ],
-    "data": "Seeded complete event 1 with Step-free entrance; change name to Revised workshop and clear accessibility needs.",
-    "expected": "Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
+    "data": "Seeded complete event 1 (2030-06-15T02:00:00.000Z) with Step-free entrance; change name to Revised workshop and clear accessibility needs.",
+    "expected": "The date input shows 2030-06-15T10:00; no prototype chips or banner; Check venue fit shows 'Every venue fits this request' for the 20-person draft; after submit the detail page shows 'Revised workshop has been submitted for review.'; latest name is stored; event 1 is unassigned with null accessibility_needs and an unchanged proposed_date of 2030-06-15T02:00:00.000Z in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
-    "execution_date": "1 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -562,6 +568,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+        "execution_date": "1 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Current browser assertions passed. Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
@@ -578,7 +590,8 @@
       "SG2-29:AC2",
       "SG2-30:AC1"
     ],
-    "method_id": "TC-747b61ba6f0a"
+    "method_id": "TC-747b61ba6f0a",
+    "notes": "Extended by the SG2-30 draft-form fix (date input, removed prototype chips and banner, venue fit, submission confirmation); it is Not Executed until re-run."
   },
   {
     "id": "SG2-32-P01",
