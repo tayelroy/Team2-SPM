@@ -774,6 +774,35 @@
     "method_id": "TC-d16f3bc6645c"
   },
   {
+    "id": "SG2-44-P02",
+    "title": "calendar days run midnight to midnight Singapore time",
+    "type": "Positive / boundary",
+    "story": "SG2-44",
+    "purpose": "Regression for the bug where the calendar split days at UTC midnight, so a period starting at 12:00 am Singapore time was also shown on the previous day.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as Venue Staff and create a Regression Hall block from 12:00 am to 12:00 pm Singapore time on 1 July 2030 (30 June 16:00 to 1 July 04:00 UTC) through the API.",
+      "Open Venue Availability for June 2030 and inspect 30 June.",
+      "Move to July 2030 and inspect 1 and 2 July."
+    ],
+    "data": "Regression Hall; block 2030-06-30T16:00Z to 2030-07-01T04:00Z, Equipment failure, note Air conditioning failed",
+    "expected": "30 June is free and does not list the block; 1 July is unavailable and lists Regression Hall · Air conditioning failed; 2 July is free.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-44:AC1",
+      "SG2-44:AC2"
+    ],
+    "status": "Pass",
+    "actual": "Passed against the production app build; failed against the previous UTC calendar code, where 30 June was marked.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-44-calendar-singapore-days working tree; npm run test:e2e; local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
     "id": "BE-AUTH-01",
     "title": "Unauthorised requests and provider failures fail closed",
     "type": "Negative",

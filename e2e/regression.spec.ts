@@ -574,6 +574,24 @@ test('SG2-44-P01 | [SG2-44:AC1] [SG2-44:AC2] [NORMAL] calendar renders fixture a
   await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toHaveCount(0);
 });
 
+test('SG2-44-P02 | [SG2-44:AC1] [SG2-44:AC2] [BOUNDARY] calendar days run midnight to midnight Singapore time', async ({ page }) => {
+  await signIn(page, 'venue');
+  // 12:00 am–12:00 pm Singapore time on 1 July 2030, which starts on 30 June in UTC.
+  const created = await page.request.post('/api/venues/1/blocks', { headers: await authHeaders(page),
+    data: { starts_at: '2030-06-30T16:00:00Z', ends_at: '2030-07-01T04:00:00Z', category: 'equipment_failure', reason: 'Air conditioning failed' } });
+  expect(created.status()).toBe(201);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByRole('heading', { name: 'June 2030', exact: true })).toBeVisible();
+  await expect(page.getByLabel('2030-06-30: free', { exact: true })).toBeVisible();
+  await expect(page.getByText('Regression Hall · Air conditioning failed', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next month', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'July 2030', exact: true })).toBeVisible();
+  await expect(page.getByLabel('2030-07-01: unavailable', { exact: true })).toContainText('Regression Hall · Air conditioning failed');
+  await expect(page.getByLabel('2030-07-02: free', { exact: true })).toBeVisible();
+});
+
 test('SG2-35-P01 | [SG2-35:AC1] [SG2-35:AC2] [NORMAL] opening an assigned submitted request moves it to under review', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/assigned-review')).status()).toBe(204);
