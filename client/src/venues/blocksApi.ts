@@ -20,7 +20,8 @@ export type VenueBlock = {
   created_at: string | null; created_by_name: string | null; affected: AffectedBooking[];
 };
 
-const dateTime = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short' });
+// Shown in Singapore time, matching how the period is entered.
+const dateTime = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore' });
 
 /** A period as one readable line, e.g. "1 Oct 2026, 9:00 am – 1 Oct 2026, 5:00 pm". */
 export function describePeriod(startsAt: string, endsAt: string): string {

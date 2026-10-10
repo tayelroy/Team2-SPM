@@ -4,10 +4,10 @@ import type { VenueAvailabilitySummary } from './availability';
 
 const OCT_2026 = new Date(Date.UTC(2026, 9, 15));
 
-test('[NORMAL] [SG2-44:AC1] monthRange returns the UTC bounds and label of the containing month', () => {
+test('[NORMAL] [SG2-44:AC1] monthRange returns the Singapore-midnight bounds and label of the containing month', () => {
   expect(monthRange(OCT_2026)).toEqual({
-    from: '2026-10-01T00:00:00.000Z',
-    to: '2026-11-01T00:00:00.000Z',
+    from: '2026-09-30T16:00:00.000Z',
+    to: '2026-10-31T16:00:00.000Z',
     label: 'October 2026',
     year: 2026,
     month: 9
@@ -16,7 +16,7 @@ test('[NORMAL] [SG2-44:AC1] monthRange returns the UTC bounds and label of the c
 
 test('[BOUNDARY] [SG2-44:AC1] monthRange rolls over into the next year at December', () => {
   const result = monthRange(new Date(Date.UTC(2026, 11, 25)));
-  expect(result.to).toBe('2027-01-01T00:00:00.000Z');
+  expect(result.to).toBe('2026-12-31T16:00:00.000Z');
   expect(result.label).toBe('December 2026');
 });
 
@@ -54,10 +54,10 @@ test('[NORMAL] [SG2-44:AC1] a multi-day booking marks every day it overlaps and 
   expect(byDate['2026-10-01'].items).toEqual(['Atrium · confirmed']);
 });
 
-test('[BOUNDARY] [SG2-44:AC1] an entry ending exactly at midnight does not spill into the next day', () => {
+test('[BOUNDARY] [SG2-44:AC1] an entry ending exactly at Singapore midnight does not spill into the next day', () => {
   const venues = [
     venue('Atrium', [
-      { start: '2026-10-05T09:00:00.000Z', end: '2026-10-06T00:00:00.000Z', kind: 'booking', label: 'held' }
+      { start: '2026-10-05T01:00:00.000Z', end: '2026-10-05T16:00:00.000Z', kind: 'booking', label: 'held' }
     ])
   ];
   const byDate = Object.fromEntries(buildCalendarDays(OCT_2026, venues).map((d) => [d.date, d]));
@@ -65,10 +65,10 @@ test('[BOUNDARY] [SG2-44:AC1] an entry ending exactly at midnight does not spill
   expect(byDate['2026-10-06'].kind).toBe('free');
 });
 
-test('[BOUNDARY] [SG2-44:AC1] an entry starting exactly at midnight belongs to that day, not the previous one', () => {
+test('[BOUNDARY] [SG2-44:AC1] an entry starting exactly at Singapore midnight belongs to that day, not the previous one', () => {
   const venues = [
     venue('Atrium', [
-      { start: '2026-10-06T00:00:00.000Z', end: '2026-10-06T09:00:00.000Z', kind: 'unavailable', label: 'Maintenance' }
+      { start: '2026-10-05T16:00:00.000Z', end: '2026-10-06T01:00:00.000Z', kind: 'unavailable', label: 'Maintenance' }
     ])
   ];
   const byDate = Object.fromEntries(buildCalendarDays(OCT_2026, venues).map((d) => [d.date, d]));
@@ -121,8 +121,35 @@ test('[NORMAL] [SG2-78:AC3] setup and turnaround are listed separately from the 
 });
 
 test('[BOUNDARY] [SG2-78:AC3] a day holding only a turnaround that ran past midnight is still occupied, as setup and turnaround', () => {
-  const turnaround = { start: '2026-10-10T23:30:00.000Z', end: '2026-10-11T00:15:00.000Z', kind: 'turnaround' as const, label: 'Turnaround (45 min) after Tentative' };
+  const turnaround = { start: '2026-10-10T15:30:00.000Z', end: '2026-10-10T16:15:00.000Z', kind: 'turnaround' as const, label: 'Turnaround (45 min) after Tentative' };
   const days = buildCalendarDays(OCT_2026, [venue('Atrium', [turnaround])]);
   expect(days.find(day => day.date === '2026-10-11')).toMatchObject({ kind: 'preparation', items: ['Atrium · Turnaround (45 min) after Tentative'] });
   expect(days.find(day => day.date === '2026-10-12')?.kind).toBe('free');
+});
+
+test('[BOUNDARY] [SG2-44:AC1] a block from 12:00 am 1 Jan to 12:00 pm 2 Jan Singapore time marks 1 and 2 January and not 31 December', () => {
+  const block = venue('Atrium Hall', [
+    { start: '2026-12-31T16:00:00.000Z', end: '2027-01-02T04:00:00.000Z', kind: 'unavailable', label: 'air con spoil' }
+  ]);
+  const january = Object.fromEntries(buildCalendarDays(new Date(Date.UTC(2027, 0, 15)), [block]).map((d) => [d.date, d.kind]));
+  expect(january['2027-01-01']).toBe('unavailable');
+  expect(january['2027-01-02']).toBe('unavailable');
+  expect(january['2027-01-03']).toBe('free');
+  const december = buildCalendarDays(new Date(Date.UTC(2026, 11, 15)), [block]);
+  expect(december.find((d) => d.date === '2026-12-31')).toMatchObject({ kind: 'free', items: [] });
+});
+
+test('[BOUNDARY] [SG2-44:AC1] the month changes at Singapore midnight, not UTC midnight', () => {
+  expect(monthRange(new Date('2026-10-31T15:59:59.999Z')).label).toBe('October 2026');
+  expect(monthRange(new Date('2026-10-31T16:00:00.000Z')).label).toBe('November 2026');
+  expect(monthRange(new Date('2026-12-31T16:00:00.000Z'))).toMatchObject({ year: 2027, month: 0, from: '2026-12-31T16:00:00.000Z' });
+});
+
+test('[BOUNDARY] [SG2-44:AC1] an early-morning Singapore booking stays on its own day even though it is the previous day in UTC', () => {
+  const venues = [venue('Atrium', [
+    { start: '2026-10-19T23:00:00.000Z', end: '2026-10-20T01:00:00.000Z', kind: 'booking', label: 'confirmed · event 3' }
+  ])];
+  const byDate = Object.fromEntries(buildCalendarDays(OCT_2026, venues).map((d) => [d.date, d]));
+  expect(byDate['2026-10-19'].kind).toBe('free');
+  expect(byDate['2026-10-20']).toMatchObject({ kind: 'booked', items: ['Atrium · confirmed · event 3'] });
 });

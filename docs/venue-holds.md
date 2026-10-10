@@ -1,6 +1,6 @@
 # Tentative venue holds — SG2-84 and SG2-85
 
-Venue Staff use **Venue holds** to reserve a venue for an approved or planning event with an assigned Event Coordinator. Select the event, venue and period, and enter a future expiry. Inputs use the device's local time; saved values are UTC instants and displayed dates use Singapore time. Event Coordinators use the same screen to view holds for their assigned events.
+Venue Staff use **Venue holds** to reserve a venue for an approved or planning event with an assigned Event Coordinator. Select the event, venue and period, and enter a future expiry. Inputs are read as Singapore time, whatever the device's time zone; saved values are UTC instants and displayed dates use Singapore time. Event Coordinators use the same screen to view holds for their assigned events.
 
 An active hold is labelled **Tentative** in the list and availability calendar. It conflicts with overlapping holds, bookings and unavailable periods and removes the venue from search matches for that period. Touching intervals do not overlap. Placement creates a pending venue booking request and informs the assigned coordinator, including the expiry. It creates no confirmed booking and does not change the event's status or approved booking pointer. Existing legacy `venue_bookings.status = 'held'` search warnings are preserved; the new effective view distinguishes SG2-84 records with `status = 'tentative'`.
 

@@ -585,6 +585,24 @@ test('SG2-44-P01 | [SG2-44:AC1] [SG2-44:AC2] [NORMAL] calendar renders fixture a
   await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toHaveCount(0);
 });
 
+test('SG2-44-P02 | [SG2-44:AC1] [SG2-44:AC2] [BOUNDARY] calendar days run midnight to midnight Singapore time', async ({ page }) => {
+  await signIn(page, 'venue');
+  // 12:00 am–12:00 pm Singapore time on 1 July 2030, which starts on 30 June in UTC.
+  const created = await page.request.post('/api/venues/1/blocks', { headers: await authHeaders(page),
+    data: { starts_at: '2030-06-30T16:00:00Z', ends_at: '2030-07-01T04:00:00Z', category: 'equipment_failure', reason: 'Air conditioning failed' } });
+  expect(created.status()).toBe(201);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByRole('heading', { name: 'June 2030', exact: true })).toBeVisible();
+  await expect(page.getByLabel('2030-06-30: free', { exact: true })).toBeVisible();
+  await expect(page.getByText('Regression Hall · Air conditioning failed', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next month', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'July 2030', exact: true })).toBeVisible();
+  await expect(page.getByLabel('2030-07-01: unavailable', { exact: true })).toContainText('Regression Hall · Air conditioning failed');
+  await expect(page.getByLabel('2030-07-02: free', { exact: true })).toBeVisible();
+});
+
 test('SG2-35-P01 | [SG2-35:AC1] [SG2-35:AC2] [NORMAL] opening an assigned submitted request moves it to under review', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/assigned-review')).status()).toBe(204);
@@ -902,38 +920,46 @@ test('SG2-36-N01 | [SG2-36:AC3] [CONFLICT] only the two parties to the request c
   expect((await posted.json()).status).toBe('under_review');
 });
 
-test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
-  await signIn(page, 'venue');
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
-  await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
-  await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
-  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
-  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
+// The block form reads times in the browser's zone, so run it as a Singapore user
+// to make the day-level calendar checks exact (as the SG2-84 holds journeys do).
+test.describe('Venue blocks in Singapore time (SG2-45)', () => {
+  test.use({ timezoneId: 'Asia/Singapore' });
 
-  // AC1: the block is recorded and shown as unavailable for that period.
-  await nav(page, 'Venue Availability');
-  await page.getByLabel('Jump to year').selectOption('2030');
-  await page.getByLabel('Jump to month').selectOption('5');
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toBeVisible();
+  test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
+    await signIn(page, 'venue');
+    await nav(page, 'Catalogue');
+    await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+    await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
+    await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-06-20T09:00');
+    await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-06-20T17:00');
+    await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
+    await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
+    await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
+    await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
 
-  // AC3: removing it makes the venue available for that period again.
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Block removed');
-  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
-  const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
-  expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
-  await nav(page, 'Venue Availability');
-  await page.getByLabel('Jump to year').selectOption('2030');
-  await page.getByLabel('Jump to month').selectOption('5');
-  await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+    // AC1: the block is recorded and shown as unavailable for that period.
+    await nav(page, 'Venue Availability');
+    await page.getByLabel('Jump to year').selectOption('2030');
+    await page.getByLabel('Jump to month').selectOption('5');
+    // 09:00–17:00 on 20 June marks that day only.
+    await expect(page.getByLabel('2030-06-20: unavailable', { exact: true })).toContainText('Regression Hall · Carpet replacement');
+    await expect(page.getByLabel('2030-06-21: free', { exact: true })).toBeVisible();
+
+    // AC3: removing it makes the venue available for that period again.
+    await nav(page, 'Catalogue');
+    await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+    await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Block removed');
+    await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
+    const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
+    expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
+    await nav(page, 'Venue Availability');
+    await page.getByLabel('Jump to year').selectOption('2030');
+    await page.getByLabel('Jump to month').selectOption('5');
+    await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
+    await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+  });
 });
 
 test('SG2-45-N01 | [SG2-45:AC1] [SG2-45:AC3] [SG2-25:AC1] [FAILURE] other roles cannot block or remove a block', async ({ page }) => {
@@ -974,8 +1000,8 @@ test('SG2-80-P01 | [SG2-80:AC1] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-80:A
   await signIn(page, 'venue');
   await nav(page, 'Catalogue');
   await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-14T00:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-16T00:00');
+  await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-06-14T00:00');
+  await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-06-16T00:00');
   await page.getByLabel('Reason', { exact: true }).selectOption('equipment_failure');
   await page.getByLabel('Note', { exact: true }).fill('Air conditioning failed');
   await page.getByRole('button', { name: 'Block venue', exact: true }).click();
@@ -987,7 +1013,7 @@ test('SG2-80-P01 | [SG2-80:AC1] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-80:A
   // AC6: who recorded it and when.
   await expect(item).toContainText(/Recorded by Regression venue on \d{1,2} \w+ 20\d\d/);
   await expect(page.getByRole('list', { name: 'Events affected by Air conditioning failed' }))
-    .toContainText(/^Planning workshop \(draft\) · 15 Jun 2030, /);
+    .toContainText('Planning workshop (draft) · 15 Jun 2030, 10:00 am – 15 Jun 2030, 12:00 pm');
   const listed = (await (await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) })).json()).blocks
     .find((block: { reason: string }) => block.reason === 'Air conditioning failed');
   expect(listed).toMatchObject({ category: 'equipment_failure', created_by_name: 'Regression venue',
@@ -1011,8 +1037,8 @@ test('SG2-80-N01 | [SG2-80:AC1] [SG2-80:AC6] [SG2-25:AC1] [BOUNDARY] [FAILURE] a
   await nav(page, 'Catalogue');
   await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
   await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-07-01T09:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-07-01T17:00');
+  await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-07-01T09:00');
+  await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-07-01T17:00');
   await page.getByLabel('Note', { exact: true }).fill('No reason chosen');
   // Bypass the browser's required-field check so the screen's own validation runs.
   await page.getByRole('form', { name: 'Block venue' }).evaluate(form => (form as HTMLFormElement).noValidate = true);
@@ -1197,9 +1223,9 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
   async function fillHold(page: Page, values: { event?: string; venue?: string; start?: string; end?: string; expiry?: string } = {}) {
     await page.getByRole('combobox', { name: 'Event', exact: true }).selectOption(values.event ?? '81');
     await page.getByRole('combobox', { name: 'Venue', exact: true }).selectOption(values.venue ?? '1');
-    await page.getByLabel('Period starts', { exact: true }).fill(values.start ?? '2030-06-05T10:00');
-    await page.getByLabel('Period ends', { exact: true }).fill(values.end ?? '2030-06-05T12:00');
-    await page.getByLabel('Hold expires', { exact: true }).fill(values.expiry ?? '2030-06-03T10:00');
+    await page.getByLabel('Period starts (Singapore time)', { exact: true }).fill(values.start ?? '2030-06-05T10:00');
+    await page.getByLabel('Period ends (Singapore time)', { exact: true }).fill(values.end ?? '2030-06-05T12:00');
+    await page.getByLabel('Hold expires (Singapore time)', { exact: true }).fill(values.expiry ?? '2030-06-03T10:00');
   }
 
   async function placeHold(page: Page, values: Parameters<typeof fillHold>[1] = {}) {
@@ -1235,10 +1261,10 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await expect(page).toHaveTitle(/ConnectSphere/i);
     expect(new URL(page.url()).origin).toBe('http://127.0.0.1:4173');
     await expect(page.locator('vite-error-overlay')).toHaveCount(0);
-    await expect(page.getByLabel('Hold expires', { exact: true })).toHaveAttribute('required', '');
+    await expect(page.getByLabel('Hold expires (Singapore time)', { exact: true })).toHaveAttribute('required', '');
     await fillHold(page, { expiry: '' });
     await page.getByRole('button', { name: 'Place hold', exact: true }).click();
-    expect(await page.getByLabel('Hold expires', { exact: true }).evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
+    expect(await page.getByLabel('Hold expires (Singapore time)', { exact: true }).evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
     const headers = await authHeaders(page);
     expect((await page.request.get('/api/venue-holds', { headers })).ok()).toBe(true);
     expect((await (await page.request.get('/api/venue-holds', { headers })).json()).holds).toEqual([]);

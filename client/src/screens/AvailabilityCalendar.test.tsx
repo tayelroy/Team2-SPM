@@ -44,7 +44,7 @@ test('[NORMAL] [SG2-44:AC2] renders bookings and unavailability across every ven
       {
         venueId: 2,
         name: 'Rooftop',
-        entries: [{ start: '2026-10-15T00:00:00.000Z', end: '2026-10-16T00:00:00.000Z', kind: 'unavailable', label: 'Maintenance' }]
+        entries: [{ start: '2026-10-14T16:00:00.000Z', end: '2026-10-15T16:00:00.000Z', kind: 'unavailable', label: 'Maintenance' }]
       }
     ]
   });
@@ -99,7 +99,7 @@ test('[NORMAL] [SG2-44:AC1] the month dropdown jumps directly to the chosen mont
 
   expect(await screen.findByRole('heading', { name: 'January 2026' })).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2026-01-01T00:00:00.000Z'));
+  expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2025-12-31T16:00:00.000Z'));
 });
 
 test('[NORMAL] [SG2-44:AC1] the year dropdown jumps directly to the chosen year, keeping the same month', async () => {
@@ -113,7 +113,7 @@ test('[NORMAL] [SG2-44:AC1] the year dropdown jumps directly to the chosen year,
 
   expect(await screen.findByRole('heading', { name: 'October 2030' })).toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2030-10-01T00:00:00.000Z'));
+  expect(String(fetchMock.mock.calls[1][0])).toContain(encodeURIComponent('2030-09-30T16:00:00.000Z'));
 });
 
 test('[NORMAL] [SG2-44:AC1] the dropdowns stay in sync with the arrows', async () => {
@@ -158,7 +158,7 @@ test('[NORMAL] [SG2-44:AC1] moving to the next month re-fetches a new date range
     return Response.json({ from, to, venues: [{
       venueId: 1, name: 'Atrium', entries: [{
         start: from, end: new Date(Date.parse(from) + 3_600_000).toISOString(),
-        kind: 'booking', label: `Booked ${from.slice(0, 7)}`,
+        kind: 'booking', label: `Booked ${new Date(Date.parse(from) + 8 * 3_600_000).toISOString().slice(0, 7)}`,
       }],
     }] });
   });
@@ -167,18 +167,32 @@ test('[NORMAL] [SG2-44:AC1] moving to the next month re-fetches a new date range
   render(<AvailabilityCalendar />);
   await screen.findByText('Atrium · Booked 2026-10');
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  expect(String(fetchMock.mock.calls[0][0])).toBe('/api/venues/availability?from=2026-10-01T00%3A00%3A00.000Z&to=2026-11-01T00%3A00%3A00.000Z');
+  expect(String(fetchMock.mock.calls[0][0])).toBe('/api/venues/availability?from=2026-09-30T16%3A00%3A00.000Z&to=2026-10-31T16%3A00%3A00.000Z');
 
   fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
   await screen.findByText('Atrium · Booked 2026-11');
   expect(screen.getByRole('heading', { name: 'November 2026' })).toBeInTheDocument();
   expect(screen.queryByText('Atrium · Booked 2026-10')).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
-  expect(String(fetchMock.mock.calls[1][0])).toBe('/api/venues/availability?from=2026-11-01T00%3A00%3A00.000Z&to=2026-12-01T00%3A00%3A00.000Z');
+  expect(String(fetchMock.mock.calls[1][0])).toBe('/api/venues/availability?from=2026-10-31T16%3A00%3A00.000Z&to=2026-11-30T16%3A00%3A00.000Z');
 
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
   await screen.findByText('Atrium · Booked 2026-10');
   expect(screen.getByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
   expect(screen.queryByText('Atrium · Booked 2026-11')).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(3);
+});
+
+test('[BOUNDARY] [SG2-44:AC1] just after midnight on 1 November in Singapore the calendar opens on November and moves on to December', async () => {
+  vi.setSystemTime(new Date('2026-10-31T16:00:00.000Z'));
+  const fetchMock = vi.fn().mockImplementation(() => Response.json({ from: '', to: '', venues: [] }));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<AvailabilityCalendar />);
+  await screen.findByRole('heading', { name: 'November 2026' });
+  expect(String(fetchMock.mock.calls[0][0])).toBe('/api/venues/availability?from=2026-10-31T16%3A00%3A00.000Z&to=2026-11-30T16%3A00%3A00.000Z');
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  expect(await screen.findByRole('heading', { name: 'December 2026' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+  expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
 });
