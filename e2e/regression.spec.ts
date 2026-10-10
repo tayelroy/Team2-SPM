@@ -937,7 +937,8 @@ test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period,
   await nav(page, 'Venue Availability');
   await page.getByLabel('Jump to year').selectOption('2030');
   await page.getByLabel('Jump to month').selectOption('5');
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toBeVisible();
+  // The times are typed in the browser's zone; in UTC the block runs past Singapore midnight onto 21 June too.
+  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true }).first()).toBeVisible();
 
   // AC3: removing it makes the venue available for that period again.
   await nav(page, 'Catalogue');
