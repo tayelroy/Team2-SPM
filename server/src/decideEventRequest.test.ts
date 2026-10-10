@@ -9,6 +9,7 @@ import type { Role } from './auth/policy';
 import { dbConfig } from './db/config';
 import { createDecideEventRequestHandler, type Decision } from './events/decide';
 import type { DecideEventRequestResult } from './db/eventRequests';
+import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 import type { Principal } from './auth/policy';
 
 const COORDINATOR: Principal = { userId: 'coordinator-1', role: 'event_coordinator' };
@@ -38,10 +39,12 @@ interface HarnessOptions {
   admin?: SupabaseClient | null;
   decideResult?: DecideEventRequestResult;
   captureDecide?: (eventId: number, coordinatorId: string, decision: Decision, reason: string | null) => void;
+  historyResult?: InsertAuditLogsResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
+  const history: InsertAuditLogInput[][] = [];
   app.use(express.json());
   app.patch(
     '/api/event-requests/:eventId/decision',
@@ -51,10 +54,14 @@ function buildApp(options: HarnessOptions = {}) {
       decide: async (_admin, eventId, coordinatorId, decision, reason) => {
         options.captureDecide?.(eventId, coordinatorId, decision, reason);
         return options.decideResult ?? { ok: true, request: DECIDED_REQUEST };
+      },
+      writeHistory: async (_admin, entries) => {
+        history.push(entries);
+        return options.historyResult ?? { ok: true, logs: [] };
       }
     })
   );
-  return app;
+  return Object.assign(app, { history });
 }
 
 describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
@@ -72,14 +79,13 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.deepEqual(decisions, [1]);
   });
 
-  test('[NORMAL] [SG2-37:AC1] approves a request under review, recording the deciding coordinator', async () => {
+  test('[NORMAL] [SG2-37:AC1] [SG2-40:AC1] [SG2-40:AC2] approves a request under review, recording the deciding coordinator and the under_review → approved history entry', async () => {
     let decided: { eventId: number; coordinatorId: string; decision: Decision; reason: string | null } | undefined;
-    const response = await request(
-      buildApp({
-        captureDecide: (eventId, coordinatorId, decision, reason) =>
-          (decided = { eventId, coordinatorId, decision, reason })
-      })
-    )
+    const app = buildApp({
+      captureDecide: (eventId, coordinatorId, decision, reason) =>
+        (decided = { eventId, coordinatorId, decision, reason })
+    });
+    const response = await request(app)
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'approved' });
 
@@ -91,6 +97,9 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
       decision: 'approved',
       reason: null
     });
+    assert.deepEqual(app.history, [[{
+      event_id: 7, actor_id: 'coordinator-1', field_name: 'status', old_value: 'under_review', new_value: 'approved'
+    }]]);
   });
 
   test('[NORMAL] [SG2-37:AC1] an approval may carry a reason, trimmed before it is stored', async () => {
@@ -105,23 +114,25 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.equal(decided?.reason, 'Budget already signed off.');
   });
 
-  test('[NORMAL] [SG2-37:AC2] rejects a request with the reason the organiser will read', async () => {
+  test('[NORMAL] [SG2-37:AC2] [SG2-40:AC1] [SG2-40:AC2] rejects a request with the reason the organiser will read and records under_review → rejected', async () => {
     let decided: { decision: Decision; reason: string | null } | undefined;
-    const response = await request(
-      buildApp({
-        decideResult: {
-          ok: true,
-          request: { ...DECIDED_REQUEST, status: 'rejected', decision_reason: 'Date clashes with the AGM.' }
-        },
-        captureDecide: (_e, _c, decision, reason) => (decided = { decision, reason })
-      })
-    )
+    const app = buildApp({
+      decideResult: {
+        ok: true,
+        request: { ...DECIDED_REQUEST, status: 'rejected', decision_reason: 'Date clashes with the AGM.' }
+      },
+      captureDecide: (_e, _c, decision, reason) => (decided = { decision, reason })
+    });
+    const response = await request(app)
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'rejected', reason: 'Date clashes with the AGM.' });
 
     assert.equal(response.status, 200);
     assert.equal(response.body.request.decision_reason, 'Date clashes with the AGM.');
     assert.deepEqual(decided, { decision: 'rejected', reason: 'Date clashes with the AGM.' });
+    assert.deepEqual(app.history, [[{
+      event_id: 7, actor_id: 'coordinator-1', field_name: 'status', old_value: 'under_review', new_value: 'rejected'
+    }]]);
   });
 
   for (const [label, body] of [
@@ -223,13 +234,13 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.equal(response.status, 503);
   });
 
-  test('[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] returns 404 when the request is not under review by this coordinator', async () => {
-    const response = await request(
-      buildApp({ decideResult: { ok: false, reason: 'not_found', message: 'missing' } })
-    )
+  test('[CONFLICT] [SG2-37:AC1] [SG2-37:AC2] [SG2-40:AC1] returns 404 and records no history when the request is not under review by this coordinator', async () => {
+    const app = buildApp({ decideResult: { ok: false, reason: 'not_found', message: 'missing' } });
+    const response = await request(app)
       .patch('/api/event-requests/7/decision')
       .send({ decision: 'approved' });
     assert.equal(response.status, 404);
+    assert.deepEqual(app.history, []);
   });
 
   test('[FAILURE] [SG2-37:AC1] returns 503 without leaking the database error when the decision fails', async () => {
@@ -240,6 +251,16 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
       .send({ decision: 'approved' });
     assert.equal(response.status, 503);
     assert.doesNotMatch(response.text, /SENTINEL/);
+  });
+
+  test('[FAILURE] [SG2-40:AC1] answers 503 without provider details when the decision cannot be recorded in history', async () => {
+    const app = buildApp({ historyResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } });
+    const response = await request(app)
+      .patch('/api/event-requests/7/decision')
+      .send({ decision: 'approved' });
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
+    assert.equal(app.history.length, 1);
   });
 });
 

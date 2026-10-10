@@ -292,9 +292,11 @@ export function EventAuditDrawer({
                     <strong style={{ color: color.platinum, fontSize: '13px' }}>
                       {entry.actor_id === null ? 'System' : entry.actor_name}
                     </strong>
-                    <Badge size={10} bg="rgba(94, 234, 212, 0.15)" fg="#5eead4">
-                      {entry.actor_id === null ? 'Automatic' : 'Editor'}
-                    </Badge>
+                    {(entry.actor_id === null || entry.actor_role) && (
+                      <Badge size={10} bg="rgba(94, 234, 212, 0.15)" fg="#5eead4">
+                        {entry.actor_id === null ? 'Automatic' : entry.actor_role}
+                      </Badge>
+                    )}
                   </div>
                   <span style={{ color: color.silver, fontSize: '12px' }}>
                     {formatSgtTimestamp(entry.created_at)}

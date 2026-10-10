@@ -9,6 +9,7 @@ import type { Role } from './auth/policy';
 import { dbConfig } from './db/config';
 import { createStartEventReviewHandler } from './events/review';
 import type { StartReviewResult } from './db/eventRequests';
+import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 import type { Principal } from './auth/policy';
 
 const COORDINATOR: Principal = { userId: 'coordinator-1', role: 'event_coordinator' };
@@ -36,10 +37,12 @@ interface HarnessOptions {
   admin?: SupabaseClient | null;
   reviewResult?: StartReviewResult;
   captureReview?: (eventId: number, coordinatorId: string) => void;
+  historyResult?: InsertAuditLogsResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
+  const history: InsertAuditLogInput[][] = [];
   app.patch(
     '/api/event-requests/:eventId/review',
     createStartEventReviewHandler({
@@ -47,17 +50,21 @@ function buildApp(options: HarnessOptions = {}) {
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
       startReview: async (_admin, eventId, coordinatorId) => {
         options.captureReview?.(eventId, coordinatorId);
-        return options.reviewResult ?? { ok: true, request: REVIEWED_REQUEST };
+        return options.reviewResult ?? { ok: true, request: REVIEWED_REQUEST, previous_status: 'submitted' };
+      },
+      writeHistory: async (_admin, entries) => {
+        history.push(entries);
+        return options.historyResult ?? { ok: true, logs: [] };
       }
     })
   );
-  return app;
+  return Object.assign(app, { history });
 }
 
 describe('PATCH /api/event-requests/:eventId/review (SG2-35)', () => {
   test('[BOUNDARY] [SG2-35:AC2] review accepts event id one and rejects zero before a transition', async () => {
     const transitioned: number[] = [];
-    const app = buildApp({ reviewResult: { ok: true, request: { ...REVIEWED_REQUEST, event_id: 1 } },
+    const app = buildApp({ reviewResult: { ok: true, request: { ...REVIEWED_REQUEST, event_id: 1 }, previous_status: 'submitted' },
       captureReview: eventId => { transitioned.push(eventId); } });
     const refused = await request(app).patch('/api/event-requests/0/review');
     assert.equal(refused.status, 400);
@@ -69,15 +76,33 @@ describe('PATCH /api/event-requests/:eventId/review (SG2-35)', () => {
     assert.deepEqual(transitioned, [1]);
   });
 
-  test('[NORMAL] [SG2-35:AC1] [SG2-35:AC2] opens a request assigned to the caller, passing the caller id to the transition', async () => {
+  test('[NORMAL] [SG2-35:AC1] [SG2-35:AC2] [SG2-40:AC1] [SG2-40:AC2] opens a request assigned to the caller and records submitted → under_review by that caller', async () => {
     let reviewed: { eventId: number; coordinatorId: string } | undefined;
-    const response = await request(
-      buildApp({ captureReview: (eventId, coordinatorId) => (reviewed = { eventId, coordinatorId }) })
-    ).patch('/api/event-requests/7/review');
+    const app = buildApp({ captureReview: (eventId, coordinatorId) => (reviewed = { eventId, coordinatorId }) });
+    const response = await request(app).patch('/api/event-requests/7/review');
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { request: REVIEWED_REQUEST });
     assert.deepEqual(reviewed, { eventId: 7, coordinatorId: 'coordinator-1' });
+    assert.deepEqual(app.history, [[{
+      event_id: 7, actor_id: 'coordinator-1', field_name: 'status', old_value: 'submitted', new_value: 'under_review'
+    }]]);
+  });
+
+  test('[CONFLICT] [SG2-35:AC2] [SG2-40:AC1] re-opening a review already in progress records no history, because nothing changed', async () => {
+    const app = buildApp({ reviewResult: { ok: true, request: REVIEWED_REQUEST, previous_status: 'under_review' } });
+    const response = await request(app).patch('/api/event-requests/7/review');
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { request: REVIEWED_REQUEST });
+    assert.deepEqual(app.history, []);
+  });
+
+  test('[FAILURE] [SG2-40:AC1] answers 503 without provider details when the review transition cannot be recorded', async () => {
+    const app = buildApp({ historyResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } });
+    const response = await request(app).patch('/api/event-requests/7/review');
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
+    assert.equal(app.history.length, 1);
   });
 
 
@@ -101,10 +126,10 @@ describe('PATCH /api/event-requests/:eventId/review (SG2-35)', () => {
   });
 
   test('[CONFLICT] [SG2-35:AC3] returns 404 when the request is assigned to another coordinator or is not reviewable', async () => {
-    const response = await request(
-      buildApp({ reviewResult: { ok: false, reason: 'not_found', message: 'missing' } })
-    ).patch('/api/event-requests/7/review');
+    const app = buildApp({ reviewResult: { ok: false, reason: 'not_found', message: 'missing' } });
+    const response = await request(app).patch('/api/event-requests/7/review');
     assert.equal(response.status, 404);
+    assert.deepEqual(app.history, []);
   });
 
   test('[FAILURE] [SG2-35:AC2] returns 503 without leaking the database error when the transition fails', async () => {

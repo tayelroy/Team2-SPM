@@ -5,11 +5,12 @@ import request from 'supertest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApp } from '../app';
 import { createAuthorization } from '../auth';
-import { PERMISSIONS, type Principal, type Role } from '../auth/policy';
+import { INTERNAL_ONLY_AUDIT_FIELDS, PERMISSIONS, type Principal, type Role } from '../auth/policy';
 import { dbConfig } from '../db/config';
 import { createGetEventHistoryHandler } from './getHistory';
 import type { EventAuditLogRecord, FetchEventAuditLogsResult } from '../db/auditLogs';
 import type { FetchEventRequestResult, EventRequestRecord } from '../db/eventRequests';
+import type { GetAccountRolesResult } from '../db/accountRoles';
 
 const ORGANISER_ID = '10000000-0000-4000-8000-000000000001';
 const UNRELATED_ORGANISER_ID = '20000000-0000-4000-8000-000000000002';
@@ -66,11 +67,38 @@ const SAMPLE_LOGS: EventAuditLogRecord[] = [
   }
 ];
 
+/** What the API returns for SAMPLE_LOGS: the actor's role in Title Case. */
+const SAMPLE_HISTORY = [
+  {
+    log_id: 2,
+    event_id: 101,
+    actor_id: COORDINATOR_ID,
+    actor_name: 'Alex Coordinator',
+    actor_role: 'Event Coordinator',
+    field_name: 'expected_attendance',
+    old_value: '200',
+    new_value: '250',
+    created_at: '2026-09-25T14:30:00.000Z'
+  },
+  {
+    log_id: 1,
+    event_id: 101,
+    actor_id: COORDINATOR_ID,
+    actor_name: 'Alex Coordinator',
+    actor_role: 'Event Coordinator',
+    field_name: 'proposed_date',
+    old_value: '2026-11-10T09:00:00.000Z',
+    new_value: '2026-11-15T09:00:00.000Z',
+    created_at: '2026-09-25T14:00:00.000Z'
+  }
+];
+
 interface HarnessOptions {
   principal?: Principal | undefined;
   admin?: SupabaseClient | null;
   eventResult?: FetchEventRequestResult;
   historyResult?: FetchEventAuditLogsResult;
+  rolesResult?: GetAccountRolesResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -84,16 +112,19 @@ function buildApp(options: HarnessOptions = {}) {
     if (options.historyResult) return options.historyResult;
     return { ok: true, logs: SAMPLE_LOGS };
   });
+  const fetchActorRoles = mock.fn(async (_admin: SupabaseClient, _userIds: string[]): Promise<GetAccountRolesResult> =>
+    options.rolesResult ?? { ok: true, roles: new Map([[COORDINATOR_ID, 'event_coordinator']]) });
   app.get(
     '/api/event-requests/:eventId/history',
     createGetEventHistoryHandler({
       getPrincipal: () => ('principal' in options ? options.principal : COORDINATOR),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
       fetchEventRequest,
-      fetchAuditLogs
+      fetchAuditLogs,
+      fetchActorRoles
     })
   );
-  return { app, fetchEventRequest, fetchAuditLogs };
+  return { app, fetchEventRequest, fetchAuditLogs, fetchActorRoles };
 }
 
 describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () => {
@@ -130,7 +161,7 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       const { app, fetchEventRequest, fetchAuditLogs } = buildApp({ principal: ORGANISER });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_HISTORY });
       assert.equal(fetchEventRequest.mock.callCount(), 1);
       assert.equal(fetchAuditLogs.mock.callCount(), 1);
       assert.equal(fetchEventRequest.mock.calls[0].arguments[1], 101);
@@ -141,21 +172,72 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       const { app } = buildApp({ principal: COORDINATOR });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_HISTORY });
     });
 
     test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] allows venue staff to retrieve history with 200', async () => {
       const { app } = buildApp({ principal: VENUE_STAFF });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_HISTORY });
     });
 
     test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] allows technical support staff to retrieve history with 200', async () => {
       const { app } = buildApp({ principal: TECH_SUPPORT });
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
-      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_HISTORY });
+    });
+  });
+
+  describe('Internal-only planning notes (AC 3)', () => {
+    const NOTES_LOG: EventAuditLogRecord = {
+      log_id: 3,
+      event_id: 101,
+      actor_id: COORDINATOR_ID,
+      actor_name: 'Alex Coordinator',
+      field_name: 'planning_notes',
+      old_value: null,
+      new_value: 'Client is difficult about catering',
+      created_at: '2026-09-25T15:00:00.000Z'
+    };
+
+    test('[NORMAL] [SG2-40:AC3] policy marks planning notes as the only internal-only history field', () => {
+      assert.deepEqual([...INTERNAL_ONLY_AUDIT_FIELDS], ['planning_notes']);
+    });
+
+    test('[FAILURE] [SG2-40:AC3] owning organiser never receives planning-notes entries, while their other changes keep their order', async () => {
+      const { app } = buildApp({ principal: ORGANISER, historyResult: { ok: true, logs: [NOTES_LOG, ...SAMPLE_LOGS] } });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_HISTORY });
+      assert.equal(JSON.stringify(res.body).includes('Client is difficult about catering'), false);
+    });
+
+    test('[BOUNDARY] [SG2-40:AC3] organiser whose event history holds only planning notes receives an empty history', async () => {
+      const { app } = buildApp({ principal: ORGANISER, historyResult: { ok: true, logs: [NOTES_LOG] } });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body, { event_id: 101, history: [] });
+    });
+
+    test('[NORMAL] [SG2-40:AC3] every internal role still receives planning-notes entries in full', async () => {
+      const internalRoles: Role[] = [
+        'event_coordinator',
+        'event_coordinator_lead',
+        'safety_officer',
+        'technical_support_staff',
+        'venue_staff'
+      ];
+      for (const role of internalRoles) {
+        const { app } = buildApp({
+          principal: { userId: 'internal-user', role },
+          historyResult: { ok: true, logs: [NOTES_LOG, ...SAMPLE_LOGS] }
+        });
+        const res = await request(app).get('/api/event-requests/101/history');
+        assert.equal(res.status, 200, role);
+        assert.deepEqual(res.body, { event_id: 101, history: [{ ...NOTES_LOG, actor_role: 'Event Coordinator' }, ...SAMPLE_HISTORY] }, role);
+      }
     });
   });
 
@@ -256,10 +338,10 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       assert.equal(res.body.history[1].old_value, '2026-11-10T09:00:00.000Z');
       assert.equal(res.body.history[1].new_value, '2026-11-15T09:00:00.000Z');
       assert.equal(res.body.history[1].created_at, '2026-09-25T14:00:00.000Z');
-      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_LOGS });
+      assert.deepEqual(res.body, { event_id: 101, history: SAMPLE_HISTORY });
     });
 
-    test('[BOUNDARY] [SG2-40:AC1] [SG2-40:AC2] missing actor names use Unknown while null old/new values are retained', async () => {
+    test('[BOUNDARY] [SG2-40:AC1] [SG2-40:AC2] missing actor names use Unknown, an actor without a role row has no role, and null old/new values are retained', async () => {
       const { app } = buildApp({
         historyResult: {
           ok: true,
@@ -280,7 +362,7 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       const res = await request(app).get('/api/event-requests/101/history');
       assert.equal(res.status, 200);
       assert.deepEqual(res.body, { event_id: 101, history: [{
-        log_id: 1, event_id: 101, actor_id: 'unknown-id', actor_name: 'Unknown',
+        log_id: 1, event_id: 101, actor_id: 'unknown-id', actor_name: 'Unknown', actor_role: null,
         field_name: 'venue_requirements', old_value: null, new_value: 'Stage setup',
         created_at: '2026-09-25T12:00:00.000Z'
       }] });
@@ -292,10 +374,66 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       const clearedResponse = await request(cleared.app).get('/api/event-requests/101/history');
       assert.equal(clearedResponse.status, 200);
       assert.deepEqual(clearedResponse.body, { event_id: 101, history: [{
-        log_id: 2, event_id: 101, actor_id: COORDINATOR_ID, actor_name: 'Alex Coordinator',
+        log_id: 2, event_id: 101, actor_id: COORDINATOR_ID, actor_name: 'Alex Coordinator', actor_role: 'Event Coordinator',
         field_name: 'venue_requirements', old_value: 'Stage setup', new_value: null,
         created_at: '2026-09-25T13:00:00.000Z'
       }] });
+    });
+  });
+
+  describe('Actor roles (AC 1)', () => {
+    const LEAD_ID = '70000000-0000-4000-8000-000000000007';
+    const MIXED_LOGS: EventAuditLogRecord[] = [
+      { log_id: 4, event_id: 101, actor_id: COORDINATOR_ID, actor_name: 'Alex Coordinator', field_name: 'status',
+        old_value: 'submitted', new_value: 'under_review', created_at: '2026-09-25T14:00:00.000Z' },
+      { log_id: 3, event_id: 101, actor_id: LEAD_ID, actor_name: 'Lee Lead', field_name: 'coordinator_id',
+        old_value: null, new_value: 'Alex Coordinator', created_at: '2026-09-25T13:00:00.000Z' },
+      { log_id: 2, event_id: 101, actor_id: COORDINATOR_ID, actor_name: 'Alex Coordinator', field_name: 'expected_attendance',
+        old_value: '200', new_value: '250', created_at: '2026-09-25T12:30:00.000Z' },
+      { log_id: 1, event_id: 101, actor_id: ORGANISER_ID, actor_name: 'Olive Organiser', field_name: 'status',
+        old_value: 'draft', new_value: 'unassigned', created_at: '2026-09-25T12:00:00.000Z' }
+    ];
+
+    test('[NORMAL] [SG2-40:AC1] names each actor\'s real role in Title Case, looking each actor up once', async () => {
+      const { app, fetchActorRoles } = buildApp({
+        principal: ORGANISER,
+        historyResult: { ok: true, logs: MIXED_LOGS },
+        rolesResult: { ok: true, roles: new Map([
+          [COORDINATOR_ID, 'event_coordinator'],
+          [LEAD_ID, 'event_coordinator_lead'],
+          [ORGANISER_ID, 'event_organiser']
+        ]) }
+      });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 200);
+      assert.deepEqual(
+        res.body.history.map((entry: { log_id: number; actor_role: string | null }) => [entry.log_id, entry.actor_role]),
+        [[4, 'Event Coordinator'], [3, 'Event Coordinator Lead'], [2, 'Event Coordinator'], [1, 'Event Organiser']]
+      );
+      assert.equal(fetchActorRoles.mock.callCount(), 1);
+      assert.deepEqual(fetchActorRoles.mock.calls[0].arguments[1], [COORDINATOR_ID, LEAD_ID, ORGANISER_ID]);
+    });
+
+    test('[BOUNDARY] [SG2-40:AC1] system-written entries have no role, and a history of only system entries looks up no roles', async () => {
+      const systemLog: EventAuditLogRecord = {
+        log_id: 5, event_id: 101, actor_id: null, actor_name: null, field_name: 'venue_hold_status',
+        old_value: 'Tentative hold 3', new_value: 'Expired hold 3', created_at: '2026-09-26T00:00:00.000Z'
+      };
+      const { app, fetchActorRoles } = buildApp({ historyResult: { ok: true, logs: [systemLog] } });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body, { event_id: 101, history: [{
+        log_id: 5, event_id: 101, actor_id: null, actor_name: 'Unknown', actor_role: null, field_name: 'venue_hold_status',
+        old_value: 'Tentative hold 3', new_value: 'Expired hold 3', created_at: '2026-09-26T00:00:00.000Z'
+      }] });
+      assert.equal(fetchActorRoles.mock.callCount(), 0);
+    });
+
+    test('[FAILURE] [SG2-40:AC1] a failed role lookup answers the generic 503 without provider details', async () => {
+      const { app } = buildApp({ rolesResult: { ok: false, error: 'SECRET_PROVIDER_DETAILS' } });
+      const res = await request(app).get('/api/event-requests/101/history');
+      assert.equal(res.status, 503);
+      assert.deepEqual(res.body, { error: 'Event history service is temporarily unavailable. Please try again later.' });
     });
   });
 });

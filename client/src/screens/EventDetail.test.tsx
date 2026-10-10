@@ -1042,6 +1042,7 @@ describe('EventDetail change history integration (SG2-40)', () => {
           event_id: 101,
           actor_id: 'coord-1',
           actor_name: 'Sarah Jenkins',
+          actor_role: 'Event Coordinator',
           field_name: 'expected_attendance',
           old_value: '40',
           new_value: '45',

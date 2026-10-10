@@ -61,6 +61,25 @@ export async function getAccountRole(admin: SupabaseClient, userId: string): Pro
   return { ok: true, role: (data as { role: string }).role };
 }
 
+export type GetAccountRolesResult =
+  | { ok: true; roles: Map<string, string> }
+  | { ok: false; error: string };
+
+/**
+ * Reads several accounts' roles at once (SG2-40), keyed by user id — the
+ * history drawer names each actor's role. An account without a role row is
+ * simply absent from the result.
+ */
+export async function getAccountRoles(admin: SupabaseClient, userIds: string[]): Promise<GetAccountRolesResult> {
+  const { data, error } = await admin.from('account_roles').select('user_id, role').in('user_id', userIds);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  const rows = (data as { user_id: string; role: string }[] | null) ?? [];
+  return { ok: true, roles: new Map(rows.map(row => [row.user_id, row.role])) };
+}
+
 /** Best-effort cleanup for registration rollback; failures are not surfaced. */
 export async function deleteAccountRole(admin: SupabaseClient, userId: string): Promise<void> {
   await admin.from('account_roles').delete().eq('user_id', userId).then(

@@ -2,6 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import { startEventReview, type StartReviewResult } from '../db/eventRequests';
+import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -15,6 +16,7 @@ export interface StartEventReviewDependencies {
     eventId: number,
     coordinatorId: string
   ) => Promise<StartReviewResult>;
+  writeHistory?: typeof insertAuditLogs;
 }
 
 /**
@@ -28,11 +30,18 @@ export interface StartEventReviewDependencies {
  * Re-opening a review already in progress succeeds unchanged rather than
  * conflicting, because a coordinator returning to their own open review is
  * ordinary rather than an error.
+ *
+ * Opening a `submitted` request records the `submitted → under_review`
+ * transition in SG2-40's history; re-opening records nothing, because
+ * nothing changed. As in the clarification handler, a history row that
+ * cannot be written answers 503 rather than reporting a change the history
+ * does not show.
  */
 export function createStartEventReviewHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  startReview = startEventReview
+  startReview = startEventReview,
+  writeHistory = insertAuditLogs
 }: StartEventReviewDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -65,6 +74,16 @@ export function createStartEventReviewHandler({
       }
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
+    }
+
+    if (reviewed.previous_status === 'submitted') {
+      const recorded = await writeHistory(admin, [
+        statusChange(eventId, principal.userId, 'submitted', reviewed.request.status)
+      ]);
+      if (!recorded.ok) {
+        res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+        return;
+      }
     }
 
     res.status(200).json({ request: reviewed.request });
