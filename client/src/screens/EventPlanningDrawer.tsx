@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { ChangeEvent, KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, KeyboardEvent, RefObject } from 'react';
 import {
   updateEventPlanning,
   type PlanningEventRecord,
@@ -75,10 +75,15 @@ export function toIsoOrNull(val: string): string | null {
 }
 
 /**
- * Validates coordinator planning drawer input before dispatching (AC 4).
+ * Validates coordinator planning drawer input before dispatching (AC 4). Mirrors
+ * the server's date rules: a newly chosen proposed date must be in the future
+ * (an unchanged one is not re-judged), and registration must open and close
+ * before the event starts.
  */
 export function validatePlanningForm({
   proposedDate,
+  initialProposedDate,
+  now,
   expectedAttendance,
   registrationNeeded,
   registrationCapacity,
@@ -90,6 +95,10 @@ export function validatePlanningForm({
   planningNotes,
 }: {
   proposedDate: string;
+  /** The proposed date the drawer opened with, in the same input format. */
+  initialProposedDate: string;
+  /** Current time in epoch milliseconds. */
+  now: number;
   expectedAttendance: string;
   registrationNeeded: boolean;
   registrationCapacity: string;
@@ -101,11 +110,17 @@ export function validatePlanningForm({
   planningNotes: string;
 }): string[] {
   const errors: string[] = [];
+  let startTime: number | null = null;
 
   if (proposedDate.trim()) {
     const d = new Date(proposedDate.trim());
     if (isNaN(d.getTime())) {
       errors.push('Proposed date must be a valid date and time.');
+    } else {
+      startTime = d.getTime();
+      if (proposedDate.trim() !== initialProposedDate && startTime <= now) {
+        errors.push('Proposed date must be in the future.');
+      }
     }
   }
 
@@ -165,6 +180,13 @@ export function validatePlanningForm({
     if (openTime !== null && closeTime !== null && closeTime <= openTime) {
       errors.push('Registration closing time must be after opening time.');
     }
+
+    if (startTime !== null && openTime !== null && openTime >= startTime) {
+      errors.push('Registration opening time must be before the event starts.');
+    }
+    if (startTime !== null && closeTime !== null && closeTime >= startTime) {
+      errors.push('Registration closing time must be before the event starts.');
+    }
   }
 
   return errors;
@@ -173,16 +195,24 @@ export function validatePlanningForm({
 /**
  * Slide-out planning drawer for event coordinators (SG2-39).
  * Allows viewing and editing planning details, registration parameters,
- * and handles arrangement impact confirmation.
+ * and handles arrangement impact confirmation. The form is mounted only while
+ * the drawer is open, so every opening starts from the event's saved values and
+ * closing without saving discards unsaved edits.
  */
-export default function EventPlanningDrawer({
-  isOpen = true,
+export default function EventPlanningDrawer({ isOpen = true, ...props }: EventPlanningDrawerProps) {
+  if (!isOpen) return null;
+  return <PlanningDrawerPanel {...props} />;
+}
+
+type FeedbackTarget = 'client' | 'server' | 'impact';
+
+function PlanningDrawerPanel({
   onClose,
   eventId,
   initialValues,
   accessToken,
   onSuccess,
-}: EventPlanningDrawerProps) {
+}: Omit<EventPlanningDrawerProps, 'isOpen'>) {
   const [proposedDate, setProposedDate] = useState(() =>
     formatForDateTimeInput(initialValues?.proposed_date),
   );
@@ -221,7 +251,26 @@ export default function EventPlanningDrawer({
   const [impactConfirmation, setImpactConfirmation] =
     useState<ImpactConfirmationState | null>(null);
 
-  if (!isOpen) return null;
+  // The Save button sits at the bottom of a scrolling drawer while messages
+  // render at the top, so each new message is scrolled into view and focused;
+  // `seq` makes a repeated identical message move there again.
+  const feedbackRefs: Record<FeedbackTarget, RefObject<HTMLDivElement>> = {
+    client: useRef<HTMLDivElement>(null),
+    server: useRef<HTMLDivElement>(null),
+    impact: useRef<HTMLDivElement>(null),
+  };
+  const [feedback, setFeedback] = useState<{ target: FeedbackTarget; seq: number } | null>(null);
+  const reveal = (target: FeedbackTarget) =>
+    setFeedback((previous) => ({ target, seq: (previous?.seq ?? 0) + 1 }));
+
+  useEffect(() => {
+    if (!feedback) return;
+    const message = feedbackRefs[feedback.target].current!;
+    message.scrollIntoView({ block: 'nearest' });
+    message.focus({ preventScroll: true });
+    // The refs are stable; only a new message should move the view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedback]);
 
   const statusLower = initialValues?.status?.toLowerCase() ?? '';
   const isTerminal = ['cancelled', 'completed', 'rejected'].includes(statusLower);
@@ -238,6 +287,8 @@ export default function EventPlanningDrawer({
 
     const validationErrors = validatePlanningForm({
       proposedDate,
+      initialProposedDate: formatForDateTimeInput(initialValues?.proposed_date),
+      now: Date.now(),
       expectedAttendance,
       registrationNeeded,
       registrationCapacity,
@@ -251,6 +302,7 @@ export default function EventPlanningDrawer({
 
     if (validationErrors.length > 0) {
       setClientErrors(validationErrors);
+      reveal('client');
       return;
     }
     setClientErrors([]);
@@ -258,6 +310,7 @@ export default function EventPlanningDrawer({
     const token = accessToken ?? loadSession()?.accessToken;
     if (!token) {
       setServerError('You are signed out. Sign in again to update planning details.');
+      reveal('server');
       return;
     }
 
@@ -291,11 +344,11 @@ export default function EventPlanningDrawer({
           affected_arrangements: outcome.affected_arrangements,
           impact_notes: outcome.impact_notes,
         });
-      } else if (outcome.kind === 'validation') {
-        setServerError(outcome.message);
-        setServerDetails(outcome.details);
+        reveal('impact');
       } else {
         setServerError(outcome.message);
+        setServerDetails(outcome.kind === 'validation' ? outcome.details : undefined);
+        reveal('server');
       }
     } finally {
       setIsSaving(false);
@@ -397,7 +450,12 @@ export default function EventPlanningDrawer({
           >
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
               <NoticeMark size={20} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div
+                ref={feedbackRefs.impact}
+                role="alert"
+                tabIndex={-1}
+                style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
+              >
                 <strong style={{ color: '#fde047', fontSize: '15px' }}>
                   Arrangements Require Rechecking
                 </strong>
@@ -457,7 +515,9 @@ export default function EventPlanningDrawer({
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
               <NoticeMark size={20} />
               <div
+                ref={feedbackRefs.client}
                 role="alert"
+                tabIndex={-1}
                 style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
               >
                 <strong style={{ color: '#ff8a80', fontSize: '14px' }}>
@@ -492,7 +552,9 @@ export default function EventPlanningDrawer({
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
               <NoticeMark size={20} />
               <div
+                ref={feedbackRefs.server}
                 role="alert"
+                tabIndex={-1}
                 style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
               >
                 <span style={{ fontSize: '14px', color: '#ff8a80' }}>{serverError}</span>
