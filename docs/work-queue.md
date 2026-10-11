@@ -24,7 +24,9 @@ grows. An event item's `ends_at` is the event's end time — the latest of its
 confirmed venue bookings, or null with none — which is when the assigned
 coordinator is offered **Mark as Completed** in the item's detail (SG2-100).
 An event's `starts_at` is its proposed date, so the two are not shown as one
-range. A request returned for clarification (`needs_clarification`, SG2-36)
+range. An assigned event in `preparation` also offers **Confirm event** in its
+detail (SG2-58); see [Event confirmation](event-confirmation.md). A request
+returned for clarification (`needs_clarification`, SG2-36)
 is waiting on its organiser and reappears in **Awaiting review** once
 resubmitted; see [Clarification exchange](clarifications.md).
 Another coordinator's assigned event is excluded. Decided/cancelled resource
