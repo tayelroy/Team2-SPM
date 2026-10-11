@@ -151,8 +151,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
 // their department on their profile. event_organiser and attendee represent
 // client-side/external users. Team decision, 2026-09-15. SG2-86 adds
 // event_coordinator_lead and safety_officer as internal; this list is
-// mirrored in the event_audit_logs RLS policy (202610050004_week7_roles.sql)
-// and the two must change together.
+// mirrored in the event_audit_logs RLS policy (latest version:
+// 202610130001_event_history_internal_fields.sql) and the two must change
+// together.
 export const INTERNAL_ROLES: readonly Role[] = [
   'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
 ];
@@ -160,6 +161,13 @@ export const INTERNAL_ROLES: readonly Role[] = [
 export function isInternalRole(role: Role): boolean {
   return (INTERNAL_ROLES as readonly string[]).includes(role);
 }
+
+// SG2-40: history entries only internal roles may read. Planning notes are the
+// coordinators' internal log, so an organiser's history never includes them.
+// Mirrored in the organiser branch of the event_audit_logs RLS policy
+// (202610130001_event_history_internal_fields.sql); the two must change
+// together.
+export const INTERNAL_ONLY_AUDIT_FIELDS: readonly string[] = ['planning_notes'];
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);

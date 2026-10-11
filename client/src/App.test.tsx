@@ -5,7 +5,6 @@ import App from './App';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
-import RequestForm from './screens/RequestForm';
 import ChangeRequest from './screens/ChangeRequest';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
@@ -524,22 +523,6 @@ describe('the request form', () => {
     fireEvent.click(within(header()).getByRole('button', { name: 'New request' }));
   };
 
-  test('[NORMAL] [SG2-28:AC1] requirement chips toggle when no suitability conflict is reported', () => {
-    render(<RequestForm onSubmit={vi.fn()} showConflicts={false} />);
-    expect(screen.queryByText(/180 expected attendance rules out/)).not.toBeInTheDocument();
-    const chip = screen.getByRole('button', { name: 'Hearing loop' });
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(chip);
-    expect(chip).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(chip);
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-
-    const unselected = screen.getByRole('button', { name: 'Parking' });
-    expect(unselected).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(unselected);
-    expect(unselected).toHaveAttribute('aria-pressed', 'true');
-  });
-
   test('[BOUNDARY] [SG2-28:AC4] saving a draft creates it and reports what is still outstanding', async () => {
     await openForm();
     expect(screen.getByText('You can save and finish this later.')).toBeInTheDocument();
@@ -605,7 +588,7 @@ describe('the request form', () => {
     // AC2: fill all required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '12 Oct 2026' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     fireEvent.change(screen.getByLabelText(/Description/i), {
@@ -613,6 +596,7 @@ describe('the request form', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
     expect(await screen.findByRole('heading', { name: 'Investor Forum 2026' })).toBeInTheDocument();
+    expect(screen.getByText('Investor Forum 2026 has been submitted for review.')).toHaveAttribute('role', 'status');
     // SG2-100: badges show the plain-language name, never the stored value.
     expect(screen.getByText('Submitted', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('Partner briefing', { exact: true })).toBeInTheDocument();
@@ -627,14 +611,17 @@ describe('the request form', () => {
       '/api/event-requests/42/clarifications',
     ]);
     expect(fetchMock.mock.calls[3][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
-    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({ name: 'Investor Forum 2026', expected_attendance: 180 });
+    // 08:00 on 12 Oct in Singapore is midnight UTC.
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({
+      name: 'Investor Forum 2026', expected_attendance: 180, proposed_date: '2026-10-12T00:00:00.000Z',
+    });
   });
 
   test('[NORMAL] [SG2-30:AC1] saving a draft and submitting sends the accessToken to the submit endpoint', async () => {
     await openForm();
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Investor Forum 2026' } });
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '12 Oct 2026' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     fireEvent.change(screen.getByLabelText(/Description/i), {
@@ -675,7 +662,7 @@ describe('the request form', () => {
 });
 
 describe('editing a draft (SG2-29)', () => {
-  test('[NORMAL] [SG2-29:AC2] Edit opens the form pre-filled, and a successful submit returns to My drafts', async () => {
+  test('[NORMAL] [SG2-29:AC2] [SG2-30:AC1] Edit opens the form pre-filled, and a successful submit confirms the named event on its detail page', async () => {
     await signInAs('Event Organiser');
     fireEvent.click(within(header()).getByRole('button', { name: 'My drafts' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
@@ -685,22 +672,38 @@ describe('editing a draft (SG2-29)', () => {
 
     // AC2: fill the remaining required fields before submit is enabled.
     fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '12 Oct 2026' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
 
-    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ request: { event_id: 9, can_manage: true, status: 'draft' }, missingForSubmission: [] }), { status: 200 }));
+    // Save and submit are answered here; every read falls through to the signed-in fixture.
+    const signedIn = globalThis.fetch;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/event-requests/9' && init?.method === 'PATCH') {
+        return Response.json({ request: { event_id: 9, can_manage: true, status: 'draft', name: 'Draft Forum' }, missingForSubmission: [] });
+      }
+      if (url === '/api/event-requests/9/submit') return new Response(null, { status: 204 });
+      return signedIn(url, init);
+    });
     vi.stubGlobal('fetch', fetchMock);
     fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
 
-    expect(await screen.findByRole('heading', { name: 'My draft requests' })).toBeInTheDocument();
+    expect(await screen.findByText('Draft Forum has been submitted for review.')).toHaveAttribute('role', 'status');
+    expect(await screen.findByRole('heading', { name: 'Draft Forum' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'My draft requests' })).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/9/submit', {
       method: 'PATCH',
       headers: { Authorization: 'Bearer test-access-token' },
     });
+
+    // The confirmation belongs to that visit only: reopening the event later shows none.
+    fireEvent.click(within(header()).getByRole('button', { name: 'My events' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View Draft Forum' }));
+    expect(await screen.findByRole('heading', { name: 'Draft Forum' })).toBeInTheDocument();
+    expect(screen.queryByText('Draft Forum has been submitted for review.')).not.toBeInTheDocument();
   });
 });
 

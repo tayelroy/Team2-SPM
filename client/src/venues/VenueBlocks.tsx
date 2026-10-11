@@ -8,6 +8,7 @@ import {
   UNAVAILABILITY_CATEGORIES, VenueBlockError, createVenueBlock, describePeriod, describeRecorded, fetchVenueBlocks,
   removeVenueBlock, type AffectedBooking, type UnavailabilityCategory, type VenueBlock
 } from './blocksApi';
+import { sgtToMs } from './searchApi';
 
 const EMPTY = { start: '', end: '', category: '', reason: '' };
 const MAX_REASON_LENGTH = 500;
@@ -75,8 +76,9 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const starts = Date.parse(values.start);
-    const ends = Date.parse(values.end);
+    // SG2-44: typed times are Singapore time, as on venue search, whatever the browser's zone.
+    const starts = sgtToMs(values.start);
+    const ends = sgtToMs(values.end);
     const reason = values.reason.trim();
     const rejected = Number.isNaN(starts) || Number.isNaN(ends) || starts >= ends || ends <= Date.now() ||
       !(values.category in UNAVAILABILITY_CATEGORIES) || !reason || Array.from(reason).length > MAX_REASON_LENGTH;
@@ -153,12 +155,12 @@ export default function VenueBlocks({ token, venue, onClose, onAccessLost }: {
           <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <div className="venue-fields">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
-                <label htmlFor="block-start" style={label}>Unavailable from</label>
+                <label htmlFor="block-start" style={label}>Unavailable from (Singapore time)</label>
                 <input id="block-start" type="datetime-local" required value={values.start} style={inputStyle}
                   onChange={e => setValues(current => ({ ...current, start: e.target.value }))} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
-                <label htmlFor="block-end" style={label}>Unavailable until</label>
+                <label htmlFor="block-end" style={label}>Unavailable until (Singapore time)</label>
                 <input id="block-end" type="datetime-local" required value={values.end} style={inputStyle}
                   onChange={e => setValues(current => ({ ...current, end: e.target.value }))} />
               </div>

@@ -11,6 +11,7 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
     event_id: 42,
     actor_id: 'coord-uuid-1',
     actor_name: 'Sarah Coordinator',
+    actor_role: 'Event Coordinator',
     field_name: 'expected_attendance',
     old_value: '100',
     new_value: '250',
@@ -21,6 +22,7 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
     event_id: 42,
     actor_id: 'coord-uuid-2',
     actor_name: 'Priya Coordinator',
+    actor_role: 'Event Coordinator',
     field_name: 'venue_requirements',
     old_value: null,
     new_value: 'Auditorium with stage lighting',
@@ -31,6 +33,7 @@ const MOCK_ENTRIES: EventAuditLogEntry[] = [
     event_id: 42,
     actor_id: 'support-uuid-3',
     actor_name: 'Daniel Support',
+    actor_role: 'Technical Support Staff',
     field_name: 'accessibility_needs',
     old_value: 'Wheelchair ramp',
     new_value: null,
@@ -204,7 +207,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
   describe('data fetching states', () => {
     test('[NORMAL] [SG2-85:AC5] automatic hold expiry identifies the actor as System and gives the hold field a readable label', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({ ok: true, history: [{
-        ...MOCK_ENTRIES[0], actor_id: null, actor_name: 'Unknown', field_name: 'venue_hold_status', old_value: 'Active', new_value: 'Expired',
+        ...MOCK_ENTRIES[0], actor_id: null, actor_name: 'Unknown', actor_role: null, field_name: 'venue_hold_status', old_value: 'Active', new_value: 'Expired',
       }] });
       render(<EventAuditDrawer isOpen={true} onClose={vi.fn()} eventId={42} accessToken="token" />);
       expect(await screen.findByText('System')).toBeInTheDocument();
@@ -287,7 +290,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       });
     });
 
-    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] renders timeline entries newest-first with expected SGT timestamps, field labels, and old/new values', async () => {
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] renders timeline entries newest-first with each actor\'s real role, expected SGT timestamps, field labels, and old/new values', async () => {
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
         ok: true,
         history: MOCK_ENTRIES,
@@ -318,6 +321,7 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       // Entry 1 (log_id 102): expected_attendance, 100 -> 250
       const entry102 = within(entries[0]);
       expect(entry102.getByText('Sarah Coordinator')).toBeInTheDocument();
+      expect(entry102.getByText('Event Coordinator')).toBeInTheDocument();
       expect(entry102.getByText('Expected Attendance')).toBeInTheDocument();
       expect(entry102.getByText('25 Sept 2026, 22:30 SGT')).toBeInTheDocument();
       expect(entry102.getByTestId('diff-old')).toHaveTextContent('100');
@@ -334,10 +338,38 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       // Entry 3 (log_id 100): accessibility_needs, Wheelchair ramp -> (empty)
       const entry100 = within(entries[2]);
       expect(entry100.getByText('Daniel Support')).toBeInTheDocument();
+      expect(entry100.getByText('Technical Support Staff')).toBeInTheDocument();
       expect(entry100.getByText('Accessibility Needs')).toBeInTheDocument();
       expect(entry100.getByText('25 Sept 2026, 21:30 SGT')).toBeInTheDocument();
       expect(entry100.getByTestId('diff-old')).toHaveTextContent('Wheelchair ramp');
       expect(entry100.getByTestId('diff-new')).toHaveTextContent('(empty)');
+      expect(screen.queryByText('Editor')).not.toBeInTheDocument();
+    });
+
+    test('[NORMAL] [SG2-40:AC1] [SG2-40:AC2] a status change reads in plain language, naming the organiser who submitted it', async () => {
+      vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({ ok: true, history: [{
+        log_id: 7, event_id: 1, actor_id: 'organiser-uuid', actor_name: 'Olive Organiser', actor_role: 'Event Organiser',
+        field_name: 'status', old_value: 'draft', new_value: 'unassigned', created_at: '2026-09-25T14:30:00.000Z',
+      }] });
+      render(<EventAuditDrawer isOpen={true} onClose={vi.fn()} eventId={1} accessToken="token" />);
+      const entry = within(await screen.findByTestId('audit-entry-7'));
+      expect(entry.getByText('Olive Organiser')).toBeInTheDocument();
+      expect(entry.getByText('Event Organiser')).toBeInTheDocument();
+      expect(entry.getByText('Status')).toBeInTheDocument();
+      expect(entry.getByTestId('diff-old')).toHaveTextContent(/^Draft$/);
+      expect(entry.getByTestId('diff-new')).toHaveTextContent(/^Awaiting Assignment$/);
+    });
+
+    test('[BOUNDARY] [SG2-40:AC1] an actor whose role is unknown shows their name with no role badge, never a made-up one', async () => {
+      vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({ ok: true, history: [{
+        ...MOCK_ENTRIES[0], actor_role: null,
+      }] });
+      render(<EventAuditDrawer isOpen={true} onClose={vi.fn()} eventId={42} accessToken="token" />);
+      const entry = within(await screen.findByTestId('audit-entry-102'));
+      expect(entry.getByText('Sarah Coordinator')).toBeInTheDocument();
+      expect(entry.queryByText('Editor')).not.toBeInTheDocument();
+      expect(entry.queryByText('Automatic')).not.toBeInTheDocument();
+      expect(entry.queryByText('Event Coordinator')).not.toBeInTheDocument();
     });
 
     test('[FAILURE] [SG2-40:signed-out-history] displays signed-out error if no token is available', async () => {
