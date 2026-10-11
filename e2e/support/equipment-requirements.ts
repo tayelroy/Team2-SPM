@@ -27,7 +27,8 @@ export function createMemoryRequirementsStore(database: MemoryDatabase, token: s
         }
         if (action === 'arrange') {
           const arrangement = values as ArrangementValues;
-          if (arrangement.shortfall > Number(record!.quantity)) return { outcome: 'invalid' };
+          if (arrangement.shortfall > Number(record!.quantity)
+            || (record!.status === 'approved' && arrangement.shortfall !== 0)) return { outcome: 'invalid' };
           if (arrangement.placement_venue_id !== null && !database.tables.venues.some(venue => venue.venue_id === arrangement.placement_venue_id)) return { outcome: 'invalid' };
           Object.assign(record!, arrangement, { version: Number(record!.version) + 1 });
         } else {

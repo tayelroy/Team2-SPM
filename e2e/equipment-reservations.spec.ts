@@ -50,6 +50,11 @@ test('SG2-55-P01 | [NORMAL] [SG2-55:AC1] [SG2-55:AC2] [SG2-55:AC4] support reser
   expect(stored.requests.find((row: { request_id: number }) => row.request_id === 551)).toMatchObject({ status: 'approved', version: 2 });
   expect(stored.notifications).toHaveLength(1);
   expect(stored.notifications[0]).toMatchObject({ recipient_id: 'user-coordinator', event_id: 55, kind: 'equipment_reserved' });
+  const invalidArrangement = await page.request.patch('/api/equipment-requests/551/arrangement', {
+    headers: await auth(page), data: { event_id: 55, version: 2, arrangement_notes: 'Must not persist', shortfall: 1, placement_venue_id: null, placement_position: null },
+  });
+  expect(invalidArrangement.status()).toBe(400);
+  expect(await ledger(page)).toEqual(stored);
   const available = await page.request.get('/api/equipment-requests/552/availability?event_id=551', { headers: await auth(page) });
   expect((await available.json())).toMatchObject({ quantity_held: 20, quantity_committed: 12, quantity_remaining: 8, shortfall: 2 });
   // A committed quantity must not trap an unfinished physical arrangement.
@@ -57,6 +62,7 @@ test('SG2-55-P01 | [NORMAL] [SG2-55:AC1] [SG2-55:AC2] [SG2-55:AC4] support reser
   await page.getByRole('button', { name: /Wireless microphones.*Equipment Reservation Forum/ }).click();
   await page.getByRole('button', { name: 'Update arrangement for Wireless microphones', exact: true }).click();
   await expect(page.getByLabel('Shortfall quantity', { exact: true })).toHaveValue('0');
+  await expect(page.getByLabel('Shortfall quantity', { exact: true })).toBeDisabled();
   await page.getByRole('combobox', { name: 'Placement venue', exact: true }).selectOption('1');
   await page.getByLabel('Placement position', { exact: true }).fill('Stage left, clear of the exit.');
   await page.getByRole('button', { name: 'Save equipment arrangement', exact: true }).click();

@@ -382,6 +382,25 @@ begin
 end $$;
 reset role;
 do $$
+declare request_before jsonb; receipts_before jsonb; notifications_before jsonb; result jsonb;
+begin
+ select to_jsonb(r) into request_before from public.equipment_requests r where request_id=95516;
+ select jsonb_agg(to_jsonb(r) order by reservation_id) into receipts_before
+  from public.equipment_reservations r where event_id=95516;
+ select jsonb_agg(to_jsonb(n) order by notification_id) into notifications_before
+  from public.notifications n where event_id=95516;
+ set local role authenticated;
+ result := public.manage_equipment_requirements('arrange',95516,95516,3,
+  '{"shortfall":1,"arrangement_notes":"Must not overwrite saved placement","placement_venue_id":null,"placement_position":null}');
+ reset role;
+ if result is distinct from '{"outcome":"invalid"}'::jsonb
+  or (select to_jsonb(r) from public.equipment_requests r where request_id=95516) is distinct from request_before
+  or (select jsonb_agg(to_jsonb(r) order by reservation_id) from public.equipment_reservations r where event_id=95516) is distinct from receipts_before
+  or (select jsonb_agg(to_jsonb(n) order by notification_id) from public.notifications n where event_id=95516) is distinct from notifications_before then
+  raise exception '[SG2-55:reserved-shortfall-one-rejected] [SG2-55:AC1] [BOUNDARY] [FAILURE] A fully reserved requirement must reject even one unit of shortfall without changing its stored request, version, receipt or notification';
+ end if;
+end $$;
+do $$
 begin
  if not exists(select 1 from public.internal_work_items where kind='equipment' and item_id=95516 and status='approved'
    and details->>'placement_venue_id'='95501' and details->>'version'='3' and details->>'shortfall'='0')

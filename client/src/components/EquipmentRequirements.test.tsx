@@ -64,11 +64,26 @@ test('[NORMAL] [SG2-55:AC1] [SG2-55:AC4] a fully reserved request resets shortfa
   act(() => vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReserved(11));
   fireEvent.click(screen.getByRole('button', { name: 'Update arrangement for Microphone' }));
   expect(screen.getByLabelText('Shortfall quantity')).toHaveValue('0');
+  expect(screen.getByLabelText('Shortfall quantity')).toBeDisabled();
+  expect(screen.getByText('This requirement is fully reserved. Shortfall stays at 0; you can still update notes and placement.')).toBeVisible();
   expect(screen.getByLabelText('Arrangement notes')).toHaveValue('Two ready');
   expect(screen.getByLabelText('Placement venue')).toHaveValue('9');
   expect(screen.getByLabelText('Placement position')).toHaveValue('Stage left');
   submit('Update equipment arrangement'); await screen.findByText('Equipment arrangement saved.');
   expect(saveEquipmentArrangement).toHaveBeenCalledWith(7, 'token', expect.any(AbortSignal), { arrangement_notes: 'Two ready', shortfall: 0, placement_venue_id: 9, placement_position: 'Stage left' }, { ...arranged, status: 'approved', shortfall: 0, version: 3 });
+});
+test('[BOUNDARY] [SG2-55:AC4] a loaded reservation keeps shortfall at zero while allowing notes and placement updates even with stale positive shortfall data', async () => {
+  const reserved = { ...arranged, status: 'approved' };
+  await open({ ...view, can_request: false, can_arrange: true, requests: [reserved] });
+  act(() => vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReceipts([11]));
+  fireEvent.click(screen.getByRole('button', { name: 'Update arrangement for Microphone' }));
+  expect(screen.getByLabelText('Shortfall quantity')).toHaveValue('0');
+  expect(screen.getByLabelText('Shortfall quantity')).toBeDisabled();
+  change('Arrangement notes', 'All four ready');
+  change('Placement position', 'Stage right');
+  submit('Update equipment arrangement');
+  await screen.findByText('Equipment arrangement saved.');
+  expect(saveEquipmentArrangement).toHaveBeenCalledWith(7, 'token', expect.any(AbortSignal), { arrangement_notes: 'All four ready', shortfall: 0, placement_venue_id: 9, placement_position: 'Stage right' }, reserved);
 });
 test('[FAILURE] [SG2-55:AC4] a receipt cannot grant arrangement permission to a read-only event viewer', async () => {
   await open({ ...view, can_request: false, can_arrange: false, requests: [{ ...record, status: 'approved' }] });
