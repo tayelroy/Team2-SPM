@@ -156,6 +156,8 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/equipment_availability.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/equipment_reservations.sql
           node .github/scripts/test-equipment-reservations-concurrency.mjs
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_confirmation.sql
+          node .github/scripts/test-event-confirmation-concurrency.mjs
           node .github/scripts/test-equipment-requirements-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_status_flow.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_temporary_unavailability.sql

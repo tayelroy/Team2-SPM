@@ -1,0 +1,332 @@
+-- SG2-58 confirm_event RPC contract, with isolated fixture changes rolled back.
+begin;
+insert into auth.users(id)
+ select ('d5800000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid from generate_series(1,9) n;
+insert into public.users(user_id,name,role_id) values
+ ('d5800000-0000-4000-8000-000000000001','Confirmation support',4),
+ ('d5800000-0000-4000-8000-000000000002','Confirmation organiser',1),
+ ('d5800000-0000-4000-8000-000000000003','Confirmation coordinator',2),
+ ('d5800000-0000-4000-8000-000000000004','Other confirmation coordinator',2),
+ ('d5800000-0000-4000-8000-000000000005','Confirmation venue staff',3),
+ ('d5800000-0000-4000-8000-000000000006','Confirmation attendee',5),
+ ('d5800000-0000-4000-8000-000000000007','Confirmation lead',2),
+ ('d5800000-0000-4000-8000-000000000008','Confirmation safety',2),
+ ('d5800000-0000-4000-8000-000000000009','Confirmation roleless',5);
+insert into public.account_roles(user_id,role) values
+ ('d5800000-0000-4000-8000-000000000001','technical_support_staff'),
+ ('d5800000-0000-4000-8000-000000000002','event_organiser'),
+ ('d5800000-0000-4000-8000-000000000003','event_coordinator'),
+ ('d5800000-0000-4000-8000-000000000004','event_coordinator'),
+ ('d5800000-0000-4000-8000-000000000005','venue_staff'),
+ ('d5800000-0000-4000-8000-000000000006','attendee'),
+ ('d5800000-0000-4000-8000-000000000007','event_coordinator_lead'),
+ ('d5800000-0000-4000-8000-000000000008','safety_officer');
+insert into public.venues(venue_id,name) values (95860,'Confirmation hall'),(95861,'Confirmation annex');
+insert into public.equipment(equipment_id,name,quantity_total) values (95860,'Confirmation projectors',20);
+-- Every event starts ready: Preparation, one approved venue request, no
+-- equipment, registration not needed. Each case then removes one item.
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed)
+ select 95860+n,'d5800000-0000-4000-8000-000000000002','d5800000-0000-4000-8000-000000000003',
+  'Confirmation event '||n,'preparation',false from generate_series(1,19) n;
+insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status)
+ select 95860+n,95860,'2031-11-01T09:00Z'::timestamptz+n*interval '1 day','2031-11-01T17:00Z'::timestamptz+n*interval '1 day','approved'
+ from generate_series(1,19) n where n not in (2,4,10);
+
+-- AC1 event: several approved venues, live equipment reserved and placed,
+-- registration fully set, plus non-live rows that must be ignored.
+update public.events set name='Confirmation Gala',registration_needed=true,registration_capacity=1,
+ registration_opens_at='2031-10-01T00:00Z',registration_closes_at='2031-10-01T00:00:01Z' where event_id=95861;
+insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status) values
+ (95861,95861,'2031-11-02T09:00Z','2031-11-02T17:00Z','approved'),
+ (95861,95861,'2031-11-03T09:00Z','2031-11-03T17:00Z','rejected'),
+ (95861,95861,'2031-11-04T09:00Z','2031-11-04T17:00Z','cancelled');
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position)
+ values (95861,95861,95860,2,'approved',0,95860,'Stage left'),
+  (95871,95861,95860,3,'rejected',null,null,null),
+  (95881,95861,95860,3,'cancelled',null,null,null);
+insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at)
+ values (95861,95860,2,'2031-11-02T09:00Z','2031-11-02T17:00Z',95861,'2031-10-01T00:00Z');
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+declare result jsonb;
+begin
+ result := public.confirm_event(95861);
+ if result - 'confirmed_at' is distinct from
+   '{"outcome":"ok","event_id":95861,"status":"confirmed","organiser_notified":true}'::jsonb
+   or jsonb_typeof(result->'confirmed_at') is distinct from 'string'
+   or not isfinite((result->>'confirmed_at')::timestamptz) then
+  raise exception '[SG2-58:ready-event-confirms] [SG2-58:AC1] [NORMAL] A ready Preparation event must confirm and return its confirmation receipt: %', result;
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if (select status::text||'|'||confirmed_by::text from public.events where event_id=95861)
+   is distinct from 'confirmed|d5800000-0000-4000-8000-000000000003'
+   or (select confirmed_at from public.events where event_id=95861) is null then
+  raise exception '[SG2-58:confirmation-recorded] [SG2-58:AC1] [NORMAL] Confirmation must store status, confirmed_by and confirmed_at together';
+ end if;
+ if (select count(*) from public.event_audit_logs where event_id=95861) <> 1
+   or (select actor_id::text||'|'||field_name||'|'||old_value||'|'||new_value from public.event_audit_logs where event_id=95861)
+   is distinct from 'd5800000-0000-4000-8000-000000000003|status|preparation|confirmed' then
+  raise exception '[SG2-58:confirmation-audited] [SG2-58:AC1] [NORMAL] Confirmation must add exactly one status history row by the coordinator';
+ end if;
+ if (select count(*) from public.notifications where event_id=95861) <> 1
+   or (select recipient_id::text||'|'||kind||'|'||message||'|'||coalesce(request_id::text,'null')||'|'||coalesce(equipment_reservation_id::text,'null')
+     from public.notifications where event_id=95861)
+   is distinct from 'd5800000-0000-4000-8000-000000000002|event_confirmed|Your event Confirmation Gala is confirmed.|null|null' then
+  raise exception '[SG2-58:organiser-notified-once] [SG2-58:AC1] [NORMAL] Exactly one accurate notification must reach the Event Organiser';
+ end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000002',true);
+do $$
+begin
+ if (select count(*) from public.notifications where event_id=95861 and kind='event_confirmed') <> 1 then
+  raise exception '[SG2-58:organiser-reads-notice] [SG2-58:AC1] [NORMAL] The Event Organiser must be able to read their confirmation notice';
+ end if;
+end $$;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ if exists(select 1 from public.notifications where event_id=95861) then
+  raise exception '[SG2-58:notice-private-to-organiser] [SG2-58:AC1] [FAILURE] The confirmation notice must not be readable by another account';
+ end if;
+ if public.confirm_event(95861) is distinct from '{"outcome":"closed","status":"confirmed"}'::jsonb then
+  raise exception '[SG2-58:replay-closed] [SG2-58:AC1] [CONFLICT] Replaying a confirmation must be refused as closed';
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if (select count(*) from public.notifications where event_id=95861) <> 1
+   or (select count(*) from public.event_audit_logs where event_id=95861) <> 1 then
+  raise exception '[SG2-58:replay-no-duplicate] [SG2-58:AC1] [CONFLICT] A replayed confirmation must not notify or audit again';
+ end if;
+end $$;
+
+-- AC2: each outstanding arrangement is refused with its exact key.
+update public.venue_booking_requests set status='pending' where event_id=95863;
+insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status) values
+ (95863,95861,'2031-12-03T09:00Z','2031-12-03T17:00Z','approved'),
+ (95863,95861,'2031-12-04T09:00Z','2031-12-04T17:00Z','approved'),
+ (95864,95861,'2031-12-05T09:00Z','2031-12-05T17:00Z','rejected'),
+ (95864,95861,'2031-12-06T09:00Z','2031-12-06T17:00Z','cancelled');
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position) values
+ (95865,95865,95860,1,'pending',0,95860,'Foyer'),
+ (95866,95866,95860,1,'approved',0,null,null),
+ (95867,95867,95860,1,'approved',0,95860,'Foyer'),
+ (95868,95868,95860,1,'approved',null,95860,'Foyer');
+insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at) values
+ (95866,95860,1,'2031-11-06T09:00Z','2031-11-06T17:00Z',95866,'2031-10-01T00:00Z'),
+ (95868,95860,1,'2031-11-08T09:00Z','2031-11-08T17:00Z',95868,'2031-10-01T00:00Z');
+update public.events set registration_needed=true,registration_capacity=null,
+ registration_opens_at='2031-10-01T00:00Z',registration_closes_at='2031-10-02T00:00Z' where event_id=95869;
+update public.events set registration_needed=true where event_id=95870;
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity) values (95870,95870,95860,1);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ if public.confirm_event(95862) is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb then
+  raise exception '[SG2-58:no-venue-request-outstanding] [SG2-58:AC2] [BOUNDARY] An event with no venue request must list the venue as outstanding';
+ end if;
+ if public.confirm_event(95863) is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb then
+  raise exception '[SG2-58:one-of-several-venues-pending] [SG2-58:AC2] [BOUNDARY] One pending venue among several approved ones must refuse confirmation';
+ end if;
+ if public.confirm_event(95864) is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb then
+  raise exception '[SG2-58:only-dead-venue-requests-outstanding] [SG2-58:AC2] [BOUNDARY] Rejected or cancelled venue requests must not count as an approved venue';
+ end if;
+ if public.confirm_event(95865) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
+  raise exception '[SG2-58:unreserved-equipment-outstanding] [SG2-58:AC2] [NORMAL] A pending equipment request without a reservation must refuse confirmation';
+ end if;
+ if public.confirm_event(95866) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
+  raise exception '[SG2-58:reserved-unplaced-outstanding] [SG2-58:AC2] [BOUNDARY] Reserved but unplaced equipment must refuse confirmation';
+ end if;
+ if public.confirm_event(95867) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
+  raise exception '[SG2-58:placed-unreserved-outstanding] [SG2-58:AC2] [BOUNDARY] Placed equipment without a reservation receipt must refuse confirmation';
+ end if;
+ if public.confirm_event(95868) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
+  raise exception '[SG2-58:unknown-shortfall-outstanding] [SG2-58:AC2] [BOUNDARY] Reserved placed equipment with an unknown shortfall must refuse confirmation';
+ end if;
+ if public.confirm_event(95869) is distinct from '{"outcome":"outstanding","outstanding":["registration"]}'::jsonb then
+  raise exception '[SG2-58:registration-capacity-outstanding] [SG2-58:AC2] [NORMAL] Needed registration without capacity must refuse confirmation';
+ end if;
+ if public.confirm_event(95870) is distinct from
+   '{"outcome":"outstanding","outstanding":["venue","equipment","registration"]}'::jsonb then
+  raise exception '[SG2-58:all-outstanding-ordered] [SG2-58:AC2] [NORMAL] Every outstanding arrangement must be listed in venue, equipment, registration order';
+ end if;
+end $$;
+reset role;
+-- Each remaining single gap: shortfall one unit, and each missing window field.
+update public.equipment_requests set shortfall=1 where request_id=95868;
+set local role authenticated;
+do $$
+begin
+ if public.confirm_event(95868) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
+  raise exception '[SG2-58:shortfall-one-outstanding] [SG2-58:AC2] [BOUNDARY] A one-unit equipment shortfall must refuse confirmation';
+ end if;
+end $$;
+reset role;
+do $$
+declare field text; result jsonb;
+begin
+ foreach field in array array['registration_opens_at','registration_closes_at'] loop
+  update public.events set registration_capacity=50,registration_opens_at='2031-10-01T00:00Z',
+   registration_closes_at='2031-10-02T00:00Z' where event_id=95869;
+  execute format('update public.events set %I=null where event_id=95869',field);
+  perform set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+  result := public.confirm_event(95869);
+  if result is distinct from '{"outcome":"outstanding","outstanding":["registration"]}'::jsonb then
+   raise exception '[SG2-58:registration-window-outstanding] [SG2-58:AC2] [BOUNDARY] Needed registration missing % must refuse confirmation: %',field,result;
+  end if;
+ end loop;
+ if exists(select 1 from public.events where event_id between 95862 and 95870
+     and (status <> 'preparation' or confirmed_by is not null or confirmed_at is not null))
+   or exists(select 1 from public.event_audit_logs where event_id between 95862 and 95870)
+   or exists(select 1 from public.notifications where event_id between 95862 and 95870) then
+  raise exception '[SG2-58:refusal-has-no-side-effects] [SG2-58:AC2] [FAILURE] A refused confirmation must not change status, history or notifications';
+ end if;
+end $$;
+
+-- AC2: equipment or registration that is not required does not block.
+update public.events set registration_needed=null where event_id=95871;
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status) values
+ (95872,95872,95860,1,'rejected'),(95882,95872,95860,1,'cancelled');
+update public.events set name='' where event_id=95872;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ if public.confirm_event(95871)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-58:unknown-registration-not-required] [SG2-58:AC2] [BOUNDARY] Registration not marked needed must not block confirmation';
+ end if;
+ if public.confirm_event(95872)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-58:no-live-equipment-not-required] [SG2-58:AC2] [NORMAL] Only rejected or cancelled equipment requests must not block confirmation';
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if (select message from public.notifications where event_id=95872 and kind='event_confirmed')
+   is distinct from 'Your event Untitled event is confirmed.' then
+  raise exception '[SG2-58:untitled-event-notice] [SG2-58:AC1] [BOUNDARY] A blank event name must be notified as Untitled event';
+ end if;
+end $$;
+
+-- Decision 1: only Preparation can be confirmed.
+do $$
+declare state public.event_status; result jsonb;
+begin
+ foreach state in array (select array_agg(s) from unnest(enum_range(null::public.event_status)) s where s <> 'preparation') loop
+  update public.events set status=state,
+   decision_reason=case when state='rejected' then 'Not suitable' end,
+   completed_by=case when state='completed' then 'd5800000-0000-4000-8000-000000000003'::uuid end,
+   completed_at=case when state='completed' then '2031-12-01T00:00Z'::timestamptz end
+   where event_id=95873;
+  perform set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+  result := public.confirm_event(95873);
+  if result is distinct from jsonb_build_object('outcome','closed','status',state::text) then
+   raise exception '[SG2-58:non-preparation-closed] [SG2-58:AC1] [FAILURE] An event in % must not be confirmable: %',state,result;
+  end if;
+ end loop;
+ if exists(select 1 from public.event_audit_logs where event_id=95873)
+   or exists(select 1 from public.notifications where event_id=95873)
+   or (select confirmed_at from public.events where event_id=95873) is not null then
+  raise exception '[SG2-58:closed-has-no-side-effects] [SG2-58:AC1] [FAILURE] A closed confirmation must write nothing';
+ end if;
+end $$;
+
+-- Ownership, identity, role and grant checks are enforced by the database.
+update public.events set coordinator_id='d5800000-0000-4000-8000-000000000004' where event_id=95874;
+update public.events set coordinator_id=null where event_id=95875;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ if public.confirm_event(95874) is distinct from '{"outcome":"missing"}'::jsonb
+   or public.confirm_event(95875) is distinct from '{"outcome":"missing"}'::jsonb
+   or public.confirm_event(999999) is distinct from '{"outcome":"missing"}'::jsonb
+   or public.confirm_event(null) is distinct from '{"outcome":"missing"}'::jsonb then
+  raise exception '[SG2-58:unassigned-event-missing] [SG2-58:AC1] [FAILURE] Another coordinator''s, unassigned or unknown events must be reported missing';
+ end if;
+end $$;
+do $$
+declare n integer;
+begin
+ foreach n in array array[1,2,5,6,7,8,9] loop
+  perform set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-'||lpad(n::text,12,'0'),true);
+  begin
+   perform public.confirm_event(95876);
+   raise exception '[SG2-58:only-coordinator-confirms] [SG2-58:AC1] [FAILURE] A non-coordinator account must not confirm: %',n;
+  exception when insufficient_privilege then null; end;
+ end loop;
+ perform set_config('request.jwt.claim.sub','',true);
+ begin
+  perform public.confirm_event(95876);
+  raise exception '[SG2-58:identity-required] [SG2-58:AC1] [FAILURE] A database role without caller identity must not confirm';
+ exception when insufficient_privilege then null; end;
+end $$;
+set local role anon;
+do $$
+begin
+ begin
+  perform public.confirm_event(95876);
+  raise exception '[SG2-58:anonymous-execute-denied] [SG2-58:AC1] [FAILURE] Anonymous callers must not execute the confirmation RPC';
+ exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+do $$
+begin
+ if exists(select 1 from public.events where event_id between 95874 and 95876 and status <> 'preparation')
+   or exists(select 1 from public.notifications where event_id between 95874 and 95876) then
+  raise exception '[SG2-58:denied-has-no-side-effects] [SG2-58:AC1] [FAILURE] Denied callers must not confirm or notify';
+ end if;
+end $$;
+
+-- Notification failure rolls back the whole confirmation.
+alter table public.notifications add constraint confirmation_test_notification_failure check(kind <> 'event_confirmed') not valid;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ begin
+  perform public.confirm_event(95877);
+  raise exception '[SG2-58:notification-failure-atomic] [SG2-58:AC1] [FAILURE] Notification failure must abort the confirmation';
+ exception when check_violation then null; end;
+end $$;
+reset role;
+alter table public.notifications drop constraint confirmation_test_notification_failure;
+do $$
+begin
+ if (select status::text||'|'||coalesce(confirmed_at::text,'null') from public.events where event_id=95877) <> 'preparation|null'
+   or exists(select 1 from public.event_audit_logs where event_id=95877) then
+  raise exception '[SG2-58:notification-failure-no-partial-write] [SG2-58:AC1] [FAILURE] A failed notification must leave the event and history unchanged';
+ end if;
+end $$;
+
+-- Hosted rows confirmed before SG2-58 keep a null record; halves are refused.
+do $$
+begin
+ update public.events set status='confirmed' where event_id=95878;
+ if (select confirmed_by is null and confirmed_at is null from public.events where event_id=95878) is not true then
+  raise exception '[SG2-58:legacy-confirmed-valid] [SG2-58:AC1] [BOUNDARY] A confirmed event without a confirmation record must remain valid';
+ end if;
+ begin
+  update public.events set confirmed_by='d5800000-0000-4000-8000-000000000003' where event_id=95878;
+  raise exception '[SG2-58:confirmed-by-needs-confirmed-at] [SG2-58:AC1] [FAILURE] confirmed_by without confirmed_at must be refused';
+ exception when check_violation then null; end;
+ begin
+  update public.events set confirmed_at='2031-12-01T00:00Z' where event_id=95878;
+  raise exception '[SG2-58:confirmed-at-needs-confirmed-by] [SG2-58:AC1] [FAILURE] confirmed_at without confirmed_by must be refused';
+ exception when check_violation then null; end;
+ if not exists(select 1 from pg_proc where oid='public.confirm_event(integer)'::regprocedure
+   and prosecdef and provolatile='v' and proconfig @> array['search_path=""'])
+  or not has_function_privilege('authenticated','public.confirm_event(integer)','EXECUTE')
+  or has_function_privilege('anon','public.confirm_event(integer)','EXECUTE') then
+  raise exception '[SG2-58:guarded-fresh-snapshot-rpc] [SG2-58:AC1] [NORMAL] Confirmation must use a scoped volatile definer executable only by authenticated callers';
+ end if;
+end $$;
+rollback;
