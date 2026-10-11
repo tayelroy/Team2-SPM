@@ -3,10 +3,11 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import type { WorkItem } from '../api/workQueue';
+import EquipmentRequirements from '../components/EquipmentRequirements';
 
-vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId, canCheckAvailability }: { eventId: number; canCheckAvailability?: boolean }) => (
+vi.mock('../components/EquipmentRequirements', () => ({ default: vi.fn(({ eventId, canCheckAvailability }: { eventId: number; canCheckAvailability?: boolean }) => (
   <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}{canCheckAvailability ? <button>Check equipment availability</button> : null}</section>
-) }));
+)) }));
 
 // SG2-57: stubbed like EquipmentRequirements so its own fetch does not change
 // the fetch counts and sequences these queue tests assert.
@@ -34,6 +35,23 @@ test('[NORMAL] [SG2-53:AC4] [SG2-53:AC5] support opens the equipment workflow fo
   render(<Dashboard role="Technical Support Staff" accessToken="support-token" onNavigate={vi.fn()} />);
   fireEvent.click(await screen.findByRole('button', { name: /Microphones/ }));
   expect(await screen.findByRole('region', { name: 'Equipment requirement integration' })).toHaveTextContent('Equipment requests for event 91');
+});
+
+test('[NORMAL] [CONFLICT] [SG2-55:AC4] the selected equipment header becomes approved only when that exact request is successfully reserved', async () => {
+  const item = { ...review, kind: 'equipment', category: 'equipment', status: 'pending', item_id: 53, event_id: 91, title: 'Microphones' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role="Technical Support Staff" accessToken="support-token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Microphones/ }));
+  await screen.findByRole('region', { name: 'Equipment requirement integration' });
+  const detail = within(screen.getByRole('article', { name: 'Equipment request' }));
+  expect(detail.getByText('pending', { exact: true })).toBeVisible();
+  const onReserved = vi.mocked(EquipmentRequirements).mock.calls.at(-1)![0].onReserved!;
+  act(() => onReserved(54));
+  expect(detail.getByText('pending', { exact: true })).toBeVisible();
+  act(() => onReserved(53));
+  expect(detail.getByText('approved', { exact: true })).toBeVisible();
+  expect(detail.queryByText('pending', { exact: true })).not.toBeInTheDocument();
+  expect(detail.getByRole('heading', { name: 'Microphones' })).toBeVisible();
 });
 
 test.each([false, true])('[FAILURE] [SG2-53:AC1] equipment requirements are hidden before approval even when assigned: %s', async assigned_to_me => {
@@ -140,7 +158,7 @@ test('[CONFLICT] [SG2-35:AC3] a review that cannot be started says so instead of
 
 test.each([
   ['Venue Staff', 'venue', 'Booking requests awaiting decision', 'Atrium Hall', 'Venue booking request'],
-  ['Technical Support Staff', 'equipment', 'Equipment requests awaiting decision', 'Wireless microphone', 'Equipment request'],
+  ['Technical Support Staff', 'equipment', 'Equipment requests and reservations', 'Wireless microphone', 'Equipment request'],
 ] as const)('[NORMAL] [SG2-41:AC4] %s sees request identity, event and the exact time window', async (role, kind, group, title, detailLabel) => {
   const item = { ...review, kind, category: kind, item_id: 7, title, ends_at: '2030-06-15T06:00:00Z', details: { quantity: 2, notes: 'Set up before doors open' } };
   const fetch = vi.fn(async () => Response.json({ items: [item] })); vi.stubGlobal('fetch', fetch);

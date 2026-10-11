@@ -277,7 +277,7 @@ export function validatePlanningSchedule(
  * registration capacity increase affects registration. A category is only
  * flagged when the event actually has that arrangement, read through SG2-57's
  * readiness view: a live venue booking request (pending, held or approved), a
- * live equipment request, or registration being needed. An edit to an event
+ * live equipment request or reservation, or registration being needed. An edit to an event
  * with nothing arranged yet has no impact and needs no confirmation.
  */
 export function detectArrangementImpact(
@@ -288,7 +288,8 @@ export function detectArrangementImpact(
   const readiness = computeArrangementReadiness({ ...current, ...facts });
   const [, equipment, registration] = readiness.arrangements;
   const venueArranged = readiness.venue_requested;
-  const equipmentArranged = equipment.state !== 'not_required';
+  const equipmentRequested = equipment.state !== 'not_required';
+  const equipmentArranged = equipmentRequested || facts.equipment_reserved === true;
   const registrationArranged = registration.state !== 'not_required';
 
   const affected = new Set<string>();
@@ -302,7 +303,7 @@ export function detectArrangementImpact(
     }
     if (equipmentArranged) {
       affected.add('equipment_recheck');
-      subjects.push('equipment requests');
+      subjects.push(equipmentRequested ? 'equipment requests' : 'equipment reservations');
     }
     if (subjects.length > 0) {
       notes.push(`${change} Existing ${subjects.join(' and ')} must be rechecked.`);

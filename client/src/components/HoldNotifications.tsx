@@ -12,11 +12,13 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   venue_request_approved: 'Venue request approved', venue_request_rejected: 'Venue request rejected',
   // SG2-51: a venue booked for the event was released.
   venue_booking_released: 'Venue booking released',
+  equipment_reserved: 'Equipment reserved',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate,
   venue_request_approved: color.accent, venue_request_rejected: color.silver,
   venue_booking_released: color.silver,
+  equipment_reserved: color.accent,
 };
 
 /** One line in the drawer, whichever inbox it came from. */

@@ -57,7 +57,7 @@ const ARRANGED: EventArrangementFacts = {
 };
 
 /** Approved but nothing requested yet, like the regression fixture's event #91. */
-const NOTHING_ARRANGED: EventArrangementFacts = { venue_requests: [], equipment_requests: [] };
+const NOTHING_ARRANGED: EventArrangementFacts = { venue_requests: [], equipment_requests: [], equipment_reserved: false };
 
 /** Fixed clock for the handler: BASE_EVENT and every date sent below lie after it. */
 const HANDLER_NOW = Date.parse('2026-10-01T00:00:00.000Z');
@@ -684,6 +684,19 @@ describe('detectArrangementImpact (AC 2)', () => {
     assert.deepEqual(impact, { has_impact: false, affected_arrangements: [], impact_notes: [] });
   });
 
+  test('[NORMAL] [SG2-39:AC2] [SG2-55:AC4] a reservation without any live request still needs equipment rechecking after date or attendance changes', () => {
+    const facts = { ...NOTHING_ARRANGED, equipment_reserved: true };
+    for (const [update, note] of [
+      [{ proposed_date: '2026-11-20T09:00:00.000Z' }, 'Proposed date changed from 2026-11-15T09:00:00.000Z to 2026-11-20T09:00:00.000Z.'],
+      [{ expected_attendance: 150 }, 'Expected attendance increased from 100 to 150.']
+    ] as const) {
+      assert.deepEqual(detectArrangementImpact({ ...BASE_EVENT, registration_needed: false }, update, facts), {
+        has_impact: true, affected_arrangements: ['equipment_recheck'],
+        impact_notes: [`${note} Existing equipment reservations must be rechecked.`]
+      });
+    }
+  });
+
   test('[BOUNDARY] [SG2-39:AC2] only the arrangement categories that exist are flagged', () => {
     const update = { expected_attendance: 101, registration_capacity: 101 };
 
@@ -1227,6 +1240,55 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       outstanding_arrangements: ['venue_recheck'], status: 'planning' }]);
     assert.equal(confirmed.body.event.status, 'planning');
     assert.deepEqual(confirmed.body.outstanding_arrangements, ['venue_recheck']);
+  });
+
+  test('[CONFLICT] [NORMAL] [SG2-39:AC2] [SG2-39:AC3] [SG2-55:AC4] reservation-only date and attendance changes require confirmation before recording equipment rechecks', async () => {
+    for (const [change, note] of [
+      [{ proposed_date: '2026-11-20T09:00:00.000Z' }, 'Proposed date changed from 2026-11-15T09:00:00.000Z to 2026-11-20T09:00:00.000Z.'],
+      [{ expected_attendance: 120 }, 'Expected attendance increased from 100 to 120.']
+    ] as const) {
+      const writes: UpdatePlanningFieldsInput[] = [];
+      const audits: InsertAuditLogInput[][] = [];
+      const app = buildApp({
+        fetchResult: { ok: true, event: { ...BASE_EVENT, registration_needed: false } },
+        arrangementFacts: { ok: true, facts: { ...NOTHING_ARRANGED, equipment_reserved: true } },
+        captureUpdateFields: fields => { writes.push(fields); },
+        captureAuditEntries: entries => { audits.push(entries); }
+      });
+      const asked = await request(app).patch('/api/event-requests/10/planning').send(change);
+      assert.equal(asked.status, 409);
+      assert.deepEqual(asked.body, {
+        error: 'Arrangements require rechecking.', requires_confirmation: true,
+        affected_arrangements: ['equipment_recheck'],
+        impact_notes: [`${note} Existing equipment reservations must be rechecked.`]
+      });
+      assert.deepEqual(writes, []); assert.equal(audits.length, 0);
+
+      const confirmed = await request(app).patch('/api/event-requests/10/planning').send({ ...change, confirm_impact: true });
+      assert.equal(confirmed.status, 200);
+      assert.deepEqual(writes, [{ ...change, arrangements_recheck_needed: true,
+        outstanding_arrangements: ['equipment_recheck'], status: 'planning' }]);
+      assert.equal(confirmed.body.arrangements_recheck_needed, true);
+      assert.deepEqual(confirmed.body.outstanding_arrangements, ['equipment_recheck']);
+      assert.equal(confirmed.body.event.status, 'planning');
+      assert.deepEqual(audits[0].map(entry => entry.field_name), [...Object.keys(change), 'status']);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-39:AC2] [SG2-55:AC4] unchanged dates or attendance reductions on reservation-only events do not invent rechecks', async () => {
+    for (const change of [{ proposed_date: BASE_EVENT.proposed_date }, { expected_attendance: 100 },
+      { expected_attendance: 90 }, { planning_notes: 'Equipment is reserved' }]) {
+      const writes: UpdatePlanningFieldsInput[] = [];
+      const response = await request(buildApp({
+        fetchResult: { ok: true, event: { ...BASE_EVENT, registration_needed: false, status: 'planning' } },
+        arrangementFacts: { ok: true, facts: { ...NOTHING_ARRANGED, equipment_reserved: true } },
+        captureUpdateFields: fields => { writes.push(fields); }
+      })).patch('/api/event-requests/10/planning').send(change);
+      assert.equal(response.status, 200);
+      assert.deepEqual(writes, [change]);
+      assert.equal(response.body.arrangements_recheck_needed, false);
+      assert.deepEqual(response.body.outstanding_arrangements, []);
+    }
   });
 
   test('[FAILURE] [SG2-39:AC2] an edit is not saved when the existing arrangements cannot be read', async () => {

@@ -17,7 +17,7 @@ import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
   'Venue Staff': [['venue', 'Booking requests awaiting decision']],
-  'Technical Support Staff': [['equipment', 'Equipment requests awaiting decision']],
+  'Technical Support Staff': [['equipment', 'Equipment requests and reservations']],
 } as const;
 type InternalRole = keyof typeof GROUPS;
 
@@ -197,7 +197,8 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           them; the RPC decides what is still editable. */}
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
-        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} canCheckAvailability={role === 'Technical Support Staff'} />
+        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} canCheckAvailability={role === 'Technical Support Staff'}
+          onReserved={item.kind === 'equipment' ? requestId => { if (requestId === item.item_id) setStatus('approved'); } : undefined} />
       )}
       {/* SG2-57: the assigned coordinator sees which arrangements are still
           outstanding before the event can be confirmed, through the same

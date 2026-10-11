@@ -20,6 +20,9 @@ export interface EquipmentRequestArrangementRow {
 export interface EventArrangementFacts {
   venue_requests: VenueBookingStatusRow[];
   equipment_requests: EquipmentRequestArrangementRow[];
+  /** Stock may already be reserved without a linked request on legacy events.
+   * Kept internal: planning rechecks need existence, not receipt details. */
+  equipment_reserved?: boolean;
 }
 
 export type FetchEventArrangementFactsResult =
@@ -32,7 +35,9 @@ export type FetchEventArrangementFactsResult =
  * route checks the caller's relationship to the event before calling this.
  *
  * The event's own registration fields and coordinator come from
- * fetchEventPlanningRecord; this only adds what lives in the two child tables.
+ * fetchEventPlanningRecord; this adds child request facts and reservation
+ * existence. Reservations have no status column; a nonterminal event's rows
+ * remain commitments, including receipts with no linked request.
  */
 export async function fetchEventArrangementFacts(
   admin: SupabaseClient,
@@ -54,11 +59,21 @@ export async function fetchEventArrangementFacts(
     return { ok: false, reason: 'unavailable', message: equipment.error.message };
   }
 
+  const reserved = await admin
+    .from('equipment_reservations')
+    .select('reservation_id')
+    .eq('event_id', eventId)
+    .limit(1);
+  if (reserved.error) {
+    return { ok: false, reason: 'unavailable', message: reserved.error.message };
+  }
+
   return {
     ok: true,
     facts: {
       venue_requests: (venue.data ?? []) as VenueBookingStatusRow[],
-      equipment_requests: (equipment.data ?? []) as EquipmentRequestArrangementRow[]
+      equipment_requests: (equipment.data ?? []) as EquipmentRequestArrangementRow[],
+      equipment_reserved: (reserved.data ?? []).length > 0
     }
   };
 }

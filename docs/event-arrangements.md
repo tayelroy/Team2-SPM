@@ -67,6 +67,11 @@ decision; this flag tells the two apart. SG2-39 planning edits use the same
 facts and computation to decide which arrangements need rechecking: a venue
 recheck is only asked for when `venue_requested` is true (see
 [Work queue](work-queue.md#coordinator-planning-edits-sg2-39)).
+The internal facts also include whether the event has an equipment reservation.
+SG2-55 planning rechecks include legacy reservations without a linked request,
+even when no live equipment request exists. This existence flag does not change
+the request/placement readiness criteria above or expose reservation rows in
+the readiness response.
 
 The readiness facts are read with the service role
 (`fetchEventArrangementFacts`), since the child tables are not client-readable

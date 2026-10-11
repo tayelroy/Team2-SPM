@@ -74,7 +74,7 @@ exist. The handler reads them through SG2-57's readiness data
 | Change | Flags | Only when the event has |
 | --- | --- | --- |
 | Proposed date moved, or expected attendance increased | `venue_recheck` | a live venue booking request (pending, placed by a hold, or approved) |
-| Proposed date moved, or expected attendance increased | `equipment_recheck` | a live equipment request |
+| Proposed date moved, or expected attendance increased | `equipment_recheck` | a live equipment request or an equipment reservation, including a legacy reservation without a linked request |
 | Registration capacity increased | `registration_recheck` | registration needed |
 
 If anything is flagged and the request lacks `confirm_impact: true`, the server
@@ -86,6 +86,12 @@ event with nothing arranged (for example an approved event with no venue
 request yet) saves at once and marks nothing outstanding; an `approved` event
 still moves to `planning`. If the arrangements cannot be read the edit is not
 saved (503).
+
+Legacy reservations still commit stock even when they have no equipment request.
+The facts reader checks for a reservation belonging to the event, so changing its
+date or increasing attendance also asks the coordinator to confirm an equipment
+recheck. No reservation quantities, periods or identities are exposed by this
+check; the saved receipt remains visible in the equipment reservations panel.
 
 **Next step.** While an assigned event is `approved` or `planning`, its detail
 shows **Next step — Find venues for this event**, so a planning save that moves

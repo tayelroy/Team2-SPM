@@ -163,7 +163,7 @@ export const HEAD: Record<
     eyebrow: 'Technical Support Staff',
     title: 'Equipment desk',
     blurb:
-      'Pending equipment requests for your team. Open a request to see its details.',
+      'Equipment requests and reservations for your team. Open a request to review stock and placement.',
   },
   Attendee: {
     eyebrow: 'Attendee · J. Halloran',

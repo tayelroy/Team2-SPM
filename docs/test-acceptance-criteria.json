@@ -596,6 +596,19 @@
       },
       "originalPullRequests": [],
       "source": "Live Jira SG2-54 description verified in the in-app browser on 9 October 2026. AC numbering follows displayed bullet order."
+    },
+    {
+      "id": "SG2-55",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-55",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Can reserve equipment for an event where enough remains free",
+        "AC2": "Reserving reduces what is available to overlapping events",
+        "AC3": "Reserving more than remains free is refused",
+        "AC4": "The reservation is visible on the event, and the coordinator is notified"
+      },
+      "verifiedAt": "2026-10-11",
+      "source": "Live SG2-55 Jira description, bullet order, read in the in-app browser."
     }
   ]
 }
