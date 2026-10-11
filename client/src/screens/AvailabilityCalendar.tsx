@@ -10,7 +10,7 @@ import { Card, IconButton } from '../ui';
 
 type Status = 'loading' | 'ready' | 'no-access' | 'error';
 
-const CURRENT_YEAR = new Date().getUTCFullYear();
+const CURRENT_YEAR = monthRange(new Date()).year;
 /** Bounded range for the year dropdown; the arrows stay unbounded either side of it. */
 const YEAR_OPTIONS = Array.from({ length: 11 }, (_, i) => CURRENT_YEAR - 5 + i);
 
@@ -77,12 +77,14 @@ export default function AvailabilityCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range.from, range.to]);
 
+  // Navigate from the Singapore month on screen; midday UTC on the 1st is
+  // inside that month in Singapore too.
   function shiftMonth(delta: number) {
-    setReference((prev) => new Date(Date.UTC(prev.getUTCFullYear(), prev.getUTCMonth() + delta, 1)));
+    jumpTo(range.year, range.month + delta);
   }
 
   function jumpTo(year: number, month: number) {
-    setReference(new Date(Date.UTC(year, month, 1)));
+    setReference(new Date(Date.UTC(year, month, 1, 12)));
   }
 
   const days = buildCalendarDays(reference, venues);

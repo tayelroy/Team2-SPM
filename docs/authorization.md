@@ -105,9 +105,12 @@ enforced per-row by the assignment and by the guards on the write itself, not
 by this grant. The coordinator reaches it from their work queue, not from the
 organiser-only event detail read.
 Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
-mirrored in the `event_audit_logs` RLS policy
-(`supabase/migrations/202610050004_week7_roles.sql`), and the two must change
-together.
+mirrored in the `event_audit_logs` RLS policy (latest version:
+`supabase/migrations/202610130001_event_history_internal_fields.sql`), and the
+two must change together. SG2-40 adds `INTERNAL_ONLY_AUDIT_FIELDS` beside it
+(currently `planning_notes`): history rows for those fields are returned only
+to internal roles, by the history handler and by the same RLS policy — see
+[organisation events](organisation-events.md#event-change-history-sg2-40).
 
 Permissions map an action name to the roles allowed to perform it. Define them
 in `PERMISSIONS` in `server/src/auth/policy.ts`. The current policy is:

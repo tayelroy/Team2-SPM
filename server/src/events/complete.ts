@@ -2,7 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import { completeEvent, type CompleteEventResult } from '../db/eventRequests';
-import { insertAuditLogs } from '../db/auditLogs';
+import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -82,15 +82,7 @@ export function createCompleteEventHandler({
       return;
     }
 
-    await recordAudit(admin, [
-      {
-        event_id: eventId,
-        actor_id: principal.userId,
-        field_name: 'status',
-        old_value: completed.previous_status,
-        new_value: 'completed'
-      }
-    ]);
+    await recordAudit(admin, [statusChange(eventId, principal.userId, completed.previous_status, 'completed')]);
 
     res.status(200).json({ request: completed.request });
   };

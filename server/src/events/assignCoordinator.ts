@@ -10,7 +10,7 @@ import {
   type AssignStatusTransition
 } from '../db/eventRequests';
 import { getAccountRole, type GetAccountRoleResult } from '../db/accountRoles';
-import { insertAuditLogs } from '../db/auditLogs';
+import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -49,7 +49,9 @@ export interface AssignCoordinatorDependencies {
  * AC4): who made it comes from the verified caller, when from the row's
  * database default, and the old and new values are the coordinators' names
  * so the history drawer reads naturally. Re-choosing the coordinator who
- * already holds the request changes nothing and so records nothing.
+ * already holds the request changes nothing and so records nothing. A first
+ * assignment also moves the request `unassigned → submitted`, and that
+ * status change is recorded in the same insert.
  *
  * The event write and the history insert are two calls, not a transaction.
  * If the insert fails, the assignment is put back (guarded so it cannot
@@ -153,7 +155,8 @@ export function createAssignCoordinatorHandler({
         field_name: 'coordinator_id',
         old_value: previousId === null ? null : current.coordinator_name ?? previousId,
         new_value: assigned.request.coordinator_name ?? coordinatorId
-      }
+      },
+      ...(transition ? [statusChange(eventId, principal.userId, transition.from, transition.to)] : [])
     ]);
     if (!recorded.ok) {
       // Undo the status move too, or a request whose assignment was rolled

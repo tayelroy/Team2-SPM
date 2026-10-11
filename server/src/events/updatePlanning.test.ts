@@ -1076,7 +1076,7 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(auditCalled, false);
   });
 
-  test('[NORMAL] [CONFLICT] [SG2-38:AC2] [SG2-38:AC3] [SG2-39:AC1] [SG2-39:AC2] [SG2-39:AC3] an attendance change invalidates arrangements; confirming saves the change and keeps the displayed stage in planning with rechecks outstanding', async () => {
+  test('[NORMAL] [CONFLICT] [SG2-38:AC2] [SG2-38:AC3] [SG2-39:AC1] [SG2-39:AC2] [SG2-39:AC3] [SG2-40:AC2] an attendance change invalidates arrangements; confirming saves the change, records approved → planning and keeps the displayed stage in planning with rechecks outstanding', async () => {
     let capturedFetchEventId: number | undefined;
     let capturedUpdateEventId: number | undefined;
     let capturedFields: UpdatePlanningFieldsInput | undefined;
@@ -1137,11 +1137,18 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
         field_name: 'expected_attendance',
         old_value: '100',
         new_value: '250'
+      },
+      {
+        event_id: 10,
+        actor_id: COORDINATOR_ID,
+        field_name: 'status',
+        old_value: 'approved',
+        new_value: 'planning'
       }
     ]);
   });
 
-  test('[NORMAL] [SG2-39:AC1] [SG2-39:AC3] AC 3: transitions approved event to planning on non-impacting update and persists diffs', async () => {
+  test('[NORMAL] [SG2-39:AC1] [SG2-39:AC3] [SG2-40:AC1] [SG2-40:AC2] AC 3: transitions approved event to planning on non-impacting update and persists diffs, including the status change by the coordinator', async () => {
     let capturedFields: UpdatePlanningFieldsInput | undefined;
     let capturedAudit: InsertAuditLogInput[] | undefined;
 
@@ -1169,6 +1176,13 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
         field_name: 'planning_notes',
         old_value: 'Initial planning notes',
         new_value: 'Updated vendor details'
+      },
+      {
+        event_id: 10,
+        actor_id: COORDINATOR_ID,
+        field_name: 'status',
+        old_value: 'approved',
+        new_value: 'planning'
       }
     ]);
   });

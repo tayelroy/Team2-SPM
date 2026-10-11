@@ -55,7 +55,7 @@ const DEFAULT_PROPS = {
 function fillAllFields() {
   fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum 2026' } });
   fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
-  fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '12 Oct 2026' } });
+  fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T10:00' } });
   fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
   fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
   fireEvent.change(screen.getByLabelText(/Description/i), {
@@ -152,7 +152,7 @@ describe('AC1 — successful submission', () => {
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
 
     const fetchMock = vi.mocked(globalThis.fetch);
-    expect(onSuccess).toHaveBeenCalledWith(12);
+    expect(onSuccess).toHaveBeenCalledWith(12, 'Forum 2026');
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/12/submit', {
       method: 'PATCH',
       headers: { Authorization: 'Bearer test-token' },
@@ -193,7 +193,7 @@ describe('AC1 — successful submission', () => {
     fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
-    expect(onSuccess).toHaveBeenCalledWith(12);
+    expect(onSuccess).toHaveBeenCalledWith(12, 'Forum 2026');
     const calls = vi.mocked(fetch).mock.calls;
     expect(calls.map(([url]) => url)).toEqual(['/api/event-requests', '/api/event-requests/12/submit']);
     expect(JSON.parse(calls[0][1]!.body as string)).toMatchObject({ name: 'Forum 2026', expected_attendance: 180 });
@@ -216,23 +216,6 @@ describe('draft and presentation callbacks', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save draft/i }));
 
     expect(await screen.findByText('Draft 12 saved — ready to submit.')).toBeInTheDocument();
-  });
-
-  test('[NORMAL] [SG2-20:prototype-suitability] hides the suitability warning when conflicts are disabled', () => {
-    render(<RequestForm {...DEFAULT_PROPS} showConflicts={false} />);
-
-    expect(screen.queryByText(/180 expected attendance rules out/i)).not.toBeInTheDocument();
-  });
-
-  test('[NORMAL] [SG2-20:prototype-requirements] toggles requirement chips on and off', () => {
-    render(<RequestForm {...DEFAULT_PROPS} />);
-    const chip = screen.getByRole('button', { name: 'Hearing loop' });
-
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(chip);
-    expect(chip).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(chip);
-    expect(chip).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -258,7 +241,8 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     const body = sentDraftBody(fetchMock);
     expect(body.name).toBe('Partner Forum');
     expect(body.purpose).toBe('Client briefing');
-    expect(body.proposed_date).toBe('2026-11-04T09:00');
+    // 09:00 Singapore time is 01:00 UTC.
+    expect(body.proposed_date).toBe('2026-11-04T01:00:00.000Z');
     expect(body.expected_attendance).toBe(120);
     expect(body.venue_requirements).toBe('Stage');
     expect(body.description).toBe('Two keynotes');
@@ -453,7 +437,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     name: 'Partner Forum',
     purpose: 'Client briefing',
     description: 'Two keynotes',
-    proposed_date: '2026-11-04T09:00',
+    proposed_date: '2026-11-04T01:00:00.000Z',
     expected_attendance: 120,
     venue_requirements: 'Stage',
     accessibility_needs: 'Hearing loop',
@@ -575,6 +559,139 @@ describe('Editing an existing draft (SG2-29)', () => {
       method: 'PATCH',
       headers: { Authorization: 'Bearer test-token' },
     });
+  });
+});
+
+// ─── SG2-30: draft form shows stored data only ──────────────────────────────
+
+describe('stored draft values (SG2-30 walkthrough fixes)', () => {
+  const STORED = {
+    name: 'Planning workshop',
+    purpose: 'Team planning',
+    description: 'A planning workshop.',
+    proposed_date: '2030-06-15T02:00:00.000Z',
+    expected_attendance: 20,
+    venue_requirements: 'A room with seating',
+  };
+
+  function renderStored(onSuccess = vi.fn()) {
+    render(<RequestForm eventId="1" accessToken="test-token" initialValues={STORED} onSuccess={onSuccess} />);
+  }
+
+  function fitResponse() {
+    return Response.json({
+      event: { event_id: 1, name: 'Planning workshop', expected_attendance: 20, venue_requirements: null, accessibility_needs: null },
+      venues: [
+        { venue_id: 1, name: 'Regression Hall', capacity: 100, suitability: { suitable: true, issues: [] } },
+        { venue_id: 2, name: 'Huddle Room', capacity: 8, suitability: { suitable: false, issues: [
+          { kind: 'capacity', message: "Expected attendance of 20 is above this venue's capacity of 8." },
+        ] } },
+      ],
+    });
+  }
+
+  test('[NORMAL] [SG2-29:AC2] [SG2-30:AC1] a stored ISO date shows in Singapore time and is submitted back unchanged when untouched', async () => {
+    const onSuccess = vi.fn();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(draftResponse([], 1))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderStored(onSuccess);
+
+    const date = screen.getByLabelText(/Date/i);
+    expect(date).toHaveAttribute('type', 'datetime-local');
+    expect(date).toHaveValue('2030-06-15T10:00');
+    expect(screen.getByText('Singapore time (SGT)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(1, 'Planning workshop'));
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/event-requests/1');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).proposed_date).toBe('2030-06-15T02:00:00.000Z');
+  });
+
+  test('[BOUNDARY] [SG2-28:AC1] an early-morning Singapore time is saved as the previous UTC day', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(draftResponse([], 1));
+    vi.stubGlobal('fetch', fetchMock);
+    renderStored();
+
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2030-06-15T07:30' } });
+    expect(screen.getByLabelText(/Date/i)).toHaveValue('2030-06-15T07:30');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await screen.findByText('Draft 1 saved — ready to submit.');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).proposed_date).toBe('2030-06-14T23:30:00.000Z');
+  });
+
+  test('[FAILURE] [SG2-30:AC2] clearing the stored date leaves it blank, flags it and blocks submission', () => {
+    renderStored();
+
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '' } });
+
+    expect(screen.getByLabelText(/Date/i)).toHaveValue('');
+    expect(screen.getByText('Date is required')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+  });
+
+  test('[NORMAL] [SG2-29:AC2] a reopened draft shows no requirement chips or canned suitability banner it never stored', () => {
+    renderStored();
+
+    for (const chip of ['Step-free access', 'Hearing loop', 'Stage + lectern', 'Catering', 'Livestream', 'Breakout room', 'Parking', 'Signage']) {
+      expect(screen.queryByRole('button', { name: chip })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/expected attendance rules out/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Atrium Hall|Deepwater Auditorium/)).not.toBeInTheDocument();
+    // The one remaining toggle reflects what was stored (nothing → off).
+    expect(screen.getByRole('button', { name: 'Registration needed' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('[NORMAL] [SG2-47:AC1] venue fit is read from the suitability API for the saved draft on request, and re-read after each save', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url === '/api/venues/suitability?event_id=1' ? fitResponse() : draftResponse([], 1));
+    vi.stubGlobal('fetch', fetchMock);
+    renderStored();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check venue fit' }));
+
+    expect(await screen.findByRole('heading', { name: '1 of 2 venues do not fit this request' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Huddle Room' })).toBeInTheDocument();
+    expect(screen.getByText("Expected attendance of 20 is above this venue's capacity of 8.")).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check venue fit' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/venues/suitability?event_id=1', {
+      headers: { Authorization: 'Bearer test-token' }, cache: 'no-store',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft 1 saved — ready to submit.');
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url === '/api/venues/suitability?event_id=1')).toHaveLength(2));
+  });
+
+  test('[BOUNDARY] [SG2-28:AC3] a new request offers venue fit only once it is saved, using the signed-in session', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url === '/api/venues/suitability?event_id=12' ? fitResponse() : draftResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm />);
+    expect(screen.queryByRole('button', { name: 'Check venue fit' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Check venue fit' }));
+
+    expect(await screen.findByRole('heading', { name: '1 of 2 venues do not fit this request' })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/venues/suitability?event_id=12', {
+      headers: { Authorization: 'Bearer test-token' }, cache: 'no-store',
+    });
+  });
+
+  test('[FAILURE] [SG2-25:AC3] a signed-out venue fit check asks to sign in without calling the API', async () => {
+    sessionStorage.clear();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm eventId="12" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check venue fit' }));
+
+    expect(await screen.findByText('Your session has expired. Sign in again.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

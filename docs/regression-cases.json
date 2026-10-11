@@ -437,18 +437,18 @@
     "steps": [
       "Sign in as Event Organiser, open My events and select Planning workshop.",
       "Open New request, fill the required event fields and submit.",
-      "Immediately check Browser workshop details, submitted status, purpose and description; check the selection prompt and edit action are absent.",
+      "Immediately check the confirmation naming Browser workshop as submitted for review, then its details, submitted status, purpose and description; check the selection prompt and edit action are absent.",
       "Check submitted status through the fixture API.",
       "Reload, open My drafts and verify the new event is listed; read its API detail and check all saved fields."
     ],
-    "data": "Browser workshop; Team planning; Review the release plan; 2030-06-15T09:00:00Z; attendance 25; Projector",
-    "expected": "The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
+    "data": "Browser workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 Singapore time (stored 2030-06-15T09:00:00.000Z); attendance 25; Projector",
+    "expected": "The immediate detail view confirms 'Browser workshop has been submitted for review.' and shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
-    "execution_date": "1 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -460,6 +460,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+        "execution_date": "1 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Current browser assertions passed. The immediate detail view shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
@@ -478,7 +484,7 @@
       "SG2-87:AC4"
     ],
     "method_id": "TC-6cea16b8d437",
-    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4."
+    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4. Since the SG2-30 draft-form fix the date is a Singapore-time date-time input and the detail view opens with a submission confirmation; it is Not Executed until re-run."
   },
   {
     "id": "SG2-28-B01",
@@ -539,18 +545,18 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Set event 1 accessibility needs to Step-free entrance through the creator API session; verify that value appears before clearing it.",
-      "Open the seeded Planning workshop draft.",
-      "Rename it Revised workshop and clear Accessibility needs.",
-      "Submit, reload and fetch event detail."
+      "Open the seeded Planning workshop draft; verify its stored 02:00 UTC date shows as 15 Jun 2030 10:00 Singapore time, no requirement chips or canned suitability banner are shown, and Check venue fit reports real venue fit for the saved draft.",
+      "Rename it Revised workshop and clear Accessibility needs, leaving the date untouched.",
+      "Submit; verify the detail page confirms Revised workshop was submitted for review and My drafts is empty; reload and fetch event detail."
     ],
-    "data": "Seeded complete event 1 with Step-free entrance; change name to Revised workshop and clear accessibility needs.",
-    "expected": "Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
+    "data": "Seeded complete event 1 (2030-06-15T02:00:00.000Z) with Step-free entrance; change name to Revised workshop and clear accessibility needs.",
+    "expected": "The date input shows 2030-06-15T10:00; no prototype chips or banner; Check venue fit shows 'Every venue fits this request' for the 20-person draft; after submit the detail page shows 'Revised workshop has been submitted for review.'; latest name is stored; event 1 is unassigned with null accessibility_needs and an unchanged proposed_date of 2030-06-15T02:00:00.000Z in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
-    "execution_date": "1 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -562,6 +568,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+        "execution_date": "1 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Current browser assertions passed. Latest name is visible and stored; event 1 has submitted status and null accessibility_needs after clearing the previously non-empty value in fixture storage.",
@@ -578,7 +590,8 @@
       "SG2-29:AC2",
       "SG2-30:AC1"
     ],
-    "method_id": "TC-747b61ba6f0a"
+    "method_id": "TC-747b61ba6f0a",
+    "notes": "Extended by the SG2-30 draft-form fix (date input, removed prototype chips and banner, venue fit, submission confirmation); it is Not Executed until re-run."
   },
   {
     "id": "SG2-32-P01",
@@ -772,6 +785,35 @@
       "SG2-44:AC2"
     ],
     "method_id": "TC-d16f3bc6645c"
+  },
+  {
+    "id": "SG2-44-P02",
+    "title": "calendar days run midnight to midnight Singapore time",
+    "type": "Positive / boundary",
+    "story": "SG2-44",
+    "purpose": "Regression for the bug where the calendar split days at UTC midnight, so a period starting at 12:00 am Singapore time was also shown on the previous day.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Sign in as Venue Staff and create a Regression Hall block from 12:00 am to 12:00 pm Singapore time on 1 July 2030 (30 June 16:00 to 1 July 04:00 UTC) through the API.",
+      "Open Venue Availability for June 2030 and inspect 30 June.",
+      "Move to July 2030 and inspect 1 and 2 July."
+    ],
+    "data": "Regression Hall; block 2030-06-30T16:00Z to 2030-07-01T04:00Z, Equipment failure, note Air conditioning failed",
+    "expected": "30 June is free and does not list the block; 1 July is unavailable and lists Regression Hall · Air conditioning failed; 2 July is free.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-44:AC1",
+      "SG2-44:AC2"
+    ],
+    "status": "Pass",
+    "actual": "Passed against the production app build; failed against the previous UTC calendar code, where 30 June was marked.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-44-calendar-singapore-days working tree; npm run test:e2e; local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
+    "executed_by": "Automated test runner"
   },
   {
     "id": "BE-AUTH-01",
@@ -1328,15 +1370,15 @@
     "type": "Positive",
     "story": "SG2-45",
     "purpose": "Verify AC1 and AC3: a block with a reason is recorded, shown as unavailable on the availability calendar, and removing it frees the period.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context in Singapore time (timezoneId Asia/Singapore); signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
       "Block 20 June 2030 09:00–17:00 with reason Renovation and note Carpet replacement.",
-      "Open Venue Availability for June 2030 and inspect the calendar.",
+      "Open Venue Availability for June 2030 and inspect 20 and 21 June.",
       "Return to the block screen, remove the block, and re-check the API and calendar."
     ],
     "data": "Seeded Regression Hall with its existing Scheduled maintenance block; 20 June 2030",
-    "expected": "The new block is listed and appears as Regression Hall · Carpet replacement on the June calendar. After removal only the seeded maintenance block remains in the API and on the calendar.",
+    "expected": "The new block is listed; on the June calendar 20 June is unavailable and lists Regression Hall · Carpet replacement, and 21 June is free. After removal only the seeded maintenance block remains in the API and on the calendar.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2214,6 +2256,27 @@
         "source": "supabase/tests/event_planning_and_audit.sql"
       }
     }
+  },
+  {
+    "id": "DB-HISTORY-01",
+    "title": "Organisers cannot read internal planning-notes history; internal staff still can",
+    "story": "SG2-40",
+    "purpose": "Check the recreated event_audit_logs_read policy hides internal-only fields (planning_notes) from the owning organiser through actual stored rows, while internal staff keep the full history.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations including 202610130001_event_history_internal_fields.sql; synthetic transaction-local data.",
+    "steps": [
+      "Seed the owning organiser, the assigned coordinator, a Safety Officer, a planning event and history rows for planning_notes, expected_attendance and status.",
+      "As the owning organiser, select the event's history.",
+      "As the assigned coordinator and as the Safety Officer, select the same history.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/event_history_internal_fields.sql",
+    "expected": "The organiser reads the expected_attendance and status rows but no planning_notes row; the coordinator reads the planning_notes row; the Safety Officer reads all three rows.",
+    "evidence": "supabase/tests/event_history_internal_fields.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed with the other 22 CI database suites. Mutation check: without 202610130001_event_history_internal_fields.sql the suite fails on organiser-planning-notes-hidden.",
+    "execution_date": "10 Oct 2026",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-40-history-notes-and-status-changes on origin/main 88a431a; CI database job replayed on embedded PostgreSQL 17 (auth fixture, 31/31 migrations, 23/23 suites in ci.yml order). Hosted CI evidence comes from the PR check."
   },
   {
     "id": "SG2-47-P01",

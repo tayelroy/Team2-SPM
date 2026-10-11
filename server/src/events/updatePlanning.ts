@@ -11,6 +11,7 @@ import {
 } from '../db/eventPlanning';
 import {
   insertAuditLogs,
+  statusChange,
   type InsertAuditLogInput,
   type InsertAuditLogsResult
 } from '../db/auditLogs';
@@ -445,6 +446,10 @@ export function createUpdateEventPlanningHandler({
       currentEvent,
       validated.values
     );
+    // SG2-40: moving the event into planning is a status change like any other.
+    if (fieldsToUpdate.status && fieldsToUpdate.status !== currentEvent.status) {
+      auditEntries.push(statusChange(eventId, principal.userId, currentEvent.status, fieldsToUpdate.status));
+    }
 
     const updateResult = await updatePlanningFields(admin, eventId, fieldsToUpdate, principal.userId);
     if (!updateResult.ok) {
