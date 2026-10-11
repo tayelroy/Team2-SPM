@@ -216,26 +216,33 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
         onPosted={setStatus}
       />}
       {item.kind === 'event' && (
-        <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-          {canEditPlanning && (
+        <footer className="organisation-detail-footer">
+          <div className="organisation-detail-actions">
+            {canEditPlanning && (
+              <button
+                type="button"
+                className="organisation-button organisation-button-primary"
+                onClick={() => setDrawerOpen(true)}
+              >
+                Edit Planning Information
+              </button>
+            )}
             <button
               type="button"
-              className="organisation-button organisation-button-primary"
-              onClick={() => setDrawerOpen(true)}
+              className="organisation-button"
+              onClick={() => setHistoryDrawerOpen(true)}
             >
-              Edit Planning Information
+              View Change History
             </button>
-          )}
-          <button
-            type="button"
-            className="organisation-button"
-            onClick={() => setHistoryDrawerOpen(true)}
-          >
-            View Change History
-          </button>
-        </div>
+          </div>
+        </footer>
       )}
-      {item.kind === 'event' && item.assigned_to_me && currentStatus === 'approved' && onFindVenues && (
+      {/* SG2-48: finding venues is the next step throughout arrangements. A
+          planning edit moves an approved event to planning (SG2-39), which
+          must not hide it, and an event may need several venues or a new
+          request after a release or rejection, so existing requests do not. */}
+      {item.kind === 'event' && item.assigned_to_me && (currentStatus === 'approved' || currentStatus === 'planning')
+        && onFindVenues && (
         <footer className="organisation-detail-footer">
           <h3>Next step</h3>
           <p className="organisation-detail-hint">Find venues that fit this event and are free on its date.</p>

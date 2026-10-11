@@ -466,6 +466,58 @@ test('[FAILURE] [SG2-46:AC1] an approved event that is not assigned to the coord
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
 
+test('[NORMAL] [SG2-39:AC3] [SG2-46:AC1] a planning event with a venue already requested still offers finding venues', async () => {
+  // The queue item carries no venue-request state; the step depends on status
+  // alone, so an event that already has a request (several venues, a release,
+  // a re-request after rejection) can still search.
+  const planning = { ...review, status: 'planning', assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [planning] })));
+  const onFindVenues = vi.fn();
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={onFindVenues} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
+  expect(onFindVenues).toHaveBeenCalledWith(expect.objectContaining({ eventId: 12, eventName: 'Leadership Forum' }));
+});
+
+test.each(['awaiting_safety_check', 'preparation', 'confirmed'])('[BOUNDARY] [SG2-39:AC3] [SG2-46:AC1] finding venues is not offered once the event has moved past planning to %s', async status => {
+  const item = { ...review, status, assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('region', { name: 'Arrangement readiness integration' });
+  expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-39:AC1] [SG2-39:AC3] a planning save that moves an approved event to planning keeps the venue step', async () => {
+  const approved = { ...review, status: 'approved', assigned_to_me: true, category: 'assigned',
+    details: { ...review.details, expected_attendance: 40 } };
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/planning')
+    ? Response.json({ event: { event_id: 12, status: 'planning', proposed_date: approved.starts_at, expected_attendance: 120,
+      venue_requirements: null, equipment_requirements: null, accessibility_needs: null, registration_needed: false,
+      registration_capacity: null, registration_opens_at: null, registration_closes_at: null, planning_notes: null,
+      arrangements_recheck_needed: false, outstanding_arrangements: [] } })
+    : Response.json({ items: [approved] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  expect(await screen.findByRole('button', { name: 'Find venues for this event' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Save Planning Details' }));
+  expect(await screen.findByText('planning', { selector: '.work-queue-status' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Find venues for this event' })).toBeVisible();
+});
+
+test('[NORMAL] [SG2-39:AC1] the planning and history actions sit inside the detail card footer, inset like its content', async () => {
+  const planning = { ...review, status: 'planning', assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [planning] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  const edit = await screen.findByRole('button', { name: 'Edit Planning Information' });
+  const actions = edit.parentElement!;
+  expect(actions).toHaveClass('organisation-detail-actions');
+  expect(actions).toContainElement(screen.getByRole('button', { name: 'View Change History' }));
+  expect(actions.parentElement).toHaveClass('organisation-detail-footer');
+});
+
 /** SG2-36: the reviewing coordinator can ask the organiser instead of deciding. */
 const question = {
   clarification_id: 1, event_id: 12, sender_id: 'coordinator-1', sender_name: 'Casey Coordinator',
