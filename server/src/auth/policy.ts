@@ -63,6 +63,13 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // registration) are still outstanding before an event can be confirmed. Which
   // event is enforced per-row by the assignment, not by this grant.
   'event_request.arrangements.view': ['event_coordinator'],
+  // SG2-58 AC1/AC2: the assigned coordinator confirms an event in Preparation.
+  // Which event, its status and its readiness are enforced by confirm_event
+  // (which also rechecks this role from account_roles), not by this grant.
+  'event_request.confirm': ['event_coordinator'],
+  // SG2-58 AC1/AC3: the confirmed arrangements, for the organiser who created
+  // the event and its assigned coordinator (enforced per-row by the handler).
+  'event_request.confirmation.view': ['event_organiser', 'event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing

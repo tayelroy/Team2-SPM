@@ -52,7 +52,7 @@ const READY_FACTS: FetchEventArrangementFactsResult = {
   ok: true,
   facts: {
     venue_requests: [{ status: 'approved' }],
-    equipment_requests: [{ status: 'pending', shortfall: 0, placement_venue_id: 7 }]
+    equipment_requests: [{ status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true }]
   }
 };
 

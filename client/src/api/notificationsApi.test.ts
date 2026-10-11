@@ -36,6 +36,13 @@ test('[NORMAL] [SG2-55:AC4] an equipment reservation notice survives response va
   expect(await loadNotifications('coordinator-token')).toEqual({ ok: true, notifications: [reserved] });
 });
 
+test('[NORMAL] [SG2-58:AC1] an event confirmation notice survives response validation for the organiser', async () => {
+  const confirmed = { notification_id: 11, event_id: 7, request_id: null, kind: 'event_confirmed',
+    message: 'Your event Confirmation Forum is confirmed.', created_at: '2026-10-11T02:00:00.000Z' };
+  respond(() => Response.json({ notifications: [confirmed] }));
+  expect(await loadNotifications('organiser-token')).toEqual({ ok: true, notifications: [confirmed] });
+});
+
 test('[BOUNDARY] [SG2-49:AC1] a response of the wrong shape is treated as unavailable; an empty inbox is valid', async () => {
   const unavailable = { ok: false, message: 'Could not load notifications. Please try again.' };
   for (const body of [null, {}, { notifications: 'none' }, { notifications: [{ ...rejected, kind: 'placed' }] },

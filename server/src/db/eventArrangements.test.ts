@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchEventArrangementFacts } from './eventArrangements';
 
 /**
- * A fake Supabase client recording selected fields, event filters and bounds.
+ * A fake Supabase client recording selected fields and event filters.
  */
 function fakeClient(responses: Record<string, { data: unknown; error: unknown }>, captured: Record<string, unknown>) {
   return {
@@ -13,14 +13,10 @@ function fakeClient(responses: Record<string, { data: unknown; error: unknown }>
         select(columns: string) {
           captured[`${table}.columns`] = columns;
           return {
-            eq: (col: string, val: unknown) => {
+            eq: async (col: string, val: unknown) => {
               assert.equal(col, 'event_id');
               captured[table] = val;
-              if (table !== 'equipment_reservations') return Promise.resolve(responses[table]);
-              return { limit: async (count: number) => {
-                captured[`${table}.limit`] = count;
-                return responses[table];
-              } };
+              return responses[table];
             }
           };
         }
@@ -30,34 +26,42 @@ function fakeClient(responses: Record<string, { data: unknown; error: unknown }>
 }
 
 describe('Event arrangement facts DB operations (SG2-57)', () => {
-  test('[NORMAL] [SG2-57:AC1] [SG2-39:AC2] [SG2-55:AC4] reads venue and equipment rows for the event', async () => {
+  test('[NORMAL] [SG2-57:AC1] [SG2-39:AC2] [SG2-55:AC4] [SG2-58:AC1] reads venue and equipment rows and marks each request reserved or not', async () => {
     const captured: Record<string, unknown> = {};
     const client = fakeClient(
       {
         venue_booking_requests: { data: [{ status: 'approved' }, { status: 'pending' }], error: null },
         equipment_requests: {
-          data: [{ status: 'pending', shortfall: 0, placement_venue_id: 7 }],
+          data: [
+            { request_id: 551, status: 'approved', shortfall: 0, placement_venue_id: 7 },
+            { request_id: 552, status: 'pending', shortfall: 0, placement_venue_id: 7 }
+          ],
           error: null
         },
-        equipment_reservations: { data: [{ reservation_id: 12 }], error: null }
+        // PostgREST may serialise a bigint request_id as a string.
+        equipment_reservations: { data: [{ request_id: '551' }], error: null }
       },
       captured
     );
 
     const result = await fetchEventArrangementFacts(client, 101);
 
-    assert.equal(result.ok, true);
     assert.equal(captured.venue_booking_requests, 101);
     assert.equal(captured.equipment_requests, 101);
     assert.equal(captured.equipment_reservations, 101);
-    assert.equal(captured['equipment_reservations.columns'], 'reservation_id');
-    assert.equal(captured['equipment_reservations.limit'], 1);
-    if (result.ok) {
-      assert.equal(result.facts.venue_requests.length, 2);
-      assert.equal(result.facts.equipment_requests[0].placement_venue_id, 7);
-      assert.equal(result.facts.equipment_reserved, true);
-      assert.deepEqual(Object.keys(result.facts).sort(), ['equipment_requests', 'equipment_reserved', 'venue_requests']);
-    }
+    assert.equal(captured['equipment_requests.columns'], 'request_id, status, shortfall, placement_venue_id');
+    assert.equal(captured['equipment_reservations.columns'], 'request_id');
+    assert.deepEqual(result, {
+      ok: true,
+      facts: {
+        venue_requests: [{ status: 'approved' }, { status: 'pending' }],
+        equipment_requests: [
+          { status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true },
+          { status: 'pending', shortfall: 0, placement_venue_id: 7, reserved: false }
+        ],
+        equipment_reserved: true
+      }
+    });
   });
 
   test('[BOUNDARY] [SG2-57:AC2] [SG2-39:AC2] missing rows come back as empty arrays, not null', async () => {
@@ -82,21 +86,24 @@ describe('Event arrangement facts DB operations (SG2-57)', () => {
     }
   });
 
-  test('[NORMAL] [SG2-39:AC2] [SG2-55:AC4] an unlinked legacy reservation counts without any equipment request', async () => {
+  test('[NORMAL] [SG2-39:AC2] [SG2-55:AC4] [SG2-58:AC2] an unlinked legacy reservation counts as a reservation but reserves no request', async () => {
     const captured: Record<string, unknown> = {};
     const client = fakeClient({
       venue_booking_requests: { data: [], error: null },
-      equipment_requests: { data: [], error: null },
-      // request_id is deliberately not selected or filtered: legacy rows have
-      // no link, and the sole projected identity is enough to prove existence.
-      equipment_reservations: { data: [{ reservation_id: 93 }], error: null }
+      equipment_requests: { data: [{ request_id: 9, status: 'pending', shortfall: 0, placement_venue_id: 1 }], error: null },
+      // Legacy rows have no link, so they prove existence but reserve nothing.
+      equipment_reservations: { data: [{ request_id: null }], error: null }
     }, captured);
     assert.deepEqual(await fetchEventArrangementFacts(client, 42), {
-      ok: true, facts: { venue_requests: [], equipment_requests: [], equipment_reserved: true }
+      ok: true,
+      facts: {
+        venue_requests: [],
+        equipment_requests: [{ status: 'pending', shortfall: 0, placement_venue_id: 1, reserved: false }],
+        equipment_reserved: true
+      }
     });
     assert.equal(captured.equipment_reservations, 42);
-    assert.equal(captured['equipment_reservations.columns'], 'reservation_id');
-    assert.equal(captured['equipment_reservations.limit'], 1);
+    assert.equal(captured['equipment_reservations.columns'], 'request_id');
   });
 
   test('[FAILURE] [SG2-39:AC2] [SG2-55:AC4] a failed reservation existence query makes arrangement facts unavailable', async () => {

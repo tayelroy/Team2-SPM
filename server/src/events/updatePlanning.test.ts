@@ -53,7 +53,7 @@ const BASE_EVENT: EventPlanningRecord = {
 /** A live venue booking request and an unarranged equipment request exist. */
 const ARRANGED: EventArrangementFacts = {
   venue_requests: [{ status: 'pending' }],
-  equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null }]
+  equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null, reserved: false }]
 };
 
 /** Approved but nothing requested yet, like the regression fixture's event #91. */
@@ -708,7 +708,7 @@ describe('detectArrangementImpact (AC 2)', () => {
     ]);
 
     const equipmentOnly = detectArrangementImpact({ ...BASE_EVENT, registration_needed: null }, update,
-      { venue_requests: [{ status: 'rejected' }], equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null }] });
+      { venue_requests: [{ status: 'rejected' }], equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null, reserved: false }] });
     assert.deepEqual(equipmentOnly.affected_arrangements, ['equipment_recheck']);
     assert.deepEqual(equipmentOnly.impact_notes, [
       'Expected attendance increased from 100 to 101. Existing equipment requests must be rechecked.'
@@ -717,7 +717,7 @@ describe('detectArrangementImpact (AC 2)', () => {
     // Withdrawn requests are not arrangements; registration is still taken.
     const registrationOnly = detectArrangementImpact(BASE_EVENT, update, {
       venue_requests: [{ status: 'cancelled' }],
-      equipment_requests: [{ status: 'cancelled', shortfall: 0, placement_venue_id: 1 }]
+      equipment_requests: [{ status: 'cancelled', shortfall: 0, placement_venue_id: 1, reserved: false }]
     });
     assert.deepEqual(registrationOnly.affected_arrangements, ['registration_recheck']);
     assert.equal(registrationOnly.impact_notes.length, 1);

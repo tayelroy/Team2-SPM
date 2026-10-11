@@ -15,6 +15,8 @@ export interface EquipmentRequestArrangementRow {
   shortfall: number | null;
   /** SG2-53: set together with placement_position once the request is placed. */
   placement_venue_id: number | null;
+  /** SG2-58: an SG2-55 reservation receipt exists for this request. */
+  reserved: boolean;
 }
 
 export interface EventArrangementFacts {
@@ -23,6 +25,13 @@ export interface EventArrangementFacts {
   /** Stock may already be reserved without a linked request on legacy events.
    * Kept internal: planning rechecks need existence, not receipt details. */
   equipment_reserved?: boolean;
+}
+
+interface EquipmentRequestRow {
+  request_id: number;
+  status: string;
+  shortfall: number | null;
+  placement_venue_id: number | null;
 }
 
 export type FetchEventArrangementFactsResult =
@@ -35,9 +44,10 @@ export type FetchEventArrangementFactsResult =
  * route checks the caller's relationship to the event before calling this.
  *
  * The event's own registration fields and coordinator come from
- * fetchEventPlanningRecord; this adds child request facts and reservation
- * existence. Reservations have no status column; a nonterminal event's rows
- * remain commitments, including receipts with no linked request.
+ * fetchEventPlanningRecord; this adds child request facts, which requests have
+ * a reservation receipt (SG2-58 readiness) and whether any reservation exists.
+ * Reservations have no status column; a nonterminal event's rows remain
+ * commitments, including receipts with no linked request.
  */
 export async function fetchEventArrangementFacts(
   admin: SupabaseClient,
@@ -53,27 +63,37 @@ export async function fetchEventArrangementFacts(
 
   const equipment = await admin
     .from('equipment_requests')
-    .select('status, shortfall, placement_venue_id')
+    .select('request_id, status, shortfall, placement_venue_id')
     .eq('event_id', eventId);
   if (equipment.error) {
     return { ok: false, reason: 'unavailable', message: equipment.error.message };
   }
 
+  // Every receipt for the event, not just one: readiness needs to know which
+  // requests are reserved, planning rechecks only that any receipt exists.
   const reserved = await admin
     .from('equipment_reservations')
-    .select('reservation_id')
-    .eq('event_id', eventId)
-    .limit(1);
+    .select('request_id')
+    .eq('event_id', eventId);
   if (reserved.error) {
     return { ok: false, reason: 'unavailable', message: reserved.error.message };
   }
 
+  const receipts = (reserved.data ?? []) as { request_id: number | null }[];
+  const reservedRequests = new Set(
+    receipts.flatMap(row => (row.request_id === null ? [] : [Number(row.request_id)]))
+  );
   return {
     ok: true,
     facts: {
       venue_requests: (venue.data ?? []) as VenueBookingStatusRow[],
-      equipment_requests: (equipment.data ?? []) as EquipmentRequestArrangementRow[],
-      equipment_reserved: (reserved.data ?? []).length > 0
+      equipment_requests: ((equipment.data ?? []) as EquipmentRequestRow[]).map(row => ({
+        status: row.status,
+        shortfall: row.shortfall,
+        placement_venue_id: row.placement_venue_id,
+        reserved: reservedRequests.has(Number(row.request_id))
+      })),
+      equipment_reserved: receipts.length > 0
     }
   };
 }

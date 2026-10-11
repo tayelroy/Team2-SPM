@@ -16,7 +16,7 @@ function baseInput(overrides: Partial<ArrangementReadinessInput> = {}): Arrangem
     registration_opens_at: '2026-11-01T00:00:00.000Z',
     registration_closes_at: '2026-11-03T00:00:00.000Z',
     venue_requests: [{ status: 'approved' }],
-    equipment_requests: [{ status: 'pending', shortfall: 0, placement_venue_id: 7 }],
+    equipment_requests: [{ status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true }],
     ...overrides
   };
 }
@@ -96,9 +96,9 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.equal(result.ready_for_confirmation, true);
   });
 
-  test('[FAILURE] [SG2-57:AC1] equipment with a remaining shortfall is outstanding', () => {
+  test('[FAILURE] [SG2-57:AC1] [SG2-58:AC2] equipment with a remaining shortfall is outstanding', () => {
     const result = computeArrangementReadiness(
-      baseInput({ equipment_requests: [{ status: 'pending', shortfall: 2, placement_venue_id: 7 }] })
+      baseInput({ equipment_requests: [{ status: 'approved', shortfall: 2, placement_venue_id: 7, reserved: true }] })
     );
 
     assert.equal(stateOf(result, 'equipment'), 'outstanding');
@@ -108,11 +108,55 @@ describe('computeArrangementReadiness (SG2-57)', () => {
 
   test('[FAILURE] [SG2-57:AC1] equipment not yet arranged (no placement) is outstanding', () => {
     const result = computeArrangementReadiness(
-      baseInput({ equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null }] })
+      baseInput({ equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null, reserved: false }] })
     );
 
     assert.equal(stateOf(result, 'equipment'), 'outstanding');
     assert.equal(result.ready_for_confirmation, false);
+  });
+
+  test('[FAILURE] [SG2-57:AC1] [SG2-58:AC2] equipment placed with no shortfall but never reserved is outstanding', () => {
+    const result = computeArrangementReadiness(
+      baseInput({ equipment_requests: [{ status: 'pending', shortfall: 0, placement_venue_id: 7, reserved: false }] })
+    );
+
+    assert.deepEqual(result.arrangements.find(a => a.key === 'equipment'), {
+      key: 'equipment',
+      label: 'Equipment',
+      state: 'outstanding',
+      detail: '1 equipment request not yet reserved and placed with no shortfall.'
+    });
+    assert.deepEqual(result.outstanding, ['equipment']);
+    assert.equal(result.ready_for_confirmation, false);
+  });
+
+  test('[FAILURE] [SG2-57:AC1] [SG2-58:AC2] equipment reserved but not yet placed is outstanding', () => {
+    const result = computeArrangementReadiness(
+      baseInput({ equipment_requests: [{ status: 'approved', shortfall: 0, placement_venue_id: null, reserved: true }] })
+    );
+
+    assert.equal(stateOf(result, 'equipment'), 'outstanding');
+    assert.deepEqual(result.outstanding, ['equipment']);
+  });
+
+  test('[BOUNDARY] [SG2-57:AC1] [SG2-58:AC1] reserved and placed requests read ready while an unreserved rejected one is ignored', () => {
+    const result = computeArrangementReadiness(
+      baseInput({
+        equipment_requests: [
+          { status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true },
+          { status: 'APPROVED', shortfall: 0, placement_venue_id: 8, reserved: true },
+          { status: 'Rejected', shortfall: null, placement_venue_id: null, reserved: false }
+        ]
+      })
+    );
+
+    assert.deepEqual(result.arrangements.find(a => a.key === 'equipment'), {
+      key: 'equipment',
+      label: 'Equipment',
+      state: 'ready',
+      detail: '2 equipment requests reserved and placed.'
+    });
+    assert.equal(result.ready_for_confirmation, true);
   });
 
   test('[FAILURE] [SG2-57:AC1] registration needed but a time is unset is outstanding and names the gap', () => {
@@ -141,7 +185,7 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     const result = computeArrangementReadiness(
       baseInput({
         venue_requests: [{ status: 'pending' }],
-        equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null }],
+        equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null, reserved: false }],
         registration_capacity: null
       })
     );

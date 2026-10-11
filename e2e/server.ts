@@ -55,6 +55,9 @@ import { createEquipmentAvailabilityRouter } from '../server/src/equipment/avail
 import { createMemoryAvailabilityStore } from './support/equipment-availability';
 import { createEquipmentReservationsRouter } from '../server/src/equipment/reservations';
 import { createMemoryReservationsStore, seedEquipmentReservations } from './support/equipment-reservations';
+import { createConfirmEventHandler } from '../server/src/events/confirm';
+import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
+import { createMemoryConfirm, seedEventConfirmation } from './support/event-confirmation';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -208,7 +211,11 @@ const app = createApp(
   // SG2-51: bookings and releases, against the in-memory client.
   createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) }),
   createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token)),
-  createEquipmentReservationsRouter(access, token => createMemoryReservationsStore(database, token))
+  createEquipmentReservationsRouter(access, token => createMemoryReservationsStore(database, token)),
+  // SG2-58: confirmation mirrors confirm_event over the in-memory tables; the
+  // confirmed-arrangements view reads them through the in-memory client.
+  createConfirmEventHandler({ getPrincipal: access.getPrincipal, confirm: createMemoryConfirm(database) }),
+  createGetEventConfirmationHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -231,6 +238,14 @@ app.post('/__e2e/equipment-reservations', (req, res) => {
 });
 app.get('/__e2e/equipment-reservations-ledger', (_req, res) => res.json({
   requests: database.tables.equipment_requests, reservations: database.tables.equipment_reservations, notifications: database.tables.notifications,
+}));
+app.post('/__e2e/event-confirmation', (_req, res) => {
+  seedEventConfirmation(database);
+  res.status(204).end();
+});
+app.get('/__e2e/event-confirmation-ledger', (_req, res) => res.json({
+  events: database.tables.events.filter(row => [581, 582, 583, 584].includes(Number(row.event_id))),
+  audit: database.tables.event_audit_logs, notifications: database.tables.notifications,
 }));
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
