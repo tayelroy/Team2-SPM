@@ -20,7 +20,9 @@ export function createMemoryRequirementsStore(database: MemoryDatabase, token: s
         let record = database.tables.equipment_requests.find(row => row.request_id === requestId && row.event_id === eventId);
         if (action !== 'create') {
           if (!record) return { outcome: 'missing' };
-          if (record.status !== 'pending') return { outcome: 'closed' };
+          const reservedArrangement = action === 'arrange' && record.status === 'approved'
+            && database.tables.equipment_reservations.some(row => row.request_id === requestId);
+          if (record.status !== 'pending' && !reservedArrangement) return { outcome: 'closed' };
           if (record.version !== version) return { outcome: 'conflict' };
         }
         if (action === 'arrange') {

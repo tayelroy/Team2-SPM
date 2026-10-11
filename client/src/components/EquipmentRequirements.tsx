@@ -7,6 +7,7 @@ import { Card, Fact, GhostButton, GradientButton } from '../ui';
 import { color, label } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
 import EquipmentAvailability from './EquipmentAvailability';
+import EquipmentReservations from './EquipmentReservations';
 
 type Editor = { kind: 'requirement'; record: EquipmentRequirement | null } | { kind: 'arrangement'; record: EquipmentRequirement };
 const optionalText = (value: string) => value.trim() || null;
@@ -14,10 +15,10 @@ const textFits = (value: string) => Array.from(value.trim()).length <= 2000;
 const whole = (value: string, minimum: number, maximum: number) => /^\d+$/.test(value) && Number(value) >= minimum && Number(value) <= maximum;
 
 /** Each event and session owns its records, drafts and cancellable requests. */
-export default function EquipmentRequirements({ eventId, accessToken = null, canCheckAvailability = false }: { eventId: number; accessToken?: string | null; canCheckAvailability?: boolean }) {
-  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} canCheckAvailability={canCheckAvailability} />;
+export default function EquipmentRequirements({ eventId, accessToken = null, canCheckAvailability = false, onReserved }: { eventId: number; accessToken?: string | null; canCheckAvailability?: boolean; onReserved?: (requestId: number) => void }) {
+  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} canCheckAvailability={canCheckAvailability} onReserved={onReserved} />;
 }
-function Requirements({ eventId, token, canCheckAvailability }: { eventId: number; token: string | null; canCheckAvailability: boolean }) {
+function Requirements({ eventId, token, canCheckAvailability, onReserved }: { eventId: number; token: string | null; canCheckAvailability: boolean; onReserved?: (requestId: number) => void }) {
   const [view, setView] = useState<RequirementsView | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
   const [attempt, setAttempt] = useState(0);
@@ -26,6 +27,7 @@ function Requirements({ eventId, token, canCheckAvailability }: { eventId: numbe
   const [conflict, setConflict] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
+  const [reservedRequestIds, setReservedRequestIds] = useState<number[]>([]);
   const pending = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!token) return;
@@ -39,7 +41,7 @@ function Requirements({ eventId, token, canCheckAvailability }: { eventId: numbe
     return () => controller.abort();
   }, [eventId, token, attempt]);
   useEffect(() => () => { pending.current?.abort(); }, []);
-  function reload() { setEditor(null); setConflict(false); setSaved(''); setAttempt(n => n + 1); }
+  function reload() { setEditor(null); setConflict(false); setSaved(''); setReservedRequestIds([]); setAttempt(n => n + 1); }
   function edit(next: Editor) { setEditor(next); setError(''); setSaved(''); setConflict(false); }
   async function save(values: RequirementValues | ArrangementValues) {
     if (pending.current) return;
@@ -86,13 +88,19 @@ function Requirements({ eventId, token, canCheckAvailability }: { eventId: numbe
           <Fact label="Shortfall" value={record.shortfall === null ? 'Not recorded' : String(record.shortfall)} />
           <Fact label="Placement venue" value={record.placement_venue_name ?? 'Not recorded'} />
           <Fact label="Placement position" value={record.placement_position ?? 'Not recorded'} />
-          {record.status === 'pending' ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            {view.can_request ? <GhostButton onClick={() => edit({ kind: 'requirement', record })}>Edit requirement for {record.equipment_type}</GhostButton> : null}
+          {record.status === 'pending' || (record.status === 'approved' && reservedRequestIds.includes(record.request_id)) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+            {view.can_request && record.status === 'pending' ? <GhostButton onClick={() => edit({ kind: 'requirement', record })}>Edit requirement for {record.equipment_type}</GhostButton> : null}
             {view.can_arrange ? <GhostButton onClick={() => edit({ kind: 'arrangement', record })}>Update arrangement for {record.equipment_type}</GhostButton> : null}
           </div> : null}
         </Card>
       </article>)}
     </>}
+    {!editor ? <EquipmentReservations eventId={eventId} accessToken={token} requests={view.requests} onRefresh={reload} onReceipts={setReservedRequestIds}
+      onReserved={requestId => {
+        setReservedRequestIds(current => [...new Set([...current, requestId])]);
+        setView({ ...view, requests: view.requests.map(record => record.request_id === requestId ? { ...record, status: 'approved', shortfall: 0, version: record.version + 1 } : record) });
+        onReserved?.(requestId);
+      }} /> : null}
   </section>;
 }
 function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCancel, onReload }: {

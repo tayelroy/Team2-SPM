@@ -91,7 +91,7 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [SG2-87:A
 
   for (const [account, kind, title, group, fact] of [
     ['venue', 'venue', 'Regression Hall', 'Booking requests awaiting decision', 'Venue capacity'],
-    ['support', 'equipment', 'Wireless microphones', 'Equipment requests awaiting decision', 'Quantity requested'],
+    ['support', 'equipment', 'Wireless microphones', 'Equipment requests and reservations', 'Quantity requested'],
   ]) {
     await page.getByRole('button', { name: 'Profile', exact: true }).click();
     await page.getByRole('button', { name: 'Logout', exact: true }).click();

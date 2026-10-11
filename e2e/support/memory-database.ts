@@ -59,6 +59,7 @@ export class MemoryDatabase {
       venue_hold_notifications: [],
       notifications: [],
       equipment_requests: [],
+      equipment_reservations: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
         quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [
@@ -288,7 +289,9 @@ export class MemoryDatabase {
     ]) {
       for (const request of this.tables[table]) {
         const event = active.find(event => event.event_id === request.event_id);
-        if (request.status !== 'pending' || !event) continue;
+        const reservedRequest = kind === 'equipment' && request.status === 'approved'
+          && this.tables.equipment_reservations.some(row => row.request_id === request.request_id);
+        if ((request.status !== 'pending' && !reservedRequest) || !event) continue;
         const resource = this.tables[resourceTable].find(resource => resource[resourceKey] === request[resourceKey])!;
         items.push({ kind, item_id: request.request_id, event_id: event.event_id, title: resource.name,
           event_name: event.name || 'Untitled event', status: request.status, starts_at: request.starts_at ?? event.proposed_date, ends_at: request.ends_at,

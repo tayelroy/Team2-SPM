@@ -53,6 +53,8 @@ import { createEquipmentRequirementsRouter } from '../server/src/equipment/requi
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
 import { createEquipmentAvailabilityRouter } from '../server/src/equipment/availability';
 import { createMemoryAvailabilityStore } from './support/equipment-availability';
+import { createEquipmentReservationsRouter } from '../server/src/equipment/reservations';
+import { createMemoryReservationsStore, seedEquipmentReservations } from './support/equipment-reservations';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -205,7 +207,8 @@ const app = createApp(
   createGetEventArrangementsHandler(eventDependencies),
   // SG2-51: bookings and releases, against the in-memory client.
   createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) }),
-  createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token))
+  createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token)),
+  createEquipmentReservationsRouter(access, token => createMemoryReservationsStore(database, token))
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -222,6 +225,13 @@ app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
   res.status(204).end();
 });
+app.post('/__e2e/equipment-reservations', (req, res) => {
+  seedEquipmentReservations(database, Boolean(req.body?.missing_dates));
+  res.status(204).end();
+});
+app.get('/__e2e/equipment-reservations-ledger', (_req, res) => res.json({
+  requests: database.tables.equipment_requests, reservations: database.tables.equipment_reservations, notifications: database.tables.notifications,
+}));
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
     coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });

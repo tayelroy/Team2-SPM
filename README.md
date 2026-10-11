@@ -30,18 +30,19 @@ An npm-workspaces monorepo:
 | Event Organiser | Raise, edit, submit and delete their own event requests; view events and status shared by their client organisation |
 | Event Coordinator | View awaiting-review requests and active assigned events; record and amend equipment requirements for approved/planning events |
 | Venue Staff | View pending booking requests and details in the dashboard; maintain the venue catalogue and check availability |
-| Technical Support Staff | View pending equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; change a user's role via the API |
+| Technical Support Staff | View pending and reserved equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; reserve equipment for events; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
 
 Every account can view and update its own profile. Technical Support Staff's
 Equipment screen reads and writes stored equipment records, including operational
 status and the quantity eligible for use. Apply the [equipment migration](docs/equipment.md)
-before deploying it. Equipment reservations are separate work.
+before deploying it.
 Coordinators and support staff share the [equipment requirements workflow](docs/equipment-requirements.md).
 Technical Support can [check equipment availability](docs/equipment-availability.md)
-for request, booking or selected dates before committing stock.
-Apply its migration before deploying SG2-53. It preserves existing request periods
-and does not change quantities held or reserve stock.
+for request, booking or selected dates, then [reserve equipment](docs/equipment-reservations.md)
+with an atomic stock check, an event receipt and a coordinator notification.
+Apply each workflow's migration before deploying it. Requirements and advisory
+checks do not reserve stock; SG2-55 commits the full requested quantity.
 The SG2-41 dashboard queue and its selected-record detail view use Supabase;
 approval/rejection mutations are separate work. See [work queue setup](docs/work-queue.md)
 for the required migration and queue rules.
@@ -179,6 +180,7 @@ uploaded as the `browser-regression` artifact.
 - [Equipment records](docs/equipment.md) — SG2-52 stock, operational status, API, migration and verification
 - [Equipment requirements](docs/equipment-requirements.md) — SG2-53 coordinator requests, support updates, placement and migration
 - [Equipment availability](docs/equipment-availability.md) — SG2-54 dated commitments, remaining stock, shortfall and migration
+- [Equipment reservations](docs/equipment-reservations.md) — SG2-55 atomic reservations, event receipts, coordinator notices and continued placement work
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 

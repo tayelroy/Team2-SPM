@@ -3976,5 +3976,187 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "story": "SG2-55",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the complete 81-journey Chromium run against the final production build and disposable Express/storage fixture; exact assertions in the named journey passed.",
+    "execution_evidence": "11 Oct 2026; npm run ci: 1,295 backend cases, 1,189 frontend cases, 100% per-file coverage across all four metrics; npm run test:e2e: 81/81 journeys, 13 report-gate checks passed. Native PostgreSQL: 32 migrations, 24 SQL suites, 22 concurrency scenarios. In-app visual QA at 1440px and 390px. Hosted migration and independent teammate approval pending.",
+    "execution_date": "11 Oct2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-11",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Assisted source/assertion and acceptance-criterion mapping review on behalf of Lim Jun Wei. Independent teammate approval remains pending."
+    },
+    "id": "SG2-55-P01",
+    "title": "support reserves stock and the coordinator sees the saved event receipt and notification",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-55:AC1",
+      "SG2-55:AC2",
+      "SG2-55:AC4"
+    ],
+    "purpose": "Prove the support reservation, reduced overlapping stock, continued physical arrangement and coordinator acknowledgement form one usable workflow.",
+    "steps": [
+      "At 1440px, sign in as Technical Support and open Equipment Reservation Forum; review quantity 12 and suggested 10:00–14:00 Singapore dates, then reserve.",
+      "Read the receipt and fixture ledger; query availability for the overlapping request.",
+      "Reload the page, reopen the reserved request, save placement at venue 1, Stage left, clear of the exit., and read the updated request.",
+      "Sign in as its coordinator, check equipment readiness, open the event receipt and read the equipment reservation notification.",
+      "Check desktop horizontal overflow and collected browser/console errors."
+    ],
+    "expected": "One receipt reserves exactly 12 for event 55/request 551 and the stated period; request becomes approved/version 2 and one equipment_reserved notice targets its coordinator. The other event shows held 20, committed 12, remaining 8 and shortfall 2. Reloaded support can save placement with shortfall 0 and version 3. Coordinator readiness is ready, receipt shows 12 without a reserve control, and the inbox shows the exact event/quantity notification. No horizontal overflow or browser errors."
+  },
+  {
+    "story": "SG2-55",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the complete 81-journey Chromium run against the final production build and disposable Express/storage fixture; exact assertions in the named journey passed.",
+    "execution_evidence": "11 Oct 2026; npm run ci: 1,295 backend cases, 1,189 frontend cases, 100% per-file coverage across all four metrics; npm run test:e2e: 81/81 journeys, 13 report-gate checks passed. Native PostgreSQL: 32 migrations, 24 SQL suites, 22 concurrency scenarios. In-app visual QA at 1440px and 390px. Hosted migration and independent teammate approval pending.",
+    "execution_date": "11 Oct2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-11",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Assisted source/assertion and acceptance-criterion mapping review on behalf of Lim Jun Wei. Independent teammate approval remains pending."
+    },
+    "id": "SG2-55-B01",
+    "title": "mobile support supplies missing dates and equal endpoints cannot create a receipt",
+    "type": "BOUNDARY / FAILURE",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-55:AC1",
+      "SG2-55:AC3"
+    ],
+    "purpose": "Require an explicit valid duration when suggested dates are incomplete, with a usable mobile form and exact persisted dates.",
+    "steps": [
+      "Reset fixtures with missing dates and open the support form at 390×844.",
+      "Verify proposed start 10:00 and blank end; submit end 10:00 and inspect the validation message and ledger.",
+      "Change end to 14:00, reserve, inspect quantity 12 and stored period, then check horizontal overflow."
+    ],
+    "expected": "No duration is invented. Equal endpoints show the end-after-start error and create no receipt. A corrected period creates quantity 12 with 02:00–06:00 UTC dates. The 390px view has no horizontal overflow."
+  },
+  {
+    "story": "SG2-55",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the complete 81-journey Chromium run against the final production build and disposable Express/storage fixture; exact assertions in the named journey passed.",
+    "execution_evidence": "11 Oct 2026; npm run ci: 1,295 backend cases, 1,189 frontend cases, 100% per-file coverage across all four metrics; npm run test:e2e: 81/81 journeys, 13 report-gate checks passed. Native PostgreSQL: 32 migrations, 24 SQL suites, 22 concurrency scenarios. In-app visual QA at 1440px and 390px. Hosted migration and independent teammate approval pending.",
+    "execution_date": "11 Oct2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-11",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Assisted source/assertion and acceptance-criterion mapping review on behalf of Lim Jun Wei. Independent teammate approval remains pending."
+    },
+    "id": "SG2-55-C01",
+    "title": "a reservation made after the advisory check refuses the stale competing promise without another notice",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-55:AC2",
+      "SG2-55:AC3"
+    ],
+    "purpose": "Ensure a stale availability snapshot cannot promise stock already committed by another event.",
+    "steps": [
+      "Open Overlapping Equipment Forum as support and observe advisory availability 20.",
+      "Reserve 12 through the other event request API and require HTTP 201.",
+      "Submit the displayed competing request for 10 and inspect its refusal, disabled control and ledger.",
+      "Refresh reservations and requirements, reopen the form and inspect the refreshed advisory count."
+    ],
+    "expected": "The competing request is refused for insufficient stock; exactly one receipt and one notification exist, and request 552 remains pending/version 1. Another submit is disabled until refresh. The reopened form reports availability 8."
+  },
+  {
+    "story": "SG2-55",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the complete 81-journey Chromium run against the final production build and disposable Express/storage fixture; exact assertions in the named journey passed.",
+    "execution_evidence": "11 Oct 2026; npm run ci: 1,295 backend cases, 1,189 frontend cases, 100% per-file coverage across all four metrics; npm run test:e2e: 81/81 journeys, 13 report-gate checks passed. Native PostgreSQL: 32 migrations, 24 SQL suites, 22 concurrency scenarios. In-app visual QA at 1440px and 390px. Hosted migration and independent teammate approval pending.",
+    "execution_date": "11 Oct2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-11",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Assisted source/assertion and acceptance-criterion mapping review on behalf of Lim Jun Wei. Independent teammate approval remains pending."
+    },
+    "id": "SG2-55-C02",
+    "title": "rapid repeated clicks send one reservation and replays keep one receipt and one notice",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-55:AC1",
+      "SG2-55:AC4"
+    ],
+    "purpose": "Protect against repeated clicks and replayed request versions without duplicating stock commitments or coordinator notifications.",
+    "steps": [
+      "Open the support reservation form and hold its outgoing POST while rapidly clicking submit twice.",
+      "Verify the saving control is disabled, release the request and read the quantity 12 receipt.",
+      "Replay the same event/request/version/period directly through the authenticated API and inspect the ledger."
+    ],
+    "expected": "Rapid clicks produce exactly one POST. Replay returns HTTP 409 with conflict code. The stored result remains exactly one receipt and one notification."
+  },
+  {
+    "story": "SG2-55",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the complete 81-journey Chromium run against the final production build and disposable Express/storage fixture; exact assertions in the named journey passed.",
+    "execution_evidence": "11 Oct 2026; npm run ci: 1,295 backend cases, 1,189 frontend cases, 100% per-file coverage across all four metrics; npm run test:e2e: 81/81 journeys, 13 report-gate checks passed. Native PostgreSQL: 32 migrations, 24 SQL suites, 22 concurrency scenarios. In-app visual QA at 1440px and 390px. Hosted migration and independent teammate approval pending.",
+    "execution_date": "11 Oct2026",
+    "executed_by": "Automated test runner",
+    "review": {
+      "date": "2026-10-11",
+      "by": "Lim Jun Wei",
+      "method_inventory": "docs/test-case-inventory.json",
+      "note": "Assisted source/assertion and acceptance-criterion mapping review on behalf of Lim Jun Wei. Independent teammate approval remains pending."
+    },
+    "id": "SG2-55-N01",
+    "title": "role guards refuse writes and a lost response after commit recovers the sole receipt through refresh",
+    "type": "FAILURE / CONFLICT",
+    "categories": [
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-55:AC1",
+      "SG2-55:AC4"
+    ],
+    "purpose": "Enforce reservation authority and recover an uncertain successful commit without duplicating its effects or leaking provider diagnostics.",
+    "steps": [
+      "Attempt reservation without credentials and as Event Coordinator.",
+      "Sign in as support; let the real reservation route commit, then replace its successful response with HTTP 503 and a private diagnostic.",
+      "Inspect the recovery message, disabled submit and ledger before refreshing.",
+      "Refresh reservations and requirements, then read the committed receipt and notification count."
+    ],
+    "expected": "Unsigned and coordinator writes return 401 and 403. The post-commit 503 displays safe refresh guidance, suppresses private diagnostics and disables another submit. The ledger already contains one receipt; refreshing recovers quantity 12 with exactly one coordinator notification."
   }
 ]

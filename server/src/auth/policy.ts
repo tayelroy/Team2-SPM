@@ -137,6 +137,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment.update': ['technical_support_staff'],
   // SG2-54: only Technical Support assesses equipment commitments.
   'equipment.availability.read': ['technical_support_staff'],
+  // SG2-55: only Technical Support commits equipment reservations.
+  'equipment.reservations.manage': ['technical_support_staff'],
   // SG2-53: assigned coordinators request; support records arrangements;
   // Safety Officers read placements for the SG2-91 review workflow.
   'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],
