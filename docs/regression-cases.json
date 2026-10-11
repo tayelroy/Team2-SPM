@@ -3984,8 +3984,8 @@
     "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the complete 81-journey Chromium run against the final production build and disposable Express/storage fixture; exact assertions in the named journey passed.",
-    "execution_evidence": "11 Oct 2026; npm run ci: 1,295 backend cases, 1,189 frontend cases, 100% per-file coverage across all four metrics; npm run test:e2e: 81/81 journeys, 13 report-gate checks passed. Native PostgreSQL: 32 migrations, 24 SQL suites, 22 concurrency scenarios. In-app visual QA at 1440px and 390px. Hosted migration and independent teammate approval pending.",
+    "actual": "Passed: full reservation; shortfall 1 HTTP edit rejected with unchanged ledger; disabled zero shortfall; placement saved; coordinator equipment readiness ready and notification visible.",
+    "execution_evidence": "11 Oct 2026 edge-case follow-up; npm run ci: 1,314 backend, 1,203 frontend, 100% per-file coverage; npm run test:e2e: 81/81 journeys and 13 report-gate checks. PostgreSQL 17: 33 migrations, 24 SQL suites, 47 SG2-55 contracts, 8 reservation concurrency scenarios. In-app visual checks at 1440px/390px; hosted rollback-only RPC smoke passed. New PR peer approval pending.",
     "execution_date": "11 Oct2026",
     "executed_by": "Automated test runner",
     "review": {
@@ -4008,12 +4008,12 @@
     "purpose": "Prove the support reservation, reduced overlapping stock, continued physical arrangement and coordinator acknowledgement form one usable workflow.",
     "steps": [
       "At 1440px, sign in as Technical Support and open Equipment Reservation Forum; review quantity 12 and suggested 10:00–14:00 Singapore dates, then reserve.",
-      "Read the receipt and fixture ledger; query availability for the overlapping request.",
-      "Reload the page, reopen the reserved request, save placement at venue 1, Stage left, clear of the exit., and read the updated request.",
+      "Read the receipt and fixture ledger; reject an arrangement API edit with shortfall 1 and verify the whole ledger is unchanged; query availability for the overlapping request.",
+      "Reload the page, reopen the reserved request, verify shortfall is disabled at zero, save placement at venue 1, Stage left, clear of the exit., and read the updated request.",
       "Sign in as its coordinator, check equipment readiness, open the event receipt and read the equipment reservation notification.",
       "Check desktop horizontal overflow and collected browser/console errors."
     ],
-    "expected": "One receipt reserves exactly 12 for event 55/request 551 and the stated period; request becomes approved/version 2 and one equipment_reserved notice targets its coordinator. The other event shows held 20, committed 12, remaining 8 and shortfall 2. Reloaded support can save placement with shortfall 0 and version 3. Coordinator readiness is ready, receipt shows 12 without a reserve control, and the inbox shows the exact event/quantity notification. No horizontal overflow or browser errors."
+    "expected": "One receipt reserves exactly 12 for event 55/request 551 and the stated period; request becomes approved/version 2 and one equipment_reserved notice targets its coordinator. An arrangement edit with shortfall 1 returns HTTP 400 and leaves the request, version, receipt and notice unchanged. The other event shows held 20, committed 12, remaining 8 and shortfall 2. Reloaded support sees a disabled zero shortfall and can save placement with shortfall 0 and version 3. Coordinator readiness is ready, receipt shows 12 without a reserve control, and the inbox shows the exact event/quantity notification. No horizontal overflow or browser errors."
   },
   {
     "story": "SG2-55",

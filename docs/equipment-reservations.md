@@ -56,6 +56,10 @@ approved requests remain closed. Reserved requests remain in the active support
 queue so this work can be completed. Event confirmation continues to close
 arrangement editing.
 
+After a full reservation, shortfall remains zero. The form locks that field
+while allowing notes and placement edits; the database also rejects a positive
+shortfall without changing the request, its version, receipt or notification.
+
 ## API and deployment
 
 - `GET /api/equipment-reservations?event_id=<id>` reads event receipts and
@@ -74,12 +78,24 @@ It uses an empty search path; ordinary clients gain no direct reservation-table
 or sequence access.
 
 Apply `supabase/migrations/202610140001_equipment_reservations.sql` once, after
-all earlier migrations, before deploying this application version to hosted
-Supabase. It adds request-linked receipts and notification references, replaces
+its prerequisite migrations, then apply
+`supabase/migrations/202610140002_equipment_reserved_shortfall.sql` before
+deploying the edge-case follow-up. The original migration adds request-linked
+receipts and notification references, replaces
 the guarded requirements RPC to support continued arrangement, and updates the
 support queue. Existing receipt rows are retained. Missing hosted RPCs are
 reported as an unavailable service; a preview build does not establish that the
 migration has been applied.
+
+The follow-up migration replaces only the guarded requirements RPC to reject
+nonzero shortfall on reserved requests. Sites that already applied `140001`
+must run `140002`; do not replay or edit the original migration. For a site
+with equipment records and legacy RLS already installed but no equipment RPCs,
+the equipment prerequisite order is `202610080001` (requirements),
+`202610120001` (availability), `202610140001` (reservations), then `202610140002`.
+The event-status vocabulary migration `202610090001` must be committed
+separately first if its four enum values are absent. This does not require the
+unrelated event-status backfill.
 
 No new environment variables, paid service, subscription or Supabase plan change
 is required. Keep the existing Free plan. A rollback must preserve committed
@@ -127,3 +143,42 @@ hosted Supabase, whose migration and deployed workflow remain unverified.
 ![Mobile reservation receipt](screenshots/sg2-55/iab-mobile.png)
 ![Mobile stock refusal](screenshots/sg2-55/iab-mobile-conflict.png)
 ![Coordinator notification](screenshots/sg2-55/iab-coordinator.png)
+
+### SG2-55 edge cases — 11 October 2026
+
+The follow-up to PR #77 addresses Elroy's review: a full reservation must keep
+shortfall at zero while notes and placement remain editable. It also aligns the
+equipment sections with the detail card's desktop and mobile padding. The
+existing authorization delegation and lock order remain unchanged.
+
+Local `npm run ci` passed with 1,314 backend and 1,203 frontend cases, 100%
+per-file coverage in all four metrics, nine inventory checks and 19 reviewer
+checks. All 81 browser journeys and 13 report-gate checks passed. Native
+PostgreSQL 17 accepted 33 migrations and all 24 SQL suites, including 47 SG2-55
+contracts, and passed all eight SG2-55 concurrency scenarios. The new native
+shortfall regression failed before the fix and passed afterward.
+
+In-app visual checks at 1440×1000 and 390×844 verified the disabled zero
+shortfall, editable notes/placement, saved placement and preserved receipt.
+Neither viewport overflowed horizontally; no warning/error console entries
+were recorded. These full visual workflows used disposable local fixtures.
+
+On the hosted Team2-SPM Supabase project, the missing event-status vocabulary
+was applied and committed separately, then equipment requirements, availability,
+reservations and the shortfall follow-up were applied in one transaction after
+a successful rollback rehearsal. Migration history records all five versions.
+A rollback-only hosted RPC test verified the receipt and notification, rejection
+of shortfall 1 without any row/version change, successful zero-shortfall
+placement, and assigned-coordinator reads. Postchecks found all four existing
+events and three notifications unchanged, identical queue identities, and no
+test equipment, requests or reservations left behind. Supabase remains Free.
+The signed-in hosted preview dashboard and equipment catalogue loaded before
+and after deployment; full reservation visual acceptance used the isolated
+fixture because the hosted catalogue contains no stock.
+
+The new PR still requires green current-head hosted CI/preview and independent
+teammate approval before merge; prior review of PR #77 is not approval of this
+follow-up.
+
+![Desktop reserved arrangement](screenshots/sg2-55-edge-cases/desktop.png)
+![Mobile reserved arrangement](screenshots/sg2-55-edge-cases/mobile.png)
