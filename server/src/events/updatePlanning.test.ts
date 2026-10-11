@@ -1196,8 +1196,10 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.deepEqual(saved, { expected_attendance: 120, status: 'planning' });
     assert.equal(response.body.arrangements_recheck_needed, false);
     assert.deepEqual(response.body.outstanding_arrangements, []);
+    // SG2-40: the approved → planning transition is recorded with the field change.
     assert.deepEqual(history, [
-      { event_id: 91, actor_id: COORDINATOR_ID, field_name: 'expected_attendance', old_value: '100', new_value: '120' }
+      { event_id: 91, actor_id: COORDINATOR_ID, field_name: 'expected_attendance', old_value: '100', new_value: '120' },
+      { event_id: 91, actor_id: COORDINATOR_ID, field_name: 'status', old_value: 'approved', new_value: 'planning' }
     ]);
   });
 
