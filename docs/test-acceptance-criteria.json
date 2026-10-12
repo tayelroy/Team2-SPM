@@ -609,6 +609,19 @@
       },
       "verifiedAt": "2026-10-11",
       "source": "Live SG2-55 Jira description, bullet order, read in the in-app browser."
+    },
+    {
+      "id": "SG2-82",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-82",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-08",
+      "acceptanceCriteria": {
+        "AC1": "I can raise more than one venue booking request for the same event, and each one stays linked to that event",
+        "AC2": "Each venue is checked independently for suitability, availability (including setup/turnaround) and conflicts",
+        "AC3": "A problem with one venue does not block requests for the event's other venues",
+        "AC4": "The event shows all of its venue bookings and the status of each one",
+        "AC5": "The event's venue arrangement counts as ready only when every venue booking the event needs is approved"
+      }
     }
   ]
 }
