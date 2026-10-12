@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { completeEvent } from '../api/eventRequests';
+import { ARRANGEMENT_LABELS, confirmEvent, type ArrangementKey } from '../api/eventConfirmation';
 import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
@@ -139,6 +140,45 @@ function CompletePanel({ eventId, endsAt, accessToken, onCompleted }: {
   </footer>;
 }
 
+/** SG2-58 AC1/AC2: the assigned coordinator confirms an event in preparation.
+ * The ref stops a second click before React re-renders the disabled button;
+ * the server re-checks status, ownership and every arrangement itself. */
+function ConfirmPanel({ eventId, accessToken, onConfirmed }: {
+  eventId: number;
+  accessToken: string;
+  onConfirmed: (organiserNotified: boolean) => void;
+}) {
+  const inFlight = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const [outstanding, setOutstanding] = useState<ArrangementKey[]>([]);
+
+  async function confirm() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
+    setError('');
+    setOutstanding([]);
+    const result = await confirmEvent(eventId, accessToken);
+    inFlight.current = false;
+    setPending(false);
+    if (result.ok) { onConfirmed(result.organiserNotified); return; }
+    setError(result.message);
+    if (result.kind === 'outstanding') setOutstanding(result.outstanding);
+  }
+
+  return <footer className="organisation-detail-footer" aria-label="Confirm this event">
+    <h3>Next step</h3>
+    <p className="organisation-detail-hint">Confirm the event once every required arrangement is in place. The Event Organiser is notified and sees the confirmed arrangements.</p>
+    {error && <p role="alert" className="organisation-detail-notice">{error}</p>}
+    {outstanding.length > 0 && <ul aria-label="Outstanding arrangements">
+      {outstanding.map(key => <li key={key}>{ARRANGEMENT_LABELS[key]}</li>)}
+    </ul>}
+    <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
+      disabled={pending} onClick={confirm}>{pending ? 'Confirming…' : 'Confirm event'}</button>
+  </footer>;
+}
+
 export type FindVenues = (prefill: VenueSearchPrefill) => void;
 
 function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalRole; item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
@@ -150,6 +190,8 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
+  // SG2-58: kept here, not in ConfirmPanel, so it outlives the panel.
+  const [confirmedNotice, setConfirmedNotice] = useState('');
 
   useEffect(() => {
     setCurrentStatus(status);
@@ -169,6 +211,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const canComplete = item.kind === 'event' && item.assigned_to_me
     && (currentStatus === 'confirmed' || currentStatus === 'preparation')
     && item.ends_at !== null && Date.parse(item.ends_at) <= Date.now();
+  const canConfirm = item.kind === 'event' && item.assigned_to_me && currentStatus === 'preparation';
 
   return (
     <article className="organisation-detail" aria-label={KINDS[item.kind]}>
@@ -252,6 +295,13 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
         </footer>
       )}
       {canComplete && accessToken && <CompletePanel eventId={item.event_id} endsAt={item.ends_at} accessToken={accessToken} onCompleted={setStatus} />}
+      {canConfirm && accessToken && <ConfirmPanel eventId={item.event_id} accessToken={accessToken} onConfirmed={notified => {
+        setStatus('confirmed');
+        setConfirmedNotice(notified ? 'Event confirmed. The Event Organiser has been notified.' : 'Event confirmed.');
+      }} />}
+      {confirmedNotice && <footer className="organisation-detail-footer">
+        <p role="status" className="organisation-detail-notice">{confirmedNotice}</p>
+      </footer>}
       {item.kind === 'event' && currentStatus === 'completed' && <footer className="organisation-detail-footer">
         <p role="status" className="organisation-detail-notice">Marked as completed. This event has left your active work queue.</p>
       </footer>}

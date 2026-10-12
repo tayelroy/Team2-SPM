@@ -166,7 +166,7 @@ a:hover {
 .organisation-detail-intro p { margin: 0; color: #bbc7c6; font-size: 16px; line-height: 1.6; max-width: 80ch; overflow-wrap: anywhere; }
 .organisation-detail-intro .organisation-detail-description { color: #edfffe; font-size: 14px; }
 .organisation-detail-facts { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 28px 32px; margin: 0; padding: 0 32px 32px; }
-.organisation-detail-equipment { padding: 0 32px 32px; }
+.organisation-detail-equipment, .organisation-detail-confirmed { padding: 0 32px 32px; }
 .organisation-detail-facts > div { border-top: 1px solid rgba(255,255,255,.12); padding-top: 16px; min-width: 0; }
 .organisation-detail-facts dt { color: #bbc7c6; font-size: 10px; line-height: 1.4; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 10px; }
 .organisation-detail-facts dd { color: #edfffe; font-size: 15px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
@@ -186,7 +186,7 @@ a:hover {
   .organisation-detail-header { padding: 20px; gap: 12px; flex-wrap: wrap; }
   .organisation-detail-intro, .organisation-detail-footer { padding: 24px 20px; }
   .organisation-detail-facts { grid-template-columns: minmax(0,1fr); padding: 0 20px 24px; gap: 20px; }
-  .organisation-detail-equipment { padding: 0 20px 24px; }
+  .organisation-detail-equipment, .organisation-detail-confirmed { padding: 0 20px 24px; }
   .organisation-detail-actions { flex-direction: column; }
   .organisation-detail-actions button { width: 100%; }
 }

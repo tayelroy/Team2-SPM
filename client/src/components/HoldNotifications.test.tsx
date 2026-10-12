@@ -28,6 +28,17 @@ test('[NORMAL] [SG2-55:AC4] the coordinator inbox visibly names the reserved equ
   expect(screen.getByText('11 Oct 2026, 10:00 SGT')).toBeVisible();
 });
 
+test('[NORMAL] [SG2-58:AC1] the organiser inbox shows that their event was confirmed', async () => {
+  vi.mocked(notices.loadNotifications).mockResolvedValue({ ok: true, notifications: [{ notification_id: 11,
+    event_id: 7, request_id: null, kind: 'event_confirmed', created_at: '2026-10-11T02:00:00.000Z',
+    message: 'Your event Confirmation Forum is confirmed.' }] });
+  render(<HoldNotifications accessToken="organiser-token" holds={false} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
+  expect(await screen.findByText('Event confirmed')).toBeVisible();
+  expect(screen.getByText('Your event Confirmation Forum is confirmed.')).toBeVisible();
+  expect(screen.getByText('11 Oct 2026, 10:00 SGT')).toBeVisible();
+});
+
 test('[NORMAL] [SG2-84:AC6] [SG2-85:AC4] loads placement, warning and expiry notifications at login and refreshes on reopen', async () => {
   const load = vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [expired, warning, placed] });
   render(<HoldNotifications accessToken="coordinator-token" />);

@@ -39,6 +39,8 @@ import { createEquipmentRouter } from './equipment';
 import { createEquipmentRequirementsRouter } from './equipment/requirements';
 import { createEquipmentAvailabilityRouter } from './equipment/availability';
 import { createEquipmentReservationsRouter } from './equipment/reservations';
+import { createConfirmEventHandler } from './events/confirm';
+import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 
 export function createApp(
@@ -98,7 +100,10 @@ export function createApp(
   // SG2-55: append to preserve every existing positional dependency.
   equipmentReservationsRouter = createEquipmentReservationsRouter(access),
   // SG2-79: appended last to keep every positional argument in place.
-  venueClashesRouter = createVenueClashesRouter(access)
+  venueClashesRouter = createVenueClashesRouter(access),
+  // SG2-58: appended last for the same reason.
+  confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
+  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -198,6 +203,14 @@ export function createApp(
     access.requirePermission('event_request.complete'),
     completeEventHandler
   );
+  // SG2-58: the assigned coordinator confirms an event in Preparation once
+  // its arrangements are in place. Registered before '/:eventId' for the
+  // same reason as '/complete'.
+  eventRequests.patch(
+    '/:eventId/confirm',
+    access.requirePermission('event_request.confirm'),
+    confirmEventHandler
+  );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(
     '/:eventId',
@@ -221,6 +234,12 @@ export function createApp(
     '/:eventId/arrangements',
     access.requirePermission('event_request.arrangements.view'),
     eventArrangementsHandler
+  );
+  // SG2-58: the organiser and coordinator see a confirmed event's arrangements.
+  eventRequests.get(
+    '/:eventId/confirmation',
+    access.requirePermission('event_request.confirmation.view'),
+    eventConfirmationHandler
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

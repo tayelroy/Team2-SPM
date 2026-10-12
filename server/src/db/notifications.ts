@@ -2,12 +2,14 @@ import { AccessError } from '../auth/policy';
 import { createUserScopedClient } from './user-client';
 
 /** A notice for one person: a venue request was approved or rejected (SG2-49),
- * or a venue booking was released (SG2-51). */
+ * a venue booking was released (SG2-51), equipment was reserved (SG2-55) or
+ * the organiser's event was confirmed (SG2-58). */
 export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash';
+  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
+    | 'event_confirmed';
   message: string;
   created_at: string;
 }

@@ -762,3 +762,87 @@ test.each(['Technical Support Staff', 'Event Coordinator'] as const)('[NORMAL] [
   if (role === 'Technical Support Staff') expect(screen.getByRole('button', { name: 'Check equipment availability' })).toBeVisible();
   else expect(screen.queryByRole('button', { name: 'Check equipment availability' })).not.toBeInTheDocument();
 });
+
+// SG2-58: the assigned coordinator confirms an event in preparation from the
+// work queue; the server re-checks every arrangement under the event lock.
+const ready: WorkItem = { ...review, item_id: 7, event_id: 7, title: 'Confirmation Forum', category: 'assigned',
+  status: 'preparation', assigned_to_me: true, ends_at: null };
+
+function confirmationFetch(item: WorkItem, confirm: () => Promise<Response> | Response) {
+  return vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/confirm')
+    ? confirm()
+    : Response.json({ items: [item] }));
+}
+
+test('[NORMAL] [SG2-58:AC1] the assigned coordinator confirms a ready event and the organiser notification is reported', async () => {
+  const fetch = confirmationFetch(ready, () => Response.json({ event_id: 7, status: 'confirmed', confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: true }));
+  await openHeld(ready, fetch);
+  const panel = within(screen.getByRole('contentinfo', { name: 'Confirm this event' }));
+  expect(panel.getByRole('heading', { name: 'Next step' })).toBeVisible();
+  expect(panel.getByText('Confirm the event once every required arrangement is in place. The Event Organiser is notified and sees the confirmed arrangements.')).toBeVisible();
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+  fireEvent.click(panel.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByText('Event confirmed. The Event Organiser has been notified.')).toHaveAttribute('role', 'status');
+  expect(screen.getByText('confirmed', { exact: true })).toBeVisible();
+  expect(screen.queryByRole('contentinfo', { name: 'Confirm this event' })).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/7/confirm', { method: 'PATCH', headers: { Authorization: 'Bearer token' } });
+});
+
+test('[BOUNDARY] [SG2-58:AC1] a confirmation without an organiser notification says only that the event is confirmed', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ event_id: 7, status: 'confirmed', confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: false })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByText('Event confirmed.', { exact: true })).toHaveAttribute('role', 'status');
+  expect(screen.queryByText('Event confirmed. The Event Organiser has been notified.')).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-58:AC2] a refusal lists every outstanding arrangement by label in server order and leaves the action to retry', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['venue', 'equipment', 'registration'] }, { status: 409 })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Confirmation refused: arrangements are still outstanding.');
+  const list = screen.getByRole('list', { name: 'Outstanding arrangements' });
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Venue booking', 'Equipment', 'Registration']);
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Confirm event' })).toBeEnabled();
+});
+
+test('[BOUNDARY] [SG2-58:AC2] one outstanding arrangement is listed alone, and a later different refusal clears the list', async () => {
+  const responses = [
+    Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['equipment'] }, { status: 409 }),
+    Response.json({ error: 'Event confirmation is unavailable.' }, { status: 503 }),
+  ];
+  await openHeld(ready, confirmationFetch(ready, () => responses.shift()!));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  const list = await screen.findByRole('list', { name: 'Outstanding arrangements' });
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Equipment']);
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByText('Could not confirm the event. Please try again.')).toHaveAttribute('role', 'alert');
+  expect(screen.queryByRole('list', { name: 'Outstanding arrangements' })).not.toBeInTheDocument();
+});
+
+test('[CONFLICT] [SG2-58:AC1] a rapid double-click sends exactly one confirmation and shows it in flight', async () => {
+  let resolve!: (response: Response) => void;
+  const fetch = confirmationFetch(ready, () => new Promise<Response>(yes => { resolve = yes; }));
+  await openHeld(ready, fetch);
+  const button = screen.getByRole('button', { name: 'Confirm event' });
+  act(() => { button.click(); button.click(); });
+  expect(screen.getByRole('button', { name: 'Confirming…' })).toBeDisabled();
+  await act(async () => resolve(Response.json({ event_id: 7, status: 'confirmed', confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: true })));
+  expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/confirm'))).toHaveLength(1);
+  expect(screen.getByText('Event confirmed. The Event Organiser has been notified.')).toBeVisible();
+});
+
+test('[CONFLICT] [SG2-58:AC1] a stale preparation status is refused with the server reason and the status is unchanged', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ error: 'Only an event in Preparation can be confirmed.', code: 'closed' }, { status: 409 })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Only an event in Preparation can be confirmed.');
+  expect(screen.queryByRole('list', { name: 'Outstanding arrangements' })).not.toBeInTheDocument();
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+});
+
+test('[FAILURE] [SG2-58:AC1] confirmation is never offered on someone else\'s event or outside preparation', async () => {
+  for (const item of [{ ...ready, assigned_to_me: false }, { ...ready, status: 'awaiting_safety_check' }, { ...ready, status: 'confirmed' }]) {
+    await openHeld(item, confirmationFetch(item, () => Response.json({})));
+    expect(screen.queryByRole('button', { name: 'Confirm event' })).not.toBeInTheDocument();
+    cleanup();
+  }
+});
