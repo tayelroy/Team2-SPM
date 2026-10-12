@@ -57,7 +57,7 @@ import { createEquipmentReservationsRouter } from '../server/src/equipment/reser
 import { createMemoryReservationsStore, seedEquipmentReservations } from './support/equipment-reservations';
 import { createConfirmEventHandler } from '../server/src/events/confirm';
 import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
-import { createMemoryConfirm, seedEventConfirmation } from './support/event-confirmation';
+import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -243,10 +243,18 @@ app.post('/__e2e/event-confirmation', (_req, res) => {
   seedEventConfirmation(database);
   res.status(204).end();
 });
-app.get('/__e2e/event-confirmation-ledger', (_req, res) => res.json({
-  events: database.tables.events.filter(row => [581, 582, 583, 584].includes(Number(row.event_id))),
-  audit: database.tables.event_audit_logs, notifications: database.tables.notifications,
-}));
+app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
+  prepareConvertedForum(database);
+  res.status(204).end();
+});
+app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [581, 582, 583, 584, 585].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), audit: database.tables.event_audit_logs, notifications: database.tables.notifications,
+    venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
+    bookings: database.tables.venue_bookings.filter(seeded),
+  });
+});
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
     coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });

@@ -93,6 +93,50 @@ test('SG2-58-N01 | [FAILURE] [SG2-58:AC2] confirmation is refused while one of t
   if (process.env.SG2_58_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_58_SCREENSHOTS}/refused-desktop.png`, fullPage: true });
 });
 
+test('SG2-58-N02 | [CONFLICT] [SG2-58:AC2] a booking converted from a hold and later released leaves Confirm refused with the venue listed', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  // Venue staff convert a tentative hold while the event is in Planning: the
+  // booking is recorded on the hold, never on the approved request.
+  const venue = await auth(page, 'venue');
+  const placed = await page.request.post('/api/venue-holds', { headers: venue, data: { event_id: 585, venue_id: 1,
+    starts_at: '2030-07-01T02:00:00.000Z', ends_at: '2030-07-01T06:00:00.000Z', expires_at: '2030-06-25T02:00:00.000Z' } });
+  expect(placed.status()).toBe(201);
+  const holdId = (await placed.json()).hold.hold_id;
+  expect((await page.request.post(`/api/venue-holds/${holdId}/convert`, { headers: venue })).status()).toBe(200);
+  expect((await page.request.post('/__e2e/event-confirmation-prepare')).status()).toBe(204);
+  let stored = await ledger(page);
+  const bookingId = stored.holds.find((hold: { hold_id: number }) => hold.hold_id === holdId).booking_id;
+  const converted = stored.venue_requests.filter((row: { event_id: number }) => row.event_id === 585);
+  expect(converted).toEqual([expect.objectContaining({ status: 'approved' })]);
+  expect(converted[0].venue_booking_id ?? null).toBeNull();
+
+  // The hold-linked booking counts while it is confirmed.
+  await signIn(page, 'coordinator'); await openAssigned(page, 'Converted Forum');
+  await expect(page.getByTestId('arrangement-venue')).toContainText('1 venue booking approved.');
+  await expect(page.getByTestId('readiness-badge')).toHaveText('Ready for confirmation');
+
+  // Releasing it cancels the booking but leaves the request approved.
+  const released = await page.request.post(`/api/venue-bookings/${bookingId}/release`,
+    { headers: await auth(page, 'coordinator'), data: { reason: 'The speaker withdrew.' } });
+  expect(released.status()).toBe(200);
+  stored = await ledger(page);
+  expect(stored.venue_requests.filter((row: { event_id: number }) => row.event_id === 585))
+    .toEqual([expect.objectContaining({ status: 'approved' })]);
+  const notices = stored.notifications.length;
+
+  await signIn(page, 'coordinator'); await openAssigned(page, 'Converted Forum');
+  await expect(page.getByTestId('arrangement-venue')).toContainText('1 approved venue request no longer has a confirmed booking.');
+  await confirmPanel(page).getByRole('button', { name: 'Confirm event', exact: true }).click();
+  await expect(confirmPanel(page).getByRole('alert')).toHaveText('Confirmation refused: arrangements are still outstanding.');
+  await expect(confirmPanel(page).getByRole('list', { name: 'Outstanding arrangements' }).getByRole('listitem'))
+    .toHaveText(['Venue booking']);
+  await expect(page.locator('.work-queue-status')).toHaveText('preparation');
+  stored = await ledger(page);
+  expect(eventRow(stored, 585)).toMatchObject({ status: 'preparation', confirmed_by: null, confirmed_at: null });
+  expect(stored.audit.filter((row: { field_name: string }) => row.field_name === 'status')).toEqual([]);
+  expect(stored.notifications).toHaveLength(notices);
+});
+
 test('SG2-58-B01 | [BOUNDARY] [SG2-58:AC2] [SG2-58:AC1] equipment and registration that are not required do not block, and both views fit 390px', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, 'coordinator'); await openAssigned(page, 'Simple Forum');

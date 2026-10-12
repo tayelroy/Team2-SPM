@@ -64,8 +64,12 @@ function pluralise(count: number, noun: string): string {
 
 function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
   const live = requests.filter(isLive);
-  const approved = live.filter(row => row.status.toLowerCase() === 'approved').length;
+  const approvedRows = live.filter(row => row.status.toLowerCase() === 'approved');
+  const approved = approvedRows.length;
   const pending = live.filter(row => row.status.toLowerCase() === 'pending').length;
+  // SG2-58 review: an approved request whose booking was converted from a hold
+  // and later released stays approved, so approval alone does not prove a venue.
+  const unbooked = approvedRows.filter(row => !row.booked).length;
 
   // Every event needs a venue, so an event with no live booking request has an
   // outstanding venue arrangement rather than "not required".
@@ -83,6 +87,16 @@ function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
       label: 'Venue booking',
       state: 'outstanding',
       detail: `${pluralise(pending, 'venue booking')} still awaiting approval.`
+    };
+  }
+  if (unbooked > 0) {
+    return {
+      key: 'venue',
+      label: 'Venue booking',
+      state: 'outstanding',
+      detail: `${pluralise(unbooked, 'approved venue request')} no longer ${
+        unbooked === 1 ? 'has' : 'have'
+      } a confirmed booking.`
     };
   }
   return {

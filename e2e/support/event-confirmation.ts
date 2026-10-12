@@ -52,6 +52,10 @@ const END = '2030-06-20T06:00:00.000Z';
  * - 583 Simple Forum: one approved venue, no equipment, no registration, so
  *   equipment and registration are not required and do not block.
  * - 584 Colleague Forum: ready, but assigned to a second coordinator.
+ * - 585 Converted Forum: still in Planning with no venue request, so a journey
+ *   can place and convert a tentative hold (which links the booking through
+ *   the hold only) before moving it to Preparation; no equipment or
+ *   registration is needed.
  */
 export function seedEventConfirmation(database: MemoryDatabase) {
   const { events, users, account_roles: roles, venue_booking_requests: venueRequests, venue_bookings: bookings,
@@ -65,7 +69,8 @@ export function seedEventConfirmation(database: MemoryDatabase) {
     [581, 'Confirmation Forum', 'user-coordinator', registration],
     [582, 'Outstanding Forum', 'user-coordinator', { ...registration, registration_capacity: null }],
     [583, 'Simple Forum', 'user-coordinator', { registration_needed: false, equipment_requirements: null }],
-    [584, 'Colleague Forum', 'user-coordinator2', registration]
+    [584, 'Colleague Forum', 'user-coordinator2', registration],
+    [585, 'Converted Forum', 'user-coordinator', { status: 'planning', registration_needed: false, equipment_requirements: null }]
   ];
   for (const [eventId, name, coordinator, extra] of rows) {
     events.push({ ...events[0], event_id: eventId, name, status: 'preparation', coordinator_id: coordinator,
@@ -90,4 +95,9 @@ export function seedEventConfirmation(database: MemoryDatabase) {
     reservations.push({ reservation_id: reservationId, request_id: requestId, event_id: eventId, equipment_id: 1,
       quantity_reserved: 12, starts_at: START, ends_at: END, reserved_at: '2030-01-03T00:00:00.000Z' });
   }
+}
+
+/** SG2-58: the Planning → Preparation move, which has no route of its own yet. */
+export function prepareConvertedForum(database: MemoryDatabase) {
+  database.tables.events.find(row => row.event_id === 585)!.status = 'preparation';
 }

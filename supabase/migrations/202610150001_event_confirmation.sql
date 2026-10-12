@@ -61,7 +61,16 @@ begin
   if not exists (select 1 from public.venue_booking_requests r
       where r.event_id = p_event_id and lower(r.status) not in ('rejected', 'cancelled'))
     or exists (select 1 from public.venue_booking_requests r
-      where r.event_id = p_event_id and lower(r.status) = 'pending') then
+      where r.event_id = p_event_id and lower(r.status) = 'pending')
+    -- An approved request counts only while a confirmed booking is linked to
+    -- it, directly or through the hold it was converted from.
+    or exists (select 1 from public.venue_booking_requests r
+      where r.event_id = p_event_id and lower(r.status) = 'approved'
+        and not exists (select 1 from public.venue_bookings b
+          where b.status = 'confirmed'
+            and (b.booking_id = r.venue_booking_id
+              or b.booking_id in (select h.booking_id from public.venue_holds h
+                where h.request_id = r.request_id)))) then
     outstanding := outstanding || 'venue'::text;
   end if;
   if exists (select 1 from public.equipment_requests r

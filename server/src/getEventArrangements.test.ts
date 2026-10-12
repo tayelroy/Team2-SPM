@@ -51,7 +51,7 @@ const MOCK_EVENT: EventPlanningRecord = {
 const READY_FACTS: FetchEventArrangementFactsResult = {
   ok: true,
   facts: {
-    venue_requests: [{ status: 'approved' }],
+    venue_requests: [{ status: 'approved', booked: true }],
     equipment_requests: [{ status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true }]
   }
 };
@@ -95,7 +95,7 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
         facts: {
           ok: true,
           facts: {
-            venue_requests: [{ status: 'pending' }],
+            venue_requests: [{ status: 'pending', booked: false }],
             equipment_requests: []
           }
         },

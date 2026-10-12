@@ -46,6 +46,18 @@ insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,
   (95881,95861,95860,3,'cancelled',null,null,null);
 insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at)
  values (95861,95860,2,'2031-11-02T09:00Z','2031-11-02T17:00Z',95861,'2031-10-01T00:00Z');
+-- An approved request is only ready while its confirmed booking stands, so
+-- give every approved fixture request the booking its approval created.
+do $$
+declare r record; booking bigint;
+begin
+ for r in select * from public.venue_booking_requests where event_id between 95861 and 95879
+   and status='approved' and venue_booking_id is null loop
+  insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status)
+   values(r.venue_id,r.event_id,r.starts_at,r.ends_at,'confirmed') returning booking_id into booking;
+  update public.venue_booking_requests set venue_booking_id=booking where request_id=r.request_id;
+ end loop;
+end $$;
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
@@ -114,6 +126,16 @@ insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,st
  (95863,95861,'2031-12-04T09:00Z','2031-12-04T17:00Z','approved'),
  (95864,95861,'2031-12-05T09:00Z','2031-12-05T17:00Z','rejected'),
  (95864,95861,'2031-12-06T09:00Z','2031-12-06T17:00Z','cancelled');
+do $$
+declare r record; booking bigint;
+begin
+ for r in select * from public.venue_booking_requests where event_id=95863
+   and status='approved' and venue_booking_id is null loop
+  insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status)
+   values(r.venue_id,r.event_id,r.starts_at,r.ends_at,'confirmed') returning booking_id into booking;
+  update public.venue_booking_requests set venue_booking_id=booking where request_id=r.request_id;
+ end loop;
+end $$;
 insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position) values
  (95865,95865,95860,1,'pending',0,95860,'Foyer'),
  (95866,95866,95860,1,'approved',0,null,null),
@@ -304,6 +326,78 @@ begin
  if (select status::text||'|'||coalesce(confirmed_at::text,'null') from public.events where event_id=95877) <> 'preparation|null'
    or exists(select 1 from public.event_audit_logs where event_id=95877) then
   raise exception '[SG2-58:notification-failure-no-partial-write] [SG2-58:AC1] [FAILURE] A failed notification must leave the event and history unchanged';
+ end if;
+end $$;
+
+-- Revision 1: an approved request counts only while a confirmed booking is
+-- linked to it, directly or through the hold it was converted from.
+insert into public.venues(venue_id,name) values (95862,'Confirmation hold hall');
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed)
+ select 95890+n,'d5800000-0000-4000-8000-000000000002','d5800000-0000-4000-8000-000000000003',
+  'Confirmation booking event '||n,case when n=0 then 'preparation' else 'planning' end::public.event_status,false
+ from generate_series(0,2) n;
+do $$
+declare booking bigint;
+begin
+ insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status,cancelled_by,cancelled_at,cancellation_reason)
+  values(95862,95890,'2032-01-01T09:00Z','2032-01-01T17:00Z','cancelled',
+   'd5800000-0000-4000-8000-000000000005','2031-10-01T00:00Z','Flooded') returning booking_id into booking;
+ insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status,venue_booking_id)
+  values(95890,95862,'2032-01-01T09:00Z','2032-01-01T17:00Z','approved',booking);
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000005',true);
+do $$
+declare hold jsonb; result jsonb; n integer;
+begin
+ foreach n in array array[1,2] loop
+  hold := public.create_venue_hold(95890+n,95862,('2032-01-0'||(n+1)||'T09:00Z')::timestamptz,
+   ('2032-01-0'||(n+1)||'T17:00Z')::timestamptz,clock_timestamp()+interval '30 days');
+  result := public.change_venue_hold((hold->'hold'->>'hold_id')::bigint,'convert');
+  if hold->>'outcome' is distinct from 'created' or result->>'outcome' is distinct from 'updated'
+    or result->'hold'->>'booking_id' is null then
+   raise exception '[SG2-58:hold-convert-fixture] [SG2-58:AC2] [NORMAL] The hold fixture must convert into a booking: % %',hold,result;
+  end if;
+  if n=2 then
+   result := public.release_venue_booking((result->'hold'->>'booking_id')::bigint,'Venue flooded');
+   if result->>'outcome' is distinct from 'released' then
+    raise exception '[SG2-58:hold-release-fixture] [SG2-58:AC2] [CONFLICT] The converted booking must release: %',result;
+   end if;
+  end if;
+ end loop;
+end $$;
+reset role;
+update public.events set status='preparation' where event_id in (95891,95892);
+do $$
+begin
+ if (select count(*) from public.venue_booking_requests
+     where event_id in (95891,95892) and status='approved' and venue_booking_id is null) <> 2 then
+  raise exception '[SG2-58:hold-requests-approved-unlinked] [SG2-58:AC2] [CONFLICT] Converted hold requests must stay approved without a direct booking link';
+ end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+begin
+ if public.confirm_event(95890) is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb then
+  raise exception '[SG2-58:cancelled-booking-outstanding] [SG2-58:AC2] [BOUNDARY] An approved request whose booking was cancelled must list the venue as outstanding';
+ end if;
+ if public.confirm_event(95891)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-58:converted-hold-confirms] [SG2-58:AC1] [NORMAL] An approved request booked through a converted hold must confirm';
+ end if;
+ if public.confirm_event(95892) is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb then
+  raise exception '[SG2-58:released-hold-booking-outstanding] [SG2-58:AC2] [CONFLICT] A converted hold booking released afterwards must list the venue as outstanding';
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if exists(select 1 from public.events where event_id in (95890,95892) and status <> 'preparation')
+   or exists(select 1 from public.event_audit_logs where event_id=95890)
+   or exists(select 1 from public.event_audit_logs where event_id=95892 and field_name='status')
+   or exists(select 1 from public.notifications where event_id in (95890,95892) and kind='event_confirmed')
+   or (select status from public.events where event_id=95891) <> 'confirmed' then
+  raise exception '[SG2-58:unbooked-venue-no-side-effects] [SG2-58:AC2] [FAILURE] Refusing an unbooked venue must not confirm, audit or notify';
  end if;
 end $$;
 

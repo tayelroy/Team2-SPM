@@ -6,6 +6,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  */
 export interface VenueBookingStatusRow {
   status: string;
+  /** SG2-58: a confirmed venue_bookings row is linked to this request, either
+   * through venue_booking_requests.venue_booking_id or through a venue hold
+   * converted for the request (venue_holds.booking_id). */
+  booked: boolean;
 }
 
 export interface EquipmentRequestArrangementRow {
@@ -34,6 +38,17 @@ interface EquipmentRequestRow {
   placement_venue_id: number | null;
 }
 
+interface VenueRequestRow {
+  request_id: number;
+  status: string;
+  venue_booking_id: number | null;
+}
+
+interface VenueHoldRow {
+  request_id: number | null;
+  booking_id: number | null;
+}
+
 export type FetchEventArrangementFactsResult =
   | { ok: true; facts: EventArrangementFacts }
   | { ok: false; reason: 'unavailable'; message: string };
@@ -44,8 +59,9 @@ export type FetchEventArrangementFactsResult =
  * route checks the caller's relationship to the event before calling this.
  *
  * The event's own registration fields and coordinator come from
- * fetchEventPlanningRecord; this adds child request facts, which requests have
- * a reservation receipt (SG2-58 readiness) and whether any reservation exists.
+ * fetchEventPlanningRecord; this adds child request facts, which venue requests
+ * still have a confirmed booking, which equipment requests have a reservation
+ * receipt (SG2-58 readiness) and whether any reservation exists.
  * Reservations have no status column; a nonterminal event's rows remain
  * commitments, including receipts with no linked request.
  */
@@ -55,11 +71,46 @@ export async function fetchEventArrangementFacts(
 ): Promise<FetchEventArrangementFactsResult> {
   const venue = await admin
     .from('venue_booking_requests')
-    .select('status')
+    .select('request_id, status, venue_booking_id')
     .eq('event_id', eventId);
   if (venue.error) {
     return { ok: false, reason: 'unavailable', message: venue.error.message };
   }
+
+  // A hold converted for a request records its booking on the hold, not on the
+  // request (change_venue_hold 'convert'), so both links are followed.
+  const holds = await admin
+    .from('venue_holds')
+    .select('request_id, booking_id')
+    .eq('event_id', eventId);
+  if (holds.error) {
+    return { ok: false, reason: 'unavailable', message: holds.error.message };
+  }
+
+  const bookings = await admin
+    .from('venue_bookings')
+    .select('booking_id')
+    .eq('event_id', eventId)
+    .eq('status', 'confirmed');
+  if (bookings.error) {
+    return { ok: false, reason: 'unavailable', message: bookings.error.message };
+  }
+
+  const confirmedBookings = new Set(
+    ((bookings.data ?? []) as { booking_id: number }[]).map(row => Number(row.booking_id))
+  );
+  const holdBookings = new Map<number, number[]>();
+  for (const hold of (holds.data ?? []) as VenueHoldRow[]) {
+    if (hold.request_id === null || hold.booking_id === null) continue;
+    const key = Number(hold.request_id);
+    holdBookings.set(key, [...(holdBookings.get(key) ?? []), Number(hold.booking_id)]);
+  }
+  const venueRequests = ((venue.data ?? []) as VenueRequestRow[]).map(row => ({
+    status: row.status,
+    booked:
+      (row.venue_booking_id !== null && confirmedBookings.has(Number(row.venue_booking_id))) ||
+      (holdBookings.get(Number(row.request_id)) ?? []).some(id => confirmedBookings.has(id))
+  }));
 
   const equipment = await admin
     .from('equipment_requests')
@@ -86,7 +137,7 @@ export async function fetchEventArrangementFacts(
   return {
     ok: true,
     facts: {
-      venue_requests: (venue.data ?? []) as VenueBookingStatusRow[],
+      venue_requests: venueRequests,
       equipment_requests: ((equipment.data ?? []) as EquipmentRequestRow[]).map(row => ({
         status: row.status,
         shortfall: row.shortfall,

@@ -4220,6 +4220,35 @@
   {
     "story": "SG2-58",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
+    "data": "Venue staff and coordinator fixture accounts; Converted Forum event 585 seeded in Planning with no venue request, no equipment and registration not needed; Regression Hall free on 1 Jul 2030.",
+    "evidence": "e2e/event-confirmation.spec.ts; e2e/support/venue-holds.ts; e2e/support/venue-releases.ts; docs/event-confirmation.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (6/6) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "12 Oct 2026; targeted run: npx playwright test e2e/event-confirmation.spec.ts e2e/regression.spec.ts e2e/equipment-reservations.spec.ts 72/72. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "12 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-N02",
+    "title": "a booking converted from a hold and later released leaves Confirm refused with the venue listed",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC2"
+    ],
+    "purpose": "Prove the venue gate follows a booking recorded only on a converted tentative hold: it counts while confirmed, and once released the still-approved request blocks confirmation (PR #80 review).",
+    "steps": [
+      "As venue staff, place a tentative hold for event 585 on Regression Hall and convert it; move the event to Preparation through the fixture.",
+      "Read the fixture ledger: the request is approved with no venue_booking_id and the hold carries the booking.",
+      "At 1440px, sign in as the coordinator, open Converted Forum and read the venue detail and readiness badge.",
+      "Release the booking as the coordinator through the API, reopen Converted Forum, read the venue detail, select Confirm event and read the alert, list, status and ledger."
+    ],
+    "expected": "Before release the venue reads '1 venue booking approved.' and the badge 'Ready for confirmation'. After release the request stays approved, the venue reads '1 approved venue request no longer has a confirmed booking.', and Confirm is refused with 'Confirmation refused: arrangements are still outstanding.' listing only Venue booking. The status stays preparation with no confirmed_by/confirmed_at, no status audit row and no new notification."
+  },
+  {
+    "story": "SG2-58",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
     "data": "Coordinator/organiser fixture accounts; Simple Forum event 583 in Preparation with one approved and confirmed Regression Hall booking, no equipment requests and registration not needed.",
     "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
     "layer": "Playwright browser + fixture API",

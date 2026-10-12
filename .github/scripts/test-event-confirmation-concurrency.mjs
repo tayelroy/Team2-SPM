@@ -91,10 +91,11 @@ try {
     INSERT INTO public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed)
       SELECT 95880+n,'${organiser}','${coordinator}','Confirmation race '||n,'preparation',false FROM generate_series(0,5)n;
     INSERT INTO public.venue_bookings(booking_id,venue_id,event_id,starts_at,ends_at,status)
-      VALUES(95880,95880,95880,'2031-12-01T09:00Z','2031-12-01T17:00Z','confirmed');
+      SELECT 95880+n,95880,95880+n,'2031-12-01T09:00Z'::timestamptz+n*interval '1 day','2031-12-01T17:00Z'::timestamptz+n*interval '1 day',
+        'confirmed' FROM generate_series(0,5)n;
     INSERT INTO public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status,venue_booking_id)
       SELECT 95880+n,95880,'2031-12-01T09:00Z'::timestamptz+n*interval '1 day','2031-12-01T17:00Z'::timestamptz+n*interval '1 day',
-        'approved',CASE WHEN n=0 THEN 95880 END FROM generate_series(0,5)n;
+        'approved',95880+n FROM generate_series(0,5)n;
     INSERT INTO public.equipment_requests(request_id,event_id,equipment_id,quantity) VALUES(95882,95882,95880,2);
     UPDATE public.events SET registration_needed=true,registration_capacity=40,
       registration_opens_at='2031-11-01T00:00Z',registration_closes_at='2031-11-20T00:00Z' WHERE event_id=95883;

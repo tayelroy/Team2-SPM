@@ -17,8 +17,14 @@ Product-owner decisions (binding):
    must be **reserved and placed** (see
    [Event arrangement readiness](event-arrangements.md)):
    - **Venue** — outstanding if the event has no live (not rejected or
-     cancelled) `venue_booking_requests`, or any live one is still `pending`.
-     One pending request among several approved ones blocks confirmation.
+     cancelled) `venue_booking_requests`, if any live one is still `pending`,
+     or if any live `approved` one no longer has a **confirmed**
+     `venue_bookings` row linked to it. A booking is linked through the
+     request's `venue_booking_id` or through a `venue_holds` row for the
+     request (`venue_holds.request_id`) whose `booking_id` it is: converting a
+     tentative hold records the booking on the hold only, and releasing that
+     booking leaves the request `approved`. One pending or unbooked request
+     among several approved ones blocks confirmation.
    - **Equipment** — not required if there are no live `equipment_requests`;
      otherwise outstanding if any live request lacks an
      `equipment_reservations` receipt with its `request_id`, has no
@@ -121,7 +127,9 @@ migration show no "Confirmed at" time.
   `authorization.test.ts`.
 - Client: API reader, Work Queue confirm action, confirmed-arrangements
   section and the notification label.
-- Browser: `e2e/event-confirmation.spec.ts` (SG2-58-P01/N01/B01/C01/F01)
-  against an in-memory mirror of the RPC (`e2e/support/event-confirmation.ts`).
+- Browser: `e2e/event-confirmation.spec.ts` (SG2-58-P01/N01/N02/B01/C01/F01)
+  against an in-memory mirror of the RPC (`e2e/support/event-confirmation.ts`);
+  N02 converts a tentative hold, releases its booking and expects Confirm to
+  be refused with Venue booking listed.
 - Database: `supabase/tests/event_confirmation.sql` and
   `.github/scripts/test-event-confirmation-concurrency.mjs`.
