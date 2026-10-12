@@ -4331,5 +4331,72 @@
       "As the organiser, read 581's confirmation before it is confirmed; confirm it as the coordinator; read it as another organiser, as venue staff and as the coordinator; read the ledger."
     ],
     "expected": "Unsigned is 401 and every other role 403. The colleague's event is 404 'No event in preparation is assigned to this account.' and stays in preparation. Before confirmation the organiser gets 404; afterwards another organiser gets 404, venue staff 403, and the coordinator 200 with 12 × Wireless microphones. One notification exists."
+  },
+  {
+    "id": "SG2-79-P01",
+    "title": "raising a venue's setup and turnaround flags bookings that now clash, tells the coordinator and clears once resolved",
+    "story": "SG2-79",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-79:AC1",
+      "SG2-79:AC2",
+      "SG2-79:AC3",
+      "SG2-79:AC4",
+      "SG2-79:AC5"
+    ],
+    "purpose": "Verify that introducing setup and turnaround time flags existing bookings now too close together, without changing them, shows the flags to Venue Staff and the affected coordinator with what each clashes with, notifies that coordinator, and clears once the clash is resolved.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Seed Regression Hall with booking #1 (Planning workshop, 10:00-12:00 SGT) and booking #31 (Venue Request Forum, 12:30-13:30 SGT) on 15 Jun 2030.",
+      "As Venue Staff, read the Clashing bookings list, then record 30 minutes setup and 45 minutes turnaround through the SG2-77 API and refresh.",
+      "List event 91's bookings.",
+      "As the coordinator, read the Clashing bookings list and the notifications drawer.",
+      "As Venue Staff, record 15 minutes setup and 15 minutes turnaround and refresh."
+    ],
+    "data": "Venue 1 (Regression Hall), bookings #1 and #31, event 91; venue and coordinator fixture accounts.",
+    "expected": "Nothing is flagged without times; with 30/45 both bookings are flagged, #31 naming Planning workshop's booking #1; booking #31 stays confirmed at 12:30-13:30; the coordinator sees only #31, clashing with another event, and has a Booking clash flagged notice; with 15/15 the flags clear.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "12 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "12 Oct 2026; feature/SG2-79-flag-clashing-bookings on main 0556593; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_clashes. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-12",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-CLASH-01",
+    "title": "Bookings closer together than setup plus turnaround are flagged, notified once and cleared when resolved",
+    "story": "SG2-79",
+    "purpose": "Check venue_booking_clashes, refresh_venue_booking_clashes() and its triggers through actual stored records, notifications and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed coordinators, events and confirmed bookings 30 minutes apart at a venue with no times, and a second venue for one coordinator's own two events.",
+      "Introduce 30/45 minutes; change to 30/40, 15/15 and 15/16; move a booking away and back; release it.",
+      "Introduce times at the second venue.",
+      "Read flags and call the re-check as a client.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_booking_clashes.sql",
+    "expected": "Nothing is flagged without times; 30/45 flags the pair, leaves both bookings unchanged and notifies each coordinator once, hiding the other coordinator's event; 30/40 keeps one flag with no new notices; 15/15 (exactly the gap) clears it and 15/16 flags it again; moving or releasing a booking clears it; a coordinator's own two events are named; clients cannot read flags or call the re-check.",
+    "evidence": "supabase/tests/venue_booking_clashes.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: dropping the venue_operations trigger failed times-introduced-flagged; dropping the venue_bookings trigger failed moved-booking-clears.",
+    "execution_date": "12 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "12 Oct 2026; feature/SG2-79-flag-clashing-bookings on main 0556593; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_clashes. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-12",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

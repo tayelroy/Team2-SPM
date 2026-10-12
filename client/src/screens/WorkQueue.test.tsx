@@ -62,11 +62,17 @@ test.each([false, true])('[FAILURE] [SG2-53:AC1] equipment requirements are hidd
   expect(screen.queryByRole('region', { name: 'Equipment requirement integration' })).not.toBeInTheDocument();
 });
 
+/** SG2-79: the dashboard also lists clashing bookings. Answer that request on
+ * its own so the work-queue responses below keep their order. */
+function withClashes(queue: (url: string, init?: RequestInit) => Promise<Response>) {
+  return vi.fn((url: string, init?: RequestInit) => url === '/api/venue-clashes' ? Promise.resolve(Response.json({ clashes: [] })) : queue(url, init));
+}
+
 test('[NORMAL] [SG2-41:AC4] coordinator queue groups distinct records, opens the exact assignment and refreshes when returning', async () => {
   const assigned = { ...review, item_id: 28, event_id: 28, title: 'Assigned workshop', category: 'assigned', status: 'planning',
     starts_at: null, details: { organisation: 'Harbour Trust', registration_needed: false } };
   const fetch = vi.fn(async (url: string) => Response.json({ items: url.endsWith('/event/28') ? [assigned] : [review, assigned] }));
-  vi.stubGlobal('fetch', fetch);
+  vi.stubGlobal('fetch', withClashes(fetch));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading');
   await screen.findByText('2 items in your work queue');
@@ -196,7 +202,7 @@ test('[NORMAL] [SG2-48:AC2] Venue Staff see the layout, venue requirements and r
 test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit empty groups, then newly arrived work', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 }))
     .mockResolvedValueOnce(Response.json({ items: [] })).mockResolvedValueOnce(Response.json({ items: [review] }));
-  vi.stubGlobal('fetch', fetch);
+  vi.stubGlobal('fetch', withClashes(fetch));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('unavailable');
   expect(screen.queryByText('0 items in your work queue')).not.toBeInTheDocument();
@@ -210,8 +216,8 @@ test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit e
 
 test('[CONFLICT] [SG2-41:session-isolation] a late result for the previous account cannot replace the new account queue', async () => {
   let resolve!: (response: Response) => void;
-  vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(() => new Promise<Response>(yes => { resolve = yes; }))
-    .mockResolvedValueOnce(Response.json({ items: [] })));
+  vi.stubGlobal('fetch', withClashes(vi.fn().mockImplementationOnce(() => new Promise<Response>(yes => { resolve = yes; }))
+    .mockResolvedValueOnce(Response.json({ items: [] }))));
   const { rerender } = render(<Dashboard role="Event Coordinator" accessToken="old" onNavigate={vi.fn()} />);
   rerender(<Dashboard role="Venue Staff" accessToken="new" onNavigate={vi.fn()} />);
   await screen.findByText('0 items in your work queue');

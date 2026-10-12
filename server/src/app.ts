@@ -34,6 +34,7 @@ import { createGetEventHistoryHandler } from './events/getHistory';
 import { createVenueHoldsRouter } from './venues/holds';
 import { createVenueConflictsRouter } from './venues/conflicts';
 import { createVenueBookingsRouter } from './venues/bookings';
+import { createVenueClashesRouter } from './venues/clashes';
 import { createEquipmentRouter } from './equipment';
 import { createEquipmentRequirementsRouter } from './equipment/requirements';
 import { createEquipmentAvailabilityRouter } from './equipment/availability';
@@ -98,6 +99,8 @@ export function createApp(
   equipmentAvailabilityRouter = createEquipmentAvailabilityRouter(access),
   // SG2-55: append to preserve every existing positional dependency.
   equipmentReservationsRouter = createEquipmentReservationsRouter(access),
+  // SG2-79: appended last to keep every positional argument in place.
+  venueClashesRouter = createVenueClashesRouter(access),
   // SG2-58: appended last for the same reason.
   confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
   eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal })
@@ -136,6 +139,8 @@ export function createApp(
   app.use('/api/venue-holds', venueHoldsRouter);
   // SG2-51: an event's or venue's bookings, and releasing one.
   app.use('/api/venue-bookings', venueBookingsRouter);
+  // SG2-79: bookings that clash once setup and turnaround time apply.
+  app.use('/api/venue-clashes', venueClashesRouter);
   app.use('/api/equipment', equipmentRouter);
   app.use('/api', equipmentReservationsRouter);
   app.use('/api/equipment-requests', equipmentAvailabilityRouter);

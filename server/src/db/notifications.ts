@@ -8,7 +8,7 @@ export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved'
+  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
     | 'event_confirmed';
   message: string;
   created_at: string;

@@ -22,11 +22,12 @@ comment on column public.events.confirmed_at is
   'When the event was confirmed (SG2-58 AC1); null for events confirmed before SG2-58.';
 
 -- AC1: the organiser's confirmation notice shares SG2-49's notifications table.
+-- Rebuilds the list 202610140003 (SG2-79) left, so every earlier kind stays allowed.
 alter table public.notifications
   drop constraint notifications_kind_check,
   add constraint notifications_kind_check check (kind in
     ('venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
-     'equipment_reserved', 'event_confirmed'));
+     'equipment_reserved', 'venue_booking_clash', 'event_confirmed'));
 
 create function public.confirm_event(p_event_id integer)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$

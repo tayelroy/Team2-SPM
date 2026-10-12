@@ -480,6 +480,19 @@
       }
     },
     {
+      "id": "SG2-79",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-79",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-12",
+      "acceptanceCriteria": {
+        "AC1": "Given existing bookings whose effective periods now overlap, when setup/turnaround times are introduced or changed for a venue, then the affected bookings are flagged as conflicting",
+        "AC2": "Flagged bookings are not cancelled, removed or altered automatically",
+        "AC3": "Venue Staff and the assigned Event Coordinator of each affected event can see a list of the flagged bookings and which booking each one clashes with",
+        "AC4": "The assigned Event Coordinator of each affected event is notified",
+        "AC5": "A flag clears once the conflict is resolved (e.g. a booking is moved, cancelled, or the times are changed)"
+      }
+    },
+    {
       "id": "SG2-86",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-86",
       "originalPullRequests": [],

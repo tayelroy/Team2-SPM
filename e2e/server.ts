@@ -36,6 +36,7 @@ import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createMemoryReleaseStore } from './support/venue-releases';
 import { createVenueBookingsRouter } from '../server/src/venues/bookings';
+import { createVenueClashesRouter } from '../server/src/venues/clashes';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -115,6 +116,8 @@ const operations = createVenueOperationsRouter(access, () => ({
     const table = database.client.from('venue_operations');
     const query = existing.data ? table.update(row).eq('venue_id', venueId) : table.insert({ venue_id: venueId, ...row });
     const result = await query.select(OPERATION_COLUMNS).maybeSingle();
+    // SG2-79: introducing or changing times re-checks the venue's bookings.
+    database.refreshVenueClashes(venueId);
     return result.data as VenueOperationRecord;
   }
 }));
@@ -212,6 +215,8 @@ const app = createApp(
   createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) }),
   createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token)),
   createEquipmentReservationsRouter(access, token => createMemoryReservationsStore(database, token)),
+  // SG2-79: clashing bookings, against the in-memory client.
+  createVenueClashesRouter(access, { getAdminClient: getClient }),
   // SG2-58: confirmation mirrors confirm_event over the in-memory tables; the
   // confirmed-arrangements view reads them through the in-memory client.
   createConfirmEventHandler({ getPrincipal: access.getPrincipal, confirm: createMemoryConfirm(database) }),
@@ -313,6 +318,10 @@ app.post('/__e2e/venue-request', (_req, res) => {
 });
 app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-clash', (_req, res) => {
+  database.seedVenueClash();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {
