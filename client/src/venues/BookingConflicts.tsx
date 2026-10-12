@@ -30,6 +30,8 @@ export function BookingRequestConflicts({ accessToken, requestId }: { accessToke
         {conflicts.map(conflict => <li key={`${conflict.kind}-${conflict.reference_id}`}>{describeConflict(conflict)}</li>)}
       </ul>
       <p className="organisation-detail-hint">This request cannot be approved while {conflicts.length === 1 ? 'this conflict stands' : 'these conflicts stand'}.</p>
+      {/* SG2-78 AC2: clashes include the venue's setup and turnaround time. */}
+      <p className="organisation-detail-hint">Clashes include the venue&apos;s setup and turnaround time, so a booking can clash even when it ends before this request starts.</p>
     </>}
   </section>;
 }

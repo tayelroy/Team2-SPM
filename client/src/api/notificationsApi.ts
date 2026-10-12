@@ -1,8 +1,11 @@
 /** The signed-in person's own notices (SG2-49): Venue Staff decisions on their
  * venue requests. Mirrors server/src/db/notifications.ts. */
-/** Venue decisions and releases (SG2-49, SG2-51) and coordinator assignment notices (SG2-88). */
+/** Venue decisions and releases (SG2-49, SG2-51), equipment and clash notices
+ * (SG2-55, SG2-79), event confirmation (SG2-58) and coordinator assignment
+ * notices (SG2-88). */
 export const NOTIFICATION_KINDS = [
   'venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
+  'equipment_reserved', 'venue_booking_clash', 'event_confirmed',
   'coordinator_assigned', 'coordinator_removed', 'event_coordinator_changed',
 ] as const;
 export type NotificationKind = typeof NOTIFICATION_KINDS[number];

@@ -12,7 +12,7 @@ const READY: EventArrangementsResult = {
   event_id: 101,
   arrangements: [
     { key: 'venue', label: 'Venue booking', state: 'ready', detail: '1 venue booking approved.' },
-    { key: 'equipment', label: 'Equipment', state: 'ready', detail: '2 equipment requests arranged.' },
+    { key: 'equipment', label: 'Equipment', state: 'ready', detail: '2 equipment requests reserved and placed.' },
     {
       key: 'registration',
       label: 'Registration',

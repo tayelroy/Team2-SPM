@@ -36,6 +36,7 @@ import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createMemoryReleaseStore } from './support/venue-releases';
 import { createVenueBookingsRouter } from '../server/src/venues/bookings';
+import { createVenueClashesRouter } from '../server/src/venues/clashes';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -51,6 +52,13 @@ import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createMemoryEquipmentStore } from './support/equipment';
 import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
+import { createEquipmentAvailabilityRouter } from '../server/src/equipment/availability';
+import { createMemoryAvailabilityStore } from './support/equipment-availability';
+import { createEquipmentReservationsRouter } from '../server/src/equipment/reservations';
+import { createMemoryReservationsStore, seedEquipmentReservations } from './support/equipment-reservations';
+import { createConfirmEventHandler } from '../server/src/events/confirm';
+import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
+import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -108,6 +116,8 @@ const operations = createVenueOperationsRouter(access, () => ({
     const table = database.client.from('venue_operations');
     const query = existing.data ? table.update(row).eq('venue_id', venueId) : table.insert({ venue_id: venueId, ...row });
     const result = await query.select(OPERATION_COLUMNS).maybeSingle();
+    // SG2-79: introducing or changing times re-checks the venue's bookings.
+    database.refreshVenueClashes(venueId);
     return result.data as VenueOperationRecord;
   }
 }));
@@ -202,7 +212,15 @@ const app = createApp(
   // coordinator's event detail can load it without a 503.
   createGetEventArrangementsHandler(eventDependencies),
   // SG2-51: bookings and releases, against the in-memory client.
-  createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) })
+  createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) }),
+  createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token)),
+  createEquipmentReservationsRouter(access, token => createMemoryReservationsStore(database, token)),
+  // SG2-79: clashing bookings, against the in-memory client.
+  createVenueClashesRouter(access, { getAdminClient: getClient }),
+  // SG2-58: confirmation mirrors confirm_event over the in-memory tables; the
+  // confirmed-arrangements view reads them through the in-memory client.
+  createConfirmEventHandler({ getPrincipal: access.getPrincipal, confirm: createMemoryConfirm(database) }),
+  createGetEventConfirmationHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -219,6 +237,29 @@ app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
   res.status(204).end();
 });
+app.post('/__e2e/equipment-reservations', (req, res) => {
+  seedEquipmentReservations(database, Boolean(req.body?.missing_dates));
+  res.status(204).end();
+});
+app.get('/__e2e/equipment-reservations-ledger', (_req, res) => res.json({
+  requests: database.tables.equipment_requests, reservations: database.tables.equipment_reservations, notifications: database.tables.notifications,
+}));
+app.post('/__e2e/event-confirmation', (_req, res) => {
+  seedEventConfirmation(database);
+  res.status(204).end();
+});
+app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
+  prepareConvertedForum(database);
+  res.status(204).end();
+});
+app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [581, 582, 583, 584, 585].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), audit: database.tables.event_audit_logs, notifications: database.tables.notifications,
+    venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
+    bookings: database.tables.venue_bookings.filter(seeded),
+  });
+});
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
     coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });
@@ -226,6 +267,39 @@ app.post('/__e2e/equipment-requirements', (_req, res) => {
     quantity_total: 2, location: 'Store B', operational_status: 'maintenance', version: 1 });
   res.status(204).end();
 });
+app.post('/__e2e/equipment-availability', (req, res) => {
+  const base = database.tables.events[0];
+  const start = '2030-06-20T02:00:00.000Z', end = '2030-06-20T06:00:00.000Z';
+  database.tables.events.push({ ...base, event_id: 54, name: 'Equipment Availability Forum',
+    coordinator_id: 'user-coordinator', status: req.body?.confirmed ? 'confirmed' : 'approved', proposed_date: start });
+  for (const event_id of [541, 542, 543, 544, 545]) database.tables.events.push({ ...base, event_id,
+    name: `Reservation fixture ${event_id}`, status: event_id === 545 ? 'cancelled' : 'confirmed' });
+  database.tables.equipment.push(
+    { equipment_id: 2, name: 'Maintenance projector', description: 'Projector', quantity_total: 5, location: 'Store B', operational_status: 'maintenance', version: 1 },
+    { equipment_id: 3, name: 'Damaged speakers', description: 'Speakers', quantity_total: 7, location: 'Store C', operational_status: 'damaged', version: 1 });
+  for (const [request_id, equipment_id, quantity] of [[1, 1, 10], [2, 2, 3], [3, 3, 2]]) {
+    database.tables.equipment_requests.push({ request_id, event_id: 54, equipment_id, quantity, notes: null, status: 'pending',
+      starts_at: req.body?.request_dates ? start : null, ends_at: req.body?.request_dates ? end : null,
+      arrangement_notes: null, shortfall: null, placement_venue_id: null, placement_position: null, version: 1 });
+  }
+  if (!req.body?.missing_dates) database.tables.venue_bookings.push({ booking_id: 540, venue_id: 1, event_id: 54, starts_at: start, ends_at: end, status: 'confirmed' });
+  database.tables.equipment_reservations = [
+    { reservation_id: 1, event_id: 541, equipment_id: 1, quantity_reserved: 8, starts_at: start, ends_at: '2030-06-20T04:00:00.000Z' },
+    { reservation_id: 2, event_id: 542, equipment_id: 1, quantity_reserved: 6, starts_at: '2030-06-20T03:00:00.000Z', ends_at: '2030-06-20T05:00:00.000Z' },
+    { reservation_id: 3, event_id: 543, equipment_id: 1, quantity_reserved: 14, starts_at: '2030-06-20T05:00:00.000Z', ends_at: end },
+    { reservation_id: 4, event_id: 54, equipment_id: 1, quantity_reserved: 2, starts_at: start, ends_at: end },
+    { reservation_id: 5, event_id: 545, equipment_id: 1, quantity_reserved: 99, starts_at: start, ends_at: end },
+  ];
+  if (req.body?.undated) database.tables.equipment_reservations.push({ reservation_id: 6, event_id: 544, equipment_id: 1, quantity_reserved: 3 });
+  res.status(204).end();
+});
+app.post('/__e2e/equipment-availability-change', (_req, res) => {
+  database.tables.equipment_reservations.find(row => row.reservation_id === 3)!.quantity_reserved = 18;
+  res.status(204).end();
+});
+app.get('/__e2e/equipment-availability-ledger', (_req, res) => res.json({
+  requests: database.tables.equipment_requests, reservations: database.tables.equipment_reservations, equipment: database.tables.equipment,
+}));
 app.post('/__e2e/assigned-review', (_req, res) => {
   database.seedAssignedReview();
   res.status(204).end();
@@ -244,6 +318,10 @@ app.post('/__e2e/venue-request', (_req, res) => {
 });
 app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-clash', (_req, res) => {
+  database.seedVenueClash();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {

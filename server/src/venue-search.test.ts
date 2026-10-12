@@ -77,10 +77,12 @@ test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returne
     { ...hall, layouts: [], held: [] },
     { ...terrace, layouts: [{ layout: 'banquet', other_description: null }], held: [] }
   ] });
-  for (const table of ['venue_unavailability', 'venue_booking_occupancy']) {
+  // Blocks are read for the period itself; bookings two days wider each side
+  // (the most setup plus turnaround a venue can have, SG2-78).
+  for (const [table, from, to] of [['venue_unavailability', FROM, TO], ['venue_booking_occupancy', '2030-06-13T00:00:00.000Z', '2030-06-17T12:00:00.000Z']]) {
     assert.deepEqual(calls.filter(call => call.table === table && ['lt', 'gt'].includes(call.method)), [
-      { table, method: 'lt', args: ['starts_at', TO] },
-      { table, method: 'gt', args: ['ends_at', FROM] }
+      { table, method: 'lt', args: ['starts_at', to] },
+      { table, method: 'gt', args: ['ends_at', from] }
     ]);
   }
   assert.deepEqual(calls.find(call => call.table === 'venues' && call.method === 'order')?.args, ['name', { ascending: true }]);

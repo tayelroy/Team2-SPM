@@ -26,6 +26,31 @@ cached browser value cannot select the organisation to read.
   Coordinators, venue staff, technical support and attendees receive 403 from
   these endpoints. Coordinator assignment and review remain separate stories.
 
+## Request form: new requests and draft edits (SG2-28, SG2-29, SG2-30)
+
+**New request** and **My drafts → Edit** open the same form
+(`client/src/screens/RequestForm.tsx`).
+
+- **Date** is a `datetime-local` input in Singapore time. The form keeps the
+  stored ISO instant and converts it only for display, so a stored
+  `2030-06-15T02:00:00.000Z` shows as `15 Jun 2030, 10:00` and is sent back
+  unchanged when untouched. An edited value is converted from Singapore time
+  (`07:30` on 15 June is saved as `2030-06-14T23:30:00.000Z`).
+- The form shows only what a request stores. The earlier prototype
+  requirement chips (Step-free access, Hearing loop, Stage + lectern, …) were
+  never sent to the server, so they silently discarded input and were removed;
+  venue, accessibility and equipment needs are the free-text fields.
+- **Venue fit** replaces the canned "180 expected attendance rules out 3 of 6
+  venues…" banner. Once the request has a saved id, **Check venue fit** reads
+  `GET /api/venues/suitability?event_id=` (SG2-47; organisers see only their
+  own events) and lists every venue that does not fit and why. It reflects the
+  last save, so each later save refreshes it. It checks capacity, facilities
+  and accessibility, not date availability.
+- After a successful submit, from either entry point, the organiser lands on
+  the submitted event's detail page with a status message such as
+  "Partner Forum has been submitted for review." (AC1). The message is cleared
+  when they leave that page.
+
 ## Event status lifecycle (SG2-100)
 
 An event moves through a 7-step stepper, shown on the event detail screen
@@ -70,6 +95,64 @@ and action that moves it forward:
 `completed`. The legal transition table enforcing which of these moves are
 allowed lives in `server/src/events/fields.ts` (`STATUS_TRANSITIONS`,
 `canTransition`).
+
+## Event change history (SG2-40)
+
+`GET /api/event-requests/:eventId/history` returns the event's
+`event_audit_logs` rows, newest first, each with the actor, the time and the
+old and new values. The owning organiser and every internal role may read it;
+attendees and unrelated organisers receive 403.
+
+**What is recorded.** Each row is one change to one field:
+
+- Planning edits (SG2-39): each changed planning field, by the coordinator.
+- Coordinator assignment and reassignment (SG2-33/34), by the Lead, with the
+  coordinators' names as old and new values.
+- Venue hold, booking decision and booking release changes written inside
+  their SQL functions; the venue-hold expiry sweep writes a null actor,
+  shown as **System**.
+- **Every status transition**, as `field_name: 'status'` with the raw stored
+  statuses as old and new values (the drawer shows them in plain language)
+  and the caller who caused it as actor (`statusChange` in
+  `server/src/db/auditLogs.ts`):
+
+  | Transition | Path | Actor |
+  | --- | --- | --- |
+  | `draft`/`rejected`/`needs_clarification` → `unassigned` or `submitted` | `PATCH …/submit` | Organiser |
+  | `unassigned` → `submitted` | `PATCH …/coordinator` (first assignment; same insert as the assignment row) | Lead |
+  | `submitted` → `under_review` | `PATCH …/review` (re-opening a review in progress records nothing) | Coordinator |
+  | `under_review` → `needs_clarification` | `POST …/clarifications` | Coordinator |
+  | `under_review` → `approved`/`rejected` | `PATCH …/decision` | Coordinator |
+  | any live status → `planning` | `PATCH …/planning` (approved event edited, or an edit that invalidates arrangements) | Coordinator |
+  | `preparation`/`confirmed` → `completed` | `PATCH …/complete` | Coordinator |
+
+  No SQL function or trigger changes `events.status`, so there are no
+  system-authored status rows. The status write and the history insert are
+  two calls, not a transaction. If the history insert fails, assignment is
+  undone and reported as 503; submit, review, clarification, decision and
+  planning answer 503 while the transition itself stands (a known gap, the
+  same one SG2-39 planning edits already have); completion keeps its 200
+  because `completed_by`/`completed_at` on the row are authoritative.
+
+Each entry also carries `actor_role`: the actor's current role from
+`account_roles` in Title Case (e.g. `Event Coordinator Lead`), or null for a
+system row or an account without a role. The history drawer
+(`client/src/components/EventAuditDrawer.tsx`) shows it as a badge next to
+the actor's name — **Automatic** for system rows, no badge when the role is
+unknown — and renders `status` values with the client's shared
+`statusLabel` mapping (`draft` → Draft, `unassigned` → Awaiting Assignment,
+`planning` → Arrangements, …).
+
+**Internal-only fields.** Some entries are internal to ConnectSphere staff.
+`INTERNAL_ONLY_AUDIT_FIELDS` in `server/src/auth/policy.ts` lists them —
+currently `planning_notes`, the coordinators' internal planning log. A caller
+whose role is not internal (`isInternalRole`) never receives those rows: the
+handler reads with the admin client, so it filters them itself, and the
+`event_audit_logs_read` RLS policy
+(`supabase/migrations/202610130001_event_history_internal_fields.sql`)
+excludes them from the organiser branch as well. Both lists must change
+together; `supabase/tests/event_history_internal_fields.sql` proves an
+organiser cannot select a planning-notes row while internal staff can.
 
 ## Provisioning and rollout
 

@@ -6,6 +6,8 @@ import {
 import { Card, Fact, GhostButton, GradientButton } from '../ui';
 import { color, label } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
+import EquipmentAvailability from './EquipmentAvailability';
+import EquipmentReservations from './EquipmentReservations';
 
 type Editor = { kind: 'requirement'; record: EquipmentRequirement | null } | { kind: 'arrangement'; record: EquipmentRequirement };
 const optionalText = (value: string) => value.trim() || null;
@@ -13,10 +15,10 @@ const textFits = (value: string) => Array.from(value.trim()).length <= 2000;
 const whole = (value: string, minimum: number, maximum: number) => /^\d+$/.test(value) && Number(value) >= minimum && Number(value) <= maximum;
 
 /** Each event and session owns its records, drafts and cancellable requests. */
-export default function EquipmentRequirements({ eventId, accessToken = null }: { eventId: number; accessToken?: string | null }) {
-  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} />;
+export default function EquipmentRequirements({ eventId, accessToken = null, canCheckAvailability = false, onReserved }: { eventId: number; accessToken?: string | null; canCheckAvailability?: boolean; onReserved?: (requestId: number) => void }) {
+  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} canCheckAvailability={canCheckAvailability} onReserved={onReserved} />;
 }
-function Requirements({ eventId, token }: { eventId: number; token: string | null }) {
+function Requirements({ eventId, token, canCheckAvailability, onReserved }: { eventId: number; token: string | null; canCheckAvailability: boolean; onReserved?: (requestId: number) => void }) {
   const [view, setView] = useState<RequirementsView | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
   const [attempt, setAttempt] = useState(0);
@@ -25,6 +27,7 @@ function Requirements({ eventId, token }: { eventId: number; token: string | nul
   const [conflict, setConflict] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
+  const [reservedRequestIds, setReservedRequestIds] = useState<number[]>([]);
   const pending = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!token) return;
@@ -38,7 +41,7 @@ function Requirements({ eventId, token }: { eventId: number; token: string | nul
     return () => controller.abort();
   }, [eventId, token, attempt]);
   useEffect(() => () => { pending.current?.abort(); }, []);
-  function reload() { setEditor(null); setConflict(false); setSaved(''); setAttempt(n => n + 1); }
+  function reload() { setEditor(null); setConflict(false); setSaved(''); setReservedRequestIds([]); setAttempt(n => n + 1); }
   function edit(next: Editor) { setEditor(next); setError(''); setSaved(''); setConflict(false); }
   async function save(values: RequirementValues | ArrangementValues) {
     if (pending.current) return;
@@ -63,7 +66,7 @@ function Requirements({ eventId, token }: { eventId: number; token: string | nul
   if (!token) return <p>Sign in to view equipment requirements.</p>;
   if (loading) return <p role="status">Loading equipment requirements…</p>;
   if (!view) return <div><p role="alert">{error}</p><GhostButton onClick={reload}>Retry equipment requirements</GhostButton></div>;
-  return <section aria-label="Equipment requirements" style={{ display: 'grid', gap: '20px', minWidth: 0 }}>
+  return <section className="organisation-detail-equipment" aria-label="Equipment requirements" style={{ display: 'grid', gap: '20px', minWidth: 0 }}>
     <h3 style={{ margin: 0 }}>Equipment requirements</h3>
     <p style={{ margin: 0, color: color.silver }}>Record what this event needs. A request does not reserve equipment or guarantee stock.</p>
     {saved ? <p role="status">{saved}</p> : null}
@@ -77,6 +80,7 @@ function Requirements({ eventId, token }: { eventId: number; token: string | nul
       {view.requests.map(record => <article key={record.request_id} aria-label={`Equipment requirement: ${record.equipment_type}`} style={{ minWidth: 0 }}>
         <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '16px', overflowWrap: 'anywhere' }}>
           <h4 style={{ margin: 0, fontSize: '20px' }}>{record.equipment_type}</h4>
+          {canCheckAvailability ? <EquipmentAvailability eventId={eventId} requestId={record.request_id} equipmentType={record.equipment_type} accessToken={token} /> : null}
           <Fact label="Quantity requested" value={String(record.quantity)} />
           <Fact label="Technical notes" value={record.notes ?? 'Not recorded'} />
           <Fact label="Request status" value={record.status} />
@@ -84,13 +88,19 @@ function Requirements({ eventId, token }: { eventId: number; token: string | nul
           <Fact label="Shortfall" value={record.shortfall === null ? 'Not recorded' : String(record.shortfall)} />
           <Fact label="Placement venue" value={record.placement_venue_name ?? 'Not recorded'} />
           <Fact label="Placement position" value={record.placement_position ?? 'Not recorded'} />
-          {record.status === 'pending' ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-            {view.can_request ? <GhostButton onClick={() => edit({ kind: 'requirement', record })}>Edit requirement for {record.equipment_type}</GhostButton> : null}
+          {record.status === 'pending' || (record.status === 'approved' && reservedRequestIds.includes(record.request_id)) ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+            {view.can_request && record.status === 'pending' ? <GhostButton onClick={() => edit({ kind: 'requirement', record })}>Edit requirement for {record.equipment_type}</GhostButton> : null}
             {view.can_arrange ? <GhostButton onClick={() => edit({ kind: 'arrangement', record })}>Update arrangement for {record.equipment_type}</GhostButton> : null}
           </div> : null}
         </Card>
       </article>)}
     </>}
+    {!editor ? <EquipmentReservations eventId={eventId} accessToken={token} requests={view.requests} onRefresh={reload} onReceipts={setReservedRequestIds}
+      onReserved={requestId => {
+        setReservedRequestIds(current => [...new Set([...current, requestId])]);
+        setView({ ...view, requests: view.requests.map(record => record.request_id === requestId ? { ...record, status: 'approved', shortfall: 0, version: record.version + 1 } : record) });
+        onReserved?.(requestId);
+      }} /> : null}
   </section>;
 }
 function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCancel, onReload }: {
@@ -105,6 +115,8 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
   const [notes, setNotes] = useState(record?.notes ?? '');
   const [arrangement, setArrangement] = useState(record?.arrangement_notes ?? '');
   const [shortfall, setShortfall] = useState(record?.shortfall == null ? '' : String(record.shortfall));
+  const fullyReserved = arranging && record!.status === 'approved';
+  const shortfallValue = fullyReserved ? '0' : shortfall;
   const [venue, setVenue] = useState(record?.placement_venue_id == null ? '' : String(record.placement_venue_id));
   const [position, setPosition] = useState(record?.placement_position ?? '');
   const [invalid, setInvalid] = useState(false);
@@ -114,9 +126,9 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
     if (saving || conflict) return;
     if (arranging) {
       const placementValid = venue === '' ? position.trim() === '' : view.venues.some(item => item.venue_id === Number(venue)) && position.trim() !== '';
-      if (!whole(shortfall, 0, record!.quantity) || !textFits(arrangement) || !textFits(position) || !placementValid) { setInvalid(true); return; }
+      if (!whole(shortfallValue, 0, record!.quantity) || !textFits(arrangement) || !textFits(position) || !placementValid) { setInvalid(true); return; }
       setInvalid(false);
-      onSave({ arrangement_notes: optionalText(arrangement), shortfall: Number(shortfall), placement_venue_id: venue === '' ? null : Number(venue), placement_position: optionalText(position) });
+      onSave({ arrangement_notes: optionalText(arrangement), shortfall: Number(shortfallValue), placement_venue_id: venue === '' ? null : Number(venue), placement_position: optionalText(position) });
     } else {
       if (!view.equipment.some(item => item.equipment_id === Number(equipment)) || !whole(quantity, 1, 2147483647) || !textFits(notes)) { setInvalid(true); return; }
       setInvalid(false); onSave({ equipment_id: Number(equipment), quantity: Number(quantity), notes: optionalText(notes) });
@@ -130,8 +142,8 @@ function RequirementEditor({ editor, view, saving, conflict, error, onSave, onCa
         {arranging ? <>
           <p style={{ margin: 0 }}>Arranging {record!.quantity} × {record!.equipment_type}</p>
           <label htmlFor={`${id}-arrangement`} style={fieldStyle}>Arrangement notes<textarea id={`${id}-arrangement`} rows={3} style={inputStyle} value={arrangement} onChange={event => setArrangement(event.target.value)} /></label>
-          <label htmlFor={`${id}-shortfall`} style={fieldStyle}>Shortfall quantity<input id={`${id}-shortfall`} required inputMode="numeric" style={inputStyle} value={shortfall} onChange={event => setShortfall(event.target.value)} /></label>
-          <p style={{ margin: 0, color: color.silver }}>Enter 0 when the requirement is fully covered. The shortfall cannot exceed the quantity requested.</p>
+          <label htmlFor={`${id}-shortfall`} style={fieldStyle}>Shortfall quantity<input id={`${id}-shortfall`} required inputMode="numeric" style={inputStyle} value={shortfallValue} disabled={fullyReserved} onChange={event => setShortfall(event.target.value)} /></label>
+          <p style={{ margin: 0, color: color.silver }}>{fullyReserved ? 'This requirement is fully reserved. Shortfall stays at 0; you can still update notes and placement.' : 'Enter 0 when the requirement is fully covered. The shortfall cannot exceed the quantity requested.'}</p>
           <label htmlFor={`${id}-venue`} style={fieldStyle}>Placement venue<select id={`${id}-venue`} style={inputStyle} value={venue} onChange={event => setVenue(event.target.value)}>
             <option value="">Not recorded</option>{view.venues.map(item => <option key={item.venue_id} value={item.venue_id}>{item.name}</option>)}
           </select></label>

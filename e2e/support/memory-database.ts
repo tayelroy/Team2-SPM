@@ -59,6 +59,7 @@ export class MemoryDatabase {
       venue_hold_notifications: [],
       notifications: [],
       equipment_requests: [],
+      equipment_reservations: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
         quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [
@@ -75,6 +76,7 @@ export class MemoryDatabase {
       ],
       venue_layouts: [],
       venue_operations: [],
+      venue_booking_clashes: [],
       event_clarifications: [],
       event_audit_logs: []
     };
@@ -194,6 +196,62 @@ export class MemoryDatabase {
 
   /** SG2-51: on top of seedVenueRequest, event 91 holds both venues on 20 June
    * 2030, 10:00-12:00 SGT (Week 7 change #3: one event, several venues). */
+  /** SG2-78: setup plus turnaround (SG2-77) that bookings at the venue keep
+   * between them; 0 when the venue has no times recorded. */
+  preparationGapMinutes(venueId: unknown): number {
+    const times = this.tables.venue_operations.find(row => row.venue_id === venueId);
+    return times ? Number(times.setup_minutes) + Number(times.turnaround_minutes) : 0;
+  }
+
+  /** SG2-79: test equivalent of refresh_venue_booking_clashes(). Flags pairs
+   * of confirmed bookings closer together than setup plus turnaround, clears
+   * pairs that no longer clash, and tells each affected event's coordinator
+   * about a new flag. The SQL suite carries the trigger and locking evidence. */
+  refreshVenueClashes(venueId: unknown) {
+    const gap = this.preparationGapMinutes(venueId) * 60_000;
+    const confirmed = this.tables.venue_bookings.filter(row => row.venue_id === venueId && row.status === 'confirmed');
+    const clash = (a: Row, b: Row) => Date.parse(String(a.starts_at)) < Date.parse(String(b.ends_at)) + gap
+      && Date.parse(String(a.ends_at)) > Date.parse(String(b.starts_at)) - gap;
+    const pairs: [Row, Row][] = [];
+    for (const a of confirmed) {
+      for (const b of confirmed) if (Number(a.booking_id) < Number(b.booking_id) && clash(a, b)) pairs.push([a, b]);
+    }
+    const flagged = (a: Row, b: Row) => (row: Row) => row.booking_id === a.booking_id && row.other_booking_id === b.booking_id;
+    this.tables.venue_booking_clashes = this.tables.venue_booking_clashes
+      .filter(row => row.venue_id !== venueId || pairs.some(([a, b]) => flagged(a, b)(row)));
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const sgt = (iso: unknown) => {
+      const at = new Date(Date.parse(String(iso)) + 8 * 3600_000);
+      return `${String(at.getUTCDate()).padStart(2, '0')} ${months[at.getUTCMonth()]} ${at.getUTCFullYear()} ${at.toISOString().slice(11, 16)}`;
+    };
+    const venue = this.tables.venues.find(row => row.venue_id === venueId);
+    for (const [a, b] of pairs) {
+      if (this.tables.venue_booking_clashes.some(flagged(a, b))) continue;
+      const now = new Date().toISOString();
+      this.tables.venue_booking_clashes.push({ booking_id: a.booking_id, other_booking_id: b.booking_id, venue_id: venueId, flagged_at: now });
+      for (const [own, other] of [[a, b], [b, a]]) {
+        const event = this.tables.events.find(row => row.event_id === own.event_id);
+        if (!event?.coordinator_id) continue;
+        const otherEvent = this.tables.events.find(row => row.event_id === other.event_id);
+        const otherName = otherEvent?.coordinator_id === event.coordinator_id ? otherEvent.name || 'Untitled event' : 'another event';
+        this.tables.notifications.push({ notification_id: Math.max(0, ...this.tables.notifications.map(row => Number(row.notification_id))) + 1,
+          recipient_id: event.coordinator_id, event_id: event.event_id, request_id: null, kind: 'venue_booking_clash',
+          message: `${venue?.name}: ${event.name || 'Untitled event'} (${sgt(own.starts_at)} – ${sgt(own.ends_at)} SGT) now clashes with ${otherName} `
+            + `(${sgt(other.starts_at)} – ${sgt(other.ends_at)} SGT) once setup and turnaround time are included. Neither booking has been changed.`,
+          created_at: now });
+      }
+    }
+  }
+
+  /** SG2-79: on top of seedVenueRequest, event 91 holds Regression Hall from
+   * 12:30 to 13:30 SGT on 15 Jun 2030, 30 minutes after booking #1 ends. */
+  seedVenueClash() {
+    this.seedVenueRequest();
+    this.tables.venue_bookings.push(
+      { booking_id: 31, venue_id: 1, event_id: 91, starts_at: '2030-06-15T04:30:00.000Z', ends_at: '2030-06-15T05:30:00.000Z', status: 'confirmed' }
+    );
+  }
+
   seedVenueRelease() {
     this.seedVenueRequest();
     this.tables.venue_bookings.push(
@@ -281,7 +339,9 @@ export class MemoryDatabase {
     ]) {
       for (const request of this.tables[table]) {
         const event = active.find(event => event.event_id === request.event_id);
-        if (request.status !== 'pending' || !event) continue;
+        const reservedRequest = kind === 'equipment' && request.status === 'approved'
+          && this.tables.equipment_reservations.some(row => row.request_id === request.request_id);
+        if ((request.status !== 'pending' && !reservedRequest) || !event) continue;
         const resource = this.tables[resourceTable].find(resource => resource[resourceKey] === request[resourceKey])!;
         items.push({ kind, item_id: request.request_id, event_id: event.event_id, title: resource.name,
           event_name: event.name || 'Untitled event', status: request.status, starts_at: request.starts_at ?? event.proposed_date, ends_at: request.ends_at,

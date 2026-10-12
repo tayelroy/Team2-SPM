@@ -19,6 +19,15 @@ export interface InsertAuditLogInput {
   new_value: string | null;
 }
 
+/**
+ * The history row for an event status transition (SG2-40): field `status`,
+ * with the raw stored statuses as old and new values — the drawer renders
+ * them in plain language — and the caller who caused it as the actor.
+ */
+export function statusChange(eventId: number, actorId: string, from: string, to: string): InsertAuditLogInput {
+  return { event_id: eventId, actor_id: actorId, field_name: 'status', old_value: from, new_value: to };
+}
+
 export type FetchEventAuditLogsResult =
   | { ok: true; logs: EventAuditLogRecord[] }
   | { ok: false; reason: 'unavailable'; message: string };

@@ -32,7 +32,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-42:AC1] [SG2-42:AC2] [SG2-42:AC3] SG2-4
     if (url.pathname !== '/rest/v1/venues') {
       assert.equal(headers.get('authorization'), 'Bearer coordinator-token');
       assert.equal(init?.method, 'GET');
-      assert.ok(['/rest/v1/venue_layouts', '/rest/v1/venue_unavailability', '/rest/v1/venue_booking_occupancy'].includes(url.pathname));
+      assert.ok(['/rest/v1/venue_layouts', '/rest/v1/venue_unavailability', '/rest/v1/venue_booking_occupancy', '/rest/v1/venue_operations'].includes(url.pathname));
       return Response.json([]);
     }
     assert.equal(url.searchParams.get('select'), 'venue_id,name,location,capacity,facilities,accessibility_features,operating_information');

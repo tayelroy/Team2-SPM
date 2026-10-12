@@ -12,6 +12,11 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   venue_request_approved: 'Venue request approved', venue_request_rejected: 'Venue request rejected',
   // SG2-51: a venue booked for the event was released.
   venue_booking_released: 'Venue booking released',
+  // SG2-79: a booking now clashes once setup and turnaround apply.
+  venue_booking_clash: 'Booking clash flagged',
+  equipment_reserved: 'Equipment reserved',
+  // SG2-58: the organiser's event was confirmed by its coordinator.
+  event_confirmed: 'Event confirmed',
   // SG2-88: an assignment or reassignment, told to everyone it affects.
   coordinator_assigned: 'Event assigned to you', coordinator_removed: 'Event reassigned',
   event_coordinator_changed: 'Event Coordinator changed',
@@ -20,6 +25,9 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate,
   venue_request_approved: color.accent, venue_request_rejected: color.silver,
   venue_booking_released: color.silver,
+  venue_booking_clash: color.silver,
+  equipment_reserved: color.accent,
+  event_confirmed: color.accent,
   coordinator_assigned: color.accent, coordinator_removed: color.silver, event_coordinator_changed: color.accent,
 };
 

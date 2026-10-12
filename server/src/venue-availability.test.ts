@@ -21,6 +21,10 @@ const ACCOUNT_ROLES = [
 
 const FROM = '2026-10-01T00:00:00.000Z';
 const TO = '2026-10-31T00:00:00.000Z';
+// SG2-78: bookings are read a day wider each side, so setup or turnaround
+// reaching into the range from just outside it is not missed.
+const WIDE_FROM = '2026-09-30T00:00:00.000Z';
+const WIDE_TO = '2026-11-01T00:00:00.000Z';
 
 type TableResult = { data?: unknown; error?: unknown };
 type QueryCall = { table: string; method: string; args: unknown[] };
@@ -85,11 +89,11 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries the chosen venue over the half-
 
   const result = await getVenueAvailability(7, FROM, TO, client);
 
-  for (const table of ['venue_booking_occupancy', 'venue_unavailability']) {
+  for (const [table, from, to] of [['venue_booking_occupancy', WIDE_FROM, WIDE_TO], ['venue_unavailability', FROM, TO]]) {
     assert.deepEqual(calls.filter(call => call.table === table && ['eq', 'lt', 'gt'].includes(call.method)), [
       { table, method: 'eq', args: ['venue_id', 7] },
-      { table, method: 'lt', args: ['starts_at', TO] },
-      { table, method: 'gt', args: ['ends_at', FROM] }
+      { table, method: 'lt', args: ['starts_at', to] },
+      { table, method: 'gt', args: ['ends_at', from] }
     ]);
   }
 
@@ -291,10 +295,10 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries every venue over the chosen ran
   assert.deepEqual(calls.filter(call => call.table === 'venues' && call.method === 'order'), [
     { table: 'venues', method: 'order', args: ['name', { ascending: true }] }
   ]);
-  for (const table of ['venue_booking_occupancy', 'venue_unavailability']) {
+  for (const [table, from, to] of [['venue_booking_occupancy', WIDE_FROM, WIDE_TO], ['venue_unavailability', FROM, TO]]) {
     assert.deepEqual(calls.filter(call => call.table === table && ['eq', 'lt', 'gt'].includes(call.method)), [
-      { table, method: 'lt', args: ['starts_at', TO] },
-      { table, method: 'gt', args: ['ends_at', FROM] }
+      { table, method: 'lt', args: ['starts_at', to] },
+      { table, method: 'gt', args: ['ends_at', from] }
     ]);
   }
 

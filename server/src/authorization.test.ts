@@ -432,19 +432,21 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] permissionsFor existing roles separates requesting equipment from arranging it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
       'event_request.update', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
+      'event_request.confirmation.view',
       'venues.suitability.view', 'venue_booking.capacity_exception.approve', 'notifications.read', 'profile.read', 'profile.update'
     ],
     event_coordinator: [
       'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
-      'event_request.decide', 'event_request.clarify', 'event_request.complete',
+      'event_request.decide', 'event_request.clarify', 'event_request.complete', 'event_request.confirm',
+      'event_request.confirmation.view',
       'event_request.arrangements.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
-      'venue_booking.request.view', 'venue_booking.conflicts.view', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venues.holds.read',
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venue_clashes.view', 'venues.holds.read',
       'equipment_requirements.read', 'equipment_requirements.request', 'profile.read', 'profile.update'
     ],
     venue_staff: [
@@ -452,13 +454,13 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'venues.read', 'venues.create', 'venues.update', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
       'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release',
-      'venue_bookings.by_venue', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
+      'venue_bookings.by_venue', 'venue_clashes.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
       'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
       'venue_booking.capacity_exception.approve', 'notifications.read', 'venues.holds.read',
-      'equipment.read', 'equipment.create', 'equipment.update', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
+      'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
     ],
     attendee: ['profile.read', 'profile.update']
   };
@@ -556,6 +558,42 @@ test('[BOUNDARY] [SG2-100:AC6] the complete route is matched on its own, not cap
   assert.equal(organiser.status, 403);
 });
 
+test('[NORMAL] [SG2-58:AC1] only an Event Coordinator confirms; only the organiser and coordinator read confirmed arrangements', () => {
+  assert.deepEqual([...PERMISSIONS['event_request.confirm']], ['event_coordinator']);
+  assert.deepEqual([...PERMISSIONS['event_request.confirmation.view']], ['event_organiser', 'event_coordinator']);
+});
+
+for (const role of [
+  'event_organiser', 'attendee', 'venue_staff', 'technical_support_staff',
+  'safety_officer', 'event_coordinator_lead'
+] as const) {
+  test(`[FAILURE] [SG2-58:AC1] ${role} is refused event_request.confirm by the mounted route`, async () => {
+    const access = createAuthorization({ resolvePrincipal: async () => ({ userId, role }), permissions: PERMISSIONS });
+    const res = await request(createApp(undefined, access))
+      .patch('/api/event-requests/7/confirm').set('Authorization', 'Bearer token');
+    assert.equal(res.status, 403);
+    assert.deepEqual(res.body, { error: 'Access denied' });
+  });
+}
+
+test('[BOUNDARY] [SG2-58:AC1] the confirm and confirmation routes are matched on their own, not by the event catch-alls', async () => {
+  // An unconfigured database: a handler that is reached answers from its own
+  // unavailable branch, so the body says which route matched.
+  dbConfig.supabaseUrl = '';
+  dbConfig.supabaseServiceRoleKey = '';
+  const as = (role: Principal['role']) => request(createApp(undefined, createAuthorization({
+    resolvePrincipal: async () => ({ userId, role }), permissions: PERMISSIONS
+  })));
+  const confirm = await as('event_coordinator').patch('/api/event-requests/7/confirm').set('Authorization', 'Bearer token');
+  assert.equal(confirm.status, 503);
+  assert.deepEqual(confirm.body, { error: 'Access service unavailable' });
+  const view = await as('event_organiser').get('/api/event-requests/7/confirmation').set('Authorization', 'Bearer token');
+  assert.equal(view.status, 503);
+  assert.deepEqual(view.body, { error: 'Confirmed arrangements are temporarily unavailable. Please try again later.' });
+  const outsider = await as('venue_staff').get('/api/event-requests/7/confirmation').set('Authorization', 'Bearer token');
+  assert.equal(outsider.status, 403);
+});
+
 test('[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles', () => {
   assert.deepEqual([...INTERNAL_ROLES].sort(), [
     'event_coordinator', 'event_coordinator_lead', 'safety_officer', 'technical_support_staff', 'venue_staff'
@@ -594,4 +632,12 @@ test('[CONFLICT] [SG2-86:AC1] two concurrent /api/auth/me requests resolving dif
     request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`)));
   assert.equal(lead.body.role, 'event_coordinator_lead');
   assert.equal(safety.body.role, 'safety_officer');
+});
+
+test('[FAILURE] [SG2-54:AC1] only Technical Support holds the equipment availability read grant', () => {
+  assert.deepEqual(SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('equipment.availability.read')), ['technical_support_staff']);
+});
+
+test('[FAILURE] [SG2-55:AC1] only Technical Support holds the equipment reservation write grant', () => {
+  assert.deepEqual(SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('equipment.reservations.manage')), ['technical_support_staff']);
 });

@@ -20,12 +20,15 @@ export function createMemoryRequirementsStore(database: MemoryDatabase, token: s
         let record = database.tables.equipment_requests.find(row => row.request_id === requestId && row.event_id === eventId);
         if (action !== 'create') {
           if (!record) return { outcome: 'missing' };
-          if (record.status !== 'pending') return { outcome: 'closed' };
+          const reservedArrangement = action === 'arrange' && record.status === 'approved'
+            && database.tables.equipment_reservations.some(row => row.request_id === requestId);
+          if (record.status !== 'pending' && !reservedArrangement) return { outcome: 'closed' };
           if (record.version !== version) return { outcome: 'conflict' };
         }
         if (action === 'arrange') {
           const arrangement = values as ArrangementValues;
-          if (arrangement.shortfall > Number(record!.quantity)) return { outcome: 'invalid' };
+          if (arrangement.shortfall > Number(record!.quantity)
+            || (record!.status === 'approved' && arrangement.shortfall !== 0)) return { outcome: 'invalid' };
           if (arrangement.placement_venue_id !== null && !database.tables.venues.some(venue => venue.venue_id === arrangement.placement_venue_id)) return { outcome: 'invalid' };
           Object.assign(record!, arrangement, { version: Number(record!.version) + 1 });
         } else {

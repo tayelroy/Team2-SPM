@@ -34,6 +34,8 @@ test('[NORMAL] [SG2-50:AC1] [SG2-50:AC2] Venue Staff see each booking and hold t
   const items = await within(panel()).findAllByRole('listitem');
   expect(items.map(item => item.textContent)).toEqual([galaText, hiddenText]);
   expect(within(panel()).getByText('This request cannot be approved while these conflicts stand.')).toBeVisible();
+  // SG2-78 AC2: the clash may lie in setup or turnaround time rather than the booked hours.
+  expect(within(panel()).getByText(/^Clashes include the venue's setup and turnaround time/)).toBeVisible();
   expect(fetch).toHaveBeenCalledWith('/api/venue-booking-requests/41/conflicts', { headers: { Authorization: 'Bearer token' }, cache: 'no-store' });
 });
 

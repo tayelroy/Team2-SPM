@@ -2,8 +2,10 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import EquipmentRequirements from './EquipmentRequirements';
+import EquipmentReservations from './EquipmentReservations';
 import { EquipmentRequirementsError, loadEquipmentRequirements, saveEquipmentArrangement, saveEquipmentRequirement, type EquipmentRequirement, type RequirementsView } from '../api/equipmentRequirements';
 vi.mock('../api/equipmentRequirements', async original => ({ ...await original<typeof import('../api/equipmentRequirements')>(), loadEquipmentRequirements: vi.fn(), saveEquipmentRequirement: vi.fn(), saveEquipmentArrangement: vi.fn() }));
+vi.mock('./EquipmentReservations', () => ({ default: vi.fn(() => null) }));
 const record: EquipmentRequirement = { request_id: 11, event_id: 7, equipment_id: 3, equipment_type: 'Microphone', quantity: 4, notes: 'Wireless', status: 'pending', arrangement_notes: null, shortfall: null, placement_venue_id: null, placement_venue_name: null, placement_position: null, version: 2 };
 const view: RequirementsView = { event: { event_id: 7, name: 'Forum', status: 'approved' }, requests: [record], equipment: [{ equipment_id: 3, type: 'Microphone' }, { equipment_id: 4, type: 'Projector' }], venues: [{ venue_id: 9, name: 'Main hall' }], can_request: true, can_arrange: false };
 const arranged = { ...record, arrangement_notes: 'Two ready', shortfall: 2, placement_venue_id: 9, placement_venue_name: 'Main hall', placement_position: 'Stage left' };
@@ -26,6 +28,76 @@ function change(label: string, value: string) { fireEvent.change(screen.getByLab
 function fillRequirement(quantity = '5', notes = '  Two spares  ') { change('Equipment type', '4'); change('Quantity required', quantity); change('Technical notes', notes); }
 function submit(name = 'Add equipment requirement') { fireEvent.submit(screen.getByRole('form', { name })); }
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason: unknown) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
+
+test('[NORMAL] [CONFLICT] [SG2-55:AC1] [SG2-55:AC4] a fresh reservation freezes demand, leaves arrangement editable, and refreshes authoritative records on conflict', async () => {
+  const other = { ...record, request_id: 12, equipment_id: 4, equipment_type: 'Projector' };
+  await open({ ...view, can_arrange: true, requests: [record, other] });
+  const props = vi.mocked(EquipmentReservations).mock.calls.at(-1)![0];
+  expect(props).toMatchObject({ eventId: 7, accessToken: 'token', requests: [record, other] });
+  act(() => props.onReserved(11));
+  expect(screen.queryByRole('button', { name: 'Edit requirement for Microphone' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Update arrangement for Microphone' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Edit requirement for Projector' })).toBeVisible();
+  expect(vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].requests).toEqual([{ ...record, status: 'approved', shortfall: 0, version: 3 }, other]);
+  act(() => props.onRefresh());
+  await screen.findByRole('button', { name: 'Edit requirement for Microphone' });
+  expect(loadEquipmentRequirements).toHaveBeenCalledTimes(2);
+});
+test('[NORMAL] [BOUNDARY] [SG2-55:AC4] loaded receipts allow arrangement editing only for matching approved requests and never reopen demand or cancelled requests', async () => {
+  const approved = { ...record, status: 'approved' };
+  const unreserved = { ...approved, request_id: 12, equipment_id: 4, equipment_type: 'Projector' };
+  const cancelled = { ...record, request_id: 13, equipment_id: 5, equipment_type: 'Speakers', status: 'cancelled' };
+  await open({ ...view, can_arrange: true, requests: [approved, unreserved, cancelled] });
+  expect(screen.queryByRole('button', { name: /Edit requirement|Update arrangement/ })).not.toBeInTheDocument();
+  const props = vi.mocked(EquipmentReservations).mock.calls.at(-1)![0];
+  act(() => props.onReceipts([11, 13]));
+  expect(screen.getByRole('button', { name: 'Update arrangement for Microphone' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Update arrangement for Projector' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Update arrangement for Speakers' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Edit requirement/ })).not.toBeInTheDocument();
+  expect(vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReceipts).toBe(props.onReceipts);
+  act(() => props.onReceipts([]));
+  expect(screen.queryByRole('button', { name: /Update arrangement/ })).not.toBeInTheDocument();
+});
+test('[NORMAL] [SG2-55:AC1] [SG2-55:AC4] a fully reserved request resets shortfall to zero and preserves placement for further arrangement work', async () => {
+  await open({ ...view, can_request: false, can_arrange: true, requests: [arranged] });
+  act(() => vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReserved(11));
+  fireEvent.click(screen.getByRole('button', { name: 'Update arrangement for Microphone' }));
+  expect(screen.getByLabelText('Shortfall quantity')).toHaveValue('0');
+  expect(screen.getByLabelText('Shortfall quantity')).toBeDisabled();
+  expect(screen.getByText('This requirement is fully reserved. Shortfall stays at 0; you can still update notes and placement.')).toBeVisible();
+  expect(screen.getByLabelText('Arrangement notes')).toHaveValue('Two ready');
+  expect(screen.getByLabelText('Placement venue')).toHaveValue('9');
+  expect(screen.getByLabelText('Placement position')).toHaveValue('Stage left');
+  submit('Update equipment arrangement'); await screen.findByText('Equipment arrangement saved.');
+  expect(saveEquipmentArrangement).toHaveBeenCalledWith(7, 'token', expect.any(AbortSignal), { arrangement_notes: 'Two ready', shortfall: 0, placement_venue_id: 9, placement_position: 'Stage left' }, { ...arranged, status: 'approved', shortfall: 0, version: 3 });
+});
+test('[BOUNDARY] [SG2-55:AC4] a loaded reservation keeps shortfall at zero while allowing notes and placement updates even with stale positive shortfall data', async () => {
+  const reserved = { ...arranged, status: 'approved' };
+  await open({ ...view, can_request: false, can_arrange: true, requests: [reserved] });
+  act(() => vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReceipts([11]));
+  fireEvent.click(screen.getByRole('button', { name: 'Update arrangement for Microphone' }));
+  expect(screen.getByLabelText('Shortfall quantity')).toHaveValue('0');
+  expect(screen.getByLabelText('Shortfall quantity')).toBeDisabled();
+  change('Arrangement notes', 'All four ready');
+  change('Placement position', 'Stage right');
+  submit('Update equipment arrangement');
+  await screen.findByText('Equipment arrangement saved.');
+  expect(saveEquipmentArrangement).toHaveBeenCalledWith(7, 'token', expect.any(AbortSignal), { arrangement_notes: 'All four ready', shortfall: 0, placement_venue_id: 9, placement_position: 'Stage right' }, reserved);
+});
+test('[FAILURE] [SG2-55:AC4] a receipt cannot grant arrangement permission to a read-only event viewer', async () => {
+  await open({ ...view, can_request: false, can_arrange: false, requests: [{ ...record, status: 'approved' }] });
+  act(() => vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReceipts([11]));
+  expect(screen.queryByRole('button', { name: /Edit requirement|Update arrangement/ })).not.toBeInTheDocument();
+});
+test('[NORMAL] [SG2-55:AC4] a confirmed receipt notifies the surrounding event view with the exact reserved request identity', async () => {
+  const onReserved = vi.fn();
+  render(<EquipmentRequirements eventId={7} accessToken="token" onReserved={onReserved} />);
+  await screen.findByRole('region', { name: 'Equipment requirements' });
+  act(() => vi.mocked(EquipmentReservations).mock.calls.at(-1)![0].onReserved(11));
+  expect(onReserved).toHaveBeenCalledExactlyOnceWith(11);
+  expect(screen.queryByRole('button', { name: 'Edit requirement for Microphone' })).not.toBeInTheDocument();
+});
 
 test('[FAILURE] [SG2-53:AC1] unsigned callers cannot fetch or change event requirements', () => {
   render(<EquipmentRequirements eventId={7} />);
@@ -155,4 +227,11 @@ test.each(['resolve', 'reject'] as const)('[CONFLICT] [SG2-53:AC2] a late save %
   expect(signal.aborted).toBe(true); await screen.findByText('No equipment requirements recorded.');
   await act(async () => { if (outcome === 'resolve') pending.resolve(view); else pending.reject(new EquipmentRequirementsError(403)); });
   expect(screen.queryByRole('article')).not.toBeInTheDocument(); expect(screen.queryByRole('alert')).not.toBeInTheDocument(); expect(screen.queryByText('Equipment requirement saved.')).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-54:AC1] support availability remains available on a confirmed event without arrangement edit permission', async () => {
+  vi.mocked(loadEquipmentRequirements).mockResolvedValue({ ...view, can_request: false, can_arrange: false, event: { ...view.event, status: 'confirmed' } });
+  render(<EquipmentRequirements eventId={7} accessToken="token" canCheckAvailability />);
+  expect(await screen.findByRole('button', { name: 'Check availability for Microphone' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Update arrangement for Microphone' })).not.toBeInTheDocument();
 });

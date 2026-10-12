@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AccessError } from '../auth/policy';
 import { createVenueSuitabilityStore, type BookingRequestRow, type SuitabilityEventRow } from './venueSuitability';
+import { gapMinutes, shiftIso, type PreparationTimes } from '../venues/preparation';
 
 /** Something already occupying a venue that a request overlaps (SG2-50 AC1):
  * a confirmed booking, or a live tentative hold (SG2-84). */
@@ -40,7 +41,8 @@ export interface VenueConflictStore {
   event(eventId: number): Promise<SuitabilityEventRow | null>;
   /** Everything committing the venue over an overlapping period, earliest
    * first. Periods that only touch (one ends as the other starts) do not
-   * overlap. */
+   * overlap. SG2-78: periods include the venue's setup and turnaround, so
+   * bookings closer together than setup plus turnaround overlap. */
   conflicts(period: ConflictPeriod, options: ConflictOptions): Promise<VenueConflictRow[]>;
 }
 
@@ -62,17 +64,29 @@ export function createVenueConflictStore(admin: SupabaseClient): VenueConflictSt
   function check(error: unknown) {
     if (error) throw new AccessError(503);
   }
+  /** The venue's setup and turnaround (SG2-77); 0 minutes each when none are recorded. */
+  async function preparation(venueId: number): Promise<PreparationTimes> {
+    const { data, error } = await admin.from('venue_operations').select('setup_minutes,turnaround_minutes').eq('venue_id', venueId).maybeSingle();
+    check(error);
+    const row = data as Partial<PreparationTimes> | null;
+    return { setup_minutes: row?.setup_minutes ?? 0, turnaround_minutes: row?.turnaround_minutes ?? 0 };
+  }
   return {
     request: requestId => suitability.request(requestId),
     event: eventId => suitability.event(eventId),
     async conflicts({ venue_id, starts_at, ends_at }, { now, excludeRequestId }) {
+      // SG2-78 AC2: effective periods overlap when the gap between two
+      // bookings is shorter than the venue's setup plus turnaround.
+      const gap = gapMinutes(await preparation(venue_id));
+      const before = shiftIso(starts_at, -gap);
+      const after = shiftIso(ends_at, gap);
       const [bookings, holds] = await Promise.all([
         admin.from('venue_bookings').select('booking_id,event_id,starts_at,ends_at,status')
           .eq('venue_id', venue_id).in('status', COMMITTED_BOOKING_STATUSES)
-          .lt('starts_at', ends_at).gt('ends_at', starts_at).order('starts_at'),
+          .lt('starts_at', after).gt('ends_at', before).order('starts_at'),
         admin.from('venue_holds').select('hold_id,event_id,request_id,starts_at,ends_at,status')
           .eq('venue_id', venue_id).eq('status', 'tentative').gt('expires_at', now)
-          .lt('starts_at', ends_at).gt('ends_at', starts_at).order('starts_at')
+          .lt('starts_at', after).gt('ends_at', before).order('starts_at')
       ]);
       check(bookings.error);
       check(holds.error);

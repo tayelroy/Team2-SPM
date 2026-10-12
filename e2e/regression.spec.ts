@@ -38,7 +38,7 @@ async function fillVenue(page: Page, name = venueValues.name, capacity = '100') 
 
 async function fillEvent(page: Page, name = 'Browser workshop') {
   for (const [label, value] of Object.entries({ 'Event name': name, Purpose: 'Team planning',
-    Description: 'Review the release plan', Date: '2030-06-15T09:00:00Z',
+    Description: 'Review the release plan', Date: '2030-06-15T17:00',
     'Expected attendance': '25', 'Venue requirements': 'Projector' })) {
     await page.getByLabel(new RegExp(`^${label}`)).fill(value);
   }
@@ -82,12 +82,16 @@ test('SG2-41-P01 | [SG2-41:AC1] [SG2-41:AC2] [SG2-41:AC3] [SG2-41:AC4] [SG2-87:A
   await expect(page.getByRole('heading', { name: 'Partner Innovation Summit', exact: true })).toBeFocused();
   await expect(page.getByText('Event request #42', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Awaiting review' })).toHaveCount(0);
+  await expect(page.getByText('1 item in your work queue')).toBeVisible();
+  // The coordinator keeps an empty review section. Wait for the loaded queue
+  // before checking its contents, rather than passing during the loading gap.
+  await expect(page.getByRole('region', { name: 'Awaiting review' }).getByRole('button')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'My assigned events' }).getByRole('button')).toHaveText(/Partner Innovation Summit/);
   if (process.env.SG2_41_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_41_SCREENSHOTS}/event-detail.png`, fullPage: true });
 
   for (const [account, kind, title, group, fact] of [
     ['venue', 'venue', 'Regression Hall', 'Booking requests awaiting decision', 'Venue capacity'],
-    ['support', 'equipment', 'Wireless microphones', 'Equipment requests awaiting decision', 'Quantity requested'],
+    ['support', 'equipment', 'Wireless microphones', 'Equipment requests and reservations', 'Quantity requested'],
   ]) {
     await page.getByRole('button', { name: 'Profile', exact: true }).click();
     await page.getByRole('button', { name: 'Logout', exact: true }).click();
@@ -413,6 +417,7 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [SG2-87:AC4] [NORMAL] 
   await nav(page, 'New request');
   await fillEvent(page);
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Browser workshop has been submitted for review.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Browser workshop', exact: true })).toBeVisible();
   // SG2-100: a fresh submission with no coordinator lands in `unassigned`,
   // shown as Awaiting Assignment, not `submitted`.
@@ -468,18 +473,28 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await nav(page, 'My drafts');
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByLabel(/^Event name/)).toHaveValue('Planning workshop');
+  // The stored 02:00 UTC instant shows as 10:00 Singapore time in a date-time input.
+  await expect(page.getByLabel(/^Date/)).toHaveValue('2030-06-15T10:00');
   await expect(page.getByLabel('Accessibility needs (optional)', { exact: true })).toHaveValue('Step-free entrance');
+  // No prototype requirement chips or canned suitability banner on a real draft.
+  await expect(page.getByRole('button', { name: 'Hearing loop', exact: true })).toHaveCount(0);
+  await expect(page.getByText(/expected attendance rules out/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Check venue fit', exact: true }).click();
+  // The 20-person draft fits every fixture venue, so the real check says so.
+  const fit = page.getByRole('region', { name: 'Venues that do not fit this request', exact: true });
+  await expect(fit.getByRole('heading', { name: 'Every venue fits this request', exact: true })).toBeVisible();
   await page.getByLabel(/^Event name/).fill('Revised workshop');
   await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
-  await nav(page, 'My events');
-  await page.getByRole('button', { name: 'View Revised workshop', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Revised workshop has been submitted for review.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Revised workshop', exact: true })).toBeVisible();
+  await nav(page, 'My drafts');
+  await expect(page.getByRole('heading', { name: 'No draft requests', exact: true })).toBeVisible();
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
   expect(detail.status()).toBe(200);
-  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null });
+  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null,
+    proposed_date: '2030-06-15T02:00:00.000Z' });
 });
 
 test('SG2-32-P01 | [SG2-32:AC1] [SG2-32:AC2] [NORMAL] [FAILURE] My drafts excludes non-drafts and confirmed deletion survives reload', async ({ page, request }) => {
@@ -568,6 +583,24 @@ test('SG2-44-P01 | [SG2-44:AC1] [SG2-44:AC2] [NORMAL] calendar renders fixture a
   expect((await next).status()).toBe(200);
   await expect(page.getByRole('heading', { name: 'July 2030', exact: true })).toBeVisible();
   await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toHaveCount(0);
+});
+
+test('SG2-44-P02 | [SG2-44:AC1] [SG2-44:AC2] [BOUNDARY] calendar days run midnight to midnight Singapore time', async ({ page }) => {
+  await signIn(page, 'venue');
+  // 12:00 am–12:00 pm Singapore time on 1 July 2030, which starts on 30 June in UTC.
+  const created = await page.request.post('/api/venues/1/blocks', { headers: await authHeaders(page),
+    data: { starts_at: '2030-06-30T16:00:00Z', ends_at: '2030-07-01T04:00:00Z', category: 'equipment_failure', reason: 'Air conditioning failed' } });
+  expect(created.status()).toBe(201);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  await expect(page.getByRole('heading', { name: 'June 2030', exact: true })).toBeVisible();
+  await expect(page.getByLabel('2030-06-30: free', { exact: true })).toBeVisible();
+  await expect(page.getByText('Regression Hall · Air conditioning failed', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Next month', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'July 2030', exact: true })).toBeVisible();
+  await expect(page.getByLabel('2030-07-01: unavailable', { exact: true })).toContainText('Regression Hall · Air conditioning failed');
+  await expect(page.getByLabel('2030-07-02: free', { exact: true })).toBeVisible();
 });
 
 test('SG2-35-P01 | [SG2-35:AC1] [SG2-35:AC2] [NORMAL] opening an assigned submitted request moves it to under review', async ({ page, request }) => {
@@ -887,38 +920,46 @@ test('SG2-36-N01 | [SG2-36:AC3] [CONFLICT] only the two parties to the request c
   expect((await posted.json()).status).toBe('under_review');
 });
 
-test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
-  await signIn(page, 'venue');
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-20T09:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-20T17:00');
-  await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
-  await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
-  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
-  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
+// The block form reads times in the browser's zone, so run it as a Singapore user
+// to make the day-level calendar checks exact (as the SG2-84 holds journeys do).
+test.describe('Venue blocks in Singapore time (SG2-45)', () => {
+  test.use({ timezoneId: 'Asia/Singapore' });
 
-  // AC1: the block is recorded and shown as unavailable for that period.
-  await nav(page, 'Venue Availability');
-  await page.getByLabel('Jump to year').selectOption('2030');
-  await page.getByLabel('Jump to month').selectOption('5');
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toBeVisible();
+  test('SG2-45-P01 | [SG2-45:AC1] [SG2-45:AC3] [NORMAL] staff block a free period, see it on the calendar, then remove it', async ({ page }) => {
+    await signIn(page, 'venue');
+    await nav(page, 'Catalogue');
+    await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+    await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
+    await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-06-20T09:00');
+    await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-06-20T17:00');
+    await page.getByLabel('Reason', { exact: true }).selectOption('renovation');
+    await page.getByLabel('Note', { exact: true }).fill('Carpet replacement');
+    await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Regression Hall is blocked');
+    await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toBeVisible();
 
-  // AC3: removing it makes the venue available for that period again.
-  await nav(page, 'Catalogue');
-  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Block removed');
-  await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
-  const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
-  expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
-  await nav(page, 'Venue Availability');
-  await page.getByLabel('Jump to year').selectOption('2030');
-  await page.getByLabel('Jump to month').selectOption('5');
-  await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
-  await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+    // AC1: the block is recorded and shown as unavailable for that period.
+    await nav(page, 'Venue Availability');
+    await page.getByLabel('Jump to year').selectOption('2030');
+    await page.getByLabel('Jump to month').selectOption('5');
+    // 09:00–17:00 on 20 June marks that day only.
+    await expect(page.getByLabel('2030-06-20: unavailable', { exact: true })).toContainText('Regression Hall · Carpet replacement');
+    await expect(page.getByLabel('2030-06-21: free', { exact: true })).toBeVisible();
+
+    // AC3: removing it makes the venue available for that period again.
+    await nav(page, 'Catalogue');
+    await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+    await page.getByRole('listitem', { name: 'Carpet replacement' }).getByRole('button', { name: 'Remove block', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Block removed');
+    await expect(page.getByRole('listitem', { name: 'Carpet replacement' })).toHaveCount(0);
+    const blocks = await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) });
+    expect((await blocks.json()).blocks.map((block: { reason: string }) => block.reason)).toEqual(['Scheduled maintenance']);
+    await nav(page, 'Venue Availability');
+    await page.getByLabel('Jump to year').selectOption('2030');
+    await page.getByLabel('Jump to month').selectOption('5');
+    await expect(page.getByText('Regression Hall · Scheduled maintenance', { exact: true })).toBeVisible();
+    await expect(page.getByText('Regression Hall · Carpet replacement', { exact: true })).toHaveCount(0);
+  });
 });
 
 test('SG2-45-N01 | [SG2-45:AC1] [SG2-45:AC3] [SG2-25:AC1] [FAILURE] other roles cannot block or remove a block', async ({ page }) => {
@@ -959,8 +1000,8 @@ test('SG2-80-P01 | [SG2-80:AC1] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-80:A
   await signIn(page, 'venue');
   await nav(page, 'Catalogue');
   await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-06-14T00:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-06-16T00:00');
+  await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-06-14T00:00');
+  await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-06-16T00:00');
   await page.getByLabel('Reason', { exact: true }).selectOption('equipment_failure');
   await page.getByLabel('Note', { exact: true }).fill('Air conditioning failed');
   await page.getByRole('button', { name: 'Block venue', exact: true }).click();
@@ -972,7 +1013,7 @@ test('SG2-80-P01 | [SG2-80:AC1] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-80:A
   // AC6: who recorded it and when.
   await expect(item).toContainText(/Recorded by Regression venue on \d{1,2} \w+ 20\d\d/);
   await expect(page.getByRole('list', { name: 'Events affected by Air conditioning failed' }))
-    .toContainText(/^Planning workshop \(draft\) · 15 Jun 2030, /);
+    .toContainText('Planning workshop (draft) · 15 Jun 2030, 10:00 am – 15 Jun 2030, 12:00 pm');
   const listed = (await (await page.request.get('/api/venues/1/blocks', { headers: await authHeaders(page) })).json()).blocks
     .find((block: { reason: string }) => block.reason === 'Air conditioning failed');
   expect(listed).toMatchObject({ category: 'equipment_failure', created_by_name: 'Regression venue',
@@ -996,8 +1037,8 @@ test('SG2-80-N01 | [SG2-80:AC1] [SG2-80:AC6] [SG2-25:AC1] [BOUNDARY] [FAILURE] a
   await nav(page, 'Catalogue');
   await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
   await expect(page.getByRole('listitem', { name: 'Scheduled maintenance' })).toBeVisible();
-  await page.getByLabel('Unavailable from', { exact: true }).fill('2030-07-01T09:00');
-  await page.getByLabel('Unavailable until', { exact: true }).fill('2030-07-01T17:00');
+  await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-07-01T09:00');
+  await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-07-01T17:00');
   await page.getByLabel('Note', { exact: true }).fill('No reason chosen');
   // Bypass the browser's required-field check so the screen's own validation runs.
   await page.getByRole('form', { name: 'Block venue' }).evaluate(form => (form as HTMLFormElement).noValidate = true);
@@ -1182,9 +1223,9 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
   async function fillHold(page: Page, values: { event?: string; venue?: string; start?: string; end?: string; expiry?: string } = {}) {
     await page.getByRole('combobox', { name: 'Event', exact: true }).selectOption(values.event ?? '81');
     await page.getByRole('combobox', { name: 'Venue', exact: true }).selectOption(values.venue ?? '1');
-    await page.getByLabel('Period starts', { exact: true }).fill(values.start ?? '2030-06-05T10:00');
-    await page.getByLabel('Period ends', { exact: true }).fill(values.end ?? '2030-06-05T12:00');
-    await page.getByLabel('Hold expires', { exact: true }).fill(values.expiry ?? '2030-06-03T10:00');
+    await page.getByLabel('Period starts (Singapore time)', { exact: true }).fill(values.start ?? '2030-06-05T10:00');
+    await page.getByLabel('Period ends (Singapore time)', { exact: true }).fill(values.end ?? '2030-06-05T12:00');
+    await page.getByLabel('Hold expires (Singapore time)', { exact: true }).fill(values.expiry ?? '2030-06-03T10:00');
   }
 
   async function placeHold(page: Page, values: Parameters<typeof fillHold>[1] = {}) {
@@ -1220,10 +1261,10 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await expect(page).toHaveTitle(/ConnectSphere/i);
     expect(new URL(page.url()).origin).toBe('http://127.0.0.1:4173');
     await expect(page.locator('vite-error-overlay')).toHaveCount(0);
-    await expect(page.getByLabel('Hold expires', { exact: true })).toHaveAttribute('required', '');
+    await expect(page.getByLabel('Hold expires (Singapore time)', { exact: true })).toHaveAttribute('required', '');
     await fillHold(page, { expiry: '' });
     await page.getByRole('button', { name: 'Place hold', exact: true }).click();
-    expect(await page.getByLabel('Hold expires', { exact: true }).evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
+    expect(await page.getByLabel('Hold expires (Singapore time)', { exact: true }).evaluate((input: HTMLInputElement) => input.validity.valueMissing)).toBe(true);
     const headers = await authHeaders(page);
     expect((await page.request.get('/api/venue-holds', { headers })).ok()).toBe(true);
     expect((await (await page.request.get('/api/venue-holds', { headers })).json()).holds).toEqual([]);
@@ -1641,6 +1682,118 @@ test('SG2-51-P02 | [SG2-51:AC1] [SG2-51:AC3] [NORMAL] [FAILURE] Venue Staff rele
     });
   }
   expect((await page.request.post('/api/venue-bookings/21/release', { data: { reason: 'x' } })).status()).toBe(401);
+});
+
+test('SG2-78-P01 | [SG2-78:AC1] [SG2-78:AC2] [SG2-78:AC3] [SG2-78:AC4] [SG2-78:AC5] [NORMAL] [CONFLICT] setup and turnaround widen a booking in the calendar, conflicts, approval and search, without changing its times', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-request')).status()).toBe(204);
+  // Venue Staff record 30 minutes setup and 45 minutes turnaround for Regression Hall (SG2-77).
+  await signIn(page, 'venue');
+  const times = await page.request.put('/api/venues/1/operations', { headers: await authHeaders(page),
+    data: { setup_minutes: 30, turnaround_minutes: 45, emergency_access: null, known_restrictions: null } });
+  expect(times.status()).toBe(200);
+
+  // AC1: booking #1 (15 Jun 2030, 10:00-12:00 SGT) occupies 09:30-12:45.
+  // AC3: its setup and turnaround are occupied, marked separately from the event.
+  const day = `from=${encodeURIComponent('2030-06-15T00:00:00.000Z')}&to=${encodeURIComponent('2030-06-16T00:00:00.000Z')}`;
+  const availability = await page.request.get(`/api/venues/1/availability?${day}`, { headers: await authHeaders(page) });
+  expect((await availability.json()).entries.map((entry: { kind: string; start: string; end: string }) => [entry.kind, entry.start, entry.end])).toEqual([
+    ['setup', '2030-06-15T01:30:00.000Z', '2030-06-15T02:00:00.000Z'],
+    ['booking', '2030-06-15T02:00:00.000Z', '2030-06-15T04:00:00.000Z'],
+    ['turnaround', '2030-06-15T04:00:00.000Z', '2030-06-15T04:45:00.000Z']
+  ]);
+  await nav(page, 'Venue Availability');
+  await page.getByLabel('Jump to year').selectOption('2030');
+  await page.getByLabel('Jump to month').selectOption('5');
+  for (const item of ['Setup (30 min) for confirmed · event 1', 'confirmed · event 1', 'Turnaround (45 min) after confirmed · event 1']) {
+    await expect(page.getByText(`Regression Hall · ${item}`, { exact: true })).toBeVisible();
+  }
+
+  // AC4: search leaves Regression Hall out while the requested time cuts into its
+  // setup or turnaround, and returns it once the 75 minutes are clear.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  const search = async (from: string, to: string) => {
+    const found = await page.request.get(`/api/venues/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { headers: await authHeaders(page) });
+    return (await found.json()).venues.map((venue: { name: string }) => venue.name);
+  };
+  expect(await search('2030-06-15T04:30:00.000Z', '2030-06-15T05:00:00.000Z')).toEqual(['Quiet Room']);
+  expect(await search('2030-06-15T05:15:00.000Z', '2030-06-15T06:00:00.000Z')).toEqual(['Quiet Room', 'Regression Hall']);
+
+  // AC2: a request starting 30 minutes after booking #1 ends is reported as clashing with it.
+  await openVenueRequestSearch(page);
+  await requestVenue(page, 'Regression Hall', '2030-06-15T12:30', '2030-06-15T13:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText(new RegExp('It overlaps Confirmed booking #1 for another event, '
+    + '15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?, so it cannot be approved while that conflict stands\\.$'));
+  // Exactly setup plus turnaround after it, a request is clear.
+  await requestVenue(page, 'Regression Hall', '2030-06-15T13:15', '2030-06-15T14:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toHaveText('Regression Hall requested. It is pending until Venue Staff decide, and the venue is not held until then.');
+
+  // AC2: Venue Staff see the clash by event and cannot approve it; the clear request is approved.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const queue = page.getByRole('region', { name: 'Booking requests awaiting decision' });
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  const decision = detail.getByRole('region', { name: 'Decide this booking request' });
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /12:30/ }).click();
+  await expect(detail.getByRole('region', { name: 'Booking conflicts' }).getByRole('listitem')).toHaveText([/^Confirmed booking #1 for Planning workshop/]);
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await page.getByRole('button', { name: 'Back to work queue' }).click();
+  await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /13:15/ }).click();
+  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
+  await expect(decision.getByRole('status')).toHaveText('Approved. The venue is committed to this event and the coordinator has been notified.');
+
+  // AC5: the booking keeps the event's own times; only the checks widen.
+  const booked = await page.request.get('/api/venue-bookings?event_id=91', { headers: await authHeaders(page) });
+  expect((await booked.json()).bookings.map((row: { starts_at: string; ends_at: string }) => [row.starts_at, row.ends_at]))
+    .toEqual([['2030-06-15T05:15:00.000Z', '2030-06-15T06:00:00.000Z']]);
+});
+
+test('SG2-79-P01 | [SG2-79:AC1] [SG2-79:AC2] [SG2-79:AC3] [SG2-79:AC4] [SG2-79:AC5] [NORMAL] [CONFLICT] raising a venue\'s setup and turnaround flags bookings that now clash, tells the coordinator and clears once resolved', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-clash')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const clashes = page.getByRole('region', { name: 'Clashing bookings' });
+  // Booking #1 ends at 12:00 SGT and #31 starts at 12:30: fine without setup or turnaround.
+  await expect(clashes.getByText('No bookings clash once setup and turnaround time are included.', { exact: true })).toBeVisible();
+
+  // AC1: 30 minutes setup and 45 minutes turnaround need 75 minutes between them.
+  const raise = await page.request.put('/api/venues/1/operations', { headers: await authHeaders(page),
+    data: { setup_minutes: 30, turnaround_minutes: 45, emergency_access: null, known_restrictions: null } });
+  expect(raise.status()).toBe(200);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  const forum = clashes.getByRole('listitem', { name: 'Booking #31' });
+  await expect(forum.getByText('Venue Request Forum', { exact: true })).toBeVisible();
+  await expect(forum.getByText(/^Clashes with Planning workshop, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)? \(booking #1\)$/)).toBeVisible();
+  await expect(clashes.getByRole('listitem', { name: 'Booking #1' })).toBeVisible();
+  // AC2: neither booking is cancelled, moved or otherwise changed.
+  const booked = await page.request.get('/api/venue-bookings?event_id=91', { headers: await authHeaders(page) });
+  expect((await booked.json()).bookings.map((row: { booking_id: number; status: string; starts_at: string; ends_at: string }) =>
+    [row.booking_id, row.status, row.starts_at, row.ends_at])).toEqual([[31, 'confirmed', '2030-06-15T04:30:00.000Z', '2030-06-15T05:30:00.000Z']]);
+
+  // AC3/AC4: the coordinator of the affected event sees their booking flagged,
+  // without another coordinator's event name, and has been told.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  const mine = page.getByRole('region', { name: 'Clashing bookings' });
+  await expect(mine.getByRole('listitem')).toHaveCount(1);
+  await expect(mine.getByRole('listitem', { name: 'Booking #31' }).getByText(/^Clashes with another event, /)).toBeVisible();
+  await page.getByRole('button', { name: /^Notifications \(1\)$/ }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Booking clash flagged', { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/^Regression Hall: Venue Request Forum \(15 Jun 2030 12:30 – 15 Jun 2030 13:30 SGT\) now clashes with another event/)).toBeVisible();
+
+  // AC5: shortening the times to exactly the 30 minutes between them clears the flag.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const lower = await page.request.put('/api/venues/1/operations', { headers: await authHeaders(page),
+    data: { setup_minutes: 15, turnaround_minutes: 15, emergency_access: null, known_restrictions: null } });
+  expect(lower.status()).toBe(200);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Clashing bookings' }).getByText('No bookings clash once setup and turnaround time are included.', { exact: true })).toBeVisible();
 });
 
 test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, sees its own role and is denied ungranted operations', async ({ page }) => {

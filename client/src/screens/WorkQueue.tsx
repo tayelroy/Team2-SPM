@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { completeEvent } from '../api/eventRequests';
+import { ARRANGEMENT_LABELS, confirmEvent, type ArrangementKey } from '../api/eventConfirmation';
 import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
 import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
@@ -13,11 +14,12 @@ import { BookingRequestConflicts } from '../venues/BookingConflicts';
 import VenueDecision from '../venues/VenueDecision';
 import type { BookingReadiness } from '../venues/suitabilityApi';
 import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
+import { BookingClashes } from '../venues/BookingClashes';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
   'Venue Staff': [['venue', 'Booking requests awaiting decision']],
-  'Technical Support Staff': [['equipment', 'Equipment requests awaiting decision']],
+  'Technical Support Staff': [['equipment', 'Equipment requests and reservations']],
 } as const;
 type InternalRole = keyof typeof GROUPS;
 
@@ -138,9 +140,48 @@ function CompletePanel({ eventId, endsAt, accessToken, onCompleted }: {
   </footer>;
 }
 
+/** SG2-58 AC1/AC2: the assigned coordinator confirms an event in preparation.
+ * The ref stops a second click before React re-renders the disabled button;
+ * the server re-checks status, ownership and every arrangement itself. */
+function ConfirmPanel({ eventId, accessToken, onConfirmed }: {
+  eventId: number;
+  accessToken: string;
+  onConfirmed: (organiserNotified: boolean) => void;
+}) {
+  const inFlight = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const [outstanding, setOutstanding] = useState<ArrangementKey[]>([]);
+
+  async function confirm() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
+    setError('');
+    setOutstanding([]);
+    const result = await confirmEvent(eventId, accessToken);
+    inFlight.current = false;
+    setPending(false);
+    if (result.ok) { onConfirmed(result.organiserNotified); return; }
+    setError(result.message);
+    if (result.kind === 'outstanding') setOutstanding(result.outstanding);
+  }
+
+  return <footer className="organisation-detail-footer" aria-label="Confirm this event">
+    <h3>Next step</h3>
+    <p className="organisation-detail-hint">Confirm the event once every required arrangement is in place. The Event Organiser is notified and sees the confirmed arrangements.</p>
+    {error && <p role="alert" className="organisation-detail-notice">{error}</p>}
+    {outstanding.length > 0 && <ul aria-label="Outstanding arrangements">
+      {outstanding.map(key => <li key={key}>{ARRANGEMENT_LABELS[key]}</li>)}
+    </ul>}
+    <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
+      disabled={pending} onClick={confirm}>{pending ? 'Confirming…' : 'Confirm event'}</button>
+  </footer>;
+}
+
 export type FindVenues = (prefill: VenueSearchPrefill) => void;
 
-function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
+function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalRole; item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
   const { status, error, setStatus } = useOpenedForReview(item, accessToken);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
@@ -149,6 +190,8 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
+  // SG2-58: kept here, not in ConfirmPanel, so it outlives the panel.
+  const [confirmedNotice, setConfirmedNotice] = useState('');
 
   useEffect(() => {
     setCurrentStatus(status);
@@ -168,6 +211,7 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
   const canComplete = item.kind === 'event' && item.assigned_to_me
     && (currentStatus === 'confirmed' || currentStatus === 'preparation')
     && item.ends_at !== null && Date.parse(item.ends_at) <= Date.now();
+  const canConfirm = item.kind === 'event' && item.assigned_to_me && currentStatus === 'preparation';
 
   return (
     <article className="organisation-detail" aria-label={KINDS[item.kind]}>
@@ -197,7 +241,8 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
           them; the RPC decides what is still editable. */}
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
-        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} />
+        <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} canCheckAvailability={role === 'Technical Support Staff'}
+          onReserved={item.kind === 'equipment' ? requestId => { if (requestId === item.item_id) setStatus('approved'); } : undefined} />
       )}
       {/* SG2-57: the assigned coordinator sees which arrangements are still
           outstanding before the event can be confirmed, through the same
@@ -215,26 +260,33 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
         onPosted={setStatus}
       />}
       {item.kind === 'event' && (
-        <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-          {canEditPlanning && (
+        <footer className="organisation-detail-footer">
+          <div className="organisation-detail-actions">
+            {canEditPlanning && (
+              <button
+                type="button"
+                className="organisation-button organisation-button-primary"
+                onClick={() => setDrawerOpen(true)}
+              >
+                Edit Planning Information
+              </button>
+            )}
             <button
               type="button"
-              className="organisation-button organisation-button-primary"
-              onClick={() => setDrawerOpen(true)}
+              className="organisation-button"
+              onClick={() => setHistoryDrawerOpen(true)}
             >
-              Edit Planning Information
+              View Change History
             </button>
-          )}
-          <button
-            type="button"
-            className="organisation-button"
-            onClick={() => setHistoryDrawerOpen(true)}
-          >
-            View Change History
-          </button>
-        </div>
+          </div>
+        </footer>
       )}
-      {item.kind === 'event' && item.assigned_to_me && currentStatus === 'approved' && onFindVenues && (
+      {/* SG2-48: finding venues is the next step throughout arrangements. A
+          planning edit moves an approved event to planning (SG2-39), which
+          must not hide it, and an event may need several venues or a new
+          request after a release or rejection, so existing requests do not. */}
+      {item.kind === 'event' && item.assigned_to_me && (currentStatus === 'approved' || currentStatus === 'planning')
+        && onFindVenues && (
         <footer className="organisation-detail-footer">
           <h3>Next step</h3>
           <p className="organisation-detail-hint">Find venues that fit this event and are free on its date.</p>
@@ -243,6 +295,13 @@ function ItemDetail({ item, accessToken, onFindVenues }: { item: WorkItem; acces
         </footer>
       )}
       {canComplete && accessToken && <CompletePanel eventId={item.event_id} endsAt={item.ends_at} accessToken={accessToken} onCompleted={setStatus} />}
+      {canConfirm && accessToken && <ConfirmPanel eventId={item.event_id} accessToken={accessToken} onConfirmed={notified => {
+        setStatus('confirmed');
+        setConfirmedNotice(notified ? 'Event confirmed. The Event Organiser has been notified.' : 'Event confirmed.');
+      }} />}
+      {confirmedNotice && <footer className="organisation-detail-footer">
+        <p role="status" className="organisation-detail-notice">{confirmedNotice}</p>
+      </footer>}
       {item.kind === 'event' && currentStatus === 'completed' && <footer className="organisation-detail-footer">
         <p role="status" className="organisation-detail-notice">Marked as completed. This event has left your active work queue.</p>
       </footer>}
@@ -319,7 +378,7 @@ function QueueContent({ role, accessToken, selection, onSelect, onFindVenues }: 
 
   if (!result) return <p role="status">Loading your work queue…</p>;
   if (!result.ok) return <p role="alert">{result.error}</p>;
-  if (selection) return <ItemDetail item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
+  if (selection) return <ItemDetail role={role} item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
 
   return <>
     <p className="work-queue-summary" role="status">{result.items.length} {result.items.length === 1 ? 'item' : 'items'} in your work queue</p>
@@ -355,5 +414,8 @@ export default function WorkQueue({ role, accessToken, onFindVenues }: { role: I
     </div>
     <QueueContent key={`${selection?.kind}:${selection?.item_id}:${revision}`} role={role}
       accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues} />
+    {/* SG2-79: bookings that clash once setup and turnaround time apply. */}
+    {!selection && (role === 'Venue Staff' || role === 'Event Coordinator')
+      ? <BookingClashes key={revision} accessToken={accessToken} /> : null}
   </div>;
 }

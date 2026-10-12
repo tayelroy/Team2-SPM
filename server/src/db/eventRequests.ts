@@ -89,7 +89,7 @@ export interface AssignStatusTransition {
 }
 
 export type StartReviewResult =
-  | { ok: true; request: EventRequestRecord }
+  | { ok: true; request: EventRequestRecord; previous_status: 'submitted' | 'under_review' }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
 
 export type RequestClarificationResult =
@@ -482,12 +482,7 @@ export async function submitEventRequest(
   return { ok: true, request: held.data[0] as unknown as EventRequestRecord };
 }
 
-/**
- * Statuses a coordinator may open for review (SG2-35). `under_review` is
- * included so returning to a review already in progress is idempotent rather
- * than an error — reopening your own open review is ordinary behaviour.
- */
-const REVIEWABLE_STATUSES = ['submitted', 'under_review'];
+const NOT_REVIEWABLE_MESSAGE = 'No reviewable event request is assigned to this account.';
 
 /**
  * Moves a request assigned to this coordinator to `under_review` (SG2-35).
@@ -498,32 +493,54 @@ const REVIEWABLE_STATUSES = ['submitted', 'under_review'];
  * touched by event id alone, even if a future caller skips the lookup.
  * Assignment is made by the Event Coordinator Lead (SG2-97), never claimed
  * here, so an unassigned request matches zero rows and stays untouched.
+ *
+ * Returning to a review already in progress is idempotent rather than an
+ * error — reopening your own open review is ordinary behaviour. The guarded
+ * `submitted` write runs first; only if it matches nothing is the request
+ * read as an `under_review` one this coordinator already holds. That split is
+ * what tells the caller the real `previous_status`, so SG2-40's history
+ * records the `submitted → under_review` transition exactly once: of two
+ * racing opens, only one can match the `submitted` write.
  */
 export async function startEventReview(
   admin: SupabaseClient,
   eventId: number,
   coordinatorId: string
 ): Promise<StartReviewResult> {
-  const { data, error } = await admin
+  const opened = await admin
     .from('events')
     .update({ status: 'under_review' })
     .eq('event_id', eventId)
     .eq('coordinator_id', coordinatorId)
-    .in('status', REVIEWABLE_STATUSES)
+    .eq('status', 'submitted')
     .select(DETAIL_COLUMNS);
 
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
+  if (opened.error) {
+    return { ok: false, reason: 'unavailable', message: opened.error.message };
   }
-  if (!data || data.length === 0) {
+  if (opened.data && opened.data.length > 0) {
+    const row = opened.data[0] as unknown as Record<string, unknown>;
+    return { ok: true, request: toDetailRecord(row), previous_status: 'submitted' };
+  }
+
+  const reopened = await admin
+    .from('events')
+    .select(DETAIL_COLUMNS)
+    .eq('event_id', eventId)
+    .eq('coordinator_id', coordinatorId)
+    .eq('status', 'under_review');
+
+  if (reopened.error) {
+    return { ok: false, reason: 'unavailable', message: reopened.error.message };
+  }
+  if (!reopened.data || reopened.data.length === 0) {
     // Deliberately one reason for "not assigned to you", "not in a reviewable
     // status" and "does not exist": a coordinator must not be able to probe
     // for another coordinator's assignments by comparing responses.
-    return { ok: false, reason: 'not_found', message: 'No reviewable event request is assigned to this account.' };
+    return { ok: false, reason: 'not_found', message: NOT_REVIEWABLE_MESSAGE };
   }
-  const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = toDetailRecord(row);
-  return { ok: true, request };
+  const row = reopened.data[0] as unknown as Record<string, unknown>;
+  return { ok: true, request: toDetailRecord(row), previous_status: 'under_review' };
 }
 
 /**
