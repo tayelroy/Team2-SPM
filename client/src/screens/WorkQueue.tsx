@@ -13,6 +13,7 @@ import { BookingRequestConflicts } from '../venues/BookingConflicts';
 import VenueDecision from '../venues/VenueDecision';
 import type { BookingReadiness } from '../venues/suitabilityApi';
 import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
+import { BookingClashes } from '../venues/BookingClashes';
 
 const GROUPS = {
   'Event Coordinator': [['review', 'Awaiting review'], ['assigned', 'My assigned events']],
@@ -363,5 +364,8 @@ export default function WorkQueue({ role, accessToken, onFindVenues }: { role: I
     </div>
     <QueueContent key={`${selection?.kind}:${selection?.item_id}:${revision}`} role={role}
       accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues} />
+    {/* SG2-79: bookings that clash once setup and turnaround time apply. */}
+    {!selection && (role === 'Venue Staff' || role === 'Event Coordinator')
+      ? <BookingClashes key={revision} accessToken={accessToken} /> : null}
   </div>;
 }

@@ -126,6 +126,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venue_bookings.view': ['venue_staff', 'event_coordinator'],
   'venue_bookings.release': ['venue_staff', 'event_coordinator'],
   'venue_bookings.by_venue': ['venue_staff'],
+  // SG2-79 AC3: bookings that clash once setup and turnaround apply, for
+  // Venue Staff and the coordinator of each affected event (per-row).
+  'venue_clashes.view': ['venue_staff', 'event_coordinator'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   // SG2-80 AC1/AC6: the same Venue Staff mark it temporarily unavailable.
   'venues.blocks.manage': ['venue_staff'],
