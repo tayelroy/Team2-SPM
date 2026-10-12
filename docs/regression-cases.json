@@ -3045,7 +3045,7 @@
       "The organiser's detail shows coordinator_name 'Regression coordinator' and coordinator_phone '+6581234567'",
       "The Lead sees Legacy Forum with its coordinator picker at both widths, with no horizontal overflow"
     ],
-    "evidence": "e2e/regression.spec.ts:1932",
+    "evidence": "e2e/regression.spec.ts:1935",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
@@ -3083,7 +3083,7 @@
       "Planning by the original coordinator returns 403 after it",
       "History, newest first: [user-lead, Regression coordinator, Regression second coordinator], [user-support, null, Regression coordinator]"
     ],
-    "evidence": "e2e/regression.spec.ts:1970",
+    "evidence": "e2e/regression.spec.ts:1973",
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",

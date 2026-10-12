@@ -1905,8 +1905,11 @@ test('SG2-88-P01 | [SG2-88:AC1] [SG2-88:AC2] [SG2-88:AC3] [SG2-88:AC4] [SG2-88:A
   expect(await notices(coordinator)).toEqual([['coordinator_assigned', 'You are now the Event Coordinator for “Planning workshop”.', 1]]);
   expect(await notices(organiser)).toEqual([['event_coordinator_changed', 'Regression coordinator is now the Event Coordinator for “Planning workshop”.', 1]]);
   const firstHistory = await (await request.get('/api/event-requests/1/history', { headers: lead })).json();
-  expect(firstHistory.history.map((entry: Record<string, unknown>) => [entry.actor_id, entry.old_value, entry.new_value]))
-    .toEqual([['user-lead', null, 'Regression coordinator']]);
+  // Status changes (SG2-100) share the history, so compare the coordinator rows only.
+  const coordinatorRows = (history: { history: Record<string, unknown>[] }) => history.history
+    .filter(entry => entry.field_name === 'coordinator_id')
+    .map(entry => [entry.actor_id, entry.old_value, entry.new_value]);
+  expect(coordinatorRows(firstHistory)).toEqual([['user-lead', null, 'Regression coordinator']]);
 
   // AC2: reassign to a different coordinator. The previous coordinator is told and loses the event at once.
   const reassign = await request.patch('/api/event-requests/1/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } });
@@ -1919,7 +1922,7 @@ test('SG2-88-P01 | [SG2-88:AC1] [SG2-88:AC2] [SG2-88:AC3] [SG2-88:AC4] [SG2-88:A
   expect((await notices(organiser)).map(([kind]) => kind)).toEqual(['event_coordinator_changed', 'event_coordinator_changed']);
   expect((await request.patch('/api/event-requests/1/review', { headers: coordinator })).status()).toBe(404);
   const history = await (await request.get('/api/event-requests/1/history', { headers: lead })).json();
-  expect(history.history.map((entry: Record<string, unknown>) => [entry.actor_id, entry.old_value, entry.new_value])).toEqual([
+  expect(coordinatorRows(history)).toEqual([
     ['user-lead', 'Regression coordinator', 'Regression second coordinator'],
     ['user-lead', null, 'Regression coordinator']
   ]);
