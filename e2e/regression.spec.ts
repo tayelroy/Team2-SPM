@@ -2127,3 +2127,107 @@ test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [SG2-100:AC9] [NOR
   expect(record).toMatchObject({ status: 'completed', completed_by: 'user-coordinator' });
   expect(record.completed_at).not.toBeNull();
 });
+
+/** SG2-82: Venue Staff open the venue's pending request from the queue and
+ * approve it, or reject it with a reason. */
+async function decideVenue(page: Page, venue: string, reason?: string) {
+  await page.getByRole('region', { name: 'Booking requests awaiting decision' }).getByRole('button', { name: new RegExp(venue) }).click();
+  const detail = page.getByRole('article', { name: 'Venue booking request' });
+  if (reason) {
+    await detail.getByLabel('Decision note (required to reject; shared with the coordinator)').fill(reason);
+    await detail.getByRole('button', { name: 'Reject with reason', exact: true }).click();
+    await expect(detail.getByText('Rejected. The coordinator has been notified and can see your reason.', { exact: true })).toBeVisible();
+  } else {
+    await detail.getByRole('button', { name: 'Approve booking', exact: true }).click();
+    await expect(detail.getByText('Approved. The venue is committed to this event and the coordinator has been notified.', { exact: true })).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Back to work queue', exact: true }).click();
+}
+
+/** SG2-82: the event's venue search with no attendance filter, so every venue is offered. */
+async function openAllVenues(page: Page, count: number) {
+  await openVenueRequestSearch(page);
+  await page.getByLabel('Attendance', { exact: true }).fill('');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText(new RegExp(`^${count} venues available`))).toBeVisible();
+}
+
+test('SG2-82-P01 | [SG2-82:AC1] [SG2-82:AC3] [SG2-82:AC4] [SG2-82:AC5] [NORMAL] one event books several venues; a rejected one does not block the others and, once withdrawn, the arrangement is ready', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-multiple')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openAllVenues(page, 3);
+
+  // AC1: three requests for the same event and period, each linked to it.
+  for (const venue of ['Regression Hall', 'Breakout Studio', 'Quiet Room']) {
+    await requestVenue(page, venue, '2030-06-20T09:00', '2030-06-20T12:00');
+    await expect(page.getByText(new RegExp(`^${venue} requested\\.`))).toBeVisible();
+  }
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByRole('heading', { level: 3 })).toHaveText(['Regression Hall', 'Breakout Studio', 'Quiet Room']);
+  await expect(list.getByText('Pending', { exact: true })).toHaveCount(3);
+  await expect(list.getByLabel('Venue arrangement')).toHaveText('Venue arrangement not ready: 0 of 3 venues approved; 3 venues awaiting Venue Staff.');
+
+  // AC3: Quiet Room is too small and is rejected; the event's other venues are still approved.
+  await switchAccount(page, 'venue');
+  await decideVenue(page, 'Quiet Room', 'Too small for 80 guests.');
+  await decideVenue(page, 'Regression Hall');
+  await decideVenue(page, 'Breakout Studio');
+
+  // AC4: the event shows each venue with its own status, and both approved venues are booked.
+  await switchAccount(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  const card = (venue: string) => list.locator('.venue-grid > *').filter({ has: page.getByRole('heading', { name: venue, exact: true }) });
+  await expect(card('Regression Hall').getByText('Approved', { exact: true })).toBeVisible();
+  await expect(card('Breakout Studio').getByText('Approved', { exact: true })).toBeVisible();
+  await expect(card('Quiet Room').getByText(/^Rejected by Regression venue on .*\. Reason: Too small for 80 guests\.$/)).toBeVisible();
+  const booked = page.getByRole('region', { name: 'Booked venues for Venue Request Forum' });
+  await expect(booked.getByText('Confirmed', { exact: true })).toHaveCount(2);
+  // AC5: the rejected venue holds the arrangement back until it is withdrawn.
+  await expect(list.getByLabel('Venue arrangement')).toHaveText(
+    'Venue arrangement not ready: 2 of 3 venues approved; 1 venue rejected — request another venue, then withdraw the rejected request.');
+  await expect(card('Regression Hall').getByRole('button', { name: 'Withdraw request', exact: true })).toHaveCount(0);
+  await card('Quiet Room').getByRole('button', { name: 'Withdraw request', exact: true }).click();
+  await card('Quiet Room').getByRole('button', { name: 'Confirm withdrawal', exact: true }).click();
+  await expect(list.getByRole('status')).toHaveText("Quiet Room withdrawn. It no longer counts towards this event's venues, and it can be requested again.");
+  await expect(list.getByLabel('Venue arrangement')).toHaveText('Venue arrangement ready: all 2 venues are approved.');
+  await expect(card('Quiet Room').getByText('Withdrawn', { exact: true })).toBeVisible();
+  await expect(card('Quiet Room').getByText(/^Withdrawn by Regression coordinator on /)).toBeVisible();
+});
+
+test('SG2-82-N01 | [SG2-82:AC1] [SG2-82:AC5] [CONFLICT] [FAILURE] the same venue twice, withdrawing an approved venue, or withdrawing as another role is refused, and the arrangement stays not ready', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-multiple')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openAllVenues(page, 3);
+  await requestVenue(page, 'Regression Hall', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Regression Hall requested\./)).toBeVisible();
+
+  // AC1: the same venue again over an overlapping period is refused; a different venue is not.
+  const again = await requestVenue(page, 'Regression Hall', '2030-06-20T11:00', '2030-06-20T13:00');
+  await expect(again.getByRole('alert')).toContainText('This event already requested Regression Hall for an overlapping period');
+  await again.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await requestVenue(page, 'Breakout Studio', '2030-06-20T09:00', '2030-06-20T12:00');
+  await expect(page.getByText(/^Breakout Studio requested\./)).toBeVisible();
+
+  await switchAccount(page, 'venue');
+  await decideVenue(page, 'Regression Hall');
+  const listed = await page.request.get('/api/venue-booking-requests?event_id=91', { headers: await authHeaders(page) });
+  const ids = Object.fromEntries((await listed.json()).requests.map((row: { venue_name: string; request_id: number }) => [row.venue_name, row.request_id]));
+  // AC5: only the event's coordinator withdraws; Venue Staff and the organiser cannot.
+  expect((await page.request.post(`/api/venue-booking-requests/${ids['Breakout Studio']}/withdraw`, { headers: await authHeaders(page) })).status()).toBe(403);
+  await switchAccount(page, 'organiser');
+  expect((await page.request.post(`/api/venue-booking-requests/${ids['Breakout Studio']}/withdraw`, { headers: await authHeaders(page) })).status()).toBe(403);
+
+  // AC5: an approved venue is released, not withdrawn, and the pending one keeps the arrangement not ready.
+  await switchAccount(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  const list = page.getByRole('region', { name: 'Venue requests for Venue Request Forum' });
+  await expect(list.getByLabel('Venue arrangement')).toHaveText('Venue arrangement not ready: 1 of 2 venues approved; 1 venue awaiting Venue Staff.');
+  const hall = list.locator('.venue-grid > *').filter({ has: page.getByRole('heading', { name: 'Regression Hall', exact: true }) });
+  await expect(hall.getByRole('button', { name: 'Withdraw request', exact: true })).toHaveCount(0);
+  const headers = await authHeaders(page);
+  const approved = await page.request.post(`/api/venue-booking-requests/${ids['Regression Hall']}/withdraw`, { headers });
+  expect([approved.status(), (await approved.json()).error])
+    .toEqual([409, 'This request has been approved. Release its booking instead if the event no longer needs the venue.']);
+  expect((await page.request.post('/api/venue-booking-requests/9999/withdraw', { headers })).status()).toBe(404);
+  await expect(hall.getByText('Approved', { exact: true })).toBeVisible();
+});
