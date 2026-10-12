@@ -633,7 +633,7 @@ test('[NORMAL] [SG2-49:AC1] [SG2-49:AC3] Venue Staff approve a ready venue reque
   const fetch = vi.fn(async (url: string) => {
     if (url.endsWith('/decision')) return Response.json({ request: { request_id: 41, event_id: 12, venue_id: 1, venue_name: 'Atrium Hall', status: 'approved',
       starts_at: '2030-06-15T02:00:00Z', ends_at: '2030-06-15T10:00:00Z', layout: 'theatre', venue_requirements: null, requester_name: 'Casey Coordinator',
-      requested_at: '2030-01-01T00:00:00Z', decider_name: 'Vera', decided_at: '2030-01-02T00:00:00Z', decision_reason: null } });
+      requested_at: '2030-01-01T00:00:00Z', decider_name: 'Vera', decided_at: '2030-01-02T00:00:00Z', decision_reason: null, withdrawer_name: null, withdrawn_at: null } });
     if (url.includes('/suitability')) return Response.json(fit);
     return Response.json({ items: [request] });
   });

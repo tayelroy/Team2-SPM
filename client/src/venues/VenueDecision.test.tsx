@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const decided = (status: string, reason: string | null = null) => ({ request: {
   request_id: 41, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status, starts_at: '2030-06-15T02:00:00.000Z',
   ends_at: '2030-06-15T10:00:00.000Z', layout: 'theatre', venue_requirements: null, requester_name: 'Casey',
-  requested_at: '2030-01-01T00:00:00.000Z', decider_name: 'Vera', decided_at: '2030-01-02T00:00:00.000Z', decision_reason: reason } });
+  requested_at: '2030-01-01T00:00:00.000Z', decider_name: 'Vera', decided_at: '2030-01-02T00:00:00.000Z', decision_reason: reason, withdrawer_name: null, withdrawn_at: null } });
 
 function panel(readiness: BookingReadiness | null = 'allowed', holdId: number | null = null) {
   const onDecided = vi.fn();

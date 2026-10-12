@@ -23,6 +23,10 @@ export interface VenueBookingRequestRecord {
   decider_name: string | null;
   decided_at: string | null;
   decision_reason: string | null;
+  /** SG2-82: who withdrew the request, and when, once the event no longer
+   * needs that venue. */
+  withdrawer_name: string | null;
+  withdrawn_at: string | null;
 }
 
 export type NewVenueBookingRequest = VenueBookingRequestValues & {
@@ -54,10 +58,11 @@ export interface VenueBookingRequestStore {
   conflicts: VenueConflictStore['conflicts'];
 }
 
-const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason';
+const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason,withdrawn_by,withdrawn_at';
 const LIVE_STATUSES = ['pending', 'approved'];
 
-type Row = Omit<VenueBookingRequestRecord, 'venue_name' | 'requester_name' | 'decider_name'> & { requested_by: string | null; decided_by: string | null };
+type Row = Omit<VenueBookingRequestRecord, 'venue_name' | 'requester_name' | 'decider_name' | 'withdrawer_name'>
+  & { requested_by: string | null; decided_by: string | null; withdrawn_by: string | null };
 
 /** Reads and writes with the service role: booking requests are not readable
  * by any client under RLS, so the routes check the caller's relationship to
@@ -76,11 +81,12 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
   async function present(rows: Row[]): Promise<VenueBookingRequestRecord[]> {
     if (rows.length === 0) return [];
     const venues = await names('venues', 'venue_id', rows.map(row => row.venue_id));
-    const people = rows.flatMap(row => [row.requested_by, row.decided_by]).filter(id => id !== null);
+    const people = rows.flatMap(row => [row.requested_by, row.decided_by, row.withdrawn_by]).filter(id => id !== null);
     const users = people.length === 0 ? new Map() : await names('users', 'user_id', people);
-    return rows.map(({ requested_by, decided_by, ...row }) => ({
+    return rows.map(({ requested_by, decided_by, withdrawn_by, ...row }) => ({
       ...row, venue_name: venues.get(row.venue_id) ?? null,
-      requester_name: users.get(requested_by) ?? null, decider_name: users.get(decided_by) ?? null
+      requester_name: users.get(requested_by) ?? null, decider_name: users.get(decided_by) ?? null,
+      withdrawer_name: users.get(withdrawn_by) ?? null
     }));
   }
   return {

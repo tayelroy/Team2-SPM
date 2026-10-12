@@ -13,6 +13,11 @@ import {
   type DecisionResult,
   type VenueBookingDecisionStore
 } from '../db/venueBookingDecisions';
+import {
+  createVenueBookingWithdrawalStore,
+  type VenueBookingWithdrawalStore,
+  type WithdrawalResult
+} from '../db/venueBookingWithdrawals';
 import { validateVenueBookingRequest } from './bookingRequestFields';
 import { assessSuitability, bookingReadiness } from './suitability';
 import { canSeeEvent, parseId } from './suitabilityRoutes';
@@ -24,6 +29,30 @@ export interface VenueBookingRequestDependencies {
   now?: () => number;
   /** SG2-49: decisions run with the caller's own token. */
   decisions?: (token: string) => VenueBookingDecisionStore;
+  /** SG2-82: withdrawals run with the coordinator's own token. */
+  withdrawals?: (token: string) => VenueBookingWithdrawalStore;
+}
+
+/**
+ * SG2-82 AC5: where the event's venue arrangement stands. Every request still
+ * pending, approved or rejected is a venue the event needs; a rejected one
+ * keeps the arrangement not ready until the coordinator withdraws it, so a
+ * refused room is never silently dropped. Withdrawn and released requests are
+ * cancelled and no longer count.
+ */
+export interface VenueArrangement {
+  state: 'none' | 'in_progress' | 'ready';
+  needed: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+}
+
+export function venueArrangement(requests: Pick<VenueBookingRequestRecord, 'status'>[]): VenueArrangement {
+  const count = (status: string) => requests.filter(request => request.status === status).length;
+  const [approved, pending, rejected] = [count('approved'), count('pending'), count('rejected')];
+  const needed = approved + pending + rejected;
+  return { state: needed === 0 ? 'none' : approved === needed ? 'ready' : 'in_progress', needed, approved, pending, rejected };
 }
 
 /** Venues are requested once the event has been approved and before it is
@@ -70,6 +99,17 @@ function refusal(result: Exclude<DecisionResult, { outcome: 'updated' }>, venue:
   }
 }
 
+/** SG2-82: why a withdrawal was refused at the moment of committing. */
+function withdrawalRefusal(result: Exclude<WithdrawalResult, { outcome: 'withdrawn' }>): [number, string] {
+  switch (result.outcome) {
+    case 'inactive': return [409, result.status === 'approved'
+      ? 'This request has been approved. Release its booking instead if the event no longer needs the venue.'
+      : `This request has already been ${result.status}.`];
+    case 'hold': return [409, `This request belongs to tentative hold #${result.hold_id}. Venue Staff release it from Venue holds.`];
+    default: return [404, 'Booking request not found.'];
+  }
+}
+
 type Respond = (status: number, body?: unknown) => void;
 
 function handler(
@@ -103,12 +143,14 @@ function handler(
  * booking or hold number (SG2-50 AC1); the request is still made, but it
  * cannot be approved while the conflict stands (SG2-50 AC2).
  *
- * GET /?event_id= — the event's requests and where each stands (AC3).
+ * GET /?event_id= — the event's requests and where each stands (AC3), with
+ * whether its venue arrangement is ready (SG2-82 AC4/AC5).
  */
 export function createVenueBookingRequestsRouter(access: ReturnType<typeof createAuthorization>, dependencies: VenueBookingRequestDependencies = {}) {
   const router = access.protectedRouter();
   const now = dependencies.now ?? Date.now;
   const decisions = dependencies.decisions ?? createVenueBookingDecisionStore;
+  const withdrawals = dependencies.withdrawals ?? createVenueBookingWithdrawalStore;
 
   router.post('/', access.requirePermission('venue_booking.request'), handler(access, dependencies, async (database, principal, req, respond) => {
     const values = validateVenueBookingRequest(req.body, now());
@@ -174,7 +216,38 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
       respond(404, { error: 'Event not found.' });
       return;
     }
-    respond(200, { requests: await database.list(eventId) });
+    const requests = await database.list(eventId);
+    respond(200, { requests, arrangement: venueArrangement(requests) });
+  }));
+
+  /**
+   * POST /:requestId/withdraw — SG2-82 AC5: the event's assigned coordinator
+   * withdraws a pending or rejected request the event no longer needs, so it
+   * stops holding the venue arrangement back. An approved request's booking
+   * is released instead (SG2-51), and a tentative hold's request through the
+   * hold (SG2-84). Who withdrew it and when are recorded with it and in the
+   * event's history.
+   */
+  router.post('/:requestId/withdraw', access.requirePermission('venue_booking.withdraw'), handler(access, dependencies, async (database, principal, req, respond) => {
+    const requestId = parseId(req.params.requestId);
+    if (requestId === null) {
+      respond(400, { error: 'Invalid booking request ID.' });
+      return;
+    }
+    const request = await database.request(requestId);
+    const event = request && await database.event(request.event_id);
+    // Another coordinator's request is reported as missing, not forbidden.
+    if (!request || !event || !canSeeEvent(principal, event)) {
+      respond(404, { error: 'Booking request not found.' });
+      return;
+    }
+    const result = await withdrawals(req.get('authorization')!.slice(7)).withdraw(requestId);
+    if (result.outcome !== 'withdrawn') {
+      const [status, error] = withdrawalRefusal(result);
+      respond(status, { error });
+      return;
+    }
+    respond(200, { request: await database.request(requestId) });
   }));
 
   /**

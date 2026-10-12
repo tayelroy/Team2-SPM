@@ -10,8 +10,9 @@ import type { NewVenueBookingRequest, VenueBookingRequestRecord, VenueBookingReq
 import type { ConflictOptions, ConflictPeriod, VenueConflictRow } from './db/venueConflicts';
 import type { Layout } from './venues/layoutFields';
 import { validateVenueBookingRequest } from './venues/bookingRequestFields';
-import { createVenueBookingRequestsRouter, type VenueBookingRequestDependencies } from './venues/bookingRequests';
+import { createVenueBookingRequestsRouter, venueArrangement, type VenueBookingRequestDependencies } from './venues/bookingRequests';
 import type { Decision, DecisionResult, VenueBookingDecisionStore } from './db/venueBookingDecisions';
+import type { VenueBookingWithdrawalStore, WithdrawalResult } from './db/venueBookingWithdrawals';
 
 // Unit tests must not connect to a developer's configured database.
 before(() => {
@@ -44,7 +45,7 @@ const bare: SuitabilityVenueRow = { venue_id: 4, name: 'Empty Annex', location: 
 
 const LAYOUTS: Record<number, Layout[]> = { 1: ['theatre', 'banquet'], 2: ['theatre'], 3: ['theatre'], 4: [] };
 
-const UNDECIDED = { decider_name: null, decided_at: null, decision_reason: null };
+const UNDECIDED = { decider_name: null, decided_at: null, decision_reason: null, withdrawer_name: null, withdrawn_at: null };
 
 const body = (overrides: Record<string, unknown> = {}) => ({
   event_id: 7, venue_id: 1, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', layout: 'theatre', ...overrides
@@ -119,7 +120,7 @@ test('[NORMAL] [SG2-48:AC1] [SG2-48:AC2] the assigned coordinator requests a ven
       request_id: 41, event_id: 7, venue_id: 1, venue_name: 'Atrium Hall', status: 'pending', layout: 'theatre',
       starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
       venue_requirements: 'A stage and a projector', requester_name: 'Casey Coordinator', requested_at: '2030-01-01T00:00:00.000Z',
-      decider_name: null, decided_at: null, decision_reason: null
+      decider_name: null, decided_at: null, decision_reason: null, withdrawer_name: null, withdrawn_at: null
     }
   });
   assert.deepEqual(created, [{
@@ -424,4 +425,144 @@ test('[FAILURE] [SG2-49:AC3] a refused or failing database decision is reported 
   // Without a configured database the default store cannot sign in as the caller.
   const unconfigured = await decide(app(store), 'venue', { decision: 'reject', reason: 'No' });
   assert.equal(unconfigured.status, 503);
+});
+
+// --- SG2-82: several venues for one event ----------------------------------
+
+test('[NORMAL] [SG2-82:AC1] [SG2-82:AC2] each of an event\'s venue requests is linked to it and checked for conflicts at its own venue', async () => {
+  const { store, checked } = fakeStore();
+  const composed = app(store);
+  for (const venue_id of [1, 3]) {
+    const response = await post(composed, 'coordinator', body({ venue_id }));
+    assert.deepEqual([response.status, response.body.request.event_id, response.body.request.venue_id], [201, 7, venue_id]);
+  }
+  assert.deepEqual(checked.map(([period]) => period.venue_id), [1, 3]);
+  const listed = await request(composed).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
+  assert.deepEqual(listed.body.requests.map((row: VenueBookingRequestRecord) => [row.event_id, row.venue_name]),
+    [[7, 'Atrium Hall'], [7, 'Lecture Theatre']]);
+});
+
+test('[FAILURE] [SG2-82:AC3] a venue refused for the event does not stop the coordinator requesting its other venues', async () => {
+  const { store, created } = fakeStore();
+  const composed = app(store);
+  // Seminar Room lacks the stage and projector the event needs.
+  assert.equal((await post(composed, 'coordinator', body({ venue_id: 2 }))).status, 409);
+  assert.equal((await post(composed, 'coordinator', body({ venue_id: 1 }))).status, 201);
+  assert.equal((await post(composed, 'coordinator', body({ venue_id: 3 }))).status, 201);
+  assert.deepEqual(created.map(row => row.venue_id), [1, 3]);
+});
+
+test('[CONFLICT] [SG2-82:AC2] [SG2-82:AC3] a clash at one venue is reported on that request alone; the event\'s other request is clear', async () => {
+  const clash: VenueConflictRow = { kind: 'booking', reference_id: 12, event_id: 70, event_name: 'Board Dinner', coordinator_id: 'user-other-coordinator',
+    starts_at: '2030-06-15T09:00:00.000Z', ends_at: '2030-06-15T12:00:00.000Z', status: 'confirmed' };
+  const { store } = fakeStore();
+  // Only Atrium Hall is occupied.
+  const conflicts = store.conflicts;
+  store.conflicts = async (period, options) => period.venue_id === 1 ? [clash] : conflicts(period, options);
+  const composed = app(store);
+  const atriumResponse = await post(composed, 'coordinator', body());
+  const theatreResponse = await post(composed, 'coordinator', body({ venue_id: 3 }));
+  assert.deepEqual([atriumResponse.status, atriumResponse.body.conflicts.map((row: { reference_id: number }) => row.reference_id)], [201, [12]]);
+  assert.deepEqual([theatreResponse.status, theatreResponse.body.conflicts], [201, []]);
+});
+
+test('[NORMAL] [SG2-82:AC4] [SG2-82:AC5] the event\'s requests come with whether its venue arrangement is ready', async () => {
+  const requests = [pendingRequest({ status: 'approved' }), pendingRequest({ request_id: 42, venue_id: 3, status: 'approved' }),
+    pendingRequest({ request_id: 43, venue_id: 2, status: 'cancelled', withdrawn_at: '2030-01-03T00:00:00.000Z', withdrawer_name: 'Casey Coordinator' })];
+  const composed = app(fakeStore({ requests }).store);
+  const response = await request(composed).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.requests.map((row: VenueBookingRequestRecord) => [row.request_id, row.status]), [[41, 'approved'], [42, 'approved'], [43, 'cancelled']]);
+  assert.deepEqual(response.body.arrangement, { state: 'ready', needed: 2, approved: 2, pending: 0, rejected: 0 });
+});
+
+test('[BOUNDARY] [SG2-82:AC5] the arrangement is ready only once every venue still needed is approved; a rejected one holds it back until withdrawn', () => {
+  const statuses = (...list: string[]) => list.map(status => ({ status }));
+  assert.deepEqual(venueArrangement([]), { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0 });
+  assert.deepEqual(venueArrangement(statuses('cancelled')), { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0 });
+  assert.deepEqual(venueArrangement(statuses('approved')), { state: 'ready', needed: 1, approved: 1, pending: 0, rejected: 0 });
+  assert.deepEqual(venueArrangement(statuses('approved', 'approved', 'pending')), { state: 'in_progress', needed: 3, approved: 2, pending: 1, rejected: 0 });
+  assert.deepEqual(venueArrangement(statuses('approved', 'rejected')), { state: 'in_progress', needed: 2, approved: 1, pending: 0, rejected: 1 });
+  assert.deepEqual(venueArrangement(statuses('approved', 'cancelled')), { state: 'ready', needed: 1, approved: 1, pending: 0, rejected: 0 });
+  assert.equal(venueArrangement(statuses('rejected')).state, 'in_progress');
+});
+
+/** Records each withdrawal; by default it commits it as the database would. */
+function fakeWithdrawals(requests: VenueBookingRequestRecord[], result?: WithdrawalResult) {
+  const calls: { token: string; requestId: number }[] = [];
+  const withdrawals = (token: string): VenueBookingWithdrawalStore => ({
+    async withdraw(requestId) {
+      calls.push({ token, requestId });
+      if (result) return result;
+      Object.assign(requests.find(item => item.request_id === requestId)!, { status: 'cancelled', withdrawer_name: 'Casey Coordinator',
+        withdrawn_at: '2030-01-03T00:00:00.000Z' });
+      return { outcome: 'withdrawn', request_id: requestId, withdrawn_at: '2030-01-03T00:00:00.000Z' };
+    }
+  });
+  return { withdrawals, calls };
+}
+
+function withdrawalApp(seed: Parameters<typeof fakeStore>[0] = {}, result?: WithdrawalResult) {
+  const { store, requests } = fakeStore({ requests: [pendingRequest({ status: 'rejected', decider_name: 'Vera Venue',
+    decided_at: '2030-01-02T00:00:00.000Z', decision_reason: 'No stage' })], ...seed });
+  const { withdrawals, calls } = fakeWithdrawals(requests, result);
+  return { composed: app(store, { withdrawals }), calls };
+}
+
+const withdraw = (composed: express.Express, user: string, id: number | string = 41) =>
+  request(composed).post(`/api/venue-booking-requests/${id}/withdraw`).set(as(user)).send();
+
+test('[NORMAL] [SG2-82:AC5] the coordinator withdraws a rejected request as themselves; it comes back cancelled and no longer holds the arrangement back', async () => {
+  const { composed, calls } = withdrawalApp();
+  const response = await withdraw(composed, 'coordinator');
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, [{ token: 'coordinator', requestId: 41 }]);
+  assert.deepEqual([response.body.request.status, response.body.request.withdrawer_name, response.body.request.withdrawn_at, response.body.request.decision_reason],
+    ['cancelled', 'Casey Coordinator', '2030-01-03T00:00:00.000Z', 'No stage']);
+  const listed = await request(composed).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
+  assert.equal(listed.body.arrangement.state, 'none');
+});
+
+test('[CONFLICT] [SG2-82:AC5] a request approved, already withdrawn or belonging to a hold at the moment of withdrawing is refused with what to do instead', async () => {
+  const cases: [WithdrawalResult, number, string][] = [
+    [{ outcome: 'inactive', status: 'approved' }, 409, 'This request has been approved. Release its booking instead if the event no longer needs the venue.'],
+    [{ outcome: 'inactive', status: 'cancelled' }, 409, 'This request has already been cancelled.'],
+    [{ outcome: 'hold', hold_id: 12 }, 409, 'This request belongs to tentative hold #12. Venue Staff release it from Venue holds.'],
+    [{ outcome: 'missing' }, 404, 'Booking request not found.']
+  ];
+  for (const [result, status, error] of cases) {
+    const { composed } = withdrawalApp({}, result);
+    const response = await withdraw(composed, 'coordinator');
+    assert.deepEqual([response.status, response.body], [status, { error }], JSON.stringify(result));
+  }
+});
+
+test('[FAILURE] [BOUNDARY] [SG2-82:AC5] only the event\'s signed-in coordinator withdraws, and only a known request with a valid id', async () => {
+  const { composed, calls } = withdrawalApp();
+  assert.equal((await request(composed).post('/api/venue-booking-requests/41/withdraw').send()).status, 401);
+  for (const user of ['venue', 'organiser', 'support', 'attendee']) {
+    assert.equal((await withdraw(composed, user)).status, 403, user);
+  }
+  for (const [user, id] of [['other_coordinator', 41], ['coordinator', 99]] as const) {
+    const hidden = await withdraw(composed, user, id);
+    assert.deepEqual([hidden.status, hidden.body], [404, { error: 'Booking request not found.' }], `${user} ${id}`);
+  }
+  // A request whose event is gone is reported the same way.
+  const orphan = withdrawalApp({ events: [] });
+  assert.equal((await withdraw(orphan.composed, 'coordinator')).status, 404);
+  for (const id of ['abc', '0']) {
+    assert.deepEqual((await withdraw(composed, 'coordinator', id)).body, { error: 'Invalid booking request ID.' }, id);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('[FAILURE] [SG2-82:AC5] a refused or failing database withdrawal is reported without leaking details', async () => {
+  const { store } = fakeStore({ requests: [pendingRequest()] });
+  for (const [error, status] of [[new AccessError(403), 403], [new Error('offline'), 503]] as const) {
+    const failing = app(store, { withdrawals: () => ({ async withdraw(): Promise<never> { throw error; } }) });
+    const response = await withdraw(failing, 'coordinator');
+    assert.deepEqual([response.status, response.body], [status, { error: new AccessError(status).message }]);
+  }
+  // Without a configured database the default store cannot sign in as the caller.
+  assert.equal((await withdraw(app(store), 'coordinator')).status, 503);
 });

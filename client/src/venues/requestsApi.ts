@@ -19,6 +19,26 @@ export interface VenueRequest {
   decider_name: string | null;
   decided_at: string | null;
   decision_reason: string | null;
+  /** SG2-82: who withdrew the request and when, once the event no longer
+   * needed that venue. */
+  withdrawer_name: string | null;
+  withdrawn_at: string | null;
+}
+
+/** SG2-82 AC5: whether every venue the event still needs is approved.
+ * Mirrors VenueArrangement in server/src/venues/bookingRequests.ts. */
+export interface VenueArrangement {
+  state: 'none' | 'in_progress' | 'ready';
+  needed: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+}
+
+function isArrangement(value: unknown): value is VenueArrangement {
+  const arrangement = value as VenueArrangement | null;
+  return ['none', 'in_progress', 'ready'].includes(arrangement?.state as string)
+    && [arrangement!.needed, arrangement!.approved, arrangement!.pending, arrangement!.rejected].every(count => typeof count === 'number');
 }
 
 /** Something already committing the venue that a request overlaps (SG2-50).
@@ -104,12 +124,21 @@ export function fetchRequestConflicts(token: string | null | undefined, requestI
   });
 }
 
-/** The event's venue requests and where each stands (AC3). */
+/** The event's venue requests and where each stands (AC3), with whether its
+ * venue arrangement is ready (SG2-82 AC5). */
 export function fetchVenueRequests(token: string | null | undefined, eventId: number) {
   return call(`/api/venue-booking-requests?event_id=${eventId}`, token, body => {
     const requests = body?.requests;
-    return Array.isArray(requests) && requests.every(isRequest) ? { requests } : null;
+    return Array.isArray(requests) && requests.every(isRequest) && isArrangement(body?.arrangement)
+      ? { requests, arrangement: body.arrangement } : null;
   });
+}
+
+/** SG2-82 AC5: the coordinator withdraws a pending or rejected request the
+ * event no longer needs; the server answers with the request as recorded. */
+export function withdrawVenueRequest(token: string | null | undefined, requestId: number) {
+  return call(`/api/venue-booking-requests/${requestId}/withdraw`, token, body => isRequest(body?.request) ? { request: body.request } : null,
+    { method: 'POST' });
 }
 
 /** SG2-49: Venue Staff approve or reject a request. A rejection needs a
