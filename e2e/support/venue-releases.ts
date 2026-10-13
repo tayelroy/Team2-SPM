@@ -26,6 +26,8 @@ export function createMemoryReleaseStore(database: MemoryDatabase) {
       const now = new Date().toISOString();
       if (String(booking.ends_at) <= now) return { outcome: 'past' };
       Object.assign(booking, { status: 'cancelled', cancelled_by: userId, cancelled_at: now, cancellation_reason: trimmed });
+      // SG2-79: releasing a booking resolves any clash it was part of.
+      database.refreshVenueClashes(booking.venue_id);
       for (const request of database.tables.venue_booking_requests) {
         if (request.venue_booking_id === bookingId && request.status === 'approved') request.status = 'cancelled';
       }

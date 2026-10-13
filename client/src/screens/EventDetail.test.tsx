@@ -8,6 +8,15 @@ vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId }: {
   <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}</section>
 ) }));
 
+// SG2-58: stubbed so its own fetch does not reach jsdom's network here.
+vi.mock('../components/ConfirmedArrangements', () => ({ default: ({ eventId, accessToken }: { eventId: number; accessToken: string }) => (
+  <section aria-label="Confirmed arrangements integration">Confirmed arrangements for event {eventId} with {accessToken}</section>
+) }));
+
+// jsdom has no scrollIntoView; the planning drawer scrolls its messages into
+// view (SG2-39), so the impact-confirmation journey below needs it defined.
+Element.prototype.scrollIntoView = vi.fn();
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -1428,5 +1437,48 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     // detail loads, so the action is never offered in the first place.
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
     expect(complete).not.toHaveBeenCalled();
+  });
+});
+
+// SG2-58 AC1/AC3: the creating organiser and the assigned coordinator see the
+// confirmed arrangements; the component's own fetch is covered in its suite.
+describe('confirmed arrangements (SG2-58)', () => {
+  const confirmedDetail = {
+    eventId: 58, organiserId: 'org-1', organisation: 'Acme Corp', name: 'Confirmation Forum', status: 'confirmed',
+    purpose: 'Confirmation', description: '', proposedDate: null, expectedAttendance: 120,
+    venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null, registrationNeeded: true,
+    coordinatorId: 'coord-1', coordinatorName: 'Assigned coordinator', canManage: true, waitingOnMe: false,
+    decisionReason: null, decidedAt: null, completedBy: null, completedAt: null, endsAt: null,
+  };
+  function show(overrides: Partial<typeof confirmedDetail>, role: 'Event Organiser' | 'Event Coordinator', currentUserId?: string) {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: { ...confirmedDetail, ...overrides } });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+    render(<EventDetail role={role} currentUserId={currentUserId} selectedEventId={58} accessToken="token" onNavigate={vi.fn()} />);
+  }
+
+  test.each(['confirmed', 'Completed'])('[NORMAL] [SG2-58:AC1] the creating organiser sees the confirmed arrangements of a %s event', async status => {
+    show({ status }, 'Event Organiser');
+    expect(await screen.findByRole('region', { name: 'Confirmed arrangements integration' })).toHaveTextContent('Confirmed arrangements for event 58 with token');
+  });
+
+  test('[NORMAL] [SG2-58:AC1] the assigned coordinator sees the confirmed arrangements', async () => {
+    show({ canManage: false }, 'Event Coordinator', 'coord-1');
+    expect(await screen.findByRole('region', { name: 'Confirmed arrangements integration' })).toHaveTextContent('Confirmed arrangements for event 58 with token');
+  });
+
+  test.each(['preparation', 'awaiting_safety_check', 'cancelled'])('[BOUNDARY] [SG2-58:AC1] a %s event shows no confirmed arrangements', async status => {
+    show({ status }, 'Event Organiser');
+    await screen.findByRole('heading', { name: 'Confirmation Forum' });
+    expect(screen.queryByRole('region', { name: 'Confirmed arrangements integration' })).not.toBeInTheDocument();
+  });
+
+  test('[FAILURE] [SG2-58:AC1] a view-only organisation member and another coordinator see no confirmed arrangements', async () => {
+    show({ canManage: false }, 'Event Organiser');
+    await screen.findByRole('heading', { name: 'Confirmation Forum' });
+    expect(screen.queryByRole('region', { name: 'Confirmed arrangements integration' })).not.toBeInTheDocument();
+    cleanup();
+    show({ canManage: false }, 'Event Coordinator', 'coord-2');
+    await screen.findByRole('heading', { name: 'Confirmation Forum' });
+    expect(screen.queryByRole('region', { name: 'Confirmed arrangements integration' })).not.toBeInTheDocument();
   });
 });

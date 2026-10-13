@@ -15,6 +15,12 @@ import {
   type InsertAuditLogInput,
   type InsertAuditLogsResult
 } from '../db/auditLogs';
+import {
+  fetchEventArrangementFacts,
+  type EventArrangementFacts,
+  type FetchEventArrangementFactsResult
+} from '../db/eventArrangements';
+import { computeArrangementReadiness } from './arrangementReadiness';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -61,6 +67,13 @@ export interface UpdateEventPlanningDependencies {
     admin: SupabaseClient,
     entries: InsertAuditLogInput[]
   ) => Promise<InsertAuditLogsResult>;
+  /** SG2-57's arrangement facts: which venue and equipment requests exist. */
+  fetchArrangementFacts?: (
+    admin: SupabaseClient,
+    eventId: number
+  ) => Promise<FetchEventArrangementFactsResult>;
+  /** Current time in epoch milliseconds; a new proposed date must be after it. */
+  now?: () => number;
 }
 
 const TEXT_FIELDS = [
@@ -213,60 +226,126 @@ export function validatePlanningUpdateInput(body: unknown): PlanningValidationRe
 }
 
 /**
- * Detects arrangement impacts caused by date shifts, attendance increases,
- * or registration capacity increases (AC 2).
+ * Checks the event's dates against each other and the clock (AC 4). Uses the
+ * value being saved for each field when the request changes it, otherwise the
+ * stored one, so a request cannot leave the event in an inconsistent state:
+ * - a newly chosen proposed date must be in the future (an unchanged past date
+ *   is left alone, since the drawer resends every field);
+ * - registration must close after it opens;
+ * - registration must open and close before the event starts.
+ */
+export function validatePlanningSchedule(
+  current: EventPlanningRecord,
+  update: PlanningUpdateValues,
+  now: number
+): string[] {
+  const errors: string[] = [];
+  const pick = (field: 'proposed_date' | 'registration_opens_at' | 'registration_closes_at') =>
+    update[field] !== undefined ? update[field] : current[field];
+  const timeOf = (value: string | null | undefined) => (value ? new Date(value).getTime() : null);
+
+  const start = timeOf(pick('proposed_date'));
+  const opens = timeOf(pick('registration_opens_at'));
+  const closes = timeOf(pick('registration_closes_at'));
+
+  if (update.proposed_date) {
+    const chosen = new Date(update.proposed_date).getTime();
+    if (chosen !== timeOf(current.proposed_date) && chosen <= now) {
+      errors.push('proposed_date must be in the future.');
+    }
+  }
+
+  if (opens !== null && closes !== null && closes <= opens) {
+    errors.push('registration_closes_at must be after registration_opens_at.');
+  }
+
+  if (start !== null) {
+    if (opens !== null && opens >= start) {
+      errors.push('registration_opens_at must be before the event starts (proposed_date).');
+    }
+    if (closes !== null && closes >= start) {
+      errors.push('registration_closes_at must be before the event starts (proposed_date).');
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Detects which existing arrangements an edit affects (AC 2): a date shift or
+ * attendance increase affects the venue booking and equipment requests, and a
+ * registration capacity increase affects registration. A category is only
+ * flagged when the event actually has that arrangement, read through SG2-57's
+ * readiness view: a live venue booking request (pending, held or approved), a
+ * live equipment request or reservation, or registration being needed. An edit to an event
+ * with nothing arranged yet has no impact and needs no confirmation.
  */
 export function detectArrangementImpact(
   current: EventPlanningRecord,
-  update: PlanningUpdateValues
+  update: PlanningUpdateValues,
+  facts: EventArrangementFacts
 ): ArrangementImpact {
+  const readiness = computeArrangementReadiness({ ...current, ...facts });
+  const [, equipment, registration] = readiness.arrangements;
+  const venueArranged = readiness.venue_requested;
+  const equipmentRequested = equipment.state !== 'not_required';
+  const equipmentArranged = equipmentRequested || facts.equipment_reserved === true;
+  const registrationArranged = registration.state !== 'not_required';
+
   const affected = new Set<string>();
   const notes: string[] = [];
+
+  const recheckVenueAndEquipment = (change: string) => {
+    const subjects: string[] = [];
+    if (venueArranged) {
+      affected.add('venue_recheck');
+      subjects.push('venue booking');
+    }
+    if (equipmentArranged) {
+      affected.add('equipment_recheck');
+      subjects.push(equipmentRequested ? 'equipment requests' : 'equipment reservations');
+    }
+    if (subjects.length > 0) {
+      notes.push(`${change} Existing ${subjects.join(' and ')} must be rechecked.`);
+    }
+  };
 
   // 1. Date shift: proposed_date != old
   if (
     update.proposed_date !== undefined &&
     update.proposed_date !== null &&
-    current.proposed_date !== null
+    current.proposed_date !== null &&
+    new Date(current.proposed_date).getTime() !== new Date(update.proposed_date).getTime()
   ) {
-    const oldTime = new Date(current.proposed_date).getTime();
-    const newTime = new Date(update.proposed_date).getTime();
-    if (oldTime !== newTime) {
-      affected.add('venue_recheck');
-      affected.add('equipment_recheck');
-      notes.push(
-        `Proposed date changed from ${current.proposed_date} to ${update.proposed_date}. Existing venue suitability and equipment requirements must be rechecked.`
-      );
-    }
+    recheckVenueAndEquipment(
+      `Proposed date changed from ${current.proposed_date} to ${update.proposed_date}.`
+    );
   }
 
   // 2. Attendance increase: expected_attendance > old
   if (
     update.expected_attendance !== undefined &&
     update.expected_attendance !== null &&
-    current.expected_attendance !== null
+    current.expected_attendance !== null &&
+    update.expected_attendance > current.expected_attendance
   ) {
-    if (update.expected_attendance > current.expected_attendance) {
-      affected.add('venue_recheck');
-      affected.add('equipment_recheck');
-      notes.push(
-        `Expected attendance increased from ${current.expected_attendance} to ${update.expected_attendance}. Existing venue suitability and equipment requirements must be rechecked.`
-      );
-    }
+    recheckVenueAndEquipment(
+      `Expected attendance increased from ${current.expected_attendance} to ${update.expected_attendance}.`
+    );
   }
 
-  // 3. Registration capacity increase: registration_capacity > old
+  // 3. Registration capacity increase on an event that takes registrations
   if (
+    registrationArranged &&
     update.registration_capacity !== undefined &&
     update.registration_capacity !== null &&
-    current.registration_capacity !== null
+    current.registration_capacity !== null &&
+    update.registration_capacity > current.registration_capacity
   ) {
-    if (update.registration_capacity > current.registration_capacity) {
-      affected.add('registration_recheck');
-      notes.push(
-        `Registration capacity increased from ${current.registration_capacity} to ${update.registration_capacity}. Existing registration arrangements must be rechecked.`
-      );
-    }
+    affected.add('registration_recheck');
+    notes.push(
+      `Registration capacity increased from ${current.registration_capacity} to ${update.registration_capacity}. Existing registration arrangements must be rechecked.`
+    );
   }
 
   return {
@@ -337,7 +416,9 @@ export function createUpdateEventPlanningHandler({
   getAdminClient = getSupabaseAdminClient,
   fetchPlanningRecord = fetchEventPlanningRecord,
   updatePlanningFields = updateEventPlanningFields,
-  insertAudit = insertAuditLogs
+  insertAudit = insertAuditLogs,
+  fetchArrangementFacts = fetchEventArrangementFacts,
+  now = Date.now
 }: UpdateEventPlanningDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -393,30 +474,20 @@ export function createUpdateEventPlanningHandler({
       return;
     }
 
-    // Registration window cross-validation with existing event values
-    const effectiveOpens =
-      validated.values.registration_opens_at !== undefined
-        ? validated.values.registration_opens_at
-        : currentEvent.registration_opens_at;
-    const effectiveCloses =
-      validated.values.registration_closes_at !== undefined
-        ? validated.values.registration_closes_at
-        : currentEvent.registration_closes_at;
-
-    if (
-      effectiveOpens &&
-      effectiveCloses &&
-      new Date(effectiveCloses).getTime() <= new Date(effectiveOpens).getTime()
-    ) {
-      res.status(400).json({
-        error: 'Invalid planning details',
-        details: ['registration_closes_at must be after registration_opens_at.']
-      });
+    // Dates against each other, the stored values and the clock (AC 4)
+    const scheduleErrors = validatePlanningSchedule(currentEvent, validated.values, now());
+    if (scheduleErrors.length > 0) {
+      res.status(400).json({ error: 'Invalid planning details', details: scheduleErrors });
       return;
     }
 
-    // Arrangement impact detection (AC 2)
-    const impact = detectArrangementImpact(currentEvent, validated.values);
+    // Arrangement impact detection (AC 2), against the arrangements that exist
+    const facts = await fetchArrangementFacts(admin, eventId);
+    if (!facts.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+    const impact = detectArrangementImpact(currentEvent, validated.values, facts.facts);
     if (impact.has_impact && !validated.confirm_impact) {
       res.status(409).json({
         error: 'Arrangements require rechecking.',

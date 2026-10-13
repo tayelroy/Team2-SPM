@@ -1,5 +1,10 @@
 # Test audit and course case design
 
+For SG2-55's current reservation scenarios, database checks and execution limits,
+see [Equipment reservations](equipment-reservations.md#verification) and cases
+SG2-55-P01/B01/C01/C02/N01 in [the regression register](regression-cases.json).
+Execution status is recorded separately from the case specification.
+
 > The current exhaustive review is [Test case review — 2 October 2026](test-case-review.md): 87 files, 1,191 test declarations and 154 SQL assertion contracts. The dated sections below preserve earlier evidence.
 
 > The current register is [Purposeful regression cases](regression.md):

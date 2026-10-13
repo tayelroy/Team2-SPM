@@ -90,4 +90,6 @@ Independent teammate sign-off must be completed before merge.
 The displayed check time identifies an advisory snapshot. Refreshing reruns
 the check, and a failed refresh removes the previous calculation. A check does
 not reserve equipment, promise future availability or overwrite the shortfall
-manually recorded under SG2-53. SG2-55 will provide the reservation workflow.
+manually recorded under SG2-53. [SG2-55](equipment-reservations.md) provides the
+reservation workflow and rechecks stock atomically, including this event's
+existing commitments before adding another reservation.

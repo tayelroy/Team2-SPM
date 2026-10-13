@@ -63,6 +63,13 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // registration) are still outstanding before an event can be confirmed. Which
   // event is enforced per-row by the assignment, not by this grant.
   'event_request.arrangements.view': ['event_coordinator'],
+  // SG2-58 AC1/AC2: the assigned coordinator confirms an event in Preparation.
+  // Which event, its status and its readiness are enforced by confirm_event
+  // (which also rechecks this role from account_roles), not by this grant.
+  'event_request.confirm': ['event_coordinator'],
+  // SG2-58 AC1/AC3: the confirmed arrangements, for the organiser who created
+  // the event and its assigned coordinator (enforced per-row by the handler).
+  'event_request.confirmation.view': ['event_organiser', 'event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing
@@ -126,6 +133,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venue_bookings.view': ['venue_staff', 'event_coordinator'],
   'venue_bookings.release': ['venue_staff', 'event_coordinator'],
   'venue_bookings.by_venue': ['venue_staff'],
+  // SG2-79 AC3: bookings that clash once setup and turnaround apply, for
+  // Venue Staff and the coordinator of each affected event (per-row).
+  'venue_clashes.view': ['venue_staff', 'event_coordinator'],
   // SG2-45: only Venue Staff block a venue from use or remove a block.
   // SG2-80 AC1/AC6: the same Venue Staff mark it temporarily unavailable.
   'venues.blocks.manage': ['venue_staff'],
@@ -137,6 +147,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment.update': ['technical_support_staff'],
   // SG2-54: only Technical Support assesses equipment commitments.
   'equipment.availability.read': ['technical_support_staff'],
+  // SG2-55: only Technical Support commits equipment reservations.
+  'equipment.reservations.manage': ['technical_support_staff'],
   // SG2-53: assigned coordinators request; support records arrangements;
   // Safety Officers read placements for the SG2-91 review workflow.
   'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],

@@ -801,7 +801,7 @@ test('[NORMAL] [SG2-26:AC1] organiser dashboard opens the selected real event an
 });
 
 // SG2-46: an approved event opens venue search pre-filled; the menu opens it blank.
-test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] a coordinator opens equipment requirements and venue search from the same approved event', async () => {
+test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] [SG2-55:AC4] a coordinator opens equipment requirements, read-only reservations and venue search from the same approved event', async () => {
   const approved = { kind: 'event', item_id: 10, event_id: 10, title: 'Approved Forum', event_name: 'Approved Forum',
     status: 'approved', starts_at: '2030-06-15T02:00:00.000Z', ends_at: null, category: 'assigned', assigned_to_me: true,
     details: { expected_attendance: 40, accessibility_needs: null } };
@@ -812,6 +812,7 @@ test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] a coordinator opens equipment requireme
       event: { event_id: 10, name: 'Approved Forum', status: 'approved' }, requests: [], equipment: [], venues: [],
       can_request: true, can_arrange: false,
     });
+    if (url === '/api/equipment-reservations?event_id=10') return Response.json({ reservations: [], can_reserve: false });
     if (url.startsWith('/api/venues/search')) return Response.json({ venues: [] });
     return Response.json({ accessToken: 'test-access-token', user: { userId: 'user-1', email: 'test@example.com', role: 'Event Coordinator' } });
   });
@@ -824,6 +825,9 @@ test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] a coordinator opens equipment requireme
   fireEvent.click(await screen.findByRole('button', { name: /Approved Forum/ }));
   expect(await screen.findByRole('region', { name: 'Equipment requirements' })).toBeVisible();
   expect(await screen.findByRole('button', { name: 'Add equipment requirement' })).toBeVisible();
+  const reservations = within(await screen.findByRole('region', { name: 'Equipment reservations' }));
+  expect(await reservations.findByText('No equipment reservations recorded.')).toBeVisible();
+  expect(reservations.queryByRole('button', { name: /^Reserve / })).not.toBeInTheDocument();
   fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
   expect(screen.getByRole('heading', { level: 1, name: 'Find venues' })).toBeInTheDocument();
   expect(screen.getByText('For: Approved Forum (#10)')).toBeInTheDocument();

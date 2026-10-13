@@ -36,6 +36,7 @@ import { createNotificationsRouter } from '../server/src/notifications';
 import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
 import { createMemoryReleaseStore } from './support/venue-releases';
 import { createVenueBookingsRouter } from '../server/src/venues/bookings';
+import { createVenueClashesRouter } from '../server/src/venues/clashes';
 import { createProfileRouter } from '../server/src/profile';
 import { createAvailabilityHandler, createAllVenuesAvailabilityHandler } from '../server/src/venues/availability';
 import type { VenueRecord } from '../server/src/venues/fields';
@@ -53,6 +54,11 @@ import { createEquipmentRequirementsRouter } from '../server/src/equipment/requi
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
 import { createEquipmentAvailabilityRouter } from '../server/src/equipment/availability';
 import { createMemoryAvailabilityStore } from './support/equipment-availability';
+import { createEquipmentReservationsRouter } from '../server/src/equipment/reservations';
+import { createMemoryReservationsStore, seedEquipmentReservations } from './support/equipment-reservations';
+import { createConfirmEventHandler } from '../server/src/events/confirm';
+import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
+import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -110,6 +116,8 @@ const operations = createVenueOperationsRouter(access, () => ({
     const table = database.client.from('venue_operations');
     const query = existing.data ? table.update(row).eq('venue_id', venueId) : table.insert({ venue_id: venueId, ...row });
     const result = await query.select(OPERATION_COLUMNS).maybeSingle();
+    // SG2-79: introducing or changing times re-checks the venue's bookings.
+    database.refreshVenueClashes(venueId);
     return result.data as VenueOperationRecord;
   }
 }));
@@ -205,7 +213,14 @@ const app = createApp(
   createGetEventArrangementsHandler(eventDependencies),
   // SG2-51: bookings and releases, against the in-memory client.
   createVenueBookingsRouter(access, { getAdminClient: getClient, releases: createMemoryReleaseStore(database) }),
-  createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token))
+  createEquipmentAvailabilityRouter(access, token => createMemoryAvailabilityStore(database, token)),
+  createEquipmentReservationsRouter(access, token => createMemoryReservationsStore(database, token)),
+  // SG2-79: clashing bookings, against the in-memory client.
+  createVenueClashesRouter(access, { getAdminClient: getClient }),
+  // SG2-58: confirmation mirrors confirm_event over the in-memory tables; the
+  // confirmed-arrangements view reads them through the in-memory client.
+  createConfirmEventHandler({ getPrincipal: access.getPrincipal, confirm: createMemoryConfirm(database) }),
+  createGetEventConfirmationHandler(eventDependencies)
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -221,6 +236,29 @@ app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memo
 app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
   res.status(204).end();
+});
+app.post('/__e2e/equipment-reservations', (req, res) => {
+  seedEquipmentReservations(database, Boolean(req.body?.missing_dates));
+  res.status(204).end();
+});
+app.get('/__e2e/equipment-reservations-ledger', (_req, res) => res.json({
+  requests: database.tables.equipment_requests, reservations: database.tables.equipment_reservations, notifications: database.tables.notifications,
+}));
+app.post('/__e2e/event-confirmation', (_req, res) => {
+  seedEventConfirmation(database);
+  res.status(204).end();
+});
+app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
+  prepareConvertedForum(database);
+  res.status(204).end();
+});
+app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [581, 582, 583, 584, 585].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), audit: database.tables.event_audit_logs, notifications: database.tables.notifications,
+    venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
+    bookings: database.tables.venue_bookings.filter(seeded),
+  });
 });
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
@@ -280,6 +318,10 @@ app.post('/__e2e/venue-request', (_req, res) => {
 });
 app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-clash', (_req, res) => {
+  database.seedVenueClash();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {
