@@ -4427,10 +4427,10 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 83-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_date": "12 Oct 2026",
+    "actual": "Passed in the 90-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_date": "13 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "12 Oct 2026; feature/SG2-82-book-multiple-venues on main at 0556593 (SG2-55 #79, including SG2-78 #73); npx playwright test; 83/83 journeys passed; installed Chromium; disposable PostgreSQL 17 replay of every migration and suite, including venue_multiple_bookings and the withdrawal race script. No hosted Supabase validation."
+    "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at caa7cc8 (SG2-58 #80, SG2-79 #81); npm run test:e2e; 90/90 journeys and 13/13 report-gate checks passed; installed Chromium; disposable PostgreSQL 17 replay of every migration and suite, including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
   },
   {
     "id": "SG2-82-N01",
@@ -4458,9 +4458,9 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 83-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_date": "12 Oct 2026",
+    "actual": "Passed in the 90-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_date": "13 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "12 Oct 2026; feature/SG2-82-book-multiple-venues on main at 0556593 (SG2-55 #79, including SG2-78 #73); npx playwright test; 83/83 journeys passed; installed Chromium; disposable PostgreSQL 17 replay of every migration and suite, including venue_multiple_bookings and the withdrawal race script. No hosted Supabase validation."
+    "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at caa7cc8 (SG2-58 #80, SG2-79 #81); npm run test:e2e; 90/90 journeys and 13/13 report-gate checks passed; installed Chromium; disposable PostgreSQL 17 replay of every migration and suite, including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
   }
 ]
