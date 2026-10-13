@@ -646,6 +646,19 @@
         "AC3": "Users with no relationship to the event are not notified"
       },
       "source": "SG2-68 Jira acceptance criteria as recorded in the team's implementation contract; AC numbering follows displayed bullet order. Product-owner scope: submitted, coordinator assigned, clarification requested, event request decision and venue booking decision/hold conversion are built here; event confirmed is SG2-58; significant change accepted (SG2-64/65) and event cancelled (SG2-67) have no code path yet and are recorded as dependencies."
+    },
+    {
+      "id": "SG2-82",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-82",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-08",
+      "acceptanceCriteria": {
+        "AC1": "I can raise more than one venue booking request for the same event, and each one stays linked to that event",
+        "AC2": "Each venue is checked independently for suitability, availability (including setup/turnaround) and conflicts",
+        "AC3": "A problem with one venue does not block requests for the event's other venues",
+        "AC4": "The event shows all of its venue bookings and the status of each one",
+        "AC5": "The event's venue arrangement counts as ready only when every venue booking the event needs is approved"
+      }
     }
   ]
 }

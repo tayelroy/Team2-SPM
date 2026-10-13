@@ -4701,5 +4701,69 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-82-P01",
+    "title": "one event books several venues; a rejected one does not block the others and, once withdrawn, the arrangement is ready",
+    "type": "Positive / multi-venue journey",
+    "story": "SG2-82",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-82:AC1",
+      "SG2-82:AC3",
+      "SG2-82:AC4",
+      "SG2-82:AC5"
+    ],
+    "purpose": "Verify AC1, AC3, AC4 and AC5: one event raises several venue requests, a venue refused by Venue Staff does not stop the others being approved, the event shows each venue with its own status, and its venue arrangement is ready only once every venue it still needs is approved.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase. Decisions and withdrawals use the in-memory equivalents of decide_venue_booking_request() and withdraw_venue_booking_request(); their SQL locking evidence is in supabase/tests/venue_multiple_bookings.sql and .github/scripts/test-venue-withdrawal-concurrency.mjs.",
+    "steps": [
+      "Seed event 91 (80 guests, needs a projector) with Regression Hall, Breakout Studio and Quiet Room (too small).",
+      "Sign in as the coordinator, open the event's venue search with no attendance filter and request all three venues for 20 Jun 2030, 09:00-12:00 SGT.",
+      "Sign in as venue staff; reject Quiet Room with the reason 'Too small for 80 guests.' and approve Regression Hall and Breakout Studio from the work queue.",
+      "Sign in as the coordinator and reopen the event's venue requests and booked venues.",
+      "Withdraw the rejected Quiet Room request and confirm."
+    ],
+    "data": "Event 91; venues 1 (Regression Hall), 2 (Quiet Room) and 5 (Breakout Studio, capacity 100, projector); coordinator and venue staff fixture accounts.",
+    "expected": "All three requests are listed as Pending with '0 of 3 venues approved; 3 venues awaiting Venue Staff'. After the decisions, two venues show Approved and two Confirmed bookings, Quiet Room shows its rejection and reason, and the arrangement reads not ready with 1 rejected venue; approved venues offer no withdrawal. Withdrawing Quiet Room shows the withdrawal notice, marks it Withdrawn by Regression coordinator and the arrangement reads 'ready: all 2 venues are approved'.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 91-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at 4b45eb1 (SG2-86 #83, SG2-38 #82, SG2-58 #80, SG2-79 #81); npm run test:e2e; 91/91 journeys and 13/13 report-gate checks passed; installed Chromium; npm run ci in a node:22 Linux clone; disposable PostgreSQL 17 replay of every migration and suite (35/35 steps), including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
+  },
+  {
+    "id": "SG2-82-N01",
+    "title": "the same venue twice, withdrawing an approved venue, or withdrawing as another role is refused, and the arrangement stays not ready",
+    "type": "Negative / role isolation",
+    "story": "SG2-82",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-82:AC1",
+      "SG2-82:AC5"
+    ],
+    "purpose": "Verify AC1 and AC5: an event cannot ask for the same venue twice over an overlapping period while other venues remain requestable, an approved venue cannot be withdrawn, only the event's coordinator withdraws, and a venue still awaiting a decision keeps the arrangement not ready.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase. Decisions and withdrawals use the in-memory equivalents of decide_venue_booking_request() and withdraw_venue_booking_request(); their SQL locking evidence is in supabase/tests/venue_multiple_bookings.sql and .github/scripts/test-venue-withdrawal-concurrency.mjs.",
+    "steps": [
+      "Seed the multi-venue fixture; as the coordinator request Regression Hall for 20 Jun 2030, 09:00-12:00 SGT, then again for 11:00-13:00, then Breakout Studio for 09:00-12:00.",
+      "Sign in as venue staff and approve Regression Hall; read the event's request ids and try to withdraw Breakout Studio through the API.",
+      "Sign in as the organiser and try the same withdrawal.",
+      "Sign in as the coordinator, reopen the event's venue requests, and through the API try to withdraw the approved Regression Hall request and request #9999."
+    ],
+    "data": "Event 91; venues 1 (Regression Hall) and 5 (Breakout Studio); coordinator, venue staff and organiser fixture accounts.",
+    "expected": "The second Regression Hall request is refused naming the earlier request while Breakout Studio is requested; venue staff and the organiser receive 403; the arrangement reads 'not ready: 1 of 2 venues approved; 1 venue awaiting Venue Staff'; Regression Hall shows Approved with no withdraw button, its API withdrawal answers 409 telling the coordinator to release the booking instead, and an unknown request answers 404.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 91-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at 4b45eb1 (SG2-86 #83, SG2-38 #82, SG2-58 #80, SG2-79 #81); npm run test:e2e; 91/91 journeys and 13/13 report-gate checks passed; installed Chromium; npm run ci in a node:22 Linux clone; disposable PostgreSQL 17 replay of every migration and suite (35/35 steps), including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
   }
 ]

@@ -33,7 +33,7 @@ import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } f
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
 import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createNotificationsRouter } from '../server/src/notifications';
-import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
+import { createMemoryDecisionStore, createMemoryWithdrawalStore, memoryNotifications } from './support/venue-decisions';
 import { createMemoryReleaseStore } from './support/venue-releases';
 import { createVenueBookingsRouter } from '../server/src/venues/bookings';
 import { createVenueClashesRouter } from '../server/src/venues/clashes';
@@ -179,7 +179,9 @@ const app = createApp(
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
-    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-82: withdrawing a request, against the in-memory client.
+    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database),
+      withdrawals: createMemoryWithdrawalStore(database) }),
     // SG2-50: what a pending request overlaps, against the in-memory client.
     conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
@@ -323,6 +325,10 @@ app.post('/__e2e/venue-decision', (_req, res) => {
 });
 app.post('/__e2e/venue-request', (_req, res) => {
   database.seedVenueRequest();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-multiple', (_req, res) => {
+  database.seedVenueMultiple();
   res.status(204).end();
 });
 app.post('/__e2e/venue-release', (_req, res) => {

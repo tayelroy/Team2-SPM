@@ -89,13 +89,41 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     }
   });
 
-  test('[BOUNDARY] [SG2-57:AC2] a rejected venue request is ignored, so an approved one still reads ready', () => {
-    const result = computeArrangementReadiness(
+  test('[CONFLICT] [SG2-57:AC2] [SG2-82:AC5] a rejected venue request holds the venue back beside an approved one until it is withdrawn', () => {
+    const rejected = computeArrangementReadiness(
       baseInput({ venue_requests: [{ status: 'rejected', booked: false }, { status: 'approved', booked: true }] })
     );
+    assert.equal(stateOf(rejected, 'venue'), 'outstanding');
+    assert.equal(rejected.arrangements.find(a => a.key === 'venue')!.detail,
+      '1 venue booking rejected: request a replacement if the event still needs one, then withdraw the rejected request.');
+    assert.deepEqual(rejected.outstanding, ['venue']);
+    assert.equal(rejected.ready_for_confirmation, false);
 
-    assert.equal(stateOf(result, 'venue'), 'ready');
-    assert.equal(result.ready_for_confirmation, true);
+    // Withdrawing it cancels the request, and the approved venue alone is ready.
+    const withdrawn = computeArrangementReadiness(
+      baseInput({ venue_requests: [{ status: 'cancelled', booked: false }, { status: 'approved', booked: true }] })
+    );
+    assert.equal(stateOf(withdrawn, 'venue'), 'ready');
+    assert.equal(withdrawn.ready_for_confirmation, true);
+  });
+
+  test('[BOUNDARY] [SG2-82:AC5] rejected venue requests are counted, an event with only a rejected one is outstanding, and pending ones are reported first', () => {
+    const several = computeArrangementReadiness(
+      baseInput({ venue_requests: [{ status: 'Rejected', booked: false }, { status: 'rejected', booked: false }, { status: 'approved', booked: true }] })
+    );
+    assert.equal(several.arrangements.find(a => a.key === 'venue')!.detail,
+      '2 venue bookings rejected: request replacements if the event still needs them, then withdraw the rejected requests.');
+
+    const onlyRejected = computeArrangementReadiness(baseInput({ venue_requests: [{ status: 'rejected', booked: false }] }));
+    assert.equal(stateOf(onlyRejected, 'venue'), 'outstanding');
+    assert.match(onlyRejected.arrangements.find(a => a.key === 'venue')!.detail, /^1 venue booking rejected/);
+    // A rejected request is not a venue being requested, for SG2-39's next step.
+    assert.equal(onlyRejected.venue_requested, false);
+
+    const pendingFirst = computeArrangementReadiness(
+      baseInput({ venue_requests: [{ status: 'rejected', booked: false }, { status: 'pending', booked: false }] })
+    );
+    assert.match(pendingFirst.arrangements.find(a => a.key === 'venue')!.detail, /awaiting approval/);
   });
 
   test('[CONFLICT] [SG2-58:AC2] an approved venue request whose booking was released leaves the venue outstanding', () => {
@@ -128,7 +156,7 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.match(pendingFirst.arrangements.find(a => a.key === 'venue')!.detail, /awaiting approval/);
   });
 
-  test('[BOUNDARY] [SG2-58:AC2] an unbooked request that was rejected or cancelled does not hold the venue back', () => {
+  test('[BOUNDARY] [SG2-58:AC2] [SG2-82:AC5] an unbooked request that was cancelled (withdrawn or released) does not hold the venue back', () => {
     const result = computeArrangementReadiness(
       baseInput({ venue_requests: [{ status: 'cancelled', booked: false }, { status: 'approved', booked: true }] })
     );

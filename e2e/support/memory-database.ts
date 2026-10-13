@@ -194,6 +194,16 @@ export class MemoryDatabase {
     );
   }
 
+  /** SG2-82: on top of seedVenueRequest, a third venue that fits event 91
+   * (80 guests, a projector), so the event can need several venues at once:
+   * Regression Hall and Breakout Studio fit; Quiet Room is too small. */
+  seedVenueMultiple() {
+    this.seedVenueRequest();
+    this.tables.venues.push({ venue_id: 5, name: 'Breakout Studio', location: 'Level 3', capacity: 100, facilities: 'Projector, whiteboards',
+      operating_information: '08:00–22:00', accessibility_features: 'Step-free' });
+    this.tables.venue_layouts.push({ venue_id: 5, layout: 'classroom', other_description: null });
+  }
+
   /** SG2-51: on top of seedVenueRequest, event 91 holds both venues on 20 June
    * 2030, 10:00-12:00 SGT (Week 7 change #3: one event, several venues). */
   /** SG2-78: setup plus turnaround (SG2-77) that bookings at the venue keep

@@ -121,6 +121,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venue_booking.conflicts.view': ['event_coordinator', 'venue_staff'],
   // SG2-49 AC1/AC2: Venue Staff approve or reject a venue request.
   'venue_booking.decide': ['venue_staff'],
+  // SG2-82 AC5: the event's assigned coordinator (enforced per-row) withdraws
+  // a pending or rejected request the event no longer needs.
+  'venue_booking.withdraw': ['event_coordinator'],
   // SG2-49 AC1/AC2: the roles with a notifications drawer read their own
   // notices; the rows are limited to the caller by the handler and by row
   // level security.
