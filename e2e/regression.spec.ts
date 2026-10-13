@@ -1751,6 +1751,51 @@ test('SG2-78-P01 | [SG2-78:AC1] [SG2-78:AC2] [SG2-78:AC3] [SG2-78:AC4] [SG2-78:A
     .toEqual([['2030-06-15T05:15:00.000Z', '2030-06-15T06:00:00.000Z']]);
 });
 
+test('SG2-79-P01 | [SG2-79:AC1] [SG2-79:AC2] [SG2-79:AC3] [SG2-79:AC4] [SG2-79:AC5] [NORMAL] [CONFLICT] raising a venue\'s setup and turnaround flags bookings that now clash, tells the coordinator and clears once resolved', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-clash')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const clashes = page.getByRole('region', { name: 'Clashing bookings' });
+  // Booking #1 ends at 12:00 SGT and #31 starts at 12:30: fine without setup or turnaround.
+  await expect(clashes.getByText('No bookings clash once setup and turnaround time are included.', { exact: true })).toBeVisible();
+
+  // AC1: 30 minutes setup and 45 minutes turnaround need 75 minutes between them.
+  const raise = await page.request.put('/api/venues/1/operations', { headers: await authHeaders(page),
+    data: { setup_minutes: 30, turnaround_minutes: 45, emergency_access: null, known_restrictions: null } });
+  expect(raise.status()).toBe(200);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  const forum = clashes.getByRole('listitem', { name: 'Booking #31' });
+  await expect(forum.getByText('Venue Request Forum', { exact: true })).toBeVisible();
+  await expect(forum.getByText(/^Clashes with Planning workshop, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)? \(booking #1\)$/)).toBeVisible();
+  await expect(clashes.getByRole('listitem', { name: 'Booking #1' })).toBeVisible();
+  // AC2: neither booking is cancelled, moved or otherwise changed.
+  const booked = await page.request.get('/api/venue-bookings?event_id=91', { headers: await authHeaders(page) });
+  expect((await booked.json()).bookings.map((row: { booking_id: number; status: string; starts_at: string; ends_at: string }) =>
+    [row.booking_id, row.status, row.starts_at, row.ends_at])).toEqual([[31, 'confirmed', '2030-06-15T04:30:00.000Z', '2030-06-15T05:30:00.000Z']]);
+
+  // AC3/AC4: the coordinator of the affected event sees their booking flagged,
+  // without another coordinator's event name, and has been told.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  const mine = page.getByRole('region', { name: 'Clashing bookings' });
+  await expect(mine.getByRole('listitem')).toHaveCount(1);
+  await expect(mine.getByRole('listitem', { name: 'Booking #31' }).getByText(/^Clashes with another event, /)).toBeVisible();
+  await page.getByRole('button', { name: /^Notifications \(1\)$/ }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Booking clash flagged', { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/^Regression Hall: Venue Request Forum \(15 Jun 2030 12:30 – 15 Jun 2030 13:30 SGT\) now clashes with another event/)).toBeVisible();
+
+  // AC5: shortening the times to exactly the 30 minutes between them clears the flag.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  const lower = await page.request.put('/api/venues/1/operations', { headers: await authHeaders(page),
+    data: { setup_minutes: 15, turnaround_minutes: 15, emergency_access: null, known_restrictions: null } });
+  expect(lower.status()).toBe(200);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Clashing bookings' }).getByText('No bookings clash once setup and turnaround time are included.', { exact: true })).toBeVisible();
+});
+
 test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, sees its own role and is denied ungranted operations', async ({ page }) => {
   await signIn(page, 'safety');
   await expect(page.getByLabel('Your role', { exact: true })).toHaveText('Safety Officer');

@@ -4,7 +4,8 @@ export interface Notification {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved';
+  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
+    | 'event_confirmed';
   message: string;
   created_at: string;
 }
@@ -18,7 +19,7 @@ const UNAVAILABLE: NotificationsOutcome = { ok: false, message: 'Could not load 
 function isNotification(value: unknown): value is Notification {
   const entry = value as Notification | null;
   return typeof entry?.notification_id === 'number'
-    && (entry.kind === 'venue_request_approved' || entry.kind === 'venue_request_rejected' || entry.kind === 'venue_booking_released' || entry.kind === 'equipment_reserved')
+    && (entry.kind === 'venue_request_approved' || entry.kind === 'venue_request_rejected' || entry.kind === 'venue_booking_released' || entry.kind === 'equipment_reserved' || entry.kind === 'venue_booking_clash' || entry.kind === 'event_confirmed')
     && typeof entry.message === 'string' && typeof entry.created_at === 'string' && Number.isFinite(Date.parse(entry.created_at));
 }
 

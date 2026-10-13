@@ -480,6 +480,19 @@
       }
     },
     {
+      "id": "SG2-79",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-79",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-12",
+      "acceptanceCriteria": {
+        "AC1": "Given existing bookings whose effective periods now overlap, when setup/turnaround times are introduced or changed for a venue, then the affected bookings are flagged as conflicting",
+        "AC2": "Flagged bookings are not cancelled, removed or altered automatically",
+        "AC3": "Venue Staff and the assigned Event Coordinator of each affected event can see a list of the flagged bookings and which booking each one clashes with",
+        "AC4": "The assigned Event Coordinator of each affected event is notified",
+        "AC5": "A flag clears once the conflict is resolved (e.g. a booking is moved, cancelled, or the times are changed)"
+      }
+    },
+    {
       "id": "SG2-86",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-86",
       "originalPullRequests": [],
@@ -609,6 +622,18 @@
       },
       "verifiedAt": "2026-10-11",
       "source": "Live SG2-55 Jira description, bullet order, read in the in-app browser."
+    },
+    {
+      "id": "SG2-58",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-58",
+      "summary": "Confirm an event",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Given an event I coordinate with every required venue booking approved, any requested equipment reserved, and registration capacity and opening/closing times set if registration is needed, when I confirm it, then its status becomes Confirmed and the Event Organiser can see the confirmed arrangements and is notified",
+        "AC2": "Given an event with any of these required arrangements outstanding (including any one of several venue bookings), when I try to confirm it, confirmation is refused and the outstanding items are listed; equipment or registration that is not required does not block confirmation",
+        "AC3": "Given a confirmed event for which registration is required, attendees can register once the registration period is open"
+      },
+      "source": "SG2-58 Jira acceptance criteria as recorded in the team's implementation contract; AC numbering follows displayed bullet order. Product-owner decisions: confirm only from Preparation; equipment must be reserved and placed with no shortfall; AC3 is delivered as the open-for-registration rule (SG2-60 builds registration)."
     },
     {
       "id": "SG2-82",

@@ -186,6 +186,28 @@ Migration `202610120002_setup_turnaround_checks.sql` adds `venue_preparation_gap
 
 Verification: `supabase/tests/venue_setup_turnaround.sql` (CI database job), `server/src/venue-setup-turnaround.test.ts`, the updated availability, search and conflict tests, `client/src/venues/calendarView.test.ts`, `client/src/venues/availability.test.ts`, `client/src/venues/BookingConflicts.test.tsx` and browser journey `SG2-78-P01`.
 
+## SG2-79: Flagging bookings that clash once setup and turnaround apply
+
+SG2-78 refuses new commitments that cut into a booking's setup or turnaround, but bookings made before a venue's times were introduced or raised can already sit too close together. Those pairs are flagged instead of changed.
+
+- **Flagged (AC1).** Whenever a venue's times are saved, every pair of its confirmed bookings closer together than setup plus turnaround is flagged in `venue_booking_clashes`.
+- **Not changed (AC2).** Flagged bookings are never cancelled, moved or otherwise altered.
+- **Listed (AC3).** `GET /api/venue-clashes` lists each flagged booking with the booking it clashes with, and the work-queue dashboard shows it as "Clashing bookings". Venue Staff see every flag. A coordinator sees their own events' bookings, with another coordinator's event shown only as "another event" (as SG2-50 shows conflicts).
+- **Notified (AC4).** When a flag appears, the coordinator of each affected event gets a `venue_booking_clash` notice. A flag that stands through a later change of times does not notify again.
+- **Cleared (AC5).** The same re-check runs whenever a booking is committed, moved or released (SG2-49 approvals, SG2-84 hold conversions, SG2-51 releases, direct writes), and drops pairs that no longer clash. A flag also clears when the venue's times change so the gap is enough.
+
+| Route | Who | Result |
+| --- | --- | --- |
+| `GET /api/venue-clashes` | Venue Staff; Event Coordinators (their events) | `200 { clashes: [{ booking, clashes_with, flagged_at }] }`, earliest first. `401`/`403` otherwise, `503` storage failure |
+
+Migration `202610140003_venue_booking_clashes.sql`:
+- adds `venue_booking_clashes` (forced RLS, server-only) and `refresh_venue_booking_clashes()`, which runs under the venue lock;
+- adds triggers on `venue_operations` and `venue_bookings`;
+- allows the `venue_booking_clash` notification kind;
+- flags any clashes that already exist when it is applied.
+
+Verification: `supabase/tests/venue_booking_clashes.sql` (CI database job), `server/src/venue-clashes.test.ts`, `server/src/db/venueClashes.test.ts`, `client/src/venues/BookingClashes.test.tsx` and browser journey `SG2-79-P01`.
+
 ## SG2-50: Preventing double-booking
 
 A venue is never committed to two overlapping events. Confirmed bookings and live tentative holds (SG2-84) commit a venue; a held booking (not yet confirmed) and a pending request do not, matching SG2-49's approval check, venue search and blocks. Periods that only touch (one ends as the next starts) do not overlap.

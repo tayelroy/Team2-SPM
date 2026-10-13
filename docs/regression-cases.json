@@ -4160,6 +4160,246 @@
     "expected": "Unsigned and coordinator writes return 401 and 403. The post-commit 503 displays safe refresh guidance, suppresses private diagnostics and disables another submit. The ledger already contains one receipt; refreshing recovers quantity 12 with exactly one coordinator notification."
   },
   {
+    "story": "SG2-58",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
+    "data": "Coordinator/organiser fixture accounts; Confirmation Forum event 581 in Preparation with Regression Hall and Quiet Room bookings approved and confirmed (20 Jun 2030, 10:00–14:00 Singapore time), 12 Wireless microphones reserved and placed with no shortfall, registration for 120 open from 1 Jan 2026 08:00 to 20 Jun 2030 00:00 Singapore time.",
+    "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (5/5) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "11 Oct 2026; targeted runs: npx playwright test e2e/event-confirmation.spec.ts 5/5; e2e/regression.spec.ts + e2e/equipment-reservations.spec.ts 66/66; server coverage 1,356 tests with every file at 100%. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "11 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-P01",
+    "title": "the coordinator confirms a ready event and the organiser is notified and sees the confirmed arrangements",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC1",
+      "SG2-58:AC3"
+    ],
+    "purpose": "Prove a ready event in Preparation is confirmed atomically, the organiser is told, and the organiser sees exactly what was confirmed including whether registration is open.",
+    "steps": [
+      "At 1440px, sign in as the coordinator and open Confirmation Forum from My assigned events; read the readiness panel.",
+      "Select Confirm event and read the status message, status badge and fixture ledger.",
+      "Sign in as the organiser, open notifications, then open the event from My events and read the Confirmed arrangements section and the confirmation API.",
+      "Check horizontal overflow and collected browser/console errors."
+    ],
+    "expected": "The panel reads Ready for confirmation with equipment reserved and placed. The status becomes confirmed with confirmed_by user-coordinator and a confirmed_at time, one status audit row preparation → confirmed and one event_confirmed notice to user-organiser reading 'Your event Confirmation Forum is confirmed.'. The organiser inbox shows 'Event confirmed'; the section lists both venues at 20 Jun 2030, 10:00 SGT – 14:00 SGT, '12 × Wireless microphones', capacity 120, opening and closing times and 'Registration is open. Attendees can register now.'; the API reports window open. No overflow or browser errors."
+  },
+  {
+    "story": "SG2-58",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
+    "data": "Coordinator fixture account; Outstanding Forum event 582 in Preparation with one approved and one pending venue request, a placed but unreserved microphone request, and registration needed with no capacity.",
+    "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (5/5) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "11 Oct 2026; targeted runs: npx playwright test e2e/event-confirmation.spec.ts 5/5; e2e/regression.spec.ts + e2e/equipment-reservations.spec.ts 66/66. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "11 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-N01",
+    "title": "confirmation is refused while one of two venues is pending, equipment is unreserved and registration has no capacity",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC2"
+    ],
+    "purpose": "Refuse confirmation when any required arrangement is outstanding, list every outstanding item, and write nothing.",
+    "steps": [
+      "At 1440px, sign in as the coordinator and open Outstanding Forum; read the venue and equipment details in the readiness panel.",
+      "Select Confirm event and read the alert and the Outstanding arrangements list.",
+      "Read the status badge and fixture ledger."
+    ],
+    "expected": "Venue reads '1 venue booking still awaiting approval.' and equipment '1 equipment request not yet reserved and placed with no shortfall.'. The alert reads 'Confirmation refused: arrangements are still outstanding.' listing Venue booking, Equipment, Registration in that order. The status stays preparation with no confirmed_by/confirmed_at, no audit row and no notification."
+  },
+  {
+    "story": "SG2-58",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
+    "data": "Venue staff and coordinator fixture accounts; Converted Forum event 585 seeded in Planning with no venue request, no equipment and registration not needed; Regression Hall free on 1 Jul 2030.",
+    "evidence": "e2e/event-confirmation.spec.ts; e2e/support/venue-holds.ts; e2e/support/venue-releases.ts; docs/event-confirmation.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (6/6) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "12 Oct 2026; targeted run: npx playwright test e2e/event-confirmation.spec.ts e2e/regression.spec.ts e2e/equipment-reservations.spec.ts 72/72. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "12 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-N02",
+    "title": "a booking converted from a hold and later released leaves Confirm refused with the venue listed",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC2"
+    ],
+    "purpose": "Prove the venue gate follows a booking recorded only on a converted tentative hold: it counts while confirmed, and once released the still-approved request blocks confirmation (PR #80 review).",
+    "steps": [
+      "As venue staff, place a tentative hold for event 585 on Regression Hall and convert it; move the event to Preparation through the fixture.",
+      "Read the fixture ledger: the request is approved with no venue_booking_id and the hold carries the booking.",
+      "At 1440px, sign in as the coordinator, open Converted Forum and read the venue detail and readiness badge.",
+      "Release the booking as the coordinator through the API, reopen Converted Forum, read the venue detail, select Confirm event and read the alert, list, status and ledger."
+    ],
+    "expected": "Before release the venue reads '1 venue booking approved.' and the badge 'Ready for confirmation'. After release the request stays approved, the venue reads '1 approved venue request no longer has a confirmed booking.', and Confirm is refused with 'Confirmation refused: arrangements are still outstanding.' listing only Venue booking. The status stays preparation with no confirmed_by/confirmed_at, no status audit row and no new notification."
+  },
+  {
+    "story": "SG2-58",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
+    "data": "Coordinator/organiser fixture accounts; Simple Forum event 583 in Preparation with one approved and confirmed Regression Hall booking, no equipment requests and registration not needed.",
+    "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (5/5) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "11 Oct 2026; targeted runs: npx playwright test e2e/event-confirmation.spec.ts 5/5; e2e/regression.spec.ts + e2e/equipment-reservations.spec.ts 66/66. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "11 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-B01",
+    "title": "equipment and registration that are not required do not block, and both views fit 390px",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC1",
+      "SG2-58:AC2"
+    ],
+    "purpose": "Show that not-required arrangements never block confirmation and that the coordinator and organiser views are usable on a phone.",
+    "steps": [
+      "At 390×844, sign in as the coordinator and open Simple Forum; read the equipment and registration states and check overflow.",
+      "Confirm the event; read the status message, overflow and ledger.",
+      "Sign in as the organiser, open the event and read the Confirmed arrangements section; check overflow."
+    ],
+    "expected": "Equipment and registration read Not required; confirmation succeeds with 'Event confirmed. The Event Organiser has been notified.' and status confirmed. The organiser sees the Regression Hall booking, 'No equipment reserved.' and 'Registration is not required for this event.'. Neither view overflows horizontally at 390px."
+  },
+  {
+    "story": "SG2-58",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
+    "data": "Coordinator fixture account; Confirmation Forum event 581 ready in Preparation.",
+    "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (5/5) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "11 Oct 2026; targeted runs: npx playwright test e2e/event-confirmation.spec.ts 5/5; e2e/regression.spec.ts + e2e/equipment-reservations.spec.ts 66/66. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "11 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-C01",
+    "title": "a double click sends one confirmation and a replay is refused without a second notice",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC1"
+    ],
+    "purpose": "Ensure repeated submissions cannot confirm twice or notify the organiser twice.",
+    "steps": [
+      "Sign in as the coordinator and open Confirmation Forum; hold the confirm request at the network layer.",
+      "Click Confirm event twice in one task; observe the disabled Confirming… button, release the request and count requests.",
+      "Replay the confirmation through the API and read the ledger."
+    ],
+    "expected": "Exactly one confirm request is sent and the success message appears. The replay returns HTTP 409 { error: 'Only an event in Preparation can be confirmed.', code: 'closed' }. The ledger holds one audit row and one notification."
+  },
+  {
+    "story": "SG2-58",
+    "preconditions": "Real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; no hosted Supabase.",
+    "data": "Every fixture account; Confirmation Forum event 581 assigned to the signed-in coordinator; Colleague Forum event 584 ready but assigned to a second coordinator.",
+    "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
+    "layer": "Playwright fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-confirmation.spec.ts (5/5) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "11 Oct 2026; targeted runs: npx playwright test e2e/event-confirmation.spec.ts 5/5; e2e/regression.spec.ts + e2e/equipment-reservations.spec.ts 66/66. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "11 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-58-F01",
+    "title": "only the assigned coordinator confirms, and only the organiser and coordinator see a confirmed event",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC1",
+      "SG2-58:AC3"
+    ],
+    "purpose": "Enforce confirmation authority and the confirmed-arrangements audience server-side.",
+    "steps": [
+      "Confirm event 581 without credentials and as organiser, technical support, venue staff, attendee, lead and safety officer.",
+      "As the coordinator, confirm the colleague's event 584.",
+      "As the organiser, read 581's confirmation before it is confirmed; confirm it as the coordinator; read it as another organiser, as venue staff and as the coordinator; read the ledger."
+    ],
+    "expected": "Unsigned is 401 and every other role 403. The colleague's event is 404 'No event in preparation is assigned to this account.' and stays in preparation. Before confirmation the organiser gets 404; afterwards another organiser gets 404, venue staff 403, and the coordinator 200 with 12 × Wireless microphones. One notification exists."
+  },
+  {
+    "id": "SG2-79-P01",
+    "title": "raising a venue's setup and turnaround flags bookings that now clash, tells the coordinator and clears once resolved",
+    "story": "SG2-79",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-79:AC1",
+      "SG2-79:AC2",
+      "SG2-79:AC3",
+      "SG2-79:AC4",
+      "SG2-79:AC5"
+    ],
+    "purpose": "Verify that introducing setup and turnaround time flags existing bookings now too close together, without changing them, shows the flags to Venue Staff and the affected coordinator with what each clashes with, notifies that coordinator, and clears once the clash is resolved.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Seed Regression Hall with booking #1 (Planning workshop, 10:00-12:00 SGT) and booking #31 (Venue Request Forum, 12:30-13:30 SGT) on 15 Jun 2030.",
+      "As Venue Staff, read the Clashing bookings list, then record 30 minutes setup and 45 minutes turnaround through the SG2-77 API and refresh.",
+      "List event 91's bookings.",
+      "As the coordinator, read the Clashing bookings list and the notifications drawer.",
+      "As Venue Staff, record 15 minutes setup and 15 minutes turnaround and refresh."
+    ],
+    "data": "Venue 1 (Regression Hall), bookings #1 and #31, event 91; venue and coordinator fixture accounts.",
+    "expected": "Nothing is flagged without times; with 30/45 both bookings are flagged, #31 naming Planning workshop's booking #1; booking #31 stays confirmed at 12:30-13:30; the coordinator sees only #31, clashing with another event, and has a Booking clash flagged notice; with 15/15 the flags clear.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other venue journeys.",
+    "execution_date": "12 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "12 Oct 2026; feature/SG2-79-flag-clashing-bookings on main 0556593; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_clashes. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-12",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-VENUE-CLASH-01",
+    "title": "Bookings closer together than setup plus turnaround are flagged, notified once and cleared when resolved",
+    "story": "SG2-79",
+    "purpose": "Check venue_booking_clashes, refresh_venue_booking_clashes() and its triggers through actual stored records, notifications and refused operations.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed coordinators, events and confirmed bookings 30 minutes apart at a venue with no times, and a second venue for one coordinator's own two events.",
+      "Introduce 30/45 minutes; change to 30/40, 15/15 and 15/16; move a booking away and back; release it.",
+      "Introduce times at the second venue.",
+      "Read flags and call the re-check as a client.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/venue_booking_clashes.sql",
+    "expected": "Nothing is flagged without times; 30/45 flags the pair, leaves both bookings unchanged and notifies each coordinator once, hiding the other coordinator's event; 30/40 keeps one flag with no new notices; 15/15 (exactly the gap) clears it and 15/16 flags it again; moving or releasing a booking clears it; a coordinator's own two events are named; clients cannot read flags or call the re-check.",
+    "evidence": "supabase/tests/venue_booking_clashes.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: dropping the venue_operations trigger failed times-introduced-flagged; dropping the venue_bookings trigger failed moved-booking-clears.",
+    "execution_date": "12 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "12 Oct 2026; feature/SG2-79-flag-clashing-bookings on main 0556593; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_clashes. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-12",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
     "id": "SG2-82-P01",
     "title": "one event books several venues; a rejected one does not block the others and, once withdrawn, the arrangement is ready",
     "type": "Positive / multi-venue journey",

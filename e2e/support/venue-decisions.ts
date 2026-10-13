@@ -51,6 +51,8 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
         database.tables.venue_bookings.push({ booking_id: booking, venue_id: request.venue_id, event_id: request.event_id,
           starts_at: request.starts_at, ends_at: request.ends_at, status: 'confirmed' });
         event.venue_booking_id ??= booking;
+        // SG2-79: a new confirmed booking re-checks its venue's clashes.
+        database.refreshVenueClashes(request.venue_id);
       }
       const status = decision === 'approve' ? 'approved' : 'rejected';
       Object.assign(request, { status, decided_by: userId, decided_at: now, decision_reason: reason, venue_booking_id: booking });

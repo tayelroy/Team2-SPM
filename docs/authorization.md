@@ -112,6 +112,15 @@ two must change together. SG2-40 adds `INTERNAL_ONLY_AUDIT_FIELDS` beside it
 to internal roles, by the history handler and by the same RLS policy — see
 [organisation events](organisation-events.md#event-change-history-sg2-40).
 
+SG2-58 adds `event_request.confirm`, held only by `event_coordinator`: the
+assigned coordinator confirms an event in Preparation. Which event, its status
+and its readiness are enforced by the `confirm_event` RPC, which also rechecks
+the caller's stored role in `account_roles` and refuses anyone else with
+`42501`. `event_request.confirmation.view` (Event Organiser, Event
+Coordinator) reads a confirmed event's arrangements; the handler then requires
+the event's creating organiser or its assigned coordinator and answers 404 to
+everyone else — see [event confirmation](event-confirmation.md).
+
 Permissions map an action name to the roles allowed to perform it. Define them
 in `PERMISSIONS` in `server/src/auth/policy.ts`. The current policy is:
 

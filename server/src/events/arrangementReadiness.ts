@@ -12,11 +12,10 @@ import type {
  * always required; equipment and registration are `not_required` when nothing
  * is requested or registration is not needed.
  *
- * `ready_for_confirmation` means every *required* arrangement is ready — the
- * event can leave the Arrangements step toward the safety check (SG2-100 put
- * Safety Check and Preparation between Arrangements and Confirmed, so this is
- * "arrangements complete", not "one click from confirmed"). SG2-58 owns the
- * actual confirmation transition and its own gating.
+ * `ready_for_confirmation` means every *required* arrangement is ready. SG2-58's
+ * `confirm_event` RPC applies the same three rules in SQL as its gate, so the
+ * panel and the Confirm action never disagree; any change here must be made
+ * there too (supabase/migrations/202610150001_event_confirmation.sql).
  */
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
@@ -65,8 +64,12 @@ function pluralise(count: number, noun: string): string {
 
 function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
   const live = requests.filter(isLive);
-  const approved = live.filter(row => row.status.toLowerCase() === 'approved').length;
+  const approvedRows = live.filter(row => row.status.toLowerCase() === 'approved');
+  const approved = approvedRows.length;
   const pending = live.filter(row => row.status.toLowerCase() === 'pending').length;
+  // SG2-58 review: an approved request whose booking was converted from a hold
+  // and later released stays approved, so approval alone does not prove a venue.
+  const unbooked = approvedRows.filter(row => !row.booked).length;
 
   // Every event needs a venue, so an event with no live booking request has an
   // outstanding venue arrangement rather than "not required".
@@ -84,6 +87,16 @@ function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
       label: 'Venue booking',
       state: 'outstanding',
       detail: `${pluralise(pending, 'venue booking')} still awaiting approval.`
+    };
+  }
+  if (unbooked > 0) {
+    return {
+      key: 'venue',
+      label: 'Venue booking',
+      state: 'outstanding',
+      detail: `${pluralise(unbooked, 'approved venue request')} no longer ${
+        unbooked === 1 ? 'has' : 'have'
+      } a confirmed booking.`
     };
   }
   return {
@@ -107,11 +120,12 @@ function computeEquipment(requests: EquipmentRequestArrangementRow[]): Arrangeme
     };
   }
 
-  // SG2-53: a request is in place once Technical Support has arranged it
-  // (placement recorded) with no remaining shortfall. A null shortfall means it
-  // has not been arranged at all.
+  // SG2-58 (product-owner decision): equipment is in place only when it is
+  // both reserved (an SG2-55 receipt for the request) and arranged (SG2-53
+  // placement recorded with no remaining shortfall). A null shortfall means
+  // it has not been arranged at all.
   const inPlace = live.filter(
-    row => row.placement_venue_id !== null && row.shortfall === 0
+    row => row.reserved && row.placement_venue_id !== null && row.shortfall === 0
   ).length;
   const outstanding = live.length - inPlace;
 
@@ -120,14 +134,14 @@ function computeEquipment(requests: EquipmentRequestArrangementRow[]): Arrangeme
       key: 'equipment',
       label: 'Equipment',
       state: 'outstanding',
-      detail: `${pluralise(outstanding, 'equipment request')} not yet arranged or with a shortfall.`
+      detail: `${pluralise(outstanding, 'equipment request')} not yet reserved and placed with no shortfall.`
     };
   }
   return {
     key: 'equipment',
     label: 'Equipment',
     state: 'ready',
-    detail: `${pluralise(inPlace, 'equipment request')} arranged.`
+    detail: `${pluralise(inPlace, 'equipment request')} reserved and placed.`
   };
 }
 
