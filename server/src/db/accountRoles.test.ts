@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAccountRole, updateAccountRole, deleteAccountRole, getAccountRole, listCoordinators } from './accountRoles';
+import { createAccountRole, updateAccountRole, deleteAccountRole, getAccountRole, getAccountRoles, listCoordinators } from './accountRoles';
 
 function fakeAdmin(options: {
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
@@ -146,6 +146,49 @@ describe('getAccountRole', () => {
     const admin = fakeAdmin({ select: async () => ({ data: null, error: { message: 'connection reset' } }) });
     const result = await getAccountRole(admin, 'coord-1');
     assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
+  });
+});
+
+describe('getAccountRoles', () => {
+  function rolesAdmin(result: { data: unknown; error: { message: string } | null }, asked: unknown[] = []): SupabaseClient {
+    return {
+      from(table: string) {
+        assert.equal(table, 'account_roles');
+        return {
+          select: (columns: string) => ({
+            in: async (column: string, values: unknown) => {
+              asked.push([columns, column, values]);
+              return result;
+            }
+          })
+        };
+      }
+    } as unknown as SupabaseClient;
+  }
+
+  test('[NORMAL] [SG2-40:AC1] reads every requested account\'s role in one query, keyed by user id', async () => {
+    const asked: unknown[] = [];
+    const result = await getAccountRoles(rolesAdmin({ data: [
+      { user_id: 'coord-1', role: 'event_coordinator' },
+      { user_id: 'lead-1', role: 'event_coordinator_lead' }
+    ], error: null }, asked), ['coord-1', 'lead-1', 'gone-1']);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.deepEqual([...result.roles], [['coord-1', 'event_coordinator'], ['lead-1', 'event_coordinator_lead']]);
+      assert.equal(result.roles.has('gone-1'), false);
+    }
+    assert.deepEqual(asked, [['user_id, role', 'user_id', ['coord-1', 'lead-1', 'gone-1']]]);
+  });
+
+  test('[BOUNDARY] [SG2-40:AC1] null rows read back as no roles', async () => {
+    const result = await getAccountRoles(rolesAdmin({ data: null, error: null }), ['ghost']);
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.roles.size, 0);
+  });
+
+  test('[FAILURE] [SG2-40:AC1] surfaces a database error', async () => {
+    const result = await getAccountRoles(rolesAdmin({ data: null, error: { message: 'connection reset' } }), ['coord-1']);
+    assert.deepEqual(result, { ok: false, error: 'connection reset' });
   });
 });
 

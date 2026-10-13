@@ -323,13 +323,15 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     });
   });
 
-  test('[NORMAL] [SG2-100:AC3] assigning a request awaiting assignment also moves it into review', async () => {
+  test('[NORMAL] [SG2-100:AC3] [SG2-40:AC1] [SG2-40:AC2] assigning a request awaiting assignment also moves it into review and records unassigned → submitted with the assignment', async () => {
     const transitions: (AssignStatusTransition | undefined)[] = [];
     const writes: [number, string | null, string | null][] = [];
+    const audits: InsertAuditLogInput[][] = [];
     const response = await request(
       buildApp({
         writes,
         transitions,
+        audits,
         fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status: 'unassigned' } },
         assignResult: {
           ok: true,
@@ -344,6 +346,11 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     assert.equal(response.body.request.status, 'submitted');
     assert.deepEqual(transitions, [{ from: 'unassigned', to: 'submitted' }]);
     assert.deepEqual(writes, [[7, 'coord-1', null]]);
+    // One insert, so the undo path covers both rows together.
+    assert.deepEqual(audits, [[
+      { event_id: 7, actor_id: 'staff-1', field_name: 'coordinator_id', old_value: null, new_value: 'Sarah Tan' },
+      { event_id: 7, actor_id: 'staff-1', field_name: 'status', old_value: 'unassigned', new_value: 'submitted' }
+    ]]);
   });
 
   test('[CONFLICT] [SG2-100:AC3] reassigning a live event carries no status move, so the event is never rewound', async () => {

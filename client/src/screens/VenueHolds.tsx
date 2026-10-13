@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Role } from '../mock/types';
 import { changeHold, createHold, fetchHolds, fetchHoldOptions, type HoldOptions, type VenueHold } from '../venues/holdsApi';
+import { sgtToMs } from '../venues/searchApi';
 
 const EMPTY = { event: '', venue: '', start: '', end: '', expiry: '' };
 const LABELS = { tentative: 'Tentative', converted: 'Confirmed booking', released: 'Released', expired: 'Expired' };
@@ -53,7 +54,8 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
     if (Object.values(form).some(value => !value)) {
       setError('Select an event and venue, and enter the period and expiry.'); return;
     }
-    const start = Date.parse(form.start), end = Date.parse(form.end), expiry = Date.parse(form.expiry);
+    // SG2-44: typed times are Singapore time, matching how holds are listed.
+    const start = sgtToMs(form.start), end = sgtToMs(form.end), expiry = sgtToMs(form.expiry);
     if (start >= end || expiry <= Date.now()) {
       setError('The period must end after it starts, and the expiry must be in the future.'); return;
     }
@@ -87,7 +89,7 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
       {staff && (options.events.length > 0 && options.venues.length > 0 ?
         <form aria-label="Place a tentative hold" className="venue-hold-form" onSubmit={place}>
           <h3>Place a tentative hold</h3>
-          <p>Choose an approved or planning event with an assigned coordinator. Date and time inputs use your device’s local time.</p>
+          <p>Choose an approved or planning event with an assigned coordinator. Enter dates and times in Singapore time.</p>
           <div className="venue-hold-fields">
             <label>Event<select required value={form.event} onChange={event => setForm(previous => ({ ...previous, event: event.target.value }))}>
               <option value="">Select event</option>{options.events.map(event => <option key={event.event_id} value={event.event_id}>{event.name} · #{event.event_id}</option>)}
@@ -95,9 +97,9 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
             <label>Venue<select required value={form.venue} onChange={event => setForm(previous => ({ ...previous, venue: event.target.value }))}>
               <option value="">Select venue</option>{options.venues.map(venue => <option key={venue.venue_id} value={venue.venue_id}>{venue.name}</option>)}
             </select></label>
-            <label>Period starts<input required type="datetime-local" value={form.start} onChange={event => setForm(previous => ({ ...previous, start: event.target.value }))} /></label>
-            <label>Period ends<input required type="datetime-local" value={form.end} onChange={event => setForm(previous => ({ ...previous, end: event.target.value }))} /></label>
-            <label>Hold expires<input required type="datetime-local" value={form.expiry} onChange={event => setForm(previous => ({ ...previous, expiry: event.target.value }))} /></label>
+            <label>Period starts (Singapore time)<input required type="datetime-local" value={form.start} onChange={event => setForm(previous => ({ ...previous, start: event.target.value }))} /></label>
+            <label>Period ends (Singapore time)<input required type="datetime-local" value={form.end} onChange={event => setForm(previous => ({ ...previous, end: event.target.value }))} /></label>
+            <label>Hold expires (Singapore time)<input required type="datetime-local" value={form.expiry} onChange={event => setForm(previous => ({ ...previous, expiry: event.target.value }))} /></label>
           </div>
           <button type="submit" className="organisation-button organisation-button-primary" disabled={pending}>{pending ? 'Placing hold…' : 'Place hold'}</button>
         </form> : <p>No eligible events or venues. An approved or planning event needs an assigned Event Coordinator before a hold can be placed.</p>)}

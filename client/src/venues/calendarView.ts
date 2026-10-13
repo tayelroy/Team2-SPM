@@ -13,6 +13,14 @@ export const MONTH_LABELS = [
 
 const DAY_MS = 86_400_000;
 const MAX_ITEMS_PER_DAY = 3;
+/** Venue times are entered and shown in Singapore time (UTC+8, no daylight
+ * saving), so calendar days run from Singapore midnight to midnight. */
+const SINGAPORE_OFFSET_MS = 8 * 3_600_000;
+
+/** The instant of 00:00 Singapore time on a calendar date (month is 0-based and may overflow). */
+function singaporeMidnight(year: number, month: number, day: number): number {
+  return Date.UTC(year, month, day) - SINGAPORE_OFFSET_MS;
+}
 
 export interface MonthRange {
   from: string;
@@ -22,13 +30,14 @@ export interface MonthRange {
   month: number;
 }
 
-/** ISO [from, to) bounds of the UTC month containing `reference`, plus its label. */
+/** ISO [from, to) bounds of the Singapore month containing `reference`, plus its label. */
 export function monthRange(reference: Date): MonthRange {
-  const year = reference.getUTCFullYear();
-  const month = reference.getUTCMonth();
+  const singapore = new Date(reference.getTime() + SINGAPORE_OFFSET_MS);
+  const year = singapore.getUTCFullYear();
+  const month = singapore.getUTCMonth();
   return {
-    from: new Date(Date.UTC(year, month, 1)).toISOString(),
-    to: new Date(Date.UTC(year, month + 1, 1)).toISOString(),
+    from: new Date(singaporeMidnight(year, month, 1)).toISOString(),
+    to: new Date(singaporeMidnight(year, month + 1, 1)).toISOString(),
     label: `${MONTH_LABELS[month]} ${year}`,
     year,
     month
@@ -71,7 +80,8 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
       continue;
     }
 
-    const dayStart = Date.UTC(year, month, dayNumber);
+    // SG2-44: a 12:00 am Singapore start belongs to that day, not the UTC day before.
+    const dayStart = singaporeMidnight(year, month, dayNumber);
     const dayEnd = dayStart + DAY_MS;
     const items: string[] = [];
     let hasBooking = false;
@@ -102,7 +112,7 @@ export function buildCalendarDays(reference: Date, venues: VenueAvailabilitySumm
     if (items.length > MAX_ITEMS_PER_DAY) shown.push(`+${items.length - MAX_ITEMS_PER_DAY} more`);
 
     days.push({
-      date: new Date(dayStart).toISOString().slice(0, 10),
+      date: new Date(Date.UTC(year, month, dayNumber)).toISOString().slice(0, 10),
       n: String(dayNumber),
       inMonth: true,
       kind,

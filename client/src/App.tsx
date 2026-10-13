@@ -75,6 +75,13 @@ export default function App() {
   // with the token they were loaded for so a previous session's never leak
   // into the next one's navigation.
   const [loadedAccess, setLoadedAccess] = useState<{ token: string; access: Access | null } | null>(null);
+  // SG2-30 AC1: the request just submitted, confirmed on its detail page.
+  // Cleared as soon as the user leaves that page.
+  const [submittedName, setSubmittedName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (screen !== 'detail') setSubmittedName(null);
+  }, [screen]);
 
   // Best-effort background check that a persisted session is still valid,
   // which also loads the permissions the navigation is gated on. Trusts the
@@ -184,19 +191,27 @@ export default function App() {
       />
     ),
     detail: (
-      <EventDetail
-        key={`${session!.accessToken}:${selectedEventId}`}
-        role={role}
-        onNavigate={setScreen}
-        selectedEventId={selectedEventId}
-        accessToken={session!.accessToken}
-      />
+      <>
+        {submittedName ? (
+          <p role="status" className="organisation-detail-notice" style={{ marginBottom: '20px' }}>
+            {submittedName} has been submitted for review.
+          </p>
+        ) : null}
+        <EventDetail
+          key={`${session!.accessToken}:${selectedEventId}`}
+          role={role}
+          onNavigate={setScreen}
+          selectedEventId={selectedEventId}
+          accessToken={session!.accessToken}
+        />
+      </>
     ),
     form: (
       <RequestForm
         accessToken={session!.accessToken}
-        onSuccess={(eventId) => {
+        onSuccess={(eventId, name) => {
           setSelectedEventId(eventId);
+          setSubmittedName(name);
           setScreen('detail');
         }}
       />
@@ -217,9 +232,11 @@ export default function App() {
         eventId={String(editingRequest.event_id)}
         initialValues={editingRequest}
         accessToken={session!.accessToken}
-        onSuccess={() => {
+        onSuccess={(eventId, name) => {
           setEditingRequest(null);
-          setScreen('drafts');
+          setSelectedEventId(eventId);
+          setSubmittedName(name);
+          setScreen('detail');
         }}
       />
     ),

@@ -171,7 +171,7 @@ export const HEAD: Record<
     eyebrow: 'Technical Support Staff',
     title: 'Equipment desk',
     blurb:
-      'Pending equipment requests for your team. Open a request to see its details.',
+      'Equipment requests and reservations for your team. Open a request to review stock and placement.',
   },
   Attendee: {
     eyebrow: 'Attendee · J. Halloran',
@@ -461,17 +461,6 @@ export const FORM_FIELDS = [
     hint: 'Drives venue suitability checks',
   },
   { label: 'Registration needed', value: 'Yes — closes 8 Oct', hint: '' },
-];
-
-export const REQUIREMENT_CHIPS = [
-  'Step-free access',
-  'Hearing loop',
-  'Stage + lectern',
-  'Catering',
-  'Livestream',
-  'Breakout room',
-  'Parking',
-  'Signage',
 ];
 
 export const NEXT_STEPS = [

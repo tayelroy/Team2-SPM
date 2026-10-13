@@ -9,6 +9,7 @@ import type { Role } from './auth/policy';
 import { dbConfig } from './db/config';
 import { submitEventRequestHandler } from './events/submit';
 import type { FetchEventRequestResult, SubmitEventRequestResult } from './db/eventRequests';
+import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 import type { Principal } from './auth/policy';
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
@@ -36,10 +37,12 @@ interface HarnessOptions {
   submitResult?: SubmitEventRequestResult;
   captureFetch?: (eventId: number, organiserId: string) => void;
   captureSubmit?: (eventId: number) => void;
+  historyResult?: InsertAuditLogsResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
+  const history: InsertAuditLogInput[][] = [];
   app.use(express.json());
   app.patch(
     '/api/event-requests/:eventId/submit',
@@ -53,10 +56,14 @@ function buildApp(options: HarnessOptions = {}) {
       submitRequest: async (_admin, eventId) => {
         options.captureSubmit?.(eventId);
         return options.submitResult ?? { ok: true, request: { ...COMPLETE_DRAFT, status: 'submitted' } };
+      },
+      writeHistory: async (_admin, entries) => {
+        history.push(entries);
+        return options.historyResult ?? { ok: true, logs: [] };
       }
     })
   );
-  return app;
+  return Object.assign(app, { history });
 }
 
 describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
@@ -80,20 +87,23 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.deepEqual(writes, [1]);
   });
 
-  test('[NORMAL] [SG2-30:AC1] submits a complete draft owned by the caller', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-40:AC1] [SG2-40:AC2] submits a complete draft owned by the caller and records draft → unassigned with the organiser as actor', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
     let submitted: number | undefined;
-    const response = await request(
-      buildApp({
-        captureFetch: (eventId, organiserId) => (fetched = { eventId, organiserId }),
-        captureSubmit: (eventId) => (submitted = eventId)
-      })
-    ).patch('/api/event-requests/7/submit');
+    const app = buildApp({
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'unassigned' } },
+      captureFetch: (eventId, organiserId) => (fetched = { eventId, organiserId }),
+      captureSubmit: (eventId) => (submitted = eventId)
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body.request, { ...COMPLETE_DRAFT, status: 'submitted' });
+    assert.deepEqual(response.body.request, { ...COMPLETE_DRAFT, status: 'unassigned' });
     assert.deepEqual(fetched, { eventId: 7, organiserId: 'user-1' });
     assert.equal(submitted, 7);
+    assert.deepEqual(app.history, [[{
+      event_id: 7, actor_id: 'user-1', field_name: 'status', old_value: 'draft', new_value: 'unassigned'
+    }]]);
   });
 
   test('[FAILURE] [SG2-30:AC1] returns 400 for a non-numeric eventId', async () => {
@@ -152,32 +162,36 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('[NORMAL] [SG2-30:AC1] resubmits a rejected request owned by the caller', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-40:AC2] resubmits a rejected request owned by the caller and records rejected → submitted', async () => {
     let submitted: number | undefined;
-    const response = await request(
-      buildApp({
-        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'rejected' } },
-        captureSubmit: (eventId) => (submitted = eventId)
-      })
-    ).patch('/api/event-requests/7/submit');
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'rejected' } },
+      captureSubmit: (eventId) => (submitted = eventId)
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
 
     assert.equal(response.status, 200);
     assert.equal(response.body.request.status, 'submitted');
     assert.equal(submitted, 7);
+    assert.deepEqual(app.history, [[{
+      event_id: 7, actor_id: 'user-1', field_name: 'status', old_value: 'rejected', new_value: 'submitted'
+    }]]);
   });
 
-  test('[NORMAL] [SG2-36:AC2] resubmits a request returned for clarification, sending it back for review', async () => {
+  test('[NORMAL] [SG2-36:AC2] [SG2-40:AC2] resubmits a request returned for clarification, sending it back for review and recording needs_clarification → submitted', async () => {
     let submitted: number | undefined;
-    const response = await request(
-      buildApp({
-        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'needs_clarification' } },
-        captureSubmit: (eventId) => (submitted = eventId)
-      })
-    ).patch('/api/event-requests/7/submit');
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'needs_clarification' } },
+      captureSubmit: (eventId) => (submitted = eventId)
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
 
     assert.equal(response.status, 200);
     assert.equal(response.body.request.status, 'submitted');
     assert.equal(submitted, 7);
+    assert.deepEqual(app.history, [[{
+      event_id: 7, actor_id: 'user-1', field_name: 'status', old_value: 'needs_clarification', new_value: 'submitted'
+    }]]);
   });
 
   test('[FAILURE] [SG2-36:AC2] a returned request emptied while amending cannot be resubmitted', async () => {
@@ -258,12 +272,20 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(response.status, 200);
   });
 
-  test('[FAILURE] [SG2-30:AC1] returns 503 without leaking the database error when the update fails', async () => {
-    const response = await request(
-      buildApp({ submitResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } })
-    ).patch('/api/event-requests/7/submit');
+  test('[FAILURE] [SG2-30:AC1] [SG2-40:AC1] returns 503 without leaking the database error when the update fails, recording nothing', async () => {
+    const app = buildApp({ submitResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } });
+    const response = await request(app).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 503);
     assert.doesNotMatch(response.text, /SENTINEL/);
+    assert.deepEqual(app.history, []);
+  });
+
+  test('[FAILURE] [SG2-40:AC1] answers 503 without provider details when the submission cannot be recorded in history', async () => {
+    const app = buildApp({ historyResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' } });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
+    assert.equal(app.history.length, 1);
   });
 });
 

@@ -12,6 +12,7 @@ import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
 import ClarificationThread from '../components/ClarificationThread';
 import EquipmentRequirements from '../components/EquipmentRequirements';
+import ConfirmedArrangements from '../components/ConfirmedArrangements';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -378,6 +379,11 @@ export default function EventDetail({
               </div>
             ))}
           </dl>
+          {/* SG2-58 AC1/AC3: the creating organiser and the assigned coordinator
+              see what was confirmed; the server returns 404 to anyone else. */}
+          {['confirmed', 'completed'].includes(detail.status.toLowerCase()) && ((isOrganiser && detail.canManage) || isAssignedCoordinator) && (
+            <ConfirmedArrangements eventId={detail.eventId} accessToken={accessToken} />
+          )}
           {isAssignedCoordinator && ['approved', 'planning', 'confirmed'].includes(detail.status.toLowerCase()) && (
             <EquipmentRequirements eventId={detail.eventId} accessToken={accessToken} />
           )}

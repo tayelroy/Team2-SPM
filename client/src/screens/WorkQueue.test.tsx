@@ -3,10 +3,11 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import type { WorkItem } from '../api/workQueue';
+import EquipmentRequirements from '../components/EquipmentRequirements';
 
-vi.mock('../components/EquipmentRequirements', () => ({ default: ({ eventId, canCheckAvailability }: { eventId: number; canCheckAvailability?: boolean }) => (
+vi.mock('../components/EquipmentRequirements', () => ({ default: vi.fn(({ eventId, canCheckAvailability }: { eventId: number; canCheckAvailability?: boolean }) => (
   <section aria-label="Equipment requirement integration">Equipment requests for event {eventId}{canCheckAvailability ? <button>Check equipment availability</button> : null}</section>
-) }));
+)) }));
 
 // SG2-57: stubbed like EquipmentRequirements so its own fetch does not change
 // the fetch counts and sequences these queue tests assert.
@@ -36,6 +37,23 @@ test('[NORMAL] [SG2-53:AC4] [SG2-53:AC5] support opens the equipment workflow fo
   expect(await screen.findByRole('region', { name: 'Equipment requirement integration' })).toHaveTextContent('Equipment requests for event 91');
 });
 
+test('[NORMAL] [CONFLICT] [SG2-55:AC4] the selected equipment header becomes approved only when that exact request is successfully reserved', async () => {
+  const item = { ...review, kind: 'equipment', category: 'equipment', status: 'pending', item_id: 53, event_id: 91, title: 'Microphones' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role="Technical Support Staff" accessToken="support-token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Microphones/ }));
+  await screen.findByRole('region', { name: 'Equipment requirement integration' });
+  const detail = within(screen.getByRole('article', { name: 'Equipment request' }));
+  expect(detail.getByText('pending', { exact: true })).toBeVisible();
+  const onReserved = vi.mocked(EquipmentRequirements).mock.calls.at(-1)![0].onReserved!;
+  act(() => onReserved(54));
+  expect(detail.getByText('pending', { exact: true })).toBeVisible();
+  act(() => onReserved(53));
+  expect(detail.getByText('approved', { exact: true })).toBeVisible();
+  expect(detail.queryByText('pending', { exact: true })).not.toBeInTheDocument();
+  expect(detail.getByRole('heading', { name: 'Microphones' })).toBeVisible();
+});
+
 test.each([false, true])('[FAILURE] [SG2-53:AC1] equipment requirements are hidden before approval even when assigned: %s', async assigned_to_me => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [{ ...review, assigned_to_me }] })));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
@@ -44,11 +62,17 @@ test.each([false, true])('[FAILURE] [SG2-53:AC1] equipment requirements are hidd
   expect(screen.queryByRole('region', { name: 'Equipment requirement integration' })).not.toBeInTheDocument();
 });
 
+/** SG2-79: the dashboard also lists clashing bookings. Answer that request on
+ * its own so the work-queue responses below keep their order. */
+function withClashes(queue: (url: string, init?: RequestInit) => Promise<Response>) {
+  return vi.fn((url: string, init?: RequestInit) => url === '/api/venue-clashes' ? Promise.resolve(Response.json({ clashes: [] })) : queue(url, init));
+}
+
 test('[NORMAL] [SG2-41:AC4] coordinator queue groups distinct records, opens the exact assignment and refreshes when returning', async () => {
   const assigned = { ...review, item_id: 28, event_id: 28, title: 'Assigned workshop', category: 'assigned', status: 'planning',
     starts_at: null, details: { organisation: 'Harbour Trust', registration_needed: false } };
   const fetch = vi.fn(async (url: string) => Response.json({ items: url.endsWith('/event/28') ? [assigned] : [review, assigned] }));
-  vi.stubGlobal('fetch', fetch);
+  vi.stubGlobal('fetch', withClashes(fetch));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading');
   await screen.findByText('2 items in your work queue');
@@ -140,7 +164,7 @@ test('[CONFLICT] [SG2-35:AC3] a review that cannot be started says so instead of
 
 test.each([
   ['Venue Staff', 'venue', 'Booking requests awaiting decision', 'Atrium Hall', 'Venue booking request'],
-  ['Technical Support Staff', 'equipment', 'Equipment requests awaiting decision', 'Wireless microphone', 'Equipment request'],
+  ['Technical Support Staff', 'equipment', 'Equipment requests and reservations', 'Wireless microphone', 'Equipment request'],
 ] as const)('[NORMAL] [SG2-41:AC4] %s sees request identity, event and the exact time window', async (role, kind, group, title, detailLabel) => {
   const item = { ...review, kind, category: kind, item_id: 7, title, ends_at: '2030-06-15T06:00:00Z', details: { quantity: 2, notes: 'Set up before doors open' } };
   const fetch = vi.fn(async () => Response.json({ items: [item] })); vi.stubGlobal('fetch', fetch);
@@ -178,7 +202,7 @@ test('[NORMAL] [SG2-48:AC2] Venue Staff see the layout, venue requirements and r
 test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit empty groups, then newly arrived work', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 }))
     .mockResolvedValueOnce(Response.json({ items: [] })).mockResolvedValueOnce(Response.json({ items: [review] }));
-  vi.stubGlobal('fetch', fetch);
+  vi.stubGlobal('fetch', withClashes(fetch));
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('unavailable');
   expect(screen.queryByText('0 items in your work queue')).not.toBeInTheDocument();
@@ -192,8 +216,8 @@ test('[FAILURE] [SG2-41:AC4] retry replaces an unavailable queue with explicit e
 
 test('[CONFLICT] [SG2-41:session-isolation] a late result for the previous account cannot replace the new account queue', async () => {
   let resolve!: (response: Response) => void;
-  vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(() => new Promise<Response>(yes => { resolve = yes; }))
-    .mockResolvedValueOnce(Response.json({ items: [] })));
+  vi.stubGlobal('fetch', withClashes(vi.fn().mockImplementationOnce(() => new Promise<Response>(yes => { resolve = yes; }))
+    .mockResolvedValueOnce(Response.json({ items: [] }))));
   const { rerender } = render(<Dashboard role="Event Coordinator" accessToken="old" onNavigate={vi.fn()} />);
   rerender(<Dashboard role="Venue Staff" accessToken="new" onNavigate={vi.fn()} />);
   await screen.findByText('0 items in your work queue');
@@ -448,6 +472,58 @@ test('[FAILURE] [SG2-46:AC1] an approved event that is not assigned to the coord
   expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
 });
 
+test('[NORMAL] [SG2-39:AC3] [SG2-46:AC1] a planning event with a venue already requested still offers finding venues', async () => {
+  // The queue item carries no venue-request state; the step depends on status
+  // alone, so an event that already has a request (several venues, a release,
+  // a re-request after rejection) can still search.
+  const planning = { ...review, status: 'planning', assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [planning] })));
+  const onFindVenues = vi.fn();
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={onFindVenues} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Find venues for this event' }));
+  expect(onFindVenues).toHaveBeenCalledWith(expect.objectContaining({ eventId: 12, eventName: 'Leadership Forum' }));
+});
+
+test.each(['awaiting_safety_check', 'preparation', 'confirmed'])('[BOUNDARY] [SG2-39:AC3] [SG2-46:AC1] finding venues is not offered once the event has moved past planning to %s', async status => {
+  const item = { ...review, status, assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [item] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('region', { name: 'Arrangement readiness integration' });
+  expect(screen.queryByRole('button', { name: 'Find venues for this event' })).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-39:AC1] [SG2-39:AC3] a planning save that moves an approved event to planning keeps the venue step', async () => {
+  const approved = { ...review, status: 'approved', assigned_to_me: true, category: 'assigned',
+    details: { ...review.details, expected_attendance: 40 } };
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/planning')
+    ? Response.json({ event: { event_id: 12, status: 'planning', proposed_date: approved.starts_at, expected_attendance: 120,
+      venue_requirements: null, equipment_requirements: null, accessibility_needs: null, registration_needed: false,
+      registration_capacity: null, registration_opens_at: null, registration_closes_at: null, planning_notes: null,
+      arrangements_recheck_needed: false, outstanding_arrangements: [] } })
+    : Response.json({ items: [approved] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} onFindVenues={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  expect(await screen.findByRole('button', { name: 'Find venues for this event' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Save Planning Details' }));
+  expect(await screen.findByText('planning', { selector: '.work-queue-status' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Find venues for this event' })).toBeVisible();
+});
+
+test('[NORMAL] [SG2-39:AC1] the planning and history actions sit inside the detail card footer, inset like its content', async () => {
+  const planning = { ...review, status: 'planning', assigned_to_me: true, category: 'assigned' };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [planning] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  const edit = await screen.findByRole('button', { name: 'Edit Planning Information' });
+  const actions = edit.parentElement!;
+  expect(actions).toHaveClass('organisation-detail-actions');
+  expect(actions).toContainElement(screen.getByRole('button', { name: 'View Change History' }));
+  expect(actions.parentElement).toHaveClass('organisation-detail-footer');
+});
+
 /** SG2-36: the reviewing coordinator can ask the organiser instead of deciding. */
 const question = {
   clarification_id: 1, event_id: 12, sender_id: 'coordinator-1', sender_name: 'Casey Coordinator',
@@ -685,4 +761,88 @@ test.each(['Technical Support Staff', 'Event Coordinator'] as const)('[NORMAL] [
   // this seam proves the queue forwards only the verified support capability.
   if (role === 'Technical Support Staff') expect(screen.getByRole('button', { name: 'Check equipment availability' })).toBeVisible();
   else expect(screen.queryByRole('button', { name: 'Check equipment availability' })).not.toBeInTheDocument();
+});
+
+// SG2-58: the assigned coordinator confirms an event in preparation from the
+// work queue; the server re-checks every arrangement under the event lock.
+const ready: WorkItem = { ...review, item_id: 7, event_id: 7, title: 'Confirmation Forum', category: 'assigned',
+  status: 'preparation', assigned_to_me: true, ends_at: null };
+
+function confirmationFetch(item: WorkItem, confirm: () => Promise<Response> | Response) {
+  return vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/confirm')
+    ? confirm()
+    : Response.json({ items: [item] }));
+}
+
+test('[NORMAL] [SG2-58:AC1] the assigned coordinator confirms a ready event and the organiser notification is reported', async () => {
+  const fetch = confirmationFetch(ready, () => Response.json({ event_id: 7, status: 'confirmed', confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: true }));
+  await openHeld(ready, fetch);
+  const panel = within(screen.getByRole('contentinfo', { name: 'Confirm this event' }));
+  expect(panel.getByRole('heading', { name: 'Next step' })).toBeVisible();
+  expect(panel.getByText('Confirm the event once every required arrangement is in place. The Event Organiser is notified and sees the confirmed arrangements.')).toBeVisible();
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+  fireEvent.click(panel.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByText('Event confirmed. The Event Organiser has been notified.')).toHaveAttribute('role', 'status');
+  expect(screen.getByText('confirmed', { exact: true })).toBeVisible();
+  expect(screen.queryByRole('contentinfo', { name: 'Confirm this event' })).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/event-requests/7/confirm', { method: 'PATCH', headers: { Authorization: 'Bearer token' } });
+});
+
+test('[BOUNDARY] [SG2-58:AC1] a confirmation without an organiser notification says only that the event is confirmed', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ event_id: 7, status: 'confirmed', confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: false })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByText('Event confirmed.', { exact: true })).toHaveAttribute('role', 'status');
+  expect(screen.queryByText('Event confirmed. The Event Organiser has been notified.')).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-58:AC2] a refusal lists every outstanding arrangement by label in server order and leaves the action to retry', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['venue', 'equipment', 'registration'] }, { status: 409 })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Confirmation refused: arrangements are still outstanding.');
+  const list = screen.getByRole('list', { name: 'Outstanding arrangements' });
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Venue booking', 'Equipment', 'Registration']);
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Confirm event' })).toBeEnabled();
+});
+
+test('[BOUNDARY] [SG2-58:AC2] one outstanding arrangement is listed alone, and a later different refusal clears the list', async () => {
+  const responses = [
+    Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['equipment'] }, { status: 409 }),
+    Response.json({ error: 'Event confirmation is unavailable.' }, { status: 503 }),
+  ];
+  await openHeld(ready, confirmationFetch(ready, () => responses.shift()!));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  const list = await screen.findByRole('list', { name: 'Outstanding arrangements' });
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Equipment']);
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByText('Could not confirm the event. Please try again.')).toHaveAttribute('role', 'alert');
+  expect(screen.queryByRole('list', { name: 'Outstanding arrangements' })).not.toBeInTheDocument();
+});
+
+test('[CONFLICT] [SG2-58:AC1] a rapid double-click sends exactly one confirmation and shows it in flight', async () => {
+  let resolve!: (response: Response) => void;
+  const fetch = confirmationFetch(ready, () => new Promise<Response>(yes => { resolve = yes; }));
+  await openHeld(ready, fetch);
+  const button = screen.getByRole('button', { name: 'Confirm event' });
+  act(() => { button.click(); button.click(); });
+  expect(screen.getByRole('button', { name: 'Confirming…' })).toBeDisabled();
+  await act(async () => resolve(Response.json({ event_id: 7, status: 'confirmed', confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: true })));
+  expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/confirm'))).toHaveLength(1);
+  expect(screen.getByText('Event confirmed. The Event Organiser has been notified.')).toBeVisible();
+});
+
+test('[CONFLICT] [SG2-58:AC1] a stale preparation status is refused with the server reason and the status is unchanged', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ error: 'Only an event in Preparation can be confirmed.', code: 'closed' }, { status: 409 })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Only an event in Preparation can be confirmed.');
+  expect(screen.queryByRole('list', { name: 'Outstanding arrangements' })).not.toBeInTheDocument();
+  expect(screen.getByText('preparation', { exact: true })).toBeVisible();
+});
+
+test('[FAILURE] [SG2-58:AC1] confirmation is never offered on someone else\'s event or outside preparation', async () => {
+  for (const item of [{ ...ready, assigned_to_me: false }, { ...ready, status: 'awaiting_safety_check' }, { ...ready, status: 'confirmed' }]) {
+    await openHeld(item, confirmationFetch(item, () => Response.json({})));
+    expect(screen.queryByRole('button', { name: 'Confirm event' })).not.toBeInTheDocument();
+    cleanup();
+  }
 });

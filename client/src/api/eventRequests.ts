@@ -1062,6 +1062,8 @@ export interface EventAuditLogEntry {
   event_id: number;
   actor_id: string | null;
   actor_name: string;
+  /** The actor's role in Title Case (SG2-40); null for system rows or an account without a role. */
+  actor_role: string | null;
   field_name: string;
   old_value: string | null;
   new_value: string | null;

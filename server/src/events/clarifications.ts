@@ -13,7 +13,7 @@ import {
   type FetchClarificationsResult,
   type InsertClarificationResult
 } from '../db/clarifications';
-import { insertAuditLogs, type InsertAuditLogsResult } from '../db/auditLogs';
+import { insertAuditLogs, statusChange, type InsertAuditLogsResult } from '../db/auditLogs';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -188,15 +188,7 @@ export function createAddClarificationHandler({
         return;
       }
       status = returned.request.status;
-      const logged = await writeAuditLogs(admin, [
-        {
-          event_id: eventId,
-          actor_id: principal.userId,
-          field_name: 'status',
-          old_value: 'under_review',
-          new_value: status
-        }
-      ]);
+      const logged = await writeAuditLogs(admin, [statusChange(eventId, principal.userId, 'under_review', status)]);
       if (!logged.ok) {
         res.status(503).json({ error: UNAVAILABLE_MESSAGE });
         return;
