@@ -91,7 +91,8 @@ try {
   await first.query('COMMIT;');
   assert.deepEqual(JSON.parse(await rejecting), { outcome: 'decided', status: 'approved' }); await second.query('COMMIT;');
   assert.equal(await root.query(`SELECT status || '|' || decided_by FROM public.venue_booking_requests WHERE request_id = 94992;`), `approved|${staff[0]}`);
-  assert.equal(await root.query('SELECT count(*) FROM public.notifications WHERE request_id = 94992;'), '1');
+  assert.equal(await root.query(`SELECT count(*) FROM public.notifications WHERE request_id = 94992 AND recipient_id = '${coordinator}';`), '1');
+  assert.equal(await root.query(`SELECT count(*) FROM public.notifications WHERE request_id = 94992 AND recipient_id = '${organiser}';`), '1');
   console.log('PASS [CONFLICT] [SG2-49:AC3] an approval and a rejection of the same request at once record only the first decision.');
 } finally {
   for (const session of sessions) await session.end();
