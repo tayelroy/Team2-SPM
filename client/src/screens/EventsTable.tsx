@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { STATUS_FILTERS } from '../mock/data';
 import type { Role } from '../mock/types';
-import { badgeStyle, statusLabel } from '../mock/viewModel';
+import { badgeStyle, eventActionLabel, statusLabel } from '../mock/viewModel';
 import { color, radius, surface } from '../theme';
 import { Badge, Notice, NoticeMark } from '../ui';
 
@@ -195,6 +195,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
 
             {requests.map((event) => {
               const badge = badgeStyle(event.status);
+              const action = eventActionLabel(event);
               return (
                 <button
                   key={event.eventId}
@@ -256,11 +257,11 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                   <span style={{ justifySelf: 'start' }}>
                     {event.waitingOnMe ? (
                       <Badge bg="rgba(203,255,252,0.16)" fg={color.accent}>
-                        Waiting on you
+                        {action}
                       </Badge>
                     ) : (
                       <span style={{ fontSize: '13px', color: color.silver }}>
-                        {event.canManage ? 'With coordinator' : 'View only'}
+                        {action}
                       </span>
                     )}
                   </span>

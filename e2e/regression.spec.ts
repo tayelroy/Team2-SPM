@@ -228,6 +228,11 @@ test('SG2-26-P02 | [SG2-26:AC3] [SG2-29:AC2] [CONFLICT] saved event changes reac
     await nav(page, 'My events');
     await expect(page.getByRole('button', { name: `View ${saved.name}`, exact: true })).toBeVisible();
     await expect(page.getByText('16 Jul 2030', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: `View ${saved.name}`, exact: true })).toContainText('View only');
+    const ownerOnlyReads: string[] = [];
+    page.on('request', (sent) => {
+      if (/\/api\/event-requests\/\d+\/(stage|history)/.test(sent.url())) ownerOnlyReads.push(sent.url());
+    });
     await page.getByRole('button', { name: `View ${saved.name}`, exact: true }).click();
     await expect(page.getByRole('heading', { name: saved.name, exact: true })).toBeVisible();
     await expect(page.getByText(saved.purpose, { exact: true })).toBeVisible();
@@ -242,6 +247,11 @@ test('SG2-26-P02 | [SG2-26:AC3] [SG2-29:AC2] [CONFLICT] saved event changes reac
     }
     await expect(page.getByText(/View only\. This event is shared/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+    // SG2-38: the creator's history and stage are not shared with colleagues,
+    // so neither the button nor the stage tracker is offered.
+    await expect(page.getByRole('button', { name: 'View Change History', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('stage-badge')).toHaveCount(0);
+    expect(ownerOnlyReads).toEqual([]);
     const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
     expect(detail.status()).toBe(200);
     expect((await detail.json()).request).toMatchObject({ ...saved, can_manage: false });
@@ -2041,11 +2051,13 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
   expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
 });
 
-test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2-100:AC13] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
+test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2-100:AC13] [SG2-38:AC1] [SG2-38:AC2] [SG2-31:AC4] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
   await signIn(page, 'organiser');
   // AC2: submission with no coordinator lands in unassigned, not submitted.
   expect((await request.patch('/api/event-requests/1/submit', { headers: await authHeaders(page) })).status()).toBe(200);
   await nav(page, 'My events');
+  // SG2-38: the list agrees with the stage — the Lead's queue, not a coordinator.
+  await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toContainText('Awaiting coordinator assignment');
   await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
   await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
   await expect(page.getByTestId('waiting-on-persona')).toContainText('Event Coordinator Lead');
@@ -2096,9 +2108,26 @@ test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2
   // AC5: the stepper and waiting-on card reflect the approved stage.
   await signIn(page, 'organiser');
   await nav(page, 'My events');
+  await expect(page.getByRole('button', { name: 'View Planning workshop', exact: true })).toContainText('With coordinator');
   await page.getByRole('button', { name: 'View Planning workshop', exact: true }).click();
   await expect(page.getByTestId('stage-badge')).toContainText('Arrangements');
   await expect(page.getByTestId('waiting-on-action')).toContainText('Complete venue suitability check and equipment reservation');
+  await expect(page.getByRole('status', { name: 'Editing disabled' })).toHaveText(
+    'This request has been approved and your coordinator is arranging the venue and equipment. Contact your coordinator if an amendment is needed.',
+  );
+
+  // SG2-38: on a phone, Arrangements (step 4) starts past the edge of the
+  // track. The track scrolls itself to it, says more steps exist, and the
+  // page itself still does not scroll sideways.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const track = page.getByTestId('stepper-track');
+  await expect(page.getByTestId('stepper-scroll-hint')).toHaveText('Swipe sideways to see all 7 steps.');
+  await expect.poll(() => track.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  const trackBox = (await track.boundingBox())!;
+  const currentBox = (await track.locator('[aria-current="step"]').boundingBox())!;
+  expect(currentBox.x).toBeGreaterThanOrEqual(trackBox.x);
+  expect(currentBox.x + currentBox.width).toBeLessThanOrEqual(trackBox.x + trackBox.width);
+  expect(await page.evaluate(() => [window.scrollX, document.documentElement.scrollWidth <= window.innerWidth])).toEqual([0, true]);
 
   const detail = await request.get('/api/event-requests/1', { headers: await authHeaders(page) });
   expect(detail.status()).toBe(200);
