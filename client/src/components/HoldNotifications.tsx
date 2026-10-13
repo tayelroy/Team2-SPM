@@ -17,6 +17,12 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   equipment_reserved: 'Equipment reserved',
   // SG2-58: the organiser's event was confirmed by its coordinator.
   event_confirmed: 'Event confirmed',
+  // SG2-68: the steps of an event request, for the people involved in it.
+  event_submitted: 'Event submitted',
+  coordinator_assigned: 'Coordinator assigned',
+  clarification_requested: 'Question from your coordinator',
+  event_approved: 'Event approved',
+  event_rejected: 'Event not approved',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate,
@@ -25,6 +31,11 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   venue_booking_clash: color.silver,
   equipment_reserved: color.accent,
   event_confirmed: color.accent,
+  event_submitted: color.accent,
+  coordinator_assigned: color.accent,
+  clarification_requested: color.silver,
+  event_approved: color.accent,
+  event_rejected: color.silver,
 };
 
 /** One line in the drawer, whichever inbox it came from. */

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from '../db';
 import { decideEventRequest, type DecideEventRequestResult } from '../db/eventRequests';
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
+import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -25,6 +26,7 @@ export interface DecideEventRequestDependencies {
     reason: string | null
   ) => Promise<DecideEventRequestResult>;
   writeHistory?: typeof insertAuditLogs;
+  notify?: typeof notifyEvent;
 }
 
 /**
@@ -47,12 +49,17 @@ export interface DecideEventRequestDependencies {
  * matches an `under_review` row, so that is always the old value. As in the
  * clarification handler, a history row that cannot be written answers 503
  * rather than reporting a change the history does not show.
+ *
+ * SG2-68: the organiser is told the outcome, and for a rejection the stored
+ * reason. A notice that cannot be stored answers 503 like the history row
+ * (see docs/notifications.md).
  */
 export function createDecideEventRequestHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   decide = decideEventRequest,
-  writeHistory = insertAuditLogs
+  writeHistory = insertAuditLogs,
+  notify = notifyEvent
 }: DecideEventRequestDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -117,6 +124,21 @@ export function createDecideEventRequestHandler({
       statusChange(eventId, principal.userId, 'under_review', decided.request.status)
     ]);
     if (!recorded.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    const label = eventLabel(decided.request.name);
+    const approved = decided.request.status === 'approved';
+    const notified = await notify(admin, [{
+      recipient_id: decided.request.organiser_id,
+      event_id: eventId,
+      kind: approved ? 'event_approved' as const : 'event_rejected' as const,
+      message: approved
+        ? eventNoticeMessages.approved(label)
+        : eventNoticeMessages.rejected(label, decided.request.decision_reason ?? reason)
+    }].filter(notice => notice.recipient_id !== principal.userId));
+    if (!notified.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
