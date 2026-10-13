@@ -1,21 +1,20 @@
 import { useEffect, useState } from 'react';
-import { STATS } from '../mock/data';
+import { ATTENDEE_ACTIONS, ATTENDEE_STATS } from '../mock/data';
 import type { EventCard, Role, Screen } from '../mock/types';
-import {
-  actionsFor,
-  dashboardListTitle,
-  eventCards,
-} from '../mock/viewModel';
+import { eventCards } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
 import {
   Badge,
   Card,
   Dot,
+  GhostButton,
   IconButton,
+  Notice,
   RecessedCard,
   StatFigure,
 } from '../ui';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
+import { fetchAssignmentQueue } from '../api/assignmentQueue';
 import { badgeStyle, eventActionLabel, statusLabel } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
@@ -165,16 +164,85 @@ function OrganisationDashboard({ accessToken, onNavigate }: DashboardProps) {
   </div>;
 }
 
-export default function Dashboard(props: DashboardProps) {
-  if (props.role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
-  if (isQueueRole(props.role)) return <WorkQueue key={`${props.role}:${props.accessToken}`} role={props.role} accessToken={props.accessToken} onFindVenues={props.onFindVenues} />;
-  const { role, onNavigate } = props;
-  const cards = eventCards(role).slice(0, 4);
-  const openEvent = 'attendee';
-  // Expand the operational summary to the full event table.
-  const expandTo = 'events';
+/**
+ * The Event Coordinator Lead's desk (SG2-86 AC2): a live count of the
+ * unassigned queue (SG2-87, `GET /api/assignment-queue`) and the way into
+ * it. Assigning is the page's primary action (SG2-97). Nothing here comes
+ * from prototype data, and nothing opens a screen the Lead cannot use.
+ */
+function LeadDashboard({ accessToken, onNavigate }: DashboardProps) {
+  const [waiting, setWaiting] = useState(0);
+  const [state, setState] = useState<'loading' | 'ready' | 'unauthorized' | 'unavailable'>('loading');
+  useEffect(() => {
+    if (!accessToken) {
+      setState('unauthorized');
+      return;
+    }
+    let cancelled = false;
+    fetchAssignmentQueue(accessToken).then((result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        setWaiting(result.entries.length);
+        setState('ready');
+      } else {
+        setState(result.kind);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+  return (
+    <Card padding="28px" style={{ gap: '16px' }}>
+      <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500, color: color.platinum }}>Unassigned queue</h2>
+      {state === 'loading' ? (
+        <p role="status" style={{ margin: 0 }}>Loading the unassigned queue…</p>
+      ) : state === 'ready' ? (
+        <p style={{ margin: 0, fontSize: '18px', color: color.mist }}>
+          {waiting} {waiting === 1 ? 'request is' : 'requests are'} awaiting a coordinator.
+        </p>
+      ) : (
+        <p role="alert" style={{ margin: 0 }}>
+          {state === 'unauthorized'
+            ? 'Only the Event Coordinator Lead can see the unassigned queue.'
+            : 'The unassigned queue is temporarily unavailable. Open it to try again.'}
+        </p>
+      )}
+      <GhostButton onClick={() => onNavigate('queue')} style={{ alignSelf: 'flex-start' }}>
+        Open unassigned queue
+      </GhostButton>
+    </Card>
+  );
+}
 
-  const stats = STATS[role];
+/**
+ * The Safety Officer's desk (SG2-86 AC2). The role has no safety checks to
+ * act on until the safety review flow lands, so the desk says so instead
+ * of showing events.
+ */
+function SafetyDashboard() {
+  return (
+    <Notice>
+      <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500, color: color.platinum }}>No safety checks yet</h2>
+      <p style={{ margin: 0, color: color.silver }}>
+        Safety checks arrive with the safety review flow. There is nothing for you to review until then.
+      </p>
+    </Notice>
+  );
+}
+
+export default function Dashboard(props: DashboardProps) {
+  const { role } = props;
+  if (role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
+  if (isQueueRole(role)) return <WorkQueue key={`${role}:${props.accessToken}`} role={role} accessToken={props.accessToken} onFindVenues={props.onFindVenues} />;
+  if (role === 'Event Coordinator Lead') return <LeadDashboard key={props.accessToken} {...props} />;
+  if (role === 'Safety Officer') return <SafetyDashboard />;
+  return <AttendeeDashboard onNavigate={props.onNavigate} />;
+}
+
+/** The Attendee's dashboard: still the clickable prototype, by design. */
+function AttendeeDashboard({ onNavigate }: Pick<DashboardProps, 'onNavigate'>) {
+  const cards = eventCards('Attendee').slice(0, 4);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -185,7 +253,7 @@ export default function Dashboard(props: DashboardProps) {
           gap: '20px',
         }}
       >
-        {stats.map((stat) => (
+        {ATTENDEE_STATS.map((stat) => (
           <Card key={stat.label} padding="28px 30px" style={{ gap: '10px' }}>
             <StatFigure value={stat.value} label={stat.label} />
           </Card>
@@ -219,9 +287,9 @@ export default function Dashboard(props: DashboardProps) {
                 color: color.platinum,
               }}
             >
-              {dashboardListTitle(role)}
+              Events I can register for
             </h2>
-            <IconButton label="See all events" onClick={() => onNavigate(expandTo)}>
+            <IconButton label="See all events" onClick={() => onNavigate('events')}>
               ↗
             </IconButton>
           </div>
@@ -230,7 +298,7 @@ export default function Dashboard(props: DashboardProps) {
               <EventTile
                 key={event.ref}
                 event={event}
-                onOpen={() => onNavigate(openEvent)}
+                onOpen={() => onNavigate('attendee')}
               />
             ))}
           </div>
@@ -251,7 +319,7 @@ export default function Dashboard(props: DashboardProps) {
               Needs your attention
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {actionsFor(role).map((action) => (
+              {ATTENDEE_ACTIONS.map((action) => (
                 <div
                   key={action.title}
                   style={{

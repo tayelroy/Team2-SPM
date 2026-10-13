@@ -1819,6 +1819,29 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
 });
 
+test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prototype events and offer only their own screens', async ({ page }) => {
+  const prototypeEvent = page.getByText('Product Launch — Tideline', { exact: true });
+  const menu = page.getByRole('navigation').getByRole('button');
+
+  await signIn(page, 'safety');
+  await expect(page.getByRole('heading', { level: 1, name: 'Safety desk' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No safety checks yet' })).toBeVisible();
+  await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
+  await expect(menu).toHaveText(['Dashboard']);
+  await expect(prototypeEvent).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await signIn(page, 'lead');
+  await expect(page.getByRole('heading', { level: 1, name: 'Coordination lead desk' })).toBeVisible();
+  await expect(menu).toHaveText(['Dashboard', 'Unassigned queue', 'Assign coordinators']);
+  await expect(page.getByText(/^\d+ requests? (is|are) awaiting a coordinator\.$/)).toBeVisible();
+  await expect(prototypeEvent).toHaveCount(0);
+  await page.getByRole('button', { name: 'Open unassigned queue', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Unassigned queue' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Event page' })).toHaveCount(0);
+});
+
 test('SG2-87-P01 | [SG2-87:AC1] [SG2-87:AC2] [SG2-87:AC3] [SG2-87:AC4] [SG2-87:AC5] [NORMAL] [FAILURE] a submitted request waits in the Lead\'s unassigned queue until it is assigned', async ({ page, request }) => {
   expect((await request.post('/__e2e/coordinator-assignment')).status()).toBe(204);
   const tokenFor = async (account: string) => {
