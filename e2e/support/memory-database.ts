@@ -438,12 +438,14 @@ class MemoryQuery implements PromiseLike<QueryResult> {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
       const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id',
         event_clarifications: 'clarification_id', event_audit_logs: 'log_id', venue_capacity_exceptions: 'exception_id',
-        venue_booking_requests: 'request_id' }[this.table];
+        venue_booking_requests: 'request_id', notifications: 'notification_id' }[this.table];
       let nextId = id ? Math.max(0, ...table.map(row => Number(row[id]))) + 1 : 0;
       rows = incoming.map(value => {
         const row = structuredClone(value);
         if (id) row[id] = nextId++;
-        if (['event_clarifications', 'event_audit_logs'].includes(this.table)) row.created_at ??= new Date().toISOString();
+        if (['event_clarifications', 'event_audit_logs', 'notifications'].includes(this.table)) row.created_at ??= new Date().toISOString();
+        // SG2-68: event notices carry no venue request.
+        if (this.table === 'notifications') row.request_id ??= null;
         // SG2-48: the column defaults a new venue request takes.
         if (this.table === 'venue_booking_requests') { row.status ??= 'pending'; row.requested_at ??= new Date().toISOString(); }
         table.push(row);

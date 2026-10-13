@@ -11,6 +11,7 @@ import {
 } from '../db/eventRequests';
 import { getAccountRole, type GetAccountRoleResult } from '../db/accountRoles';
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
+import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -31,6 +32,7 @@ export interface AssignCoordinatorDependencies {
     statusTransition?: AssignStatusTransition
   ) => Promise<AssignCoordinatorResult>;
   writeHistory?: typeof insertAuditLogs;
+  notify?: typeof notifyEvent;
 }
 
 /**
@@ -57,6 +59,12 @@ export interface AssignCoordinatorDependencies {
  * If the insert fails, the assignment is put back (guarded so it cannot
  * undo a newer one) and the caller is told to retry, rather than leaving a
  * change the history does not show.
+ *
+ * SG2-68: once the change is recorded, the new coordinator, the organiser
+ * and, on a reassignment, the coordinator taken off the event are told. A
+ * notice that cannot be stored answers 503 but does not undo the
+ * assignment: the history already shows it, so it stands (see
+ * docs/notifications.md).
  */
 export function createAssignCoordinatorHandler({
   getPrincipal,
@@ -64,7 +72,8 @@ export function createAssignCoordinatorHandler({
   fetchRequest = fetchEventRequestById,
   lookupRole = getAccountRole,
   assignCoordinator = assignEventCoordinator,
-  writeHistory = insertAuditLogs
+  writeHistory = insertAuditLogs,
+  notify = notifyEvent
 }: AssignCoordinatorDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -169,6 +178,20 @@ export function createAssignCoordinatorHandler({
         coordinatorId,
         transition ? { from: transition.to, to: transition.from } : undefined
       );
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    const label = eventLabel(assigned.request.name);
+    const notified = await notify(admin, [
+      { recipient_id: coordinatorId, event_id: eventId, kind: 'coordinator_assigned' as const,
+        message: eventNoticeMessages.assignedToCoordinator(label) },
+      { recipient_id: assigned.request.organiser_id, event_id: eventId, kind: 'coordinator_assigned' as const,
+        message: eventNoticeMessages.assignedToOrganiser(assigned.request.coordinator_name, label) },
+      { recipient_id: previousId, event_id: eventId, kind: 'coordinator_assigned' as const,
+        message: eventNoticeMessages.reassignedFromCoordinator(label) }
+    ].filter(notice => notice.recipient_id !== principal.userId));
+    if (!notified.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }

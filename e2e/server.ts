@@ -59,6 +59,7 @@ import { createMemoryReservationsStore, seedEquipmentReservations } from './supp
 import { createConfirmEventHandler } from '../server/src/events/confirm';
 import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
 import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
+import { seedEventNotifications } from './support/event-notifications';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -260,6 +261,14 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     bookings: database.tables.venue_bookings.filter(seeded),
   });
 });
+app.post('/__e2e/event-notifications', (_req, res) => {
+  seedEventNotifications(database);
+  res.status(204).end();
+});
+// SG2-68: every stored notice with its recipient, which the bell never shows.
+app.get('/__e2e/event-notifications-ledger', (_req, res) => res.json({
+  notifications: database.tables.notifications, events: database.tables.events.filter(row => [681, 682, 683].includes(Number(row.event_id))),
+}));
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
     coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });

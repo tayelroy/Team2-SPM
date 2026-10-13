@@ -250,8 +250,10 @@ export default function AppShell({
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released. */}
-            {accessToken && (internalRole || role === 'Event Organiser')
+            {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released.
+                SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
+                neither has hold notices. */}
+            {accessToken && (internalRole || role === 'Event Organiser' || role === 'Event Coordinator Lead')
               ? <HoldNotifications key={accessToken} accessToken={accessToken} holds={internalRole} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}

@@ -14,6 +14,7 @@ import {
   type InsertClarificationResult
 } from '../db/clarifications';
 import { insertAuditLogs, statusChange, type InsertAuditLogsResult } from '../db/auditLogs';
+import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -40,6 +41,7 @@ export interface ClarificationDependencies {
     coordinatorId: string
   ) => Promise<RequestClarificationResult>;
   writeAuditLogs?: typeof insertAuditLogs;
+  notify?: typeof notifyEvent;
 }
 
 /**
@@ -142,6 +144,10 @@ export function createListClarificationsHandler({
  *
  * Posting at any other point simply appends, which is what a follow-up
  * question or the organiser's answer is.
+ *
+ * SG2-68: returning the request tells its organiser that their coordinator
+ * has a question, without the question itself. A notice that cannot be
+ * stored answers 503 like the history row (see docs/notifications.md).
  */
 export function createAddClarificationHandler({
   getPrincipal,
@@ -149,7 +155,8 @@ export function createAddClarificationHandler({
   fetchRequest = fetchEventRequestById,
   addMessage = insertClarification,
   returnForClarification = requestClarification,
-  writeAuditLogs = insertAuditLogs
+  writeAuditLogs = insertAuditLogs,
+  notify = notifyEvent
 }: ClarificationDependencies): RequestHandler {
   return async (req, res) => {
     const resolved = await resolveParticipant(req, { getPrincipal, getAdminClient, fetchRequest });
@@ -190,6 +197,14 @@ export function createAddClarificationHandler({
       status = returned.request.status;
       const logged = await writeAuditLogs(admin, [statusChange(eventId, principal.userId, 'under_review', status)]);
       if (!logged.ok) {
+        res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+        return;
+      }
+      const notified = await notify(admin, [{
+        recipient_id: returned.request.organiser_id, event_id: eventId, kind: 'clarification_requested' as const,
+        message: eventNoticeMessages.clarificationRequested(eventLabel(returned.request.name))
+      }].filter(notice => notice.recipient_id !== principal.userId));
+      if (!notified.ok) {
         res.status(503).json({ error: UNAVAILABLE_MESSAGE });
         return;
       }

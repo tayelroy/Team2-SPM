@@ -10,6 +10,7 @@ import { dbConfig } from './db/config';
 import { createDecideEventRequestHandler, type Decision } from './events/decide';
 import type { DecideEventRequestResult } from './db/eventRequests';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
+import type { EventNotice, NotifyEventResult } from './db/eventNotifications';
 import type { Principal } from './auth/policy';
 
 const COORDINATOR: Principal = { userId: 'coordinator-1', role: 'event_coordinator' };
@@ -40,11 +41,13 @@ interface HarnessOptions {
   decideResult?: DecideEventRequestResult;
   captureDecide?: (eventId: number, coordinatorId: string, decision: Decision, reason: string | null) => void;
   historyResult?: InsertAuditLogsResult;
+  notifyResult?: NotifyEventResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
   const history: InsertAuditLogInput[][] = [];
+  const notices: { afterHistory: number; batch: EventNotice[] }[] = [];
   app.use(express.json());
   app.patch(
     '/api/event-requests/:eventId/decision',
@@ -58,10 +61,14 @@ function buildApp(options: HarnessOptions = {}) {
       writeHistory: async (_admin, entries) => {
         history.push(entries);
         return options.historyResult ?? { ok: true, logs: [] };
+      },
+      notify: async (_admin, batch) => {
+        notices.push({ afterHistory: history.length, batch });
+        return options.notifyResult ?? { ok: true };
       }
     })
   );
-  return Object.assign(app, { history });
+  return Object.assign(app, { history, notices });
 }
 
 describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
@@ -260,6 +267,52 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
       .send({ decision: 'approved' });
     assert.equal(response.status, 503);
     assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
+    assert.equal(app.history.length, 1);
+    assert.deepEqual(app.notices, []);
+  });
+});
+
+describe('PATCH /api/event-requests/:eventId/decision notices (SG2-68)', () => {
+  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] an approval tells the organiser, after the history row', async () => {
+    const app = buildApp();
+    assert.equal((await request(app).patch('/api/event-requests/7/decision').send({ decision: 'approved' })).status, 200);
+    assert.deepEqual(app.notices, [{ afterHistory: 1, batch: [
+      { recipient_id: 'organiser-1', event_id: 7, kind: 'event_approved', message: 'Partner Forum was approved.' }
+    ] }]);
+  });
+
+  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] a rejection tells the organiser why, using the reason as stored', async () => {
+    const app = buildApp({
+      decideResult: { ok: true, request: { ...DECIDED_REQUEST, status: 'rejected', decision_reason: 'Clashes with the AGM' } }
+    });
+    await request(app).patch('/api/event-requests/7/decision').send({ decision: 'rejected', reason: '  Clashes with the AGM  ' });
+    assert.deepEqual(app.notices[0].batch, [
+      { recipient_id: 'organiser-1', event_id: 7, kind: 'event_rejected', message: 'Partner Forum was not approved: Clashes with the AGM' }
+    ]);
+  });
+
+  test('[BOUNDARY] [SG2-68:AC2] a 5000-character reason is cut so the notice fits 2000 characters; an unnamed event and an unreturned reason still read correctly', async () => {
+    const reason = 'r'.repeat(5000);
+    const long = buildApp({ decideResult: { ok: true, request: { ...DECIDED_REQUEST, status: 'rejected', decision_reason: reason } } });
+    await request(long).patch('/api/event-requests/7/decision').send({ decision: 'rejected', reason });
+    const prefix = 'Partner Forum was not approved: ';
+    assert.equal(long.notices[0].batch[0].message, prefix + 'r'.repeat(2000 - prefix.length));
+
+    const unnamed = buildApp({ decideResult: { ok: true, request: { ...DECIDED_REQUEST, name: null, status: 'rejected' } } });
+    await request(unnamed).patch('/api/event-requests/7/decision').send({ decision: 'rejected', reason: 'Too late' });
+    assert.equal(unnamed.notices[0].batch[0].message, 'Untitled event was not approved: Too late');
+  });
+
+  test('[CONFLICT] [SG2-68:AC3] a coordinator deciding their own event is not told about it', async () => {
+    const app = buildApp({ decideResult: { ok: true, request: { ...DECIDED_REQUEST, organiser_id: 'coordinator-1' } } });
+    await request(app).patch('/api/event-requests/7/decision').send({ decision: 'approved' });
+    assert.deepEqual(app.notices, [{ afterHistory: 1, batch: [] }]);
+  });
+
+  test('[FAILURE] [SG2-68:AC1] a notice that cannot be stored answers 503 without provider details, the decision recorded', async () => {
+    const app = buildApp({ notifyResult: { ok: false } });
+    const response = await request(app).patch('/api/event-requests/7/decision').send({ decision: 'approved' });
+    assert.deepEqual([response.status, response.body], [503, { error: 'Event requests are temporarily unavailable. Please try again later.' }]);
     assert.equal(app.history.length, 1);
   });
 });

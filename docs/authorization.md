@@ -121,6 +121,16 @@ Coordinator) reads a confirmed event's arrangements; the handler then requires
 the event's creating organiser or its assigned coordinator and answers 404 to
 everyone else — see [event confirmation](event-confirmation.md).
 
+SG2-68 adds the Event Coordinator Lead to `notifications.read` (already held by
+Event Coordinator, Venue Staff, Technical Support Staff and Event Organiser),
+so the Lead reads their own notices — "an event was submitted and is waiting
+for a coordinator" — through `GET /api/notifications`. The rows are still
+limited to the caller by the handler and by the `notifications` RLS policy;
+the grant only lets the Lead ask. The Lead's header shows the same bell as the
+organiser's, without hold notices (the Lead holds no `venues.holds.read`). The
+Safety Officer receives no notices yet and keeps the placeholder bell, without
+the grant. See [notifications](notifications.md).
+
 In the client, each role reaches only its own functions (SG2-86 AC2). The
 Event Coordinator Lead's desk shows a live count of the unassigned queue
 (`GET /api/assignment-queue`) with a way into it, and its primary action is
