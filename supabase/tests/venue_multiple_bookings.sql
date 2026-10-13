@@ -184,7 +184,37 @@ begin
   end if;
 end $$;
 
--- 8. Direct writes cannot mark a live request withdrawn:
+-- 8. Confirming the event (SG2-58) waits until every venue it needs is
+-- approved: a rejected venue blocks it until the coordinator withdraws it.
+insert into public.events (event_id, organiser_id, coordinator_id, name, status, registration_needed) values
+  (98203, 'e8200000-0000-4000-8000-000000000003', 'e8200000-0000-4000-8000-000000000002', 'Multi Gala', 'preparation', false);
+insert into public.venue_bookings (booking_id, venue_id, event_id, starts_at, ends_at, status) values
+  (98203, 98201, 98203, '2030-10-05 01:00+00', '2030-10-05 05:00+00', 'confirmed');
+insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, layout, requested_by,
+    status, decided_by, decided_at, decision_reason, venue_booking_id) values
+  (98205, 98203, 98201, '2030-10-05 01:00+00', '2030-10-05 05:00+00', 'theatre', 'e8200000-0000-4000-8000-000000000002',
+    'approved', 'e8200000-0000-4000-8000-000000000001', now(), null, 98203),
+  (98206, 98203, 98203, '2030-10-05 01:00+00', '2030-10-05 05:00+00', 'classroom', 'e8200000-0000-4000-8000-000000000002',
+    'rejected', 'e8200000-0000-4000-8000-000000000001', now(), 'Room closed for repairs', null);
+select set_config('request.jwt.claim.sub', 'e8200000-0000-4000-8000-000000000002', true);
+do $$
+declare result jsonb;
+begin
+  result := public.confirm_event(98203);
+  if result is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb
+      or (select status from public.events where event_id = 98203) <> 'preparation' then
+    raise exception '[SG2-82:rejected-venue-blocks-confirmation] [SG2-82:AC5] [CONFLICT] An event with one venue approved and another rejected was confirmed: %', result;
+  end if;
+  if public.withdraw_venue_booking_request(98206)->>'outcome' <> 'withdrawn' then
+    raise exception '[SG2-82:withdraw-before-confirming] [SG2-82:AC5] [NORMAL] The coordinator could not withdraw the rejected venue';
+  end if;
+  result := public.confirm_event(98203);
+  if result->>'outcome' <> 'ok' or (select status from public.events where event_id = 98203) <> 'confirmed' then
+    raise exception '[SG2-82:confirm-once-every-venue-approved] [SG2-82:AC5] [NORMAL] Once the rejected venue was withdrawn, the event with every needed venue approved must confirm: %', result;
+  end if;
+end $$;
+
+-- 9. Direct writes cannot mark a live request withdrawn:
 reset role;
 do $$
 begin
@@ -195,7 +225,7 @@ begin
   end;
 end $$;
 
--- 9. Clients cannot withdraw by writing the table, nor anonymously:
+-- 10. Clients cannot withdraw by writing the table, nor anonymously:
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'e8200000-0000-4000-8000-000000000002', true);
 do $$

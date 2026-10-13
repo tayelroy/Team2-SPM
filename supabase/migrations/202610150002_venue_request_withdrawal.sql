@@ -12,7 +12,8 @@
 -- coordinator's own login so withdrawn_by is the real person. It locks the
 -- request row, as decide_venue_booking_request() does before deciding, so a
 -- withdrawal and a decision made at the same moment cannot both succeed:
--- whichever commits second finds the request no longer pending.
+-- whichever commits second finds the request no longer pending. It then
+-- locks the event row, so confirming the event (SG2-58) waits for it.
 begin;
 
 alter table public.venue_booking_requests
@@ -43,7 +44,9 @@ begin
 
   select * into r from public.venue_booking_requests where request_id = p_request_id for update;
   if not found then return jsonb_build_object('outcome', 'missing'); end if;
-  select * into e from public.events where event_id = r.event_id;
+  -- Request before event, as decide_venue_booking_request() does; SG2-58's
+  -- confirm_event() locks the event row before reading its requests.
+  select * into e from public.events where event_id = r.event_id for update;
   -- Only the event's assigned coordinator withdraws; any other request is
   -- reported as missing so it is not revealed.
   if e.coordinator_id is null or e.coordinator_id <> auth.uid() then

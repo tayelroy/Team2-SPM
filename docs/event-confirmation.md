@@ -16,15 +16,20 @@ Product-owner decisions (binding):
 2. The readiness gate is exactly SG2-57's readiness, tightened so equipment
    must be **reserved and placed** (see
    [Event arrangement readiness](event-arrangements.md)):
-   - **Venue** — outstanding if the event has no live (not rejected or
-     cancelled) `venue_booking_requests`, if any live one is still `pending`,
-     or if any live `approved` one no longer has a **confirmed**
+   - **Venue** — outstanding if the event has no `venue_booking_requests`
+     other than cancelled ones, if any is still `pending` or `rejected`, or if
+     any `approved` one no longer has a **confirmed**
      `venue_bookings` row linked to it. A booking is linked through the
      request's `venue_booking_id` or through a `venue_holds` row for the
      request (`venue_holds.request_id`) whose `booking_id` it is: converting a
      tentative hold records the booking on the hold only, and releasing that
-     booking leaves the request `approved`. One pending or unbooked request
-     among several approved ones blocks confirmation.
+     booking leaves the request `approved`. One pending, rejected or unbooked
+     request among several approved ones blocks confirmation. SG2-82 AC5
+     (every venue the event needs must be approved): a rejected request still
+     counts until the coordinator withdraws it, which cancels it
+     (`withdraw_venue_booking_request()`; migration
+     `202610150003_confirm_event_rejected_venues.sql` replaced the gate's
+     venue check). A booking released under SG2-51 also cancels its request.
    - **Equipment** — not required if there are no live `equipment_requests`;
      otherwise outstanding if any live request lacks an
      `equipment_reservations` receipt with its `request_id`, has no
