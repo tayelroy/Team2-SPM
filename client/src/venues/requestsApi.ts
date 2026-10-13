@@ -25,20 +25,24 @@ export interface VenueRequest {
   withdrawn_at: string | null;
 }
 
-/** SG2-82 AC5: whether every venue the event still needs is approved.
- * Mirrors VenueArrangement in server/src/venues/bookingRequests.ts. */
+/** SG2-82 AC5: whether every venue the event still needs is approved and
+ * booked, by the same rule as confirming the event (SG2-58). Mirrors
+ * VenueArrangement in server/src/venues/bookingRequests.ts. */
 export interface VenueArrangement {
   state: 'none' | 'in_progress' | 'ready';
   needed: number;
   approved: number;
   pending: number;
   rejected: number;
+  /** Approved venues whose booking is no longer confirmed. */
+  unbooked: number;
 }
 
 function isArrangement(value: unknown): value is VenueArrangement {
   const arrangement = value as VenueArrangement | null;
   return ['none', 'in_progress', 'ready'].includes(arrangement?.state as string)
-    && [arrangement!.needed, arrangement!.approved, arrangement!.pending, arrangement!.rejected].every(count => typeof count === 'number');
+    && [arrangement!.needed, arrangement!.approved, arrangement!.pending, arrangement!.rejected, arrangement!.unbooked]
+      .every(count => typeof count === 'number');
 }
 
 /** Something already committing the venue that a request overlaps (SG2-50).

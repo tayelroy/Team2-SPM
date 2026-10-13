@@ -18,6 +18,8 @@ import {
   type VenueBookingWithdrawalStore,
   type WithdrawalResult
 } from '../db/venueBookingWithdrawals';
+import type { VenueBookingStatusRow } from '../db/eventArrangements';
+import { venueTally, type VenueTally } from '../events/arrangementReadiness';
 import { validateVenueBookingRequest } from './bookingRequestFields';
 import { assessSuitability, bookingReadiness } from './suitability';
 import { canSeeEvent, parseId } from './suitabilityRoutes';
@@ -34,25 +36,22 @@ export interface VenueBookingRequestDependencies {
 }
 
 /**
- * SG2-82 AC5: where the event's venue arrangement stands. Every request still
+ * SG2-82 AC5: where the event's venue arrangement stands, by the same tally
+ * as SG2-57's readiness and SG2-58's confirmation gate. Every request still
  * pending, approved or rejected is a venue the event needs; a rejected one
  * keeps the arrangement not ready until the coordinator withdraws it, so a
  * refused room is never silently dropped. Withdrawn and released requests are
- * cancelled and no longer count.
+ * cancelled and no longer count, and an approved one counts only while its
+ * booking is confirmed.
  */
-export interface VenueArrangement {
+export interface VenueArrangement extends VenueTally {
   state: 'none' | 'in_progress' | 'ready';
-  needed: number;
-  approved: number;
-  pending: number;
-  rejected: number;
 }
 
-export function venueArrangement(requests: Pick<VenueBookingRequestRecord, 'status'>[]): VenueArrangement {
-  const count = (status: string) => requests.filter(request => request.status === status).length;
-  const [approved, pending, rejected] = [count('approved'), count('pending'), count('rejected')];
-  const needed = approved + pending + rejected;
-  return { state: needed === 0 ? 'none' : approved === needed ? 'ready' : 'in_progress', needed, approved, pending, rejected };
+export function venueArrangement(requests: VenueBookingStatusRow[]): VenueArrangement {
+  const tally = venueTally(requests);
+  const ready = tally.approved === tally.needed && tally.unbooked === 0;
+  return { state: tally.needed === 0 ? 'none' : ready ? 'ready' : 'in_progress', ...tally };
 }
 
 /** Venues are requested once the event has been approved and before it is
@@ -216,8 +215,8 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
       respond(404, { error: 'Event not found.' });
       return;
     }
-    const requests = await database.list(eventId);
-    respond(200, { requests, arrangement: venueArrangement(requests) });
+    const [requests, statuses] = await Promise.all([database.list(eventId), database.venueStatuses(eventId)]);
+    respond(200, { requests, arrangement: venueArrangement(statuses) });
   }));
 
   /**

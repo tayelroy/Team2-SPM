@@ -7,8 +7,8 @@ const pending: VenueRequest = { request_id: 41, event_id: 10, venue_id: 3, venue
   starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', layout: 'banquet',
   venue_requirements: 'A bar', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null,
   withdrawer_name: null, withdrawn_at: null };
-const waiting: VenueArrangement = { state: 'in_progress', needed: 1, approved: 0, pending: 1, rejected: 0 };
-const nothing: VenueArrangement = { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0 };
+const waiting: VenueArrangement = { state: 'in_progress', needed: 1, approved: 0, pending: 1, rejected: 0, unbooked: 0 };
+const nothing: VenueArrangement = { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0 };
 const values = { event_id: 10, venue_id: 3, starts_at: pending.starts_at, ends_at: pending.ends_at, layout: 'banquet' as const };
 
 function respond(response: () => Response) {
@@ -69,7 +69,7 @@ test('[BOUNDARY] [SG2-48:AC1] [SG2-48:AC3] [SG2-48:request-response-shape] a res
 });
 
 test('[BOUNDARY] [SG2-82:AC5] a list without a well-formed arrangement is treated as unavailable', async () => {
-  for (const arrangement of [undefined, null, { ...nothing, state: 'done' }, { ...nothing, approved: '0' }, { state: 'ready' }]) {
+  for (const arrangement of [undefined, null, { ...nothing, state: 'done' }, { ...nothing, approved: '0' }, { ...nothing, unbooked: null }, { state: 'ready' }]) {
     respond(() => Response.json({ requests: [], arrangement }));
     expect(await fetchVenueRequests('token', 10)).toEqual({ ok: false, error: 'Venue requests are unavailable right now. Please try again.' });
   }

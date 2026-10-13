@@ -80,7 +80,8 @@ function requestStore(occupied: VenueConflictRow[]) {
     async conflicts(at, options) {
       checked.push([at, options]);
       return overlapping(occupied, at);
-    }
+    },
+    async venueStatuses() { return []; }
   };
   const composed = express();
   composed.use(express.json());

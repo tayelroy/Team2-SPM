@@ -4,6 +4,7 @@ import type { Layout } from '../venues/layoutFields';
 import type { VenueBookingRequestValues } from '../venues/bookingRequestFields';
 import { createVenueSuitabilityStore, type CapacityExceptionRecord, type SuitabilityEventRow, type SuitabilityVenueRow } from './venueSuitability';
 import { createVenueConflictStore, type VenueConflictStore } from './venueConflicts';
+import { fetchEventArrangementFacts, type VenueBookingStatusRow } from './eventArrangements';
 
 /** A venue request as people see it: the venue, requester and decider by
  * name. Their account ids are not sent to clients. */
@@ -56,6 +57,10 @@ export interface VenueBookingRequestStore {
   exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
   /** What else commits the venue over the period (SG2-50 AC1). */
   conflicts: VenueConflictStore['conflicts'];
+  /** SG2-82 AC5: each of the event's requests by status, and whether an
+   * approved one still has its confirmed booking, as SG2-57's readiness reads
+   * them. */
+  venueStatuses(eventId: number): Promise<VenueBookingStatusRow[]>;
 }
 
 const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason,withdrawn_by,withdrawn_at';
@@ -130,6 +135,11 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
       check(error);
       return (data as { hold_id: number } | null)?.hold_id ?? null;
     },
-    exceptions: requestId => suitability.exceptions(requestId)
+    exceptions: requestId => suitability.exceptions(requestId),
+    async venueStatuses(eventId) {
+      const result = await fetchEventArrangementFacts(admin, eventId);
+      if (!result.ok) throw new AccessError(503);
+      return result.facts.venue_requests;
+    }
   };
 }

@@ -4,9 +4,11 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { EventVenueRequests, VenueRequestForm, arrangementSummary, requestedNotice } from './VenueRequests';
 import type { VenueArrangement, VenueRequest } from './requestsApi';
 
-/** As the server reports it, from how many of the needed venues are approved or rejected. */
-function arrangement(approved: number, needed: number, rejected = 0): VenueArrangement {
-  return { state: needed === 0 ? 'none' : approved === needed ? 'ready' : 'in_progress', needed, approved, pending: needed - approved - rejected, rejected };
+/** As the server reports it, from how many of the needed venues are approved,
+ * rejected, or approved but no longer booked. */
+function arrangement(approved: number, needed: number, rejected = 0, unbooked = 0): VenueArrangement {
+  const ready = approved === needed && unbooked === 0;
+  return { state: needed === 0 ? 'none' : ready ? 'ready' : 'in_progress', needed, approved, pending: needed - approved - rejected, rejected, unbooked };
 }
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -152,6 +154,8 @@ test('[BOUNDARY] [SG2-82:AC5] the arrangement reads as ready only when every nee
     'Venue arrangement not ready: 0 of 1 venue approved; 1 venue rejected — request another venue, then withdraw the rejected request.');
   expect(arrangementSummary(arrangement(1, 5, 2))).toBe('Venue arrangement not ready: 1 of 5 venues approved; 2 venues awaiting Venue Staff; '
     + '2 venues rejected — request another venue, then withdraw the rejected request.');
+  // SG2-58: an approved venue whose booking was released no longer counts.
+  expect(arrangementSummary(arrangement(2, 2, 0, 1))).toBe('Venue arrangement not ready: 2 of 2 venues approved; 1 venue approved but no longer booked.');
 });
 
 const auditorium = { ...pending, request_id: 51, venue_id: 1, venue_name: 'Auditorium', status: 'approved', decider_name: 'Vera Venue', decided_at: '2030-01-02T02:00:00.000Z' };

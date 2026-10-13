@@ -23,13 +23,15 @@ const STATUS: Record<string, { text: string; bg: string; fg: string }> = {
 const venues = (count: number) => `${count} ${count === 1 ? 'venue' : 'venues'}`;
 
 /** SG2-82 AC5: whether the event's venue arrangement is ready, and if not,
- * what is still holding it back. */
+ * what is still holding it back. The same rule decides whether the event can
+ * be confirmed (SG2-58). */
 export function arrangementSummary(arrangement: VenueArrangement): string {
   if (arrangement.state === 'ready') return `Venue arrangement ready: ${arrangement.needed === 1 ? 'the venue is' : `all ${venues(arrangement.needed)} are`} approved.`;
   if (arrangement.state === 'none') return 'Venue arrangement not started: no venue requests are live for this event.';
   const outstanding = [
     arrangement.pending > 0 ? `${venues(arrangement.pending)} awaiting Venue Staff` : '',
-    arrangement.rejected > 0 ? `${venues(arrangement.rejected)} rejected — request another venue, then withdraw the rejected request` : ''
+    arrangement.rejected > 0 ? `${venues(arrangement.rejected)} rejected — request another venue, then withdraw the rejected request` : '',
+    arrangement.unbooked > 0 ? `${venues(arrangement.unbooked)} approved but no longer booked` : ''
   ].filter(Boolean);
   return `Venue arrangement not ready: ${arrangement.approved} of ${venues(arrangement.needed)} approved; ${outstanding.join('; ')}.`;
 }

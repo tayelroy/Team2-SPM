@@ -133,6 +133,26 @@ test('[NORMAL] [SG2-49:AC2] [SG2-49:AC3] one request is read with its decision, 
   assert.equal(await store.request(99), null);
 });
 
+test('[NORMAL] [SG2-82:AC5] the event\'s venue requests are read as SG2-57 readiness reads them, an approved one booked only while its booking is confirmed', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingRequestStore(fakeAdmin({
+    venue_booking_requests: [{ data: [{ request_id: 41, status: 'approved', venue_booking_id: 9 }, { request_id: 42, status: 'approved', venue_booking_id: 10 },
+      { request_id: 43, status: 'rejected', venue_booking_id: null }], error: null }],
+    venue_holds: [{ data: [], error: null }],
+    venue_bookings: [{ data: [{ booking_id: 9 }], error: null }]
+  }, calls));
+  assert.deepEqual(await store.venueStatuses(7), [
+    { status: 'approved', booked: true }, { status: 'approved', booked: false }, { status: 'rejected', booked: false }
+  ]);
+  assert.deepEqual(calls.filter(call => call.method === 'eq' && call.args[0] === 'event_id').map(call => call.table),
+    ['venue_booking_requests', 'venue_holds', 'venue_bookings', 'equipment_requests', 'equipment_reservations']);
+});
+
+test('[FAILURE] [SG2-82:AC5] venue requests that cannot be read for readiness are reported as temporarily unavailable', async () => {
+  const store = createVenueBookingRequestStore(fakeAdmin({ venue_booking_requests: [{ data: null, error: { message: 'offline' } }] }));
+  await assert.rejects(store.venueStatuses(7), (error: unknown) => error instanceof AccessError && error.status === 503);
+});
+
 test('[NORMAL] [SG2-82:AC4] [SG2-82:AC5] a withdrawn request is read with who withdrew it and when, alongside its earlier rejection', async () => {
   const calls: Call[] = [];
   const withdrawn = { ...row, status: 'cancelled', decided_by: 'user-venue', decided_at: '2030-01-02T00:00:00.000Z', decision_reason: 'Rewiring',

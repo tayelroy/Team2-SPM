@@ -52,7 +52,7 @@ const body = (overrides: Record<string, unknown> = {}) => ({
 });
 
 function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean;
-  holds?: Record<number, number>; exceptions?: CapacityExceptionRecord[]; occupied?: VenueConflictRow[] } = {}) {
+  holds?: Record<number, number>; exceptions?: CapacityExceptionRecord[]; occupied?: VenueConflictRow[]; unbooked?: number[] } = {}) {
   const events = seed.events ?? [forum];
   const venues = [atrium, theatre, seminar, bare];
   const requests: VenueBookingRequestRecord[] = seed.requests ?? [];
@@ -85,6 +85,11 @@ function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBooki
     async conflicts(period, options) {
       checked.push([{ venue_id: period.venue_id, starts_at: period.starts_at, ends_at: period.ends_at }, options]);
       return (seed.occupied ?? []).filter(row => row.starts_at < period.ends_at && row.ends_at > period.starts_at);
+    },
+    // SG2-82: an approved request is booked unless the seed says its booking was released.
+    async venueStatuses(id) {
+      return requests.filter(row => row.event_id === id)
+        .map(row => ({ status: row.status, booked: row.status === 'approved' && !(seed.unbooked ?? []).includes(row.request_id) }));
     }
   };
   return { store, created, requests, checked };
@@ -473,18 +478,23 @@ test('[NORMAL] [SG2-82:AC4] [SG2-82:AC5] the event\'s requests come with whether
   const response = await request(composed).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.requests.map((row: VenueBookingRequestRecord) => [row.request_id, row.status]), [[41, 'approved'], [42, 'approved'], [43, 'cancelled']]);
-  assert.deepEqual(response.body.arrangement, { state: 'ready', needed: 2, approved: 2, pending: 0, rejected: 0 });
+  assert.deepEqual(response.body.arrangement, { state: 'ready', needed: 2, approved: 2, pending: 0, rejected: 0, unbooked: 0 });
+  // An approved venue whose booking was released (SG2-51) holds it back again.
+  const released = await request(app(fakeStore({ requests, unbooked: [42] }).store)).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
+  assert.deepEqual(released.body.arrangement, { state: 'in_progress', needed: 2, approved: 2, pending: 0, rejected: 0, unbooked: 1 });
 });
 
-test('[BOUNDARY] [SG2-82:AC5] the arrangement is ready only once every venue still needed is approved; a rejected one holds it back until withdrawn', () => {
-  const statuses = (...list: string[]) => list.map(status => ({ status }));
-  assert.deepEqual(venueArrangement([]), { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0 });
-  assert.deepEqual(venueArrangement(statuses('cancelled')), { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0 });
-  assert.deepEqual(venueArrangement(statuses('approved')), { state: 'ready', needed: 1, approved: 1, pending: 0, rejected: 0 });
-  assert.deepEqual(venueArrangement(statuses('approved', 'approved', 'pending')), { state: 'in_progress', needed: 3, approved: 2, pending: 1, rejected: 0 });
-  assert.deepEqual(venueArrangement(statuses('approved', 'rejected')), { state: 'in_progress', needed: 2, approved: 1, pending: 0, rejected: 1 });
-  assert.deepEqual(venueArrangement(statuses('approved', 'cancelled')), { state: 'ready', needed: 1, approved: 1, pending: 0, rejected: 0 });
+test('[BOUNDARY] [SG2-82:AC5] the arrangement is ready only once every venue still needed is approved and booked; a rejected one holds it back until withdrawn', () => {
+  const statuses = (...list: string[]) => list.map(status => ({ status, booked: status === 'approved' }));
+  const counts = { needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0 };
+  assert.deepEqual(venueArrangement([]), { state: 'none', ...counts });
+  assert.deepEqual(venueArrangement(statuses('cancelled')), { state: 'none', ...counts });
+  assert.deepEqual(venueArrangement(statuses('approved')), { state: 'ready', ...counts, needed: 1, approved: 1 });
+  assert.deepEqual(venueArrangement(statuses('approved', 'approved', 'pending')), { state: 'in_progress', ...counts, needed: 3, approved: 2, pending: 1 });
+  assert.deepEqual(venueArrangement(statuses('approved', 'rejected')), { state: 'in_progress', ...counts, needed: 2, approved: 1, rejected: 1 });
+  assert.deepEqual(venueArrangement(statuses('approved', 'cancelled')), { state: 'ready', ...counts, needed: 1, approved: 1 });
   assert.equal(venueArrangement(statuses('rejected')).state, 'in_progress');
+  assert.deepEqual(venueArrangement([{ status: 'approved', booked: false }]), { state: 'in_progress', ...counts, needed: 1, approved: 1, unbooked: 1 });
 });
 
 /** Records each withdrawal; by default it commits it as the database would. */

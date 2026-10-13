@@ -185,7 +185,7 @@ function stubEventSearch(booking = 'allowed') {
       return Response.json({ request: requested, booking }, { status: 201 });
     }
     if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: made.length ? [requested] : [],
-      arrangement: { state: made.length ? 'in_progress' : 'none', needed: made.length, approved: 0, pending: made.length, rejected: 0 } });
+      arrangement: { state: made.length ? 'in_progress' : 'none', needed: made.length, approved: 0, pending: made.length, rejected: 0, unbooked: 0 } });
     return Response.json({ venues: [terrace] });
   });
   vi.stubGlobal('fetch', fetch);
