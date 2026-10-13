@@ -15,6 +15,7 @@ import type {
 } from './db/eventRequests';
 import type { GetAccountRoleResult } from './db/accountRoles';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
+import type { EventNotice, NotifyEventResult } from './db/eventNotifications';
 
 // SG2-97: assignment belongs to the Event Coordinator Lead.
 const STAFF: Principal = { userId: 'staff-1', role: 'event_coordinator_lead' };
@@ -54,6 +55,9 @@ interface HarnessOptions {
   /** SG2-100: the status move each coordinator write carried, in order. */
   transitions?: (AssignStatusTransition | undefined)[];
   audits?: InsertAuditLogInput[][];
+  notifyResult?: NotifyEventResult;
+  /** SG2-68: each notice batch, with how many history batches preceded it. */
+  notices?: { afterHistory: number; batch: EventNotice[] }[];
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -90,6 +94,10 @@ function buildApp(options: HarnessOptions = {}) {
       writeHistory: async (_admin, entries) => {
         options.audits?.push(entries);
         return options.auditResult ?? { ok: true, logs: [] };
+      },
+      notify: async (_admin, batch) => {
+        options.notices?.push({ afterHistory: options.audits?.length ?? 0, batch });
+        return options.notifyResult ?? { ok: true };
       }
     })
   );
@@ -499,6 +507,80 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     assert.equal(storedCoordinator, 'coord-1');
   });
 
+});
+
+describe('PATCH /api/event-requests/:eventId/coordinator notices (SG2-68)', () => {
+  const ASSIGNED_TO_OLD = { ...SUBMITTED_REQUEST, coordinator_id: 'coord-old', coordinator_name: 'Old Coordinator' };
+
+  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] a first assignment tells the new coordinator and the organiser, after the history row', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const notices: { afterHistory: number; batch: EventNotice[] }[] = [];
+    const response = await request(buildApp({
+      audits, notices, fetchResult: { ok: true, request: { ...SUBMITTED_REQUEST, status: 'unassigned' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(notices, [{ afterHistory: 1, batch: [
+      { recipient_id: 'coord-1', event_id: 7, kind: 'coordinator_assigned', message: 'You are now coordinating Partner Forum.' },
+      { recipient_id: 'user-1', event_id: 7, kind: 'coordinator_assigned', message: 'Coord One is now coordinating Partner Forum.' },
+      { recipient_id: null, event_id: 7, kind: 'coordinator_assigned', message: 'Partner Forum was reassigned to another coordinator.' }
+    ] }]);
+  });
+
+  test('[NORMAL] [SG2-68:AC1] a reassignment also tells the coordinator taken off the event', async () => {
+    const notices: { afterHistory: number; batch: EventNotice[] }[] = [];
+    await request(buildApp({
+      notices,
+      fetchResult: { ok: true, request: ASSIGNED_TO_OLD },
+      assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: 'coord-new', coordinator_name: 'New Coordinator' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-new' });
+    assert.deepEqual(notices[0].batch, [
+      { recipient_id: 'coord-new', event_id: 7, kind: 'coordinator_assigned', message: 'You are now coordinating Partner Forum.' },
+      { recipient_id: 'user-1', event_id: 7, kind: 'coordinator_assigned', message: 'New Coordinator is now coordinating Partner Forum.' },
+      { recipient_id: 'coord-old', event_id: 7, kind: 'coordinator_assigned', message: 'Partner Forum was reassigned to another coordinator.' }
+    ]);
+  });
+
+  test('[BOUNDARY] [SG2-68:AC1] [SG2-68:AC3] re-choosing the current coordinator notifies nobody; an unnamed coordinator is "A coordinator"', async () => {
+    const unchanged: { afterHistory: number; batch: EventNotice[] }[] = [];
+    const same = await request(buildApp({ notices: unchanged, fetchResult: { ok: true, request: ASSIGNED_TO_OLD } }))
+      .patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-old' });
+    assert.equal(same.status, 200);
+    assert.deepEqual(unchanged, []);
+
+    const unnamed: { afterHistory: number; batch: EventNotice[] }[] = [];
+    await request(buildApp({
+      notices: unnamed,
+      assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, name: '', coordinator_id: 'coord-1', coordinator_name: null } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(unnamed[0].batch[1].message, 'A coordinator is now coordinating Untitled event.');
+  });
+
+  test('[CONFLICT] [SG2-68:AC3] the Lead making the change is never told about it, even when they are also the organiser', async () => {
+    const notices: { afterHistory: number; batch: EventNotice[] }[] = [];
+    await request(buildApp({
+      notices,
+      assignResult: { ok: true, request: { ...SUBMITTED_REQUEST, organiser_id: 'staff-1', coordinator_id: 'coord-1', coordinator_name: 'Coord One' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.deepEqual(notices[0].batch.map(notice => notice.recipient_id), ['coord-1', null]);
+  });
+
+  test('[FAILURE] [SG2-68:AC1] a notice that cannot be stored answers 503 but leaves the recorded assignment in place', async () => {
+    const writes: [number, string | null, string | null][] = [];
+    const audits: InsertAuditLogInput[][] = [];
+    const response = await request(buildApp({ writes, audits, notifyResult: { ok: false } }))
+      .patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.deepEqual([response.status, response.body], [503, { error: 'Event requests are temporarily unavailable. Please try again later.' }]);
+    assert.deepEqual(writes, [[7, 'coord-1', null]]);
+    assert.equal(audits.length, 1);
+  });
+
+  test('[FAILURE] [SG2-68:AC1] an assignment that cannot be recorded sends no notice', async () => {
+    const notices: { afterHistory: number; batch: EventNotice[] }[] = [];
+    const response = await request(buildApp({ notices, auditResult: { ok: false, reason: 'unavailable', message: 'down' } }))
+      .patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 503);
+    assert.deepEqual(notices, []);
+  });
 });
 
 describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', () => {

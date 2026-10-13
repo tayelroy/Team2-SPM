@@ -636,6 +636,18 @@
       "source": "SG2-58 Jira acceptance criteria as recorded in the team's implementation contract; AC numbering follows displayed bullet order. Product-owner decisions: confirm only from Preparation; equipment must be reserved and placed with no shortfall; AC3 is delivered as the open-for-registration rule (SG2-60 builds registration)."
     },
     {
+      "id": "SG2-68",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-68",
+      "summary": "Be told when something affects my event",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "A notification is raised for the users affected when an event is submitted, a coordinator is assigned, clarification is requested, a decision is made on a request or booking, an event is confirmed, a significant change is accepted, or an event is cancelled",
+        "AC2": "Each notification identifies the event, says what happened, and when",
+        "AC3": "Users with no relationship to the event are not notified"
+      },
+      "source": "SG2-68 Jira acceptance criteria as recorded in the team's implementation contract; AC numbering follows displayed bullet order. Product-owner scope: submitted, coordinator assigned, clarification requested, event request decision and venue booking decision/hold conversion are built here; event confirmed is SG2-58; significant change accepted (SG2-64/65) and event cancelled (SG2-67) have no code path yet and are recorded as dependencies."
+    },
+    {
       "id": "SG2-82",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-82",
       "originalPullRequests": [],

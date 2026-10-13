@@ -59,10 +59,13 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: request.event_id,
         actor_id: userId, field_name: 'venue_booking_request', old_value: `Pending: ${venue.name} (request ${requestId})`,
         new_value: `${status[0].toUpperCase()}${status.slice(1)}: ${venue.name} (request ${requestId})${reason ? ` — ${reason}` : ''}`, created_at: now });
-      if (event.coordinator_id) {
+      const message = `${venue.name} was ${status} for ${event.name || 'Untitled event'}${status === 'rejected' ? `: ${reason}` : '.'}`;
+      // SG2-68: the organiser is told the same, unless they are the coordinator just told.
+      const recipients = [event.coordinator_id, event.organiser_id !== event.coordinator_id ? event.organiser_id : null];
+      for (const recipient of recipients) {
+        if (!recipient) continue;
         database.tables.notifications.push({ notification_id: nextId(database.tables.notifications, 'notification_id'),
-          recipient_id: event.coordinator_id, event_id: request.event_id, request_id: requestId, kind: `venue_request_${status}`,
-          message: `${venue.name} was ${status} for ${event.name || 'Untitled event'}${status === 'rejected' ? `: ${reason}` : '.'}`, created_at: now });
+          recipient_id: recipient, event_id: request.event_id, request_id: requestId, kind: `venue_request_${status}`, message, created_at: now });
       }
       return { outcome: 'updated', request_id: requestId, status, venue_booking_id: booking, decided_at: now };
     }
