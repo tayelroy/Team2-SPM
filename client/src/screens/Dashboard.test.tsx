@@ -92,7 +92,7 @@ test('[NORMAL] [SG2-87:AC4] the organisation dashboard shows a queued request as
   const card = await screen.findByRole('button', { name: /Queued forum/ });
   expect(within(card).getByText('Awaiting Assignment')).toBeInTheDocument();
   expect(within(card).getByText(/Unassigned/)).toBeInTheDocument();
-  expect(within(card).getByText('Awaiting a coordinator')).toBeInTheDocument();
+  expect(within(card).getByText('Awaiting coordinator assignment')).toBeInTheDocument();
   expect(within(card).queryByText('With coordinator')).not.toBeInTheDocument();
 });
 
@@ -164,4 +164,21 @@ test('[NORMAL] [SG2-86:AC2] the Safety Officer desk is an honest empty state wit
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
   expect(fetch).not.toHaveBeenCalled();
   expect(onNavigate).not.toHaveBeenCalled();
+});
+
+test('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] [SG2-31:AC4] each dashboard card says who the event is waiting on, in step with its status', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
+    { event_id: 41, name: 'Queued forum', status: 'unassigned', can_manage: true, coordinator_id: null },
+    { event_id: 42, name: 'Planning forum', status: 'planning', can_manage: true, coordinator_id: 'coord-1', coordinator_name: 'A. Coordinator' },
+    { event_id: 44, name: 'Finished forum', status: 'completed', can_manage: true, coordinator_id: 'coord-1', coordinator_name: 'A. Coordinator' },
+    { event_id: 45, name: 'Returned forum', status: 'needs_clarification', can_manage: true, coordinator_id: 'coord-1', coordinator_name: 'A. Coordinator' },
+  ] })));
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
+  const line = async (name: RegExp) => within(await screen.findByRole('button', { name })).getByText(
+    /^(Awaiting coordinator assignment|With coordinator|No action needed|Waiting on you|View only)$/,
+  );
+  expect(await line(/Queued forum/)).toHaveTextContent('Awaiting coordinator assignment');
+  expect(await line(/Planning forum/)).toHaveTextContent('With coordinator');
+  expect(await line(/Finished forum/)).toHaveTextContent('No action needed');
+  expect(await line(/Returned forum/)).toHaveTextContent('Waiting on you');
 });

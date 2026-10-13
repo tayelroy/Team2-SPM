@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { EventStageResult } from '../api/eventRequests';
 import { color, gradient, radius, rule } from '../theme';
 import { Badge, Eyebrow } from '../ui';
@@ -6,6 +6,17 @@ import { Badge, Eyebrow } from '../ui';
 export interface EventStageTrackerProps {
   stage: EventStageResult;
   style?: CSSProperties;
+}
+
+/** How far the fade reaches into the track from a side that hides steps. */
+const FADE = '40px';
+
+/** A mask that fades out each end of the track with more steps past it. */
+function trackEdgeFade(before: boolean, after: boolean): string | undefined {
+  if (!before && !after) return undefined;
+  const start = before ? `transparent, #000 ${FADE}` : '#000';
+  const end = after ? `#000 calc(100% - ${FADE}), transparent` : '#000';
+  return `linear-gradient(to right, ${start}, ${end})`;
 }
 
 /**
@@ -19,6 +30,36 @@ export interface EventStageTrackerProps {
 export default function EventStageTracker({ stage, style }: EventStageTrackerProps) {
   const steps = stage.stepper_steps || [];
   const waitingOn = stage.waiting_on;
+  const currentKey = steps.find((step) => step.status === 'current')?.key;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [moreBefore, setMoreBefore] = useState(false);
+  const [moreAfter, setMoreAfter] = useState(false);
+
+  /** Which sides of the track hide steps right now (SG2-38 mobile stepper). */
+  const syncOverflow = (track: HTMLElement) => {
+    setMoreBefore(track.scrollLeft >= 1);
+    setMoreAfter(Math.ceil(track.scrollLeft + track.clientWidth) < track.scrollWidth);
+  };
+  const edgeFade = trackEdgeFade(moreBefore, moreAfter);
+
+  // On a phone the seven steps are wider than the track, and the current
+  // one can start off-screen. Bring it to the middle of the track on render
+  // and on every resize. Only the track's own scrollLeft moves: unlike
+  // scrollIntoView, this never scrolls the page or any other ancestor.
+  useLayoutEffect(() => {
+    const track = trackRef.current as HTMLDivElement;
+    const revealCurrent = () => {
+      const current = track.querySelector<HTMLElement>('[aria-current="step"]');
+      if (current) {
+        const centred = current.offsetLeft - (track.clientWidth - current.offsetWidth) / 2;
+        track.scrollLeft = Math.min(Math.max(0, centred), track.scrollWidth - track.clientWidth);
+      }
+      syncOverflow(track);
+    };
+    revealCurrent();
+    window.addEventListener('resize', revealCurrent);
+    return () => window.removeEventListener('resize', revealCurrent);
+  }, [currentKey, steps.length]);
 
   return (
     <section
@@ -76,9 +117,11 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
 
       {/* Stepper Pipeline */}
       <div
+        ref={trackRef}
         role="list"
         aria-label="Lifecycle steps"
         data-testid="stepper-track"
+        onScroll={(event) => syncOverflow(event.currentTarget)}
         style={{
           display: 'flex',
           alignItems: 'flex-start',
@@ -91,6 +134,10 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
           // legible instead of letting it compress to fit.
           overflowX: 'auto',
           gap: '8px',
+          // SG2-38: the side that hides steps fades out, so a phone user can
+          // see the track goes on (WebKit still needs the prefixed name).
+          maskImage: edgeFade,
+          WebkitMaskImage: edgeFade,
         }}
       >
         {steps.map((step, idx) => {
@@ -190,6 +237,11 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
           );
         })}
       </div>
+      {moreBefore || moreAfter ? (
+        <p data-testid="stepper-scroll-hint" style={{ margin: '-8px 0 0', fontSize: '12px', color: color.silver }}>
+          Swipe sideways to see all {steps.length} steps.
+        </p>
+      ) : null}
 
       {/* Prominent "Waiting On" Card (SG2-38 AC 2) */}
       <div

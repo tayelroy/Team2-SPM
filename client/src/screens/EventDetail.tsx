@@ -14,7 +14,7 @@ import ClarificationThread from '../components/ClarificationThread';
 import EquipmentRequirements from '../components/EquipmentRequirements';
 import ConfirmedArrangements from '../components/ConfirmedArrangements';
 import type { Role, Screen } from '../mock/types';
-import { badgeStyle, statusLabel } from '../mock/viewModel';
+import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
 import { Badge, Card, Notice, NoticeMark } from '../ui';
 import { formatProposedDate } from './EventsTable';
@@ -83,22 +83,27 @@ export default function EventDetail({
     setLoading(true);
     setError(null);
     setNotFound(false);
-
-    getEventStage(selectedEventId, accessToken)
-      .then((stageResult) => {
-        if (!cancelled && stageResult.ok) {
-          setStage(stageResult.stage);
-        }
-      })
-      .catch(() => {
-        // Stage error does not prevent event details from displaying
-      });
+    setStage(null);
 
     fetchOwnEventDetail(selectedEventId, accessToken)
       .then((result) => {
         if (cancelled) return;
         if (result.ok) {
           setDetail(result.request);
+          // SG2-38: a colleague's view-only copy has no stage access on the
+          // server, so asking for it would only earn a 403. The stage is
+          // fetched once the detail says whose event this is.
+          if (result.request.canManage || isCoordinator) {
+            getEventStage(selectedEventId, accessToken)
+              .then((stageResult) => {
+                if (!cancelled && stageResult.ok) {
+                  setStage(stageResult.stage);
+                }
+              })
+              .catch(() => {
+                // Stage error does not prevent event details from displaying
+              });
+          }
         } else if (result.kind === 'not_found') {
           setNotFound(true);
         } else if (result.kind === 'unauthorized') {
@@ -123,7 +128,7 @@ export default function EventDetail({
     return () => {
       cancelled = true;
     };
-  }, [isAuthorizedRole, selectedEventId, accessToken, reloadKey]);
+  }, [isAuthorizedRole, isCoordinator, selectedEventId, accessToken, reloadKey]);
 
   if (!isAuthorizedRole) {
     return <Card><p role="alert">Event requests are available only to Event Organisers.</p></Card>;
@@ -390,20 +395,11 @@ export default function EventDetail({
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
             {!detail.canManage && !isCoordinator ? (
-              <>
-                <p role="status" className="organisation-detail-notice">
-                  View only. This event is shared with your organisation. Only its creator can edit or submit the request.
-                </p>
-                <div className="organisation-detail-actions">
-                  <button
-                    className="organisation-button"
-                    type="button"
-                    onClick={() => setIsHistoryDrawerOpen(true)}
-                  >
-                    View Change History
-                  </button>
-                </div>
-              </>
+              // SG2-38: view only means the creator's history and stage stay
+              // with the creator; the server refuses both to colleagues.
+              <p role="status" className="organisation-detail-notice">
+                View only. This event is shared with your organisation. Only its creator can edit or submit the request.
+              </p>
             ) : (
               <>
                 {needsClarification && isOrganiser ? (
@@ -422,8 +418,8 @@ export default function EventDetail({
                   <p role="alert" className="organisation-detail-notice">{completeError}</p>
                 ) : null}
                 {isLocked && isOrganiser ? (
-                  <p role="status" aria-label="Editing disabled: request submitted" className="organisation-detail-notice">
-                    This request has been submitted and is now with your coordinator. Contact your coordinator if an amendment is needed.
+                  <p role="status" aria-label="Editing disabled" className="organisation-detail-notice">
+                    {lockedRequestNotice(detail)}
                   </p>
                 ) : null}
                 <div className="organisation-detail-actions">
@@ -503,13 +499,15 @@ export default function EventDetail({
               }}
             />
           )}
-          <EventAuditDrawer
-            isOpen={isHistoryDrawerOpen}
-            onClose={() => setIsHistoryDrawerOpen(false)}
-            eventId={detail.eventId}
-            eventName={detail.name}
-            accessToken={accessToken}
-          />
+          {detail.canManage || isCoordinator ? (
+            <EventAuditDrawer
+              isOpen={isHistoryDrawerOpen}
+              onClose={() => setIsHistoryDrawerOpen(false)}
+              eventId={detail.eventId}
+              eventName={detail.name}
+              accessToken={accessToken}
+            />
+          ) : null}
         </article>
       );
     }

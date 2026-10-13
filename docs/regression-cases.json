@@ -1320,16 +1320,16 @@
       "Sign in as the event creator and a colleague in separate tabs.",
       "Read the initial event in the colleague dashboard.",
       "Update the event through the creator API session.",
-      "Reload the colleague view and check the dashboard counts, list, and every saved detail field."
+      "Reload the colleague view and check the dashboard counts, list (the row reads View only), and every saved detail field; record any stage or history request the detail screen makes."
     ],
     "data": "Updated name, purpose, description, date, attendance, venue/accessibility/equipment requirements and registration flag for event 1; foreign event 2 remains excluded.",
-    "expected": "The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
+    "expected": "The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values. The view-only detail shows no View Change History button and no stage tracker, and requests neither the stage nor the history endpoint (SG2-38).",
     "evidence": "e2e/regression.spec.ts; .github/scripts/regression-gate.mjs",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
-    "execution_date": "1 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-38-event-state-consistency on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -1341,6 +1341,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+        "execution_evidence": "1 Oct 2026; npm run test:e2e; 28/28 journeys and 13/13 report-gate checks passed; separate Playwright Chromium runtime; PR check supplies pushed-head evidence. No hosted Supabase validation.",
+        "execution_date": "1 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Current browser assertions passed. The colleague sees saved values and own-organisation counts, no stale or foreign event, and read-only controls. The detail API agrees with the rendered values.",
@@ -3198,22 +3204,22 @@
     "title": "a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop",
     "type": "Positive",
     "story": "SG2-100",
-    "purpose": "Verify AC2, AC3 and AC5: submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status.",
+    "purpose": "Verify AC2, AC3 and AC5: submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status. SG2-38: the My events Action column agrees with the stage (Awaiting coordinator assignment, then With coordinator), the locked Your options notice names the stage, and at 390px the stepper scrolls its current step into view inside the track and shows the swipe hint without scrolling the page.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
     "steps": [
-      "Sign in as organiser and submit the seeded draft; open My events and read the stage badge and waiting-on card.",
+      "Sign in as organiser and submit the seeded draft; open My events, read the row's Action text, then open it and read the stage badge and waiting-on card at 390x844 and 1440x900.",
       "Sign in as the Event Coordinator Lead and assign a coordinator; sign back in as organiser and read the stage badge and waiting-on persona.",
       "Sign in as the coordinator, open the request from Awaiting review (moves it to under_review) and approve it.",
-      "Sign back in as organiser and read the stage badge and waiting-on action for the approved stage."
+      "Sign back in as organiser, read the row's Action text, open the request and read the stage badge, waiting-on action and Your options notice; resize to 390x844 and read the stepper track position and hint."
     ],
     "data": "Event 1 (Planning workshop, seeded draft owned by the organiser); lead and coordinator fixture accounts.",
-    "expected": "Awaiting Assignment / Event Coordinator Lead / \"Assign an event coordinator\" after submission; Under Review / the assigned coordinator's name after assignment; approved status after the coordinator's decision; Arrangements / \"Complete venue suitability check and equipment reservation\" once approved.",
+    "expected": "Awaiting Assignment / Event Coordinator Lead / \"Assign an event coordinator\" after submission; Under Review / the assigned coordinator's name after assignment; approved status after the coordinator's decision; Arrangements / \"Complete venue suitability check and equipment reservation\" once approved. The My events row reads \"Awaiting coordinator assignment\" after submission and \"With coordinator\" once approved; the approved request's notice reads \"This request has been approved and your coordinator is arranging the venue and equipment. Contact your coordinator if an amendment is needed.\"; at 390px the current Arrangements step lies wholly inside the track (scrollLeft > 0), \"Swipe sideways to see all 7 steps.\" is shown, window.scrollX stays 0 and the document does not overflow.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
-    "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at c0d8265 (SG2-53 integrated); npm run test:e2e locally in Chromium: 64/64 journeys passed including this one, and the required SG2-26 regression gate passed. No hosted Supabase validation.",
-    "execution_date": "8 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-38-event-state-consistency on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026",
     "categories": [
       "NORMAL",
       "BOUNDARY"
@@ -3222,7 +3228,19 @@
       "SG2-100:AC2",
       "SG2-100:AC3",
       "SG2-100:AC5",
-      "SG2-100:AC13"
+      "SG2-100:AC13",
+      "SG2-100:AC9",
+      "SG2-38:AC1",
+      "SG2-38:AC2",
+      "SG2-31:AC4"
+    ],
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed locally in the full Chromium regression run against the production app build and reset loopback fixture; assertions checked the specified visible/persisted results and HTTP responses.",
+        "execution_evidence": "8 Oct 2026; feature/SG2-100-event-status-flow merged with origin/main at c0d8265 (SG2-53 integrated); npm run test:e2e locally in Chromium: 64/64 journeys passed including this one, and the required SG2-26 regression gate passed. No hosted Supabase validation.",
+        "execution_date": "8 Oct 2026"
+      }
     ]
   },
   {

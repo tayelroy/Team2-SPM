@@ -703,14 +703,15 @@ describe('the request form', () => {
     expect(screen.getByText('A half-day forum with two keynotes and a panel.', { exact: true })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Select an event from your organisation/)).not.toBeInTheDocument();
+    // The stage is asked for once the detail says the viewer owns it (SG2-38).
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       '/api/event-requests',
       '/api/event-requests/42/submit',
-      '/api/event-requests/42/stage',
       '/api/event-requests/42',
+      '/api/event-requests/42/stage',
       '/api/event-requests/42/clarifications',
     ]);
-    expect(fetchMock.mock.calls[3][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
+    expect(fetchMock.mock.calls[2][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
     // 08:00 on 12 Oct in Singapore is midnight UTC.
     expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toMatchObject({
       name: 'Investor Forum 2026', expected_attendance: 180, proposed_date: '2026-10-12T00:00:00.000Z',
