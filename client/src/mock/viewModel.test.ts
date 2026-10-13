@@ -14,6 +14,8 @@ import {
   primaryActionFor,
   scopedEvents,
   statusLabel,
+  eventActionLabel,
+  lockedRequestNotice,
   STATUS_LABELS,
   showsPipeline,
   statusTrailStyle,
@@ -300,5 +302,77 @@ describe('badgeStyle for the Week 7 statuses (SG2-100 AC5)', () => {
     for (const status of ['unassigned', 'awaiting_safety_check', 'preparation', 'completed']) {
       expect(badgeStyle(status)).toEqual(live);
     }
+  });
+});
+
+describe('eventActionLabel (SG2-38, SG2-31)', () => {
+  const own = { canManage: true, waitingOnMe: false, coordinatorId: 'coord-1' };
+
+  test.each([
+    ['submitted', 'With coordinator'],
+    ['under_review', 'With coordinator'],
+    ['approved', 'With coordinator'],
+    ['planning', 'With coordinator'],
+    ['preparation', 'With coordinator'],
+    ['awaiting_safety_check', 'With safety officer'],
+    ['confirmed', 'No action needed'],
+    ['completed', 'No action needed'],
+    ['cancelled', 'No action needed'],
+    ['safety_rejected', 'No action needed'],
+    ['rejected', 'No action needed'],
+  ])('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] an assigned %s request reads "%s"', (status, label) => {
+    expect(eventActionLabel({ ...own, status })).toBe(label);
+  });
+
+  test('[NORMAL] [SG2-31:AC4] a request waiting on its organiser says so, whatever the coordinator', () => {
+    expect(eventActionLabel({ ...own, status: 'needs_clarification', waitingOnMe: true })).toBe('Waiting on you');
+    expect(eventActionLabel({ ...own, status: 'draft', coordinatorId: null, waitingOnMe: true })).toBe('Waiting on you');
+  });
+
+  test('[BOUNDARY] [SG2-38:AC2] a request nobody has been assigned to is awaiting assignment, never with a coordinator', () => {
+    expect(eventActionLabel({ ...own, status: 'unassigned', coordinatorId: null })).toBe('Awaiting coordinator assignment');
+    // A legacy submitted row with no coordinator is in the same place.
+    expect(eventActionLabel({ ...own, status: 'submitted', coordinatorId: null })).toBe('Awaiting coordinator assignment');
+    // A finished event with nobody assigned still needs nothing.
+    expect(eventActionLabel({ ...own, status: 'cancelled', coordinatorId: null })).toBe('No action needed');
+  });
+
+  test('[BOUNDARY] [SG2-38:AC3] the status is matched regardless of case and padding', () => {
+    expect(eventActionLabel({ ...own, status: '  COMPLETED ' })).toBe('No action needed');
+  });
+
+  test('[FAILURE] [SG2-31:AC4] a colleague\'s event is view only, whatever its status', () => {
+    for (const status of ['draft', 'unassigned', 'planning', 'completed']) {
+      expect(eventActionLabel({ status, coordinatorId: null, canManage: false, waitingOnMe: false })).toBe('View only');
+    }
+  });
+});
+
+describe('lockedRequestNotice (SG2-38 AC3)', () => {
+  test.each([
+    ['submitted', 'This request has been submitted and is now with your coordinator for review. Contact your coordinator if an amendment is needed.'],
+    ['under_review', 'This request has been submitted and is now with your coordinator for review. Contact your coordinator if an amendment is needed.'],
+    ['approved', 'This request has been approved and your coordinator is arranging the venue and equipment. Contact your coordinator if an amendment is needed.'],
+    ['planning', 'This request has been approved and your coordinator is arranging the venue and equipment. Contact your coordinator if an amendment is needed.'],
+    ['awaiting_safety_check', 'Arrangements are complete and the event is waiting for its safety check by the Safety Officer. Contact your coordinator if an amendment is needed.'],
+    ['safety_rejected', 'This event did not pass its safety check and cannot go ahead as planned. Contact your coordinator to discuss next steps.'],
+    ['preparation', 'The safety check has passed and your coordinator is completing final preparations. Contact your coordinator if an amendment is needed.'],
+    ['confirmed', 'This event is confirmed. No action is needed from you.'],
+    ['completed', 'This event has been completed. No action is needed.'],
+    ['cancelled', 'This event has been cancelled. No action is needed.'],
+  ])('[NORMAL] [SG2-38:AC3] an assigned %s request explains where it is', (status, notice) => {
+    expect(lockedRequestNotice({ status, coordinatorId: 'coord-1' })).toBe(notice);
+  });
+
+  test('[BOUNDARY] [SG2-38:AC2] with no coordinator yet the notice says one is still to be assigned', () => {
+    const awaiting = 'This request has been submitted and is waiting for a coordinator to be assigned. You will see who it is here once they are.';
+    expect(lockedRequestNotice({ status: 'unassigned', coordinatorId: null })).toBe(awaiting);
+    expect(lockedRequestNotice({ status: 'submitted', coordinatorId: null })).toBe(awaiting);
+    expect(lockedRequestNotice({ status: 'cancelled', coordinatorId: null })).toBe('This event has been cancelled. No action is needed.');
+  });
+
+  test('[FAILURE] [SG2-38:AC3] an unrecognised status gets a neutral notice rather than a wrong claim', () => {
+    expect(lockedRequestNotice({ status: 'some_future_status', coordinatorId: 'coord-1' }))
+      .toBe('This request can no longer be edited. Contact your coordinator if an amendment is needed.');
   });
 });

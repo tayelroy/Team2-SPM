@@ -155,6 +155,30 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(screen.queryByText('Submitted')).not.toBeInTheDocument();
   });
 
+  test.each([
+    ['unassigned', null, 'This request has been submitted and is waiting for a coordinator to be assigned. You will see who it is here once they are.'],
+    ['planning', 'coord-2', 'This request has been approved and your coordinator is arranging the venue and equipment. Contact your coordinator if an amendment is needed.'],
+    ['completed', 'coord-2', 'This event has been completed. No action is needed.'],
+  ])('[NORMAL] [SG2-38:AC3] a locked %s request explains where it actually is in Your options', async (status, coordinatorId, notice) => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: {
+        eventId: 104, organiserId: 'org-1', organisation: 'Acme Corp', status,
+        name: 'Locked forum', purpose: 'p', description: '', proposedDate: null, expectedAttendance: null,
+        venueRequirements: null, accessibilityNeeds: null, equipmentRequirements: null,
+        registrationNeeded: false, coordinatorId, coordinatorName: coordinatorId ? 'Sarah Jenkins' : null,
+        coordinatorPhone: null, canManage: true, waitingOnMe: false, decisionReason: null, decidedAt: null,
+        completedBy: null, completedAt: null, endsAt: null,
+      },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+    render(<EventDetail role="Event Organiser" selectedEventId={104} accessToken="t" onNavigate={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Locked forum' });
+    expect(screen.getByRole('status', { name: 'Editing disabled' })).toHaveTextContent(notice);
+    expect(screen.queryByText(/is now with your coordinator/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
+  });
+
   test('[BOUNDARY] [SG2-33:AC3] says when the coordinator has no phone number on file (SG2-33 AC3)', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
@@ -381,6 +405,38 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(screen.getByRole('heading', { name: 'Current request' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Previous request' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('[CONFLICT] [SG2-38:AC3] a late stage for the previously selected request never replaces the current one', async () => {
+    type StageOutcome = eventRequestsApi.GetEventStageOutcome;
+    const request = (eventId: number, name: string): eventRequestsApi.EventRequestDetail => ({
+      eventId, organiserId: 'org-1', organisation: null, status: 'planning',
+      name, purpose: '', description: '', proposedDate: null,
+      expectedAttendance: null, venueRequirements: null, accessibilityNeeds: null,
+      equipmentRequirements: null, registrationNeeded: false, coordinatorId: 'coord-1',
+      coordinatorName: 'Sarah Jenkins', canManage: true, waitingOnMe: false, decisionReason: null, decidedAt: null,
+      completedBy: null, completedAt: null, endsAt: null,
+    });
+    const stage = (eventId: number, label: string): StageOutcome => ({ ok: true, stage: {
+      event_id: eventId, raw_status: 'planning', stage: label, stage_key: 'in_planning', description: label,
+      waiting_on: null, stepper_steps: [], arrangements_recheck_needed: false, outstanding_arrangements: [],
+    } });
+    let resolveOldStage!: (value: StageOutcome) => void;
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
+      .mockResolvedValueOnce({ ok: true, request: request(101, 'Previous request') })
+      .mockResolvedValueOnce({ ok: true, request: request(102, 'Current request') });
+    const getStage = vi.spyOn(eventRequestsApi, 'getEventStage')
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOldStage = resolve; }))
+      .mockResolvedValueOnce(stage(102, 'Current stage'));
+
+    const { rerender } = render(<EventDetail role="Event Organiser" selectedEventId={101} accessToken="test-token" onNavigate={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Previous request' });
+    rerender(<EventDetail role="Event Organiser" selectedEventId={102} accessToken="test-token" onNavigate={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Current request' });
+    expect(await screen.findByTestId('stage-badge')).toHaveTextContent('Current stage');
+    await act(async () => resolveOldStage(stage(101, 'Previous stage')));
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent('Current stage');
+    expect(getStage.mock.calls).toEqual([[101, 'test-token'], [102, 'test-token']]);
   });
 });
 
@@ -839,9 +895,10 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
   });
 
   test('[NORMAL] [SG2-39:AC3] displays outstanding arrangements tags when stage contains custom or registration arrangements (AC 3)', async () => {
+    // The creator's own copy: a view-only colleague never gets the stage (SG2-38).
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
-      request: baseDetail,
+      request: { ...baseDetail, canManage: true },
     });
     vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
       ok: true,
@@ -1118,6 +1175,9 @@ describe('EventDetail change history integration (SG2-40)', () => {
     expect(await screen.findByText('No change history recorded for this event yet.')).toBeInTheDocument();
     expect(getHistory).toHaveBeenCalledTimes(1);
     expect(getHistory).toHaveBeenCalledWith(101, 'test-token');
+
+    fireEvent.click(screen.getByRole('button', { name: /close change history/i }));
+    expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
   });
 
   test('[FAILURE] [SG2-40:AC3] does not render "View Change History" for Attendees', () => {
@@ -1135,7 +1195,7 @@ describe('EventDetail change history integration (SG2-40)', () => {
     expect(getHistory).not.toHaveBeenCalled();
   });
 
-  test('[BOUNDARY] [SG2-40:drawer-visibility] renders "View Change History" for Organiser when canManage is false and closes drawer properly', async () => {
+  test('[BOUNDARY] [SG2-38:AC3] a colleague\'s view-only detail offers no history and asks for neither stage nor history', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -1143,10 +1203,8 @@ describe('EventDetail change history integration (SG2-40)', () => {
         canManage: false,
       },
     });
-    vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
-      ok: true,
-      history: [],
-    });
+    const getStage = vi.spyOn(eventRequestsApi, 'getEventStage');
+    const getHistory = vi.spyOn(eventRequestsApi, 'getEventHistory');
 
     render(
       <EventDetail
@@ -1157,15 +1215,12 @@ describe('EventDetail change history integration (SG2-40)', () => {
       />
     );
 
-    const historyBtn = await screen.findByRole('button', { name: /view change history/i });
-    expect(historyBtn).toBeInTheDocument();
-
-    fireEvent.click(historyBtn);
-    expect(await screen.findByRole('dialog', { name: /change history/i })).toBeInTheDocument();
-
-    const closeBtn = screen.getByRole('button', { name: /close change history/i });
-    fireEvent.click(closeBtn);
+    expect(await screen.findByText(/View only\. This event is shared/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /view change history/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: /change history/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Event stage progress' })).not.toBeInTheDocument();
+    expect(getStage).not.toHaveBeenCalled();
+    expect(getHistory).not.toHaveBeenCalled();
   });
 });
 
