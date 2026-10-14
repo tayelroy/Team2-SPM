@@ -79,7 +79,7 @@ test('[FAILURE] [SG2-45:AC1] only callers who may manage blocks see the block co
   expect(screen.queryByRole('button', { name: /^Block/ })).not.toBeInTheDocument();
 });
 
-test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC6] the block screen lists upcoming blocks with reason, note, recorder and time, or says there are none', async () => {
+test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC6] [SG2-98:AC3] the block screen lists upcoming blocks with reason, note, recorder and time, or says there are none', async () => {
   await openBlocks([existing, { ...existing, unavailability_id: 2, category: 'other', reason: 'Legacy closure', created_at: null, created_by_name: null }]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   expect(item).toHaveTextContent('1 Aug 2030, 9:00 am – 2 Aug 2030, 9:00 am');
@@ -109,7 +109,7 @@ test('[NORMAL] [SG2-45:AC1] [SG2-80:AC1] blocking a free period with a reason an
   expect(screen.getByLabelText('Note')).toHaveValue('');
 });
 
-test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] a period holding confirmed bookings is accepted and lists each affected event as not cancelled', async () => {
+test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-98:AC1] a period holding confirmed bookings is accepted and lists each affected event as not cancelled', async () => {
   const affected: AffectedBooking[] = [
     gala,
     { ...gala, booking_id: 8, event_id: 4, event_name: null, event_status: null },
@@ -140,7 +140,7 @@ test('[BOUNDARY] [SG2-80:AC3] a single affected event is reported in the singula
   expect(await screen.findByRole('status')).toHaveTextContent('1 booked event is flagged as affected and not cancelled.');
 });
 
-test('[NORMAL] [SG2-45:AC3] AC3: removing a block makes the venue available for that period again', async () => {
+test('[NORMAL] [SG2-45:AC3] [SG2-98:AC2] AC3: removing a block makes the venue available for that period again', async () => {
   const { fetch } = await openBlocks([existing]);
   const item = await screen.findByRole('listitem', { name: 'Scheduled maintenance' });
   fireEvent.click(within(item).getByRole('button', { name: 'Remove block' }));
