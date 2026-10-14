@@ -5,6 +5,7 @@ import App from './App';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
+import EventsTable from './screens/EventsTable';
 import ChangeRequest from './screens/ChangeRequest';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
@@ -173,8 +174,7 @@ describe('every role can reach every screen in its navigation', () => {
       ['Event detail', 'Event detail'],
     ],
     'Event Coordinator': [
-      ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
-      ['Review', 'Event detail'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
+      ['Dashboard', 'Coordination desk'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
       ['Venue Availability', 'Venue availability'],
       ['Venue holds', 'Venue holds'],
     ],
@@ -510,13 +510,13 @@ test('[NORMAL] [SG2-41:AC4] the signed-in coordinator opens the actual selected 
 });
 
 describe('the events table', () => {
-  const openTable = async () => {
+  test('[FAILURE] [SG2-26:AC2] a coordinator is not offered the organisation event list or detail, and the list still refuses them', async () => {
     await signInAs('Event Coordinator');
-    fireEvent.click(within(header()).getByRole('button', { name: 'All events' }));
-  };
-
-  test('[FAILURE] [SG2-26:AC2] coordinator navigation cannot expose organisation event rows', async () => {
-    await openTable();
+    const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
+    expect(labels).not.toContain('All events');
+    expect(labels).not.toContain('Review');
+    cleanup();
+    render(<EventsTable role="Event Coordinator" accessToken="test-access-token" onOpenEvent={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
@@ -598,9 +598,8 @@ describe('the event detail action panel', () => {
     expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
   });
 
-  test('[FAILURE] [SG2-26:AC2] coordinator review navigation shows no event content or decision actions', async () => {
-    await signInAs('Event Coordinator');
-    fireEvent.click(within(header()).getByRole('button', { name: 'Review' }));
+  test('[FAILURE] [SG2-26:AC2] event detail opened without a work-queue event shows a coordinator no content or decision actions', () => {
+    render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
   });
