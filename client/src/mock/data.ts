@@ -104,10 +104,11 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
   ],
+  // SG2-26: a coordinator opens events from the work queue on the dashboard.
+  // All events and event detail list organisation requests (event_request.view,
+  // organisers only), so offering them here only ever showed a refusal.
   'Event Coordinator': [
     ['dashboard', 'Dashboard'],
-    ['events', 'All events'],
-    ['detail', 'Review'],
     ['venues', 'Venues'],
     ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
