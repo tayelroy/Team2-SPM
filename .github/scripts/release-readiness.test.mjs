@@ -66,3 +66,17 @@ test('[FAILURE] [SG2-23:AC1] missing Safety Officer role catalogue entry blocks 
 test('[FAILURE] [SG2-25:AC2] a missing privileged view read grant blocks release even with an intact schema', () => {
   assertReadinessRejects('REVOKE SELECT ON public.internal_work_items FROM service_role;', 'service_role SELECT public.internal_work_items');
 });
+
+test('[FAILURE] [SG2-22:AC3] [SG2-68:AC1] [SG2-58:AC1] legacy notification kinds block release before lifecycle writes fail', () => {
+  assertReadinessRejects(`TRUNCATE public.notifications;
+    ALTER TABLE public.notifications DROP CONSTRAINT notifications_kind_check,
+      ADD CONSTRAINT notifications_kind_check CHECK (kind IN
+        ('venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
+         'equipment_reserved', 'venue_booking_clash'));`,
+  'notifications_kind_check allows event_confirmed',
+  'notifications_kind_check allows event_submitted',
+  'notifications_kind_check allows coordinator_assigned',
+  'notifications_kind_check allows clarification_requested',
+  'notifications_kind_check allows event_approved',
+  'notifications_kind_check allows event_rejected');
+});

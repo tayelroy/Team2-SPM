@@ -13,6 +13,7 @@ begin
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
+    ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at'),
     ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
     ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details')
   ), column_checks as (
@@ -93,11 +94,34 @@ begin
     select 'internal_work_items planning key ' || name as name,
       coalesce(position(quote_literal(name) in pg_get_viewdef(to_regclass('public.internal_work_items'))) > 0, false) as passed
     from required_planning_keys
+  ), required_notification_kinds(name) as (values
+    ('venue_request_approved'), ('venue_request_rejected'), ('venue_booking_released'),
+    ('equipment_reserved'), ('venue_booking_clash'), ('event_confirmed'),
+    ('event_submitted'), ('coordinator_assigned'), ('clarification_requested'),
+    ('event_approved'), ('event_rejected')
+  ), notification_constraint as (
+    select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
+      array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),
+        '''([^'']+)''::text', 'g') literal) as allowed_kinds
+    from pg_constraint c
+    where c.conrelid = to_regclass('public.notifications')
+      and c.conname = 'notifications_kind_check' and c.contype = 'c'
+  ), notification_checks as (
+    select 'notifications_kind_check allows ' || r.name as name,
+      exists (select 1 from notification_constraint c
+        where c.convalidated and r.name = any(c.allowed_kinds)
+          -- Verify the literal allow-list shape as well as each value. Merely
+          -- finding a quoted kind in an unrelated/reversed predicate is unsafe.
+          and c.expression = '(kind = ANY (ARRAY[' ||
+            (select string_agg(quote_literal(kind) || '::text', ', ')
+              from unnest(c.allowed_kinds) kind) || ']))') as passed
+    from required_notification_kinds r
   ), checks as (
     select * from column_checks union all select * from type_checks
     union all select * from relation_checks union all select * from status_checks
     union all select * from function_checks union all select * from foreign_key_checks
     union all select * from grant_checks union all select * from view_checks
+    union all select * from notification_checks
   )
   select array_agg(name order by name) into failures from checks where not passed;
 

@@ -61,6 +61,20 @@ acceptance tests or the Definition of Done.
 - Foreign keys required by the organiser, coordinator, booking and audit embeds.
 - Service-role read grants needed by the privileged readers.
 - The planning registration fields/notes exposed by the work queue view.
+- Notification columns and the validated literal `notifications_kind_check`
+  allow-list, including `event_confirmed` and all five event lifecycle kinds.
+
+Notification schema drift can produce a partial success: submission changes the
+event state and writes history before its notice insert fails. The UI then
+reports an error even though the request has entered the unassigned queue.
+Migration `202610150001_event_confirmation.sql` adds `event_confirmed` to the
+allow-list; `202610160001_event_notifications.sql` preserves it and adds
+submission, assignment, clarification and event approval/rejection notices.
+Check the actual constraint and required columns, not just migration-ledger
+entries: a missing ledger row does not prove that every statement is absent.
+The gate reads the constraint's literal allow-list without inserting a test
+notice or executing its expression. Native API tests must still prove the
+complete transition/history/notification result.
 
 The view check verifies named JSON keys structurally. It does not prove that the
 values are correct; the disposable database integration tests and the UI save /
@@ -90,7 +104,8 @@ The database CI job applies every committed migration to its disposable
 PostgreSQL service, runs the structural gate, and runs
 [`release-readiness.test.mjs`](../.github/scripts/release-readiness.test.mjs).
 The tests deliberately remove required columns, alter the queue view, rename a
-role and revoke a grant inside transactions. Every mutation rolls back, and the
+role, revoke a grant and restore a legacy notification-kind constraint inside
+transactions. Every mutation rolls back, and the
 tests prove the next independent check passes again. All four test categories
 are represented. No hosted credentials or automatic hosted migration are used.
 

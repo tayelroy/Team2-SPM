@@ -5301,7 +5301,7 @@
     "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",
     "layer": "Native PostgreSQL catalogue and privilege checks through the public release gate",
     "status": "Pass",
-    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 6/6 passed after the helper rename. /tmp/spm-readiness-final.log. Each damaged-schema transaction rolled back and an independent healthy check passed. Local verification; no hosted PR check or human review claim.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 7/7 passed, including the new legacy-notification constraint regression. /tmp/spm-readiness-notifications.log. Every damaged transaction rolled back and the next independent healthy read-only check passed. Local native PostgreSQL verification; no new hosted CI or human review claim.",
     "execution_date": "15 Oct 2026",
     "executed_by": "Codex automated verification",
     "review": null,
@@ -5323,7 +5323,7 @@
       "SG2-22:AC3",
       "SG2-23:AC1"
     ],
-    "actual": "The normal read-only check and empty-content boundary check both passed among the six native readiness regressions; fixture removal rolled back."
+    "actual": "Healthy read-only schema and empty-content checks passed in the seven-case native suite; no personal demo data is required."
   },
   {
     "type": "Deployment readiness regression",
@@ -5331,7 +5331,7 @@
     "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",
     "layer": "Native PostgreSQL catalogue and privilege checks through the public release gate",
     "status": "Pass",
-    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 6/6 passed after the helper rename. /tmp/spm-readiness-final.log. Each damaged-schema transaction rolled back and an independent healthy check passed. Local verification; no hosted PR check or human review claim.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 7/7 passed, including the new legacy-notification constraint regression. /tmp/spm-readiness-notifications.log. Every damaged transaction rolled back and the next independent healthy read-only check passed. Local native PostgreSQL verification; no new hosted CI or human review claim.",
     "execution_date": "15 Oct 2026",
     "executed_by": "Codex automated verification",
     "review": null,
@@ -5357,5 +5357,37 @@
       "SG2-25:AC2"
     ],
     "actual": "All four damaged-contract scenarios were refused with the expected diagnostics, and every independent post-rollback healthy check passed."
+  },
+  {
+    "id": "SG2-22-READINESS-NOTIFICATION-KINDS",
+    "title": "Legacy notification constraint blocks release before lifecycle writes fail",
+    "type": "Deployment readiness regression",
+    "story": "SG2-22",
+    "purpose": "Detect the hosted drift that allowed an event transition/history row but rejected its lifecycle notice, and separately cover the older event_confirmed notification kind.",
+    "preconditions": "Disposable native PostgreSQL with all repository migrations; POSTGRES_CONTAINER points only to its local Docker container. No hosted mutation.",
+    "steps": [
+      "Run the public structural gate against the healthy migrated schema.",
+      "Inside a rollback transaction, clear synthetic notices and restore the old validated five-kind notifications_kind_check.",
+      "Require a nonzero readiness result naming event_confirmed and all five lifecycle kinds.",
+      "Close the failed transaction and run a separate healthy read-only check, proving the old constraint/data changes rolled back."
+    ],
+    "data": "Old kinds: venue_request_approved, venue_request_rejected, venue_booking_released, equipment_reserved, venue_booking_clash. Expected additional kinds: event_confirmed, event_submitted, coordinator_assigned, clarification_requested, event_approved, event_rejected.",
+    "expected": "All six missing-kind contracts are diagnosed. The structurally healthy schema passes before and after the failed rollback transaction. The gate never inserts a hosted test notification or executes the constraint expression.",
+    "evidence": ".github/scripts/release-readiness.test.mjs:70; supabase/checks/release_readiness.sql",
+    "layer": "Native PostgreSQL catalogue checks through the read-only release gate",
+    "status": "Pass",
+    "actual": "7/7 native readiness tests passed, including the exact old-kind constraint regression. The new case diagnosed all six omitted kinds and confirmed the next independent healthy read-only check passed.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; /tmp/spm-readiness-notifications.log. Local native PostgreSQL; no new hosted CI, deployment or human approval claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-68:AC1",
+      "SG2-58:AC1"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
   }
 ]
