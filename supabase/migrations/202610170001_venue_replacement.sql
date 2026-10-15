@@ -229,7 +229,9 @@ begin
   select * into v from public.venues where venue_id = venue for update;
   select * into b from public.venue_bookings where booking_id = p_booking_id for update;
   instant := clock_timestamp();
-  -- A booking already released, or already over, is left as it is.
+  -- A booking already released, or already over, is left as it is. Whether the
+  -- booking may be replaced at all (it is flagged and belongs to the request's
+  -- event) is decided by the only caller, decide_venue_booking_request().
   if b.status <> 'confirmed' or b.ends_at <= instant then return; end if;
   select * into e from public.events where event_id = b.event_id for update;
 
@@ -277,6 +279,7 @@ declare
   booking bigint;
   clash record;
   replaced_venue integer;
+  replaces_affected boolean;
   reason text := nullif(btrim(p_reason), '');
   instant timestamptz;
   gap interval;
@@ -310,6 +313,12 @@ begin
   select hold_id into hold from public.venue_holds where request_id = r.request_id;
   if hold is not null then return jsonb_build_object('outcome', 'hold', 'hold_id', hold); end if;
   select * into e from public.events where event_id = r.event_id for update;
+  -- SG2-81: a request counts as a replacement only while the booking it names
+  -- is a confirmed booking of this event that a venue's unavailability
+  -- affects, whatever the API checked when the request was made.
+  replaces_affected := r.replaces_booking_id is not null and exists (select 1
+    from public.venue_bookings x join public.venue_booking_disruptions d on d.booking_id = x.booking_id
+    where x.booking_id = r.replaces_booking_id and x.event_id = r.event_id and x.status = 'confirmed');
   instant := clock_timestamp();
   -- SG2-78: setup before and turnaround after every booking at this venue.
   gap := public.venue_preparation_gap(r.venue_id);
@@ -318,7 +327,7 @@ begin
     -- SG2-81: a replacement for an unavailable venue is also decided once the
     -- event has reached preparation or been confirmed.
     if (e.status not in ('approved', 'planning')
-        and not (r.replaces_booking_id is not null and e.status in ('preparation', 'confirmed')))
+        and not (replaces_affected and e.status in ('preparation', 'confirmed')))
       or r.ends_at <= instant then
       return jsonb_build_object('outcome', 'closed');
     end if;
@@ -371,8 +380,7 @@ begin
     -- the coordinator and organiser are told), so the event no longer shows
     -- alternative arrangements as required. A booking already released, or
     -- over, is left as it is.
-    if r.replaces_booking_id is not null and exists (select 1 from public.venue_bookings x
-        where x.booking_id = r.replaces_booking_id and x.event_id = r.event_id) then
+    if replaces_affected then
       perform public.release_replaced_booking(r.replaces_booking_id, v.name);
     end if;
   else

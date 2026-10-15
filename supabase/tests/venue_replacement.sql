@@ -333,8 +333,8 @@ declare
   result jsonb;
 begin
   result := public.decide_venue_booking_request(98105, 'approve', null);
-  if result->>'outcome' <> 'updated' then
-    raise exception '[SG2-81:foreign-replacement-approvable] [SG2-81:AC4] [FAILURE] The request itself is decided as normal: %', result;
+  if result->>'outcome' <> 'closed' then
+    raise exception '[SG2-81:foreign-replacement-gets-no-allowance] [SG2-81:AC4] [FAILURE] A request naming another event''s booking must not get the Preparation allowance: %', result;
   end if;
   if not exists (select 1 from public.venue_bookings where booking_id = 98102 and status = 'confirmed') then
     raise exception '[SG2-81:foreign-booking-not-released] [SG2-81:AC4] [FAILURE] A replacement naming another event''s booking must not release it';
@@ -345,6 +345,77 @@ begin
   end if;
 end $$;
 reset role;
+
+-- AC4/AC5 (FAILURE): the database itself, not only the API, requires the
+-- booking a replacement names to be affected. A request naming an unaffected
+-- booking of its own event is decided as an ordinary request: it releases
+-- nothing, and it does not get the Preparation/Confirmed allowance.
+insert into public.events (event_id, organiser_id, coordinator_id, name, status) values
+  (98107, 'f8100000-0000-4000-8000-000000000003', 'f8100000-0000-4000-8000-000000000002', 'Planning Event', 'planning');
+insert into public.venue_bookings (booking_id, venue_id, event_id, starts_at, ends_at, status) values
+  (98107, 983, 98107, '2031-07-01 09:00+00', '2031-07-01 12:00+00', 'confirmed');
+insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, layout, requested_by,
+    venue_requirements, replaces_booking_id) values
+  (98107, 98107, 982, '2031-07-02 09:00+00', '2031-07-02 12:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000002', null, 98107),
+  (98108, 98102, 983, '2031-07-03 09:00+00', '2031-07-03 12:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000004', null, 98102),
+  -- naming another event's flagged booking (the confirmed gala's)
+  (98109, 98107, 983, '2031-07-05 09:00+00', '2031-07-05 12:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000002', null, 98105),
+  -- the gala's own replacement, once the gala is back in Preparation
+  (98110, 98105, 983, '2031-07-06 09:00+00', '2031-07-06 12:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000002', null, 98105);
+update public.events set status = 'preparation' where event_id = 98105;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'f8100000-0000-4000-8000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"f8100000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+do $$
+declare
+  result jsonb;
+begin
+  result := public.decide_venue_booking_request(98107, 'approve', null);
+  if result->>'outcome' <> 'updated' then
+    raise exception '[SG2-81:unaffected-replacement-decided-as-ordinary] [SG2-81:AC4] [FAILURE] A request naming an unaffected booking must still be decidable as an ordinary request: %', result;
+  end if;
+  result := public.decide_venue_booking_request(98108, 'approve', null);
+  if result->>'outcome' <> 'closed' then
+    raise exception '[SG2-81:unaffected-replacement-no-preparation-allowance] [SG2-81:AC4] [FAILURE] Naming an unaffected booking must not let an event in Preparation have a venue approved: %', result;
+  end if;
+  -- Another event's flagged booking is not this event's to replace.
+  result := public.decide_venue_booking_request(98109, 'approve', null);
+  if result->>'outcome' <> 'updated' then
+    raise exception '[SG2-81:foreign-flagged-replacement-decided-as-ordinary] [SG2-81:AC4] [FAILURE] A request naming another event''s flagged booking is decided as an ordinary request: %', result;
+  end if;
+end $$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.venue_bookings where booking_id = 98105 and status = 'confirmed')
+    or not exists (select 1 from public.venue_booking_disruptions where booking_id = 98105) then
+    raise exception '[SG2-81:foreign-flagged-booking-not-released] [SG2-81:AC4] [FAILURE] A replacement must not release a flagged booking that belongs to another event';
+  end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'f8100000-0000-4000-8000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"f8100000-0000-4000-8000-000000000001","role":"authenticated"}', true);
+do $$
+declare
+  result jsonb := public.decide_venue_booking_request(98110, 'approve', null);
+begin
+  if result->>'outcome' <> 'updated' then
+    raise exception '[SG2-81:preparation-event-replacement-approvable] [SG2-81:AC4] [NORMAL] An event in Preparation must be able to have a replacement for its own affected booking approved: %', result;
+  end if;
+end $$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.venue_bookings where booking_id = 98105 and status = 'cancelled')
+    or exists (select 1 from public.venue_booking_disruptions where booking_id = 98105) then
+    raise exception '[SG2-81:preparation-event-affected-booking-released] [SG2-81:AC5] [NORMAL] The Preparation event''s affected booking must be released once its replacement is approved';
+  end if;
+  if not exists (select 1 from public.venue_bookings where booking_id = 98107 and status = 'confirmed')
+    or not exists (select 1 from public.venue_booking_requests where request_id = 98107 and status = 'approved')
+    or exists (select 1 from public.event_audit_logs where event_id = 98107 and field_name = 'venue_booking') then
+    raise exception '[SG2-81:unaffected-booking-not-released] [SG2-81:AC4] [FAILURE] A replacement must not release a booking that no venue unavailability affects';
+  end if;
+end $$;
 
 -- Roles: a coordinator and an anonymous caller cannot decide, so cannot
 -- trigger a release through a replacement.
