@@ -1,8 +1,9 @@
-# ConnectSphere API specification — as of main 1d1e336 (14 Oct 2026)
+# ConnectSphere API specification — as of PR90 head 61416cc (16 Oct 2026)
 
-SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts on `main`. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
+SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at the documented snapshot. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
 
 - **Ground truth:** `server/src/app.ts` (mounts), the routers it mounts (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue}/*.ts`), `server/src/auth/policy.ts` (`PERMISSIONS`), the `server/src/db/*` adapters, and the RPCs in `supabase/migrations/*.sql`.
+- **Revision scope:** PR90 head `61416cc` includes merged PR92 (`64b1da6`). The route catalogue retains the original 73 paths; SG2-81 extends existing request and decision routes, and adds no replacement endpoint. Source line numbers inherited from the original catalogue are locators for that baseline; source filenames and the contracts below identify the current implementation. Safety routes remain planned.
 - **Endpoint count:** 73 method + path pairs, from 70 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
 - **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `connectsphere.dsl` (C3 API components), `sequence-diagrams.puml`, `data-model.puml`, `class-diagram.puml`, `event-status-model.puml`.
 
@@ -424,7 +425,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 403 `Only the assigned event coordinator can view these arrangements.`
   - 404 `Event not found.`
   - 503
-- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding.
+- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding. SG2-81 additionally counts affected confirmed bookings as outstanding. Persisted `arrangements_recheck_needed` with `venue_recheck`, `equipment_recheck` or `registration_recheck` keeps the corresponding arrangement outstanding even when its booking/receipt data exists.
 
 ### 4.15 PATCH /api/event-requests/:eventId/confirm
 - **Week 7:** New since W7 — SG2-58; #3 — SG2-82.
@@ -437,11 +438,11 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `{ error: "Only an event in Preparation can be confirmed.", code: "closed" }`
   - 409 `{ error: "Confirmation refused: arrangements are still outstanding.", code: "outstanding", outstanding[] }`
   - 401/403/503 mapped from the RPC
-- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610150003_confirm_event_rejected_venues.sql`. Under `for update` the RPC:
+- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610170002_confirmation_rechecks_and_disruptions.sql` (merges PR90 rechecks with PR92 disruption checks). Under `for update` the RPC:
   - rechecks the caller's role and assignment
-  - applies the readiness gate
+  - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment or registration needs, and persisted venue/equipment/registration rechecks; refusal changes no event, booking, receipt, history or notification
   - writes the status, a history row and an `event_confirmed` notice
-- **Note:** no endpoint on `main` moves an event into `preparation`. That is the safety-check outcome (SG2-91..94, «planned»).
+- **Note:** no endpoint at this snapshot moves an event into `preparation`. That is the safety-check outcome (SG2-91..94, «planned»).
 
 ### 4.16 GET /api/event-requests/:eventId/confirmation
 - **Week 7:** New since W7 — SG2-58.
@@ -517,7 +518,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Permission:** `notifications.read` (EC, VS, TSS, EO, ECL). The Safety Officer does not hold it.
 - **200:** `{ notifications: [{ notification_id, event_id, request_id, kind, message, created_at }] }`
   - The newest 50 for the caller.
-  - `kind` is one of: `venue_request_approved`, `venue_request_rejected`, `venue_booking_released`, `equipment_reserved`, `venue_booking_clash`, `event_confirmed`, `event_submitted`, `coordinator_assigned`, `clarification_requested`, `event_approved`, `event_rejected`.
+  - `kind` is one of: `venue_request_approved`, `venue_request_rejected`, `venue_booking_released`, `equipment_reserved`, `venue_booking_clash`, `event_confirmed`, `event_submitted`, `coordinator_assigned`, `clarification_requested`, `event_approved`, `event_rejected`, `venue_unavailable`.
 - **Errors:** 503.
 - **Data:** `notifications`, filtered on `recipient_id` = caller and by RLS (user-scoped client).
 - **Hold notices** are a separate endpoint: 8.3.
@@ -670,7 +671,7 @@ All venue routers are `protectedRouter`s mounted at `/api/venues`. Except for su
 - **Behaviour:**
   - A period that covers confirmed bookings is **accepted** (SG2-80 AC2).
   - Trigger `venue_unavailability_flag_bookings` writes those bookings to `venue_booking_disruptions`, and they appear in `affected`.
-  - Neither the bookings nor their events are changed.
+  - The booking is retained. Since SG2-81 (`202610170001`), each new disruption flag notifies the current Coordinator (`venue_unavailable`). If the event is in Preparation or Confirmed, the same trigger returns it to Planning, clears `confirmed_by/at`, writes status history and notifies the Organiser (unless the same recipient). Date, time, attendance and requirements remain unchanged. Other stages stay unchanged; pre-migration flags are not retrospectively announced.
 - **Errors:**
   - 400 `Invalid venue ID.`
   - 400 `Enter a start and an end, with the end after the start and not in the past, a listed reason, and a note within 500 characters.`
@@ -702,6 +703,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - requested: `requester_name, requested_at`
 - decided: `decider_name, decided_at, decision_reason`
 - withdrawn: `withdrawer_name, withdrawn_at`
+- replacement: `replaces_booking_id` (nullable old booking reference, SG2-81)
 
 ### 7.1 POST /api/venue-booking-requests
 - **Week 7:** New since W7 — SG2-48; #1 — SG2-78.
@@ -712,15 +714,18 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - `starts_at`: in the future
   - `ends_at`: after `starts_at`
   - `layout`: one of the layouts in 6.5
+  - `replaces_booking_id`: optional positive whole ID of an affected confirmed booking belonging to this event; omit or send null for an ordinary request (SG2-81)
 - **201:** `{ request, booking: "allowed"|"needs_capacity_exception", conflicts: [{ kind: "booking"|"hold", reference_id, event_id, event_name, starts_at, ends_at, status }] }`
 - **Errors:**
   - 400 `Choose an event, a venue, a layout and a future period that starts before it ends.`
   - 404 `Event not found.` / `Venue not found.`
-  - 409 event not `approved` or `planning`
+  - 409 ordinary request event not `approved` or `planning`; replacement additionally permits `preparation` and `confirmed`
+  - 409 replacement reference is not an affected booking of this event
   - 409 layout not offered
   - 409 required facility missing
   - 409 overlapping duplicate request for the same event and venue
 - **Rule:** only the assigned EC. An event may have **several** requests for different venues; SG2-82 is change #3.
+- **Replacement:** uses this same route and the existing 7.4 decision route. A pending replacement reserves nothing. Approval creates the new booking and releases the referenced old one atomically; rejection leaves the old booking intact. The Coordinator UI prefills the affected booking's period and event requirements for the existing venue search.
 - **Conflicts:**
   - Cover confirmed bookings and live holds within the venue's setup + turnaround gap (SG2-78).
   - They are reported, not refused.
@@ -731,7 +736,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Source:** `venues/bookingRequests.ts:207`.
 - **Permission:** `venue_booking.request.view` (EC, VS).
 - **Query:** `event_id` (required).
-- **200:** `{ requests[], arrangement: { state: "none"|"in_progress"|"ready", needed, approved, pending, rejected, unbooked } }`. A rejected request keeps the state `in_progress` until it is withdrawn (SG2-82).
+- **200:** `{ requests[], arrangement: { state: "none"|"in_progress"|"ready", needed, approved, pending, rejected, unbooked, affected } }`. A rejected request keeps the state `in_progress` until it is withdrawn (SG2-82); affected confirmed bookings also prevent `ready` (SG2-81).
 - **Errors:** 400 `event_id must be a positive whole number.`; 404 `Event not found.`
 
 ### 7.3 GET /api/venue-booking-requests/:requestId/conflicts
@@ -756,11 +761,12 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 `Approve a capacity exception for this request before approving the booking.`
   - 409 `closed`
   - 409 `{ error, conflict: { kind: "booking"|"block"|"hold", starts_at, ends_at, label } }`
-- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610160001_event_notifications.sql`.
+- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610170001_venue_replacement.sql`.
 - **What the RPC does:**
   - Under the venue lock it refuses confirmed bookings and live holds within the setup + turnaround gap (`venue_preparation_gap`, SG2-78), and unavailability without the gap.
   - It inserts a confirmed `venue_bookings` row and keeps the event's first booking (`events.venue_booking_id = coalesce(...)`, SG2-82).
   - It writes history and notifies the coordinator and organiser.
+  - For a replacement, it locks the relevant venues in ascending ID order, then approves the new booking and calls internal `release_replaced_booking` in the same transaction. The old confirmed booking becomes cancelled, its old request is cancelled, the primary booking pointer is updated when needed, and history plus `venue_booking_released` notices are written to distinct Coordinator/Organiser recipients. A failed approval rolls back.
   - The exclusion constraint `venue_bookings_no_double_booking` is the backstop.
 
 ### 7.5 POST /api/venue-booking-requests/:requestId/withdraw
@@ -881,7 +887,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Source:** `venues/bookings.ts:89`.
 - **Permission:** `venue_bookings.view` (VS, EC). The `?venue_id` form also needs `venue_bookings.by_venue` (VS), checked in the handler.
 - **Query:** exactly one of `event_id` or `venue_id`.
-- **200:** `{ bookings: [{ booking_id, venue_id, venue_name, event_id, event_name, starts_at, ends_at, status, cancelled_at, cancellation_reason, canceller_name }] }`
+- **200:** `{ bookings: [{ booking_id, venue_id, venue_name, event_id, event_name, starts_at, ends_at, status, cancelled_at, cancellation_reason, canceller_name, affected_by: [{ starts_at, ends_at, category, reason }], replacement: { request_id, venue_name }|null }] }`
 - **Errors:**
   - 400 `Give either event_id or venue_id.` (or a bad ID)
   - 403 `Access denied` (`venue_id` without VS)
@@ -1067,14 +1073,13 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 
 ## 11. Week 7 work with no endpoint yet («planned»)
 
-No endpoint on `main` delivers these stories. They are listed so that nobody reads an endpoint into them. The API surface they will add is not yet designed, so no path is proposed here.
+SG2-81 replacement is implemented by 7.1/7.4, 8.7 and arrangement readiness; SG2-88 is Done using 4.7/4.8. SG2-98 is also Done in the 16 Oct Jira snapshot; overlapping unavailability is accepted (6.13), with removal through 6.14. These are not planned endpoints.
 
-| Change | Story (Jira To Do) | What exists on `main` today |
+No endpoint at this snapshot delivers these planned stories. They are listed so that nobody reads an endpoint into them. The API surface they will add is not yet designed, so no path is proposed here.
+
+| Change | Story (Jira To Do) | What exists at this snapshot today |
 |---|---|---|
-| #2 | SG2-81 replace a venue | No replace endpoint. A coordinator can release a booking (8.8) and request another venue (7.1) as separate calls. |
-| #2 | SG2-98 remediation of SG2-80 | — |
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
-| #5 | SG2-88 assign/reassign as Lead | 4.7 and 4.8 already let the ECL assign **and** reassign (SG2-97). No code is tagged SG2-88. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
 | #6 | SG2-91, SG2-92, SG2-93, SG2-94 safety check | No endpoint. Already in place: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation` (SG2-100), the SO grants in §2, venue safety details (6.6), and SO read access to equipment placement (9.4). Nothing moves an event out of `planning` into `awaiting_safety_check` or `preparation`. |
 

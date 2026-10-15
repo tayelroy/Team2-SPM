@@ -1,6 +1,6 @@
 # C4 model notes (SG2-95)
 
-Source: [`connectsphere.dsl`](connectsphere.dsl) (moved from `docs/context-diagram.dsl`). As of main 1d1e336 (14 Oct 2026).
+Source: [`connectsphere.dsl`](connectsphere.dsl) (moved from `docs/context-diagram.dsl`). As of PR90 head 61416cc (16 Oct 2026).
 Orange (`#f5a623`, tag `Week 7`) = built for the Week 7 changes. Grey dashed (`#DDDDDD`, tag `Planned`) = not built; the label names the Jira story.
 
 ## Views
@@ -12,7 +12,7 @@ Orange (`#f5a623`, tag `Week 7`) = built for the Week 7 changes. Grey dashed (`#
 | `C3_API_Components` (1/4) | Request pipeline: `requireAuth`/`requirePermission`, `auth/policy`, auth routes |
 | `C3_API_Components_Events` (2/4) | Event handlers, coordinator assignment, notifications/profile/work queue, safety check «planned» |
 | `C3_API_Components_Venues` (3/4) | Venue catalogue, setup/safety details, unavailability, holds, pg_cron hold job |
-| `C3_API_Components_Bookings` (4/4) | Venue requests/bookings, clashes, equipment, venue replacement «planned» |
+| `C3_API_Components_Bookings` (4/4) | Venue requests/bookings, clashes, equipment, built venue replacement, general venue change «planned» |
 
 C3 is split over four views so each page stays readable at A4 landscape. Pages 2–4 leave out the middleware's `account_roles` read, which page 1 shows. With that edge in, the smetana layout pushes elements into the title.
 
@@ -21,15 +21,17 @@ C3 is split over four views so each page stays readable at A4 landscape. Pages 2
 ```sh
 bash ~/.cache/sg2-95-tools/structurizr-cli/structurizr.sh export -w docs/design/connectsphere.dsl -f plantuml/c4plantuml -o /tmp/sg2-95-render/c4
 cd /tmp/sg2-95-render/c4
-java -jar ~/.cache/sg2-95-tools/plantuml.jar -Playout=smetana -tsvg *.puml
-java -jar ~/.cache/sg2-95-tools/plantuml.jar -Playout=smetana -tpng *.puml
+java -Djava.awt.headless=true -jar ~/.cache/sg2-95-tools/plantuml.jar -Playout=smetana -tsvg *.puml
+java -Djava.awt.headless=true -jar ~/.cache/sg2-95-tools/plantuml.jar -Playout=smetana -tpng *.puml
 ```
 
-The Structurizr export cannot write `!pragma layout smetana` into its `.puml` files. `-Playout=smetana` applies the same pragma from the command line. Without it, Graphviz is missing, so PlantUML draws an error image but **still exits 0**.
+On headless macOS validation runs, `-Djava.awt.headless=true` avoids Java AWT startup failure. The source renderer can use the same option through `JAVA_TOOL_OPTIONS=-Djava.awt.headless=true`; point `PLANTUML_JAR` and `STRUCTURIZR_CLI` at the available tool files. This update was validated with official temporary PlantUML 1.2026.8 and Structurizr CLI 2025.11.09 releases, without a global install.
+
+The Structurizr export cannot write `!pragma layout smetana` into its `.puml` files. `-Playout=smetana` applies the same pragma from the command line. Without it, PlantUML depends on Graphviz. In an environment without Graphviz it can draw an error image and **still exit 0**; inspect the output as well as the exit code. The commands require the existing PlantUML JAR and Structurizr CLI at the shown paths; if absent, rendering is unavailable until those tools are provisioned.
 
 ## Roles (C1/C2) — source: `ROLES`/`PERMISSIONS` in `server/src/auth/policy.ts`, `client/src/screens/Dashboard.tsx`
 
-| Role | What it does on main |
+| Role | What it does at this snapshot |
 |---|---|
 | Event Organiser | Creates, edits, submits and deletes own drafts. Views own organisation's requests, stage, history and confirmation. Clarifications. Approves capacity exceptions for own event. Own notifications. |
 | Event Coordinator | Reviews, decides and plans assigned requests. Clarifications. Venue search and suitability. Requests venues and withdraws a request (SG2-82). Views and releases bookings. Sees clashes and conflicts. Requests equipment. Views arrangements. Confirms and completes events. Work queue. Notifications. |
@@ -71,12 +73,21 @@ The Structurizr export cannot write `!pragma layout smetana` into its `.puml` fi
 | User-scoped DB adapters | `db/user-client.ts` + store modules that call it | — |
 | Service-role DB adapters | `db/supabase.ts` (`getSupabaseAdminClient`), used by `events/*`, `assignmentQueue`, `workQueue`, `profile`, `auth/roles.ts`, `venues/bookingRequests.ts`, `conflicts.ts`, `bookings.ts`, `clashes.ts`, `suitabilityRoutes.ts` | — |
 | Safety check review «planned» | none. Only the statuses `awaiting_safety_check`/`safety_rejected`/`preparation` exist (`202610090001_event_status_flow.sql`, `events/fields.ts`) | SG2-91/92/93/94 |
-| Venue replacement «planned» | none | SG2-81, SG2-83 |
+| Venue replacement «Week 7» | Existing `venues/bookingRequests.ts` routes, `db/venueBookings.ts`, `db/venueDisruptions.ts`; `202610170001_venue_replacement.sql` | SG2-81 |
+| Change/cancel one venue «planned» | No general change flow; separate from SG2-81 replacement | SG2-83 |
+
+## Replacement and confirmation contracts
+
+- SG2-81 extends existing booking routes; the C3 replacement component groups this responsibility and is not a separate service or a new HTTP endpoint. An assigned Coordinator sends `replaces_booking_id` on the existing booking-request POST for an affected confirmed booking of the same event. Pending replacement requests reserve nothing.
+- The existing Venue Staff decision RPC atomically creates the replacement booking and releases the original booking, cancels its old request, records history and sends release/approval notices. The event's date, time, attendance and requirements are retained.
+- In `202610170001_venue_replacement.sql`, each newly inserted disruption flag raises a `venue_unavailable` notice to the current Coordinator. Preparation/Confirmed events return to Planning, lose the confirmation stamp, gain status history and notify the Organiser (deduplicated if the same recipient). Earlier flags are not retrospectively announced.
+- `202610170002_confirmation_rechecks_and_disruptions.sql` is the final `confirm_event` definition: it retains both SG2-81 affected-booking refusal and PR90 persisted venue/equipment/registration recheck gates. `202610160005_event_confirmation_record_repair.sql` repairs the confirmation columns without replacing this RPC. UI readiness follows the same persisted flags and affected-booking count.
+- `61416cc` supports `venue_unavailable` throughout the client notification contract and drawer. No Safety decision route is added by these changes.
 
 ## Where the code differs from the brief
 
-- **SG2-88:** main already lets the Lead assign and reassign through `PATCH /api/event-requests/:eventId/coordinator` (SG2-97 moved `event_request.assign_coordinator` to `event_coordinator_lead`), and the Lead's queue is built (SG2-87). The diagrams show this as built. The code does not mark which part of SG2-88 is still open.
-- **SG2-77:** the migration says the safety details are "for the Safety Officer", but `venues.operations.read` does not grant `safety_officer`. The Safety Officer cannot read them on main.
+- **SG2-88:** Jira is now Done (fresh export 16 Oct 2026). The Lead assigns and reassigns through `PATCH /api/event-requests/:eventId/coordinator`; SG2-97 supplies the permission and SG2-87 the unassigned queue. The diagrams show this as built.
+- **SG2-77:** the migration says the safety details are "for the Safety Officer", but `venues.operations.read` does not grant `safety_officer`. The Safety Officer cannot read them at this snapshot.
 - The Safety Officer has no `notifications.read`. `AppShell.tsx` shows the notifications drawer only to the Coordinator, Venue Staff, Technical Support Staff, Organiser and Lead.
 - Notifications are in-app only: the `notifications` and `venue_hold_notifications` tables. Neither the server nor the migrations send email.
 - Removed the old "Planned" tags on Event Coordinator and Technical Support Staff. Both are built. Attendee is still a prototype.

@@ -1,4 +1,4 @@
-' ConnectSphere domain class model (SG2-95), as of main 1d1e336 (14 Oct 2026).
+' ConnectSphere domain class model (SG2-95), as of PR90 head 61416cc (16 Oct 2026).
 ' Three diagrams, one per area; each renders to its own page.
 ' Attributes are the persisted fields (supabase/migrations) in domain form;
 ' operations name the real RPC / handler that changes the object.
@@ -6,7 +6,7 @@
 
 @startuml class-events-people
 !pragma layout smetana
-title ConnectSphere domain model (1/3): events, people & coordination\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere domain model (1/3): events, people & coordination\nas of PR90 head 61416cc (16 Oct 2026)
 hide empty members
 skinparam shadowing false
 skinparam defaultFontSize 11
@@ -88,7 +88,7 @@ class Event {
   confirmedBy / confirmedAt [0..1]
   --
   STATUS_TRANSITIONS / canTransition()
-  confirm_event()
+  confirm_event() «202610170002»
 }
 
 class CoordinatorAssignment <<Week 7>> {
@@ -128,6 +128,7 @@ enum NotificationKind {
   clarification_requested
   event_approved
   event_rejected
+  <back:#FFF4CC>venue_unavailable «W7 SG2-81»</back>
 }
 
 class Notification {
@@ -138,7 +139,7 @@ class Notification {
 }
 
 class SafetyCheck <<planned>> #DDDDDD;line.dashed;line:777777 {
-  .. SG2-91/92/93/94: no table or RPC on main ..
+  .. SG2-91/92/93/94: no table or RPC at this snapshot ..
 }
 
 User "1" -- "0..1" AccountRole : has >
@@ -180,7 +181,7 @@ end note
 legend bottom left
   |= Marker |= Meaning |
   |<back:#FFFFFF>   plain   </back>| built before Week 7 |
-  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built on main (story id) |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built at this snapshot (story id) |
   |<back:#DDDDDD> <<planned>> dashed </back>| not built; Jira story named |
   Multiplicity [0..1] = nullable column.
 endlegend
@@ -188,7 +189,7 @@ endlegend
 
 @startuml class-venues-bookings
 !pragma layout smetana
-title ConnectSphere domain model (2/3): venues, availability & bookings\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere domain model (2/3): venues, availability & bookings\nas of PR90 head 61416cc (16 Oct 2026)
 hide empty members
 skinparam shadowing false
 skinparam defaultFontSize 11
@@ -262,6 +263,7 @@ class VenueBookingRequest {
   requestedAt : timestamptz
   decidedBy / decidedAt / decisionReason [0..1]
   <back:#FFF4CC>withdrawnBy / withdrawnAt [0..1] «W7 SG2-82»</back>
+  <back:#FFF4CC>replacesBookingId : bigint [0..1] «W7 SG2-81»</back>
   --
   decide_venue_booking_request()
   <back:#FFF4CC>withdraw_venue_booking_request() «W7 SG2-82»</back>
@@ -318,8 +320,8 @@ class VenueHoldSettings <<Week 7>> {
   {field} warningLeadSeconds : int = 86400 (24 h)
 }
 
-class ReplaceVenue <<planned>> #DDDDDD;line.dashed;line:777777 {
-  .. SG2-81: no model on main ..
+class ChangeOneVenue <<planned>> #DDDDDD;line.dashed;line:777777 {
+  .. SG2-83: general change/cancellation flow ..
 }
 
 Venue "1" *-- "0..1" VenueOperations
@@ -339,7 +341,7 @@ VenueHold ..> VenueHoldSettings : warning lead
 VenueUnavailability "1" -- "*" VenueBookingDisruption
 VenueBookingDisruption "*" -- "1" VenueBooking : flags confirmed >
 VenueBooking "1" -- "*" BookingClash : clashes with (pair) >
-VenueBookingDisruption .. ReplaceVenue : <<planned>> SG2-81
+VenueBookingRequest "*" --> "0..1" VenueBooking : replaces (SG2-81) >
 
 note bottom of VenueOperations
   Setup before + turnaround after widen every
@@ -348,16 +350,23 @@ note bottom of VenueOperations
   as BookingClash (SG2-79).
 end note
 
-note bottom of ReplaceVenue
-  <<planned>> SG2-81 replace a venue for a
-  disrupted booking; SG2-83 change one venue
-  of a multi-venue event.
+note bottom of VenueBookingDisruption
+  SG2-81: new flag notifies Coordinator; Preparation/Confirmed
+  returns to Planning, clears confirmation and notifies Organiser.
+  Approval of a replacement atomically releases its old booking
+  and cancels its old request (202610170001). Other event details stay.
+  Pending replacement requests reserve nothing.
+end note
+
+note bottom of ChangeOneVenue
+  SG2-83 remains planned; distinct from built
+  replacement of an unavailable booking.
 end note
 
 legend bottom left
   |= Marker |= Meaning |
   |<back:#FFFFFF>   plain   </back>| built before Week 7 |
-  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built on main (story id) |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built at this snapshot (story id) |
   |<back:#DDDDDD> <<planned>> dashed </back>| not built; Jira story named |
   |<back:#E8F0FE> <<ref>> </back>| defined on another page |
   Event 1–* VenueBooking: one event may hold several venues (SG2-82).
@@ -366,7 +375,7 @@ endlegend
 
 @startuml class-equipment
 !pragma layout smetana
-title ConnectSphere domain model (3/3): equipment\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere domain model (3/3): equipment\nas of PR90 head 61416cc (16 Oct 2026)
 hide empty members
 skinparam shadowing false
 skinparam defaultFontSize 11

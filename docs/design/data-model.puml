@@ -1,4 +1,4 @@
-' ConnectSphere physical data model (SG2-95), as of main 1d1e336 (14 Oct 2026).
+' ConnectSphere physical data model (SG2-95), as of PR90 head 61416cc (16 Oct 2026).
 ' Final state of public schema after every file in supabase/migrations/, in order.
 ' 24 tables in four areas; each diagram block renders to its own page.
 ' Week 7 tables/columns are tagged with the migration that added them.
@@ -6,7 +6,7 @@
 
 @startuml er-events-people
 !pragma layout smetana
-title ConnectSphere data model (1/4): events & people (public schema)\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere data model (1/4): events & people (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -81,6 +81,7 @@ entity events {
   <back:#FFF4CC>submitted_at : timestamptz  «W7 202610090004»</back>
   confirmed_by : uuid <<FK users>>
   confirmed_at : timestamptz
+  .. 202610160005 additive confirmation-column repair ..
   .. checks ..
   closes_at > opens_at; rejected => decision_reason;
   by/at pairs recorded together (decided, completed,
@@ -150,7 +151,7 @@ endlegend
 
 @startuml er-venues-availability
 !pragma layout smetana
-title ConnectSphere data model (2/4): venues, availability & bookings (public schema)\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere data model (2/4): venues, availability & bookings (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -220,6 +221,8 @@ entity venue_unavailability {
   <back:#FFF4CC>«W7 202610100001_venue_temporary_unavailability»</back>
 }
 
+' AFTER INSERT: venue_disruption_notify (202610170001) notifies Coordinator;
+' Preparation/Confirmed -> Planning, clear confirmation, audit, notify Organiser.
 entity venue_booking_disruptions <<Week 7>> {
   * unavailability_id : bigint <<PK>> <<FK venue_unavailability>> cascade
   * booking_id : bigint <<PK>> <<FK venue_bookings>> cascade
@@ -279,7 +282,7 @@ endlegend
 
 @startuml er-requests-holds
 !pragma layout smetana
-title ConnectSphere data model (3/4): venue requests, capacity exceptions & holds (public schema)\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere data model (3/4): venue requests, capacity exceptions & holds (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -320,6 +323,8 @@ entity venue_booking_requests {
   decided_at : timestamptz
   decision_reason : text  (<= 500)
   venue_booking_id : bigint <<FK venue_bookings>> set null
+  <back:#FFF4CC>replaces_booking_id : bigint <<FK venue_bookings>> set null</back>
+  <back:#FFF4CC>«W7 202610170001_venue_replacement (SG2-81)»</back>
   <back:#FFF4CC>withdrawn_by : uuid <<FK users>> set null</back>
   <back:#FFF4CC>withdrawn_at : timestamptz  (=> status cancelled)</back>
   <back:#FFF4CC>«W7 202610150002_venue_request_withdrawal»</back>
@@ -388,6 +393,7 @@ venue_ref ||--o{ venue_holds
 venue_booking_requests ||--o{ venue_capacity_exceptions
 venue_booking_requests ||--o| venue_holds : request_id
 venue_booking_requests }o--o| vb_ref : venue_booking_id
+venue_booking_requests }o--o| vb_ref : replaces_booking_id
 venue_holds }o--o| vb_ref : booking_id (converted)
 venue_holds ||--o{ venue_hold_notifications
 ev_ref ||--o{ venue_hold_notifications
@@ -407,7 +413,7 @@ endlegend
 
 @startuml er-equipment-notifications
 !pragma layout smetana
-title ConnectSphere data model (4/4): equipment & notifications (public schema)\nas of main 1d1e336 (14 Oct 2026)
+title ConnectSphere data model (4/4): equipment & notifications (public schema)\nas of PR90 head 61416cc (16 Oct 2026)
 hide circle
 hide empty members
 skinparam shadowing false
@@ -491,7 +497,8 @@ entity notifications {
   <back:#FFF4CC>    venue_booking_clash «W7 202610140003»,</back>
       event_confirmed, event_submitted,
       coordinator_assigned, clarification_requested,
-      event_approved, event_rejected)
+      event_approved, event_rejected,
+  <back:#FFF4CC>    venue_unavailable «W7 202610170001»</back>)
   * message : text  (1..2000)
   * created_at : timestamptz = clock_timestamp()
   UNIQUE (request_id, recipient_id, kind)
