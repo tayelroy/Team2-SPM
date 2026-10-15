@@ -33,7 +33,7 @@ An npm-workspaces monorepo:
 | Technical Support Staff | View pending and reserved equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; reserve equipment for events; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
 | Event Coordinator Lead | See the unassigned queue of submitted requests; assign and reassign Event Coordinators; view an event's stage and history; receive submitted-event notices |
-| Safety Officer | View an event's stage and history; read equipment placement and venue safety details (emergency access, known restrictions) via the API. The Operational Safety Check screens (SG2-91 to SG2-94) are not built yet |
+| Safety Officer | View an event's stage and history; read equipment placement and a venue's full operations record (setup and turnaround minutes, emergency access, known restrictions) via the API, read-only. The Operational Safety Check screens (SG2-91 to SG2-94) are not built yet |
 
 Every account can view and update its own profile. Technical Support Staff's
 Equipment screen reads and writes stored equipment records, including operational

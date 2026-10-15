@@ -496,13 +496,26 @@ describe('clarification authorisation wiring', () => {
     });
   }
 
-  // SG2-86 AC2: the Week 7 roles take no part in a clarification exchange either.
-  for (const role of ['venue_staff', 'technical_support_staff', 'attendee', 'event_coordinator_lead', 'safety_officer'] as const) {
+  for (const role of ['venue_staff', 'technical_support_staff', 'attendee'] as const) {
     test(`[CONFLICT] [SG2-36:AC1] denies ${role}, who takes no part in the exchange`, async () => {
       const response = await request(appForRole(role))
         .get('/api/event-requests/7/clarifications')
         .set('Authorization', 'Bearer token');
       assert.equal(response.status, 403);
+    });
+  }
+
+  // SG2-86 AC2: the Week 7 roles can neither read nor post a clarification.
+  for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+    test(`[FAILURE] [SG2-36:AC1] [SG2-86:AC2] denies ${role} reading or posting a clarification`, async () => {
+      for (const call of [
+        request(appForRole(role)).get('/api/event-requests/7/clarifications'),
+        request(appForRole(role)).post('/api/event-requests/7/clarifications').send({ body: 'Any update?' })
+      ]) {
+        const response = await call.set('Authorization', 'Bearer token');
+        assert.equal(response.status, 403);
+        assert.equal(response.body.reached, undefined);
+      }
     });
   }
 });

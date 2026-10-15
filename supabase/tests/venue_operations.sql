@@ -8,6 +8,7 @@ begin;
 -- Seed test identities:
 -- 1: venue staff   2: event coordinator   3: technical support staff
 -- 4: event organiser   5: attendee   6: second venue staff member
+-- 7: safety officer   8: event coordinator lead (SG2-86 Week 7 roles)
 insert into auth.users (id) values
   ('e0000000-0000-4000-8000-000000000001'),
   ('e0000000-0000-4000-8000-000000000002'),
@@ -166,7 +167,7 @@ begin
 
   perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000008', true);
   if exists (select 1 from public.venue_operations) then
-    raise exception '[SG2-77:lead-read] [SG2-77:AC5] [SG2-86:AC2] [FAILURE] The Event Coordinator Lead must not read venue operations';
+    raise exception '[SG2-77:lead-read] [SG2-86:AC2] [FAILURE] The Event Coordinator Lead must not read venue operations';
   end if;
   begin
     insert into public.venue_operations (venue_id, setup_minutes) values (97702, 1)
@@ -228,6 +229,22 @@ begin
   if changed <> 0 or (select to_jsonb(operation) from public.venue_operations operation where venue_id = 97701)
       is distinct from current_setting('venue_operations.before_revocation')::jsonb then
     raise exception '[SG2-77:revoked-staff-update] [SG2-77:AC6] [CONFLICT] A revoked staff update must affect zero rows and preserve the complete stored record';
+  end if;
+end $$;
+
+-- 7. SG2-77 AC5 / SG2-86 AC2: an account moved off the Safety Officer role
+-- loses read access straight away, with no stale grant left behind.
+reset role;
+set local role service_role;
+update public.account_roles set role = 'attendee'
+  where user_id = 'e0000000-0000-4000-8000-000000000007';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000007', true);
+select set_config('request.jwt.claims', '{"sub":"e0000000-0000-4000-8000-000000000007","role":"authenticated"}', true);
+do $$
+begin
+  if exists (select 1 from public.venue_operations) then
+    raise exception '[SG2-77:revoked-safety-officer-read] [SG2-77:AC5] [SG2-86:AC2] [CONFLICT] An account moved off the Safety Officer role must not read venue operations';
   end if;
 end $$;
 reset role;
