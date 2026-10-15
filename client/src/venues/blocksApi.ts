@@ -30,7 +30,8 @@ export function describePeriod(startsAt: string, endsAt: string): string {
 
 /** SG2-80 AC6: who recorded a period and when, for periods recorded since SG2-80. */
 export function describeRecorded(block: Pick<VenueBlock, 'created_at' | 'created_by_name'>): string {
-  if (!block.created_at) return 'Recorded before who and when were kept';
+  // SG2-98 AC3: blocks kept from SG2-45 have no recorder or time.
+  if (!block.created_at) return 'Added before the recorder and time were tracked';
   return `Recorded by ${block.created_by_name ?? 'a former user'} on ${dateTime.format(new Date(block.created_at))}`;
 }
 

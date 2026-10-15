@@ -1096,7 +1096,7 @@ test('SG2-98-P01 | [SG2-98:AC1] [SG2-98:AC2] [SG2-98:AC3] [NORMAL] an old block 
   await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
   const oldBlock = page.getByRole('listitem', { name: 'Roof repair' });
   await expect(oldBlock).toContainText('Other: Roof repair');
-  await expect(oldBlock).toContainText('Recorded before who and when were kept');
+  await expect(oldBlock).toContainText('Added before the recorder and time were tracked');
 
   // AC1: blocking a period holding confirmed booking #1 (15 June 2030, 10:00 am–12:00 pm Singapore time) is accepted and flags it.
   await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-06-15T09:00');

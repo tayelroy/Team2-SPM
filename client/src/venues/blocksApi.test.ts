@@ -22,7 +22,7 @@ test('[NORMAL] [SG2-80:AC1] the reasons offered are exactly the five listed in t
 test('[BOUNDARY] [SG2-80:AC6] [SG2-98:AC3] describeRecorded names the recorder and time, a removed recorder, or a period from before recording began', () => {
   expect(describeRecorded(block)).toBe('Recorded by Vera Staff on 5 Oct 2026, 9:00 am');
   expect(describeRecorded({ ...block, created_by_name: null })).toBe('Recorded by a former user on 5 Oct 2026, 9:00 am');
-  expect(describeRecorded({ created_at: null, created_by_name: null })).toBe('Recorded before who and when were kept');
+  expect(describeRecorded({ created_at: null, created_by_name: null })).toBe('Added before the recorder and time were tracked');
 });
 
 test.each([

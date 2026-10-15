@@ -86,7 +86,7 @@ test('[BOUNDARY] [SG2-45:AC1] [SG2-80:AC6] [SG2-98:AC3] the block screen lists u
   expect(item).toHaveTextContent('Maintenance: Scheduled maintenance');
   expect(item).toHaveTextContent('Recorded by Vera Staff on 5 Oct 2026, 9:00 am');
   expect(within(item).queryByRole('list')).not.toBeInTheDocument();
-  expect(screen.getByRole('listitem', { name: 'Legacy closure' })).toHaveTextContent('Other: Legacy closureRecorded before who and when were kept');
+  expect(screen.getByRole('listitem', { name: 'Legacy closure' })).toHaveTextContent('Other: Legacy closureAdded before the recorder and time were tracked');
   cleanup();
   await openBlocks([]);
   expect(await screen.findByText(/No upcoming blocks/)).toBeInTheDocument();

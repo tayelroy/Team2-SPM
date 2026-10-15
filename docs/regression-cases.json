@@ -1611,7 +1611,7 @@
       "As Venue Staff, remove Roof repair; as coordinator, repeat the search."
     ],
     "data": "Old-style block #98 (Roof repair); seeded confirmed booking #1 for event 1 (Planning workshop) on 15 June 2030 02:00–04:00 UTC; Regression venue and Regression coordinator accounts",
-    "expected": "Roof repair shows as Other with Recorded before who and when were kept; the new block is saved and one booked event is reported as flagged and not cancelled; search leaves out Regression Hall while the old block exists and returns it after the block is removed.",
+    "expected": "Roof repair shows as Other with 'Added before the recorder and time were tracked'; the new block is saved and one booked event is reported as flagged and not cancelled; search leaves out Regression Hall while the old block exists and returns it after the block is removed.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "categories": [
