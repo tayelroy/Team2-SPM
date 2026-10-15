@@ -196,6 +196,17 @@ describe('PATCH /api/event-requests/:eventId/review authorisation wiring', () =>
     assert.equal(response.status, 403);
   });
 
+  // SG2-86 AC2: the Lead assigns a coordinator and the Safety Officer checks
+  // safety; neither opens a request for review.
+  for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+    test(`[FAILURE] [SG2-35:AC3] [SG2-86:AC2] denies ${role}, who does not review requests`, async () => {
+      const response = await request(appForRole(role))
+        .patch('/api/event-requests/7/review')
+        .set('Authorization', 'Bearer token');
+      assert.equal(response.status, 403);
+    });
+  }
+
   test('[NORMAL] [SG2-35:AC2] lets an Event Coordinator reach the review handler', async () => {
     const response = await request(appForRole('event_coordinator'))
       .patch('/api/event-requests/7/review')

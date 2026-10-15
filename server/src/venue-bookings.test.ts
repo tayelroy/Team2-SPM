@@ -22,7 +22,10 @@ const USERS: Record<string, Principal> = {
   venue: { userId: 'user-venue', role: 'venue_staff' },
   organiser: { userId: 'user-organiser', role: 'event_organiser' },
   support: { userId: 'user-support', role: 'technical_support_staff' },
-  attendee: { userId: 'user-attendee', role: 'attendee' }
+  attendee: { userId: 'user-attendee', role: 'attendee' },
+  // SG2-86: the Week 7 roles.
+  lead: { userId: 'user-lead', role: 'event_coordinator_lead' },
+  safety: { userId: 'user-safety', role: 'safety_officer' }
 };
 
 const summit: SuitabilityEventRow = {
@@ -127,9 +130,9 @@ test('[FAILURE] [SG2-51:AC1] an unknown booking, or one for another coordinator\
   }
 });
 
-test('[FAILURE] [SG2-51:AC1] organisers, attendees and Technical Support Staff cannot release, and nobody can without signing in', async () => {
+test('[FAILURE] [SG2-51:AC1] [SG2-86:AC2] organisers, attendees, Technical Support Staff and the Week 7 roles cannot release, and nobody can without signing in', async () => {
   const { composed, released } = fixture();
-  for (const user of ['organiser', 'support', 'attendee']) {
+  for (const user of ['organiser', 'support', 'attendee', 'lead', 'safety']) {
     assert.equal((await release(composed, user, { reason: 'x' })).status, 403, user);
   }
   assert.equal((await request(composed).post('/api/venue-bookings/11/release').send({ reason: 'x' })).status, 401);
@@ -168,13 +171,13 @@ test('[NORMAL] [SG2-51:AC2] Venue Staff list a venue\'s bookings that are not ye
   assert.deepEqual(asked, [['venue', 1, '2030-01-01T00:00:00.000Z']]);
 });
 
-test('[FAILURE] [SG2-51:AC1] bookings are hidden from other coordinators, other roles and for unknown events or venues', async () => {
+test('[FAILURE] [SG2-51:AC1] [SG2-86:AC2] bookings are hidden from other coordinators, other roles and for unknown events or venues', async () => {
   const { composed, asked } = fixture();
   const get = (query: string, user: string) => request(composed).get(`/api/venue-bookings?${query}`).set(as(user));
   assert.deepEqual([(await get('event_id=7', 'other_coordinator')).status, (await get('event_id=8', 'venue')).status], [404, 404]);
   assert.equal((await get('venue_id=1', 'coordinator')).status, 403);
   assert.equal((await get('venue_id=9', 'venue')).status, 404);
-  for (const user of ['organiser', 'support', 'attendee']) assert.equal((await get('event_id=7', user)).status, 403, user);
+  for (const user of ['organiser', 'support', 'attendee', 'lead', 'safety']) assert.equal((await get('event_id=7', user)).status, 403, user);
   assert.deepEqual(asked, []);
 });
 

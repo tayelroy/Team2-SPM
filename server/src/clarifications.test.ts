@@ -496,7 +496,8 @@ describe('clarification authorisation wiring', () => {
     });
   }
 
-  for (const role of ['venue_staff', 'technical_support_staff', 'attendee'] as const) {
+  // SG2-86 AC2: the Week 7 roles take no part in a clarification exchange either.
+  for (const role of ['venue_staff', 'technical_support_staff', 'attendee', 'event_coordinator_lead', 'safety_officer'] as const) {
     test(`[CONFLICT] [SG2-36:AC1] denies ${role}, who takes no part in the exchange`, async () => {
       const response = await request(appForRole(role))
         .get('/api/event-requests/7/clarifications')

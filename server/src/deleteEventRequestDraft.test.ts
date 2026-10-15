@@ -195,6 +195,16 @@ describe('DELETE /api/event-requests/:eventId authorisation wiring', () => {
     assert.equal(response.status, 403);
   });
 
+  // SG2-86 AC2: only the organiser who owns a draft deletes it.
+  for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+    test(`[FAILURE] [SG2-32:AC1] [SG2-86:AC2] denies ${role}, who owns no drafts`, async () => {
+      const response = await request(appForRole(role))
+        .delete('/api/event-requests/7')
+        .set('Authorization', 'Bearer token');
+      assert.equal(response.status, 403);
+    });
+  }
+
   test('[NORMAL] [SG2-32:AC1] lets an Event Organiser reach the delete handler', async () => {
     const response = await request(appForRole('event_organiser'))
       .delete('/api/event-requests/7')
