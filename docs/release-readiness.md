@@ -56,6 +56,11 @@ acceptance tests or the Definition of Done.
 
 - Event detail, submission and planning columns, including the completion and
   submission timestamps; selected fragile column types.
+- Confirmation record columns with UUID/timestamp types, the coordinator foreign
+  key and the validated paired-null constraint. Migration
+  `202610160005_event_confirmation_record_repair.sql` additively repairs missing
+  fields without replacing the installed confirmation RPC. Older confirmed rows
+  may retain two null fields; the repair does not invent a confirmer or time.
 - Supporting workflow tables, views and callable RPC signatures.
 - All fourteen lifecycle enum values and all seven fixed role names.
 - Foreign keys required by the organiser, coordinator, booking and audit embeds.

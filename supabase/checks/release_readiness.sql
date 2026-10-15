@@ -24,6 +24,7 @@ begin
     from required_columns r cross join lateral unnest(string_to_array(r.columns, ',')) col(name)
   ), required_types(column_name, type_name) as (values
     ('completed_by', 'uuid'), ('completed_at', 'timestamptz'),
+    ('confirmed_by', 'uuid'), ('confirmed_at', 'timestamptz'),
     ('submitted_at', 'timestamptz'), ('registration_capacity', 'integer'),
     ('registration_opens_at', 'timestamptz'), ('registration_closes_at', 'timestamptz'),
     ('planning_notes', 'text'), ('arrangements_recheck_needed', 'boolean'),
@@ -82,6 +83,7 @@ begin
   ), required_foreign_keys(relation, column_name, target, target_column) as (values
     ('events', 'organiser_id', 'users', 'user_id'),
     ('events', 'coordinator_id', 'users', 'user_id'),
+    ('events', 'confirmed_by', 'users', 'user_id'),
     ('venue_bookings', 'event_id', 'events', 'event_id'),
     ('event_audit_logs', 'actor_id', 'users', 'user_id')
   ), foreign_key_checks as (
@@ -100,6 +102,12 @@ begin
       coalesce(has_table_privilege((select oid from pg_roles where rolname = 'service_role'),
         to_regclass('public.' || relation), 'SELECT'), false) as passed
     from required_admin_reads
+  ), confirmation_pair_check as (
+    select 'confirmation record pair constraint' as name,
+      exists (select 1 from pg_constraint c
+        where c.conrelid = to_regclass('public.events') and c.contype = 'c' and c.convalidated
+          and regexp_replace(lower(pg_get_expr(c.conbin, c.conrelid)), '[[:space:]()]', '', 'g')
+            in ('confirmed_byisnull=confirmed_atisnull', 'confirmed_atisnull=confirmed_byisnull')) as passed
   ), required_planning_keys(name) as (values
     ('registration_capacity'), ('registration_opens_at'), ('registration_closes_at'), ('planning_notes')
   ), view_checks as (
@@ -134,6 +142,7 @@ begin
     union all select * from function_checks union all select * from foreign_key_checks
     union all select * from recheck_function_checks
     union all select * from grant_checks union all select * from view_checks
+    union all select * from confirmation_pair_check
     union all select * from notification_checks
   )
   select array_agg(name order by name) into failures from checks where not passed;

@@ -7,6 +7,8 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const sql = readFileSync(new URL('../../supabase/checks/release_readiness.sql', import.meta.url), 'utf8');
+const confirmationRepair = readFileSync(new URL('../../supabase/migrations/202610160005_event_confirmation_record_repair.sql', import.meta.url), 'utf8')
+  .replace(/^begin;\s*$/mi, '').replace(/^commit;\s*$/mi, '');
 
 function run(mutation = '') {
   const container = process.env.POSTGRES_CONTAINER;
@@ -50,6 +52,51 @@ test('[BOUNDARY] [SG2-23:AC1] structural readiness does not require personal dem
 test('[FAILURE] [SG2-22:AC3] missing hosted completion and submission columns block release with named diagnostics', () => {
   assertReadinessRejects('ALTER TABLE public.events DROP COLUMN completed_by CASCADE, DROP COLUMN completed_at CASCADE, DROP COLUMN submitted_at CASCADE;',
     'public.events.completed_by', 'public.events.completed_at', 'public.events.submitted_at');
+});
+
+test('[FAILURE] [SG2-58:AC1] missing confirmation record columns block release even when the RPC exists', () => {
+  assertReadinessRejects('ALTER TABLE public.events DROP COLUMN confirmed_by CASCADE, DROP COLUMN confirmed_at CASCADE;',
+    'public.events.confirmed_by', 'public.events.confirmed_at');
+});
+
+test('[CONFLICT] [SG2-58:AC1] wrong confirmation types or missing record constraints block release', () => {
+  for (const [mutation, diagnostic] of [
+    ['ALTER TABLE public.events DROP CONSTRAINT events_confirmation_recorded_together;', 'confirmation record pair constraint'],
+    ['ALTER TABLE public.events DROP CONSTRAINT events_confirmed_by_fkey;', 'embed FK public.events.confirmed_by'],
+    ['ALTER TABLE public.events ALTER COLUMN confirmed_at TYPE text USING confirmed_at::text;', 'type public.events.confirmed_at = timestamptz'],
+  ]) assertReadinessRejects(mutation, diagnostic);
+});
+
+test('[NORMAL] [BOUNDARY] [SG2-58:AC1] additive confirmation record repair is repeatable and preserves the installed RPC', () => {
+  const result = run(`CREATE TEMP TABLE confirmation_repair_baseline AS
+      SELECT md5(pg_get_functiondef('public.confirm_event(integer)'::regprocedure)) AS hash;
+    ALTER TABLE public.events DROP COLUMN confirmed_by CASCADE, DROP COLUMN confirmed_at CASCADE;
+    ${confirmationRepair}
+    ${confirmationRepair}
+    DO $$ BEGIN
+      IF md5(pg_get_functiondef('public.confirm_event(integer)'::regprocedure))
+          IS DISTINCT FROM (SELECT hash FROM confirmation_repair_baseline) THEN
+        RAISE EXCEPTION 'The additive repair must not replace the tested confirmation function';
+      END IF;
+    END $$;`);
+  assert.equal(result.status, 0, result.output);
+  assert.match(result.output, /ready/);
+});
+
+test('[FAILURE] [SG2-58:AC1] confirmation record repair refuses incompatible types, foreign keys and pair constraints', () => {
+  for (const mutation of [
+    'ALTER TABLE public.events ALTER COLUMN confirmed_at TYPE text USING confirmed_at::text;',
+    `ALTER TABLE public.events DROP CONSTRAINT events_confirmed_by_fkey;
+      ALTER TABLE public.events ADD CONSTRAINT events_confirmed_by_fkey FOREIGN KEY(confirmed_by) REFERENCES auth.users(id) NOT VALID;`,
+    `ALTER TABLE public.events DROP CONSTRAINT events_confirmation_recorded_together;
+      ALTER TABLE public.events ADD CONSTRAINT events_confirmation_recorded_together CHECK(confirmed_by IS NULL OR confirmed_at IS NULL) NOT VALID;`,
+  ]) {
+    const result = run(`${mutation}\n${confirmationRepair}`);
+    assert.notEqual(result.status, 0);
+    assert.match(result.output, /Confirmation record repair.*incompatible/);
+    const restored = run();
+    assert.equal(restored.status, 0, restored.output);
+  }
 });
 
 test('[CONFLICT] [SG2-22:AC3] a stale work queue view cannot pass merely because its backing columns exist', () => {
