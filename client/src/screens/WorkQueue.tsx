@@ -190,7 +190,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
-  // Refresh only the readiness read after equipment changes. Reloading the
+  // Refresh only readiness after equipment or planning changes. Reloading the
   // whole queue would discard any planning draft still open in the drawer.
   const [arrangementsRevision, setArrangementsRevision] = useState(0);
   // SG2-58: kept here, not in ConfirmPanel, so it outlives the panel.
@@ -329,6 +329,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
             status: currentStatus,
           }}
           onSuccess={(updatedEvent) => {
+            setArrangementsRevision(value => value + 1);
             setCurrentStatus(updatedEvent.status);
             setStartsAt(updatedEvent.proposed_date);
             setCurrentDetails((prev) => ({

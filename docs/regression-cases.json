@@ -5423,5 +5423,39 @@
     "execution_date": "15 Oct 2026",
     "executed_by": "Codex automated verification",
     "review": null
+  },
+  {
+    "id": "SG2-57-HOTFIX-PLANNING-READINESS",
+    "title": "Planning saves refresh registration readiness immediately without reloading the event",
+    "type": "Positive / boundary / recovery / UI freshness",
+    "story": "SG2-57",
+    "purpose": "Prevent the readiness panel retaining Registration not required after planning saves enable or configure registration.",
+    "preconditions": "Rendered WorkQueue, planning drawer and readiness panel with controlled public API responses; no hosted writes.",
+    "steps": [
+      "Enable registration, set capacity and valid opening/closing dates, and save planning details.",
+      "Read the updated readiness panel immediately and reopen the drawer to verify capacity and dates.",
+      "Save registration with missing windows and check Outstanding, then disable it and check Not required.",
+      "Reject a planning save and verify the form draft and previous readiness survive without an extra readiness fetch."
+    ],
+    "data": "Synthetic event 17; capacity 20; opening 1 Jun 2030 10:00 and closing 10 Jun 2030 18:00; empty windows and a 503 planning response.",
+    "expected": "Successful planning saves refresh readiness once while leaving queue and equipment data mounted. Complete configuration shows Ready, incomplete configuration shows Outstanding, and disabling registration shows Not required. Failed saves retain the draft and do not refresh readiness.",
+    "evidence": "client/src/screens/WorkQueue.equipmentReadiness.test.tsx; client/src/screens/WorkQueue.tsx",
+    "layer": "Composed rendered React components and public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-39:AC4",
+      "SG2-57:AC2"
+    ],
+    "status": "Pass",
+    "actual": "The normal and incomplete-registration regressions failed before the callback fix because the old Not required panel remained. After the fix all 104 targeted tests and all 1,351 client tests passed; WorkQueue.tsx has 100% statements, branches, functions and lines. Client typecheck passed.",
+    "execution_evidence": "15 Oct 2026 local runs; /tmp/spm-registration-readiness-before.log, /tmp/spm-registration-readiness-after.log, /tmp/spm-registration-readiness-coverage.log and /tmp/spm-registration-readiness-types.log. No hosted deployment or combined CI result claimed for this follow-up.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
   }
 ]
