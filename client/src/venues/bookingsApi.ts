@@ -12,6 +12,19 @@ export interface VenueBooking {
   cancelled_at: string | null;
   cancellation_reason: string | null;
   canceller_name: string | null;
+  /** SG2-81: the unavailable periods affecting this confirmed booking. While
+   * there are any, the event needs an alternative venue. */
+  affected_by: BookingDisruption[];
+  /** SG2-81 AC4: a replacement requested for this booking that Venue Staff
+   * have not decided yet. */
+  replacement: { request_id: number; venue_name: string | null } | null;
+}
+
+export interface BookingDisruption {
+  starts_at: string;
+  ends_at: string;
+  category: string;
+  reason: string;
 }
 
 export interface Released {
@@ -55,7 +68,10 @@ async function call<T>(url: string, token: string | null | undefined, read: (bod
 
 const readBookings = (body: Record<string, unknown> | null) => {
   const bookings = body?.bookings;
-  return Array.isArray(bookings) && bookings.every(isBooking) ? { bookings } : null;
+  // A booking from before SG2-81 carries no unavailability or replacement.
+  return Array.isArray(bookings) && bookings.every(isBooking)
+    ? { bookings: bookings.map(booking => ({ ...booking, affected_by: booking.affected_by ?? [], replacement: booking.replacement ?? null })) }
+    : null;
 };
 
 /** An event's confirmed and released bookings, one per venue (AC3). */

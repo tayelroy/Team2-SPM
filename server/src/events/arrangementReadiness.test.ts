@@ -262,4 +262,31 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.deepEqual(result.outstanding, ['venue', 'equipment', 'registration']);
     assert.equal(result.ready_for_confirmation, false);
   });
+
+  test('[NORMAL] [SG2-81:AC2] a booking a venue\'s unavailability affects leaves the venue arrangement outstanding, and says alternatives are required', () => {
+    const result = computeArrangementReadiness(baseInput({ affected_bookings: 2 }));
+
+    assert.equal(stateOf(result, 'venue'), 'outstanding');
+    assert.equal(result.arrangements.find(a => a.key === 'venue')!.detail,
+      '2 venue bookings affected by venue unavailability: alternative venue arrangements are required.');
+    assert.deepEqual(result.outstanding, ['venue']);
+    assert.equal(result.ready_for_confirmation, false);
+    assert.match(computeArrangementReadiness(baseInput({ affected_bookings: 1 })).arrangements[0].detail, /^1 venue booking affected/);
+  });
+
+  test('[BOUNDARY] [SG2-81:AC5] with none affected, or the count absent, the venue arrangement is ready again', () => {
+    for (const affected_bookings of [0, undefined]) {
+      const result = computeArrangementReadiness(baseInput({ affected_bookings }));
+      assert.equal(stateOf(result, 'venue'), 'ready', String(affected_bookings));
+      assert.equal(result.ready_for_confirmation, true);
+    }
+  });
+
+  test('[CONFLICT] [SG2-81:AC2] a pending or rejected request is still reported first; an affected booking is reported before an unbooked approval', () => {
+    const detail = (input: Partial<ArrangementReadinessInput>) =>
+      computeArrangementReadiness(baseInput({ affected_bookings: 1, ...input })).arrangements[0].detail;
+    assert.match(detail({ venue_requests: [{ status: 'approved', booked: true }, { status: 'pending', booked: false }] }), /awaiting approval/);
+    assert.match(detail({ venue_requests: [{ status: 'approved', booked: true }, { status: 'rejected', booked: false }] }), /rejected/);
+    assert.match(detail({ venue_requests: [{ status: 'approved', booked: false }] }), /affected by venue unavailability/);
+  });
 });

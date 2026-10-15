@@ -11,7 +11,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 /** The summit holds two venues (Week 7 change #3). */
 const hall: VenueBooking = { booking_id: 11, venue_id: 1, venue_name: 'Atrium Hall', event_id: 7, event_name: 'Leadership Summit',
   starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', status: 'confirmed',
-  cancelled_at: null, cancellation_reason: null, canceller_name: null };
+  cancelled_at: null, cancellation_reason: null, canceller_name: null, affected_by: [], replacement: null };
 const annex: VenueBooking = { ...hall, booking_id: 12, venue_id: 2, venue_name: 'Annex' };
 const releasedHall: VenueBooking = { ...hall, status: 'cancelled', cancelled_at: '2030-01-02T01:00:00.000Z',
   cancellation_reason: 'The workshop moved online', canceller_name: 'Casey Coordinator' };
@@ -205,4 +205,73 @@ test('[BOUNDARY] [SG2-51:AC4] releasing a booking with no event says nobody was 
   fireEvent.click(screen.getByRole('button', { name: 'Confirm release' }));
   expect(await screen.findByRole('status')).toHaveTextContent(`Annex released for ${period}. It is available again.`);
   expect(screen.getByRole('status')).not.toHaveTextContent('notified');
+});
+
+// --- SG2-81: a venue that has become unavailable ---------------------------------
+
+const disruption = { starts_at: '2030-06-15T00:00:00.000Z', ends_at: '2030-06-16T00:00:00.000Z', category: 'equipment_failure', reason: 'Air conditioning failed' };
+const affectedHall: VenueBooking = { ...hall, affected_by: [disruption] };
+
+test('[NORMAL] [SG2-81:AC1] [SG2-81:AC2] an affected booking says the venue is unavailable, for when and why, and that alternatives are required', async () => {
+  serve(() => Response.json({ bookings: [affectedHall, annex] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onFindReplacement={vi.fn()} />);
+  await within(list()).findAllByRole('listitem');
+  const alert = within(item(11)).getByRole('alert', { name: 'Booking #11 is affected by venue unavailability' });
+  expect(alert).toHaveTextContent('Venue unavailable');
+  expect(alert).toHaveTextContent(`${formatSgt(disruption.starts_at)} – ${formatSgt(disruption.ends_at)} · Equipment failure: Air conditioning failed`);
+  expect(alert).toHaveTextContent('Alternative venue arrangements are required for this booking.');
+  // The event\'s other venue is unaffected and says nothing of the kind.
+  expect(within(item(12)).queryByRole('alert')).toBeNull();
+  // Nothing about the booking itself has changed: it is still confirmed and releasable.
+  expect(within(item(11)).getByText('Confirmed')).toBeVisible();
+  expect(within(item(11)).getByRole('button', { name: 'Release booking' })).toBeVisible();
+});
+
+test('[NORMAL] [SG2-81:AC4] the coordinator can start looking for a replacement from the affected booking', async () => {
+  serve(() => Response.json({ bookings: [affectedHall, annex] }));
+  const onFindReplacement = vi.fn();
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onFindReplacement={onFindReplacement} />);
+  await within(list()).findAllByRole('listitem');
+  expect(within(item(12)).queryByRole('button', { name: 'Find a replacement venue' })).toBeNull();
+  fireEvent.click(within(item(11)).getByRole('button', { name: 'Find a replacement venue' }));
+  expect(onFindReplacement).toHaveBeenCalledWith(expect.objectContaining({ booking_id: 11, venue_id: 1 }));
+});
+
+test('[CONFLICT] [SG2-81:AC4] a replacement already requested is shown instead of offering another, and without a way to search the booking is only reported', async () => {
+  serve(() => Response.json({ bookings: [{ ...affectedHall, replacement: { request_id: 90, venue_name: 'Lecture Theatre' } }] }));
+  const { unmount } = render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onFindReplacement={vi.fn()} />);
+  expect(await within(list()).findByText('Replacement requested: Lecture Theatre, awaiting Venue Staff.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Find a replacement venue' })).toBeNull();
+  unmount();
+  serve(() => Response.json({ bookings: [{ ...affectedHall, replacement: { request_id: 91, venue_name: null } }] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
+  expect(await within(list()).findByText('Replacement requested: request #91, awaiting Venue Staff.')).toBeVisible();
+  cleanup();
+  serve(() => Response.json({ bookings: [affectedHall] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
+  expect(await within(list()).findByRole('alert')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Find a replacement venue' })).toBeNull();
+});
+
+test('[BOUNDARY] [SG2-81:AC5] once the affected booking is released, or an unrecognised category comes back, nothing is flagged as needing a replacement', async () => {
+  serve(() => Response.json({ bookings: [{ ...releasedHall, affected_by: [disruption] }, { ...annex, affected_by: [{ ...disruption, category: 'flood' }] }] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onFindReplacement={vi.fn()} />);
+  await within(list()).findAllByRole('listitem');
+  expect(within(item(11)).queryByRole('alert')).toBeNull();
+  expect(within(item(12)).getByRole('alert')).toHaveTextContent('flood: Air conditioning failed');
+});
+
+test('[NORMAL] [SG2-81:AC1] Venue Staff listing a venue\'s bookings see which are affected but are not offered a replacement search', async () => {
+  serve(() => Response.json({ bookings: [affectedHall] }));
+  const venue = { venue_id: 1, name: 'Atrium Hall' } as never;
+  render(<VenueBookings token="token" venue={venue} onClose={vi.fn()} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Air conditioning failed');
+  expect(screen.queryByRole('button', { name: 'Find a replacement venue' })).toBeNull();
+});
+
+test('[BOUNDARY] [SG2-81:AC1] a booking answered without unavailability or replacement details reads as unaffected, and ones given are kept as sent', async () => {
+  const { affected_by: _a, replacement: _r, ...older } = hall;
+  serve(() => Response.json({ bookings: [older, affectedHall] }));
+  const result = await fetchEventBookings('token', 7);
+  expect(result).toEqual({ ok: true, bookings: [{ ...older, affected_by: [], replacement: null }, affectedHall] });
 });

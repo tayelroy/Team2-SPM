@@ -6,9 +6,9 @@ import type { VenueArrangement, VenueRequest } from './requestsApi';
 
 /** As the server reports it, from how many of the needed venues are approved,
  * rejected, or approved but no longer booked. */
-function arrangement(approved: number, needed: number, rejected = 0, unbooked = 0): VenueArrangement {
-  const ready = approved === needed && unbooked === 0;
-  return { state: needed === 0 ? 'none' : ready ? 'ready' : 'in_progress', needed, approved, pending: needed - approved - rejected, rejected, unbooked };
+function arrangement(approved: number, needed: number, rejected = 0, unbooked = 0, affected = 0): VenueArrangement {
+  const ready = approved === needed && unbooked === 0 && affected === 0;
+  return { state: needed === 0 ? 'none' : ready ? 'ready' : 'in_progress', needed, approved, pending: needed - approved - rejected, rejected, unbooked, affected };
 }
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -156,6 +156,10 @@ test('[BOUNDARY] [SG2-82:AC5] the arrangement reads as ready only when every nee
     + '2 venues rejected — request another venue, then withdraw the rejected request.');
   // SG2-58: an approved venue whose booking was released no longer counts.
   expect(arrangementSummary(arrangement(2, 2, 0, 1))).toBe('Venue arrangement not ready: 2 of 2 venues approved; 1 venue approved but no longer booked.');
+  // SG2-81 AC2: an unavailable venue holds the arrangement back and says alternatives are required.
+  expect(arrangementSummary(arrangement(2, 2, 0, 0, 1))).toBe(
+    'Venue arrangement not ready: 2 of 2 venues approved; 1 venue unavailable — alternative venue arrangements are required.');
+  expect(arrangementSummary(arrangement(2, 2, 0, 0, 2))).toContain('2 venues unavailable — alternative venue arrangements are required');
 });
 
 const auditorium = { ...pending, request_id: 51, venue_id: 1, venue_name: 'Auditorium', status: 'approved', decider_name: 'Vera Venue', decided_at: '2030-01-02T02:00:00.000Z' };
@@ -237,4 +241,26 @@ test('[CONFLICT] [FAILURE] [SG2-82:AC5] a withdrawal refused by the server expla
   fireEvent.click(within(confirm).getByRole('button', { name: 'Keep request' }));
   fireEvent.click(screen.getByRole('button', { name: 'Withdraw request' }));
   expect(within(screen.getByRole('group', { name: 'Withdraw Venue #3' })).queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-81:AC4] a request made to replace an affected booking names it, says it will be released on approval, and sends it with the request', async () => {
+  const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ request: pending, booking: 'allowed' }, { status: 201 }));
+  vi.stubGlobal('fetch', fetch);
+  const { onRequested } = form({ replacesBookingId: 12 });
+  expect(screen.getByText('This replaces booking #12, which is released once Venue Staff approve this request.')).toBeVisible();
+  send();
+  await vi.waitFor(() => expect(onRequested).toHaveBeenCalled());
+  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toEqual({
+    event_id: 10, venue_id: 3, layout: 'other', starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', replaces_booking_id: 12
+  });
+});
+
+test('[BOUNDARY] [SG2-81:AC4] an ordinary request names no booking and says nothing about replacing one', async () => {
+  const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ request: pending, booking: 'allowed' }, { status: 201 }));
+  vi.stubGlobal('fetch', fetch);
+  const { onRequested } = form();
+  expect(screen.queryByText(/This replaces booking/)).toBeNull();
+  send();
+  await vi.waitFor(() => expect(onRequested).toHaveBeenCalled());
+  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).not.toHaveProperty('replaces_booking_id');
 });
