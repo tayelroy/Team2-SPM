@@ -5,10 +5,13 @@ see [Equipment reservations](equipment-reservations.md#verification) and cases
 SG2-55-P01/B01/C01/C02/N01 in [the regression register](regression-cases.json).
 Execution status is recorded separately from the case specification.
 
-> The current exhaustive review is [Test case review — 2 October 2026](test-case-review.md): 87 files, 1,191 test declarations and 154 SQL assertion contracts. The dated sections below preserve earlier evidence.
+> The current source register is [test-case-inventory.json](test-case-inventory.json),
+> verified by `npm run test:inventory`. See [CI execution evidence](ci.md#reviewing-playwright-execution-evidence)
+> for repeatable Playwright runs, reports, screenshots and traces. The dated
+> reviews below retain their original scope and counts as historical evidence.
 
-> The current register is [Purposeful regression cases](regression.md):
-> 29 scenarios including 19 browser journeys. The 22 September revalidation
+> Behavioral scenarios are recorded in [regression-cases.json](regression-cases.json).
+> The 22 September revalidation
 > below supersedes earlier test-quality and execution summaries. Older dated
 > sections are historical evidence, not current results.
 

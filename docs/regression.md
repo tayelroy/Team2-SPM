@@ -1,10 +1,12 @@
 # Purposeful regression cases
 
-> The current exhaustive method register and execution limits are in [Test case review — 1 October 2026](test-case-review.md) and [test-case-inventory.json](test-case-inventory.json). The scenario register remains [regression-cases.json](regression-cases.json); dated records below are historical.
+> The current method register is [test-case-inventory.json](test-case-inventory.json).
+> [CI execution evidence](ci.md#reviewing-playwright-execution-evidence) explains
+> repeatable Playwright runs and their reports, screenshots and traces. Dated
+> reviews below preserve their original counts and execution limits as history.
 
-The current register is [`regression-cases.json`](regression-cases.json): **29
-scenarios: 19 browser journeys, 4 supporting backend cases, 4 SQL cases and 2
-hosted CI cases**. A scenario groups assertions around one observable outcome;
+The current scenario register is [`regression-cases.json`](regression-cases.json).
+A scenario groups assertions around one observable outcome;
 it is not a list of every unit test. Positive, negative and boundary partitions
 can share a case when they establish the same rule. Counts are not a coverage
 or quality target.
@@ -21,10 +23,11 @@ the register does not automatically write to that Sheet.
 
 | Layer | Purpose and limit |
 | --- | --- |
-| Playwright, 19 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
-| Backend, 4 cases | Existing unit/API suites retain denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
-| PostgreSQL, 4 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
-| Hosted CI, 2 cases | Check the required aggregate and workflow event behavior, including the new browser job. Local script inspection or a past workflow run cannot establish current hosted execution or branch protection. |
+| Playwright browser suite | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
+| Supporting unit/API suites | Cover denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
+| Native API integration | Real Express/Supabase-client/PostgREST/PostgreSQL checks use disposable containers and committed migrations. They verify adapter and database contracts separately from browser fixtures and hosted Supabase. |
+| PostgreSQL contracts | Committed SQL scripts check policies and constraints in disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests. |
+| Hosted CI evidence | The matching run records job outcomes and the required aggregate. Local script inspection or a past run cannot establish current hosted execution or branch protection. |
 
 Run `npm run test:regression` for the browser journeys after installing Chromium
 with `npx playwright install chromium`. The regression command builds the app;

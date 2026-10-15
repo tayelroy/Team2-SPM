@@ -19,11 +19,15 @@ npm run ci
 | `npm test` | Backend, frontend, and security reviewer tests. |
 | `npm run test:coverage` | Tests and application coverage thresholds. |
 | `npm run ci` | Builds followed by tests with coverage. |
-| `npm run test:regression` | Builds then runs 18 Chromium journeys against real API routes with isolated in-memory providers. |
+| `npm run test:regression` | Builds then runs the complete Playwright Chromium suite against real API routes with isolated in-memory providers. |
+| `npm run build && npm run test:smoke` | Runs the four critical Playwright smoke scenarios and retains successful screenshots, traces and video. |
+| `npm run test:integration` | Runs real Express/Supabase-client/PostgREST/PostgreSQL integration in disposable Docker containers. Docker must be running. |
 | `npm run ci:full` | Build, coverage, reviewer and Playwright checks; SQL remains a separate CI job. |
 
-Tests mock Supabase responses and use temporary local HTTP sockets. They do not
-need Supabase credentials or a running database.
+Application tests use controlled providers and temporary local HTTP sockets.
+The native integration command starts its own PostgreSQL and PostgREST containers,
+applies committed migrations and checks real adapter/API contracts. Neither route
+needs hosted Supabase credentials; integration needs Docker rather than a shared database.
 
 ## Workflow
 
@@ -38,7 +42,8 @@ Each merge has its own concurrency group and cannot cancel another merge's run.
 Newer pre-merge updates may cancel older checks for the same pull request.
 
 The workflow exposes separate PR checks: **Build applications**, **Test backend**,
-**Test frontend**, **Test browser regression**, **Test database policies**, and **Test security reviewer**.
+**Test frontend**, **Test browser regression**, **Test browser smoke**,
+**Test database policies**, and **Test security reviewer**.
 They run independently, so a failed build or backend test does not suppress
 frontend or database results. Application jobs use Node 22 and install locked
 dependencies with `npm ci`; the reviewer uses only Node built-ins. Backend and
@@ -68,9 +73,46 @@ Passing browser tests establish persistence across reloads within that fixture;
 they do not establish deployed Auth, durable database storage or RLS.
 
 The `browser-regression` artifact contains an HTML report, JSON/JUnit results,
-and traces/screenshots/video for failures, retained for 14 days. Stable IDs in
-test titles map to [the 27-case register](regression.md). Do not create a course
+and failure evidence, retained for 14 days. Its smoke scenarios also retain successful
+traces, screenshots and video. Stable IDs in test titles map to
+[the scenario register](regression-cases.json) and [method inventory](test-case-inventory.json). Do not create a course
 row for each low-level assertion or copy old Pass statuses into a new execution.
+
+## Reviewing Playwright execution evidence
+
+On a pull request's **Checks** tab, open the matching **Test browser smoke** or
+**Test browser regression** run. Confirm its commit SHA, then download the
+`browser-smoke` or `browser-regression` artifact from that run's summary. Reports
+from another commit are historical evidence.
+
+The four smoke scenarios exercise seven role desks and logout, incomplete versus
+complete submission and Lead assignment, planning persistence/readiness at phone
+and desktop widths, and refusal of a former coordinator's already-open save.
+Each records named Playwright steps and successful screenshot attachments. Traces
+and video are retained for passing smoke tests as well as failures; a screenshot
+is supporting evidence, while the assertions establish the expected behavior.
+
+After extracting an artifact, open its report with:
+
+```sh
+npx playwright show-report path/to/playwright-report
+```
+
+Select a smoke case to inspect its steps and screenshots. Use the trace attachment
+in the report, or open the extracted trace locally with
+`npx playwright show-trace path/to/trace.zip`. JSON and JUnit results under
+`test-results/` retain machine-readable outcomes. Artifacts expire after 14 days;
+download the matching run before then for the course submission.
+
+The SPM Test Cases register links each declaration to its introducing PR, Jira
+criteria, source and execution evidence. A parameterized declaration can execute
+several runner cases; do not count each screenshot as a new test. Current human
+review and hosted acceptance remain separate from a passing automated run.
+
+These Playwright runs use the built app and real HTTP handlers with isolated
+identity/storage fixtures. Native API integration separately proves real
+PostgREST/database behavior. Neither replaces authenticated staging checks or
+establishes that every Jira Done criterion and page has been reviewed visually.
 
 Vercel's existing build gate still runs `npm run ci`; Chromium is installed and
 run by GitHub Actions, not Vercel. Requiring **Build and test** protects the merge,

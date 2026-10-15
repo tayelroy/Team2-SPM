@@ -5271,9 +5271,9 @@
     "evidence": "e2e/smoke.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
-    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
-    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim. Successful landing 390px/1440px and mobile occupied-day screenshots are attached to the report; preserved copies and locations: /tmp/spm-ui-evidence.json. Bounds, text and overflow assertions passed; screenshots do not represent pixel-baseline assertions.",
-    "execution_date": "15 Oct 2026",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
     "categories": [
       "NORMAL",
       "FAILURE"
@@ -5285,8 +5285,16 @@
       "SG2-71:AC1",
       "SG2-71:AC3"
     ],
-    "executed_by": "Codex automated verification",
-    "review": null
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim. Successful landing 390px/1440px and mobile occupied-day screenshots are attached to the report; preserved copies and locations: /tmp/spm-ui-evidence.json. Bounds, text and overflow assertions passed; screenshots do not represent pixel-baseline assertions.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
   },
   {
     "id": "SMOKE-ASSIGN-01",
@@ -5305,9 +5313,9 @@
     "evidence": "e2e/smoke.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
-    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
-    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
-    "execution_date": "15 Oct 2026",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
     "categories": [
       "NORMAL",
       "BOUNDARY"
@@ -5317,8 +5325,16 @@
       "SG2-30:AC2",
       "SG2-87:AC5"
     ],
-    "executed_by": "Codex automated verification",
-    "review": null
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
   },
   {
     "id": "SMOKE-PLANNING-01",
@@ -5337,9 +5353,9 @@
     "evidence": "e2e/smoke.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
-    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
-    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
-    "execution_date": "15 Oct 2026",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
     "categories": [
       "NORMAL",
       "BOUNDARY"
@@ -5348,8 +5364,16 @@
       "SG2-39:AC1",
       "SG2-41:AC4"
     ],
-    "executed_by": "Codex automated verification",
-    "review": null
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
   },
   {
     "id": "SMOKE-CONFLICT-01",
@@ -5368,9 +5392,9 @@
     "evidence": "e2e/smoke.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
-    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
-    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
-    "execution_date": "15 Oct 2026",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
     "categories": [
       "CONFLICT",
       "FAILURE"
@@ -5378,8 +5402,16 @@
     "mapped_acs": [
       "SG2-90:AC3"
     ],
-    "executed_by": "Codex automated verification",
-    "review": null
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
   },
   {
     "type": "Deployment readiness regression",
