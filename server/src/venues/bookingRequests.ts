@@ -48,15 +48,18 @@ export interface VenueArrangement extends VenueTally {
   state: 'none' | 'in_progress' | 'ready';
 }
 
-export function venueArrangement(requests: VenueBookingStatusRow[]): VenueArrangement {
-  const tally = venueTally(requests);
-  const ready = tally.approved === tally.needed && tally.unbooked === 0;
+export function venueArrangement(requests: VenueBookingStatusRow[], affectedBookings = 0): VenueArrangement {
+  const tally = venueTally(requests, affectedBookings);
+  const ready = tally.approved === tally.needed && tally.unbooked === 0 && tally.affected === 0;
   return { state: tally.needed === 0 ? 'none' : ready ? 'ready' : 'in_progress', ...tally };
 }
 
 /** Venues are requested once the event has been approved and before it is
  * confirmed (SG2-48 AC1). */
 const REQUESTABLE_EVENT_STATUSES = ['approved', 'planning'];
+/** SG2-81: a replacement for an unavailable venue is also requested once the
+ * event has reached preparation or been confirmed. */
+const REPLACEMENT_EVENT_STATUSES = [...REQUESTABLE_EVENT_STATUSES, 'preparation', 'confirmed'];
 
 const INVALID_REQUEST = 'Choose an event, a venue, a layout and a future period that starts before it ends.';
 
@@ -137,7 +140,9 @@ function handler(
  * pending and reaches Venue Staff through the work queue (AC2). Nothing is
  * written to venue_bookings, so the venue is neither held nor shown as
  * unavailable (AC3). Several venues may be requested for one event, but not
- * the same venue twice over an overlapping period (AC4). Anything already
+ * the same venue twice over an overlapping period (AC4). A request may name
+ * the affected booking it replaces (SG2-81 AC4); approving it releases that
+ * booking. Anything already
  * committing the venue over the period is reported with the new request, by
  * booking or hold number (SG2-50 AC1); the request is still made, but it
  * cannot be approved while the conflict stands (SG2-50 AC2).
@@ -164,8 +169,15 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
       respond(404, { error: 'Event not found.' });
       return;
     }
-    if (!REQUESTABLE_EVENT_STATUSES.includes(event.status)) {
+    const requestable = values.replaces_booking_id === undefined ? REQUESTABLE_EVENT_STATUSES : REPLACEMENT_EVENT_STATUSES;
+    if (!requestable.includes(event.status)) {
       respond(409, { error: `A venue can be requested only for an approved event. This event is ${event.status.replace('_', ' ')}.` });
+      return;
+    }
+    // SG2-81 AC4: a replacement must name a booking of this event that a
+    // venue's unavailability affects, so it cannot release anything else.
+    if (values.replaces_booking_id !== undefined && !(await database.affectedBookings(event.event_id)).includes(values.replaces_booking_id)) {
+      respond(409, { error: 'That booking is not affected by venue unavailability, so it cannot be replaced.' });
       return;
     }
     const venue = await database.venue(values.venue_id);
@@ -215,8 +227,8 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
       respond(404, { error: 'Event not found.' });
       return;
     }
-    const [requests, statuses] = await Promise.all([database.list(eventId), database.venueStatuses(eventId)]);
-    respond(200, { requests, arrangement: venueArrangement(statuses) });
+    const [requests, statuses, affected] = await Promise.all([database.list(eventId), database.venueStatuses(eventId), database.affectedBookings(eventId)]);
+    respond(200, { requests, arrangement: venueArrangement(statuses, affected.length) });
   }));
 
   /**

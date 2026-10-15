@@ -115,6 +115,13 @@ test('[CONFLICT] [SG2-39:AC2] [SG2-58:AC2] a stale confirmation RPC missing any 
   }
 });
 
+test('[CONFLICT] [SG2-81:AC2] [SG2-58:AC2] a stale confirmation RPC missing the venue disruption guard blocks release', () => {
+  assertReadinessRejects(`DO $$ BEGIN
+    EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
+      'public.venue_booking_disruptions', 'public.legacy_venue_booking_disruptions');
+  END $$;`, 'confirm_event venue disruption guard');
+});
+
 test('[FAILURE] [SG2-23:AC1] missing Safety Officer role catalogue entry blocks release without requiring a seeded login', () => {
   assertReadinessRejects("UPDATE public.roles SET role_name = 'Retired Safety Officer' WHERE role_name = 'Safety Officer';", 'Safety Officer');
 });

@@ -73,6 +73,11 @@ acceptance tests or the Definition of Done.
   `202610160004_event_confirmation_rechecks.sql` installs that gate. This is a
   structural deployment fingerprint; the rollback confirmation SQL suite proves
   that pending rechecks refuse confirmation without changing receipts or history.
+- The later `202610170002_confirmation_rechecks_and_disruptions.sql` preserves
+  both those rechecks and SG2-81's affected-booking guard after venue replacement
+  installs its own confirmation definition. Apply `170001` and `170002` together
+  on an existing deployment so there is no intermediate recheck bypass. The gate
+  also checks the replacement link, its FK, helper functions and notification kind.
 
 Notification schema drift can produce a partial success: submission changes the
 event state and writes history before its notice insert fails. The UI then

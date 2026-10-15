@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchAffectedBookingIds } from './venueDisruptions';
 
 /**
  * Arrangement facts for an event's readiness view (SG2-57). Only the fields the
@@ -25,6 +26,10 @@ export interface EquipmentRequestArrangementRow {
 
 export interface EventArrangementFacts {
   venue_requests: VenueBookingStatusRow[];
+  /** SG2-81 AC2: confirmed bookings a venue's unavailability affects. Each
+   * leaves the venue arrangement outstanding until it is replaced. Always
+   * set by fetchEventArrangementFacts; absent means none. */
+  affected_bookings?: number;
   equipment_requests: EquipmentRequestArrangementRow[];
   /** Stock may already be reserved without a linked request on legacy events.
    * Kept internal: planning rechecks need existence, not receipt details. */
@@ -99,6 +104,10 @@ export async function fetchEventArrangementFacts(
   const confirmedBookings = new Set(
     ((bookings.data ?? []) as { booking_id: number }[]).map(row => Number(row.booking_id))
   );
+  const affected = await fetchAffectedBookingIds(admin, [...confirmedBookings]);
+  if (!affected.ok) {
+    return { ok: false, reason: 'unavailable', message: affected.message };
+  }
   const holdBookings = new Map<number, number[]>();
   for (const hold of (holds.data ?? []) as VenueHoldRow[]) {
     if (hold.request_id === null || hold.booking_id === null) continue;
@@ -138,6 +147,7 @@ export async function fetchEventArrangementFacts(
     ok: true,
     facts: {
       venue_requests: venueRequests,
+      affected_bookings: affected.ids.size,
       equipment_requests: ((equipment.data ?? []) as EquipmentRequestRow[]).map(row => ({
         status: row.status,
         shortfall: row.shortfall,

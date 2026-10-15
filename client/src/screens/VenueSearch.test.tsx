@@ -286,3 +286,71 @@ test('[FAILURE] [SG2-48:AC1] a manual search, not opened from an event, offers n
   expect(screen.queryByRole('button', { name: 'Request this venue' })).not.toBeInTheDocument();
   expect(screen.queryByRole('region', { name: /Venue requests for/ })).not.toBeInTheDocument();
 });
+
+// --- SG2-81: replacing a venue that has become unavailable ------------------------
+
+const affectedBooking = { booking_id: 11, venue_id: 1, venue_name: 'Atrium Hall', event_id: 10, event_name: 'Meridian Forum',
+  starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', status: 'confirmed', cancelled_at: null, cancellation_reason: null,
+  canceller_name: null, replacement: null,
+  affected_by: [{ starts_at: '2030-06-15T00:00:00.000Z', ends_at: '2030-06-16T00:00:00.000Z', category: 'maintenance', reason: 'Roof repairs' }] };
+
+/** An event whose booking a venue's unavailability affects; requests are recorded. */
+function stubAffectedEvent(venueName: string | null = 'Atrium Hall') {
+  const made: Record<string, unknown>[] = [];
+  const searched: Record<string, string>[] = [];
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/venues/suitability')) return Response.json({ venues: [] });
+    if (url.startsWith('/api/venue-bookings')) {
+      return Response.json({ bookings: [made.length ? { ...affectedBooking, venue_name: venueName, replacement: { request_id: 41, venue_name: 'Rooftop Terrace' } } : { ...affectedBooking, venue_name: venueName }] });
+    }
+    if (url.startsWith('/api/venue-booking-requests') && init?.method === 'POST') {
+      made.push(JSON.parse(init.body as string));
+      return Response.json({ request: requested, booking: 'allowed' }, { status: 201 });
+    }
+    if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: [], arrangement: { state: 'in_progress', needed: 1, approved: 1,
+      pending: 0, rejected: 0, unbooked: 0, affected: 1 } });
+    searched.push(Object.fromEntries(new URL(url, 'http://local').searchParams));
+    return Response.json({ venues: [terrace] });
+  });
+  vi.stubGlobal('fetch', fetch);
+  return { made, searched };
+}
+
+test('[NORMAL] [SG2-81:AC4] from the affected booking the coordinator searches the same period with the event\'s requirements and requests a replacement', async () => {
+  const { made, searched } = stubAffectedEvent();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Find a replacement venue' }));
+  // The search reruns for the affected booking\'s period (Singapore time), keeping the event\'s own attendance and accessibility.
+  await vi.waitFor(() => expect(searched).toHaveLength(2));
+  expect(searched[1]).toMatchObject({ from: '2030-06-15T02:00:00.000Z', to: '2030-06-15T10:00:00.000Z', attendance: '180', accessibility: 'step-free' });
+  expect(screen.getByLabelText('From (Singapore time)')).toHaveValue('2030-06-15T10:00');
+  expect(screen.getByText(/Finding a replacement for Atrium Hall \(booking #11/)).toBeVisible();
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  expect(screen.getByText('This replaces booking #11, which is released once Venue Staff approve this request.')).toBeVisible();
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  expect(await screen.findByText(/Rooftop Terrace requested/)).toBeVisible();
+  expect(made).toEqual([expect.objectContaining({ event_id: 10, venue_id: 3, replaces_booking_id: 11 })]);
+  // Once requested, the banner goes and the affected booking shows the replacement asked for.
+  expect(screen.queryByText(/Finding a replacement for/)).toBeNull();
+  expect(await screen.findByText('Replacement requested: Rooftop Terrace, awaiting Venue Staff.')).toBeVisible();
+});
+
+test('[CONFLICT] [SG2-81:AC4] stopping the replacement makes later requests ordinary ones that release nothing', async () => {
+  const { made } = stubAffectedEvent();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Find a replacement venue' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Stop replacing this booking' }));
+  expect(screen.queryByText(/Finding a replacement for/)).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  expect(screen.queryByText(/This replaces booking/)).toBeNull();
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  await screen.findByText(/Rooftop Terrace requested/);
+  expect(made[0]).not.toHaveProperty('replaces_booking_id');
+});
+
+test('[BOUNDARY] [SG2-81:AC4] an affected booking whose venue has no recorded name is still named by its number when finding a replacement', async () => {
+  stubAffectedEvent(null);
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Find a replacement venue' }));
+  expect(await screen.findByText(/Finding a replacement for venue #1 \(booking #11/)).toBeVisible();
+});

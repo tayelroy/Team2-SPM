@@ -36,6 +36,9 @@ export interface VenueArrangement {
   rejected: number;
   /** Approved venues whose booking is no longer confirmed. */
   unbooked: number;
+  /** SG2-81: confirmed bookings a venue's unavailability affects; each needs
+   * a replacement. */
+  affected: number;
 }
 
 function isArrangement(value: unknown): value is VenueArrangement {
@@ -77,6 +80,8 @@ export interface NewVenueRequest {
   starts_at: string;
   ends_at: string;
   layout: Layout;
+  /** SG2-81 AC4: the affected booking this request replaces. */
+  replaces_booking_id?: number;
 }
 
 export type Result<T> = ({ ok: true } & T) | { ok: false; error: string };
@@ -133,8 +138,9 @@ export function fetchRequestConflicts(token: string | null | undefined, requestI
 export function fetchVenueRequests(token: string | null | undefined, eventId: number) {
   return call(`/api/venue-booking-requests?event_id=${eventId}`, token, body => {
     const requests = body?.requests;
+    // An answer from before SG2-81 carries no count of affected bookings.
     return Array.isArray(requests) && requests.every(isRequest) && isArrangement(body?.arrangement)
-      ? { requests, arrangement: body.arrangement } : null;
+      ? { requests, arrangement: { ...body.arrangement, affected: typeof body.arrangement.affected === 'number' ? body.arrangement.affected : 0 } } : null;
   });
 }
 

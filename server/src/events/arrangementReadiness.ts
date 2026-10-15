@@ -16,8 +16,9 @@ import type {
  * `confirm_event` RPC applies the same three rules in SQL as its gate, so the
  * panel and the Confirm action never disagree; any change here must be made
  * there too (supabase/migrations/202610150001_event_confirmation.sql, whose
- * venue rule SG2-82 replaced in 202610150003_confirm_event_rejected_venues.sql;
- * 202610160004_event_confirmation_rechecks.sql adds the persisted recheck gate).
+ * venue rule SG2-82 replaced in 202610150003_confirm_event_rejected_venues.sql.
+ * 202610170002_confirmation_rechecks_and_disruptions.sql combines persisted
+ * planning rechecks with SG2-81's affected-booking guard).
  */
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
@@ -37,6 +38,8 @@ export interface ArrangementReadinessInput {
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   venue_requests: VenueBookingStatusRow[];
+  /** SG2-81 AC2: confirmed bookings a venue's unavailability affects. */
+  affected_bookings?: number;
   equipment_requests: EquipmentRequestArrangementRow[];
   /** Persisted SG2-39 impacts; absent/null values preserve legacy readiness. */
   arrangements_recheck_needed?: boolean | null;
@@ -77,6 +80,8 @@ export interface VenueTally {
   rejected: number;
   /** Approved requests no longer linked to a confirmed booking. */
   unbooked: number;
+  /** SG2-81: confirmed bookings a venue's unavailability affects. */
+  affected: number;
 }
 
 /**
@@ -86,7 +91,7 @@ export interface VenueTally {
  * counting. Also used by the event's venue request list
  * (server/src/venues/bookingRequests.ts), so both say the same.
  */
-export function venueTally(requests: VenueBookingStatusRow[]): VenueTally {
+export function venueTally(requests: VenueBookingStatusRow[], affected = 0): VenueTally {
   const needed = requests.filter(row => row.status.toLowerCase() !== 'cancelled');
   const count = (status: string) => needed.filter(row => row.status.toLowerCase() === status);
   const approvedRows = count('approved');
@@ -98,12 +103,13 @@ export function venueTally(requests: VenueBookingStatusRow[]): VenueTally {
     // SG2-58 review: an approved request whose booking was converted from a
     // hold and later released stays approved, so approval alone does not
     // prove a venue.
-    unbooked: approvedRows.filter(row => !row.booked).length
+    unbooked: approvedRows.filter(row => !row.booked).length,
+    affected
   };
 }
 
-function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
-  const { needed, approved, pending, rejected, unbooked } = venueTally(requests);
+function computeVenue(requests: VenueBookingStatusRow[], affectedBookings: number): ArrangementStatus {
+  const { needed, approved, pending, rejected, unbooked, affected } = venueTally(requests, affectedBookings);
 
   // Every event needs a venue, so an event with no venue booking request has
   // an outstanding venue arrangement rather than "not required".
@@ -131,6 +137,16 @@ function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
       detail: rejected === 1
         ? '1 venue booking rejected: request a replacement if the event still needs one, then withdraw the rejected request.'
         : `${rejected} venue bookings rejected: request replacements if the event still needs them, then withdraw the rejected requests.`
+    };
+  }
+  // SG2-81 AC2: a booking the venue's unavailability affects is outstanding
+  // until a replacement is approved, which releases it.
+  if (affected > 0) {
+    return {
+      key: 'venue',
+      label: 'Venue booking',
+      state: 'outstanding',
+      detail: `${pluralise(affected, 'venue booking')} affected by venue unavailability: alternative venue arrangements are required.`
     };
   }
   if (unbooked > 0) {
@@ -224,7 +240,7 @@ export function computeArrangementReadiness(
   input: ArrangementReadinessInput
 ): ArrangementReadinessResult {
   const arrangements: ArrangementStatus[] = [
-    computeVenue(input.venue_requests),
+    computeVenue(input.venue_requests, input.affected_bookings ?? 0),
     computeEquipment(input.equipment_requests),
     computeRegistration(input)
   ].map(arrangement => input.arrangements_recheck_needed === true

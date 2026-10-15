@@ -229,8 +229,10 @@ export const STATUS_TRANSITIONS: Readonly<Record<EventStatus, readonly EventStat
   planning: ['awaiting_safety_check', 'cancelled'],
   awaiting_safety_check: ['preparation', 'safety_rejected', 'planning', 'cancelled'],
   safety_rejected: ['cancelled'],
-  preparation: ['confirmed', 'completed', 'cancelled'],
-  confirmed: ['completed', 'cancelled'],
+  // SG2-81 AC6: a venue becoming unavailable sends a Preparation or Confirmed
+  // event back to Planning while a replacement is found.
+  preparation: ['confirmed', 'completed', 'planning', 'cancelled'],
+  confirmed: ['completed', 'planning', 'cancelled'],
   completed: [],
   cancelled: []
 };

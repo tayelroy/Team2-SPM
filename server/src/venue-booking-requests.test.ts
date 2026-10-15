@@ -52,7 +52,8 @@ const body = (overrides: Record<string, unknown> = {}) => ({
 });
 
 function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean;
-  holds?: Record<number, number>; exceptions?: CapacityExceptionRecord[]; occupied?: VenueConflictRow[]; unbooked?: number[] } = {}) {
+  holds?: Record<number, number>; exceptions?: CapacityExceptionRecord[]; occupied?: VenueConflictRow[]; unbooked?: number[];
+  affected?: number[] } = {}) {
   const events = seed.events ?? [forum];
   const venues = [atrium, theatre, seminar, bare];
   const requests: VenueBookingRequestRecord[] = seed.requests ?? [];
@@ -90,7 +91,9 @@ function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBooki
     async venueStatuses(id) {
       return requests.filter(row => row.event_id === id)
         .map(row => ({ status: row.status, booked: row.status === 'approved' && !(seed.unbooked ?? []).includes(row.request_id) }));
-    }
+    },
+    // SG2-81: the event's confirmed bookings a venue's unavailability affects.
+    async affectedBookings() { return seed.affected ?? []; }
   };
   return { store, created, requests, checked };
 }
@@ -478,15 +481,15 @@ test('[NORMAL] [SG2-82:AC4] [SG2-82:AC5] the event\'s requests come with whether
   const response = await request(composed).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.requests.map((row: VenueBookingRequestRecord) => [row.request_id, row.status]), [[41, 'approved'], [42, 'approved'], [43, 'cancelled']]);
-  assert.deepEqual(response.body.arrangement, { state: 'ready', needed: 2, approved: 2, pending: 0, rejected: 0, unbooked: 0 });
+  assert.deepEqual(response.body.arrangement, { state: 'ready', needed: 2, approved: 2, pending: 0, rejected: 0, unbooked: 0, affected: 0 });
   // An approved venue whose booking was released (SG2-51) holds it back again.
   const released = await request(app(fakeStore({ requests, unbooked: [42] }).store)).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
-  assert.deepEqual(released.body.arrangement, { state: 'in_progress', needed: 2, approved: 2, pending: 0, rejected: 0, unbooked: 1 });
+  assert.deepEqual(released.body.arrangement, { state: 'in_progress', needed: 2, approved: 2, pending: 0, rejected: 0, unbooked: 1, affected: 0 });
 });
 
 test('[BOUNDARY] [SG2-82:AC5] the arrangement is ready only once every venue still needed is approved and booked; a rejected one holds it back until withdrawn', () => {
   const statuses = (...list: string[]) => list.map(status => ({ status, booked: status === 'approved' }));
-  const counts = { needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0 };
+  const counts = { needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0, affected: 0 };
   assert.deepEqual(venueArrangement([]), { state: 'none', ...counts });
   assert.deepEqual(venueArrangement(statuses('cancelled')), { state: 'none', ...counts });
   assert.deepEqual(venueArrangement(statuses('approved')), { state: 'ready', ...counts, needed: 1, approved: 1 });
@@ -495,6 +498,71 @@ test('[BOUNDARY] [SG2-82:AC5] the arrangement is ready only once every venue sti
   assert.deepEqual(venueArrangement(statuses('approved', 'cancelled')), { state: 'ready', ...counts, needed: 1, approved: 1 });
   assert.equal(venueArrangement(statuses('rejected')).state, 'in_progress');
   assert.deepEqual(venueArrangement([{ status: 'approved', booked: false }]), { state: 'in_progress', ...counts, needed: 1, approved: 1, unbooked: 1 });
+  // SG2-81 AC2: a booking a venue's unavailability affects holds the arrangement back until it is replaced.
+  assert.deepEqual(venueArrangement(statuses('approved'), 1), { state: 'in_progress', ...counts, needed: 1, approved: 1, affected: 1 });
+  assert.deepEqual(venueArrangement(statuses('approved'), 0), { state: 'ready', ...counts, needed: 1, approved: 1 });
+});
+
+// --- SG2-81: replacing a venue that has become unavailable ---------------------
+
+const preparing = { ...forum, status: 'preparation' };
+const replacement = (overrides: Record<string, unknown> = {}) => body({ venue_id: 3, replaces_booking_id: 12, ...overrides });
+
+test('[NORMAL] [SG2-81:AC4] the coordinator requests a replacement for an affected booking; the request carries the event\'s requirements and names the booking it replaces', async () => {
+  const { store, created } = fakeStore({ events: [preparing], affected: [12] });
+  const response = await post(app(store), 'coordinator', replacement());
+  assert.equal(response.status, 201);
+  assert.equal(response.body.request.venue_name, 'Lecture Theatre');
+  assert.deepEqual(created, [{
+    event_id: 7, venue_id: 3, layout: 'theatre', starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
+    replaces_booking_id: 12, venue_requirements: 'A stage and a projector', requested_by: 'user-coordinator'
+  }]);
+});
+
+test('[NORMAL] [SG2-81:AC4] a replacement is also requested for an event that is confirmed or still being planned', async () => {
+  for (const status of ['confirmed', 'planning', 'approved']) {
+    const { store, created } = fakeStore({ events: [{ ...forum, status }], affected: [12] });
+    assert.equal((await post(app(store), 'coordinator', replacement())).status, 201, status);
+    assert.equal(created[0].replaces_booking_id, 12);
+  }
+});
+
+test('[FAILURE] [SG2-81:AC4] a replacement may only name an affected booking of the same event, so it cannot release anything else', async () => {
+  const { store, created } = fakeStore({ events: [preparing], affected: [12] });
+  const composed = app(store);
+  // Not flagged, or flagged on another event: the event\'s own affected list does not include it.
+  const unaffected = await post(composed, 'coordinator', replacement({ replaces_booking_id: 13 }));
+  assert.deepEqual([unaffected.status, unaffected.body], [409, { error: 'That booking is not affected by venue unavailability, so it cannot be replaced.' }]);
+  assert.equal(created.length, 0);
+  // Another coordinator is told the event does not exist, whatever the booking.
+  assert.equal((await post(composed, 'other_coordinator', replacement())).status, 404);
+  assert.equal((await post(composed, 'organiser', replacement())).status, 403);
+});
+
+test('[CONFLICT] [SG2-81:AC4] an ordinary request is still refused once the event is past planning; only a replacement is allowed', async () => {
+  for (const status of ['preparation', 'confirmed']) {
+    const { store } = fakeStore({ events: [{ ...forum, status }], affected: [12] });
+    const refused = await post(app(store), 'coordinator', body());
+    assert.equal(refused.status, 409, status);
+    assert.match(refused.body.error, /only for an approved event/);
+  }
+});
+
+test('[BOUNDARY] [SG2-81:AC4] the booking to replace must be a whole-number id; none, null and a missing field all mean an ordinary request', () => {
+  const ok = body();
+  assert.equal(validateVenueBookingRequest(ok, NOW)!.replaces_booking_id, undefined);
+  assert.equal(validateVenueBookingRequest({ ...ok, replaces_booking_id: null }, NOW)!.replaces_booking_id, undefined);
+  assert.equal(validateVenueBookingRequest({ ...ok, replaces_booking_id: 1 }, NOW)!.replaces_booking_id, 1);
+  assert.equal(validateVenueBookingRequest({ ...ok, replaces_booking_id: 2147483647 }, NOW)!.replaces_booking_id, 2147483647);
+  for (const bad of [0, -1, 1.5, '12', 2147483648, {}, []]) assert.equal(validateVenueBookingRequest({ ...ok, replaces_booking_id: bad }, NOW), null, JSON.stringify(bad));
+});
+
+test('[NORMAL] [SG2-81:AC2] the event\'s requests say its venue arrangement is not ready while an affected booking stands, even when every request is approved', async () => {
+  const requests = [pendingRequest({ status: 'approved' })];
+  const clear = await request(app(fakeStore({ requests }).store)).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
+  assert.equal(clear.body.arrangement.state, 'ready');
+  const affected = await request(app(fakeStore({ requests, affected: [12] }).store)).get('/api/venue-booking-requests?event_id=7').set(as('coordinator'));
+  assert.deepEqual(affected.body.arrangement, { state: 'in_progress', needed: 1, approved: 1, pending: 0, rejected: 0, unbooked: 0, affected: 1 });
 });
 
 /** Records each withdrawal; by default it commits it as the database would. */

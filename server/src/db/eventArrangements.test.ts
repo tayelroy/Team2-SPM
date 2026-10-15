@@ -19,6 +19,10 @@ function fakeClient(responses: Record<string, { data: unknown; error: unknown }>
               captured[col === 'event_id' ? table : `${table}.${col}`] = val;
               return chain;
             },
+            in(col: string, values: unknown) {
+              captured[`${table}.in.${col}`] = values;
+              return chain;
+            },
             then(resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) {
               return Promise.resolve(responses[table] ?? { data: [], error: null }).then(resolve, reject);
             }
@@ -74,6 +78,7 @@ describe('Event arrangement facts DB operations (SG2-57)', () => {
       ok: true,
       facts: {
         venue_requests: [{ status: 'approved', booked: true }, { status: 'pending', booked: false }],
+        affected_bookings: 0,
         equipment_requests: [
           { status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true },
           { status: 'pending', shortfall: 0, placement_venue_id: 7, reserved: false }
@@ -119,12 +124,42 @@ describe('Event arrangement facts DB operations (SG2-57)', () => {
       ok: true,
       facts: {
         venue_requests: [],
+        affected_bookings: 0,
         equipment_requests: [{ status: 'pending', shortfall: 0, placement_venue_id: 1, reserved: false }],
         equipment_reserved: true
       }
     });
     assert.equal(captured.equipment_reservations, 42);
     assert.equal(captured['equipment_reservations.columns'], 'request_id');
+  });
+
+  test('[NORMAL] [SG2-81:AC2] counts the event\'s confirmed bookings a venue\'s unavailability affects', async () => {
+    const captured: Record<string, unknown> = {};
+    const client = fakeClient({
+      venue_booking_requests: { data: [{ request_id: 1, status: 'approved', venue_booking_id: 21 }], error: null },
+      venue_bookings: { data: [{ booking_id: 21 }, { booking_id: 22 }], error: null },
+      // PostgREST may serialise a bigint as a string; a flag on a booking counts once however many periods flag it.
+      venue_booking_disruptions: { data: [{ booking_id: '21' }, { booking_id: 21 }], error: null }
+    }, captured);
+    const result = await fetchEventArrangementFacts(client, 101);
+    assert.equal(result.ok && result.facts.affected_bookings, 1);
+    assert.deepEqual(captured['venue_booking_disruptions.in.booking_id'], [21, 22]);
+    assert.equal(captured['venue_booking_disruptions.columns'], 'booking_id');
+  });
+
+  test('[BOUNDARY] [SG2-81:AC2] with no confirmed booking nothing is looked up and nothing is affected', async () => {
+    const captured: Record<string, unknown> = {};
+    const result = await fetchEventArrangementFacts(fakeClient({}, captured), 101);
+    assert.equal(result.ok && result.facts.affected_bookings, 0);
+    assert.equal('venue_booking_disruptions' in captured, false);
+  });
+
+  test('[FAILURE] [SG2-81:AC2] a failed flag query makes arrangement facts unavailable rather than reporting the venue ready', async () => {
+    const client = fakeClient({
+      venue_bookings: { data: [{ booking_id: 21 }], error: null },
+      venue_booking_disruptions: { data: null, error: { message: 'Flag query failed' } }
+    }, {});
+    assert.deepEqual(await fetchEventArrangementFacts(client, 101), { ok: false, reason: 'unavailable', message: 'Flag query failed' });
   });
 
   test('[FAILURE] [SG2-39:AC2] [SG2-55:AC4] a failed reservation existence query makes arrangement facts unavailable', async () => {

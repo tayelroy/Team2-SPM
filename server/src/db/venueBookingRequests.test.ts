@@ -148,6 +148,35 @@ test('[NORMAL] [SG2-82:AC5] the event\'s venue requests are read as SG2-57 readi
     ['venue_booking_requests', 'venue_holds', 'venue_bookings', 'equipment_requests', 'equipment_reservations']);
 });
 
+test('[NORMAL] [SG2-81:AC2] [SG2-81:AC4] the event\'s affected bookings are its confirmed bookings that carry a venue unavailability flag, lowest first', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingRequestStore(fakeAdmin({
+    venue_bookings: [{ data: [{ booking_id: 14 }, { booking_id: 9 }, { booking_id: 10 }], error: null }],
+    venue_booking_disruptions: [{ data: [{ booking_id: 14 }, { booking_id: '9' }], error: null }]
+  }, calls));
+  assert.deepEqual(await store.affectedBookings(7), [9, 14]);
+  assert.deepEqual(calls.filter(call => call.table === 'venue_bookings' && call.method === 'eq').map(call => call.args), [['event_id', 7], ['status', 'confirmed']]);
+  assert.deepEqual(calls.find(call => call.table === 'venue_booking_disruptions' && call.method === 'in')?.args, ['booking_id', [14, 9, 10]]);
+});
+
+test('[BOUNDARY] [SG2-81:AC2] an event with no confirmed booking has none affected and no flag is looked up', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingRequestStore(fakeAdmin({ venue_bookings: [{ data: null, error: null }] }, calls));
+  assert.deepEqual(await store.affectedBookings(7), []);
+  assert.equal(calls.some(call => call.table === 'venue_booking_disruptions'), false);
+});
+
+test('[FAILURE] [SG2-81:AC2] bookings or flags that cannot be read are reported as temporarily unavailable', async () => {
+  const unreadable: Parameters<typeof fakeAdmin>[0][] = [
+    { venue_bookings: [{ data: null, error: { message: 'offline' } }] },
+    { venue_bookings: [{ data: [{ booking_id: 9 }], error: null }], venue_booking_disruptions: [{ data: null, error: { message: 'offline' } }] }
+  ];
+  for (const tables of unreadable) {
+    await assert.rejects(createVenueBookingRequestStore(fakeAdmin(tables)).affectedBookings(7),
+      (error: unknown) => error instanceof AccessError && error.status === 503);
+  }
+});
+
 test('[FAILURE] [SG2-82:AC5] venue requests that cannot be read for readiness are reported as temporarily unavailable', async () => {
   const store = createVenueBookingRequestStore(fakeAdmin({ venue_booking_requests: [{ data: null, error: { message: 'offline' } }] }));
   await assert.rejects(store.venueStatuses(7), (error: unknown) => error instanceof AccessError && error.status === 503);

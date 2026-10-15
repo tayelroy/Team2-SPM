@@ -5722,5 +5722,81 @@
     ],
     "actual": "Final-rejection product guards were restored to committed baseline before verification. All9 native cases pass, including rejected resubmission and clarification amendment. Active positive rejected-resubmit unit case TC-77d84ac446db remains in the passing1429-case backend suite.",
     "execution_evidence": "/tmp/spm-planning-rechecks-native-green.log; /tmp/spm-planning-rechecks-backend.log. No hosted writes or completed coordinator-reopen workflow claimed."
+  },
+  {
+    "id": "SG2-58-HOTFIX-CONFIRMATION-RECORD-SCHEMA",
+    "title": "Confirmation record schema repair preserves the installed procedure and legacy rows",
+    "type": "Positive / boundary / conflict / failure / release schema drift",
+    "story": "SG2-58",
+    "purpose": "Repair hosted installations where the confirmation procedure exists but confirmed_by/confirmed_at and their constraints were never applied.",
+    "preconditions": "Disposable migrated database; capture confirmation function hash; remove both columns inside a rollback transaction.",
+    "steps": [
+      "Remove confirmation record columns from an isolated schema while retaining the existing procedure.",
+      "Run the exact operator transaction recording only migration005, then apply the source repair twice again.",
+      "Run read-only readiness and the full confirmation SQL suite, including legacy confirmed-null rows and atomic confirmation history/notifications.",
+      "Exercise wrong types, missing/wrong FK and pair constraints through rollback-only release regressions."
+    ],
+    "data": "Missing UUID confirmer/timestamptz confirmation time; correct users FK and paired-null equality; installed procedure hash21d177627354c7b2958a593457f7ac0d.",
+    "expected": "Missing fields are added without invented confirmation values or a function replacement. Correct constraints are reused; incompatible schema fails safely. Release guard catches missing/wrong dependencies; ready confirmation still writes receipt/audit/notice atomically.",
+    "evidence": "supabase/migrations/202610160005_event_confirmation_record_repair.sql; .github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql; existing supabase/tests/event_confirmation.sql",
+    "layer": "Rollback schema mutation regressions and separate disposable PostgreSQL repair rehearsal",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC1"
+    ],
+    "status": "Pass",
+    "actual": "All12 release regression cases passed. The exact guarded005 operator transaction repaired a separate schema missing both columns; repeated source applications succeeded, full confirmation SQL suite passed and rolled back, release gate returned ready, procedure hash stayed21d177 and only005 was recorded. Missing constraints/types were previously missed by the guard and now fail with diagnostics.",
+    "execution_evidence": "/tmp/spm-confirmation-record-repair-red.log; /tmp/spm-confirmation-record-repair-green.log; /tmp/spm-confirmation-record-repair-rehearsal.log. No hosted writes by this agent.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-39-SG2-81-HOTFIX-COMBINED-READINESS",
+    "title": "Venue disruptions and planning rechecks both block confirmation after the venue replacement upgrade",
+    "type": "Conflict / failure / native API / migration regression",
+    "story": "SG2-39 / SG2-57 / SG2-58 / SG2-81",
+    "purpose": "Keep the planning impact gate when venue replacement replaces confirm_event; display and enforce both persisted outstanding reasons without releasing bookings or clearing saved markers.",
+    "preconditions": "Disposable native PostgreSQL/PostgREST after all migrations; Preparation event with physically ready arrangements, active known recheck markers and a confirmed booking affected by unavailability. Exact operator rehearsal starts from verified160004/160005 schema.",
+    "steps": [
+      "Run combined public readiness computation and native GET arrangements after a planning impact and venue unavailability.",
+      "Call confirm_event with the venue outstanding only because of its disruption and equipment/registration outstanding only because of saved flags.",
+      "Compare stage, flags, confirmed booking, equipment receipt and audit/notification counts.",
+      "Temporarily remove the disruption gate in an isolated rollback transaction and require release refusal.",
+      "Rehearse170001 and170002 atomically with exact baseline hash, actual migration ledger bodies and duplicate-apply protection."
+    ],
+    "data": "Synthetic event with attendance21, active venue/equipment flags; independent combined SQL fixture with equipment/registration flags and affected confirmed booking. No hosted fixture mutations.",
+    "expected": "Both venue explanations remain visible; effective outstanding keys contain all affected arrangements once. Confirmation refuses unchanged physical receipts, stage and flags with no audit/notice mutations. Healthy release check passes; stale disruption guard fails. Atomic upgrade keeps original event JSON unchanged and finishes with confirm_event hash d58767f00d8611cab462c850fbd7c781.",
+    "evidence": "server/src/events/arrangementReadiness.test.ts; integration/api.test.ts; supabase/tests/venue_replacement.sql; .github/scripts/release-readiness.test.mjs; supabase/migrations/202610170002_confirmation_rechecks_and_disruptions.sql",
+    "layer": "Public readmodel + native API/PostgreSQL + rollback release guard + exact migration rehearsal",
+    "status": "Pass",
+    "relatedCases": [
+      "TC-c9484442bdb1",
+      "TC-f3ea905fb5b6",
+      "TC-0fdb7e7b7c93",
+      "SG2-39:disruptions-and-rechecks-combined",
+      "SG2-39:combined-readiness-no-side-effects"
+    ],
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC2",
+      "SG2-57:AC2",
+      "SG2-58:AC2",
+      "SG2-81:AC2"
+    ],
+    "actual": "PASS local merged validation: backend1453/1453, native9/9, release13/13,30 SQL suites,31 race cases. Hosted combined deployment pending root application.",
+    "execution_evidence": "/tmp/spm-combined-readiness-backend-retry.log; /tmp/spm-combined-readiness-native.log; /tmp/spm-combined-readiness-release.log; /tmp/spm-combined-readiness-sql.log; /tmp/spm-combined-readiness-upgrade.log; /tmp/spm-combined-readiness-rehearsal.log",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
   }
 ]

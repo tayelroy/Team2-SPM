@@ -38,12 +38,59 @@ test('[NORMAL] [SG2-51:AC3] [SG2-51:AC5] an event\'s confirmed and released book
   }, calls));
   const { cancelled_by: _by, ...visible } = row;
   assert.deepEqual(await store.forEvent(7), [
-    { ...visible, venue_name: 'Atrium Hall', event_name: 'Leadership Summit', canceller_name: 'Vera' },
+    { ...visible, venue_name: 'Atrium Hall', event_name: 'Leadership Summit', canceller_name: 'Vera', affected_by: [], replacement: null },
     { ...visible, booking_id: 12, venue_id: 2, status: 'confirmed', cancelled_at: null, cancellation_reason: null,
-      venue_name: 'Annex', event_name: 'Leadership Summit', canceller_name: null }
+      venue_name: 'Annex', event_name: 'Leadership Summit', canceller_name: null, affected_by: [], replacement: null }
   ]);
   assert.deepEqual(filters(calls, 'venue_bookings'), [['eq', 'event_id', 7], ['in', 'status', ['confirmed', 'cancelled']], ['order', 'starts_at'], ['order', 'booking_id']]);
   assert.deepEqual(filters(calls, 'users'), [['in', 'user_id', ['user-venue']]]);
+});
+
+test('[NORMAL] [SG2-81:AC1] [SG2-81:AC2] a confirmed booking comes with the unavailable periods affecting it, earliest first, and the replacement asked for', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingStore(fakeAdmin({
+    venue_bookings: [{ data: [{ ...row, status: 'confirmed', cancelled_by: null, cancelled_at: null, cancellation_reason: null },
+      { ...row, booking_id: 12, venue_id: 2, status: 'confirmed', cancelled_by: null, cancelled_at: null, cancellation_reason: null },
+      { ...row, booking_id: 13 }], error: null }],
+    // The embedded period is an object, or an array if the foreign key were ever one-to-many.
+    venue_booking_disruptions: [{ data: [
+      { booking_id: 11, venue_unavailability: { starts_at: '2030-06-16T00:00:00.000Z', ends_at: '2030-06-17T00:00:00.000Z', category: 'renovation', reason: 'New floor' } },
+      { booking_id: '11', venue_unavailability: [{ starts_at: '2030-06-15T00:00:00.000Z', ends_at: '2030-06-16T00:00:00.000Z', category: 'maintenance', reason: 'Roof repairs' }] },
+      { booking_id: 99, venue_unavailability: null }
+    ], error: null }],
+    venue_booking_requests: [{ data: [{ request_id: 90, venue_id: 2, replaces_booking_id: '11' }], error: null }],
+    venues: [{ data: [{ venue_id: 1, name: 'Atrium Hall' }, { venue_id: 2, name: 'Annex' }], error: null }, { data: [{ venue_id: 2, name: 'Annex' }], error: null }],
+    events: [{ data: [{ event_id: 7, name: 'Leadership Summit' }], error: null }],
+    users: [{ data: [], error: null }]
+  }, calls));
+  const [affected, clear, released] = await store.forEvent(7);
+  assert.deepEqual(affected.affected_by.map(period => period.reason), ['Roof repairs', 'New floor']);
+  assert.deepEqual(affected.replacement, { request_id: 90, venue_name: 'Annex' });
+  assert.deepEqual([clear.affected_by, clear.replacement], [[], null]);
+  // Only confirmed bookings are looked up: a released one is never "affected".
+  assert.deepEqual(released.affected_by, []);
+  assert.deepEqual(filters(calls, 'venue_booking_disruptions'), [['in', 'booking_id', [11, 12]]]);
+  assert.deepEqual(filters(calls, 'venue_booking_requests'), [['in', 'replaces_booking_id', [11, 12]], ['eq', 'status', 'pending'], ['order', 'request_id']]);
+});
+
+test('[BOUNDARY] [SG2-81:AC4] a replacement whose venue can no longer be found is still reported, without a venue name', async () => {
+  const store = createVenueBookingStore(fakeAdmin({
+    venue_bookings: [{ data: [{ ...row, status: 'confirmed', cancelled_by: null }], error: null }],
+    venue_booking_requests: [{ data: [{ request_id: 90, venue_id: 9, replaces_booking_id: 11 }], error: null }]
+  }));
+  const [booking] = await store.forEvent(7);
+  assert.deepEqual(booking.replacement, { request_id: 90, venue_name: null });
+});
+
+test('[FAILURE] [SG2-81:AC1] a failing flag or replacement lookup is reported as unavailable, not as an unaffected booking', async () => {
+  const confirmed = { ...row, status: 'confirmed', cancelled_by: null };
+  for (const failing of ['venue_booking_disruptions', 'venue_booking_requests']) {
+    const store = createVenueBookingStore(fakeAdmin({
+      venue_bookings: [{ data: [confirmed], error: null }],
+      [failing]: [{ data: null, error: { message: 'down' } }]
+    }));
+    await assert.rejects(store.forEvent(7), failure => failure instanceof AccessError && failure.status === 503, failing);
+  }
 });
 
 test('[BOUNDARY] [SG2-51:AC2] a venue lists only bookings that end after now; with none, no names are looked up', async () => {

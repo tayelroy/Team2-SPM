@@ -201,7 +201,7 @@ test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] clarification POST immediately returns 
   assert.equal((await api.get(`/api/event-requests/${id}/clarifications`).set(auth('other'))).status, 404);
 });
 
-test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
   const id = await planned();
   assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({
     registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z'
@@ -244,6 +244,15 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] confirmed planning
   assert.equal(persisted.arrangements_recheck_needed, true);
   assert.deepEqual(persisted.outstanding_arrangements, ['venue_recheck', 'equipment_recheck', 'registration_recheck']);
   assert.deepEqual((await database.from('venue_bookings').select('*').eq('booking_id', booking.data!.booking_id).single()).data, booking.data);
+  assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
+  const disruption = await database.from('venue_unavailability').insert({ venue_id: venue.data!.venue_id,
+    starts_at: period.starts_at, ends_at: period.ends_at, category: 'maintenance', reason: 'Integration combined readiness' });
+  assert.equal(disruption.error, null);
+  const combined = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
+  assert.equal(combined.status, 200);
+  assert.deepEqual(combined.body.outstanding, ['venue', 'equipment', 'registration']);
+  assert.match(combined.body.arrangements[0].detail, /affected by venue unavailability/);
+  assert.match(combined.body.arrangements[0].detail, /recheck.*planning/i);
   assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
 });
 

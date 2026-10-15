@@ -15,6 +15,7 @@ begin
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
     ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at'),
     ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
+    ('venue_booking_requests', 'request_id,event_id,venue_id,status,venue_booking_id,replaces_booking_id'),
     ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details')
   ), column_checks as (
     select 'column public.' || r.relation || '.' || col.name as name,
@@ -65,7 +66,8 @@ begin
     ('public.venue_hold_options()'), ('public.list_venue_hold_notifications()'),
     ('public.withdraw_venue_booking_request(bigint)'),
     ('public.release_venue_booking(bigint,text)'),
-    ('public.list_venue_unavailability(integer,timestamptz)')
+    ('public.list_venue_unavailability(integer,timestamptz)'),
+    ('public.release_replaced_booking(bigint,text)'), ('public.venue_disruption_notify()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -80,11 +82,16 @@ begin
         and position('outstanding_arrangements' in definition) > 0
         and position('["' || name || '"]' in definition) > 0, false) as passed
     from required_rechecks cross join confirmation_definition
+  ), disruption_function_check as (
+    select 'confirm_event venue disruption guard' as name,
+      coalesce(position('public.venue_booking_disruptions' in definition) > 0, false) as passed
+    from confirmation_definition
   ), required_foreign_keys(relation, column_name, target, target_column) as (values
     ('events', 'organiser_id', 'users', 'user_id'),
     ('events', 'coordinator_id', 'users', 'user_id'),
     ('events', 'confirmed_by', 'users', 'user_id'),
     ('venue_bookings', 'event_id', 'events', 'event_id'),
+    ('venue_booking_requests', 'replaces_booking_id', 'venue_bookings', 'booking_id'),
     ('event_audit_logs', 'actor_id', 'users', 'user_id')
   ), foreign_key_checks as (
     select 'embed FK public.' || r.relation || '.' || r.column_name as name,
@@ -118,7 +125,7 @@ begin
     ('venue_request_approved'), ('venue_request_rejected'), ('venue_booking_released'),
     ('equipment_reserved'), ('venue_booking_clash'), ('event_confirmed'),
     ('event_submitted'), ('coordinator_assigned'), ('clarification_requested'),
-    ('event_approved'), ('event_rejected')
+    ('event_approved'), ('event_rejected'), ('venue_unavailable')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),
@@ -141,6 +148,7 @@ begin
     union all select * from relation_checks union all select * from status_checks
     union all select * from function_checks union all select * from foreign_key_checks
     union all select * from recheck_function_checks
+    union all select * from disruption_function_check
     union all select * from grant_checks union all select * from view_checks
     union all select * from confirmation_pair_check
     union all select * from notification_checks

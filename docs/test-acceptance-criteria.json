@@ -696,6 +696,20 @@
         "AC4": "The newly assigned coordinator, any previous coordinator, and the Event Organiser are notified of an assignment or reassignment",
         "AC5": "Each assignment and reassignment is recorded with who made it and when, and previous assignments stay visible in the event history"
       }
+    },
+    {
+      "id": "SG2-81",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-81",
+      "originalPullRequests": ["https://github.com/tayelroy/Team2-SPM/pull/92"],
+      "sourceReadDate": "2026-10-15",
+      "acceptanceCriteria": {
+        "AC1": "Given a booking for an event I coordinate that is affected by venue unavailability, I am notified with the venue, the period and the reason",
+        "AC2": "The event shows that alternative venue arrangements are required, and the venue booking is shown as outstanding",
+        "AC3": "Original event information (date, time, attendance, requirements) is kept unchanged",
+        "AC4": "From the affected event, I can search for alternative venues using the event's existing requirements and raise a booking request for a replacement venue",
+        "AC5": "Once the replacement booking is approved, the affected booking is released and the event no longer shows alternative arrangements as required",
+        "AC6": "If the affected event is Confirmed or in Preparation, it moves back to Planning (SG2-66), and the Event Organiser is notified that the venue arrangement is being changed"
+      }
     }
   ]
 }
