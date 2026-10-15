@@ -217,6 +217,92 @@ describe('EventPlanningDrawer Component', () => {
     sessionStorage.clear();
   });
 
+  const storedRegistration = {
+    registration_needed: true,
+    registration_capacity: 136,
+    registration_opens_at: '2026-10-01T13:30:00.000Z',
+    registration_closes_at: '2026-10-01T13:31:00.000Z',
+    planning_notes: 'Keep the loading bay clear',
+  };
+  const savedPlanning = {
+    event_id: 17, status: 'planning', expected_attendance: 136,
+    proposed_date: '2030-06-20T01:00:00.000Z', venue_requirements: 'Hall A',
+    equipment_requirements: '1 projector', accessibility_needs: null,
+    ...storedRegistration, arrangements_recheck_needed: false, outstanding_arrangements: [],
+  };
+
+  test('[NORMAL] [SG2-39:AC1] [SG2-41:AC4] saving an unrelated planning edit retains loaded registration values and notes', async () => {
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+      ok: true, event: savedPlanning, arrangements_recheck_needed: false, outstanding_arrangements: [],
+    });
+    const onClose = vi.fn();
+    render(<EventPlanningDrawer eventId={17} initialValues={savedPlanning} onClose={onClose} />);
+    expect(screen.getByLabelText('Registration Capacity')).toHaveValue(136);
+    expect(screen.getByLabelText('Opens At')).toHaveValue('2026-10-01T13:30');
+    expect(screen.getByLabelText('Closes At')).toHaveValue('2026-10-01T13:31');
+    expect(screen.getByLabelText(/Planning Notes/i)).toHaveValue('Keep the loading bay clear');
+    fireEvent.change(screen.getByLabelText('Equipment Requirements'), { target: { value: '2 projectors' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith(17, expect.objectContaining({
+      ...storedRegistration, equipment_requirements: '2 projectors',
+    }), 'valid-token');
+  });
+
+  test('[BOUNDARY] [SG2-39:AC1] distinguishes loaded empty values from omitted fields while retaining explicit clearing', async () => {
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+      ok: false, kind: 'unavailable', message: 'Planning unavailable.',
+    });
+    render(<EventPlanningDrawer eventId={17} onClose={vi.fn()} initialValues={{
+      registration_needed: true, registration_capacity: 136, registration_opens_at: null,
+      registration_closes_at: null, planning_notes: 'Clear this note',
+    }} />);
+    fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Planning Notes/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await screen.findByText('Planning unavailable.');
+    expect(update).toHaveBeenCalledWith(17, {
+      registration_needed: true, registration_capacity: null, registration_opens_at: null,
+      registration_closes_at: null, planning_notes: null, confirm_impact: false,
+    }, 'valid-token');
+  });
+
+  test('[CONFLICT] [SG2-39:AC1] an incomplete queue form cannot erase registration data stored after the queue was loaded', async () => {
+    // The server has data that this older queue response never included.
+    const storage = { ...savedPlanning };
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockImplementation(async (_id, patch) => {
+      Object.assign(storage, patch);
+      return { ok: true, event: storage, arrangements_recheck_needed: false, outstanding_arrangements: [] };
+    });
+    const onClose = vi.fn();
+    render(<EventPlanningDrawer eventId={17} onClose={onClose} initialValues={{
+      registration_needed: true, equipment_requirements: '1 projector',
+    }} />);
+    fireEvent.change(screen.getByLabelText('Equipment Requirements'), { target: { value: '2 projectors' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith(17, {
+      registration_needed: true, equipment_requirements: '2 projectors', confirm_impact: false,
+    }, 'valid-token');
+    expect(storage).toMatchObject({ ...storedRegistration, equipment_requirements: '2 projectors' });
+  });
+
+  test('[FAILURE] [SG2-39:AC1] retrying an unavailable save from missing initial values does not submit unseen fields as empty', async () => {
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+      ok: false, kind: 'unavailable', message: 'Planning unavailable.',
+    });
+    render(<EventPlanningDrawer eventId={17} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Planning Notes/i), { target: { value: 'New note' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await screen.findByText('Planning unavailable.');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+    for (const call of update.mock.calls) {
+      expect(call).toEqual([17, { planning_notes: 'New note', confirm_impact: false }, 'valid-token']);
+    }
+    expect(screen.getByRole('dialog', { name: 'Event Planning Details' })).toBeVisible();
+  });
+
   test('[NORMAL] [SG2-39:AC1] cancelling discards unsaved edits, so reopening shows the saved values', () => {
     const saved = { expected_attendance: 100, planning_notes: 'Catering booked', status: 'planning' };
     const onClose = vi.fn();

@@ -331,6 +331,16 @@ function PlanningDrawerPanel({
       confirm_impact: confirmImpact,
     };
 
+    // A missing field is not a stored empty value. Older queue responses may
+    // omit planning fields: saving another edit must not clear unseen data.
+    // Keep explicit nulls for fields that were loaded, so users can clear them.
+    for (const field of Object.keys(payload) as (keyof PlanningUpdatePayload)[]) {
+      if (field !== 'confirm_impact' && initialValues?.[field] === undefined
+        && (payload[field] === null || payload[field] === false)) {
+        delete payload[field];
+      }
+    }
+
     setIsSaving(true);
     try {
       const outcome = await updateEventPlanning(eventId, payload, token);

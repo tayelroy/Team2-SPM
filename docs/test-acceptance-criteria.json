@@ -659,6 +659,18 @@
         "AC4": "The event shows all of its venue bookings and the status of each one",
         "AC5": "The event's venue arrangement counts as ready only when every venue booking the event needs is approved"
       }
+    },
+    {
+      "id": "SG2-71",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-71",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-15",
+      "acceptanceCriteria": {
+        "AC1": "Event list, event detail, venue availability, equipment and registration screens are readable and usable on a phone-sized screen without sideways scrolling",
+        "AC2": "Event Organisers can create, save, reopen, edit and submit their event requests on a phone without sideways scrolling",
+        "AC3": "Layouts adapt on larger screens rather than stretching",
+        "AC4": "Controls can be operated by touch"
+      }
     }
   ]
 }

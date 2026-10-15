@@ -119,7 +119,7 @@ const DETAIL_COLUMNS =
   'decided_at, decision_reason, ' +
   // SG2-100 AC4: who marked the event completed and when, plus the bookings
   // the event's end time is derived from.
-  'completed_by, completed_at, venue_bookings(ends_at, status)';
+  'completed_by, completed_at, venue_bookings!venue_bookings_event_id_fkey(ends_at, status)';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {

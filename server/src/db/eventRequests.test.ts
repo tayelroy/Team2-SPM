@@ -304,7 +304,7 @@ function eventDatabase(initial: Record<string, unknown>) {
   const client = createClient('https://event-state.test.supabase.co', 'test-key', {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: async (input, init) => {
-      const url = new URL(String(input));
+      const url = new URL(new Request(input).url);
       assert.equal(url.pathname, '/rest/v1/events');
       const selected = rows.filter(row => [...url.searchParams].every(([column, filter]) => {
         if (filter.startsWith('eq.')) return String(row[column]) === filter.slice(3);
@@ -1719,6 +1719,24 @@ describe('completeEvent (SG2-100 AC4)', () => {
 
 
 describe('the event end time on a detail read (SG2-100 AC4)', () => {
+  test('[NORMAL] [SG2-100:AC6] detail reads explicitly embed bookings by event rather than the legacy event booking pointer', async () => {
+    const client = createClient('https://fixture.example.test', 'synthetic-test-key', {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: async (input) => {
+        const url = new URL(new Request(input).url);
+        assert.equal(url.pathname, '/rest/v1/events');
+        assert.equal(url.searchParams.get('event_id'), 'eq.7');
+        assert.ok(url.searchParams.get('select')?.includes('venue_bookings!venue_bookings_event_id_fkey(ends_at,status)'));
+        return new Response(JSON.stringify([{ event_id: 7, status: 'confirmed',
+          venue_bookings: [{ ends_at: '2030-06-15T10:00:00Z', status: 'confirmed' }] }]),
+          { headers: { 'Content-Type': 'application/json' } });
+      } },
+    });
+    const result = await fetchEventRequestById(client, 7);
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.request.ends_at, '2030-06-15T10:00:00Z');
+  });
+
   async function detailFor(venue_bookings: unknown) {
     const result = await fetchEventRequestById(
       fakeEventsSelectClient({

@@ -190,6 +190,9 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
+  // Refresh only the readiness read after equipment changes. Reloading the
+  // whole queue would discard any planning draft still open in the drawer.
+  const [arrangementsRevision, setArrangementsRevision] = useState(0);
   // SG2-58: kept here, not in ConfirmPanel, so it outlives the panel.
   const [confirmedNotice, setConfirmedNotice] = useState('');
 
@@ -242,6 +245,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
         <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} canCheckAvailability={role === 'Technical Support Staff'}
+          onChanged={() => setArrangementsRevision(value => value + 1)}
           onReserved={item.kind === 'equipment' ? requestId => { if (requestId === item.item_id) setStatus('approved'); } : undefined} />
       )}
       {/* SG2-57: the assigned coordinator sees which arrangements are still
@@ -249,7 +253,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           arrangement-through-confirmed window as the requirements above. */}
       {item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
-        <EventArrangements eventId={item.event_id} accessToken={accessToken} />
+        <EventArrangements key={arrangementsRevision} eventId={item.event_id} accessToken={accessToken} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread

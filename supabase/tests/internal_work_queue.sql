@@ -28,6 +28,14 @@ insert into public.events (event_id, organiser_id, name, status) values
   (94111, 'c0000000-0000-4000-8000-000000000001', 'Unassigned planning', 'planning'),
   (94112, 'c0000000-0000-4000-8000-000000000001', '', 'submitted');
 
+-- SG2-39: use stored, nonempty registration settings to catch a queue
+-- projection silently omitting them. Event 94104 exercises explicit nulls.
+update public.events set registration_capacity = 136,
+  registration_opens_at = '2026-10-01T13:30Z',
+  registration_closes_at = '2026-10-01T13:31Z',
+  planning_notes = 'Keep the loading bay clear' where event_id = 94105;
+update public.events set registration_capacity = 1 where event_id = 94104;
+
 set local role service_role;
 insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, notes)
 select event_id, event_id, 94101, '2030-06-15T02:00Z', '2030-06-15T10:00Z', 'Setup at 10am SGT'
@@ -66,6 +74,16 @@ begin
       @> '{"description":"Full event description","expected_attendance":80,"registration_needed":true}'::jsonb is not true then
     raise exception '[SG2-41:event-detail-values] [SG2-41:AC4] [NORMAL] Event detail lost stored values';
   end if;
+  if not exists (select 1 from public.internal_work_items where kind = 'event' and item_id = 94105
+    and details @> '{"registration_needed":true,"registration_capacity":136,"planning_notes":"Keep the loading bay clear"}'::jsonb
+    and (details->>'registration_opens_at')::timestamptz = '2026-10-01T13:30Z'::timestamptz
+    and (details->>'registration_closes_at')::timestamptz = '2026-10-01T13:31Z'::timestamptz) then
+    raise exception '[SG2-39:queue-planning-values] [SG2-39:AC1] [SG2-41:AC4] [NORMAL] Queue must carry saved registration settings and planning notes';
+  end if;
+  if not exists (select 1 from public.internal_work_items where kind = 'event' and item_id = 94104
+    and details @> '{"registration_capacity":1,"registration_opens_at":null,"registration_closes_at":null,"planning_notes":null}'::jsonb) then
+    raise exception '[SG2-39:queue-planning-empty-values] [SG2-39:AC1] [BOUNDARY] Capacity one and explicit null planning fields must remain distinguishable from missing fields';
+  end if;
   foreach kind_name in array array['venue', 'equipment'] loop
     if (select array_agg(item_id order by item_id) from public.internal_work_items where kind = kind_name)
         is distinct from array[94102,94103,94104,94105,94106]::bigint[] then
@@ -82,6 +100,18 @@ begin
     and audience = 'technical_support_staff' and title = 'Queue microphones'
     and details @> '{"quantity":4,"notes":"Four microphones"}'::jsonb) then
     raise exception '[SG2-41:equipment-detail-values] [SG2-41:AC3] [NORMAL] Equipment identity or quantity does not match storage';
+  end if;
+
+  -- A competing update after a queue read must be visible on the next read.
+  update public.events set registration_capacity = 137,
+    registration_opens_at = '2026-10-01T13:31Z',
+    registration_closes_at = '2026-10-01T13:32Z', planning_notes = 'Use the east loading bay'
+    where event_id = 94105;
+  if not exists (select 1 from public.internal_work_items where kind = 'event' and item_id = 94105
+    and details @> '{"registration_capacity":137,"planning_notes":"Use the east loading bay"}'::jsonb
+    and (details->>'registration_opens_at')::timestamptz = '2026-10-01T13:31Z'::timestamptz
+    and (details->>'registration_closes_at')::timestamptz = '2026-10-01T13:32Z'::timestamptz) then
+    raise exception '[SG2-39:queue-planning-refresh] [SG2-39:AC1] [CONFLICT] Reopening queue details after a competing planning update must load the latest values';
   end if;
 
   update public.venue_booking_requests set status = 'approved' where request_id = 94102;
@@ -157,6 +187,11 @@ declare role_name text; object_name text;
 begin
   foreach role_name in array array['anon', 'authenticated'] loop
     execute format('set local role %I', role_name);
+    begin
+      perform details->>'planning_notes' from public.internal_work_items where item_id = 94105;
+      raise exception '[SG2-39:queue-planning-privacy] [SG2-39:AC1] [FAILURE] Direct client % must not read internal planning notes', role_name;
+    exception when insufficient_privilege then null;
+    end;
     foreach object_name in array array['venue_booking_requests', 'equipment_requests', 'internal_work_items'] loop
       begin
         execute format('select 1 from public.%I limit 1', object_name);

@@ -4765,5 +4765,206 @@
     "execution_date": "13 Oct 2026",
     "executed_by": "LIM DAO JUN",
     "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at 4b45eb1 (SG2-86 #83, SG2-38 #82, SG2-58 #80, SG2-79 #81); npm run test:e2e; 91/91 journeys and 13/13 report-gate checks passed; installed Chromium; npm run ci in a node:22 Linux clone; disposable PostgreSQL 17 replay of every migration and suite (35/35 steps), including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
+  },
+  {
+    "id": "SG2-71-HOTFIX-LANDING",
+    "title": "Phone hero particles clear the copy after resize; landing actions have real destinations",
+    "type": "Hotfix regression",
+    "story": "SG2-71",
+    "purpose": "Keep animated particles out of the mobile hero text and remove inert contact, social and policy controls.",
+    "preconditions": "Rendered Landing and particle hook tests with controlled canvas geometry, pointer events and animation frames; local production preview for visual checks.",
+    "steps": [
+      "Render the hero at phone width and measure the complete copy bounds.",
+      "Resize from desktop to 390px with canvas CSS height derived from the changed spacer; compare final bitmap size with the final hero box.",
+      "Draw animation frames and check CSS-scaled particle bounds; return to desktop and check spacing and one active animation loop.",
+      "Activate both application entry buttons and verify there are no placeholder contact, social or policy links."
+    ],
+    "data": "390x844 and 1440px local preview; synthetic copy bottom 449.59375px; captured device scale 2; deterministic particle sizes.",
+    "expected": "At phone width the orb clears the complete copy by at least 24px; bitmap follows the final hero height rather than shrinking into the text; desktop composition and animation cleanup remain intact; both entry actions open the application.",
+    "evidence": "client/src/hooks/useParticleOrb.test.tsx; client/src/screens/Landing.test.tsx",
+    "layer": "Rendered React component and canvas hook; local visual check",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-71:AC3",
+      "SG2-71:AC4"
+    ],
+    "status": "Pass",
+    "actual": "Regression reproduced the stale bitmap height before correction and passed afterward. The parent agent confirmed the rebuilt local Landing at 390px and 1440px.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. Focused hook/Landing run: 14 tests passed; /tmp/spm-staging-qa/orb-canvas-regression-before.log and /tmp/spm-staging-qa/orb-canvas-regression-after.log. Visual observation is local browser evidence, not a human review.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-44-HOTFIX-PHONE-DETAILS",
+    "title": "Phone availability calendar exposes full readable day details and resists stale month responses",
+    "type": "Hotfix regression",
+    "story": "SG2-44",
+    "purpose": "Replace unreadable seven-column booking text on phones with compact selectable dates and full-width details while retaining the desktop summary.",
+    "preconditions": "Rendered AvailabilityCalendar with controlled public availability responses and Singapore clock; local production preview.",
+    "steps": [
+      "Load a day with four overlapping entries and select it; inspect all venue labels and full time intervals.",
+      "Select a free day and verify previous details are replaced; blank grid cells are not buttons.",
+      "Navigate months while the earlier response is pending, then complete the earlier response.",
+      "Reject a current month read and an aborted earlier read; verify the current error state and absence of obsolete details."
+    ],
+    "data": "October 2026; four same-day bookings, an entry ending at Singapore midnight and an entry starting at the following midnight; deferred month responses.",
+    "expected": "Phone dates remain usable without compressed booking labels; selected-day details include entries behind + more and use correct Singapore day boundaries; desktop labels remain; stale responses cannot overwrite the current month.",
+    "evidence": "client/src/screens/AvailabilityCalendar.test.tsx; client/src/screens/AvailabilityCalendar.css",
+    "layer": "Rendered React component; local visual check",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-44:AC2",
+      "SG2-71:AC1"
+    ],
+    "status": "Pass",
+    "actual": "All calendar regressions passed. The parent agent confirmed the rebuilt local occupied-day view at phone width and the desktop calendar.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. The responsive targeted run passed 29 tests before the additional canvas regression; the final combined client suite includes that additional test. /tmp/spm-staging-qa/responsive-targeted-tests.log.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-57-HOTFIX-EQUIPMENT-READINESS",
+    "title": "Equipment changes refresh arrangement readiness without discarding a planning draft",
+    "type": "Hotfix regression",
+    "story": "SG2-57",
+    "purpose": "Prevent stale No equipment requested and Ready for confirmation after an equipment requirement is saved.",
+    "preconditions": "Real rendered WorkQueue, EquipmentRequirements, readiness panel and planning drawer with controlled public API responses; reservation forms have their own component suite.",
+    "steps": [
+      "Start with no equipment and ready/not-required readiness, then add one projector.",
+      "Edit its quantity while the first readiness refresh is pending; complete the older read last.",
+      "Complete a pending equipment save while an unsaved planning drawer is open.",
+      "Exercise requirement and arrangement saves and confirmed reservation callbacks; reject or abort mutations and reject a readiness refresh."
+    ],
+    "data": "Synthetic planning event 17; pending projector request 51; quantity 1 then 2; unsaved planning note; 409/503 and late account-change responses.",
+    "expected": "Successful mutations refresh only readiness; new demand becomes Outstanding, edits show the latest quantity, old reads do not overwrite it, and the planning draft and queue selection survive. Failed/aborted saves do not notify; a failed readiness refresh does not retain a false ready badge.",
+    "evidence": "client/src/screens/WorkQueue.equipmentReadiness.test.tsx; client/src/components/EquipmentRequirements.test.tsx",
+    "layer": "Composed rendered React components and public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC2",
+      "SG2-53:AC4",
+      "SG2-57:AC2",
+      "SG2-39:AC1"
+    ],
+    "status": "Pass",
+    "actual": "The targeted three-file run passed 115 tests, including create/edit readiness, draft preservation, stale response and error cases; all remain green in combined CI.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. /tmp/spm-staging-qa/equipment-readiness-tests.log; /tmp/spm-staging-qa/equipment-readiness-coverage.log.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-39-REG-PRESERVE",
+    "title": "Planning saves preserve loaded registration settings and unknown fields",
+    "story": "SG2-39",
+    "type": "Positive / data integrity / recovery",
+    "purpose": "Prevent unrelated planning edits from erasing stored registration capacity, windows or notes.",
+    "preconditions": "Rendered drawer with a fixed clock and synthetic planning records; mocked public planning API.",
+    "steps": [
+      "Load registration capacity 136, one-minute opening window and a planning note; edit equipment requirements and save.",
+      "Clear known loaded fields and save; distinguish explicit nulls from omitted initial values.",
+      "Open an older incomplete queue response while the simulated server retains newer registration data; save an unrelated edit.",
+      "Retry an unavailable save from missing initial values."
+    ],
+    "data": "Synthetic event 17; capacity 136; opens 2026-10-01T13:30Z; closes 2026-10-01T13:31Z; internal note.",
+    "expected": "Loaded values retained; intentional clears submit null; omitted blank values omitted from PATCH; retry never supplies unseen fields as empty.",
+    "evidence": "client/src/screens/EventPlanningDrawer.test.tsx",
+    "layer": "Rendered React component / public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-41:AC4"
+    ],
+    "status": "Pass",
+    "actual": "All 4 new regression tests and 32 existing drawer tests pass; the touched application file has 100% statement, branch, function and line coverage.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. Local 15 Oct 2026; vitest EventPlanningDrawer.test.tsx with V8 coverage. /tmp/spm-planning-tests.log; /tmp/spm-planning-coverage/coverage-summary.json.",
+    "execution_date": "15 Oct 2026",
+    "review": null,
+    "executed_by": "Codex automated verification"
+  },
+  {
+    "id": "SG2-39-DB-PLANNING-DETAILS",
+    "title": "Queue view exposes complete planning details only to the backend",
+    "story": "SG2-39",
+    "type": "SQL projection / data integrity / access control",
+    "purpose": "Ensure the queue projection includes registration capacity, opening/closing times and planning notes, preserving existing service-only access.",
+    "preconditions": "Disposable PostgreSQL with all migrations and auth fixture; suite rolls all data back.",
+    "steps": [
+      "Seed full saved registration fields and an internal planning note.",
+      "Verify queue details match storage and distinguish null fields from missing JSON keys at minimum capacity one.",
+      "Update stored values after first read and verify next queue read returns the latest metadata.",
+      "Verify anon and authenticated cannot directly read planning notes from the queue view."
+    ],
+    "data": "Existing synthetic 941xx queue fixture; capacity 136 then 137; capacity one boundary; null windows and notes.",
+    "expected": "Saved metadata present; nulls explicit; later update reflected; direct client read refused; all existing role and lifecycle queue assertions pass.",
+    "evidence": "supabase/tests/internal_work_queue.sql; supabase/migrations/202610160003_work_queue_planning_details.sql",
+    "layer": "PostgreSQL public view / privileges",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-41:AC4"
+    ],
+    "status": "Pass",
+    "actual": "The complete internal_work_queue SQL suite passed against native PostgreSQL 17, including all four added projection, boundary, refresh and privacy assertions. All data rolled back.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. Local 15 Oct 2026; native Docker PostgreSQL 17; /tmp/spm-planning-sql.log.",
+    "execution_date": "15 Oct 2026",
+    "review": null,
+    "executed_by": "Codex automated verification"
+  },
+  {
+    "id": "SG2-100-HOTFIX-BOOKING-EMBED",
+    "title": "Event detail explicitly selects the event-to-bookings relationship",
+    "type": "Hotfix regression",
+    "story": "SG2-100",
+    "purpose": "Keep draft/detail and shared detail prechecks readable when PostgREST exposes both the legacy booking pointer and the booking event foreign key.",
+    "preconditions": "Database adapter test uses the real Supabase request builder with a controlled fetch response. No hosted database is required.",
+    "steps": [
+      "Fetch an event detail through the public database adapter.",
+      "Inspect the outgoing PostgREST select and require venue_bookings!venue_bookings_event_id_fkey(ends_at,status).",
+      "Return a confirmed booking and verify detail exposes its latest confirmed end time."
+    ],
+    "data": "Synthetic event 7; confirmed booking ending 15 Jun 2030 10:00 UTC; explicit venue_bookings_event_id_fkey relationship.",
+    "expected": "The detail query identifies the event-to-bookings foreign key explicitly and returns the derived latest confirmed booking end without relying on an ambiguous implicit embed.",
+    "evidence": "server/src/db/eventRequests.test.ts; server/src/db/eventRequests.ts",
+    "layer": "Database adapter / actual Supabase request construction",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC6"
+    ],
+    "status": "Pass",
+    "actual": "The explicit foreign-key selector regression passed in the 1,420-test server suite; the changed adapter file has 100% coverage.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
   }
 ]
