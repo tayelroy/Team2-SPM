@@ -1418,7 +1418,7 @@
     "title": "other roles cannot block or remove a block",
     "type": "Negative / role isolation",
     "story": "SG2-45",
-    "purpose": "Verify the Venue Staff-only permission for listing, creating and removing blocks. SG2-80 replaced AC2, so the confirmed-booking refusal is no longer tested here (see SG2-80-P01).",
+    "purpose": "Verify the Venue Staff-only permission for listing, creating and removing blocks. SG2-45 AC2 (refuse a block over a confirmed booking) is superseded by SG2-80 (PR #70) under SG2-98 AC4, so the refusal is no longer tested here; SG2-80-P01 and SG2-98-P01 test the replacement.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, technical support, organiser and attendee; try to list, create and remove blocks through the API; check the coordinator catalogue has no block control.",
@@ -1472,7 +1472,7 @@
     "title": "Venue block SQL policies hold",
     "type": "Positive / negative / integrity",
     "story": "SG2-45",
-    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff. SG2-80 removed the confirmed-booking trigger; DB-SG2-80-01 covers the replacement.",
+    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff. SG2-45 AC2 is superseded by SG2-80 (PR #70) under SG2-98 AC4: its confirmed-booking trigger was removed, and DB-SG2-80-01 and DB-SG2-98-01 cover the replacement.",
     "preconditions": "Disposable postgres:17 container; supabase/tests/fixtures/auth.sql followed by every migration in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Run venue_blocks.sql with ON_ERROR_STOP=1.",
@@ -1664,7 +1664,7 @@
     "title": "Venue blocks recorded under SG2-45 survive the SG2-80 upgrade in SQL",
     "type": "Positive / negative / upgrade integrity",
     "story": "SG2-98",
-    "purpose": "Test that the SG2-80 migration keeps blocks recorded before it as venue unavailability records: unchanged period and reason, filed under other, no recorder or time invented, a confirmed booking already inside one flagged, and SG2-45 AC1 and AC3 still holding for them.",
+    "purpose": "Test that the SG2-80 migration keeps blocks recorded before it as venue unavailability records: unchanged period and reason, filed under other, no recorder or time invented, a confirmed booking already inside one flagged, and SG2-45 AC1 and AC3 still holding for them. Also confirms for SG2-98 AC4 that the SG2-45 AC2 refusal trigger is gone after the upgrade.",
     "preconditions": "Separate disposable postgres:17 container; supabase/tests/fixtures/auth.sql, the migrations before 202610100001_venue_temporary_unavailability.sql, supabase/tests/fixtures/legacy_venue_blocks.sql, then the remaining migrations in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Run venue_block_upgrade.sql with ON_ERROR_STOP=1.",
