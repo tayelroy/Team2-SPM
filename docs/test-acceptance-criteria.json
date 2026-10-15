@@ -403,6 +403,18 @@
       }
     },
     {
+      "id": "SG2-98",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-98",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-14",
+      "acceptanceCriteria": {
+        "AC1": "Blocking a period that contains confirmed bookings is no longer refused; the bookings are flagged as affected instead (see SG2-80)",
+        "AC2": "SG2-45 AC1 (blocked venue is shown as unavailable and excluded from search) and AC3 (removing a block restores availability) still hold",
+        "AC3": "Existing blocks are kept as venue unavailability records",
+        "AC4": "Tests for SG2-45 AC2 are replaced with the new behaviour; the rest of the SG2-45 tests still pass"
+      }
+    },
+    {
       "id": "SG2-84",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-84",
       "originalPullRequests": [],
