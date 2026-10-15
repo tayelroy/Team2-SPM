@@ -8,6 +8,7 @@ import { dbConfig } from './db';
 import { createApp } from './app';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 import type { FetchUnassignedQueueResult } from './db/assignmentQueue';
+import type { ListCoordinatorsResult } from './db/accountRoles';
 
 // Unit tests must not connect to a developer's configured database.
 before(() => {
@@ -19,16 +20,20 @@ const ENTRY = {
   proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 120, submitted_at: '2026-10-06T01:00:00.000Z'
 };
 
+const COORDINATORS = [{ user_id: 'coord-1', name: 'Casey Coordinator' }, { user_id: 'coord-2', name: 'Robin Second' }];
+
 function appFor(role: Role, {
   admin = {} as SupabaseClient | null,
-  result = { ok: true, entries: [ENTRY] } as FetchUnassignedQueueResult
+  result = { ok: true, entries: [ENTRY] } as FetchUnassignedQueueResult,
+  coordinators = { ok: true, coordinators: COORDINATORS } as ListCoordinatorsResult
 } = {}) {
   let reads = 0;
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'user-1', role }) });
   const app = express();
   app.use('/api/assignment-queue', createAssignmentQueueRouter(access, {
     getAdminClient: () => admin,
-    fetchQueue: async () => { reads += 1; return result; }
+    fetchQueue: async () => { reads += 1; return result; },
+    fetchCoordinators: async () => coordinators
   }));
   return { app, reads: () => reads };
 }
@@ -37,7 +42,13 @@ test('[NORMAL] [SG2-87:AC2] [SG2-87:AC3] the Event Coordinator Lead reads the un
   const { app } = appFor('event_coordinator_lead');
   const response = await request(app).get('/api/assignment-queue').set('Authorization', 'Bearer token');
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body, { entries: [ENTRY] });
+  assert.deepEqual(response.body, { entries: [ENTRY], coordinators: COORDINATORS });
+});
+
+test('[NORMAL] [SG2-88:AC1] the queue also lists the Event Coordinators the Lead can assign to', async () => {
+  const { app } = appFor('event_coordinator_lead');
+  const response = await request(app).get('/api/assignment-queue').set('Authorization', 'Bearer token');
+  assert.deepEqual(response.body.coordinators.map((c: { name: string }) => c.name), ['Casey Coordinator', 'Robin Second']);
 });
 
 test('[FAILURE] [SG2-87:AC2] every other role is refused before the queue is read', async () => {
@@ -61,7 +72,8 @@ test('[FAILURE] [SG2-87:AC2] a request without a bearer token is refused, even f
 test('[FAILURE] [SG2-87:AC2] an unconfigured or failing database answers 503 without leaking the cause', async () => {
   for (const options of [
     { admin: null },
-    { result: { ok: false, reason: 'unavailable', message: 'DATABASE_SECRET' } as FetchUnassignedQueueResult }
+    { result: { ok: false, reason: 'unavailable', message: 'DATABASE_SECRET' } as FetchUnassignedQueueResult },
+    { coordinators: { ok: false, error: 'DATABASE_SECRET' } as ListCoordinatorsResult }
   ]) {
     const { app } = appFor('event_coordinator_lead', options);
     const response = await request(app).get('/api/assignment-queue').set('Authorization', 'Bearer token');

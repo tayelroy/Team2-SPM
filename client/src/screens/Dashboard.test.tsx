@@ -103,7 +103,7 @@ const queueEntry = (eventId: number) => ({ event_id: eventId, name: `Queued ${ev
   expected_attendance: null, submitted_at: '2030-06-01T01:00:00Z' });
 
 test('[NORMAL] [SG2-86:AC2] the Lead desk counts the real unassigned queue and opens only the Lead\'s queue', async () => {
-  const fetch = vi.fn().mockResolvedValue(Response.json({ entries: [queueEntry(41), queueEntry(42)] }));
+  const fetch = vi.fn().mockResolvedValue(Response.json({ coordinators: [], entries: [queueEntry(41), queueEntry(42)] }));
   vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
   render(<Dashboard role="Event Coordinator Lead" accessToken="lead-token" onNavigate={onNavigate} />);
@@ -123,7 +123,7 @@ test.each([
   [[], '0 requests are awaiting a coordinator.'],
   [[queueEntry(41)], '1 request is awaiting a coordinator.'],
 ] as const)('[BOUNDARY] [SG2-86:AC2] the Lead desk counts a queue of %j exactly', async (entries, text) => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ entries })));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ coordinators: [], entries })));
   render(<Dashboard role="Event Coordinator Lead" accessToken="lead-token" onNavigate={vi.fn()} />);
   expect(await screen.findByText(text)).toBeInTheDocument();
 });
@@ -145,11 +145,11 @@ test('[CONFLICT] [SG2-86:AC2] a late queue count for the previous session cannot
   let resolve!: (response: Response) => void;
   vi.stubGlobal('fetch', vi.fn()
     .mockImplementationOnce(() => new Promise<Response>((yes) => { resolve = yes; }))
-    .mockResolvedValueOnce(Response.json({ entries: [queueEntry(41)] })));
+    .mockResolvedValueOnce(Response.json({ coordinators: [], entries: [queueEntry(41)] })));
   const { rerender } = render(<Dashboard role="Event Coordinator Lead" accessToken="old-token" onNavigate={vi.fn()} />);
   rerender(<Dashboard role="Event Coordinator Lead" accessToken="new-token" onNavigate={vi.fn()} />);
   await screen.findByText('1 request is awaiting a coordinator.');
-  await act(async () => resolve(Response.json({ entries: [queueEntry(41), queueEntry(42), queueEntry(43)] })));
+  await act(async () => resolve(Response.json({ coordinators: [], entries: [queueEntry(41), queueEntry(42), queueEntry(43)] })));
   expect(screen.getByText('1 request is awaiting a coordinator.')).toBeInTheDocument();
 });
 

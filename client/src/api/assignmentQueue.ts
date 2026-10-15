@@ -1,3 +1,5 @@
+export interface CoordinatorOption { userId: string; name: string }
+
 /** A request waiting in the Event Coordinator Lead's unassigned queue (SG2-87). */
 export interface QueueEntry {
   eventId: number;
@@ -9,7 +11,7 @@ export interface QueueEntry {
 }
 
 export type FetchAssignmentQueueResult =
-  | { ok: true; entries: QueueEntry[] }
+  | { ok: true; entries: QueueEntry[]; coordinators: CoordinatorOption[] }
   | { ok: false; kind: 'unauthorized' | 'unavailable' };
 
 const text = (value: unknown) => (typeof value === 'string' ? value : null);
@@ -24,7 +26,7 @@ export async function fetchAssignmentQueue(token: string): Promise<FetchAssignme
   if (response.status === 401 || response.status === 403) return { ok: false, kind: 'unauthorized' };
   if (!response.ok) return { ok: false, kind: 'unavailable' };
   const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!Array.isArray(data.entries)) return { ok: false, kind: 'unavailable' };
+  if (!Array.isArray(data.entries) || !Array.isArray(data.coordinators)) return { ok: false, kind: 'unavailable' };
   return {
     ok: true,
     entries: (data.entries as Record<string, unknown>[]).map((raw) => ({
@@ -34,6 +36,10 @@ export async function fetchAssignmentQueue(token: string): Promise<FetchAssignme
       proposedDate: text(raw.proposed_date),
       expectedAttendance: typeof raw.expected_attendance === 'number' ? raw.expected_attendance : null,
       submittedAt: text(raw.submitted_at),
+    })),
+    coordinators: (data.coordinators as Record<string, unknown>[]).map((raw) => ({
+      userId: text(raw.user_id) ?? '',
+      name: text(raw.name) ?? '',
     })),
   };
 }
