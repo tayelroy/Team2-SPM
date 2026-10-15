@@ -176,6 +176,10 @@ export function EventVenueRequests({ accessToken, eventId, eventName, refresh }:
 
   useEffect(() => {
     let cancelled = false;
+    // A successful mutation invalidates the previous list. While its replacement
+    // is in flight, an old empty/ready result would contradict the saved change.
+    setLoaded(null);
+    setError('');
     fetchVenueRequests(accessToken, eventId).then(result => {
       if (cancelled) return;
       if (result.ok) { setLoaded({ requests: result.requests, arrangement: result.arrangement }); setError(''); }

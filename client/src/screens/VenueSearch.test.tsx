@@ -220,6 +220,63 @@ test('[NORMAL] [SG2-48:AC3] [SG2-47:AC5] requesting a venue too small for the ev
   expect(await screen.findByText(/A capacity exception must also be approved before it can be booked\./)).toBeVisible();
 });
 
+test('[BOUNDARY] [SG2-48:AC3] after a successful request a delayed list refresh shows loading instead of the old empty result', async () => {
+  let reads = 0;
+  let refreshed!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/venue-booking-requests') && init?.method === 'POST') {
+      return Response.json({ request: requested, booking: 'allowed' }, { status: 201 });
+    }
+    if (url.startsWith('/api/venue-booking-requests')) {
+      reads += 1;
+      if (reads > 1) return new Promise<Response>(resolve => { refreshed = resolve; });
+      return Response.json({ requests: [], arrangement: { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0 } });
+    }
+    return Response.json({ venues: [terrace] });
+  }));
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  await screen.findByText('No venues have been requested for this event yet.');
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  expect(await screen.findByText(/Rooftop Terrace requested\./)).toBeVisible();
+  const list = screen.getByRole('region', { name: 'Venue requests for Meridian Forum' });
+  expect(within(list).getByText('Loading venue requests…')).toBeVisible();
+  expect(within(list).queryByText('No venues have been requested for this event yet.')).not.toBeInTheDocument();
+  expect(screen.queryByRole('form', { name: 'Request Rooftop Terrace' })).not.toBeInTheDocument();
+  expect(reads).toBe(2);
+  await act(async () => refreshed(Response.json({ requests: [requested], arrangement: {
+    state: 'in_progress', needed: 1, approved: 0, pending: 1, rejected: 0, unbooked: 0
+  } })));
+  expect(await within(list).findByText('Pending')).toBeVisible();
+  expect(within(list).getByLabelText('Venue arrangement')).toHaveTextContent('1 venue awaiting Venue Staff');
+  expect(within(list).queryByText('Loading venue requests…')).not.toBeInTheDocument();
+});
+
+test('[CONFLICT] [FAILURE] [SG2-48:AC3] a refused request keeps the known list without refreshing or claiming success', async () => {
+  let reads = 0;
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/venue-booking-requests') && init?.method === 'POST') {
+      return Response.json({ error: 'The event is no longer assigned to you.' }, { status: 409 });
+    }
+    if (url.startsWith('/api/venue-booking-requests')) {
+      reads += 1;
+      return Response.json({ requests: [], arrangement: { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0 } });
+    }
+    return Response.json({ venues: [terrace] });
+  }));
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  await screen.findByText('No venues have been requested for this event yet.');
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The event is no longer assigned to you.');
+  const list = screen.getByRole('region', { name: 'Venue requests for Meridian Forum' });
+  expect(within(list).getByText('No venues have been requested for this event yet.')).toBeVisible();
+  expect(within(list).queryByText('Loading venue requests…')).not.toBeInTheDocument();
+  expect(screen.getByRole('form', { name: 'Request Rooftop Terrace' })).toBeVisible();
+  expect(screen.queryByText(/Rooftop Terrace requested\./)).not.toBeInTheDocument();
+  expect(reads).toBe(1);
+});
+
 test('[FAILURE] [SG2-48:AC1] a manual search, not opened from an event, offers no venue request', async () => {
   stubSearch(() => Response.json({ venues: [terrace] }));
   render(<VenueSearch accessToken="token" />);
