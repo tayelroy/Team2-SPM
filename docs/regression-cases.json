@@ -5864,5 +5864,48 @@
     "execution_date": "16 Oct2026",
     "executed_by": "Codex automated verification",
     "review": null
+  },
+  {
+    "id": "SG2-46-FACILITY-PREFILL-01",
+    "title": "Event facility requirements survive prefill and search without excluding equivalent venue features",
+    "type": "Normal / boundary / conflict",
+    "story": "SG2-46",
+    "purpose": "Repair the hosted QA22 default-search mismatch while keeping recognised facility filters consistent with booking suitability and preserving unknown user phrases.",
+    "preconditions": "Client public helper plus real loopback Express search handler with deterministic venue/provider fixtures. Hosted QA22 failure captured separately; no hosted pass claimed by these tests.",
+    "steps": [
+      "Open prefill for an event requiring projector and verify canonical filter plus unchanged requirement text.",
+      "Exercise multiple facilities, unrelated/blank prose and all twelve recognised requirements.",
+      "Search the real HTTP handler with canonical facility labels against equivalent projection, Wi-Fi and PA venue features.",
+      "Verify a missing required facility excludes the venue and unknown whole phrases remain literal and conjunctive.",
+      "Verify twelve keywords are accepted and thirteen are rejected without weakening the 255-character limit."
+    ],
+    "data": "QA room, 14 seats and projector; Stage/PROJECTOR/microphones/Wi-Fi; all12facilities; venue projection/Wi-Fi/PA; unknown phrase projector balcony.",
+    "expected": "Prefill retains all recognised requirements and raw text; equivalent venue features match; missing or unknown phrase criteria are not silently dropped;12terms allowed and13refused.",
+    "evidence": "client/src/venues/searchPrefill.test.ts; server/src/venue-search.test.ts; docs/test-case-inventory.json",
+    "layer": "Public client helper + native loopback Express API with controlled storage",
+    "status": "Pass",
+    "actual": "Local frontend1396 and backend1457 passed with100% statements/branches/functions/lines on both applications; client/server production builds and13inventory checks passed. Hosted fixed-preview retest and pushed-head CI pending.",
+    "execution_evidence": "16Oct2026 local coverage runners and combined build, recorded in facility-prefill handoff; isolated providers, not hosted acceptance.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (automated local runners)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-46:AC1",
+      "SG2-46:AC2"
+    ],
+    "source_method_ids": [
+      "TC-7374ec3fefa4",
+      "TC-26e7adab3c89",
+      "TC-84c9bb72d424",
+      "TC-9300029d2991",
+      "TC-03588b5b3b63",
+      "TC-b5b1ecf34f9e",
+      "TC-a23df58c1687"
+    ],
+    "notes": "Independent PR90 test-case review remains pending. Historical source-test identities and the renamed keyword-boundary workbook identity must be preserved."
   }
 ]

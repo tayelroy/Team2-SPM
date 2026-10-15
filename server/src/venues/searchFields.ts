@@ -3,7 +3,8 @@ import { LAYOUTS, type Layout } from './layoutFields';
 export const MAX_SEARCH_DAYS = 31;
 const DAY_MS = 86_400_000;
 const MAX_TEXT = 255;
-const MAX_TERMS = 10;
+// Event prefill can name all twelve recognised facility requirements.
+const MAX_TERMS = 12;
 
 /** One venue search (SG2-46). Text criteria are lower-cased for matching;
  * facilities and accessibility are comma-separated keywords that must all

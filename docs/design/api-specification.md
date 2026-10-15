@@ -628,8 +628,9 @@ All venue routers are `protectedRouter`s mounted at `/api/venues`. Except for su
   - `attendance`: optional
   - `location`: optional, at most 255 characters
   - `layout`: optional
-  - `facilities`, `accessibility`: optional comma-separated keywords, at most 10 each
+  - `facilities`, `accessibility`: optional comma-separated keywords, at most 12 each (255 characters per text criterion)
 - **200:** `{ venues: [{ venue_id, name, location, capacity, facilities, accessibility_features, operating_information, layouts[], held[] }] }`
+- **Matching:** event search prefills recognised facility requirements as well as attendance/accessibility. Exact canonical facility labels use the same aliases as suitability (for example projector/projection and wifi/Wi-Fi); other user phrases retain literal substring matching, and every supplied criterion must match. The 12-keyword limit accommodates the full recognised facility vocabulary. This SG2-46 correction follows the recorded `61416cc` snapshot.
 - **Exclusions:** a venue is left out when:
   - it is unavailable for the period
   - a confirmed or tentative occupancy clashes once the venue's setup + turnaround gap is applied (SG2-78)

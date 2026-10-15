@@ -12,6 +12,23 @@ export interface VenueSearchPrefill {
   venueRequirements: string | null;
 }
 
+/** Mirror server/src/venues/suitability.ts: extract the same recognised
+ * facilities from event prose instead of treating every word as a filter. */
+const FACILITY_KEYWORDS: [string, RegExp][] = [
+  ['projector', /\bproject(or|ors|ion)\b/i],
+  ['screen', /\bscreens?\b/i],
+  ['PA system', /\bPA\b|public address|sound system/],
+  ['microphone', /\bmic(rophone)?s?\b/i],
+  ['stage', /\bstages?\b/i],
+  ['whiteboard', /\bwhiteboards?\b/i],
+  ['wifi', /\bwi-?fi\b|\binternet\b/i],
+  ['kitchen', /\bkitchens?\b|\bcatering\b/i],
+  ['bar', /\bbars?\b/i],
+  ['power outlets', /\bpower\b/i],
+  ['air-conditioning', /\bair[\s-]?con(ditioning|ditioned)?\b/i],
+  ['video conferencing', /\bvideo[\s-]?conferenc(e|ing)\b/i]
+];
+
 /** Accessibility needs are free text, so only recognised features become
  * matching keywords; the coordinator sees the full text and can add more. */
 const ACCESSIBILITY_KEYWORDS: [string, RegExp][] = [
@@ -35,16 +52,19 @@ export function prefillFromEvent(item: WorkItem): VenueSearchPrefill {
   const rawNeeds = item.details.accessibility_needs;
   const needs = typeof rawNeeds === 'string' && rawNeeds.trim() ? rawNeeds.trim() : null;
   const requirements = item.details.venue_requirements;
+  const venueRequirements = typeof requirements === 'string' && requirements.trim() ? requirements.trim() : null;
   return {
     eventId: item.event_id,
     eventName: item.title,
     accessibilityNeeds: needs,
-    venueRequirements: typeof requirements === 'string' && requirements.trim() ? requirements.trim() : null,
+    venueRequirements,
     values: {
       ...EMPTY_SEARCH,
       from: day === null ? '' : `${day}T00:00`,
       until: day === null ? '' : `${day}T23:59`,
       attendance: typeof attendance === 'number' ? String(attendance) : '',
+      facilities: venueRequirements === null ? '' : FACILITY_KEYWORDS
+        .filter(([, pattern]) => pattern.test(venueRequirements)).map(([keyword]) => keyword).join(', '),
       accessibility: needs === null ? '' : accessibilityKeywords(needs).join(', ')
     }
   };
