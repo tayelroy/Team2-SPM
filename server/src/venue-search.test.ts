@@ -88,7 +88,7 @@ test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returne
   assert.deepEqual(calls.find(call => call.table === 'venues' && call.method === 'order')?.args, ['name', { ascending: true }]);
 });
 
-test('[CONFLICT] [SG2-45:AC1] [SG2-46:AC2] AC2: a blocked venue or one with a confirmed booking in the period is not returned', async () => {
+test('[CONFLICT] [SG2-45:AC1] [SG2-46:AC2] [SG2-98:AC2] AC2: a blocked venue or one with a confirmed booking in the period is not returned', async () => {
   assert.deepEqual(await names({}, {
     venue_unavailability: { data: [{ venue_id: 1, starts_at: FROM, ends_at: TO }], error: null },
     venue_booking_occupancy: { data: [{ venue_id: 2, starts_at: FROM, ends_at: TO, status: 'confirmed' }], error: null }

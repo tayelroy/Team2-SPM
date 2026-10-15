@@ -1085,6 +1085,75 @@ test('SG2-80-N01 | [SG2-80:AC1] [SG2-80:AC6] [SG2-25:AC1] [BOUNDARY] [FAILURE] a
   expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance', 'Spoof attempt']);
 });
 
+test('SG2-98-P01 | [SG2-98:AC1] [SG2-98:AC2] [SG2-98:AC3] [NORMAL] an old block is kept and still closes the venue, a block over a booking is accepted, and removing the old block reopens it', async ({ page, request }) => {
+  // AC3: Roof repair, 18 June 2030 (UTC), was recorded under SG2-45 before SG2-80.
+  expect((await request.post('/__e2e/legacy-venue-block')).status()).toBe(204);
+  const oldBlockSlot = `/api/venues/search?from=${encodeURIComponent('2030-06-18T05:00:00Z')}&to=${encodeURIComponent('2030-06-18T06:00:00Z')}`;
+  const searchNames = async () => ((await (await page.request.get(oldBlockSlot, { headers: await authHeaders(page) })).json()).venues as { name: string }[]).map(venue => venue.name);
+
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  const oldBlock = page.getByRole('listitem', { name: 'Roof repair' });
+  await expect(oldBlock).toContainText('Other: Roof repair');
+  await expect(oldBlock).toContainText('Added before the recorder and time were tracked');
+
+  // AC1: blocking a period holding confirmed booking #1 (15 June 2030, 10:00 am–12:00 pm Singapore time) is accepted and flags it.
+  await page.getByLabel('Unavailable from (Singapore time)', { exact: true }).fill('2030-06-15T09:00');
+  await page.getByLabel('Unavailable until (Singapore time)', { exact: true }).fill('2030-06-15T13:00');
+  await page.getByLabel('Reason', { exact: true }).selectOption('maintenance');
+  await page.getByLabel('Note', { exact: true }).fill('Projector swap');
+  await page.getByRole('button', { name: 'Block venue', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('1 booked event is flagged as affected and not cancelled.');
+  await expect(page.getByRole('list', { name: 'Events affected by Projector swap' })).toContainText('Planning workshop');
+
+  // AC2 (SG2-45 AC1): the old block keeps Regression Hall out of search.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  expect(await searchNames()).not.toContain('Regression Hall');
+
+  // AC2 (SG2-45 AC3): removing the old block makes the venue available again.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  await nav(page, 'Catalogue');
+  await page.getByRole('button', { name: 'Block Regression Hall', exact: true }).click();
+  await page.getByRole('listitem', { name: 'Roof repair' }).getByRole('button', { name: 'Remove block', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Block removed');
+  await expect(page.getByRole('listitem', { name: 'Roof repair' })).toHaveCount(0);
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  expect(await searchNames()).toContain('Regression Hall');
+});
+
+test('SG2-98-N01 | [SG2-98:AC1] [SG2-98:AC2] [SG2-98:AC3] [FAILURE] other roles cannot remove an old block, and a block over a booking still needs a valid period', async ({ page, request }) => {
+  expect((await request.post('/__e2e/legacy-venue-block')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const staffHeaders = await authHeaders(page);
+  // AC1 lifts only the booking refusal: a reversed or empty period over booking #1 is still refused.
+  for (const data of [
+    { starts_at: '2030-06-15T04:00:00Z', ends_at: '2030-06-15T02:00:00Z', category: 'maintenance', reason: 'Reversed period' },
+    { starts_at: '2030-06-15T02:00:00Z', ends_at: '2030-06-15T02:00:00Z', category: 'maintenance', reason: 'Empty period' }
+  ]) {
+    expect((await page.request.post('/api/venues/1/blocks', { headers: staffHeaders, data })).status()).toBe(400);
+  }
+
+  // AC2/AC3: only Venue Staff may remove the old block.
+  for (const account of ['coordinator', 'support', 'organiser']) {
+    await test.step(account, async () => {
+      await page.goto('/');
+      await page.evaluate(() => sessionStorage.clear());
+      await signIn(page, account);
+      expect((await page.request.delete('/api/venues/1/blocks/98', { headers: await authHeaders(page) })).status()).toBe(403);
+    });
+  }
+  expect((await page.request.delete('/api/venues/1/blocks/98')).status()).toBe(401);
+  const remaining = await page.request.get('/api/venues/1/blocks', { headers: staffHeaders });
+  expect((await remaining.json()).blocks.map((item: { reason: string }) => item.reason)).toEqual(['Scheduled maintenance', 'Roof repair']);
+});
+
 test('SG2-46-P01 | [SG2-46:AC1] [SG2-46:AC2] [SG2-46:AC3] [SG2-46:AC4] [NORMAL] an approved event opens a pre-filled venue search that leaves out busy venues', async ({ page, request }) => {
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/under-review')).status()).toBe(204);

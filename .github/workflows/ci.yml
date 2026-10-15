@@ -119,6 +119,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      postgres_upgrade:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -168,6 +177,23 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_booking_clashes.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_multiple_bookings.sql
           node .github/scripts/test-venue-withdrawal-concurrency.mjs
+      # SG2-98 AC3: replay the live upgrade on its own database. Blocks written
+      # under SG2-45 are seeded just before SG2-80's migration, then the
+      # remaining migrations run and the suite checks what survived.
+      - name: Check venue blocks survive the SG2-80 upgrade
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres_upgrade.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/auth.sql
+          seeded=false
+          for migration in supabase/migrations/*.sql; do
+            if [ "$seeded" = false ] && [[ "$(basename "$migration")" > 202610100001 ]]; then
+              docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/legacy_venue_blocks.sql
+              seeded=true
+            fi
+            docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$migration"
+          done
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_block_upgrade.sql
 
   reviewer-tests:
     name: Test security reviewer
