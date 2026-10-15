@@ -96,8 +96,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venues.layouts.update': ['venue_staff'],
   // SG2-77: setup/turnaround times and safety details are read wherever
   // venue availability is read (they change what counts as free), but only
-  // Venue Staff record them.
-  'venues.operations.read': ['venue_staff', 'event_coordinator', 'technical_support_staff'],
+  // Venue Staff record them. SG2-77 AC5: the Safety Officer reads a venue's
+  // emergency access and known restrictions for the operational safety check
+  // (Week 7 change #6); mirrored in the venue_operations RLS read policy
+  // (202610160002_safety_officer_reads_venue_operations.sql).
+  'venues.operations.read': ['venue_staff', 'event_coordinator', 'technical_support_staff', 'safety_officer'],
   'venues.operations.update': ['venue_staff'],
   // SG2-46: coordinators narrow the venues down to those that could host an
   // event they are planning.

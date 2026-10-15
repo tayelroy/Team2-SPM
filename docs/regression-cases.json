@@ -2879,26 +2879,27 @@
     "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
     "steps": [
       "Seed users, roles and venues as the superuser.",
-      "Run the tagged assertions as Venue Staff, a coordinator, Technical Support Staff, an organiser, an attendee and anon.",
+      "Run the tagged assertions as Venue Staff, a coordinator, Technical Support Staff, a Safety Officer, an Event Coordinator Lead, an organiser, an attendee and anon.",
       "Roll back the suite transaction."
     ],
     "data": "Synthetic IDs and values defined in supabase/tests/venue_operations.sql",
-    "expected": "0 and 1440 minutes are accepted, -1 and 1441 refused; defaults are 0 minutes; every change is recorded with old and new value, who and when; only Venue Staff change values; two staff edits in a row keep the last value and record both authors; nobody writes history directly; external users and anon see nothing; losing the Venue Staff role removes write access.",
+    "expected": "0 and 1440 minutes are accepted, -1 and 1441 refused; defaults are 0 minutes; every change is recorded with old and new value, who and when; only Venue Staff change values; the Safety Officer reads emergency access and known restrictions but cannot change them or read their history (SG2-77 AC5); the Event Coordinator Lead sees nothing and cannot write (SG2-86 AC2); two staff edits in a row keep the last value and record both authors; nobody writes history directly; external users and anon see nothing; losing the Venue Staff role removes write access.",
     "evidence": "supabase/tests/venue_operations.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Suite passed. Mutation check: opening the update policy to every role made the suite fail on the matching assertion.",
-    "execution_date": "5 Oct 2026",
+    "actual": "Suite passed. Mutation checks: opening the update policy to every role made the suite fail on the matching assertion; leaving out 202610160002_safety_officer_reads_venue_operations.sql made it fail on [SG2-77:safety-officer-read].",
+    "execution_date": "16 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "5 Oct 2026; feature/SG2-77-venue-setup-turnaround on top of main dd9be1b; server and client suites at 100% coverage; venue browser journeys passed; disposable PostgreSQL 17 replay of all migrations and the new venue_operations suite. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "16 Oct 2026; fix/SG2-77-week7-roles on main 8d74912; server suite at 100% coverage; disposable PostgreSQL 17 replay of all migrations, every SQL suite and every concurrency script (36/36). Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-05",
+      "date": "2026-10-16",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json",
       "method_scope": {
         "source": "supabase/tests/venue_operations.sql"
       }
-    }
+    },
+    "mapped_acs": []
   },
   {
     "id": "SG2-86-P01",

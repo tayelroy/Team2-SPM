@@ -9,7 +9,8 @@ import { DEFAULT_OPERATIONS, validateVenueOperations, type VenueOperationRecord 
 import type { VenueOperationStore } from './db/venueOperations';
 
 const ACCOUNT_ROLES = [
-  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
+  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee',
+  'event_coordinator_lead', 'safety_officer'
 ] as const;
 
 const saved: VenueOperationRecord = {
@@ -68,7 +69,7 @@ test('[BOUNDARY] [SG2-77:AC3] a venue with nothing saved reads as 0 minutes and 
 });
 
 for (const role of ACCOUNT_ROLES) {
-  const reads = ['venue_staff', 'event_coordinator', 'technical_support_staff'].includes(role);
+  const reads = ['venue_staff', 'event_coordinator', 'technical_support_staff', 'safety_officer'].includes(role);
   test(`${role === 'venue_staff' ? '[NORMAL]' : '[FAILURE]'} [SG2-77:AC6] only Venue Staff change venue operations (${role})`, async () => {
     const { app, writes } = fixture(role);
     const write = await put(app, body);
@@ -77,6 +78,20 @@ for (const role of ACCOUNT_ROLES) {
     assert.equal((await get(app)).status, reads ? 200 : 403);
   });
 }
+
+// SG2-77 AC5 / Week 7 change #6: the Safety Officer reviews emergency access
+// and known restrictions in the operational safety check, so reads them, but
+// only Venue Staff change them; the Event Coordinator Lead has no use for them.
+test('[NORMAL] [SG2-77:AC5] [SG2-86:AC2] the Safety Officer reads a venue\'s emergency access and known restrictions but cannot change them', async () => {
+  const { app, writes } = fixture('safety_officer');
+  const read = await get(app);
+  assert.equal(read.status, 200);
+  assert.deepEqual(read.body.operations, saved);
+  assert.equal((await put(app, body)).status, 403);
+  assert.equal(writes.length, 0);
+  const lead = fixture('event_coordinator_lead');
+  assert.deepEqual([(await get(lead.app)).status, (await put(lead.app, body)).status, lead.writes.length], [403, 403, 0]);
+});
 
 test('[FAILURE] [SG2-25:AC3] [SG2-77:AC6] the production app protects both operations routes without credentials', async () => {
   for (const method of ['get', 'put'] as const) {

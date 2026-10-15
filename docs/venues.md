@@ -160,12 +160,14 @@ Venue Staff record how long each venue needs before an event to prepare and afte
 
 | Route | Who | Result |
 | --- | --- | --- |
-| `GET /api/venues/:venueId/operations` | Venue Staff, Event Coordinators, Technical Support Staff | `200 { operations }`; a venue with nothing saved returns 0 minutes and no safety details |
+| `GET /api/venues/:venueId/operations` | Venue Staff, Event Coordinators, Technical Support Staff, Safety Officers | `200 { operations }`; a venue with nothing saved returns 0 minutes and no safety details |
 | `PUT /api/venues/:venueId/operations` | Venue Staff | `200 { operations }`; minutes must be whole numbers from 0 to 1440 and each note at most 2000 characters (`400` otherwise) |
 
 Unknown venues return `404`; storage failures return `503` without details.
 
 Migration `202610050003_venue_operations.sql` adds `venue_operations` (one row per venue) and `venue_operation_history`. A trigger records every changed field with its old and new value, who changed it and when; nobody can write the history directly. Row-level security mirrors the routes: the three internal roles read, only Venue Staff insert or update, and only Venue Staff read the history. The store uses the caller's own token, so the trigger records the real user.
+
+**Safety Officer (AC5, Week 7 change #6).** The Safety Officer reviews emergency access and known restrictions in the Operational Safety Check, so migration `202610160002_safety_officer_reads_venue_operations.sql` adds `safety_officer` to the read policy, matching `venues.operations.read` in `server/src/auth/policy.ts`. The Safety Officer cannot change the values or read their history, and the Event Coordinator Lead still cannot read them (SG2-86 AC2). The Safety Officer's own view of the event, where AC5 says these details appear, arrives with SG2-91; until then the access is API-only.
 
 Verification: `supabase/tests/venue_operations.sql` (CI database job), `server/src/venue-operations.test.ts`, `server/src/db/venueOperations.test.ts`, `client/src/venues/VenueOperations.test.tsx`, `client/src/venues/operationsApi.test.ts` and browser journey `SG2-77-P01`.
 

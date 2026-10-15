@@ -14,7 +14,9 @@ insert into auth.users (id) values
   ('e0000000-0000-4000-8000-000000000003'),
   ('e0000000-0000-4000-8000-000000000004'),
   ('e0000000-0000-4000-8000-000000000005'),
-  ('e0000000-0000-4000-8000-000000000006');
+  ('e0000000-0000-4000-8000-000000000006'),
+  ('e0000000-0000-4000-8000-000000000007'),
+  ('e0000000-0000-4000-8000-000000000008');
 
 insert into public.users (user_id, name, organisation, role_id) values
   ('e0000000-0000-4000-8000-000000000001', 'Venue Staff V', 'ConnectSphere', 3),
@@ -22,7 +24,9 @@ insert into public.users (user_id, name, organisation, role_id) values
   ('e0000000-0000-4000-8000-000000000003', 'Tech Support T', 'ConnectSphere', 4),
   ('e0000000-0000-4000-8000-000000000004', 'Organiser O', 'Acme Corp', 1),
   ('e0000000-0000-4000-8000-000000000005', 'Attendee A', 'Acme Corp', 5),
-  ('e0000000-0000-4000-8000-000000000006', 'Venue Staff W', 'ConnectSphere', 3);
+  ('e0000000-0000-4000-8000-000000000006', 'Venue Staff W', 'ConnectSphere', 3),
+  ('e0000000-0000-4000-8000-000000000007', 'Safety Officer S', 'ConnectSphere', 7),
+  ('e0000000-0000-4000-8000-000000000008', 'Coordinator Lead L', 'ConnectSphere', 6);
 
 insert into public.account_roles (user_id, role) values
   ('e0000000-0000-4000-8000-000000000001', 'venue_staff'),
@@ -30,7 +34,9 @@ insert into public.account_roles (user_id, role) values
   ('e0000000-0000-4000-8000-000000000003', 'technical_support_staff'),
   ('e0000000-0000-4000-8000-000000000004', 'event_organiser'),
   ('e0000000-0000-4000-8000-000000000005', 'attendee'),
-  ('e0000000-0000-4000-8000-000000000006', 'venue_staff');
+  ('e0000000-0000-4000-8000-000000000006', 'venue_staff'),
+  ('e0000000-0000-4000-8000-000000000007', 'safety_officer'),
+  ('e0000000-0000-4000-8000-000000000008', 'event_coordinator_lead');
 
 insert into public.venues (venue_id, name, location, capacity, facilities, accessibility_features, operating_information) values
   (97701, 'Main Hall', 'Level 1', 200, 'Stage', 'Step-free', '08:00-22:00'),
@@ -137,6 +143,37 @@ begin
       raise exception '[SG2-77:history-staff-only] [SG2-77:AC6] [FAILURE] Reader % must not read change history', reader;
     end if;
   end loop;
+end $$;
+
+-- 3b. SG2-77 AC5 (Week 7 change #6): the Safety Officer reads a venue's
+-- emergency access and known restrictions for the operational safety check,
+-- but cannot change them or read who changed them. The Event Coordinator
+-- Lead has no use for them (SG2-86 AC2) and sees nothing.
+do $$
+begin
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000007', true);
+  if not exists (select 1 from public.venue_operations where venue_id = 97701
+      and emergency_access = 'Two exits to the car park' and known_restrictions = 'No open flames') then
+    raise exception '[SG2-77:safety-officer-read] [SG2-77:AC5] [NORMAL] The Safety Officer must see a venue''s emergency access and known restrictions';
+  end if;
+  update public.venue_operations set known_restrictions = 'None' where venue_id = 97701;
+  if not exists (select 1 from public.venue_operations where venue_id = 97701 and known_restrictions = 'No open flames') then
+    raise exception '[SG2-77:safety-officer-update] [SG2-77:AC6] [FAILURE] The Safety Officer must not change a venue''s safety details';
+  end if;
+  if exists (select 1 from public.venue_operation_history) then
+    raise exception '[SG2-77:safety-officer-history] [SG2-77:AC6] [FAILURE] The Safety Officer must not read change history';
+  end if;
+
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000008', true);
+  if exists (select 1 from public.venue_operations) then
+    raise exception '[SG2-77:lead-read] [SG2-77:AC5] [SG2-86:AC2] [FAILURE] The Event Coordinator Lead must not read venue operations';
+  end if;
+  begin
+    insert into public.venue_operations (venue_id, setup_minutes) values (97702, 1)
+      on conflict (venue_id) do update set setup_minutes = 1;
+    raise exception '[SG2-77:lead-write] [SG2-77:AC6] [SG2-86:AC2] [FAILURE] The Event Coordinator Lead must not change venue operations';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 
 -- 4. Organisers and attendees see nothing:
