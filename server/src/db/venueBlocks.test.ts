@@ -43,7 +43,7 @@ test('[NORMAL] [SG2-45:AC1] [SG2-80:AC6] list reads the venue\'s unended periods
   assert.deepEqual(calls[0].body, { p_venue_id: 1, p_after: '2026-09-26T00:00:00.000Z' });
 });
 
-test('[NORMAL] [SG2-80:AC2] [SG2-80:AC3] create inserts without checking for confirmed bookings, then reads back the flagged period', async () => {
+test('[NORMAL] [SG2-80:AC2] [SG2-80:AC3] [SG2-98:AC1] create inserts without checking for confirmed bookings, then reads back the flagged period', async () => {
   const calls = stubFetch(call => {
     if (call.pathname === '/rest/v1/venues') return Response.json({ venue_id: 1 });
     if (call.pathname === '/rest/v1/venue_unavailability') return Response.json({ unavailability_id: 4 });
