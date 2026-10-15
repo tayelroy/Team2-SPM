@@ -661,6 +661,19 @@
       }
     },
     {
+      "id": "SG2-88",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-88",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-09",
+      "acceptanceCriteria": {
+        "AC1": "From the unassigned queue, I can assign an event to an Event Coordinator",
+        "AC2": "I can reassign an assigned event to a different Event Coordinator; the new coordinator gains rights to manage it and the previous coordinator loses them",
+        "AC3": "Only the Event Coordinator Lead can assign or reassign events",
+        "AC4": "The newly assigned coordinator, any previous coordinator, and the Event Organiser are notified of an assignment or reassignment",
+        "AC5": "Each assignment and reassignment is recorded with who made it and when, and previous assignments stay visible in the event history"
+      }
+    },
+    {
       "id": "SG2-81",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-81",
       "originalPullRequests": [],

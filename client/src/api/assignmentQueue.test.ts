@@ -10,7 +10,7 @@ const RAW = {
 
 describe('fetchAssignmentQueue (SG2-87)', () => {
   test('[NORMAL] [SG2-87:AC3] maps each queue entry and sends the bearer token', async () => {
-    const fetch = vi.fn().mockResolvedValue(Response.json({ entries: [RAW] }));
+    const fetch = vi.fn().mockResolvedValue(Response.json({ entries: [RAW], coordinators: [{ user_id: 'c1', name: 'Casey Coordinator' }] }));
     vi.stubGlobal('fetch', fetch);
     expect(await fetchAssignmentQueue('tok')).toEqual({
       ok: true,
@@ -18,14 +18,16 @@ describe('fetchAssignmentQueue (SG2-87)', () => {
         eventId: 1, name: 'Leadership Forum', organiserName: 'Olivia Organiser',
         proposedDate: '2030-06-15T02:00:00.000Z', expectedAttendance: 120, submittedAt: '2026-10-06T01:00:00.000Z',
       }],
+      coordinators: [{ userId: 'c1', name: 'Casey Coordinator' }],
     });
     expect(fetch).toHaveBeenCalledWith('/api/assignment-queue', { method: 'GET', headers: { Authorization: 'Bearer tok' } });
   });
 
   test('[BOUNDARY] [SG2-87:AC3] missing optional details come through as null, not as invented values', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ entries: [{ event_id: 2 }, { event_id: 'x' }] })));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ entries: [{ event_id: 2 }, { event_id: 'x' }], coordinators: [{}] })));
     expect(await fetchAssignmentQueue('tok')).toEqual({
       ok: true,
+      coordinators: [{ userId: '', name: '' }],
       entries: [
         { eventId: 2, name: '', organiserName: null, proposedDate: null, expectedAttendance: null, submittedAt: null },
         { eventId: 0, name: '', organiserName: null, proposedDate: null, expectedAttendance: null, submittedAt: null },
@@ -41,7 +43,8 @@ describe('fetchAssignmentQueue (SG2-87)', () => {
   test('[FAILURE] [SG2-87:AC2] a server error, a malformed body or a network failure is reported as unavailable', async () => {
     for (const reply of [
       () => Promise.resolve(new Response(null, { status: 503 })),
-      () => Promise.resolve(Response.json({ entries: 'nope' })),
+      () => Promise.resolve(Response.json({ entries: 'nope', coordinators: [] })),
+      () => Promise.resolve(Response.json({ entries: [] })),
       () => Promise.resolve(new Response('not json', { status: 200 })),
       () => Promise.reject(new TypeError('Failed to fetch')),
     ]) {
