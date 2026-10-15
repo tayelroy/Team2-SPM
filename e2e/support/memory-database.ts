@@ -194,6 +194,16 @@ export class MemoryDatabase {
     );
   }
 
+  /** SG2-82: on top of seedVenueRequest, a third venue that fits event 91
+   * (80 guests, a projector), so the event can need several venues at once:
+   * Regression Hall and Breakout Studio fit; Quiet Room is too small. */
+  seedVenueMultiple() {
+    this.seedVenueRequest();
+    this.tables.venues.push({ venue_id: 5, name: 'Breakout Studio', location: 'Level 3', capacity: 100, facilities: 'Projector, whiteboards',
+      operating_information: '08:00–22:00', accessibility_features: 'Step-free' });
+    this.tables.venue_layouts.push({ venue_id: 5, layout: 'classroom', other_description: null });
+  }
+
   /** SG2-51: on top of seedVenueRequest, event 91 holds both venues on 20 June
    * 2030, 10:00-12:00 SGT (Week 7 change #3: one event, several venues). */
   /** SG2-78: setup plus turnaround (SG2-77) that bookings at the venue keep
@@ -444,6 +454,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         const row = structuredClone(value);
         if (id) row[id] = nextId++;
         if (['event_clarifications', 'event_audit_logs', 'notifications'].includes(this.table)) row.created_at ??= new Date().toISOString();
+        // SG2-68: event notices carry no venue request.
         if (this.table === 'notifications') row.request_id ??= null;
         // SG2-48: the column defaults a new venue request takes.
         if (this.table === 'venue_booking_requests') { row.status ??= 'pending'; row.requested_at ??= new Date().toISOString(); }

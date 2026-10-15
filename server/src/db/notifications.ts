@@ -1,17 +1,17 @@
 import { AccessError } from '../auth/policy';
 import { createUserScopedClient } from './user-client';
-import type { AssignmentNoticeKind } from './assignmentNotifications';
+import type { EventNoticeKind } from './eventNotifications';
 
 /** A notice for one person: a venue request was approved or rejected (SG2-49),
- * a venue booking was released (SG2-51), equipment was reserved (SG2-55), the
- * organiser's event was confirmed (SG2-58), or an event's coordinator was
- * assigned or changed (SG2-88). */
+ * a venue booking was released (SG2-51), equipment was reserved (SG2-55),
+ * the organiser's event was confirmed (SG2-58), or a step in the event's
+ * request lifecycle happened (SG2-68, see eventNotifications.ts). */
 export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
   kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
-    | 'event_confirmed' | AssignmentNoticeKind;
+    | 'event_confirmed' | EventNoticeKind;
   message: string;
   created_at: string;
 }

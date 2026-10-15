@@ -8,6 +8,7 @@ import {
   type SubmitEventRequestResult
 } from '../db/eventRequests';
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
+import { eventLabel, eventNoticeMessages, fetchLeadIds, notifyEvent, type EventNotice } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
 import { missingForSubmission } from './fields';
 
@@ -24,6 +25,8 @@ export interface SubmitEventRequestDependencies {
   ) => Promise<FetchEventRequestResult>;
   submitRequest?: (admin: SupabaseClient, eventId: number) => Promise<SubmitEventRequestResult>;
   writeHistory?: typeof insertAuditLogs;
+  fetchLeads?: typeof fetchLeadIds;
+  notify?: typeof notifyEvent;
 }
 
 /** Statuses a caller may submit from: a fresh draft, or a rejected request being reworked. */
@@ -46,13 +49,21 @@ const SUBMITTABLE_STATUSES = new Set(['draft', 'rejected', 'needs_clarification'
  * one in between, so it is the status the write actually replaced. As in the
  * clarification handler, a history row that cannot be written answers 503
  * rather than reporting a change the history does not show.
+ *
+ * SG2-68: the people who act next are told. A request waiting for a
+ * coordinator notifies every Event Coordinator Lead; a resubmission that
+ * goes straight back to its coordinator notifies that coordinator. A notice
+ * that cannot be stored answers 503 like the history row, with the
+ * submission already made (see docs/notifications.md).
  */
 export function submitEventRequestHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchOwnRequest = fetchManageableEventRequest,
   submitRequest = submitEventRequest,
-  writeHistory = insertAuditLogs
+  writeHistory = insertAuditLogs,
+  fetchLeads = fetchLeadIds,
+  notify = notifyEvent
 }: SubmitEventRequestDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -114,6 +125,29 @@ export function submitEventRequestHandler({
       statusChange(eventId, principal.userId, existing.request.status, submitted.request.status)
     ]);
     if (!recorded.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    const label = eventLabel(submitted.request.name);
+    let notices: EventNotice[];
+    if (submitted.request.status === 'unassigned') {
+      const leads = await fetchLeads(admin);
+      if (!leads.ok) {
+        res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+        return;
+      }
+      notices = leads.ids.map(id => ({
+        recipient_id: id, event_id: eventId, kind: 'event_submitted', message: eventNoticeMessages.submittedToLeads(label)
+      }));
+    } else {
+      notices = [{
+        recipient_id: existing.request.coordinator_id, event_id: eventId, kind: 'event_submitted',
+        message: eventNoticeMessages.resubmittedToCoordinator(label)
+      }];
+    }
+    const notified = await notify(admin, notices.filter(notice => notice.recipient_id !== principal.userId));
+    if (!notified.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }

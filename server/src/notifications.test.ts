@@ -16,6 +16,8 @@ const USERS: Record<string, { userId: string; role: Role }> = {
   coordinator: { userId: 'user-coordinator', role: 'event_coordinator' },
   support: { userId: 'user-support', role: 'technical_support_staff' },
   organiser: { userId: 'user-organiser', role: 'event_organiser' },
+  lead: { userId: 'user-lead', role: 'event_coordinator_lead' },
+  safety: { userId: 'user-safety', role: 'safety_officer' },
   attendee: { userId: 'user-attendee', role: 'attendee' }
 };
 
@@ -64,4 +66,22 @@ test('[NORMAL] [SG2-51:AC4] an Event Organiser reads their own notices, such as 
     .get('/api/notifications').set('Authorization', 'Bearer organiser');
   assert.deepEqual([response.status, response.body], [200, { notifications: [released] }]);
   assert.deepEqual(asked, ['organiser', 'user-organiser']);
+});
+
+test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] the Event Coordinator Lead reads their own submitted-event notices', async () => {
+  const submitted = { ...notice, request_id: null, kind: 'event_submitted' as const,
+    message: 'Leadership Forum was submitted and is waiting for a coordinator.' };
+  let asked: unknown[] = [];
+  const response = await request(app(async (...args) => { asked = args; return [submitted]; }))
+    .get('/api/notifications').set('Authorization', 'Bearer lead');
+  assert.deepEqual([response.status, response.body], [200, { notifications: [submitted] }]);
+  assert.deepEqual(asked, ['lead', 'user-lead']);
+});
+
+test('[FAILURE] [SG2-68:AC3] a Safety Officer, who has no event notices, is refused before any store read', async () => {
+  let reads = 0;
+  const response = await request(app(async () => { reads += 1; return [notice]; }))
+    .get('/api/notifications').set('Authorization', 'Bearer safety');
+  assert.equal(response.status, 403);
+  assert.equal(reads, 0);
 });

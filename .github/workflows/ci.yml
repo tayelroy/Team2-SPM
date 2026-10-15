@@ -157,6 +157,7 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/equipment_reservations.sql
           node .github/scripts/test-equipment-reservations-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_confirmation.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_notifications.sql
           node .github/scripts/test-event-confirmation-concurrency.mjs
           node .github/scripts/test-equipment-requirements-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_status_flow.sql
@@ -164,7 +165,8 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_booking_release.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_setup_turnaround.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_booking_clashes.sql
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/coordinator_assignment_notifications.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_multiple_bookings.sql
+          node .github/scripts/test-venue-withdrawal-concurrency.mjs
 
   reviewer-tests:
     name: Test security reviewer

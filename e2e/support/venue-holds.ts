@@ -147,6 +147,11 @@ export class VenueHoldFixture {
           event_id: hold.event_id, starts_at: hold.starts_at, ends_at: hold.ends_at, status: 'confirmed' };
         this.database.tables.venue_bookings.push(booking);
         hold.status = 'converted'; hold.booking_id = booking.booking_id; request.status = 'approved'; event.venue_booking_id = booking.booking_id;
+        // SG2-68: the organiser is told their event now has the venue.
+        const notices = this.database.tables.notifications;
+        if (event.organiser_id) notices.push({ notification_id: nextId(notices, 'notification_id'), recipient_id: event.organiser_id,
+          event_id: hold.event_id, request_id: hold.request_id, kind: 'venue_request_approved',
+          message: `${venue.name} was approved for ${event.name || 'Untitled event'}.`, created_at: new Date(this.now).toISOString() });
       } else { hold.status = 'released'; request.status = 'cancelled'; }
       this.audit(hold, userId, `Tentative hold ${hold.hold_id}`, `${action === 'convert' ? 'Converted' : 'Released'} hold ${hold.hold_id}`);
       return { outcome: 'updated', hold: this.record(hold) };

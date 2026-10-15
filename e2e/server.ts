@@ -33,7 +33,7 @@ import { createBookingRequestSuitabilityRouter, createVenueSuitabilityRouter } f
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
 import { createVenueConflictsRouter } from '../server/src/venues/conflicts';
 import { createNotificationsRouter } from '../server/src/notifications';
-import { createMemoryDecisionStore, memoryNotifications } from './support/venue-decisions';
+import { createMemoryDecisionStore, createMemoryWithdrawalStore, memoryNotifications } from './support/venue-decisions';
 import { createMemoryReleaseStore } from './support/venue-releases';
 import { createVenueBookingsRouter } from '../server/src/venues/bookings';
 import { createVenueClashesRouter } from '../server/src/venues/clashes';
@@ -59,6 +59,7 @@ import { createMemoryReservationsStore, seedEquipmentReservations } from './supp
 import { createConfirmEventHandler } from '../server/src/events/confirm';
 import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
 import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
+import { seedEventNotifications } from './support/event-notifications';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -178,7 +179,9 @@ const app = createApp(
     suitability: createVenueSuitabilityRouter(access, { getAdminClient: getClient }),
     bookingRequests: createBookingRequestSuitabilityRouter(access, { getAdminClient: getClient }),
     // SG2-48: venue requests, against the in-memory client.
-    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database) }),
+    // SG2-82: withdrawing a request, against the in-memory client.
+    venueRequests: createVenueBookingRequestsRouter(access, { getAdminClient: getClient, decisions: createMemoryDecisionStore(database),
+      withdrawals: createMemoryWithdrawalStore(database) }),
     // SG2-50: what a pending request overlaps, against the in-memory client.
     conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
@@ -260,6 +263,14 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     bookings: database.tables.venue_bookings.filter(seeded),
   });
 });
+app.post('/__e2e/event-notifications', (_req, res) => {
+  seedEventNotifications(database);
+  res.status(204).end();
+});
+// SG2-68: every stored notice with its recipient, which the bell never shows.
+app.get('/__e2e/event-notifications-ledger', (_req, res) => res.json({
+  notifications: database.tables.notifications, events: database.tables.events.filter(row => [681, 682, 683].includes(Number(row.event_id))),
+}));
 app.post('/__e2e/equipment-requirements', (_req, res) => {
   database.tables.events.push({ ...database.tables.events[0], event_id: 53, name: 'Equipment Requirements Forum',
     coordinator_id: 'user-coordinator', status: 'approved', proposed_date: '2030-06-20T02:00:00.000Z' });
@@ -314,6 +325,10 @@ app.post('/__e2e/venue-decision', (_req, res) => {
 });
 app.post('/__e2e/venue-request', (_req, res) => {
   database.seedVenueRequest();
+  res.status(204).end();
+});
+app.post('/__e2e/venue-multiple', (_req, res) => {
+  database.seedVenueMultiple();
   res.status(204).end();
 });
 app.post('/__e2e/venue-release', (_req, res) => {

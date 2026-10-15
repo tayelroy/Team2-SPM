@@ -1701,19 +1701,12 @@ describe('assignCoordinator (SG2-33/34)', () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: {} }));
     vi.stubGlobal('fetch', fetchMock);
 
-    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true, notified: true });
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/coordinator', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
       body: JSON.stringify({ coordinatorId: 'c1' }),
     });
-  });
-
-  test('[BOUNDARY] [SG2-88:AC4] reports whether the notices were sent: only an explicit false means they were not', async () => {
-    for (const [body, notified] of [[{ notified: false }, false], [{ notified: true }, true], [{}, true]] as const) {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)));
-      expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true, notified });
-    }
   });
 
   test.each([401, 403])('[FAILURE] [SG2-33:AC1] [SG2-97:AC1] tells the user only the Event Coordinator Lead can assign on %i', async (status) => {

@@ -88,18 +88,27 @@ export const EVENTS: EventRecord[] = [
   },
 ];
 
+/**
+ * A nav item: the screen it opens, its label and, optionally, the server
+ * permission (an action in `server/src/auth/policy.ts`) that screen needs.
+ * An item with a permission is shown only once the signed-in account's
+ * permissions are known to include it (SG2-86 AC2).
+ */
+export type NavEntry = readonly [screen: Screen, label: string, permission?: string];
+
 /** Nav items per role — the mockup scopes navigation, not just data. */
-export const NAV: Record<Role, [Screen, string][]> = {
+export const NAV: Record<Role, readonly NavEntry[]> = {
   'Event Organiser': [
     ['events', 'My events'],
     ['form', 'New request'],
     ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
   ],
+  // SG2-26: a coordinator opens events from the work queue on the dashboard.
+  // All events and event detail list organisation requests (event_request.view,
+  // organisers only), so offering them here only ever showed a refusal.
   'Event Coordinator': [
     ['dashboard', 'Dashboard'],
-    ['events', 'All events'],
-    ['detail', 'Review'],
     ['venues', 'Venues'],
     ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
@@ -120,20 +129,20 @@ export const NAV: Record<Role, [Screen, string][]> = {
     ['dashboard', 'My registrations'],
     ['attendee', 'Event page'],
   ],
-  // SG2-86: deliberately minimal — a nav item pointing at a screen the role
-  // has no permission for would render a page that 403s. The assignment
-  // queue and safety-check screens arrive with SG2-87/SG2-100.
+  // SG2-86: only screens the role can use. Each functional item is gated on
+  // the permission its screen needs, so a role is never offered a page that
+  // refuses it. Neither role holds `event_request.view`, so neither is
+  // offered the organiser-only All events list.
   // SG2-97: assignment moved here from Technical Support Staff.
   'Event Coordinator Lead': [
     ['dashboard', 'Dashboard'],
     // SG2-87: the queue of submitted requests no coordinator holds yet.
-    ['queue', 'Unassigned queue'],
-    ['assign', 'Assign coordinators'],
-    ['events', 'All events'],
+    ['queue', 'Unassigned queue', 'event_request.queue.view'],
+    ['assign', 'Assign coordinators', 'event_request.assign_coordinator'],
   ],
+  // SG2-86: the safety-check screens arrive with the safety review flow.
   'Safety Officer': [
     ['dashboard', 'Dashboard'],
-    ['events', 'All events'],
   ],
 };
 
@@ -228,133 +237,35 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Venues that meet every criterion and are free for the whole period. Blocked or confirmed-booked venues are left out.',
 };
 
-export const STATS: Record<Role, Stat[]> = {
-  'Event Organiser': [
-    { value: '1', label: 'Draft' },
-    { value: '1', label: 'Awaiting review' },
-    { value: '1', label: 'Confirmed' },
-    { value: '2', label: 'Updates for you' },
-  ],
-  'Event Coordinator': [
-    { value: '3', label: 'Needs review' },
-    { value: '5', label: 'Assigned to me' },
-    { value: '2', label: 'Venues outstanding' },
-    { value: '1', label: 'Equipment conflict' },
-  ],
-  'Venue Staff': [
-    { value: '4', label: 'Booking requests' },
-    { value: '1', label: 'Conflicts flagged' },
-    { value: '6', label: 'Venues live' },
-    { value: '9', label: 'Confirmed this month' },
-  ],
-  'Technical Support Staff': [
-    { value: '5', label: 'Equipment requests' },
-    { value: '1', label: 'Shortfall' },
-    { value: '12', label: 'Items reserved' },
-    { value: '31', label: 'Items in stock' },
-  ],
-  Attendee: [
-    { value: '2', label: 'Registered' },
-    { value: '1', label: 'Waiting on confirmation' },
-    { value: '3', label: 'Open to register' },
-    { value: '0', label: 'Withdrawn' },
-  ],
-  'Event Coordinator Lead': [],
-  'Safety Officer': [],
-};
+/** Headline figures on the Attendee's prototype dashboard. */
+export const ATTENDEE_STATS: Stat[] = [
+  { value: '2', label: 'Registered' },
+  { value: '1', label: 'Waiting on confirmation' },
+  { value: '3', label: 'Open to register' },
+  { value: '0', label: 'Withdrawn' },
+];
 
-export const ACTIONS: Record<Role, ActionItem[]> = {
-  'Event Coordinator': [
-    {
-      title: 'E-201 clarification pending',
-      body: 'Catering headcount and stage size still unanswered.',
-      dot: color.accent,
-      screen: 'detail',
-    },
-    {
-      title: 'Projector shortfall for E-201',
-      body: '2 requested, 1 free in the window.',
-      dot: color.accent,
-      screen: 'equipment',
-    },
-    {
-      title: 'Change request on E-198',
-      body: 'Organiser asked to raise attendance from 90 to 140.',
-      dot: color.teal,
-      screen: 'change',
-    },
-  ],
-  'Event Organiser': [
-    {
-      title: 'E-201 — your coordinator has a question',
-      body: 'Confirm catering headcount and whether the stage needs a lectern.',
-      dot: color.accent,
-      screen: 'detail',
-    },
-    {
-      title: 'E-205 is still a draft',
-      body: 'Nothing has been sent yet — submit when the details are settled.',
-      dot: color.accent,
-      screen: 'form',
-    },
-    {
-      title: 'E-198 is confirmed',
-      body: 'Venue and equipment are settled; registration is open.',
-      dot: color.teal,
-      screen: 'detail',
-    },
-  ],
-  'Venue Staff': [
-    {
-      title: 'Maintenance block 24–25 Oct',
-      body: 'Atrium Hall is unavailable for those two days.',
-      dot: color.slate,
-      screen: 'calendar',
-    },
-  ],
-  'Technical Support Staff': [
-    {
-      title: 'Projector shortfall — E-201',
-      body: '2 requested, only 1 free in the 12 Oct window.',
-      dot: color.accent,
-      screen: 'equipment',
-    },
-    {
-      title: '4 requests awaiting reservation',
-      body: 'PA system, hearing loop kit, risers and mic set.',
-      dot: color.accent,
-      screen: 'equipment',
-    },
-    {
-      title: 'Risers reserved for E-190',
-      body: 'Unavailable to other events on 28 Sep.',
-      dot: color.teal,
-      screen: 'equipment',
-    },
-  ],
-  Attendee: [
-    {
-      title: 'Registration closes 8 Oct',
-      body: 'Northbridge Investor Forum — 42 places left.',
-      dot: color.accent,
-      screen: 'attendee',
-    },
-    {
-      title: 'Quarterly Partner Dinner is 3 Nov',
-      body: "You're registered. Venue: The Kelp Room.",
-      dot: color.teal,
-      screen: 'attendee',
-    },
-    {
-      title: 'Grad Recruitment Open Day',
-      body: "Registration isn't open yet — we'll let you know.",
-      dot: color.slate,
-      screen: 'dashboard',
-    },
-  ],
-  'Event Coordinator Lead': [],
-  'Safety Officer': [],
-};
+/** The Attendee's prototype "Needs your attention" items. */
+export const ATTENDEE_ACTIONS: ActionItem[] = [
+  {
+    title: 'Registration closes 8 Oct',
+    body: 'Northbridge Investor Forum — 42 places left.',
+    dot: color.accent,
+    screen: 'attendee',
+  },
+  {
+    title: 'Quarterly Partner Dinner is 3 Nov',
+    body: "You're registered. Venue: The Kelp Room.",
+    dot: color.teal,
+    screen: 'attendee',
+  },
+  {
+    title: 'Grad Recruitment Open Day',
+    body: "Registration isn't open yet — we'll let you know.",
+    dot: color.slate,
+    screen: 'dashboard',
+  },
+];
 
 export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
   'Event Organiser': { label: 'New event request', screen: 'form' },
@@ -362,9 +273,11 @@ export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
   'Venue Staff': { label: 'Open availability', screen: 'calendar' },
   'Technical Support Staff': { label: 'Check availability', screen: 'equipment' },
   Attendee: { label: 'Browse events', screen: 'attendee' },
-  // SG2-86: the one screen either role can actually use until SG2-87/SG2-100
-  // grant their functional screens.
-  'Event Coordinator Lead': { label: 'My profile', screen: 'profile' },
+  // SG2-87/SG2-97: the Lead's dashboard summarises the unassigned queue;
+  // its one call to action is the assignment screen.
+  'Event Coordinator Lead': { label: 'Assign coordinators', screen: 'assign' },
+  // SG2-86: the one screen the Safety Officer can use until the safety
+  // review flow grants its functional screens.
   'Safety Officer': { label: 'My profile', screen: 'profile' },
 };
 

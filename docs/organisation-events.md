@@ -168,6 +168,10 @@ attendees and unrelated organisers receive 403.
   planning answer 503 while the transition itself stands (a known gap, the
   same one SG2-39 planning edits already have); completion keeps its 200
   because `completed_by`/`completed_at` on the row are authoritative.
+  SG2-68's notices are a third call after the history insert on submit,
+  assignment, clarification and decision, with the same gap: a notice that
+  cannot be stored answers 503 while the transition and its history row stand
+  (assignment is not undone for it) — see [notifications](notifications.md).
 
 Each entry also carries `actor_role`: the actor's current role from
 `account_roles` in Title Case (e.g. `Event Coordinator Lead`), or null for a

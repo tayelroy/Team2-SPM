@@ -1,20 +1,12 @@
 /** The signed-in person's own notices (SG2-49): Venue Staff decisions on their
- * venue requests. Mirrors server/src/db/notifications.ts. */
-/** Venue decisions and releases (SG2-49, SG2-51), equipment and clash notices
- * (SG2-55, SG2-79), event confirmation (SG2-58) and coordinator assignment
- * notices (SG2-88). */
-export const NOTIFICATION_KINDS = [
-  'venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
-  'equipment_reserved', 'venue_booking_clash', 'event_confirmed',
-  'coordinator_assigned', 'coordinator_removed', 'event_coordinator_changed',
-] as const;
-export type NotificationKind = typeof NOTIFICATION_KINDS[number];
-
+ * venue requests, and since SG2-68 the steps of their event's request
+ * lifecycle. Mirrors server/src/db/notifications.ts. */
 export interface Notification {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
-  kind: NotificationKind;
+  kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
+    | 'event_confirmed' | 'event_submitted' | 'coordinator_assigned' | 'clarification_requested' | 'event_approved' | 'event_rejected';
   message: string;
   created_at: string;
 }
@@ -25,10 +17,16 @@ export type NotificationsOutcome =
 
 const UNAVAILABLE: NotificationsOutcome = { ok: false, message: 'Could not load notifications. Please try again.' };
 
+const KINDS: Record<Notification['kind'], true> = {
+  venue_request_approved: true, venue_request_rejected: true, venue_booking_released: true, equipment_reserved: true,
+  venue_booking_clash: true, event_confirmed: true, event_submitted: true, coordinator_assigned: true,
+  clarification_requested: true, event_approved: true, event_rejected: true
+};
+
 function isNotification(value: unknown): value is Notification {
   const entry = value as Notification | null;
   return typeof entry?.notification_id === 'number'
-    && (NOTIFICATION_KINDS as readonly string[]).includes(entry.kind)
+    && KINDS[entry.kind] === true
     && typeof entry.message === 'string' && typeof entry.created_at === 'string' && Number.isFinite(Date.parse(entry.created_at));
 }
 

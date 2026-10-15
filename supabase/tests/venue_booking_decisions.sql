@@ -189,7 +189,16 @@ begin
     insert into public.notifications (recipient_id, kind, message) values ('c4900000-0000-4000-8000-000000000002', 'venue_request_approved', 'Forged');
     raise exception '[SG2-49:no-forged-notifications] [SG2-49:AC1] [FAILURE] A client wrote a notification directly';
   exception when insufficient_privilege then null; end;
+  -- SG2-68 AC1: the organiser is now told every decision on their events too.
   perform set_config('request.jwt.claim.sub', 'c4900000-0000-4000-8000-000000000003', true);
+  if (select string_agg(request_id || '|' || kind || '|' || message, ' / ' order by request_id) from public.notifications)
+      is distinct from '94901|venue_request_approved|Decision Hall was approved for Decision forum. / '
+        || '94903|venue_request_approved|Small Room was approved for Decision forum. / '
+        || '94904|venue_request_rejected|Decision Hall was rejected for Decision forum: ' || repeat('x', 500) || ' / '
+        || '94907|venue_request_rejected|Decision Hall was rejected for Reviewing forum: Event not approved yet' then
+    raise exception '[SG2-68:organiser-reads-own-decisions] [SG2-68:AC1] [NORMAL] The organiser must see exactly their own decision notifications';
+  end if;
+  perform set_config('request.jwt.claim.sub', 'c4900000-0000-4000-8000-000000000004', true);
   if exists (select 1 from public.notifications) then
     raise exception '[SG2-49:others-notifications-hidden] [SG2-49:AC1] [FAILURE] Someone read another person''s notifications';
   end if;

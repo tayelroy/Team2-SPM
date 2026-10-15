@@ -96,6 +96,76 @@ test('[NORMAL] [SG2-87:AC4] the organisation dashboard shows a queued request as
   expect(within(card).queryByText('With coordinator')).not.toBeInTheDocument();
 });
 
+// SG2-86: the Week 7 roles' desks carry no prototype events (E-205 etc.) and
+// nothing on them opens an Attendee screen.
+const prototypeEvents = ['Product Launch — Tideline', 'Northbridge Investor Forum', 'Quarterly Partner Dinner', 'Grad Recruitment Open Day'];
+const queueEntry = (eventId: number) => ({ event_id: eventId, name: `Queued ${eventId}`, organiser_name: 'Org', proposed_date: null,
+  expected_attendance: null, submitted_at: '2030-06-01T01:00:00Z' });
+
+test('[NORMAL] [SG2-86:AC2] the Lead desk counts the real unassigned queue and opens only the Lead\'s queue', async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ coordinators: [], entries: [queueEntry(41), queueEntry(42)] }));
+  vi.stubGlobal('fetch', fetch);
+  const onNavigate = vi.fn();
+  render(<Dashboard role="Event Coordinator Lead" accessToken="lead-token" onNavigate={onNavigate} />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading the unassigned queue');
+  expect(await screen.findByText('2 requests are awaiting a coordinator.')).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/assignment-queue', { method: 'GET', headers: { Authorization: 'Bearer lead-token' } });
+  for (const name of prototypeEvents) expect(screen.queryByText(name)).not.toBeInTheDocument();
+  expect(screen.queryByText('Events needing attention')).not.toBeInTheDocument();
+  expect(screen.queryByText('Needs your attention')).not.toBeInTheDocument();
+  expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Open unassigned queue']);
+  fireEvent.click(screen.getByRole('button', { name: 'Open unassigned queue' }));
+  expect(onNavigate).toHaveBeenCalledTimes(1);
+  expect(onNavigate).toHaveBeenCalledWith('queue');
+});
+
+test.each([
+  [[], '0 requests are awaiting a coordinator.'],
+  [[queueEntry(41)], '1 request is awaiting a coordinator.'],
+] as const)('[BOUNDARY] [SG2-86:AC2] the Lead desk counts a queue of %j exactly', async (entries, text) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ coordinators: [], entries })));
+  render(<Dashboard role="Event Coordinator Lead" accessToken="lead-token" onNavigate={vi.fn()} />);
+  expect(await screen.findByText(text)).toBeInTheDocument();
+});
+
+test.each([
+  ['a refused request', 'lead-token', 403, 'Only the Event Coordinator Lead can see the unassigned queue.'],
+  ['no session token', undefined, 200, 'Only the Event Coordinator Lead can see the unassigned queue.'],
+  ['an unavailable queue', 'lead-token', 503, 'The unassigned queue is temporarily unavailable. Open it to try again.'],
+] as const)('[FAILURE] [SG2-86:AC2] the Lead desk reports %s instead of falling back to prototype events', async (_, token, status, message) => {
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status }));
+  vi.stubGlobal('fetch', fetch);
+  render(<Dashboard role="Event Coordinator Lead" accessToken={token} onNavigate={vi.fn()} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  for (const name of prototypeEvents) expect(screen.queryByText(name)).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledTimes(token ? 1 : 0);
+});
+
+test('[CONFLICT] [SG2-86:AC2] a late queue count for the previous session cannot replace the current one', async () => {
+  let resolve!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn()
+    .mockImplementationOnce(() => new Promise<Response>((yes) => { resolve = yes; }))
+    .mockResolvedValueOnce(Response.json({ coordinators: [], entries: [queueEntry(41)] })));
+  const { rerender } = render(<Dashboard role="Event Coordinator Lead" accessToken="old-token" onNavigate={vi.fn()} />);
+  rerender(<Dashboard role="Event Coordinator Lead" accessToken="new-token" onNavigate={vi.fn()} />);
+  await screen.findByText('1 request is awaiting a coordinator.');
+  await act(async () => resolve(Response.json({ coordinators: [], entries: [queueEntry(41), queueEntry(42), queueEntry(43)] })));
+  expect(screen.getByText('1 request is awaiting a coordinator.')).toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-86:AC2] the Safety Officer desk is an honest empty state with no events and nothing to open', () => {
+  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+  const onNavigate = vi.fn();
+  render(<Dashboard role="Safety Officer" accessToken="safety-token" onNavigate={onNavigate} />);
+  expect(screen.getByRole('heading', { level: 2, name: 'No safety checks yet' })).toBeInTheDocument();
+  expect(screen.getByText(/Safety checks arrive with the safety review flow/)).toBeInTheDocument();
+  for (const name of prototypeEvents) expect(screen.queryByText(name)).not.toBeInTheDocument();
+  expect(screen.queryByText('Events needing attention')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(onNavigate).not.toHaveBeenCalled();
+});
+
 test('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] [SG2-31:AC4] each dashboard card says who the event is waiting on, in step with its status', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
     { event_id: 41, name: 'Queued forum', status: 'unassigned', can_manage: true, coordinator_id: null },

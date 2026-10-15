@@ -202,19 +202,43 @@ test('[NORMAL] [SG2-51:AC4] an Event Organiser is told when a venue for their ev
   expect(holds).not.toHaveBeenCalled();
 });
 
-test.each([
-  ['Event Organiser', 'event_coordinator_changed', 'Event Coordinator changed', 'Robin Second is now the Event Coordinator for “Leadership Summit”.'],
-  ['Event Coordinator', 'coordinator_assigned', 'Event assigned to you', 'You are now the Event Coordinator for “Leadership Summit”.'],
-  ['Event Coordinator', 'coordinator_removed', 'Event reassigned', '“Leadership Summit” has been reassigned to Robin Second. You are no longer its Event Coordinator.'],
-] as const)('[NORMAL] [SG2-88:AC4] %s sees the %s notice with its own label', async (role, kind, label, message) => {
-  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [] });
-  vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [
-    { notification_id: 11, event_id: 7, request_id: null, kind, message, created_at: '2026-10-10T02:00:00.000Z' },
-  ] });
-  render(<AppShell role={role} screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="tok">Dashboard</AppShell>);
+test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] the Event Coordinator Lead has a real inbox showing a submitted event, its message and time, without asking for hold notices', async () => {
+  const holds = vi.spyOn(api, 'loadHoldNotifications');
+  const submitted = { notification_id: 30, event_id: 7, request_id: null, kind: 'event_submitted' as const,
+    message: 'Partner Forum was submitted and is waiting for a coordinator.', created_at: '2026-10-13T02:00:00.000Z' };
+  const load = vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [submitted] });
+  render(<AppShell role="Event Coordinator Lead" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="lead-token">Dashboard</AppShell>);
   fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
-  expect(screen.getByText(label)).toBeInTheDocument();
-  expect(screen.getByText(message)).toBeInTheDocument();
+  expect(screen.getByText('Event submitted')).toBeVisible();
+  expect(screen.getByText('Partner Forum was submitted and is waiting for a coordinator.')).toBeVisible();
+  expect(screen.getByText('13 Oct 2026, 10:00 SGT')).toBeVisible();
+  expect(screen.queryByText('Clarification requested on E-201')).not.toBeInTheDocument();
+  expect(load).toHaveBeenCalledWith('lead-token');
+  expect(holds).not.toHaveBeenCalled();
+});
+
+test('[NORMAL] [SG2-68:AC2] each event lifecycle notice is labelled with what happened', async () => {
+  const lifecycle = [
+    ['coordinator_assigned', 'You are now coordinating Partner Forum.'],
+    ['clarification_requested', 'Your coordinator has a question about Partner Forum.'],
+    ['event_approved', 'Partner Forum was approved.'],
+    ['event_rejected', 'Partner Forum was not approved: Clashes with the AGM']
+  ] as const;
+  vi.mocked(notices.loadNotifications).mockResolvedValue({ ok: true, notifications: lifecycle.map(([kind, message], index) => ({
+    notification_id: 40 + index, event_id: 7, request_id: null, kind, message, created_at: '2026-10-13T02:00:00.000Z' })) });
+  render(<HoldNotifications accessToken="organiser-token" holds={false} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (4)' }));
+  for (const label of ['Coordinator assigned', 'Question from your coordinator', 'Event approved', 'Event not approved']) {
+    expect(screen.getByText(label)).toBeVisible();
+  }
+  for (const [, message] of lifecycle) expect(screen.getByText(message)).toBeVisible();
+  expect(screen.getAllByText('13 Oct 2026, 10:00 SGT')).toHaveLength(4);
+});
+
+test('[BOUNDARY] [SG2-68:AC3] the Safety Officer, who receives no notices yet, keeps the empty placeholder and makes no notice request', () => {
+  render(<AppShell role="Safety Officer" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="safety-token">Dashboard</AppShell>);
+  expect(screen.getByRole('button', { name: 'Notifications (0)' })).toBeInTheDocument();
+  expect(notices.loadNotifications).not.toHaveBeenCalled();
 });
 
 test('[BOUNDARY] [SG2-84:AC6] [SG2-85:AC4] a prototype shell without a token preserves sample internal notifications', () => {

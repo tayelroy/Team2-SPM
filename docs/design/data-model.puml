@@ -1,0 +1,521 @@
+' ConnectSphere physical data model (SG2-95), as of main 1d1e336 (14 Oct 2026).
+' Final state of public schema after every file in supabase/migrations/, in order.
+' 24 tables in four areas; each diagram block renders to its own page.
+' Week 7 tables/columns are tagged with the migration that added them.
+' Sources per element: docs/design/model-notes.md.
+
+@startuml er-events-people
+!pragma layout smetana
+title ConnectSphere data model (1/4): events & people (public schema)\nas of main 1d1e336 (14 Oct 2026)
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+entity "auth.users" as auth_users <<ref>> {
+  * id : uuid <<PK>>
+  .. Supabase Auth (not public) ..
+}
+
+entity roles {
+  * role_id : serial <<PK>>
+  --
+  * role_name : varchar(50) <<UQ>>
+  description : text
+  .. rows 1-5 seeded in core schema ..
+  <back:#FFF4CC>rows 6 Event Coordinator Lead, 7 Safety Officer</back>
+  <back:#FFF4CC>«W7 202610050004_week7_roles»</back>
+}
+
+entity users {
+  * user_id : uuid <<PK>> <<FK auth.users>>
+  --
+  * name : varchar(255)
+  organisation : varchar(255)
+  * role_id : integer <<FK roles>>
+  phone : varchar
+  * communication_preferences : text[] = '{}'
+  department : varchar
+}
+
+entity account_roles {
+  * user_id : uuid <<PK>> <<FK auth.users>>
+  --
+  * role : text  CHECK in (event_organiser,
+      event_coordinator, venue_staff,
+      technical_support_staff, attendee,
+  <back:#FFF4CC>    event_coordinator_lead, safety_officer)</back>
+  <back:#FFF4CC>«W7 202610050004_week7_roles»</back>
+}
+
+entity events {
+  * event_id : serial <<PK>>
+  --
+  * organiser_id : uuid <<FK users>>
+  coordinator_id : uuid <<FK users>>
+  organisation : varchar(255)
+  name : varchar(255)
+  purpose, description : text
+  proposed_date : timestamptz
+  expected_attendance : integer
+  venue_requirements, accessibility_needs : text
+  equipment_requirements : text
+  registration_needed : boolean
+  * status : event_status = 'draft'
+  venue_booking_id : integer <<FK venue_bookings>>
+  registration_capacity : integer  CHECK > 0
+  registration_opens_at, registration_closes_at : timestamptz
+  planning_notes : text
+  * arrangements_recheck_needed : boolean = false
+  * outstanding_arrangements : jsonb = '[]'
+  decided_by : uuid <<FK users>>
+  decided_at : timestamptz
+  decision_reason : text
+  <back:#FFF4CC>completed_by : uuid <<FK users>>  «W7 202610090003»</back>
+  <back:#FFF4CC>completed_at : timestamptz  «W7 202610090003»</back>
+  <back:#FFF4CC>submitted_at : timestamptz  «W7 202610090004»</back>
+  confirmed_by : uuid <<FK users>>
+  confirmed_at : timestamptz
+  .. checks ..
+  closes_at > opens_at; rejected => decision_reason;
+  by/at pairs recorded together (decided, completed,
+  confirmed); completed => completed_at
+  .. indexes ..
+  (organisation); (coordinator_id, status);
+  <back:#FFF4CC>(submitted_at, event_id) WHERE unassigned</back>
+}
+
+entity event_audit_logs {
+  * log_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  <back:#FFF4CC>actor_id : uuid <<FK users>> (NOT NULL dropped:</back>
+  <back:#FFF4CC>  null = System) «W7 202610050001_venue_holds»</back>
+  * field_name : text
+  old_value, new_value : text
+  * created_at : timestamptz = now()
+}
+
+entity event_clarifications {
+  * clarification_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * sender_id : uuid <<FK users>>
+  * message : text  CHECK not blank
+  * created_at : timestamptz = now()
+}
+
+entity registrations {
+  * registration_id : serial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * attendee_id : uuid <<FK users>>
+  status : varchar(50)
+}
+
+entity "venue_bookings" as vb_ref <<ref>> {
+  * booking_id : bigserial <<PK>>
+  .. page 2 ..
+}
+
+auth_users ||--o| users
+auth_users ||--o| account_roles
+roles ||--o{ users
+users ||--o{ events : organiser_id
+users |o--o{ events : coordinator_id
+events ||--o{ event_audit_logs
+users |o--o{ event_audit_logs : actor_id
+events ||--o{ event_clarifications
+users ||--o{ event_clarifications : sender_id
+events ||--o{ registrations
+users ||--o{ registrations : attendee_id
+vb_ref |o--o{ events : venue_booking_id (first venue)
+
+legend bottom left
+  |= Marker |= Meaning |
+  | ● (source *) | NOT NULL |
+  |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| added by a Week 7 migration |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page / outside public |
+  enum event_status: draft, submitted, under_review, approved, planning,
+  confirmed, completed, cancelled, rejected, needs_clarification (202609300001),
+  <back:#FFF4CC>unassigned, awaiting_safety_check, safety_rejected, preparation «W7 202610090001»</back>
+  events.decided_by / completed_by / confirmed_by -> users: lines omitted.
+endlegend
+@enduml
+
+@startuml er-venues-availability
+!pragma layout smetana
+title ConnectSphere data model (2/4): venues, availability & bookings (public schema)\nas of main 1d1e336 (14 Oct 2026)
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+entity "events" as ev_ref <<ref>> {
+  * event_id : serial <<PK>>
+  .. page 1 ..
+}
+
+entity venues {
+  * venue_id : serial <<PK>>
+  --
+  * name : varchar(255)
+  location : text
+  capacity : integer
+  facilities : text
+  accessibility_features : text
+  operating_information : text
+}
+
+entity venue_layouts {
+  * venue_id : integer <<PK>> <<FK venues>> cascade
+  * layout : venue_layout <<PK>>
+  --
+  other_description : text  (required iff 'other')
+}
+
+entity venue_operations <<Week 7>> {
+  * venue_id : integer <<PK>> <<FK venues>> cascade
+  --
+  * setup_minutes : integer = 0  CHECK 0..1440
+  * turnaround_minutes : integer = 0  CHECK 0..1440
+  emergency_access : text  (<= 2000)
+  known_restrictions : text  (<= 2000)
+  updated_by : uuid <<FK users>>
+  * updated_at : timestamptz = now()
+  .. «W7 202610050003_venue_operations (SG2-77)» ..
+}
+
+entity venue_operation_history <<Week 7>> {
+  * history_id : bigserial <<PK>>
+  --
+  * venue_id : integer <<FK venues>> cascade
+  * field_name : text
+  old_value, new_value : text
+  changed_by : uuid <<FK users>>
+  * changed_at : timestamptz = now()
+  .. «W7 202610050003 (SG2-77)», trigger-written ..
+}
+
+entity venue_unavailability {
+  * unavailability_id : bigserial <<PK>>
+  --
+  * venue_id : integer <<FK venues>> cascade
+  * starts_at, ends_at : timestamptz  (ends > starts)
+  * reason : text
+  * <back:#FFF4CC>category : text = 'other'  CHECK in (maintenance,</back>
+  <back:#FFF4CC>  equipment_failure, renovation, safety_concern, other)</back>
+  <back:#FFF4CC>created_by : uuid <<FK auth.users>> set null</back>
+  <back:#FFF4CC>created_at : timestamptz</back>
+  <back:#FFF4CC>«W7 202610100001_venue_temporary_unavailability»</back>
+}
+
+entity venue_booking_disruptions <<Week 7>> {
+  * unavailability_id : bigint <<PK>> <<FK venue_unavailability>> cascade
+  * booking_id : bigint <<PK>> <<FK venue_bookings>> cascade
+  --
+  * flagged_at : timestamptz = clock_timestamp()
+  .. «W7 202610100001 (SG2-80)» ..
+}
+
+entity venue_bookings {
+  * booking_id : bigserial <<PK>>
+  --
+  * venue_id : integer <<FK venues>> cascade
+  event_id : integer <<FK events>> set null
+  * starts_at, ends_at : timestamptz  (ends > starts)
+  * status : text  CHECK in (held, confirmed, cancelled)
+  cancelled_by : uuid <<FK users>> set null
+  cancelled_at : timestamptz
+  cancellation_reason : text  (<= 500)
+  .. constraints ..
+  EXCLUDE gist (venue_id =, tstzrange &&)
+    WHERE status = 'confirmed'
+  cancelled <=> cancelled_at; cancelled => reason
+}
+
+entity venue_booking_clashes <<Week 7>> {
+  * booking_id : bigint <<PK>> <<FK venue_bookings>> cascade
+  * other_booking_id : bigint <<PK>> <<FK venue_bookings>> cascade
+  --
+  * venue_id : integer <<FK venues>> cascade
+  * flagged_at : timestamptz = clock_timestamp()
+  CHECK booking_id < other_booking_id
+  .. «W7 202610140003_venue_booking_clashes (SG2-79)» ..
+}
+
+venues ||--o{ venue_layouts
+venues ||--o| venue_operations
+venues ||--o{ venue_operation_history
+venues ||--o{ venue_unavailability
+venues ||--o{ venue_bookings
+venues ||--o{ venue_booking_clashes
+venue_unavailability ||--o{ venue_booking_disruptions
+venue_bookings ||--o{ venue_booking_disruptions
+venue_bookings ||--o{ venue_booking_clashes : booking_id / other_booking_id
+ev_ref |o--o{ venue_bookings : event_id
+
+legend bottom left
+  |= Marker |= Meaning |
+  | ● (source *) | NOT NULL |
+  |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| added by a Week 7 migration |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  enum venue_layout: classroom, theatre, boardroom, banquet, exhibition, other.
+  Actor columns (*_by) reference users.user_id (venue_unavailability.created_by:
+  auth.users.id): lines omitted.
+  Views: venue_booking_occupancy (bookings + live holds), venue_affected_bookings.
+endlegend
+@enduml
+
+@startuml er-requests-holds
+!pragma layout smetana
+title ConnectSphere data model (3/4): venue requests, capacity exceptions & holds (public schema)\nas of main 1d1e336 (14 Oct 2026)
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+entity "events" as ev_ref <<ref>> {
+  * event_id : serial <<PK>>
+  .. page 1 ..
+}
+entity "venues" as venue_ref <<ref>> {
+  * venue_id : serial <<PK>>
+  .. page 2 ..
+}
+entity "venue_bookings" as vb_ref <<ref>> {
+  * booking_id : bigserial <<PK>>
+  .. page 2 ..
+}
+
+entity venue_booking_requests {
+  * request_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * venue_id : integer <<FK venues>>
+  * starts_at, ends_at : timestamptz  (ends > starts)
+  * status : text = 'pending'  CHECK in (pending,
+      approved, rejected, cancelled)
+  notes : text
+  layout : venue_layout
+  venue_requirements : text
+  requested_by : uuid <<FK users>>  (null = hold)
+  * requested_at : timestamptz = now()
+  decided_by : uuid <<FK users>>
+  decided_at : timestamptz
+  decision_reason : text  (<= 500)
+  venue_booking_id : bigint <<FK venue_bookings>> set null
+  <back:#FFF4CC>withdrawn_by : uuid <<FK users>> set null</back>
+  <back:#FFF4CC>withdrawn_at : timestamptz  (=> status cancelled)</back>
+  <back:#FFF4CC>«W7 202610150002_venue_request_withdrawal»</back>
+  .. constraints ..
+  EXCLUDE gist (event_id =, venue_id =, tstzrange &&)
+    WHERE pending/approved and requested_by not null
+}
+
+entity venue_capacity_exceptions {
+  * exception_id : bigserial <<PK>>
+  --
+  * request_id : bigint <<FK venue_booking_requests>> cascade
+  * approved_by : uuid <<FK users>>
+  * approver_role : text  CHECK in (venue_staff,
+      technical_support_staff, event_organiser)
+  * expected_attendance : integer  CHECK > 0
+  venue_capacity : integer
+  * approved_at : timestamptz = now()
+  UNIQUE (request_id, expected_attendance)
+}
+
+entity venue_holds <<Week 7>> {
+  * hold_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * venue_id : integer <<FK venues>>
+  * request_id : bigint <<UQ>> <<FK venue_booking_requests>>
+  booking_id : bigint <<FK venue_bookings>>
+  * starts_at, ends_at, expires_at : timestamptz
+  * status : text = 'tentative'  CHECK in (tentative,
+      converted, released, expired)
+  * created_by : uuid <<FK users>>
+  * created_at : timestamptz = clock_timestamp()
+  warning_sent_at : timestamptz
+  .. checks ..
+  ends > starts; expires_at > created_at;
+  converted <=> booking_id not null
+  .. «W7 202610050001_venue_holds (SG2-84/85)» ..
+}
+
+entity venue_hold_notifications <<Week 7>> {
+  * notification_id : bigserial <<PK>>
+  --
+  * recipient_id : uuid <<FK users>>
+  * event_id : integer <<FK events>> cascade
+  * hold_id : bigint <<FK venue_holds>> cascade
+  * kind : text  CHECK in (placed, warning, expired)
+  * message : text
+  * created_at : timestamptz = clock_timestamp()
+  UNIQUE (hold_id, recipient_id, kind)
+  .. «W7 202610050001» ..
+}
+
+entity venue_hold_settings <<Week 7>> {
+  * singleton : boolean <<PK>> = true  CHECK true
+  --
+  * warning_lead_seconds : integer = 86400
+      CHECK 1..2592000
+  .. «W7 202610050001», one row ..
+}
+
+ev_ref ||--o{ venue_booking_requests
+venue_ref ||--o{ venue_booking_requests
+ev_ref ||--o{ venue_holds
+venue_ref ||--o{ venue_holds
+venue_booking_requests ||--o{ venue_capacity_exceptions
+venue_booking_requests ||--o| venue_holds : request_id
+venue_booking_requests }o--o| vb_ref : venue_booking_id
+venue_holds }o--o| vb_ref : booking_id (converted)
+venue_holds ||--o{ venue_hold_notifications
+ev_ref ||--o{ venue_hold_notifications
+
+legend bottom left
+  |= Marker |= Meaning |
+  | ● (source *) | NOT NULL |
+  |<back:#FFF4CC> <<Week 7>> / «W7 migration» </back>| added by a Week 7 migration |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  Actor columns (*_by, recipient_id) reference users.user_id: lines omitted.
+  venue_hold_settings is a single-row table read by the hold functions.
+  pg_cron job 'venue-hold-deadlines' (* * * * *) runs process_venue_hold_deadlines():
+  expires holds and sends the 'warning' notice warning_lead_seconds (24 h) ahead.
+  View: internal_work_items (work queue over requests).
+endlegend
+@enduml
+
+@startuml er-equipment-notifications
+!pragma layout smetana
+title ConnectSphere data model (4/4): equipment & notifications (public schema)\nas of main 1d1e336 (14 Oct 2026)
+hide circle
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+entity "events" as ev_ref <<ref>> {
+  * event_id : serial <<PK>>
+  .. page 1 ..
+}
+entity "venues" as venue_ref <<ref>> {
+  * venue_id : serial <<PK>>
+  .. page 2 ..
+}
+entity "venue_booking_requests" as vbr_ref <<ref>> {
+  * request_id : bigserial <<PK>>
+  .. page 3 ..
+}
+entity "users" as users_ref <<ref>> {
+  * user_id : uuid <<PK>>
+  .. page 1 ..
+}
+
+entity equipment {
+  * equipment_id : serial <<PK>>
+  --
+  * name : varchar(255)  (not blank)
+  * quantity_total : integer = 0  CHECK >= 0
+  * description : text = 'Not recorded'
+  * location : text = 'Not recorded'
+  * operational_status : text = 'operational'
+      CHECK in (operational, damaged, maintenance)
+  * version : bigint = 1
+  available_quantity : integer  GENERATED STORED
+}
+
+entity equipment_requests {
+  * request_id : bigserial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * equipment_id : integer <<FK equipment>>
+  * quantity : integer  CHECK > 0
+  starts_at, ends_at : timestamptz  (both or neither)
+  * status : text = 'pending'  CHECK in (pending,
+      approved, rejected, cancelled)
+  notes : text
+  arrangement_notes : text  (<= 2000)
+  shortfall : integer  CHECK 0..quantity
+  placement_venue_id : integer <<FK venues>>
+  placement_position : text  (pair with venue)
+  * version : bigint = 1
+}
+
+entity equipment_reservations {
+  * reservation_id : serial <<PK>>
+  --
+  * event_id : integer <<FK events>> cascade
+  * equipment_id : integer <<FK equipment>>
+  * quantity_reserved : integer
+  starts_at, ends_at : timestamptz  (both or neither)
+  request_id : bigint <<UQ>> <<FK equipment_requests>>
+  reserved_at : timestamptz
+  .. index (equipment_id, event_id) ..
+}
+
+entity notifications {
+  * notification_id : bigserial <<PK>>
+  --
+  * recipient_id : uuid <<FK users>> cascade
+  event_id : integer <<FK events>> cascade
+  request_id : bigint <<FK venue_booking_requests>> cascade
+  equipment_reservation_id : integer
+      <<FK equipment_reservations>> cascade
+  * kind : text  CHECK in (venue_request_approved,
+      venue_request_rejected, venue_booking_released,
+      equipment_reserved,
+  <back:#FFF4CC>    venue_booking_clash «W7 202610140003»,</back>
+      event_confirmed, event_submitted,
+      coordinator_assigned, clarification_requested,
+      event_approved, event_rejected)
+  * message : text  (1..2000)
+  * created_at : timestamptz = clock_timestamp()
+  UNIQUE (request_id, recipient_id, kind)
+  UNIQUE (equipment_reservation_id, recipient_id)
+}
+
+ev_ref ||--o{ equipment_requests
+ev_ref ||--o{ equipment_reservations
+equipment ||--o{ equipment_requests
+equipment ||--o{ equipment_reservations
+venue_ref |o--o{ equipment_requests : placement_venue_id
+equipment_requests |o--o| equipment_reservations : request_id
+users_ref ||--o{ notifications : recipient_id
+ev_ref |o--o{ notifications
+vbr_ref |o--o{ notifications : request_id
+equipment_reservations |o--o{ notifications : equipment_reservation_id
+
+legend bottom left
+  |= Marker |= Meaning |
+  | ● (source *) | NOT NULL |
+  |<back:#FFF4CC> «W7 migration» </back>| added by a Week 7 migration |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  notifications kind history: 202610060001, 202610100002, 202610140001,
+  202610140003, 202610150001, 202610160001 (SG2-68 event notices).
+  Hold notices live in venue_hold_notifications (page 3).
+endlegend
+@enduml

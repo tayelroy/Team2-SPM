@@ -1,0 +1,439 @@
+' ConnectSphere domain class model (SG2-95), as of main 1d1e336 (14 Oct 2026).
+' Three diagrams, one per area; each renders to its own page.
+' Attributes are the persisted fields (supabase/migrations) in domain form;
+' operations name the real RPC / handler that changes the object.
+' Sources per element: docs/design/model-notes.md.
+
+@startuml class-events-people
+!pragma layout smetana
+title ConnectSphere domain model (1/3): events, people & coordination\nas of main 1d1e336 (14 Oct 2026)
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<planned>> #DDDDDD
+  BorderStyle<<planned>> dashed
+  BorderColor<<planned>> #777777
+}
+
+enum EventStatus {
+  draft
+  submitted
+  under_review
+  approved
+  planning
+  confirmed
+  completed
+  cancelled
+  rejected
+  needs_clarification
+  <back:#FFF4CC>unassigned «W7 SG2-100»</back>
+  <back:#FFF4CC>awaiting_safety_check «W7 SG2-100»</back>
+  <back:#FFF4CC>safety_rejected «W7 SG2-100»</back>
+  <back:#FFF4CC>preparation «W7 SG2-100»</back>
+}
+
+enum AccountRoleName {
+  event_organiser
+  event_coordinator
+  venue_staff
+  technical_support_staff
+  attendee
+  <back:#FFF4CC>event_coordinator_lead «W7 SG2-86»</back>
+  <back:#FFF4CC>safety_officer «W7 SG2-86»</back>
+}
+
+class User {
+  userId : uuid
+  name : string
+  organisation : string [0..1]
+  phone : string [0..1]
+  communicationPreferences : string[]
+  department : string [0..1]
+}
+
+class AccountRole {
+  userId : uuid
+  role : AccountRoleName
+  --
+  updateAccountRole()
+}
+
+class Role {
+  roleId : int
+  roleName : string
+  description : string [0..1]
+}
+
+class Event {
+  eventId : int
+  organisation : string [0..1]
+  name, purpose, description : string [0..1]
+  proposedDate : timestamptz [0..1]
+  expectedAttendance : int [0..1]
+  venueRequirements, accessibilityNeeds : string [0..1]
+  equipmentRequirements : string [0..1]
+  registrationNeeded : boolean [0..1]
+  registrationCapacity : int [0..1]
+  registrationOpensAt, registrationClosesAt : timestamptz [0..1]
+  planningNotes : string [0..1]
+  arrangementsRecheckNeeded : boolean
+  outstandingArrangements : jsonb
+  status : EventStatus
+  decidedBy / decidedAt / decisionReason [0..1]
+  <back:#FFF4CC>submittedAt : timestamptz [0..1] «W7 SG2-87»</back>
+  <back:#FFF4CC>completedBy / completedAt [0..1] «W7 SG2-100»</back>
+  confirmedBy / confirmedAt [0..1]
+  --
+  STATUS_TRANSITIONS / canTransition()
+  confirm_event()
+}
+
+class CoordinatorAssignment <<Week 7>> {
+  .. no table: events.coordinator_id ..
+  assignEventCoordinator()
+  fetchUnassignedQueue()
+}
+
+class EventAuditLog {
+  logId : bigint
+  <back:#FFF4CC>actorId : uuid [0..1] «W7 SG2-84: null = System»</back>
+  fieldName : string
+  oldValue, newValue : string [0..1]
+  createdAt : timestamptz
+}
+
+class Clarification {
+  clarificationId : bigint
+  message : string
+  createdAt : timestamptz
+}
+
+class Registration {
+  registrationId : int
+  status : string [0..1]
+}
+
+enum NotificationKind {
+  venue_request_approved
+  venue_request_rejected
+  venue_booking_released
+  equipment_reserved
+  <back:#FFF4CC>venue_booking_clash «W7 SG2-79»</back>
+  event_confirmed
+  event_submitted
+  coordinator_assigned
+  clarification_requested
+  event_approved
+  event_rejected
+}
+
+class Notification {
+  notificationId : bigint
+  kind : NotificationKind
+  message : string
+  createdAt : timestamptz
+}
+
+class SafetyCheck <<planned>> #DDDDDD;line.dashed;line:777777 {
+  .. SG2-91/92/93/94: no table or RPC on main ..
+}
+
+User "1" -- "0..1" AccountRole : has >
+User "*" -- "1" Role : roleId >
+AccountRole ..> AccountRoleName
+Event ..> EventStatus
+Notification ..> NotificationKind
+
+User "1" -- "*" Event : organiser <
+Event "*" -- "0..1" User : coordinator >
+(Event, User) .. CoordinatorAssignment
+
+Event "1" *-- "*" EventAuditLog
+EventAuditLog "*" -- "0..1" User : actor >
+Event "1" *-- "*" Clarification
+Clarification "*" -- "1" User : sender >
+Event "1" *-- "*" Registration
+Registration "*" -- "1" User : attendee >
+Notification "*" -- "1" User : recipient >
+Notification "*" -- "0..1" Event : about >
+
+SafetyCheck "*" .. "1" Event : checks (awaiting_safety_check) >
+SafetyCheck "*" .. "1" User : decided by Safety Officer >
+
+note right of CoordinatorAssignment
+  Event Coordinator Lead only (event_request.assign_coordinator).
+  PATCH /api/event-requests/:eventId/coordinator: assigns or
+  reassigns; unassigned -> submitted; history row
+  field_name 'coordinator_id'; notices kind coordinator_assigned.
+  Queue: GET /api/assignment-queue (SG2-87/97).
+end note
+
+note bottom of SafetyCheck
+  <<planned>> SG2-91/92/93/94 (epic SG2-76).
+  Statuses already exist (SG2-100):
+  awaiting_safety_check -> preparation | safety_rejected | planning.
+end note
+
+legend bottom left
+  |= Marker |= Meaning |
+  |<back:#FFFFFF>   plain   </back>| built before Week 7 |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built on main (story id) |
+  |<back:#DDDDDD> <<planned>> dashed </back>| not built; Jira story named |
+  Multiplicity [0..1] = nullable column.
+endlegend
+@enduml
+
+@startuml class-venues-bookings
+!pragma layout smetana
+title ConnectSphere domain model (2/3): venues, availability & bookings\nas of main 1d1e336 (14 Oct 2026)
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<planned>> #DDDDDD
+  BorderStyle<<planned>> dashed
+  BorderColor<<planned>> #777777
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+class Event <<ref>> {
+  eventId : int
+}
+
+class Venue {
+  venueId : int
+  name : string
+  location : string [0..1]
+  capacity : int [0..1]
+  facilities : string [0..1]
+  accessibilityFeatures : string [0..1]
+  operatingInformation : string [0..1]
+}
+
+class VenueOperations <<Week 7>> {
+  {field} setupMinutes : int (0..1440)
+  {field} turnaroundMinutes : int (0..1440)
+  emergencyAccess : string [0..1]
+  knownRestrictions : string [0..1]
+  updatedBy : uuid [0..1]
+  updatedAt : timestamptz
+  --
+  venue_preparation_gap()
+}
+
+class VenueOperationHistory <<Week 7>> {
+  fieldName : string
+  oldValue, newValue : string [0..1]
+  changedBy : uuid [0..1]
+  changedAt : timestamptz
+}
+
+class VenueLayout {
+  layout : classroom|theatre|boardroom|banquet|exhibition|other
+  otherDescription : string [0..1]
+}
+
+class VenueUnavailability {
+  unavailabilityId : bigint
+  startsAt, endsAt : timestamptz
+  {field} reason : string (the note)
+  <back:#FFF4CC>category : maintenance|equipment_failure|</back>
+  <back:#FFF4CC>  renovation|safety_concern|other «W7 SG2-80»</back>
+  <back:#FFF4CC>createdBy : uuid [0..1] «W7 SG2-80»</back>
+  <back:#FFF4CC>createdAt : timestamptz [0..1] «W7 SG2-80»</back>
+}
+
+class VenueBookingDisruption <<Week 7>> {
+  flaggedAt : timestamptz
+}
+
+class VenueBookingRequest {
+  requestId : bigint
+  startsAt, endsAt : timestamptz
+  status : pending|approved|rejected|cancelled
+  notes, venueRequirements : string [0..1]
+  layout : VenueLayout [0..1]
+  {field} requestedBy : uuid [0..1] (null = hold)
+  requestedAt : timestamptz
+  decidedBy / decidedAt / decisionReason [0..1]
+  <back:#FFF4CC>withdrawnBy / withdrawnAt [0..1] «W7 SG2-82»</back>
+  --
+  decide_venue_booking_request()
+  <back:#FFF4CC>withdraw_venue_booking_request() «W7 SG2-82»</back>
+}
+
+class CapacityException {
+  exceptionId : bigint
+  approvedBy : uuid
+  approverRole : venue_staff|technical_support_staff|event_organiser
+  expectedAttendance : int
+  venueCapacity : int [0..1]
+  approvedAt : timestamptz
+}
+
+class VenueBooking {
+  bookingId : bigint
+  startsAt, endsAt : timestamptz
+  status : held|confirmed|cancelled
+  cancelledBy / cancelledAt / cancellationReason [0..1]
+  --
+  release_venue_booking()
+}
+
+class BookingClash <<Week 7>> {
+  flaggedAt : timestamptz
+  {field} bookingId < otherBookingId (pair stored once)
+  --
+  refresh_venue_booking_clashes()
+}
+
+class VenueHold <<Week 7>> {
+  holdId : bigint
+  startsAt, endsAt : timestamptz
+  expiresAt : timestamptz
+  status : tentative|converted|released|expired
+  createdBy : uuid
+  createdAt : timestamptz
+  warningSentAt : timestamptz [0..1]
+  --
+  create_venue_hold()
+  change_venue_hold(release|convert)
+  process_venue_hold_deadlines() «pg_cron 1/min»
+}
+
+class VenueHoldNotification <<Week 7>> {
+  notificationId : bigint
+  {field} recipientId : uuid (event coordinator)
+  kind : placed|warning|expired
+  message : string
+  createdAt : timestamptz
+}
+
+class VenueHoldSettings <<Week 7>> {
+  {field} warningLeadSeconds : int = 86400 (24 h)
+}
+
+class ReplaceVenue <<planned>> #DDDDDD;line.dashed;line:777777 {
+  .. SG2-81: no model on main ..
+}
+
+Venue "1" *-- "0..1" VenueOperations
+Venue "1" *-- "*" VenueOperationHistory
+Venue "1" *-- "*" VenueLayout
+Venue "1" *-- "*" VenueUnavailability
+Venue "1" -- "*" VenueBooking
+Venue "1" -- "*" VenueBookingRequest
+Event "1" -- "*" VenueBookingRequest
+Event "0..1" -- "*" VenueBooking : event (nullable FK) >
+VenueBookingRequest "1" *-- "*" CapacityException
+VenueBookingRequest "0..1" -- "0..1" VenueBooking : approved as >
+VenueBookingRequest "1" -- "0..1" VenueHold : held by <
+VenueHold "0..1" -- "0..1" VenueBooking : converted to >
+VenueHold "1" *-- "*" VenueHoldNotification
+VenueHold ..> VenueHoldSettings : warning lead
+VenueUnavailability "1" -- "*" VenueBookingDisruption
+VenueBookingDisruption "*" -- "1" VenueBooking : flags confirmed >
+VenueBooking "1" -- "*" BookingClash : clashes with (pair) >
+VenueBookingDisruption .. ReplaceVenue : <<planned>> SG2-81
+
+note bottom of VenueOperations
+  Setup before + turnaround after widen every
+  availability / conflict check (SG2-78);
+  existing pairs that now clash are flagged
+  as BookingClash (SG2-79).
+end note
+
+note bottom of ReplaceVenue
+  <<planned>> SG2-81 replace a venue for a
+  disrupted booking; SG2-83 change one venue
+  of a multi-venue event.
+end note
+
+legend bottom left
+  |= Marker |= Meaning |
+  |<back:#FFFFFF>   plain   </back>| built before Week 7 |
+  |<back:#FFF4CC> <<Week 7>> / «W7» </back>| Week 7 change, built on main (story id) |
+  |<back:#DDDDDD> <<planned>> dashed </back>| not built; Jira story named |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  Event 1–* VenueBooking: one event may hold several venues (SG2-82).
+endlegend
+@enduml
+
+@startuml class-equipment
+!pragma layout smetana
+title ConnectSphere domain model (3/3): equipment\nas of main 1d1e336 (14 Oct 2026)
+hide empty members
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BackgroundColor<<Week 7>> #FFF4CC
+  BackgroundColor<<ref>> #E8F0FE
+}
+
+class Event <<ref>> {
+  eventId : int
+}
+class Venue <<ref>> {
+  venueId : int
+}
+class Notification <<ref>> {
+  kind = equipment_reserved
+}
+
+class Equipment {
+  equipmentId : int
+  name : string
+  description : string
+  quantityTotal : int
+  location : string
+  operationalStatus : operational|damaged|maintenance
+  version : bigint
+  availableQuantity : int «generated»
+  --
+  check_equipment_availability()
+}
+
+class EquipmentRequest {
+  requestId : bigint
+  quantity : int
+  startsAt, endsAt : timestamptz [0..1]
+  status : pending|approved|rejected|cancelled
+  notes, arrangementNotes : string [0..1]
+  shortfall : int [0..1]
+  placementPosition : string [0..1]
+  version : bigint
+  --
+  manage_equipment_requirements()
+}
+
+class EquipmentReservation {
+  reservationId : int
+  quantityReserved : int
+  startsAt, endsAt : timestamptz [0..1]
+  reservedAt : timestamptz [0..1]
+  --
+  manage_equipment_reservations()
+}
+
+Event "1" *-- "*" EquipmentRequest
+Event "1" *-- "*" EquipmentReservation
+Equipment "1" -- "*" EquipmentRequest
+Equipment "1" -- "*" EquipmentReservation
+EquipmentRequest "0..1" -- "0..1" EquipmentReservation : reserved as >
+EquipmentRequest "*" -- "0..1" Venue : placed at >
+EquipmentReservation "1" -- "*" Notification : receipt >
+
+legend bottom left
+  |= Marker |= Meaning |
+  |<back:#FFFFFF>   plain   </back>| built (SG2-52/53/54/55) |
+  |<back:#E8F0FE> <<ref>> </back>| defined on another page |
+  No Week 7 change touches equipment; placement
+  is read by the Safety Officer (SG2-53 AC6).
+endlegend
+@enduml

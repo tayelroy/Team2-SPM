@@ -2923,6 +2923,40 @@
     "execution_date": "6 Oct 2026"
   },
   {
+    "id": "SG2-86-P02",
+    "title": "the Week 7 desks show no prototype events and offer only their own screens",
+    "story": "SG2-86",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-86:AC2"
+    ],
+    "purpose": "Guard the browser walkthrough bug where the Event Coordinator Lead and Safety Officer dashboards listed prototype events (E-205 'Product Launch — Tideline' with organiser copy), a click on one opened the Attendee event page, and the menu offered All events, which only says it is for Event Organisers. Each desk must show only real data for that role and the menu only the screens its server permissions allow.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Fixture accounts safety@example.test (safety_officer) and lead@example.test (event_coordinator_lead).",
+    "steps": [
+      "Sign in as safety@example.test",
+      "Wait for the menu to finish loading permissions (navigation aria-busy=false) and read its items",
+      "Log out; sign in as lead@example.test and read the menu and the desk",
+      "Click Open unassigned queue"
+    ],
+    "data": [
+      "Prototype event name 'Product Launch — Tideline' (must not appear)"
+    ],
+    "expected": [
+      "Safety desk heading, a 'No safety checks yet' empty state, a menu of exactly [Dashboard] and no prototype event",
+      "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
+      "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
+    ],
+    "evidence": "e2e/regression.spec.ts; client/src/App.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/mock/viewModel.test.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-86-new-role-dashboards on origin/main 88a431a; npm run test:regression locally in Chromium: 76/76 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026"
+  },
+  {
     "id": "SG2-87-P01",
     "title": "a submitted request waits in the Lead's unassigned queue until it is assigned",
     "story": "SG2-87",
@@ -3003,9 +3037,9 @@
     "expected": [
       "Technical Support receives 403 and no notice is created",
       "The queue card disappears and the screen says 'Assigned Planning workshop to Regression coordinator.'",
-      "The coordinator has one coordinator_assigned notice; the organiser has one event_coordinator_changed notice naming the coordinator",
+      "The coordinator has one coordinator_assigned notice; the organiser has one coordinator_assigned notice naming the coordinator",
       "History holds [user-lead, empty, Regression coordinator]",
-      "After reassignment the response has notified true; the previous coordinator also has a coordinator_removed notice naming the new coordinator; the organiser has two notices",
+      "After reassignment the previous coordinator also has a coordinator_assigned notice saying the event was reassigned to another coordinator; the organiser has two notices",
       "The previous coordinator's review call returns 404",
       "History holds both changes newest first, each by user-lead",
       "Reassigning to the coordinator who already holds the event returns 200 and sends no further notice"
@@ -4401,6 +4435,257 @@
     "expected": "Unsigned is 401 and every other role 403. The colleague's event is 404 'No event in preparation is assigned to this account.' and stays in preparation. Before confirmation the organiser gets 404; afterwards another organiser gets 404, venue staff 403, and the coordinator 200 with 12 × Wireless microphones. One notification exists."
   },
   {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures; fresh browser context; no hosted Supabase.",
+    "data": "Organiser and lead fixture accounts; Notice Forum event 681, a complete draft with no coordinator, organised by organiser.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-P01",
+    "title": "submitting an event tells the Event Coordinator Lead, whose bell names the event, what happened and when",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1",
+      "SG2-68:AC2"
+    ],
+    "purpose": "Prove a submission waiting for a coordinator raises a notice for the Lead, and that the Lead now has a bell showing it.",
+    "steps": [
+      "Submit event 681 as the organiser through the API and read the fixture ledger.",
+      "At 1440px, sign in as the Lead, open the notifications bell and read the notice; collect browser and console errors."
+    ],
+    "expected": "The ledger holds exactly one notice: user-lead, event 681, no request, event_submitted, 'Notice Forum was submitted and is waiting for a coordinator.' with a stored time. The Lead's bell reads Notifications (1) and shows 'Event submitted', the message and a time in Singapore time. No browser errors."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures; fresh browser context; no hosted Supabase.",
+    "data": "Organiser, lead and coordinator fixture accounts; a second coordinator without a sign-in account; Notice Forum event 681.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-P02",
+    "title": "assigning and reassigning a coordinator tells the new coordinator, the organiser and the coordinator taken off",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1",
+      "SG2-68:AC2"
+    ],
+    "purpose": "Prove assignment and reassignment notify everyone the change affects, and not the Lead who made it.",
+    "steps": [
+      "Submit event 681; as the Lead assign the signed-in coordinator; read the coordinator's ledger rows.",
+      "At 1440px, open the coordinator's bell, then the organiser's bell.",
+      "As the Lead reassign to the second coordinator; read each person's ledger rows."
+    ],
+    "expected": "The coordinator's bell shows 'Coordinator assigned' / 'You are now coordinating Notice Forum.'; the organiser's shows 'Regression coordinator is now coordinating Notice Forum.'. After reassignment the first coordinator also has 'Notice Forum was reassigned to another coordinator.', the second coordinator 'You are now coordinating Notice Forum.', the organiser 'Regression second coordinator is now coordinating Notice Forum.', and the Lead only the submission notice."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures; fresh browser context; no hosted Supabase.",
+    "data": "Organiser, coordinator and lead fixture accounts; Question Forum event 682 under review by the coordinator.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-P03",
+    "title": "a coordinator's question tells the organiser without the question, and the resubmission tells the coordinator",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1",
+      "SG2-68:AC2"
+    ],
+    "purpose": "Prove a clarification request notifies the organiser without exposing the question, and the resubmission goes to the coordinator rather than the Leads.",
+    "steps": [
+      "As the coordinator post a question on event 682; read the organiser's ledger rows.",
+      "At 1440px, open the organiser's bell and look for the question text.",
+      "As the organiser answer and resubmit; read the coordinator's and the Lead's ledger rows; open the coordinator's bell."
+    ],
+    "expected": "The organiser has one 'clarification_requested' notice, shown as 'Question from your coordinator' / 'Your coordinator has a question about Question Forum.', and the drawer does not contain the question. The answer adds nothing; the resubmission gives the coordinator 'Question Forum was resubmitted for your review.' under 'Event submitted' and the Lead nothing."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures; fresh browser context; no hosted Supabase.",
+    "data": "Organiser and coordinator fixture accounts; Question Forum event 682 and Rejection Forum event 683 under review by the coordinator.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-P04",
+    "title": "approving one request and rejecting another tells the organiser each outcome and the reason",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1",
+      "SG2-68:AC2"
+    ],
+    "purpose": "Prove an event request decision notifies the organiser with the outcome and, for a rejection, the reason.",
+    "steps": [
+      "As the coordinator approve 682 and reject 683 with a reason; read the organiser's and the coordinator's ledger rows.",
+      "At 1440px, open the organiser's bell."
+    ],
+    "expected": "The organiser has 'Question Forum was approved.' (event_approved) and 'Rejection Forum was not approved: It clashes with the annual general meeting.' (event_rejected), shown as 'Event approved' and 'Event not approved' with times; the deciding coordinator has nothing."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of decide_venue_booking_request; fresh browser context; no hosted Supabase.",
+    "data": "Venue staff, coordinator and organiser fixture accounts; Venue Request Forum event 91 with pending Regression Hall requests 101 (clear) and 102.",
+    "evidence": "e2e/event-notifications.spec.ts; e2e/support/venue-decisions.ts; docs/notifications.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-P05",
+    "title": "a venue decision tells the organiser as well as the coordinator, with the same text",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1",
+      "SG2-68:AC2"
+    ],
+    "purpose": "Prove a venue booking decision now also reaches the event's organiser.",
+    "steps": [
+      "As venue staff approve request 101 and reject 102 with a reason; read the organiser's and the coordinator's ledger rows.",
+      "At 1440px, open the organiser's bell."
+    ],
+    "expected": "Organiser and coordinator each hold the same two notices: 'Regression Hall was approved for Venue Request Forum.' (request 101) and 'Regression Hall was rejected for Venue Request Forum: The floor is being resurfaced that week.' (request 102). The organiser's bell shows 'Venue request approved' and 'Venue request rejected' with those messages."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of change_venue_hold; no hosted Supabase.",
+    "data": "Venue staff fixture account; Tentative Hold Forum event 81 in Planning, organised by organiser; fixture clock 1 Jun 2030.",
+    "evidence": "e2e/event-notifications.spec.ts; e2e/support/venue-holds.ts; docs/notifications.md",
+    "layer": "Playwright fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-P06",
+    "title": "converting a tentative hold into a booking tells the organiser their event has the venue",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1"
+    ],
+    "purpose": "Prove a hold converted to a booking notifies the organiser.",
+    "steps": [
+      "As venue staff place a hold for event 81 on Regression Hall (5 Jun 2030, 10:00–12:00 SGT) and convert it; read the organiser's and the coordinator's ledger rows."
+    ],
+    "expected": "The organiser has one venue_request_approved notice for request 1: 'Regression Hall was approved for Tentative Hold Forum.'; the coordinator has none in this table."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures; fresh browser context; no hosted Supabase.",
+    "data": "Every SG2-68 fixture event; organiser, colleague (same organisation), organiser2 (other organisation), coordinator, venue staff and lead accounts; event 681 assigned to the second coordinator.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-N01",
+    "title": "people with no part in the event are never notified, whoever else is",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC3"
+    ],
+    "purpose": "Prove notices reach only the people related to each event.",
+    "steps": [
+      "Submit 681 and assign it to the second coordinator; as the coordinator ask a question on 682 and approve 683; list the distinct recipients in the ledger.",
+      "Read GET /api/notifications as organiser2, colleague and venue staff.",
+      "At 1440px, open the signed-in coordinator's bell and organiser2's bell."
+    ],
+    "expected": "Recipients are exactly user-coordinator2, user-lead and user-organiser. The three unrelated accounts read { notifications: [] }; both bells read Notifications (0) with 'No notifications yet.'."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures; fresh browser context; no hosted Supabase.",
+    "data": "Lead and organiser fixture accounts with notices from submitting and assigning 681 and rejecting 683 with a 109-character reason.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright browser",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-B01",
+    "title": "the Lead's and the organiser's bells fit 390px and 1440px without horizontal overflow",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC2"
+    ],
+    "purpose": "Show the notices are readable on a phone and a desktop.",
+    "steps": [
+      "For the Lead and the organiser, at 390×844 and 1440×1000: sign in, check horizontal overflow, open the bell, read each notice and its time, measure the drawer and check overflow again."
+    ],
+    "expected": "Each bell shows its notices with label, message and Singapore time; the drawer lies within the viewport and the page never scrolls horizontally."
+  },
+  {
+    "story": "SG2-68",
+    "preconditions": "Real Express routes on loopback with reset disposable identity/storage fixtures; no hosted Supabase.",
+    "data": "Every fixture account; events 681 and 682; Venue Request Forum request 101.",
+    "evidence": "e2e/event-notifications.spec.ts; docs/notifications.md",
+    "layer": "Playwright fixture API",
+    "status": "Pass",
+    "actual": "Passed in a targeted Chromium run of e2e/event-notifications.spec.ts (9/9) against the production build and disposable Express/storage fixture.",
+    "execution_evidence": "13 Oct 2026; targeted run: npx playwright test e2e/event-notifications.spec.ts e2e/regression.spec.ts e2e/event-confirmation.spec.ts 78/78. Full npm run ci / test:e2e by the integrator.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "Automated test runner",
+    "id": "SG2-68-F01",
+    "title": "refused and replayed actions notify nobody, and only roles with an inbox may read one",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-68:AC1",
+      "SG2-68:AC3"
+    ],
+    "purpose": "Enforce that only real transitions notify, and that the notices endpoint is guarded server-side.",
+    "steps": [
+      "Submit 681 as organiser2, assign it as the organiser and decide 682 as the organiser; read the ledger.",
+      "Submit 681 twice as the organiser; approve 682 then reject it as the coordinator; approve venue request 101 twice as venue staff; read the ledger.",
+      "Read GET /api/notifications unsigned and as the Safety Officer and an attendee."
+    ],
+    "expected": "The refused calls answer 404, 403 and 403 with no notice. The replays answer 409, 404 and 409. The ledger holds exactly lead/event_submitted, organiser/event_approved, coordinator/venue_request_approved and organiser/venue_request_approved. Unsigned is 401; Safety Officer and attendee are 403."
+  },
+  {
     "id": "SG2-79-P01",
     "title": "raising a venue's setup and turnaround flags bookings that now clash, tells the coordinator and clears once resolved",
     "story": "SG2-79",
@@ -4466,5 +4751,69 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-82-P01",
+    "title": "one event books several venues; a rejected one does not block the others and, once withdrawn, the arrangement is ready",
+    "type": "Positive / multi-venue journey",
+    "story": "SG2-82",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-82:AC1",
+      "SG2-82:AC3",
+      "SG2-82:AC4",
+      "SG2-82:AC5"
+    ],
+    "purpose": "Verify AC1, AC3, AC4 and AC5: one event raises several venue requests, a venue refused by Venue Staff does not stop the others being approved, the event shows each venue with its own status, and its venue arrangement is ready only once every venue it still needs is approved.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase. Decisions and withdrawals use the in-memory equivalents of decide_venue_booking_request() and withdraw_venue_booking_request(); their SQL locking evidence is in supabase/tests/venue_multiple_bookings.sql and .github/scripts/test-venue-withdrawal-concurrency.mjs.",
+    "steps": [
+      "Seed event 91 (80 guests, needs a projector) with Regression Hall, Breakout Studio and Quiet Room (too small).",
+      "Sign in as the coordinator, open the event's venue search with no attendance filter and request all three venues for 20 Jun 2030, 09:00-12:00 SGT.",
+      "Sign in as venue staff; reject Quiet Room with the reason 'Too small for 80 guests.' and approve Regression Hall and Breakout Studio from the work queue.",
+      "Sign in as the coordinator and reopen the event's venue requests and booked venues.",
+      "Withdraw the rejected Quiet Room request and confirm."
+    ],
+    "data": "Event 91; venues 1 (Regression Hall), 2 (Quiet Room) and 5 (Breakout Studio, capacity 100, projector); coordinator and venue staff fixture accounts.",
+    "expected": "All three requests are listed as Pending with '0 of 3 venues approved; 3 venues awaiting Venue Staff'. After the decisions, two venues show Approved and two Confirmed bookings, Quiet Room shows its rejection and reason, and the arrangement reads not ready with 1 rejected venue; approved venues offer no withdrawal. Withdrawing Quiet Room shows the withdrawal notice, marks it Withdrawn by Regression coordinator and the arrangement reads 'ready: all 2 venues are approved'.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 91-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at 4b45eb1 (SG2-86 #83, SG2-38 #82, SG2-58 #80, SG2-79 #81); npm run test:e2e; 91/91 journeys and 13/13 report-gate checks passed; installed Chromium; npm run ci in a node:22 Linux clone; disposable PostgreSQL 17 replay of every migration and suite (35/35 steps), including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
+  },
+  {
+    "id": "SG2-82-N01",
+    "title": "the same venue twice, withdrawing an approved venue, or withdrawing as another role is refused, and the arrangement stays not ready",
+    "type": "Negative / role isolation",
+    "story": "SG2-82",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-82:AC1",
+      "SG2-82:AC5"
+    ],
+    "purpose": "Verify AC1 and AC5: an event cannot ask for the same venue twice over an overlapping period while other venues remain requestable, an approved venue cannot be withdrawn, only the event's coordinator withdraws, and a venue still awaiting a decision keeps the arrangement not ready.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase. Decisions and withdrawals use the in-memory equivalents of decide_venue_booking_request() and withdraw_venue_booking_request(); their SQL locking evidence is in supabase/tests/venue_multiple_bookings.sql and .github/scripts/test-venue-withdrawal-concurrency.mjs.",
+    "steps": [
+      "Seed the multi-venue fixture; as the coordinator request Regression Hall for 20 Jun 2030, 09:00-12:00 SGT, then again for 11:00-13:00, then Breakout Studio for 09:00-12:00.",
+      "Sign in as venue staff and approve Regression Hall; read the event's request ids and try to withdraw Breakout Studio through the API.",
+      "Sign in as the organiser and try the same withdrawal.",
+      "Sign in as the coordinator, reopen the event's venue requests, and through the API try to withdraw the approved Regression Hall request and request #9999."
+    ],
+    "data": "Event 91; venues 1 (Regression Hall) and 5 (Breakout Studio); coordinator, venue staff and organiser fixture accounts.",
+    "expected": "The second Regression Hall request is refused naming the earlier request while Breakout Studio is requested; venue staff and the organiser receive 403; the arrangement reads 'not ready: 1 of 2 venues approved; 1 venue awaiting Venue Staff'; Regression Hall shows Approved with no withdraw button, its API withdrawal answers 409 telling the coordinator to release the booking instead, and an unknown request answers 404.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the 91-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "execution_date": "13 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at 4b45eb1 (SG2-86 #83, SG2-38 #82, SG2-58 #80, SG2-79 #81); npm run test:e2e; 91/91 journeys and 13/13 report-gate checks passed; installed Chromium; npm run ci in a node:22 Linux clone; disposable PostgreSQL 17 replay of every migration and suite (35/35 steps), including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
   }
 ]

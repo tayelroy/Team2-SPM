@@ -1,6 +1,7 @@
 import { AccessError } from '../../server/src/auth/policy';
 import type { DecisionResult, VenueBookingDecisionStore } from '../../server/src/db/venueBookingDecisions';
 import type { NotificationRecord } from '../../server/src/db/notifications';
+import type { VenueBookingWithdrawalStore, WithdrawalResult } from '../../server/src/db/venueBookingWithdrawals';
 import type { MemoryDatabase } from './memory-database';
 
 type Row = Record<string, unknown>;
@@ -58,12 +59,43 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: request.event_id,
         actor_id: userId, field_name: 'venue_booking_request', old_value: `Pending: ${venue.name} (request ${requestId})`,
         new_value: `${status[0].toUpperCase()}${status.slice(1)}: ${venue.name} (request ${requestId})${reason ? ` — ${reason}` : ''}`, created_at: now });
-      if (event.coordinator_id) {
+      const message = `${venue.name} was ${status} for ${event.name || 'Untitled event'}${status === 'rejected' ? `: ${reason}` : '.'}`;
+      // SG2-68: the organiser is told the same, unless they are the coordinator just told.
+      const recipients = [event.coordinator_id, event.organiser_id !== event.coordinator_id ? event.organiser_id : null];
+      for (const recipient of recipients) {
+        if (!recipient) continue;
         database.tables.notifications.push({ notification_id: nextId(database.tables.notifications, 'notification_id'),
-          recipient_id: event.coordinator_id, event_id: request.event_id, request_id: requestId, kind: `venue_request_${status}`,
-          message: `${venue.name} was ${status} for ${event.name || 'Untitled event'}${status === 'rejected' ? `: ${reason}` : '.'}`, created_at: now });
+          recipient_id: recipient, event_id: request.event_id, request_id: requestId, kind: `venue_request_${status}`, message, created_at: now });
       }
       return { outcome: 'updated', request_id: requestId, status, venue_booking_id: booking, decided_at: now };
+    }
+  });
+}
+
+/**
+ * SG2-82: test equivalent of withdraw_venue_booking_request() for the
+ * browser suite, answering as the signed-in coordinator. The SQL suite and
+ * its concurrency script carry the locking evidence.
+ */
+export function createMemoryWithdrawalStore(database: MemoryDatabase) {
+  return (token: string): VenueBookingWithdrawalStore => ({
+    async withdraw(requestId): Promise<WithdrawalResult> {
+      const userId = database.sessions.get(token);
+      if (database.tables.account_roles.find(row => row.user_id === userId)?.role !== 'event_coordinator') throw new AccessError(403);
+      const request = database.tables.venue_booking_requests.find(row => row.request_id === requestId);
+      const event = request && database.tables.events.find(row => row.event_id === request.event_id);
+      if (!request || event?.coordinator_id !== userId) return { outcome: 'missing' };
+      const hold = database.tables.venue_holds.find(row => row.request_id === requestId);
+      if (hold) return { outcome: 'hold', hold_id: Number(hold.hold_id) };
+      if (request.status !== 'pending' && request.status !== 'rejected') return { outcome: 'inactive', status: String(request.status) };
+      const previous = String(request.status);
+      const now = new Date().toISOString();
+      Object.assign(request, { status: 'cancelled', withdrawn_by: userId, withdrawn_at: now });
+      const venue = database.tables.venues.find(row => row.venue_id === request.venue_id)!;
+      database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: request.event_id,
+        actor_id: userId, field_name: 'venue_booking_request', old_value: `${previous[0].toUpperCase()}${previous.slice(1)}: ${venue.name} (request ${requestId})`,
+        new_value: `Withdrawn: ${venue.name} (request ${requestId})`, created_at: now });
+      return { outcome: 'withdrawn', request_id: requestId, withdrawn_at: now };
     }
   });
 }

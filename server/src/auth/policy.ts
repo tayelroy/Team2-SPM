@@ -121,12 +121,17 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venue_booking.conflicts.view': ['event_coordinator', 'venue_staff'],
   // SG2-49 AC1/AC2: Venue Staff approve or reject a venue request.
   'venue_booking.decide': ['venue_staff'],
+  // SG2-82 AC5: the event's assigned coordinator (enforced per-row) withdraws
+  // a pending or rejected request the event no longer needs.
+  'venue_booking.withdraw': ['event_coordinator'],
   // SG2-49 AC1/AC2: the roles with a notifications drawer read their own
   // notices; the rows are limited to the caller by the handler and by row
   // level security.
   // SG2-51 AC4: Event Organisers are told when a venue for their event is
   // released, so they read their own notices too.
-  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_organiser'],
+  // SG2-68: the Event Coordinator Lead is told when an event is submitted
+  // and waiting for a coordinator.
+  'notifications.read': ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_organiser', 'event_coordinator_lead'],
   // SG2-51: Venue Staff, or the event's assigned coordinator (enforced
   // per-row), see an event's bookings and release one with a reason. Only
   // Venue Staff list a whole venue's bookings (enforced by the handler).

@@ -54,9 +54,22 @@ test('[BOUNDARY] [SG2-49:AC1] a response of the wrong shape is treated as unavai
   expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [] });
 });
 
-test('[NORMAL] [SG2-88:AC4] the three coordinator-assignment notice kinds are accepted alongside the venue ones', async () => {
-  const kinds = ['coordinator_assigned', 'coordinator_removed', 'event_coordinator_changed'];
-  const notifications = kinds.map((kind, index) => ({ ...rejected, notification_id: 20 + index, kind }));
-  respond(() => Response.json({ notifications: [...notifications, rejected] }));
-  expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [...notifications, rejected] });
+test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] every event lifecycle notice survives response validation with its event, message and time', async () => {
+  const lifecycle = [
+    ['event_submitted', 'Partner Forum was submitted and is waiting for a coordinator.'],
+    ['coordinator_assigned', 'You are now coordinating Partner Forum.'],
+    ['clarification_requested', 'Your coordinator has a question about Partner Forum.'],
+    ['event_approved', 'Partner Forum was approved.'],
+    ['event_rejected', 'Partner Forum was not approved: Clashes with the AGM']
+  ].map(([kind, message], index) => ({ notification_id: 20 + index, event_id: 7, request_id: null, kind, message,
+    created_at: '2026-10-13T02:00:00.000Z' }));
+  respond(() => Response.json({ notifications: lifecycle }));
+  expect(await loadNotifications('token')).toEqual({ ok: true, notifications: lifecycle });
+});
+
+test('[FAILURE] [SG2-68:AC2] a near-miss or inherited kind name is refused rather than shown unlabelled', async () => {
+  for (const kind of ['event_submitted ', 'Event_approved', 'event_cancelled', 'toString', 7]) {
+    respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));
+    expect(await loadNotifications('token')).toEqual({ ok: false, message: 'Could not load notifications. Please try again.' });
+  }
 });

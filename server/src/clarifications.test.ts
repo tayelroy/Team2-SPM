@@ -10,6 +10,7 @@ import { dbConfig } from './db/config';
 import { createAddClarificationHandler, createListClarificationsHandler } from './events/clarifications';
 import type { FetchEventRequestResult } from './db/eventRequests';
 import type { FetchClarificationsResult, InsertClarificationResult } from './db/clarifications';
+import type { EventNotice } from './db/eventNotifications';
 import type { Principal } from './auth/policy';
 
 const COORDINATOR: Principal = { userId: 'coordinator-1', role: 'event_coordinator' };
@@ -53,6 +54,9 @@ interface HarnessOptions {
   captureAdd?: (eventId: number, senderId: string, message: string) => void;
   captureReturn?: (eventId: number, coordinatorId: string) => void;
   captureAudit?: (entries: unknown[]) => void;
+  notifyOk?: boolean;
+  /** SG2-68: notice batches, in order. */
+  notices?: EventNotice[][];
 }
 
 function deps(options: HarnessOptions) {
@@ -79,6 +83,10 @@ function deps(options: HarnessOptions) {
       return options.auditOk === false
         ? { ok: false as const, reason: 'unavailable' as const, message: 'audit down' }
         : { ok: true as const, logs: [] };
+    },
+    notify: async (_a: SupabaseClient, batch: EventNotice[]) => {
+      options.notices?.push(batch);
+      return options.notifyOk === false ? { ok: false as const } : { ok: true as const };
     }
   };
 }
@@ -322,6 +330,57 @@ describe('POST /api/event-requests/:eventId/clarifications (SG2-36)', () => {
       .send({ message: 'hello' });
     assert.equal(response.status, 503);
     assert.doesNotMatch(response.text, /SENTINEL/);
+  });
+});
+
+describe('POST /api/event-requests/:eventId/clarifications notices (SG2-68)', () => {
+  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] returning a request tells its organiser there is a question, without the question text', async () => {
+    const notices: EventNotice[][] = [];
+    const order: string[] = [];
+    const response = await request(postApp({
+      notices, captureAudit: () => order.push('history'), captureAdd: () => order.push(`message after ${notices.length} notice batch`)
+    })).post('/api/event-requests/7/clarifications').send({ message: 'Which room layout do you need?' });
+    assert.equal(response.status, 201);
+    assert.deepEqual(notices, [[
+      { recipient_id: 'organiser-1', event_id: 7, kind: 'clarification_requested', message: 'Your coordinator has a question about Partner Forum.' }
+    ]]);
+    assert.deepEqual(order, ['history', 'message after 1 notice batch']);
+  });
+
+  test('[BOUNDARY] [SG2-68:AC1] [SG2-68:AC3] a follow-up question or the organiser\'s answer moves no status and sends no notice', async () => {
+    const followUp: EventNotice[][] = [];
+    await request(postApp({ notices: followUp, fetchResult: { ok: true, request: { ...REQUEST_UNDER_REVIEW, status: 'needs_clarification' } } }))
+      .post('/api/event-requests/7/clarifications').send({ message: 'And the catering?' });
+    const answer: EventNotice[][] = [];
+    await request(postApp({ notices: answer, principal: ORGANISER }))
+      .post('/api/event-requests/7/clarifications').send({ message: 'Theatre style.' });
+    assert.deepEqual([followUp, answer], [[], []]);
+  });
+
+  test('[CONFLICT] [SG2-68:AC3] a coordinator who is also the organiser is not told about their own question', async () => {
+    const notices: EventNotice[][] = [];
+    await request(postApp({
+      notices,
+      returnResult: { ok: true, request: { ...REQUEST_UNDER_REVIEW, organiser_id: 'coordinator-1', status: 'needs_clarification' } }
+    })).post('/api/event-requests/7/clarifications').send({ message: 'Which room layout do you need?' });
+    assert.deepEqual(notices, [[]]);
+  });
+
+  test('[FAILURE] [SG2-68:AC1] a notice that cannot be stored answers 503 after the history row and before the message', async () => {
+    let added = 0;
+    let audited = 0;
+    const response = await request(postApp({ notifyOk: false, captureAdd: () => { added += 1; }, captureAudit: () => { audited += 1; } }))
+      .post('/api/event-requests/7/clarifications').send({ message: 'hello' });
+    assert.deepEqual([response.status, response.body], [503, { error: 'Event requests are temporarily unavailable. Please try again later.' }]);
+    assert.deepEqual([audited, added], [1, 0]);
+  });
+
+  test('[FAILURE] [SG2-68:AC1] a return that cannot be recorded in history sends no notice', async () => {
+    const notices: EventNotice[][] = [];
+    const response = await request(postApp({ notices, auditOk: false }))
+      .post('/api/event-requests/7/clarifications').send({ message: 'hello' });
+    assert.equal(response.status, 503);
+    assert.deepEqual(notices, []);
   });
 });
 

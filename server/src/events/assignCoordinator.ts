@@ -11,8 +11,7 @@ import {
 } from '../db/eventRequests';
 import { getAccountRole, type GetAccountRoleResult } from '../db/accountRoles';
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
-import { insertAssignmentNotifications } from '../db/assignmentNotifications';
-import { assignmentNotices } from './assignmentNotices';
+import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -33,8 +32,7 @@ export interface AssignCoordinatorDependencies {
     statusTransition?: AssignStatusTransition
   ) => Promise<AssignCoordinatorResult>;
   writeHistory?: typeof insertAuditLogs;
-  /** SG2-88 AC4: tells the people involved once an assignment is committed. */
-  notify?: typeof insertAssignmentNotifications;
+  notify?: typeof notifyEvent;
 }
 
 /**
@@ -61,6 +59,12 @@ export interface AssignCoordinatorDependencies {
  * If the insert fails, the assignment is put back (guarded so it cannot
  * undo a newer one) and the caller is told to retry, rather than leaving a
  * change the history does not show.
+ *
+ * SG2-68: once the change is recorded, the new coordinator, the organiser
+ * and, on a reassignment, the coordinator taken off the event are told. A
+ * notice that cannot be stored answers 503 but does not undo the
+ * assignment: the history already shows it, so it stands (see
+ * docs/notifications.md).
  */
 export function createAssignCoordinatorHandler({
   getPrincipal,
@@ -69,7 +73,7 @@ export function createAssignCoordinatorHandler({
   lookupRole = getAccountRole,
   assignCoordinator = assignEventCoordinator,
   writeHistory = insertAuditLogs,
-  notify = insertAssignmentNotifications
+  notify = notifyEvent
 }: AssignCoordinatorDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -178,21 +182,20 @@ export function createAssignCoordinatorHandler({
       return;
     }
 
-    // SG2-88 AC4: notices go out only once the assignment and its history are
-    // committed. A failure to send them does not undo a valid assignment; the
-    // Lead is told instead, and the cause stays in the server log.
-    const notified = await notify(admin, assignmentNotices({
-      eventId,
-      eventName: current.name ?? '',
-      organiserId: current.organiser_id,
-      coordinatorId,
-      coordinatorName: assigned.request.coordinator_name ?? null,
-      previousCoordinatorId: previousId
-    }));
+    const label = eventLabel(assigned.request.name);
+    const notified = await notify(admin, [
+      { recipient_id: coordinatorId, event_id: eventId, kind: 'coordinator_assigned' as const,
+        message: eventNoticeMessages.assignedToCoordinator(label) },
+      { recipient_id: assigned.request.organiser_id, event_id: eventId, kind: 'coordinator_assigned' as const,
+        message: eventNoticeMessages.assignedToOrganiser(assigned.request.coordinator_name, label) },
+      { recipient_id: previousId, event_id: eventId, kind: 'coordinator_assigned' as const,
+        message: eventNoticeMessages.reassignedFromCoordinator(label) }
+    ].filter(notice => notice.recipient_id !== principal.userId));
     if (!notified.ok) {
-      console.error(`[SG2-88] assignment notices for event ${eventId} were not sent: ${notified.message}`);
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
     }
 
-    res.status(200).json({ request: assigned.request, notified: notified.ok });
+    res.status(200).json({ request: assigned.request });
   };
 }

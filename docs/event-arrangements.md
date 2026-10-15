@@ -20,11 +20,15 @@ follows:
   `venue_holds` row for the request (a converted tentative hold records its
   booking on the hold only). Outstanding when nothing has been requested yet,
   any request is still awaiting a decision ("N venue booking(s) still awaiting
-  approval."), or an approved request's booking was released or otherwise is
+  approval."), any request was rejected ("1 venue booking rejected: request a
+  replacement if the event still needs one, then withdraw the rejected
+  request."), or an approved request's booking was released or otherwise is
   no longer confirmed ("N approved venue request(s) no longer have a confirmed
-  booking."), checked in that order. Rejected and cancelled requests are
-  ignored. An event may need several bookings (Week 7 change #3); all live ones
-  must be approved and booked (SG2-58 review).
+  booking."), checked in that order. Only cancelled requests (withdrawn by the
+  coordinator, or released) are ignored: SG2-82 AC5 keeps a rejected request
+  as a venue the event needs until it is withdrawn. An event may need several
+  bookings (Week 7 change #3); all of them must be approved and booked (SG2-58
+  review).
 - **Equipment** — `not_required` when the event has no live `equipment_requests`.
   Otherwise ready only when **every** live request is both **reserved** (an
   SG2-55 `equipment_reservations` receipt with that `request_id`) and

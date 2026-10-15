@@ -1,10 +1,11 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import App from './App';
 import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
+import EventsTable from './screens/EventsTable';
 import ChangeRequest from './screens/ChangeRequest';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
@@ -22,10 +23,18 @@ beforeAll(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
 });
 
-function mockLoginResponse(role: Role) {
-  const permissions = role === 'Venue Staff' ? ['venues.read', 'venues.create', 'venues.update']
-    : role === 'Event Coordinator' ? ['venues.read']
-    : role === 'Technical Support Staff' ? ['equipment.read', 'equipment.create', 'equipment.update'] : [];
+// Mirrors the grants in server/src/auth/policy.ts that these screens use.
+const POLICY_PERMISSIONS: Partial<Record<Role, string[]>> = {
+  'Venue Staff': ['venues.read', 'venues.create', 'venues.update'],
+  'Event Coordinator': ['venues.read'],
+  'Technical Support Staff': ['equipment.read', 'equipment.create', 'equipment.update'],
+  'Event Coordinator Lead': ['event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view',
+    'event_request.history.view', 'profile.read', 'profile.update'],
+  'Safety Officer': ['event_request.stage.view', 'event_request.history.view', 'equipment_requirements.read',
+    'profile.read', 'profile.update'],
+};
+
+function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ?? []) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -36,6 +45,9 @@ function mockLoginResponse(role: Role) {
         description: 'Handheld microphone', location: 'Store A', quantity_held: 8, operational_status: 'operational', available_quantity: 8, version: 1 }] });
       // SG2-49: venue request decision notices share the notification drawer.
       if (url === '/api/notifications') return Response.json({ notifications: [] });
+      // SG2-87: the Lead's desk counts the unassigned queue.
+      if (url === '/api/assignment-queue') return Response.json({ entries: [{ event_id: 41, name: 'Queued forum',
+        organiser_name: 'Org', proposed_date: null, expected_attendance: null, submitted_at: '2030-06-01T01:00:00Z' }] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
@@ -80,15 +92,28 @@ function mockLoginResponse(role: Role) {
   );
 }
 
-/** Walk landing -> login -> signed in as `role`, via a mocked real login call. */
-async function signInAs(role: Role) {
-  mockLoginResponse(role);
-  render(<App />);
+/** Walk landing -> login -> signed in, with whatever fetch mock is in place. */
+async function submitSignIn() {
   fireEvent.click(screen.getByRole('button', { name: 'Open app' }));
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Correct-Horse-9' } });
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
   await screen.findByRole('banner');
+}
+
+/** The header navigation once the account's permissions have loaded (SG2-86). */
+async function loadedNav() {
+  const nav = within(screen.getByRole('banner')).getByRole('navigation');
+  await waitFor(() => expect(nav).toHaveAttribute('aria-busy', 'false'));
+  return nav;
+}
+
+/** Walk landing -> login -> signed in as `role`, via a mocked real login call. */
+async function signInAs(role: Role, permissions?: string[]) {
+  mockLoginResponse(role, permissions);
+  render(<App />);
+  await submitSignIn();
+  await loadedNav();
 }
 
 const header = () => screen.getByRole('banner');
@@ -149,8 +174,7 @@ describe('every role can reach every screen in its navigation', () => {
       ['Event detail', 'Event detail'],
     ],
     'Event Coordinator': [
-      ['Dashboard', 'Coordination desk'], ['All events', 'All events'],
-      ['Review', 'Event detail'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
+      ['Dashboard', 'Coordination desk'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
       ['Venue Availability', 'Venue availability'],
       ['Venue holds', 'Venue holds'],
     ],
@@ -164,14 +188,14 @@ describe('every role can reach every screen in its navigation', () => {
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
-    // SG2-86: deliberately minimal nav — only the screens these roles are
-    // actually permitted to use today.
+    // SG2-86: only the screens these roles can use; neither holds
+    // event_request.view, so neither is offered All events.
     // SG2-97: assignment moved here from Technical Support Staff.
     'Event Coordinator Lead': [
       ['Dashboard', 'Coordination lead desk'], ['Unassigned queue', 'Unassigned queue'],
-      ['Assign coordinators', 'Assign coordinators'], ['All events', 'All events'],
+      ['Assign coordinators', 'Assign coordinators'],
     ],
-    'Safety Officer': [['Dashboard', 'Safety desk'], ['All events', 'All events']],
+    'Safety Officer': [['Dashboard', 'Safety desk']],
   };
   test('[NORMAL] [SG2-24:AC1] [SG2-86:AC1] the role catalogue contains all seven documented roles', () => {
     expect(ROLES).toEqual(expectedRoles);
@@ -184,6 +208,26 @@ describe('every role can reach every screen in its navigation', () => {
       expect(screen.getByRole('main')).not.toBeEmptyDOMElement();
     }
   });
+  // SG2-86: the menu is exactly the screens above — nothing extra is offered.
+  test.each(['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)(
+    '[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles',
+    async (role) => {
+      await signInAs(role);
+      const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
+      expect(labels).toEqual(destinations[role].map(([label]) => label));
+    },
+  );
+  test.each(['Event Coordinator Lead', 'Safety Officer'] as const)(
+    '[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages',
+    async (role) => {
+      await signInAs(role);
+      const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
+      expect(labels).toEqual(destinations[role].map(([label]) => label));
+      expect(labels).not.toContain('All events');
+      expect(labels).not.toContain('Event page');
+      expect(labels).not.toContain('My registrations');
+    },
+  );
 });
 
 // SG2-87: only the Event Coordinator Lead is offered the unassigned queue.
@@ -205,6 +249,62 @@ test.each([
   const button = within(header()).queryByRole('button', { name: 'Assign coordinators' });
   if (offered) expect(button).toBeInTheDocument();
   else expect(button).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-86:AC2] a Lead the server has not granted the queue or assignment is not offered them', async () => {
+  await signInAs('Event Coordinator Lead', ['profile.read', 'profile.update']);
+  expect(within(await loadedNav()).getAllByRole('button').map((button) => button.textContent)).toEqual(['Dashboard']);
+});
+
+// SG2-86: a Lead clicking a prototype event tile used to land on the Attendee
+// event page ("You're registered", "Withdraw registration").
+test.each([
+  ['Event Coordinator Lead', 'Coordination lead desk'],
+  ['Safety Officer', 'Safety desk'],
+] as const)('[FAILURE] [SG2-86:AC2] no click on the %s desk or menu reaches an Attendee screen', async (role, desk) => {
+  await signInAs(role);
+  expect(await screen.findByRole('heading', { level: 1, name: desk })).toBeInTheDocument();
+  for (const name of ['Product Launch — Tideline', 'Northbridge Investor Forum', 'Events needing attention', 'Needs your attention']) {
+    expect(screen.queryByText(name)).not.toBeInTheDocument();
+  }
+  const navigation = () => within(header()).getByRole('navigation');
+  const targets = [
+    ...within(navigation()).getAllByRole('button').map((button) => [navigation, button.textContent!] as const),
+    ...within(screen.getByRole('main')).getAllByRole('button').map((button) => [() => screen.getByRole('main'), button.textContent!] as const),
+  ];
+  expect(targets.length).toBeGreaterThan(1);
+  for (const [container, label] of targets) {
+    fireEvent.click(within(header()).getByRole('button', { name: /ConnectSphere/ }));
+    expect(screen.getByRole('heading', { level: 1, name: desk })).toBeInTheDocument();
+    fireEvent.click(within(container()).getByRole('button', { name: label }));
+    expect(screen.queryByRole('heading', { level: 1, name: 'Event page' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Withdraw registration|My registrations|Registration open/)).not.toBeInTheDocument();
+  }
+});
+
+test('[CONFLICT] [SG2-86:AC2] a late permissions answer for a signed-out session neither signs out nor gates the next one', async () => {
+  mockLoginResponse('Event Coordinator Lead');
+  const base = globalThis.fetch;
+  let releaseFirst!: (response: Response) => void;
+  let accessChecks = 0;
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+    if (url === '/api/auth/me' && ++accessChecks === 1) return new Promise<Response>((resolve) => { releaseFirst = resolve; });
+    return base(url, init);
+  }));
+  render(<App />);
+  await submitSignIn();
+  expect(within(header()).getByRole('navigation')).toHaveAttribute('aria-busy', 'true');
+  expect(within(header()).queryByRole('button', { name: 'Unassigned queue' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+  await screen.findByRole('button', { name: 'Open app' });
+  await submitSignIn();
+  expect(within(await loadedNav()).getByRole('button', { name: 'Unassigned queue' })).toBeInTheDocument();
+
+  await act(async () => releaseFirst(new Response(null, { status: 401 })));
+  expect(within(header()).getByRole('button', { name: 'Unassigned queue' })).toBeInTheDocument();
+  expect(sessionStorage.getItem('connectsphere.session')).not.toBeNull();
 });
 
 test.each(['Technical Support Staff', 'Event Coordinator', 'Venue Staff'] as const)('[NORMAL] [SG2-52:AC3] %s has no obsolete equipment preview menu', async role => {
@@ -410,13 +510,13 @@ test('[NORMAL] [SG2-41:AC4] the signed-in coordinator opens the actual selected 
 });
 
 describe('the events table', () => {
-  const openTable = async () => {
+  test('[FAILURE] [SG2-26:AC2] a coordinator is not offered the organisation event list or detail, and the list still refuses them', async () => {
     await signInAs('Event Coordinator');
-    fireEvent.click(within(header()).getByRole('button', { name: 'All events' }));
-  };
-
-  test('[FAILURE] [SG2-26:AC2] coordinator navigation cannot expose organisation event rows', async () => {
-    await openTable();
+    const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
+    expect(labels).not.toContain('All events');
+    expect(labels).not.toContain('Review');
+    cleanup();
+    render(<EventsTable role="Event Coordinator" accessToken="test-access-token" onOpenEvent={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByText('Product Launch — Tideline')).not.toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
@@ -498,9 +598,8 @@ describe('the event detail action panel', () => {
     expect(screen.queryByText('Quarterly Partner Dinner')).not.toBeInTheDocument();
   });
 
-  test('[FAILURE] [SG2-26:AC2] coordinator review navigation shows no event content or decision actions', async () => {
-    await signInAs('Event Coordinator');
-    fireEvent.click(within(header()).getByRole('button', { name: 'Review' }));
+  test('[FAILURE] [SG2-26:AC2] event detail opened without a work-queue event shows a coordinator no content or decision actions', () => {
+    render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
     expect(screen.queryByRole('button', { name: 'Approve request' })).not.toBeInTheDocument();
   });

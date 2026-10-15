@@ -73,7 +73,7 @@ describe('AssignmentQueue (SG2-87)', () => {
   }
 
   test('[NORMAL] [SG2-88:AC1] picking a coordinator and assigning sends the assignment and takes the request out of the queue', async () => {
-    const fetch = assignApi(() => Response.json({ request: {}, notified: true }));
+    const fetch = assignApi(() => Response.json({ request: {} }));
     render(<AssignmentQueue accessToken="tok" />);
     const entry = await screen.findByRole('article', { name: 'Leadership Forum' });
     expect(within(entry).getByRole('button', { name: 'Assign Leadership Forum' })).toBeDisabled();
@@ -86,15 +86,6 @@ describe('AssignmentQueue (SG2-87)', () => {
       method: 'PATCH', body: JSON.stringify({ coordinatorId: 'c2' }),
     }));
     expect(screen.getByRole('heading', { level: 2, name: '1 request awaiting a coordinator' })).toBeInTheDocument();
-  });
-
-  test('[NORMAL] [SG2-88:AC4] says so when the assignment was saved but the notices could not be sent', async () => {
-    assignApi(() => Response.json({ request: {}, notified: false }));
-    render(<AssignmentQueue accessToken="tok" />);
-    const entry = await screen.findByRole('article', { name: 'Leadership Forum' });
-    fireEvent.change(within(entry).getByLabelText('Coordinator for Leadership Forum'), { target: { value: 'c1' } });
-    fireEvent.click(within(entry).getByRole('button', { name: 'Assign Leadership Forum' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Assigned Leadership Forum to Casey Coordinator, but the notifications could not be sent.');
   });
 
   test('[FAILURE] [SG2-88:AC1] a refused assignment keeps the request in the queue and shows why', async () => {
@@ -117,7 +108,7 @@ describe('AssignmentQueue (SG2-87)', () => {
 
   test('[BOUNDARY] [SG2-88:AC1] assigning the last request still confirms it on the empty-queue screen', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, init?: { method?: string }) =>
-      Promise.resolve(init?.method === 'PATCH' ? Response.json({ request: {}, notified: true })
+      Promise.resolve(init?.method === 'PATCH' ? Response.json({ request: {} })
         : Response.json({ coordinators: COORDS, entries: [RAW] }))));
     render(<AssignmentQueue accessToken="tok" />);
     const entry = await screen.findByRole('article', { name: 'Leadership Forum' });

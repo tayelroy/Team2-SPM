@@ -10,6 +10,7 @@ import { dbConfig } from './db/config';
 import { submitEventRequestHandler } from './events/submit';
 import type { FetchEventRequestResult, SubmitEventRequestResult } from './db/eventRequests';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
+import type { EventNotice, FetchLeadIdsResult, NotifyEventResult } from './db/eventNotifications';
 import type { Principal } from './auth/policy';
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
@@ -38,11 +39,15 @@ interface HarnessOptions {
   captureFetch?: (eventId: number, organiserId: string) => void;
   captureSubmit?: (eventId: number) => void;
   historyResult?: InsertAuditLogsResult;
+  leadsResult?: FetchLeadIdsResult;
+  notifyResult?: NotifyEventResult;
 }
 
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
   const history: InsertAuditLogInput[][] = [];
+  const notices: EventNotice[][] = [];
+  const leadReads: number[] = [];
   app.use(express.json());
   app.patch(
     '/api/event-requests/:eventId/submit',
@@ -60,10 +65,18 @@ function buildApp(options: HarnessOptions = {}) {
       writeHistory: async (_admin, entries) => {
         history.push(entries);
         return options.historyResult ?? { ok: true, logs: [] };
+      },
+      fetchLeads: async () => {
+        leadReads.push(history.length);
+        return options.leadsResult ?? { ok: true, ids: ['lead-1', 'lead-2'] };
+      },
+      notify: async (_admin, batch) => {
+        notices.push(batch);
+        return options.notifyResult ?? { ok: true };
       }
     })
   );
-  return Object.assign(app, { history });
+  return Object.assign(app, { history, notices, leadReads });
 }
 
 describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
@@ -286,6 +299,76 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(response.status, 503);
     assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
     assert.equal(app.history.length, 1);
+    assert.deepEqual(app.notices, []);
+  });
+});
+
+describe('PATCH /api/event-requests/:eventId/submit notices (SG2-68)', () => {
+  const UNAVAILABLE = { error: 'Event requests are temporarily unavailable. Please try again later.' };
+
+  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] a submission waiting for a coordinator tells every Event Coordinator Lead, after the history row', async () => {
+    const app = buildApp({ submitResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'unassigned' } } });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 200);
+    assert.deepEqual(app.leadReads, [1]);
+    assert.deepEqual(app.notices, [[
+      { recipient_id: 'lead-1', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was submitted and is waiting for a coordinator.' },
+      { recipient_id: 'lead-2', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was submitted and is waiting for a coordinator.' }
+    ]]);
+  });
+
+  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC3] a resubmission that goes back to its coordinator tells only that coordinator, not the Leads', async () => {
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'needs_clarification', coordinator_id: 'coord-1' } }
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 200);
+    assert.deepEqual(app.leadReads, []);
+    assert.deepEqual(app.notices, [[
+      { recipient_id: 'coord-1', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was resubmitted for your review.' }
+    ]]);
+  });
+
+  test('[BOUNDARY] [SG2-68:AC2] an unnamed event is named "Untitled event", and an empty Lead list sends nothing', async () => {
+    const app = buildApp({
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, name: null, status: 'unassigned' } },
+      leadsResult: { ok: true, ids: ['lead-1'] }
+    });
+    await request(app).patch('/api/event-requests/7/submit');
+    assert.deepEqual(app.notices, [[
+      { recipient_id: 'lead-1', event_id: 7, kind: 'event_submitted', message: 'Untitled event was submitted and is waiting for a coordinator.' }
+    ]]);
+    const none = buildApp({
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'unassigned' } },
+      leadsResult: { ok: true, ids: [] }
+    });
+    assert.equal((await request(none).patch('/api/event-requests/7/submit')).status, 200);
+    assert.deepEqual(none.notices, [[]]);
+  });
+
+  test('[CONFLICT] [SG2-68:AC3] the organiser is never told about their own submission, even if they also hold a recipient part', async () => {
+    const app = buildApp({
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'unassigned' } },
+      leadsResult: { ok: true, ids: ['user-1', 'lead-2'] }
+    });
+    await request(app).patch('/api/event-requests/7/submit');
+    assert.deepEqual(app.notices[0].map(notice => notice.recipient_id), ['lead-2']);
+  });
+
+  test('[FAILURE] [SG2-68:AC1] an unreadable Lead list or a notice that cannot be stored answers 503 after the history row, without provider details', async () => {
+    const unread = buildApp({
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'unassigned' } },
+      leadsResult: { ok: false }
+    });
+    const first = await request(unread).patch('/api/event-requests/7/submit');
+    assert.deepEqual([first.status, first.body], [503, UNAVAILABLE]);
+    assert.equal(unread.history.length, 1);
+    assert.deepEqual(unread.notices, []);
+
+    const unstored = buildApp({ notifyResult: { ok: false } });
+    const second = await request(unstored).patch('/api/event-requests/7/submit');
+    assert.deepEqual([second.status, second.body], [503, UNAVAILABLE]);
+    assert.equal(unstored.history.length, 1);
   });
 });
 

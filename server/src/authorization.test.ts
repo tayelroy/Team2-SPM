@@ -406,7 +406,7 @@ for (const role of ['safety_officer'] as const) {
   });
 }
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, stage and history to the profile grants', async () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, stage, history and their own notices to the profile grants', async () => {
   const fetchMock = provider({ role: 'event_coordinator_lead' });
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
@@ -414,7 +414,7 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] GET /api/auth/me for the
     userId, role: 'event_coordinator_lead',
     permissions: [
       'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view', 'event_request.history.view',
-      'profile.read', 'profile.update'
+      'notifications.read', 'profile.read', 'profile.update'
     ]
   });
   assert.equal(fetchMock.mock.callCount(), 2);
@@ -432,7 +432,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -446,7 +446,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'event_request.confirmation.view',
       'event_request.arrangements.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
-      'venue_booking.request.view', 'venue_booking.conflicts.view', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venue_clashes.view', 'venues.holds.read',
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.withdraw', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venue_clashes.view', 'venues.holds.read',
       'equipment_requirements.read', 'equipment_requirements.request', 'profile.read', 'profile.update'
     ],
     venue_staff: [
@@ -482,7 +482,7 @@ test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] the Safety Officer holds exactly the 
   assert.deepEqual(permissionsFor('safety_officer', PERMISSIONS).sort(), [...EXPECTED].sort());
 });
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] the Event Coordinator Lead holds exactly the profile grants plus assignment, the unassigned queue, stage and history', () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] the Event Coordinator Lead holds exactly the profile grants plus assignment, the unassigned queue, stage, history and their own notices', () => {
   // Written as an independent literal, never computed from PERMISSIONS, for
   // the same reason as the Safety Officer's test above.
   const EXPECTED = [
@@ -490,6 +490,7 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] the Event Coordinator Le
     'event_request.queue.view',
     'event_request.stage.view',
     'event_request.history.view',
+    'notifications.read',
     'profile.read',
     'profile.update'
   ];

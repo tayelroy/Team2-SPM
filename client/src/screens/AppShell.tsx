@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
 import type { Notification, Role, Screen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
+import type { Access } from '../auth/access';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
@@ -148,6 +149,7 @@ export default function AppShell({
   onNavigate,
   onSignOut,
   accessToken,
+  access,
   children,
 }: {
   role: Role;
@@ -155,6 +157,8 @@ export default function AppShell({
   onNavigate: (screen: Screen) => void;
   onSignOut: () => void;
   accessToken?: string;
+  /** The account's server permissions; `undefined` while still loading. */
+  access?: Access | null;
   children: ReactNode;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -219,6 +223,7 @@ export default function AppShell({
           </button>
 
           <nav
+            aria-busy={access === undefined}
             style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -228,7 +233,7 @@ export default function AppShell({
               minWidth: 0,
             }}
           >
-            {navFor(role).map((item) => {
+            {navFor(role, access).map((item) => {
               const active = item.screen === screen;
               return (
                 <button
@@ -245,8 +250,10 @@ export default function AppShell({
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released. */}
-            {accessToken && (internalRole || role === 'Event Organiser')
+            {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released.
+                SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
+                neither has hold notices. */}
+            {accessToken && (internalRole || role === 'Event Organiser' || role === 'Event Coordinator Lead')
               ? <HoldNotifications key={accessToken} accessToken={accessToken} holds={internalRole} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}

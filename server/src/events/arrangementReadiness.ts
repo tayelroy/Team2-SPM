@@ -15,7 +15,8 @@ import type {
  * `ready_for_confirmation` means every *required* arrangement is ready. SG2-58's
  * `confirm_event` RPC applies the same three rules in SQL as its gate, so the
  * panel and the Confirm action never disagree; any change here must be made
- * there too (supabase/migrations/202610150001_event_confirmation.sql).
+ * there too (supabase/migrations/202610150001_event_confirmation.sql, whose
+ * venue rule SG2-82 replaced in 202610150003_confirm_event_rejected_venues.sql).
  */
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
@@ -50,8 +51,10 @@ export interface ArrangementReadinessResult {
   venue_requested: boolean;
 }
 
-// A venue or equipment request that has been decided against (or withdrawn) no
-// longer stands for a need the coordinator intends to meet.
+// An equipment request that has been decided against (or withdrawn) no longer
+// stands for a need the coordinator intends to meet; neither does a pending or
+// approved venue request for `venue_requested`. Venue readiness itself keeps
+// rejected requests (SG2-82, see computeVenue).
 const DEAD_STATUSES = new Set(['rejected', 'cancelled']);
 
 function isLive(row: { status: string }): boolean {
@@ -62,18 +65,45 @@ function pluralise(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
-  const live = requests.filter(isLive);
-  const approvedRows = live.filter(row => row.status.toLowerCase() === 'approved');
-  const approved = approvedRows.length;
-  const pending = live.filter(row => row.status.toLowerCase() === 'pending').length;
-  // SG2-58 review: an approved request whose booking was converted from a hold
-  // and later released stays approved, so approval alone does not prove a venue.
-  const unbooked = approvedRows.filter(row => !row.booked).length;
+export interface VenueTally {
+  /** Every request but a cancelled (withdrawn or released) one. */
+  needed: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  /** Approved requests no longer linked to a confirmed booking. */
+  unbooked: number;
+}
 
-  // Every event needs a venue, so an event with no live booking request has an
-  // outstanding venue arrangement rather than "not required".
-  if (live.length === 0) {
+/**
+ * SG2-82 AC5: every venue the event needs must be approved. A rejected
+ * request is still a venue the event needs until the coordinator withdraws it
+ * (or the booking is released), which cancels it; only cancelled requests stop
+ * counting. Also used by the event's venue request list
+ * (server/src/venues/bookingRequests.ts), so both say the same.
+ */
+export function venueTally(requests: VenueBookingStatusRow[]): VenueTally {
+  const needed = requests.filter(row => row.status.toLowerCase() !== 'cancelled');
+  const count = (status: string) => needed.filter(row => row.status.toLowerCase() === status);
+  const approvedRows = count('approved');
+  return {
+    needed: needed.length,
+    approved: approvedRows.length,
+    pending: count('pending').length,
+    rejected: count('rejected').length,
+    // SG2-58 review: an approved request whose booking was converted from a
+    // hold and later released stays approved, so approval alone does not
+    // prove a venue.
+    unbooked: approvedRows.filter(row => !row.booked).length
+  };
+}
+
+function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
+  const { needed, approved, pending, rejected, unbooked } = venueTally(requests);
+
+  // Every event needs a venue, so an event with no venue booking request has
+  // an outstanding venue arrangement rather than "not required".
+  if (needed === 0) {
     return {
       key: 'venue',
       label: 'Venue booking',
@@ -87,6 +117,16 @@ function computeVenue(requests: VenueBookingStatusRow[]): ArrangementStatus {
       label: 'Venue booking',
       state: 'outstanding',
       detail: `${pluralise(pending, 'venue booking')} still awaiting approval.`
+    };
+  }
+  if (rejected > 0) {
+    return {
+      key: 'venue',
+      label: 'Venue booking',
+      state: 'outstanding',
+      detail: rejected === 1
+        ? '1 venue booking rejected: request a replacement if the event still needs one, then withdraw the rejected request.'
+        : `${rejected} venue bookings rejected: request replacements if the event still needs them, then withdraw the rejected requests.`
     };
   }
   if (unbooked > 0) {

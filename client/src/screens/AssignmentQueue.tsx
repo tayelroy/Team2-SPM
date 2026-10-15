@@ -49,9 +49,7 @@ export default function AssignmentQueue({ accessToken }: { accessToken: string }
       return;
     }
     setEntries((current) => current.filter((item) => item.eventId !== entry.eventId));
-    setConfirmation(outcome.notified
-      ? `Assigned ${title} to ${chosen.name}.`
-      : `Assigned ${title} to ${chosen.name}, but the notifications could not be sent.`);
+    setConfirmation(`Assigned ${title} to ${chosen.name}.`);
   }
 
   if (loading) return <p role="status">Loading the unassigned queue…</p>;

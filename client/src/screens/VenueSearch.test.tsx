@@ -173,7 +173,7 @@ test('[CONFLICT] [SG2-46:search-supersession] a newer search supersedes one stil
 
 const requested = { request_id: 41, event_id: 10, venue_id: 3, venue_name: 'Rooftop Terrace', status: 'pending',
   starts_at: '2030-06-14T16:00:00.000Z', ends_at: '2030-06-15T15:59:00.000Z', layout: 'banquet',
-  venue_requirements: 'A bar', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null };
+  venue_requirements: 'A bar', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null, withdrawer_name: null, withdrawn_at: null };
 
 /** The venue search, suitability and venue request endpoints, as a coordinator sees them. */
 function stubEventSearch(booking = 'allowed') {
@@ -184,7 +184,8 @@ function stubEventSearch(booking = 'allowed') {
       made.push(JSON.parse(init.body as string));
       return Response.json({ request: requested, booking }, { status: 201 });
     }
-    if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: made.length ? [requested] : [] });
+    if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: made.length ? [requested] : [],
+      arrangement: { state: made.length ? 'in_progress' : 'none', needed: made.length, approved: 0, pending: made.length, rejected: 0, unbooked: 0 } });
     return Response.json({ venues: [terrace] });
   });
   vi.stubGlobal('fetch', fetch);

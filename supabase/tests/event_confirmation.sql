@@ -33,13 +33,15 @@ insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,st
  from generate_series(1,19) n where n not in (2,4,10);
 
 -- AC1 event: several approved venues, live equipment reserved and placed,
--- registration fully set, plus non-live rows that must be ignored.
+-- registration fully set, plus non-live rows that must be ignored. SG2-82: a
+-- rejected venue request counts until withdrawn, so the event's rejected
+-- venue was withdrawn (cancelled) before confirming.
 update public.events set name='Confirmation Gala',registration_needed=true,registration_capacity=1,
  registration_opens_at='2031-10-01T00:00Z',registration_closes_at='2031-10-01T00:00:01Z' where event_id=95861;
-insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status) values
- (95861,95861,'2031-11-02T09:00Z','2031-11-02T17:00Z','approved'),
- (95861,95861,'2031-11-03T09:00Z','2031-11-03T17:00Z','rejected'),
- (95861,95861,'2031-11-04T09:00Z','2031-11-04T17:00Z','cancelled');
+insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status,withdrawn_at) values
+ (95861,95861,'2031-11-02T09:00Z','2031-11-02T17:00Z','approved',null),
+ (95861,95861,'2031-11-03T09:00Z','2031-11-03T17:00Z','cancelled','2031-10-01T00:00Z'),
+ (95861,95861,'2031-11-04T09:00Z','2031-11-04T17:00Z','cancelled',null);
 insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position)
  values (95861,95861,95860,2,'approved',0,95860,'Stage left'),
   (95871,95861,95860,3,'rejected',null,null,null),
@@ -159,7 +161,7 @@ begin
   raise exception '[SG2-58:one-of-several-venues-pending] [SG2-58:AC2] [BOUNDARY] One pending venue among several approved ones must refuse confirmation';
  end if;
  if public.confirm_event(95864) is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb then
-  raise exception '[SG2-58:only-dead-venue-requests-outstanding] [SG2-58:AC2] [BOUNDARY] Rejected or cancelled venue requests must not count as an approved venue';
+  raise exception '[SG2-58:only-dead-venue-requests-outstanding] [SG2-58:AC2] [SG2-82:AC5] [BOUNDARY] Rejected or cancelled venue requests must not count as an approved venue';
  end if;
  if public.confirm_event(95865) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
   raise exception '[SG2-58:unreserved-equipment-outstanding] [SG2-58:AC2] [NORMAL] A pending equipment request without a reservation must refuse confirmation';

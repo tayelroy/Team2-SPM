@@ -1,0 +1,77 @@
+@startuml event-status-model
+!pragma layout smetana
+title Event status model — generated from STATUS_TRANSITIONS (server/src/events/fields.ts)\nas of main 1d1e336 (14 Oct 2026)
+hide empty description
+skinparam state {
+  BackgroundColor<<Week 7>> #FFF4CC
+  BorderColor<<Week 7>> #B8860B
+}
+skinparam ArrowFontSize 10
+
+state draft
+state unassigned <<Week 7>>
+state submitted
+state under_review
+state needs_clarification
+state rejected
+state approved
+state planning
+state awaiting_safety_check <<Week 7>>
+state safety_rejected <<Week 7>>
+state preparation <<Week 7>>
+state confirmed
+state completed
+state cancelled
+
+[*] --> draft : POST /api/event-requests\n(eventDraftHandler)
+draft --> unassigned : PATCH /:id/submit\n(submitEventRequest, no coordinator)
+draft -[#888888,dashed]-> cancelled : <<planned>> SG2-67
+unassigned --> submitted : PATCH /:id/coordinator\n(assignCoordinatorHandler, SG2-97)
+submitted --> under_review : PATCH /:id/review\n(startEventReviewHandler)
+under_review --> needs_clarification : POST /:id/clarifications\n(requestClarification)
+under_review --> rejected : PATCH /:id/decision\n(decideEventRequestHandler)
+under_review --> approved : PATCH /:id/decision\n(decideEventRequestHandler)
+needs_clarification --> unassigned : PATCH /:id/submit\n(only if no coordinator)
+rejected --> unassigned : PATCH /:id/submit\n(only if no coordinator)
+approved --> planning : PATCH /:id/planning\n(updateEventPlanningHandler)
+planning -[#888888,dashed]-> awaiting_safety_check : <<planned>> SG2-91
+planning -[#888888,dashed]-> cancelled : <<planned>> SG2-67
+awaiting_safety_check -[#888888,dashed]-> preparation : <<planned>> SG2-92 pass
+awaiting_safety_check -[#888888,dashed]-> safety_rejected : <<planned>> SG2-92 fail
+awaiting_safety_check --> planning : PATCH /:id/planning\n(edit with arrangement impact);\nSG2-92 return <<planned>>
+awaiting_safety_check -[#888888,dashed]-> cancelled : <<planned>> SG2-67
+safety_rejected -[#888888,dashed]-> cancelled : <<planned>> SG2-67
+preparation --> confirmed : PATCH /:id/confirm\n(rpc confirm_event, SG2-58)
+preparation --> completed : PATCH /:id/complete\n(completeEventHandler)
+preparation -[#888888,dashed]-> cancelled : <<planned>> SG2-67
+confirmed --> completed : PATCH /:id/complete\n(completeEventHandler)
+confirmed -[#888888,dashed]-> cancelled : <<planned>> SG2-67
+completed --> [*]
+cancelled --> [*]
+
+needs_clarification -[#C0392B]-> submitted : PATCH /:id/submit\n(coordinator held; off-table)
+rejected -[#C0392B]-> submitted : PATCH /:id/submit\n(coordinator held; off-table)
+preparation -[#C0392B]-> planning : PATCH /:id/planning\n(edit with arrangement impact)
+confirmed -[#C0392B]-> planning : PATCH /:id/planning\n(edit with arrangement impact)
+
+note right of cancelled
+  <<planned>> SG2-67 "Cancel an event";
+  SG2-56 releases equipment on cancellation.
+end note
+
+note as enforcement
+  Handlers do not call canTransition(); STATUS_TRANSITIONS
+  documents the intended flow. Any non-terminal event
+  (incl. submitted / under_review / needs_clarification)
+  returns to planning on an impacting planning edit.
+end note
+
+legend right
+  |= Style |= Meaning |
+  |<#FFF4CC>| <<Week 7>> state (SG2-100) |
+  | solid | writer exists on main |
+  |<#DDDDDD>| dashed grey: <<planned>> (story on edge) |
+  | red | written by code, not in STATUS_TRANSITIONS |
+  All /:id paths are under /api/event-requests.
+endlegend
+@enduml
