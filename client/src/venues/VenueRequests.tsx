@@ -31,7 +31,8 @@ export function arrangementSummary(arrangement: VenueArrangement): string {
   const outstanding = [
     arrangement.pending > 0 ? `${venues(arrangement.pending)} awaiting Venue Staff` : '',
     arrangement.rejected > 0 ? `${venues(arrangement.rejected)} rejected — request another venue, then withdraw the rejected request` : '',
-    arrangement.unbooked > 0 ? `${venues(arrangement.unbooked)} approved but no longer booked` : ''
+    arrangement.unbooked > 0 ? `${venues(arrangement.unbooked)} approved but no longer booked` : '',
+    arrangement.affected > 0 ? `${venues(arrangement.affected)} unavailable — alternative venue arrangements are required` : ''
   ].filter(Boolean);
   return `Venue arrangement not ready: ${arrangement.approved} of ${venues(arrangement.needed)} approved; ${outstanding.join('; ')}.`;
 }
@@ -55,6 +56,8 @@ interface RequestFormProps {
   period: { from: string; until: string };
   layout: Layout | '';
   venueRequirements: string | null;
+  /** SG2-81 AC4: the affected booking this request replaces, if it does. */
+  replacesBookingId?: number;
   onRequested: (request: VenueRequest, booking: BookingReadiness, conflicts: VenueConflict[]) => void;
   onCancel: () => void;
 }
@@ -75,7 +78,7 @@ export function VenueRequestForm(props: RequestFormProps) {
   return <RequestFields {...props} layout={props.layout && offered.includes(props.layout) ? props.layout : offered[0]} />;
 }
 
-function RequestFields({ accessToken, eventId, venue, period, layout, venueRequirements, onRequested, onCancel }: RequestFormProps & { layout: Layout }) {
+function RequestFields({ accessToken, eventId, venue, period, layout, venueRequirements, replacesBookingId, onRequested, onCancel }: RequestFormProps & { layout: Layout }) {
   const [values, setValues] = useState({ from: period.from, until: period.until, layout });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -91,7 +94,8 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
     setSubmitting(true);
     const result = await requestVenue(accessToken, {
       event_id: eventId, venue_id: venue.venue_id, layout: values.layout,
-      starts_at: sgtToIso(values.from), ends_at: sgtToIso(values.until)
+      starts_at: sgtToIso(values.from), ends_at: sgtToIso(values.until),
+      ...(replacesBookingId === undefined ? {} : { replaces_booking_id: replacesBookingId })
     });
     setSubmitting(false);
     if (result.ok) onRequested(result.request, result.booking, result.conflicts);
@@ -115,6 +119,8 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
       </select>
     </div>
     <Fact label="Venue requirements" value={venueRequirements ?? 'None recorded for this event'} />
+    {replacesBookingId === undefined ? null
+      : <p style={{ margin: 0, color: color.silver, fontSize: '13px' }}>This replaces booking #{replacesBookingId}, which is released once Venue Staff approve this request.</p>}
     {error ? <p role="alert" style={{ margin: 0 }}>{error}</p> : null}
     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
       <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',

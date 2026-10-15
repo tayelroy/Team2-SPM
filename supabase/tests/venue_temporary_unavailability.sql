@@ -89,11 +89,13 @@ end $$;
 reset role;
 do $$
 begin
+  -- SG2-81 AC6 moves a Confirmed or Preparation event back to Planning when
+  -- its booking is flagged; it is never cancelled, and its details are kept.
   if (select array_agg(status::text order by event_id) from public.events where event_id in (98001, 98002))
-      is distinct from array['confirmed', 'confirmed']
+      is distinct from array['planning', 'planning']
     or (select array_agg(name::text order by event_id) from public.events where event_id in (98001, 98002))
       is distinct from array['Gala Night', 'Partner Lunch'] then
-    raise exception '[SG2-80:events-not-cancelled] [SG2-80:AC4] [NORMAL] Affected events must keep their status and details';
+    raise exception '[SG2-80:events-not-cancelled] [SG2-80:AC4] [NORMAL] Affected events must not be cancelled and must keep their details';
   end if;
   if (select count(*) from public.venue_bookings where booking_id in (98001, 98002) and status = 'confirmed'
       and starts_at in ('2031-03-01 09:00+00', '2031-03-02 09:00+00')) <> 2 then
@@ -136,7 +138,7 @@ begin
     raise exception '[SG2-80:list-recorded-details] [SG2-80:AC6] [NORMAL] The listing must show the reason, note, recorder and time';
   end if;
   if jsonb_array_length(item->'affected') <> 2
-    or item#>>'{affected,0,event_name}' <> 'Gala Night' or item#>>'{affected,0,event_status}' <> 'confirmed'
+    or item#>>'{affected,0,event_name}' <> 'Gala Night' or item#>>'{affected,0,event_status}' <> 'planning'
     or item#>>'{affected,1,booking_id}' <> '98002' then
     raise exception '[SG2-80:list-affected-events] [SG2-80:AC3] [NORMAL] The listing must identify each affected event, earliest first';
   end if;

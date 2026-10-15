@@ -5,6 +5,7 @@ import { color, gradient, label, radius, rule } from '../theme';
 import { inputStyle } from './VenueForm';
 import type { Venue } from './api';
 import { formatSgt } from './searchApi';
+import { UNAVAILABILITY_CATEGORIES } from './blocksApi';
 import {
   MAX_RELEASE_REASON, fetchEventBookings, fetchVenueBookings, releaseBooking,
   type BookingsResult, type VenueBooking
@@ -63,7 +64,7 @@ function ReleaseForm({ booking, accessToken, onReleased, onCancel }: {
  * SG2-51: bookings with their status, each confirmed one releasable with a
  * reason; released ones say who released them, when and why (AC5).
  */
-function BookingList({ accessToken, load, refresh, describe, empty, label: listLabel, onReleased }: {
+function BookingList({ accessToken, load, refresh, describe, empty, label: listLabel, onReleased, onFindReplacement }: {
   accessToken: string | null | undefined;
   load: () => Promise<BookingsResult<{ bookings: VenueBooking[] }>>;
   refresh: number;
@@ -72,6 +73,8 @@ function BookingList({ accessToken, load, refresh, describe, empty, label: listL
   label: string;
   /** After a release, e.g. so the event's requests show the request as cancelled. */
   onReleased?: () => void;
+  /** SG2-81 AC4: offered on a booking a venue's unavailability affects. */
+  onFindReplacement?: (booking: VenueBooking) => void;
 }) {
   const [bookings, setBookings] = useState<VenueBooking[] | null>(null);
   const [error, setError] = useState('');
@@ -107,6 +110,21 @@ function BookingList({ accessToken, load, refresh, describe, empty, label: listL
                   <Badge bg={status.bg} fg={status.fg}>{status.text}</Badge>
                 </div>
                 <span style={{ color: color.silver, fontSize: '13px' }}>{period(booking)} · Booking #{booking.booking_id}</span>
+                {booking.status === 'confirmed' && booking.affected_by.length > 0 ? <div role="alert" aria-label={`Booking #${booking.booking_id} is affected by venue unavailability`}
+                  style={{ display: 'grid', gap: '6px', padding: '10px 12px', borderRadius: radius.sm, border: rule.edge }}>
+                  <strong style={{ color: color.mist, fontSize: '14px' }}>Venue unavailable</strong>
+                  {booking.affected_by.map(period => <span key={period.starts_at} style={{ color: color.silver, fontSize: '13px' }}>
+                    {formatSgt(period.starts_at)} – {formatSgt(period.ends_at)} · {(UNAVAILABILITY_CATEGORIES as Record<string, string>)[period.category] ?? period.category}: {period.reason}
+                  </span>)}
+                  <span style={{ color: color.mist, fontSize: '13px' }}>Alternative venue arrangements are required for this booking.</span>
+                  {booking.replacement
+                    ? <span style={{ color: color.silver, fontSize: '13px' }}>
+                      Replacement requested: {booking.replacement.venue_name ?? `request #${booking.replacement.request_id}`}, awaiting Venue Staff.
+                    </span>
+                    : onFindReplacement
+                      ? <GhostButton onClick={() => onFindReplacement(booking)} style={{ justifySelf: 'start' }}>Find a replacement venue</GhostButton>
+                      : null}
+                </div> : null}
                 {booking.status === 'cancelled' ? <span style={{ color: color.silver, fontSize: '13px' }}>
                   Released by {booking.canceller_name ?? 'an unnamed account'}{booking.cancelled_at ? ` on ${formatSgt(booking.cancelled_at)}` : ''}: {booking.cancellation_reason}
                 </span> : null}
@@ -123,15 +141,16 @@ function BookingList({ accessToken, load, refresh, describe, empty, label: listL
 }
 
 /** SG2-51 AC3: every venue booked for the event, each released on its own. */
-export function EventVenueBookings({ accessToken, eventId, eventName, refresh, onReleased }: {
+export function EventVenueBookings({ accessToken, eventId, eventName, refresh, onReleased, onFindReplacement }: {
   accessToken: string; eventId: number; eventName: string; refresh: number; onReleased?: () => void;
+  onFindReplacement?: (booking: VenueBooking) => void;
 }) {
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
     <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 500 }}>Booked venues for {eventName}</h2>
     <BookingList accessToken={accessToken} refresh={refresh} label={`Booked venues for ${eventName}`}
       load={() => fetchEventBookings(accessToken, eventId)}
       describe={booking => booking.venue_name ?? `Venue #${booking.venue_id}`}
-      empty="No venues are booked for this event yet." onReleased={onReleased} />
+      empty="No venues are booked for this event yet." onReleased={onReleased} onFindReplacement={onFindReplacement} />
   </div>;
 }
 

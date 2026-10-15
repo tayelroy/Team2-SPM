@@ -43,6 +43,7 @@ notice of a kind per action even if they hold two parts in the event.
 | `venue_booking_released` | Venue booking released | A confirmed booking is released (SG2-51) | Coordinator and organiser | `<Venue> was released for <Event> (<period> SGT): <reason>` | `public.release_venue_booking` |
 | `equipment_reserved` | Equipment reserved | Technical Support reserve equipment (SG2-55) | Coordinator | receipt naming the equipment and event | equipment reservation RPC |
 | `venue_booking_clash` | Booking clash flagged | A booking newly clashes once setup and turnaround apply (SG2-79) | Each affected event's coordinator | names both bookings and periods | `public.refresh_venue_booking_clashes` |
+| `venue_unavailable` | Venue unavailable | A confirmed booking is flagged because its venue was marked unavailable (SG2-81) | The affected event's coordinator and, when the event moved back to Planning, its organiser | the venue, the period (SGT), the reason, and the booking or event affected | `public.venue_disruption_notify` |
 | `event_confirmed` | Event confirmed | The coordinator confirms the event (SG2-58) | Organiser | `Your event <Event> is confirmed.` | `public.confirm_event` |
 
 The SG2-68 event-request notices are written by the API with the service-role
