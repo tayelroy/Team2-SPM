@@ -903,7 +903,7 @@ export async function fetchAssignable(token: string): Promise<FetchAssignableRes
   };
 }
 
-export type AssignCoordinatorOutcome = { ok: true } | { ok: false; message: string };
+export type AssignCoordinatorOutcome = { ok: true; status?: string } | { ok: false; message: string };
 
 /**
  * Assigns (SG2-33) or reassigns (SG2-34) an event's coordinator. Maps to
@@ -926,7 +926,16 @@ export async function assignCoordinator(
     return unavailable;
   }
 
-  if (response.ok) return { ok: true };
+  if (response.ok) {
+    const data = await readEventRequestJson(response, null);
+    const status = data?.request?.status;
+    // Mirror the server's live assignable states. An absent or invalid status
+    // preserves the caller's existing state instead of inventing a transition.
+    return typeof status === 'string' && [
+      'unassigned', 'submitted', 'under_review', 'approved', 'planning',
+      'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed',
+    ].includes(status) ? { ok: true, status } : { ok: true };
+  }
   if (response.status === 401 || response.status === 403) {
     return { ok: false, message: 'Only the Event Coordinator Lead can assign a coordinator. Sign in again.' };
   }

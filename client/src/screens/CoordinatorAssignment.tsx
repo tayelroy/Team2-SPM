@@ -63,7 +63,9 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
     const { userId: coordinatorId, name } = chosen;
     setRequests((current) =>
       current.map((item) =>
-        item.eventId === request.eventId ? { ...item, coordinatorId, coordinatorName: name } : item,
+        item.eventId === request.eventId
+          ? { ...item, coordinatorId, coordinatorName: name, status: outcome.status ?? item.status }
+          : item,
       ),
     );
     setRowMessage((current) => ({

@@ -1601,16 +1601,16 @@
     "title": "an old block is kept and still closes the venue, a block over a booking is accepted, and removing the old block reopens it",
     "type": "Positive",
     "story": "SG2-98",
-    "purpose": "Verify AC1–AC3: a block recorded before SG2-80 is listed as an unavailability record with no recorder and still keeps the venue out of search; a new block over a confirmed booking is accepted and flags it; removing the old block makes the venue searchable again.",
+    "purpose": "Verify AC1\u2013AC3: a block recorded before SG2-80 is listed as an unavailability record with no recorder and still keeps the venue out of search; a new block over a confirmed booking is accepted and flags it; removing the old block makes the venue searchable again.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Seed the old-style block Roof repair on Regression Hall for 18 June 2030 (UTC), filed under other with no recorder or time.",
       "As Venue Staff, open the block screen and check the old block is listed.",
-      "Block 15 June 2030 09:00–13:00 Singapore time over confirmed booking #1 with reason Maintenance and note Projector swap.",
-      "As coordinator, search 18 June 2030 05:00–06:00 UTC.",
+      "Block 15 June 2030 09:00\u201313:00 Singapore time over confirmed booking #1 with reason Maintenance and note Projector swap.",
+      "As coordinator, search 18 June 2030 05:00\u201306:00 UTC.",
       "As Venue Staff, remove Roof repair; as coordinator, repeat the search."
     ],
-    "data": "Old-style block #98 (Roof repair); seeded confirmed booking #1 for event 1 (Planning workshop) on 15 June 2030 02:00–04:00 UTC; Regression venue and Regression coordinator accounts",
+    "data": "Old-style block #98 (Roof repair); seeded confirmed booking #1 for event 1 (Planning workshop) on 15 June 2030 02:00\u201304:00 UTC; Regression venue and Regression coordinator accounts",
     "expected": "Roof repair shows as Other with 'Added before the recorder and time were tracked'; the new block is saved and one booked event is reported as flagged and not cancelled; search leaves out Regression Hall while the old block exists and returns it after the block is removed.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1641,7 +1641,7 @@
       "As coordinator, technical support and organiser, delete block #98; then delete it without signing in.",
       "List the blocks as Venue Staff."
     ],
-    "data": "Old-style block #98 (Roof repair); confirmed booking #1 on 15 June 2030 02:00–04:00 UTC; fixture roles",
+    "data": "Old-style block #98 (Roof repair); confirmed booking #1 on 15 June 2030 02:00\u201304:00 UTC; fixture roles",
     "expected": "Both invalid periods return 400; other roles receive 403 and the anonymous call 401; only Scheduled maintenance and Roof repair remain.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1672,7 +1672,7 @@
       "As Venue Staff, list the old blocks, try to place a hold inside one, and block a period over a confirmed booking.",
       "As coordinator, then Venue Staff, remove an old block and place the hold again; roll back."
     ],
-    "data": "Venues 9801 and 9802; old blocks 98201–98203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
+    "data": "Venues 9801 and 9802; old blocks 98201\u201398203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
     "expected": "All three old blocks keep their period and reason, are filed under other with no recorder or time; booking 98301 is flagged and stays confirmed, 98302 is not flagged; the hold is refused while the old block exists and created after Venue Staff remove it; the coordinator removes nothing; a new block over a booking is accepted and flags it.",
     "evidence": "supabase/tests/venue_block_upgrade.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
@@ -5573,6 +5573,42 @@
     "status": "Pass",
     "actual": "The delayed refresh regression failed before the fix because the empty result remained visible. After clearing invalidated list/error state at fetch start, all 36 focused venue tests passed; VenueRequests.tsx has 100% statement, branch, function and line coverage. Client typecheck and diff whitespace validation passed.",
     "execution_evidence": "15 Oct 2026 local verification; /tmp/spm-venue-refresh-red.log; /tmp/spm-venue-refresh-green.log; /tmp/spm-venue-refresh-typecheck.log; /tmp/spm-venue-refresh-coverage/coverage-summary.json. Hosted deployment and full combined CI are not claimed.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-100-HOTFIX-ASSIGNMENT-STATUS",
+    "title": "Assignment cards immediately display the server-recorded lifecycle status",
+    "type": "Positive / boundary / conflict / failure / UI response consistency",
+    "story": "SG2-100",
+    "purpose": "Prevent a successfully assigned request retaining Awaiting Assignment until the Lead reloads the screen.",
+    "preconditions": "Isolated rendered CoordinatorAssignment and real public assignment API helper with controlled HTTP responses; synthetic event/coordinator identities; no hosted writes.",
+    "steps": [
+      "Assign event7 while holding PATCH pending and verify Awaiting Assignment until success.",
+      "Return the recorded submitted status; verify Submitted and new coordinator immediately.",
+      "Reassign event8 with each advanced returned status and verify the exact lifecycle label.",
+      "Return incomplete or unsupported status payloads and preserve existing known status.",
+      "Reject assignment with409/503 despite a submitted-shaped response and retain unassigned coordinator/status."
+    ],
+    "data": "Events7/8; Sarah/Raj coordinator identities; submitted, under_review, planning, awaiting_safety_check, preparation, confirmed; absent/null/numeric/unknown/terminal status payloads; HTTP409/503.",
+    "expected": "Successful first assignment updates the displayed status from the server response. Reassignment never guesses Submitted. Missing or invalid status leaves the previous state; refused mutations do not change the card.",
+    "evidence": "client/src/screens/CoordinatorAssignment.test.tsx; client/src/api/eventRequests.test.ts; client/src/screens/CoordinatorAssignment.tsx; client/src/api/eventRequests.ts",
+    "layer": "Composed rendered React screen and authenticated public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC3",
+      "SG2-33:AC1",
+      "SG2-34:AC1"
+    ],
+    "status": "Pass",
+    "actual": "Before the fix five rendered instances failed because the old badge remained despite the successful assignment response. After the fix all1368 client tests in68 files pass, all client source coverage metrics100%, and typecheck passes. Four new method declarations and two revised existing methods cover15 extra runner instances.",
+    "execution_evidence": "15 Oct2026 local verification; /tmp/spm-assignment-status-red.log, /tmp/spm-assignment-status-full.log, /tmp/spm-assignment-status-full-coverage/coverage-summary.json and /tmp/spm-assignment-status-types.log. No hosted deployment or combined CI result claimed.",
     "execution_date": "15 Oct 2026",
     "executed_by": "Codex automated verification",
     "review": null

@@ -1697,16 +1697,24 @@ describe('fetchAssignable (SG2-33/34)', () => {
 });
 
 describe('assignCoordinator (SG2-33/34)', () => {
-  test('[NORMAL] [SG2-33:AC1] patches the coordinator endpoint with the chosen coordinator', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: {} }));
+  test('[NORMAL] [SG2-33:AC1] [SG2-100:AC3] patches the coordinator endpoint with the chosen coordinator', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: { status: 'submitted' } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true, status: 'submitted' });
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/coordinator', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
       body: JSON.stringify({ coordinatorId: 'c1' }),
     });
+  });
+
+  test.each([
+    null, {}, { request: null }, { request: {} }, { request: { status: 42 } },
+    { request: { status: 'unknown_status' } }, { request: { status: 'completed' } },
+  ])('[BOUNDARY] [FAILURE] [SG2-100:AC3] an absent or invalid assignment status does not invent a lifecycle change (%j)', async body => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
   });
 
   test.each([401, 403])('[FAILURE] [SG2-33:AC1] [SG2-97:AC1] tells the user only the Event Coordinator Lead can assign on %i', async (status) => {
