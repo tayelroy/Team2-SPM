@@ -36,7 +36,7 @@ const summit: SuitabilityEventRow = {
 /** The summit holds two venues (Week 7 change #3). */
 const hall: VenueBookingRecord = { booking_id: 11, venue_id: 1, venue_name: 'Atrium Hall', event_id: 7, event_name: 'Leadership Summit',
   starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', status: 'confirmed',
-  cancelled_at: null, cancellation_reason: null, canceller_name: null };
+  cancelled_at: null, cancellation_reason: null, canceller_name: null, affected_by: [], replacement: null };
 const annex: VenueBookingRecord = { ...hall, booking_id: 12, venue_id: 2, venue_name: 'Annex' };
 
 function fixture(seed: { results?: ReleaseResult[]; fail?: Error } = {}) {
@@ -91,6 +91,23 @@ test('[NORMAL] [SG2-51:AC1] Venue Staff release a booking too', async () => {
   const { composed, released } = fixture();
   assert.equal((await release(composed, 'venue', { reason: 'Burst pipe' })).status, 200);
   assert.deepEqual(released, [['venue', 11, 'Burst pipe']]);
+});
+
+test('[NORMAL] [SG2-81:AC1] [SG2-81:AC2] the coordinator and Venue Staff see which of the event\'s bookings a venue\'s unavailability affects, and the replacement asked for', async () => {
+  const affected: VenueBookingRecord = { ...hall, affected_by: [{ starts_at: '2030-06-15T00:00:00.000Z', ends_at: '2030-06-16T00:00:00.000Z',
+    category: 'maintenance', reason: 'Roof repairs' }], replacement: { request_id: 90, venue_name: 'Lecture Theatre' } };
+  const store: VenueBookingStore = { async event() { return summit; }, async venueExists() { return true; },
+    async forEvent() { return [affected, annex]; }, async forVenue() { return []; } };
+  const composed = compose({ getAdminClient: () => ({}) as SupabaseClient, store: () => store, now: () => NOW });
+  for (const user of ['coordinator', 'venue']) {
+    const response = await request(composed).get('/api/venue-bookings?event_id=7').set(as(user));
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.bookings.map((booking: VenueBookingRecord) => [booking.booking_id, booking.affected_by.length, booking.replacement]),
+      [[11, 1, { request_id: 90, venue_name: 'Lecture Theatre' }], [12, 0, null]]);
+    assert.equal(response.body.bookings[0].affected_by[0].reason, 'Roof repairs');
+  }
+  // An event that is not the caller\'s own is not revealed.
+  assert.equal((await request(composed).get('/api/venue-bookings?event_id=7').set(as('other_coordinator'))).status, 404);
 });
 
 test('[BOUNDARY] [SG2-51:AC1] a reason is required and may be 500 characters but not 501', async () => {

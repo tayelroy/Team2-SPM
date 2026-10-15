@@ -103,6 +103,7 @@ export function createGetEventArrangementsHandler({
       registration_opens_at: event.registration_opens_at,
       registration_closes_at: event.registration_closes_at,
       venue_requests: facts.facts.venue_requests,
+      affected_bookings: facts.facts.affected_bookings,
       equipment_requests: facts.facts.equipment_requests
     });
 

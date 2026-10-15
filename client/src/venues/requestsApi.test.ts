@@ -7,8 +7,8 @@ const pending: VenueRequest = { request_id: 41, event_id: 10, venue_id: 3, venue
   starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', layout: 'banquet',
   venue_requirements: 'A bar', requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null,
   withdrawer_name: null, withdrawn_at: null };
-const waiting: VenueArrangement = { state: 'in_progress', needed: 1, approved: 0, pending: 1, rejected: 0, unbooked: 0 };
-const nothing: VenueArrangement = { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0 };
+const waiting: VenueArrangement = { state: 'in_progress', needed: 1, approved: 0, pending: 1, rejected: 0, unbooked: 0, affected: 0 };
+const nothing: VenueArrangement = { state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0, affected: 0 };
 const values = { event_id: 10, venue_id: 3, starts_at: pending.starts_at, ends_at: pending.ends_at, layout: 'banquet' as const };
 
 function respond(response: () => Response) {
@@ -105,4 +105,13 @@ test('[NORMAL] [SG2-49:AC3] a decision is posted with its trimmed reason and ans
   await decideVenueRequest('staff-token', 41, 'approve', '   ');
   respond(() => Response.json({ nothing: true }));
   expect(await decideVenueRequest('staff-token', 41, 'approve', '')).toEqual({ ok: false, error: 'Venue requests are unavailable right now. Please try again.' });
+});
+
+test('[BOUNDARY] [SG2-81:AC2] an arrangement answered without a count of affected bookings reads as none affected; one given is kept', async () => {
+  const { affected: _unused, ...older } = waiting;
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(Response.json({ requests: [pending], arrangement: older }))
+    .mockResolvedValueOnce(Response.json({ requests: [pending], arrangement: { ...waiting, affected: 2 } })));
+  expect(await fetchVenueRequests('token', 10)).toEqual({ ok: true, requests: [pending], arrangement: { ...waiting, affected: 0 } });
+  expect(await fetchVenueRequests('token', 10)).toEqual({ ok: true, requests: [pending], arrangement: { ...waiting, affected: 2 } });
 });

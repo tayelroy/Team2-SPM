@@ -256,3 +256,18 @@ Migration `202610100002_venue_booking_release.sql`:
 Clients still cannot write `venue_bookings` directly.
 
 Verification: `supabase/tests/venue_booking_release.sql` (CI database job), `server/src/venue-bookings.test.ts`, `server/src/db/venueBookings.test.ts`, `server/src/notifications.test.ts`, `client/src/venues/VenueBookings.test.tsx`, `client/src/components/HoldNotifications.test.tsx` and browser journeys `SG2-51-P01` and `SG2-51-P02`.
+
+## SG2-81: Replacing a venue that has become unavailable
+
+SG2-80 flags every confirmed booking that falls in a period a venue is marked unavailable (`venue_booking_disruptions`) and leaves the booking and its event alone. SG2-81 gives the event's coordinator the way through that.
+
+- **Told (AC1).** When a booking is flagged, its event's coordinator gets a `venue_unavailable` notice naming the venue, the period (Singapore time), the reason and the affected booking. A flag that stands through a later change of the period does not notify again. Bookings flagged before the migration are not announced.
+- **Outstanding (AC2).** An affected booking leaves the event's venue arrangement not ready, with the detail "alternative venue arrangements are required", in the arrangements panel, the venue requests summary (`affected` count) and `confirm_event()`. The booking list shows a "Venue unavailable" alert with each period, category and note.
+- **Details kept (AC3).** Nothing changes the event's name, date, time, attendance or requirements, or the booking itself.
+- **Replacement (AC4).** **Find a replacement venue** on the affected booking reruns the venue search for that booking's period with the event's own requirements. A request made from it carries `replaces_booking_id`. The API accepts that only for an affected, confirmed booking of the same event, and then also accepts it once the event is in Preparation or Confirmed.
+- **Released on approval (AC5).** Approving the replacement releases the booking it replaces in the same transaction (`release_replaced_booking()`, which no role can call directly and which does not depend on who may release a booking by hand): the old request is cancelled, the event's venue moves to a booking still confirmed, the event's history records the release and the coordinator and organiser are told. The flag clears with the booking.
+- **Back to Planning (AC6).** An event that is Confirmed or in Preparation when one of its bookings is flagged moves back to Planning (SG2-66). The move and the cleared confirmation stamp are recorded, and the organiser is told the venue arrangement is being changed. `STATUS_TRANSITIONS` now allows `preparation -> planning` and `confirmed -> planning`. An event already in Planning, or not yet approved, keeps its status.
+
+Migration `202610170001_venue_replacement.sql` adds the notice kind, `venue_booking_requests.replaces_booking_id`, the flag trigger, `release_replaced_booking()`, and new versions of `confirm_event()` and `decide_venue_booking_request()`. It must be applied after `202610150001_event_confirmation.sql` and `202610160001_event_notifications.sql`. SG2-80's SQL test now expects an affected confirmed event to be in Planning.
+
+Verification: `supabase/tests/venue_replacement.sql` (CI database job), `server/src/venue-booking-requests.test.ts`, `server/src/venue-bookings.test.ts`, `server/src/db/venueBookings.test.ts`, `server/src/db/venueBookingRequests.test.ts`, `server/src/db/eventArrangements.test.ts`, `server/src/events/arrangementReadiness.test.ts`, `server/src/events/fields.test.ts`, `client/src/venues/VenueBookings.test.tsx`, `client/src/venues/VenueRequests.test.tsx` and `client/src/screens/VenueSearch.test.tsx`. There is no browser journey yet: the in-memory fixture cannot flag a booking.

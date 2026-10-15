@@ -31,6 +31,21 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
     assert.equal(canTransition('safety_rejected', 'cancelled'), true);
   });
 
+  test('[NORMAL] [SG2-81:AC6] a Preparation or Confirmed event can move back to Planning when its venue becomes unavailable', () => {
+    assert.equal(canTransition('preparation', 'planning'), true);
+    assert.equal(canTransition('confirmed', 'planning'), true);
+  });
+
+  test('[BOUNDARY] [SG2-81:AC6] Planning is reachable only from approved (the normal way in), the safety check, Preparation and Confirmed, never from the earlier stages or the terminal ones', () => {
+    const back = EVENT_STATUSES.filter(from => canTransition(from, 'planning'));
+    assert.deepEqual([...back].sort(), ['approved', 'awaiting_safety_check', 'confirmed', 'preparation']);
+  });
+
+  test('[FAILURE] [SG2-81:AC6] a completed or cancelled event still cannot go back to Planning', () => {
+    assert.equal(canTransition('completed', 'planning'), false);
+    assert.equal(canTransition('cancelled', 'planning'), false);
+  });
+
   test('[BOUNDARY] [SG2-100:AC4] every EVENT_STATUSES member has a STATUS_TRANSITIONS entry', () => {
     for (const status of EVENT_STATUSES) {
       assert.ok(

@@ -5,6 +5,7 @@ import type { VenueBookingRequestValues } from '../venues/bookingRequestFields';
 import { createVenueSuitabilityStore, type CapacityExceptionRecord, type SuitabilityEventRow, type SuitabilityVenueRow } from './venueSuitability';
 import { createVenueConflictStore, type VenueConflictStore } from './venueConflicts';
 import { fetchEventArrangementFacts, type VenueBookingStatusRow } from './eventArrangements';
+import { fetchAffectedBookingIds } from './venueDisruptions';
 
 /** A venue request as people see it: the venue, requester and decider by
  * name. Their account ids are not sent to clients. */
@@ -61,6 +62,8 @@ export interface VenueBookingRequestStore {
    * approved one still has its confirmed booking, as SG2-57's readiness reads
    * them. */
   venueStatuses(eventId: number): Promise<VenueBookingStatusRow[]>;
+  /** SG2-81: the event's confirmed bookings a venue's unavailability affects. */
+  affectedBookings(eventId: number): Promise<number[]>;
 }
 
 const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason,withdrawn_by,withdrawn_at';
@@ -140,6 +143,13 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
       const result = await fetchEventArrangementFacts(admin, eventId);
       if (!result.ok) throw new AccessError(503);
       return result.facts.venue_requests;
+    },
+    async affectedBookings(eventId) {
+      const { data, error } = await admin.from('venue_bookings').select('booking_id').eq('event_id', eventId).eq('status', 'confirmed');
+      check(error);
+      const affected = await fetchAffectedBookingIds(admin, ((data ?? []) as { booking_id: number }[]).map(row => Number(row.booking_id)));
+      if (!affected.ok) throw new AccessError(503);
+      return [...affected.ids].sort((a, b) => a - b);
     }
   };
 }

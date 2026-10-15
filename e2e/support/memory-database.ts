@@ -77,6 +77,8 @@ export class MemoryDatabase {
       venue_layouts: [],
       venue_operations: [],
       venue_booking_clashes: [],
+      // SG2-81: bookings a venue's unavailability affects; the browser journeys flag none.
+      venue_booking_disruptions: [],
       event_clarifications: [],
       event_audit_logs: []
     };

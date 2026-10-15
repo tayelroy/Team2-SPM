@@ -108,6 +108,20 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
     assert.equal(res.body.ready_for_confirmation, false);
   });
 
+  test('[NORMAL] [SG2-81:AC2] an affected booking leaves the venue outstanding and the event not ready, even with every request approved', async () => {
+    const res = await request(
+      buildApp({
+        facts: { ok: true, facts: { venue_requests: [{ status: 'approved', booked: true }], affected_bookings: 1,
+          equipment_requests: [{ status: 'approved', shortfall: 0, placement_venue_id: 7, reserved: true }] } }
+      })
+    ).get('/api/event-requests/101/arrangements');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.outstanding, ['venue']);
+    assert.equal(res.body.ready_for_confirmation, false);
+    assert.match(res.body.arrangements[0].detail, /affected by venue unavailability/);
+  });
+
   test('[FAILURE] [SG2-57:AC1] returns 401 when the caller is not authenticated', async () => {
     const res = await request(buildApp({ principal: undefined })).get('/api/event-requests/101/arrangements');
 

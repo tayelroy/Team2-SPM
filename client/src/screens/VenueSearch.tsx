@@ -4,11 +4,12 @@ import { Card, Eyebrow, Fact, GhostButton, RecessedCard } from '../ui';
 import { color, gradient, label, radius } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
 import { LAYOUT_LABELS, LAYOUTS, describeLayouts, type Layout } from '../venues/layoutsApi';
-import { EMPTY_SEARCH, VenueSearchError, formatSgt, searchVenues, sgtToIso, type VenueMatch, type VenueSearchValues } from '../venues/searchApi';
+import { EMPTY_SEARCH, VenueSearchError, formatSgt, isoToSgtLocal, searchVenues, sgtToIso, type VenueMatch, type VenueSearchValues } from '../venues/searchApi';
 import type { VenueSearchPrefill } from '../venues/searchPrefill';
 import { EventVenueFit } from '../venues/VenueFit';
 import { EventVenueRequests, VenueRequestForm, requestedNotice } from '../venues/VenueRequests';
 import { EventVenueBookings } from '../venues/VenueBookings';
+import type { VenueBooking } from '../venues/bookingsApi';
 
 const TEXT_FIELDS = [
   ['location', 'Location', 'e.g. North Wing'],
@@ -41,6 +42,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   const [requesting, setRequesting] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
   const [requestsVersion, setRequestsVersion] = useState(0);
+  // SG2-81 AC4: the affected booking a request made from this search replaces.
+  const [replacing, setReplacing] = useState<VenueBooking | null>(null);
   // A new request, or a released booking (SG2-51), changes the event's requests.
   const refreshRequests = () => setRequestsVersion(version => version + 1);
   const pending = useRef<AbortController | null>(null);
@@ -64,6 +67,16 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
+  }
+
+  // SG2-81 AC4: search again for the affected booking's period with the
+  // event's own requirements (the prefill), and request from the results.
+  function findReplacement(booking: VenueBooking) {
+    const criteria = { ...values, from: isoToSgtLocal(booking.starts_at), until: isoToSgtLocal(booking.ends_at) };
+    setReplacing(booking);
+    setValues(criteria);
+    setInvalid(false);
+    void run(criteria);
   }
 
   function submit(event: FormEvent) {
@@ -136,6 +149,13 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
         </form>
       </RecessedCard>
 
+      {replacing ? <RecessedCard padding="18px 24px" style={{ gap: '10px' }}>
+        <p role="status" style={{ margin: 0, color: color.mist }}>
+          Finding a replacement for {replacing.venue_name ?? `venue #${replacing.venue_id}`} (booking #{replacing.booking_id}, {formatSgt(replacing.starts_at)} – {formatSgt(replacing.ends_at)}).
+          The search uses this event&apos;s requirements. The booking is released once Venue Staff approve the replacement you request.
+        </p>
+        <GhostButton onClick={() => setReplacing(null)} style={{ alignSelf: 'flex-start' }}>Stop replacing this booking</GhostButton>
+      </RecessedCard> : null}
       {loading ? <p role="status">Searching venues…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {notice ? <p role="status" style={{ margin: 0, color: color.accent }}>{notice}</p> : null}
@@ -179,8 +199,10 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
                     ? <VenueRequestForm accessToken={accessToken} eventId={prefill.eventId} venue={venue}
                         period={{ from: searched.from, until: searched.until }} layout={searched.layout}
                         venueRequirements={prefill.venueRequirements} onCancel={() => setRequesting(null)}
+                        replacesBookingId={replacing?.booking_id}
                         onRequested={(_request, booking, conflicts) => {
                           setRequesting(null);
+                          setReplacing(null);
                           setNotice(requestedNotice(venue.name, booking, conflicts));
                           refreshRequests();
                         }} />
@@ -199,7 +221,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
       {prefill && searched ? <EventVenueRequests accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion} /> : null}
       {/* SG2-51: the venues booked for the event, each released on its own. */}
       {prefill && searched ? <EventVenueBookings accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion}
-          onReleased={refreshRequests} /> : null}
+          onReleased={refreshRequests} onFindReplacement={findReplacement} /> : null}
     </section>
   );
 }
