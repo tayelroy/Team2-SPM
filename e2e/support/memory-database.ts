@@ -341,7 +341,7 @@ export class MemoryDatabase {
       kind: 'event', item_id: event.event_id, event_id: event.event_id, title: event.name || 'Untitled event', event_name: event.name || 'Untitled event',
       status: event.status, starts_at: event.proposed_date, ends_at: this.eventEndsAt(event.event_id), audience: 'event_coordinator', assigned_to: event.coordinator_id,
       category: REVIEW_STATUSES.includes(String(event.status)) ? 'review' : 'assigned',
-      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed'].map(key => [key, event[key]])),
+      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'registration_capacity', 'registration_opens_at', 'registration_closes_at', 'planning_notes'].map(key => [key, event[key]])),
     } as Row));
     for (const [table, kind, resourceTable, resourceKey, audience] of [
       ['venue_booking_requests', 'venue', 'venues', 'venue_id', 'venue_staff'],

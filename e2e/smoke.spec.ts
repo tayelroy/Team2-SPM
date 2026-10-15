@@ -1,0 +1,176 @@
+import { test, expect, type Page, type APIRequestContext, type TestInfo } from '@playwright/test';
+
+// Fast deployment gate on the production build + real Express routes, with
+// isolated external providers. Native PostgreSQL integration runs separately.
+test.use({ timezoneId: 'Asia/Singapore' });
+const password = 'Regression123!';
+async function token(request: APIRequestContext, account: string) {
+  const response = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+  expect(response.status()).toBe(200);
+  return { Authorization: `Bearer ${(await response.json()).accessToken}` };
+}
+async function signIn(page: Page, account: string) {
+  await page.clock.setFixedTime('2026-10-15T08:00:00Z');
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await page.getByRole('button', { name: 'Open app', exact: true }).click();
+  await page.getByLabel('Email', { exact: true }).fill(`${account}@example.test`);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('banner')).toBeVisible();
+}
+async function openPlanning(page: Page) {
+  await page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Confirmation Forum/ }).click();
+  await page.getByRole('button', { name: 'Edit Planning Information', exact: true }).click();
+  return page.getByRole('dialog', { name: 'Event Planning Details' });
+}
+const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+async function attachScreenshot(page: Page, info: TestInfo, name: string, fullPage = true) {
+  const path = info.outputPath(`${name}.png`);
+  await page.screenshot({ path, fullPage });
+  await info.attach(name, { path, contentType: 'image/png' });
+}
+
+test.beforeEach(async ({ request, baseURL }) => {
+  expect(new URL(baseURL!).hostname).toBe('127.0.0.1');
+  expect((await request.post('/__e2e/reset')).status()).toBe(204);
+});
+
+test('SMOKE-ROLES-01 | [NORMAL] [FAILURE] [SG2-23:AC1] [SG2-41:AC4] each role opens its desk and logout revokes access', async ({ page, request }, testInfo) => {
+  expect((await request.post('/__e2e/work-queue')).status()).toBe(204);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  // Success screenshots are review evidence, not pixel comparison assertions.
+  // Bounds checks independently verify that the entry text and action fit.
+  await page.goto('/');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const heading = page.getByRole('heading', { name: 'Exceptional Events Begin with the Perfect Space' });
+    await expect(heading).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeInViewport();
+    const bounds = (await heading.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    expect(await noOverflow(page)).toBe(true);
+    await attachScreenshot(page, testInfo, `landing-${width}`);
+  }
+  for (const [account, label] of [
+    ['organiser', 'Event Organiser'], ['coordinator', 'Event Coordinator'], ['lead', 'Event Coordinator Lead'],
+    ['venue', 'Venue Staff'], ['support', 'Technical Support Staff'], ['safety', 'Safety Officer'], ['attendee', 'Attendee'],
+  ]) {
+    await signIn(page, account);
+    await expect(page.getByRole('banner')).toContainText(label);
+    if (account === 'venue' || account === 'support') {
+      await expect(page.getByText('1 item in your work queue')).toBeVisible();
+      const group = account === 'venue' ? 'Booking requests awaiting decision' : 'Equipment requests and reservations';
+      await expect(page.getByRole('region', { name: group }).getByRole('button')).toHaveCount(1);
+    }
+    if (account === 'venue') {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByRole('navigation').getByRole('button', { name: 'Venue Availability', exact: true }).click();
+      await page.getByLabel('Jump to year').selectOption('2030');
+      await page.getByLabel('Jump to month').selectOption('5');
+      await expect(page.getByRole('heading', { name: 'June 2030', exact: true })).toBeVisible();
+      const occupiedDay = page.getByRole('button', { name: '2030-06-15: booked', exact: true });
+      await occupiedDay.click();
+      await expect(occupiedDay).toHaveAttribute('aria-pressed', 'true');
+      const details = page.getByRole('region', { name: 'Selected day availability' });
+      await expect(details.getByRole('listitem')).toHaveCount(1);
+      await expect(details).toContainText('Regression Hall · confirmed · event 1');
+      await expect(details).toContainText('15 Jun 2030, 10:00');
+      await expect(details).toContainText('15 Jun 2030, 12:00');
+      await details.scrollIntoViewIfNeeded();
+      await expect(details).toBeInViewport();
+      const bounds = (await details.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(0);
+      expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+      expect(await details.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+      expect(await noOverflow(page)).toBe(true);
+      await attachScreenshot(page, testInfo, 'calendar-occupied-day-390', false);
+      await page.setViewportSize({ width: 1440, height: 900 });
+    }
+    const headers = await page.evaluate(() => ({ Authorization: `Bearer ${JSON.parse(sessionStorage.getItem('connectsphere.session')!).accessToken}` }));
+    await page.getByRole('button', { name: 'Profile', exact: true }).click();
+    await page.getByRole('button', { name: 'Logout', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
+    expect((await request.get('/api/auth/me', { headers })).status()).toBe(401);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('SMOKE-ASSIGN-01 | [NORMAL] [BOUNDARY] [SG2-28:AC1] [SG2-30:AC2] [SG2-87:AC5] empty drafts stay drafts and a complete submission reaches Lead assignment', async ({ page, request }) => {
+  const organiser = await token(request, 'organiser');
+  const empty = await request.post('/api/event-requests', { headers: organiser, data: {} });
+  expect(empty.status()).toBe(201);
+  const emptyId = (await empty.json()).request.event_id;
+  expect((await request.patch(`/api/event-requests/${emptyId}/submit`, { headers: organiser })).status()).toBe(400);
+  await signIn(page, 'organiser');
+  await page.getByRole('navigation').getByRole('button', { name: 'New request', exact: true }).click();
+  for (const [label, value] of Object.entries({ 'Event name': 'Smoke workshop', Purpose: 'Release check',
+    Description: 'Synthetic smoke event', Date: '2030-06-15T10:00', 'Expected attendance': '1', 'Venue requirements': 'One seat' })) {
+    await page.getByLabel(new RegExp(`^${label}`)).fill(value);
+  }
+  await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Smoke workshop', exact: true })).toBeVisible();
+  await expect(page.getByTestId('stage-badge')).toContainText('Awaiting Assignment');
+  const list = await (await request.get('/api/event-requests', { headers: organiser })).json();
+  const id = list.requests.find((row: { name: string }) => row.name === 'Smoke workshop').event_id;
+  await signIn(page, 'lead');
+  await page.getByRole('navigation').getByRole('button', { name: 'Unassigned queue', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Smoke workshop' })).toBeVisible();
+  await page.getByRole('navigation').getByRole('button', { name: 'Assign coordinators', exact: true }).click();
+  await page.getByLabel('Coordinator for Smoke workshop', { exact: true }).selectOption('user-coordinator');
+  await page.getByLabel('Coordinator for Smoke workshop', { exact: true }).locator('..').getByRole('button', { name: 'Assign', exact: true }).click();
+  await expect(page.getByText('Coordinator: Regression coordinator', { exact: true })).toBeVisible();
+  const lead = await token(request, 'lead');
+  expect((await (await request.get('/api/assignment-queue', { headers: lead })).json()).entries.some((row: { event_id: number }) => row.event_id === id)).toBe(false);
+  expect((await (await request.get(`/api/event-requests/${id}`, { headers: organiser })).json()).request).toMatchObject({ status: 'submitted', coordinator_name: 'Regression coordinator' });
+});
+
+test('SMOKE-PLANNING-01 | [NORMAL] [BOUNDARY] [SG2-39:AC1] [SG2-41:AC4] queue reload and unrelated edit retain stored registration settings on mobile and desktop', async ({ page, request }) => {
+  expect((await request.post('/__e2e/event-confirmation')).status()).toBe(204);
+  const coordinator = await token(request, 'coordinator');
+  expect((await request.patch('/api/event-requests/581/planning', { headers: coordinator, data: {
+    registration_capacity: 136, registration_opens_at: '2026-10-01T13:30:00.000Z',
+    registration_closes_at: '2026-10-01T13:31:00.000Z', planning_notes: 'Keep the loading bay clear', confirm_impact: true,
+  } })).status()).toBe(200);
+  await signIn(page, 'coordinator');
+  let drawer = await openPlanning(page);
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(drawer.getByLabel('Registration Capacity')).toHaveValue('136');
+    await expect(drawer.getByLabel('Opens At')).toHaveValue('2026-10-01T21:30');
+    await expect(drawer.getByLabel('Closes At')).toHaveValue('2026-10-01T21:31');
+    await expect(drawer.getByLabel(/Planning Notes/i)).toHaveValue('Keep the loading bay clear');
+    expect(await noOverflow(page)).toBe(true);
+  }
+  await drawer.getByLabel('Equipment Requirements').fill('12 microphones and 1 projector');
+  await drawer.getByRole('button', { name: 'Save Planning Details' }).click();
+  await expect(drawer).toHaveCount(0);
+  await page.reload();
+  drawer = await openPlanning(page);
+  await expect(drawer.getByLabel('Registration Capacity')).toHaveValue('136');
+  await expect(drawer.getByLabel(/Planning Notes/i)).toHaveValue('Keep the loading bay clear');
+  const ledger = await (await request.get('/__e2e/event-confirmation-ledger')).json();
+  expect(ledger.events.find((row: { event_id: number }) => row.event_id === 581)).toMatchObject({
+    registration_capacity: 136, registration_opens_at: '2026-10-01T13:30:00.000Z',
+    registration_closes_at: '2026-10-01T13:31:00.000Z', planning_notes: 'Keep the loading bay clear',
+    equipment_requirements: '12 microphones and 1 projector',
+  });
+});
+
+test('SMOKE-CONFLICT-01 | [CONFLICT] [FAILURE] [SG2-90:AC3] a coordinator loses write access after Lead reassignment while their drawer is open', async ({ page, request }) => {
+  expect((await request.post('/__e2e/event-confirmation')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  const drawer = await openPlanning(page);
+  const lead = await token(request, 'lead');
+  expect((await request.patch('/api/event-requests/581/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } })).status()).toBe(200);
+  await drawer.getByLabel(/Planning Notes/i).fill('Stale edit must not persist');
+  await drawer.getByRole('button', { name: 'Save Planning Details' }).click();
+  await expect(drawer.getByRole('alert')).toContainText('Only the assigned event coordinator can update planning details');
+  const ledger = await (await request.get('/__e2e/event-confirmation-ledger')).json();
+  const event = ledger.events.find((row: { event_id: number }) => row.event_id === 581);
+  expect(event.coordinator_id).toBe('user-coordinator2');
+  expect(event.planning_notes).not.toBe('Stale edit must not persist');
+});

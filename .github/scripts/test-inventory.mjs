@@ -41,7 +41,7 @@ function unique(values) { return [...new Set(values)]; }
 
 const methods = [];
 const errors = [];
-const paths = ['server/src', 'client/src', 'e2e', '.github/scripts'].flatMap(directory =>
+const paths = ['server/src', 'client/src', 'e2e', 'integration', '.github/scripts'].flatMap(directory =>
   files(resolve(root, directory)).filter(path => /\.(?:test|spec)\.(?:ts|tsx|mjs)$/.test(path))).sort();
 
 for (const path of paths) {
@@ -100,7 +100,9 @@ for (const path of paths) {
           preconditions: file.startsWith('e2e/') ? 'Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.'
             : file.startsWith('client/') ? 'Isolated jsdom render or public exported helper; file setup resets mocks/session and controls clocks where relevant.'
               : file.startsWith('server/') ? 'Isolated exported handler/service or loopback Express API; controlled identity and storage fixtures. No hosted Supabase.'
-                : 'Node test runner; local report/provider fixtures and temporary files; no provider requests.',
+                : file.startsWith('integration/') ? 'Disposable local PostgreSQL and PostgREST, committed migrations and synthetic role identities; real Express/Supabase adapters over loopback HTTP. No hosted Supabase.'
+                : file.endsWith('/release-readiness.test.mjs') ? 'Disposable local PostgreSQL after committed migrations; rollback-only structural mutations and read-only release guard. Never run against hosted Supabase.'
+                  : 'Node test runner; local report/provider fixtures and temporary files; no provider requests.',
           testData: unique(inputs), steps: unique(actions), expectedAssertions: unique(oracles),
           originalPullRequests: unique(metadata.references.flatMap(reference => stories.get(reference.story)?.originalPullRequests ?? [])) });
       }

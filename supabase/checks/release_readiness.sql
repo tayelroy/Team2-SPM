@@ -1,0 +1,120 @@
+-- Hosted release gate (SG2-23 / SG2-25 / SG2-96). READ ONLY: no DDL, writes,
+-- credentials, personal/event records, RPC execution or schema-cache reload.
+-- Run as the database operator against the application's actual Supabase project.
+-- A passing result verifies this structural contract, not complete workflow/RLS
+-- correctness. See docs/release-readiness.md for the required browser follow-up.
+do $readiness$
+declare
+  failures text[];
+begin
+  with required_columns(relation, columns) as (values
+    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,registration_capacity,registration_opens_at,registration_closes_at,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
+    ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
+    ('roles', 'role_id,role_name'),
+    ('account_roles', 'user_id,role'),
+    ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
+    ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
+    ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details')
+  ), column_checks as (
+    select 'column public.' || r.relation || '.' || col.name as name,
+      exists (select 1 from pg_attribute a
+        where a.attrelid = to_regclass('public.' || r.relation)
+          and a.attname = col.name and a.attnum > 0 and not a.attisdropped) as passed
+    from required_columns r cross join lateral unnest(string_to_array(r.columns, ',')) col(name)
+  ), required_types(column_name, type_name) as (values
+    ('completed_by', 'uuid'), ('completed_at', 'timestamptz'),
+    ('submitted_at', 'timestamptz'), ('registration_capacity', 'integer'),
+    ('registration_opens_at', 'timestamptz'), ('registration_closes_at', 'timestamptz'),
+    ('planning_notes', 'text')
+  ), type_checks as (
+    select 'type public.events.' || r.column_name || ' = ' || r.type_name as name,
+      exists (select 1 from pg_attribute a
+        where a.attrelid = to_regclass('public.events') and a.attname = r.column_name
+          and not a.attisdropped and a.atttypid = to_regtype(r.type_name)) as passed
+    from required_types r
+  ), required_relations(name) as (values
+    ('venues'), ('venue_layouts'), ('venue_unavailability'), ('venue_operations'),
+    ('venue_operation_history'), ('venue_booking_requests'), ('venue_capacity_exceptions'),
+    ('venue_holds'), ('venue_hold_settings'), ('venue_hold_notifications'),
+    ('venue_booking_disruptions'), ('venue_booking_clashes'), ('venue_booking_occupancy'),
+    ('equipment'), ('equipment_requests'), ('equipment_reservations'),
+    ('event_clarifications'), ('notifications')
+  ), relation_checks as (
+    select 'relation public.' || name as name, to_regclass('public.' || name) is not null as passed
+    from required_relations
+  ), required_statuses(name) as (values
+    ('draft'), ('submitted'), ('under_review'), ('approved'), ('planning'),
+    ('confirmed'), ('completed'), ('cancelled'), ('rejected'), ('needs_clarification'),
+    ('unassigned'), ('awaiting_safety_check'), ('safety_rejected'), ('preparation')
+  ), status_checks as (
+    select 'event_status.' || name as name,
+      exists (select 1 from pg_enum e where e.enumtypid = to_regtype('public.event_status')
+        and e.enumlabel = r.name) as passed
+    from required_statuses r
+  ), required_functions(signature) as (values
+    ('public.confirm_event(integer)'),
+    ('public.decide_venue_booking_request(bigint,text,text)'),
+    ('public.manage_equipment_requirements(text,integer,bigint,bigint,jsonb)'),
+    ('public.manage_equipment_reservations(text,integer,bigint,bigint,timestamptz,timestamptz)'),
+    ('public.check_equipment_availability(integer,bigint,timestamptz,timestamptz)'),
+    ('public.create_venue_hold(integer,integer,timestamptz,timestamptz,timestamptz)'),
+    ('public.change_venue_hold(bigint,text)'), ('public.list_venue_holds()'),
+    ('public.venue_hold_options()'), ('public.list_venue_hold_notifications()'),
+    ('public.withdraw_venue_booking_request(bigint)'),
+    ('public.release_venue_booking(bigint,text)'),
+    ('public.list_venue_unavailability(integer,timestamptz)')
+  ), function_checks as (
+    select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
+    from required_functions
+  ), required_foreign_keys(relation, column_name, target, target_column) as (values
+    ('events', 'organiser_id', 'users', 'user_id'),
+    ('events', 'coordinator_id', 'users', 'user_id'),
+    ('venue_bookings', 'event_id', 'events', 'event_id'),
+    ('event_audit_logs', 'actor_id', 'users', 'user_id')
+  ), foreign_key_checks as (
+    select 'embed FK public.' || r.relation || '.' || r.column_name as name,
+      exists (select 1 from pg_constraint c
+        join pg_attribute a on a.attrelid = c.conrelid and a.attname = r.column_name
+        join pg_attribute b on b.attrelid = c.confrelid and b.attname = r.target_column
+        where c.contype = 'f' and c.conrelid = to_regclass('public.' || r.relation)
+          and c.confrelid = to_regclass('public.' || r.target)
+          and c.conkey = array[a.attnum] and c.confkey = array[b.attnum]) as passed
+    from required_foreign_keys r
+  ), required_admin_reads(relation) as (values
+    ('events'), ('users'), ('account_roles'), ('event_audit_logs'), ('internal_work_items')
+  ), grant_checks as (
+    select 'service_role SELECT public.' || relation as name,
+      coalesce(has_table_privilege((select oid from pg_roles where rolname = 'service_role'),
+        to_regclass('public.' || relation), 'SELECT'), false) as passed
+    from required_admin_reads
+  ), required_planning_keys(name) as (values
+    ('registration_capacity'), ('registration_opens_at'), ('registration_closes_at'), ('planning_notes')
+  ), view_checks as (
+    select 'internal_work_items planning key ' || name as name,
+      coalesce(position(quote_literal(name) in pg_get_viewdef(to_regclass('public.internal_work_items'))) > 0, false) as passed
+    from required_planning_keys
+  ), checks as (
+    select * from column_checks union all select * from type_checks
+    union all select * from relation_checks union all select * from status_checks
+    union all select * from function_checks union all select * from foreign_key_checks
+    union all select * from grant_checks union all select * from view_checks
+  )
+  select array_agg(name order by name) into failures from checks where not passed;
+
+  if failures is not null then
+    raise exception 'Release schema readiness failed: %', array_to_string(failures, '; ');
+  end if;
+
+  -- Only the fixed, non-personal catalogue is read; never inspect demo identities.
+  select array_agg(expected.name order by expected.name) into failures
+  from (values ('Event Organiser'), ('Event Coordinator'), ('Venue Staff'),
+    ('Technical Support Staff'), ('Attendee'), ('Event Coordinator Lead'), ('Safety Officer')) expected(name)
+  where not exists (select 1 from public.roles r where r.role_name = expected.name);
+  if failures is not null then
+    raise exception 'Release role catalogue readiness failed: %', array_to_string(failures, '; ');
+  end if;
+end
+$readiness$;
+
+select 'ready' as release_schema_status,
+  'Structural checks passed; authenticated UI smoke tests and schema-cache verification still required.' as scope;

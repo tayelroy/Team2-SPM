@@ -4966,5 +4966,346 @@
     "execution_date": "15 Oct 2026",
     "executed_by": "Codex automated verification",
     "review": null
+  },
+  {
+    "id": "INT-REQUEST-01",
+    "title": "Native organiser submission, Lead assignment and planning retain stored fields",
+    "type": "NORMAL",
+    "story": "SG2-28",
+    "purpose": "Exercise production API handlers and Supabase adapters through real PostgREST/PostgreSQL.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Create, submit, assign, review and approve a request.",
+      "Save registration settings and note; read queue JSON.",
+      "Save unrelated equipment edit; inspect persisted values and audit."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Draft submits, assignment leaves Lead queue, planning stores registration and notes, unrelated edit retains settings and records audit.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + Supabase client + PostgREST + PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC1",
+      "SG2-87:AC5",
+      "SG2-39:AC1"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-BOUNDARY-01",
+    "title": "Incomplete native draft and explicit null planning values",
+    "type": "BOUNDARY",
+    "story": "SG2-28",
+    "purpose": "Prove draft completeness and absent/null boundaries in real storage.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Save empty draft then submit.",
+      "Approve another request, save minimum capacity and null notes, inspect queue fields."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Empty draft creation succeeds but submission returns 400 without transition; capacity one and JSON nulls survive queue projection.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC2",
+      "SG2-39:AC4"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-CONFLICT-01",
+    "title": "Reassigned coordinator cannot save stale native planning",
+    "type": "CONFLICT",
+    "story": "SG2-90",
+    "purpose": "Verify assignment ownership against real persisted changes.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Load queue as original coordinator.",
+      "Reassign through Lead API.",
+      "Try stale planning save and inspect storage."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Old coordinator save 403 and queue 404; new coordinator queue 200; stale note not saved.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-90:AC3"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-FAILURE-01",
+    "title": "Native authentication, role, validation and provider outage preserve data",
+    "type": "FAILURE",
+    "story": "SG2-41",
+    "purpose": "Validate security and failure recovery across actual database boundary.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Attempt unauthenticated and role-inappropriate requests.",
+      "Try capacityzero and anonymous direct PostgREST view read.",
+      "Disable injected provider, attempt save, restore provider and inspect unchanged data."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Unsigned 401; wrong-role 403; capacity zero 400; direct anonymous view denied; unavailable provider 503; stored values unchanged.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-41:AC4",
+      "SG2-39:AC4"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-STAFF-01",
+    "title": "Native request projections reach matching staff queues",
+    "type": "NORMAL",
+    "story": "SG2-41",
+    "purpose": "Verify the repaired view retains venue and equipment branches.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Create synthetic venue/equipment requests in storage.",
+      "Read exact requests as appropriate roles and refuse coordinator-only details."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Each staff queue returns correct event, resource title and notes; staff cannot open coordinator event detail.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-41:AC2",
+      "SG2-41:AC3"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SMOKE-ROLES-01",
+    "title": "Each role desk loads and logout revokes fixture session",
+    "type": "NORMAL / FAILURE",
+    "story": "SG2-23",
+    "purpose": "Fast role/session deployment smoke.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Check Landing heading and Open app control fit 390px and 1440px viewports; attach successful screenshots.",
+      "Sign in as each seeded role and inspect banner/work queue.",
+      "As Venue Staff select the booked 15 June 2030 day on a 390px calendar; verify full venue/time details, containment and no horizontal overflow; attach viewport screenshot.",
+      "Logout and reuse prior token."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Seven roles show correct banner; staff pending queues load; logged-out session cannot authenticate; no page errors. Landing controls fit both widths; selected occupied-day venue and exact booking times are readable within the mobile details panel; three successful screenshot attachments accompany the report.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim. Successful landing 390px/1440px and mobile occupied-day screenshots are attached to the report; preserved copies and locations: /tmp/spm-ui-evidence.json. Bounds, text and overflow assertions passed; screenshots do not represent pixel-baseline assertions.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-23:AC1",
+      "SG2-41:AC4",
+      "SG2-44:AC2",
+      "SG2-71:AC1",
+      "SG2-71:AC3"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SMOKE-ASSIGN-01",
+    "title": "Draft boundary and complete submission reach Lead assignment",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-28",
+    "purpose": "Smoke complete organiser-to-Lead path.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Try empty draft submission via API.",
+      "Submit a complete form through UI.",
+      "Open Lead queue and assign coordinator through UI; inspect persisted request."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Empty draft remains unsubmitted; UI submission appears Awaiting Assignment; Lead assigns and queue entry disappears.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC2",
+      "SG2-87:AC5"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SMOKE-PLANNING-01",
+    "title": "Planning reload retains settings at mobile and desktop widths",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-39",
+    "purpose": "Catch missing planning queue fields and unrelated-save data loss through the browser.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Prepare saved settings via API with required impact confirmation.",
+      "Inspect drawer at390px and1440px.",
+      "Edit equipment requirement, save, reload and compare persisted metadata."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Capacity 136, one-minute window and note render at 390/1440 without overflow, survive unrelated save and full page reload, and match fixture ledger.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-41:AC4"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SMOKE-CONFLICT-01",
+    "title": "Open planning drawer loses access after Lead reassignment",
+    "type": "CONFLICT / FAILURE",
+    "story": "SG2-90",
+    "purpose": "Smoke stale open-form ownership protection.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Open assigned drawer.",
+      "Reassign through Lead API before saving.",
+      "Submit stale note and inspect error and ledger."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Save displays assigned-coordinator error and refuses stale note; new assignment persists.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+    "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-90:AC3"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "type": "Deployment readiness regression",
+    "preconditions": "Disposable local PostgreSQL 17 with the auth fixture and all repository migrations applied; POSTGRES_CONTAINER identifies only the isolated Docker test container. No hosted mutation.",
+    "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",
+    "layer": "Native PostgreSQL catalogue and privilege checks through the public release gate",
+    "status": "Pass",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 6/6 passed after the helper rename. /tmp/spm-readiness-final.log. Each damaged-schema transaction rolled back and an independent healthy check passed. Local verification; no hosted PR check or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null,
+    "id": "SG2-22-READINESS-HEALTHY",
+    "title": "Healthy release structure passes without requiring seeded personal accounts or event content",
+    "story": "SG2-22",
+    "purpose": "Allow deployment readiness to depend on schema, role catalogue and privileges rather than personal demo data.",
+    "steps": [
+      "Run the release check inside an explicit read-only transaction after all migrations.",
+      "Temporarily remove user and dependent event content inside a rollback transaction and rerun structural readiness."
+    ],
+    "data": "Migrated disposable PostgreSQL; healthy schema and fixed seven-role catalogue, with and without synthetic user/event content.",
+    "expected": "Both healthy checks return ready and exit zero; no requirement for personal demo logins is inferred from the structural gate.",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1"
+    ],
+    "actual": "The normal read-only check and empty-content boundary check both passed among the six native readiness regressions; fixture removal rolled back."
+  },
+  {
+    "type": "Deployment readiness regression",
+    "preconditions": "Disposable local PostgreSQL 17 with the auth fixture and all repository migrations applied; POSTGRES_CONTAINER identifies only the isolated Docker test container. No hosted mutation.",
+    "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",
+    "layer": "Native PostgreSQL catalogue and privilege checks through the public release gate",
+    "status": "Pass",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 6/6 passed after the helper rename. /tmp/spm-readiness-final.log. Each damaged-schema transaction rolled back and an independent healthy check passed. Local verification; no hosted PR check or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null,
+    "id": "SG2-22-READINESS-MISSING-CONTRACTS",
+    "title": "Missing columns, stale queue projection, role catalogue or service grant blocks release with diagnostics",
+    "story": "SG2-22",
+    "purpose": "Catch schema drift and missing backend read access before deployment while preserving recovery from intentionally damaged test transactions.",
+    "steps": [
+      "Drop completion/submission columns inside an isolated transaction and require named missing-column diagnostics.",
+      "Replace the queue planning_notes JSON key with an obsolete key while backing columns remain present.",
+      "Rename the Safety Officer role catalogue entry and separately revoke the service_role queue SELECT grant.",
+      "After each refused check, close the failed transaction and run an independent healthy read-only check."
+    ],
+    "data": "Four rollback-only fault scenarios: missing completed_by/completed_at/submitted_at, missing planning_notes projection key, absent Safety Officer role name, revoked service-role SELECT on internal_work_items.",
+    "expected": "Every damaged contract produces a nonzero exit and the matching diagnostic; each rollback restores a passing healthy schema. The checks do not replace real PostgREST/API integration testing.",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1",
+      "SG2-25:AC2"
+    ],
+    "actual": "All four damaged-contract scenarios were refused with the expected diagnostics, and every independent post-rollback healthy check passed."
   }
 ]

@@ -124,6 +124,11 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Check role isolation and database constraints
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
@@ -132,6 +137,8 @@ jobs:
           for migration in supabase/migrations/*.sql; do
             docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$migration"
           done
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/checks/release_readiness.sql
+          node --test .github/scripts/release-readiness.test.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/account_roles.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_availability.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_layouts.sql
@@ -168,6 +175,41 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_multiple_bookings.sql
           node .github/scripts/test-venue-withdrawal-concurrency.mjs
 
+      - name: Test APIs against native PostgreSQL through PostgREST
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: npm run test:integration
+
+  browser-smoke:
+    name: Test browser smoke
+    if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Exercise critical roles and request workflow on isolated loopback fixtures
+        run: npm run test:smoke
+      - name: Upload smoke evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-smoke
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: error
+          retention-days: 14
+
   reviewer-tests:
     name: Test security reviewer
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
@@ -186,7 +228,7 @@ jobs:
   build-and-test:
     # Preserve the required check name used by existing branch rules.
     name: Build and test
-    needs: [build, application-tests, browser-tests, database-tests, reviewer-tests]
+    needs: [build, application-tests, browser-tests, browser-smoke, database-tests, reviewer-tests]
     if: ${{ always() && (github.event.action != 'closed' || github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -211,22 +253,22 @@ jobs:
             }
           '
       - name: Collect backend coverage
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.browser-smoke.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage
           path: server/coverage
       - name: Collect frontend coverage
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.browser-smoke.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: frontend-coverage
           path: client/coverage
       - name: Summarize application coverage
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.browser-smoke.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         run: node .github/scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
       - name: Upload combined coverage reports
-        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
+        if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.browser-smoke.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: application-coverage
