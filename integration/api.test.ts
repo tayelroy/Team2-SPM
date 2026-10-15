@@ -19,6 +19,7 @@ import { createDecideEventRequestHandler } from '../server/src/events/decide';
 import { createUpdateEventPlanningHandler } from '../server/src/events/updatePlanning';
 import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
+import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -69,6 +70,8 @@ args[15] = createStartEventReviewHandler(dependencies);
 args[16] = createAssignCoordinatorHandler(dependencies);
 args[17] = createDecideEventRequestHandler(dependencies);
 args[19] = createUpdateEventPlanningHandler(dependencies);
+args[21] = createListClarificationsHandler(dependencies);
+args[22] = createAddClarificationHandler(dependencies);
 args[27] = createAssignmentQueueRouter(access, dependencies);
 const api = request(createApp(...args));
 const auth = (who: string) => ({ Authorization: `Bearer ${who}` });
@@ -94,6 +97,30 @@ async function stored(id: number) {
   assert.equal(result.error, null);
   return result.data;
 }
+
+test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] clarification POST immediately returns the stored sender name and matches the reloaded thread', async () => {
+  const id = await draft();
+  assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
+  assert.equal((await api.patch(`/api/event-requests/${id}/coordinator`).set(auth('lead')).send({ coordinatorId: ids.coordinator })).status, 200);
+  assert.equal((await api.patch(`/api/event-requests/${id}/review`).set(auth('coordinator')).send({})).status, 200);
+  const question = await api.post(`/api/event-requests/${id}/clarifications`).set(auth('coordinator')).send({ message: 'Which room layout do you need?' });
+  assert.equal(question.status, 201, JSON.stringify(question.body));
+  assert.equal(question.body.status, 'needs_clarification');
+  assert.equal(question.body.clarification.sender_id, ids.coordinator);
+  assert.equal(question.body.clarification.sender_name, 'Integration coordinator');
+  assert.equal(question.body.clarification.message, 'Which room layout do you need?');
+  const reply = await api.post(`/api/event-requests/${id}/clarifications`).set(auth('organiser')).send({ message: 'Theatre layout, please.' });
+  assert.equal(reply.status, 201, JSON.stringify(reply.body));
+  assert.equal(reply.body.clarification.sender_id, ids.organiser);
+  assert.equal(reply.body.clarification.sender_name, 'Integration organiser');
+  assert.equal(reply.body.clarification.message, 'Theatre layout, please.');
+  for (const who of ['coordinator', 'organiser']) {
+    const reloaded = await api.get(`/api/event-requests/${id}/clarifications`).set(auth(who));
+    assert.equal(reloaded.status, 200, JSON.stringify(reloaded.body));
+    assert.deepEqual(reloaded.body.clarifications, [question.body.clarification, reply.body.clarification]);
+  }
+  assert.equal((await api.get(`/api/event-requests/${id}/clarifications`).set(auth('other'))).status, 404);
+});
 
 test('[NORMAL] [SG2-28:AC1] [SG2-30:AC1] [SG2-87:AC5] [SG2-39:AC1] organiser submission, Lead assignment and planning preserve actual stored values', async () => {
   const id = await planned();

@@ -5389,5 +5389,39 @@
     ],
     "executed_by": "Codex automated verification",
     "review": null
+  },
+  {
+    "id": "SG2-36-HOTFIX-SENDER-NAME",
+    "title": "New clarification messages return the stored sender name immediately and match the reloaded thread",
+    "type": "Positive / boundary / API response consistency / role isolation",
+    "story": "SG2-36",
+    "purpose": "Prevent a known coordinator or organiser appearing as Unknown sender immediately after posting because the insert response omits the sender relation.",
+    "preconditions": "Disposable local PostgreSQL 17 and PostgREST v12.2.12 with committed migrations and synthetic identities; real Express routes and Supabase adapters. Adapter unit suite uses controlled query responses. No hosted database changes.",
+    "steps": [
+      "Create and submit an event, assign the coordinator as Lead, and begin review.",
+      "POST the coordinator question and check HTTP 201, needs_clarification, exact sender identity/name and message.",
+      "POST the organiser reply and check its exact sender identity/name and message.",
+      "GET the thread as each participant and compare the entire two-message response with the POST records; another coordinator must receive 404.",
+      "Check the insert selector includes the sender relation and preserve array, null-name, missing-user and existing unavailable-response behavior."
+    ],
+    "data": "Synthetic integration organiser/coordinator identities; question Which room layout do you need?; reply Theatre layout, please.; array and null sender adapter fixtures.",
+    "expected": "Both POST records immediately contain their real stored sender names and exactly match GET records for both participants. Unrelated coordinators cannot read the thread. Genuinely absent names remain null for the existing UI fallback.",
+    "evidence": "integration/api.test.ts; server/src/db/clarifications.test.ts; server/src/db/clarifications.ts",
+    "layer": "Real Express/Supabase/PostgREST/PostgreSQL integration and database adapter unit tests",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-36:AC1",
+      "SG2-36:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Before the fix, the new native API regression failed with sender_name null instead of Integration coordinator while the other five API cases passed. After returning the same joined sender columns as GET, all six native API cases and all fourteen adapter unit cases passed. Changed adapter coverage is 100% statements, branches, functions and lines.",
+    "execution_evidence": "15 Oct 2026 local verification; POSTGRES_CONTAINER=spm-hotfix-integration-pg npm run test:integration; compiled adapter unit test run with c8. Logs /tmp/spm-clarification-native-before.log, /tmp/spm-clarification-native-after.log and /tmp/spm-clarification-coverage.log. Full combined CI and hosted deployment for this follow-up are not claimed.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
   }
 ]

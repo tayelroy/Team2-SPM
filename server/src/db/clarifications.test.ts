@@ -45,14 +45,14 @@ function fakeSelectClient(
   } as unknown as SupabaseClient;
 }
 
-function fakeInsertClient(result: Result, capture?: (row: Record<string, unknown>) => void): SupabaseClient {
+function fakeInsertClient(result: Result, capture?: (row: Record<string, unknown>) => void, captureColumns?: (columns: string) => void): SupabaseClient {
   return {
     from(table: string) {
       assert.equal(table, 'event_clarifications');
       return {
         insert: (row: Record<string, unknown>) => {
           capture?.(row);
-          return { select: async () => result };
+          return { select: async (columns: string) => { captureColumns?.(columns); return result; } };
         }
       };
     }
@@ -106,6 +106,30 @@ describe('fetchClarifications', () => {
 });
 
 describe('insertClarification', () => {
+  test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] an inserted message requests its joined sender and immediately returns the known name', async () => {
+    let selected: string | undefined;
+    const result = await insertClarification(fakeInsertClient({ data: [{ ...ROW, sender: { name: 'Casey Coordinator' } }], error: null }, undefined, columns => { selected = columns; }), 7, 'coordinator-1', ROW.message);
+    assert.ok(selected?.includes('sender:users!sender_id(name)'));
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.clarification.sender_name, 'Casey Coordinator');
+      assert.equal(result.clarification.sender_id, 'coordinator-1');
+      assert.equal(result.clarification.message, ROW.message);
+    }
+  });
+
+  for (const [label, sender, expected] of [
+    ['a joined array', [{ name: 'Olly Organiser' }], 'Olly Organiser'],
+    ['a null stored name', { name: null }, null],
+    ['no related user', null, null]
+  ] as const) {
+    test(`[BOUNDARY] [SG2-36:AC1] [SG2-36:AC3] an inserted message preserves the sender fallback for ${label}`, async () => {
+      const result = await insertClarification(fakeInsertClient({ data: [{ ...ROW, sender }], error: null }), 7, 'coordinator-1', ROW.message);
+      assert.equal(result.ok, true);
+      if (result.ok) assert.equal(result.clarification.sender_name, expected);
+    });
+  }
+
   test('[NORMAL] [SG2-36:AC1] appends the message against the event and its sender', async () => {
     let captured: Record<string, unknown> | undefined;
     const result = await insertClarification(
