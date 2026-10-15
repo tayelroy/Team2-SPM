@@ -274,7 +274,7 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
               data-testid="waiting-on-persona"
               style={{ fontSize: '14px', color: color.slate }}
             >
-              None (Planning completed)
+              No active next step
             </span>
           )}
         </div>
@@ -299,7 +299,7 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
             data-testid="waiting-on-action"
             style={{ fontSize: '13px', color: color.silver }}
           >
-            No further actions pending. All lifecycle requirements are satisfied.
+            {stage.description}
           </div>
         )}
       </div>

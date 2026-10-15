@@ -252,7 +252,7 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
     expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
   });
 
-  test('[NORMAL] [SG2-31:AC4] displays rejection notice for rejected request', async () => {
+  test('[CONFLICT] [SG2-37:coordinator-led-revision] rejected request directs revisions through the coordinator without self editing despite a stale waiting flag', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
       ok: true,
       request: {
@@ -290,11 +290,14 @@ describe('EventDetail for Event Organiser with selected event (API consumption)'
       />,
     );
 
-    expect(await screen.findByText('Request returned for revision')).toBeInTheDocument();
-    expect(
-      screen.getByText(/This request was returned by your coordinator. Please review the details/),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit request' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Editing disabled')).toHaveTextContent('Contact your coordinator to discuss revisions and resubmission');
+    expect(screen.getByLabelText('Editing disabled')).toHaveTextContent('Changes after submission must go through your coordinator');
+    expect(screen.queryByText(/cannot be edited or resubmitted/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Request returned for revision')).not.toBeInTheDocument();
+    expect(screen.queryByText(/edit and resubmit/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View Change History' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create a new request' })).not.toBeInTheDocument();
   });
 
   test('[FAILURE] [SG2-26:AC1] handles 404 not_found with return button', async () => {
@@ -453,7 +456,7 @@ test.each(['draft', 'rejected', 'submitted'])('[FAILURE] [SG2-26:AC3] colleague 
   expect(await screen.findByText(/View only. This event/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Request a change' })).not.toBeInTheDocument();
-  expect(screen.queryByText('Request returned for revision')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Create a new request' })).not.toBeInTheDocument();
   expect(screen.queryByText('Confirmed arrangements')).not.toBeInTheDocument();
   expect(screen.queryByText('Activity')).not.toBeInTheDocument();
 });

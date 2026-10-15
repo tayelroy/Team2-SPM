@@ -229,7 +229,7 @@ describe('submitEventRequest', () => {
 });
 
 describe('isWaitingOnOrganiser', () => {
-  test.each(['draft', 'Draft', 'DRAFT', 'rejected', 'Rejected', '  rejected  '])(
+  test.each(['draft', 'Draft', 'DRAFT', 'needs_clarification', '  NEEDS_CLARIFICATION  '])(
     '[NORMAL] [SG2-31:AC4] returns true for organiser actionable status %s',
     (status) => {
       expect(isWaitingOnOrganiser(status)).toBe(true);
@@ -243,6 +243,9 @@ describe('isWaitingOnOrganiser', () => {
     'confirmed',
     'completed',
     'cancelled',
+    'rejected',
+    'Rejected',
+    '  rejected  ',
     'unknown',
   ])('[NORMAL] [SG2-31:AC4] returns false for coordinator/system status %s', (status) => {
     expect(isWaitingOnOrganiser(status)).toBe(false);
@@ -624,7 +627,7 @@ describe('fetchOwnEventDetail', () => {
       coordinatorId: 'coord-uuid-5',
       coordinatorName: 'Coordinator Jane',
       canManage: true,
-      waitingOnMe: true,
+      waitingOnMe: false,
       decisionReason: 'Clashes with the AGM.',
       coordinatorPhone: '+65 9123 4567',
       decidedAt: '2026-09-25T02:00:00.000Z',

@@ -182,3 +182,19 @@ test('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] [SG2-31:AC4] each dashboard card says w
   expect(await line(/Finished forum/)).toHaveTextContent('No action needed');
   expect(await line(/Returned forum/)).toHaveTextContent('Waiting on you');
 });
+
+// Customer sources: Week 4 Q&A rows 5/38 permit revised resubmission; Week 9 row 11 requires changes through the coordinator.
+test('[BOUNDARY] [SG2-31:AC4] [SG2-37:coordinator-led-revision] rejected requests do not count as waiting on the organiser while clarification still does', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [
+    { event_id: 70, name: 'Rejected forum', status: 'rejected', can_manage: true, coordinator_id: 'coord-1' },
+    { event_id: 71, name: 'Clarification forum', status: 'needs_clarification', can_manage: true, coordinator_id: 'coord-1' },
+    { event_id: 72, name: 'Rejected colleague forum', status: 'rejected', can_manage: false, coordinator_id: 'coord-1' },
+  ] })));
+  render(<Dashboard role="Event Organiser" accessToken="token" onNavigate={vi.fn()} />);
+  const rejected = await screen.findByRole('button', { name: /Rejected forum/ });
+  expect(within(rejected).getByText('Contact coordinator')).toBeInTheDocument();
+  expect(within(screen.getByRole('button', { name: /Rejected colleague forum/ })).getByText('View only')).toBeInTheDocument();
+  expect(within(screen.getByRole('button', { name: /Clarification forum/ })).getByText('Waiting on you')).toBeInTheDocument();
+  expect(screen.getByText('Waiting on me').closest('div')).toHaveTextContent('1');
+  expect(screen.getByText('My drafts').closest('div')).toHaveTextContent('1');
+});
