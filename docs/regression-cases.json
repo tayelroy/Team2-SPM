@@ -5798,5 +5798,39 @@
     "execution_date": "16 Oct 2026",
     "executed_by": "Codex automated verification",
     "review": null
+  },
+  {
+    "id": "SG2-81-HOTFIX-NOTIFICATION-CONTRACT",
+    "title": "Venue unavailability warnings remain readable alongside the existing inbox",
+    "type": "Positive / conflict / failure / public API and rendered role inbox",
+    "story": "SG2-81",
+    "purpose": "Accept the exact venue_unavailable contract emitted by venue replacement without discarding all of a recipient’s notifications.",
+    "preconditions": "Signed-in Coordinator or Organiser, real browser notification parser; response includes a new venue warning and an older approval.",
+    "steps": [
+      "Load the mixed inbox through the public notification API.",
+      "Open each role’s application notification drawer.",
+      "Check warning label, original message/time, existing notice and authenticated no-store request.",
+      "Check malformed near-miss, inherited and unknown kind names remain refused.",
+      "Verify protected server route forwards exact recipient-specific records."
+    ],
+    "data": "venue_unavailable for event20 plus existing venue_request_approved; trailing-space and wrong-case variants are invalid.",
+    "expected": "Notifications (2) loads and Venue unavailable shows the original warning alongside earlier notices; no unavailable alert. Invalid kinds still fail validation. No database changes or loosened generic acceptance.",
+    "evidence": "client/src/api/notificationsApi.test.ts; client/src/components/HoldNotifications.test.tsx; server/src/notifications.test.ts",
+    "layer": "Browser API boundary + rendered role AppShell + protected Express API",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-81:AC1",
+      "SG2-81:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Red API and both rendered-role cases reproduced the unavailable inbox. After fix: fullfrontend1392/1392, focusednotificationbackend11/11, clienttypecheckgreen, all touchedsource100% statements/branches/functions/lines. Inventory2352methods744SQL.",
+    "execution_evidence": "/tmp/spm-venue-notifications-red.log; /tmp/spm-venue-notifications-client-coverage.log; /tmp/spm-venue-notifications-server.log",
+    "execution_date": "16 Oct2026",
+    "executed_by": "Codex automated verification",
+    "review": null
   }
 ]

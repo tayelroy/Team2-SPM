@@ -85,3 +85,17 @@ test('[FAILURE] [SG2-68:AC3] a Safety Officer, who has no event notices, is refu
   assert.equal(response.status, 403);
   assert.equal(reads, 0);
 });
+
+
+test('[NORMAL] [SG2-81:AC1] [SG2-81:AC6] a coordinator and organiser read their own venue disruption warning without changing its facts', async () => {
+  const unavailable: NotificationRecord = { ...notice, request_id: null, kind: 'venue_unavailable',
+    message: 'QA room is unavailable on 14 Nov: maintenance. Find a replacement venue; the event requirements are unchanged.' };
+  for (const role of ['coordinator', 'organiser'] as const) {
+    const calls: string[][] = [];
+    const response = await request(app(async (token, userId) => { calls.push([token, userId]); return [unavailable, notice]; }))
+      .get('/api/notifications').set('Authorization', `Bearer ${role}`);
+    assert.deepEqual([response.status, response.body], [200, { notifications: [unavailable, notice] }]);
+    assert.deepEqual(calls, [[role, USERS[role].userId]]);
+    assert.equal(response.headers['cache-control'], 'no-store');
+  }
+});

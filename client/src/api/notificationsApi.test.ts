@@ -68,8 +68,17 @@ test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] every event lifecycle notice survives r
 });
 
 test('[FAILURE] [SG2-68:AC2] a near-miss or inherited kind name is refused rather than shown unlabelled', async () => {
-  for (const kind of ['event_submitted ', 'Event_approved', 'event_cancelled', 'toString', 7]) {
+  for (const kind of ['event_submitted ', 'Event_approved', 'event_cancelled', 'venue_unavailable ', 'Venue_unavailable', 'toString', 7]) {
     respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));
     expect(await loadNotifications('token')).toEqual({ ok: false, message: 'Could not load notifications. Please try again.' });
   }
+});
+
+
+test('[NORMAL] [CONFLICT] [SG2-81:AC1] [SG2-81:AC6] a venue unavailable warning coexists with existing notices instead of making the inbox unavailable', async () => {
+  const unavailableVenue = { notification_id: 51, event_id: 20, request_id: null, kind: 'venue_unavailable',
+    message: 'QA room is unavailable on 14 Nov: maintenance. Find a replacement venue; the event requirements are unchanged.',
+    created_at: '2026-10-16T02:00:00.000Z' };
+  respond(() => Response.json({ notifications: [unavailableVenue, rejected] }));
+  expect(await loadNotifications('coordinator-token')).toEqual({ ok: true, notifications: [unavailableVenue, rejected] });
 });
