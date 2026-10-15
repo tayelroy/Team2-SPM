@@ -103,6 +103,7 @@ describe('AssignmentQueue (SG2-87)', () => {
     render(<AssignmentQueue accessToken="tok" />);
     const entry = await screen.findByRole('article', { name: 'Leadership Forum' });
     expect(within(entry).getByRole('option', { name: 'No coordinators available' })).toBeInTheDocument();
+    expect(within(entry).getByLabelText('Coordinator for Leadership Forum')).toBeDisabled();
     expect(within(entry).getByRole('button', { name: 'Assign Leadership Forum' })).toBeDisabled();
   });
 
