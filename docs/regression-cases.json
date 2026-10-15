@@ -1418,7 +1418,7 @@
     "title": "other roles cannot block or remove a block",
     "type": "Negative / role isolation",
     "story": "SG2-45",
-    "purpose": "Verify the Venue Staff-only permission for listing, creating and removing blocks. SG2-80 replaced AC2, so the confirmed-booking refusal is no longer tested here (see SG2-80-P01).",
+    "purpose": "Verify the Venue Staff-only permission for listing, creating and removing blocks. SG2-45 AC2 (refuse a block over a confirmed booking) is superseded by SG2-80 (PR #70) under SG2-98 AC4, so the refusal is no longer tested here; SG2-80-P01 and SG2-98-P01 test the replacement.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, technical support, organiser and attendee; try to list, create and remove blocks through the API; check the coordinator catalogue has no block control.",
@@ -1472,7 +1472,7 @@
     "title": "Venue block SQL policies hold",
     "type": "Positive / negative / integrity",
     "story": "SG2-45",
-    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff. SG2-80 removed the confirmed-booking trigger; DB-SG2-80-01 covers the replacement.",
+    "purpose": "Test that row level security, not only the API route, restricts blocking to Venue Staff. SG2-45 AC2 is superseded by SG2-80 (PR #70) under SG2-98 AC4: its confirmed-booking trigger was removed, and DB-SG2-80-01 and DB-SG2-98-01 cover the replacement.",
     "preconditions": "Disposable postgres:17 container; supabase/tests/fixtures/auth.sql followed by every migration in filename order. No shared database or deployed Supabase.",
     "steps": [
       "Run venue_blocks.sql with ON_ERROR_STOP=1.",
@@ -1594,6 +1594,92 @@
     "actual": "All disposable PostgreSQL suites in the ci.yml order passed, including this one.",
     "execution_evidence": "8 Oct 2026; feature/SG2-80-venue-temporary-unavailability working tree; Docker postgres:17; ci.yml database-tests steps reproduced locally.",
     "execution_date": "8 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-98-P01",
+    "title": "an old block is kept and still closes the venue, a block over a booking is accepted, and removing the old block reopens it",
+    "type": "Positive",
+    "story": "SG2-98",
+    "purpose": "Verify AC1–AC3: a block recorded before SG2-80 is listed as an unavailability record with no recorder and still keeps the venue out of search; a new block over a confirmed booking is accepted and flags it; removing the old block makes the venue searchable again.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Seed the old-style block Roof repair on Regression Hall for 18 June 2030 (UTC), filed under other with no recorder or time.",
+      "As Venue Staff, open the block screen and check the old block is listed.",
+      "Block 15 June 2030 09:00–13:00 Singapore time over confirmed booking #1 with reason Maintenance and note Projector swap.",
+      "As coordinator, search 18 June 2030 05:00–06:00 UTC.",
+      "As Venue Staff, remove Roof repair; as coordinator, repeat the search."
+    ],
+    "data": "Old-style block #98 (Roof repair); seeded confirmed booking #1 for event 1 (Planning workshop) on 15 June 2030 02:00–04:00 UTC; Regression venue and Regression coordinator accounts",
+    "expected": "Roof repair shows as Other with 'Added before the recorder and time were tracked'; the new block is saved and one booked event is reported as flagged and not cancelled; search leaves out Regression Hall while the old block exists and returns it after the block is removed.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-98:AC1",
+      "SG2-98:AC2",
+      "SG2-98:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture, alongside the SG2-45 and SG2-80 regressions; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "14 Oct 2026; feature/SG2-98-stop-refusing-overlapping-blocks working tree; npx playwright test -g \"SG2-98|SG2-45|SG2-80\" (6 passed); local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "14 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-98-N01",
+    "title": "other roles cannot remove an old block, and a block over a booking still needs a valid period",
+    "type": "Negative / boundary / role isolation",
+    "story": "SG2-98",
+    "purpose": "Verify AC1 lifts only the booking refusal (a reversed or empty period over a booking is still refused) and AC2/AC3: an old block can be removed only by Venue Staff and survives other attempts.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "steps": [
+      "Seed the old-style block Roof repair on Regression Hall.",
+      "As Venue Staff, post a reversed and an empty period over confirmed booking #1.",
+      "As coordinator, technical support and organiser, delete block #98; then delete it without signing in.",
+      "List the blocks as Venue Staff."
+    ],
+    "data": "Old-style block #98 (Roof repair); confirmed booking #1 on 15 June 2030 02:00–04:00 UTC; fixture roles",
+    "expected": "Both invalid periods return 400; other roles receive 403 and the anonymous call 401; only Scheduled maintenance and Roof repair remain.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-98:AC1",
+      "SG2-98:AC2",
+      "SG2-98:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture, alongside the SG2-45 and SG2-80 regressions; assertions checked the specified visible and persisted results.",
+    "execution_evidence": "14 Oct 2026; feature/SG2-98-stop-refusing-overlapping-blocks working tree; npx playwright test -g \"SG2-98|SG2-45|SG2-80\" (6 passed); local Playwright Chromium. No hosted Supabase validation.",
+    "execution_date": "14 Oct 2026",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "DB-SG2-98-01",
+    "title": "Venue blocks recorded under SG2-45 survive the SG2-80 upgrade in SQL",
+    "type": "Positive / negative / upgrade integrity",
+    "story": "SG2-98",
+    "purpose": "Test that the SG2-80 migration keeps blocks recorded before it as venue unavailability records: unchanged period and reason, filed under other, no recorder or time invented, a confirmed booking already inside one flagged, and SG2-45 AC1 and AC3 still holding for them. Also confirms for SG2-98 AC4 that the SG2-45 AC2 refusal trigger is gone after the upgrade.",
+    "preconditions": "Separate disposable postgres:17 container; supabase/tests/fixtures/auth.sql, the migrations before 202610100001_venue_temporary_unavailability.sql, supabase/tests/fixtures/legacy_venue_blocks.sql, then the remaining migrations in filename order. No shared database or deployed Supabase.",
+    "steps": [
+      "Run venue_block_upgrade.sql with ON_ERROR_STOP=1.",
+      "As the owner, check the old blocks, their category, recorder and flags, and that the SG2-45 refusal trigger is gone; try to stamp a recorder onto an old block.",
+      "As Venue Staff, list the old blocks, try to place a hold inside one, and block a period over a confirmed booking.",
+      "As coordinator, then Venue Staff, remove an old block and place the hold again; roll back."
+    ],
+    "data": "Venues 9801 and 9802; old blocks 98201–98203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
+    "expected": "All three old blocks keep their period and reason, are filed under other with no recorder or time; booking 98301 is flagged and stays confirmed, 98302 is not flagged; the hold is refused while the old block exists and created after Venue Staff remove it; the coordinator removes nothing; a new block over a booking is accepted and flags it.",
+    "evidence": "supabase/tests/venue_block_upgrade.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Passed on the replayed upgrade. Weakening the SG2-80 migration (no backfill of existing overlaps, the SG2-45 refusal trigger kept, or a default recording time) made the suite fail on the matching assertion each time.",
+    "execution_evidence": "14 Oct 2026; feature/SG2-98-stop-refusing-overlapping-blocks working tree; Docker postgres:17; the ci.yml upgrade step reproduced locally, plus the main database-tests step (all suites passed).",
+    "execution_date": "14 Oct 2026",
     "executed_by": "Automated test runner"
   },
   {

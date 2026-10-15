@@ -73,7 +73,7 @@ test('[FAILURE] [SG2-25:AC3] [SG2-45:AC1] the production app protects every bloc
   assert.equal((await request(app).delete('/api/venues/1/blocks/1')).status, 401);
 });
 
-test('[NORMAL] [SG2-45:AC1] AC1: blocking a free period records it with its reason and lists it as upcoming', async () => {
+test('[NORMAL] [SG2-45:AC1] [SG2-98:AC2] AC1: blocking a free period records it with its reason and lists it as upcoming', async () => {
   const { app, listed } = fixture();
   const created = await request(app).post('/api/venues/1/blocks').set(auth).send(period);
   assert.equal(created.status, 201);
@@ -84,7 +84,7 @@ test('[NORMAL] [SG2-45:AC1] AC1: blocking a free period records it with its reas
   assert.deepEqual(listed, [new Date(NOW).toISOString()]);
 });
 
-test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] a period holding a confirmed booking is accepted and the booking is flagged with its event unchanged', async () => {
+test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] [SG2-98:AC1] a period holding a confirmed booking is accepted and the booking is flagged with its event unchanged', async () => {
   const { app } = fixture();
   const overlapping = { ...period, category: 'safety_concern', starts_at: '2026-10-02T11:00:00Z', ends_at: '2026-10-02T13:00:00Z' };
   const response = await request(app).post('/api/venues/1/blocks').set(auth).send(overlapping);
@@ -94,7 +94,7 @@ test('[CONFLICT] [SG2-80:AC2] [SG2-80:AC3] [SG2-80:AC4] a period holding a confi
   assert.deepEqual((await request(app).get('/api/venues/1/blocks').set(auth)).body.blocks.map((block: { affected: unknown[] }) => block.affected), [[confirmed]]);
 });
 
-test('[CONFLICT] [SG2-45:AC3] AC3: removing a block frees the period; removing it again is 404', async () => {
+test('[CONFLICT] [SG2-45:AC3] [SG2-98:AC2] AC3: removing a block frees the period; removing it again is 404', async () => {
   const { app } = fixture();
   await request(app).post('/api/venues/1/blocks').set(auth).send(period);
   assert.equal((await request(app).delete('/api/venues/1/blocks/1').set(auth)).status, 204);

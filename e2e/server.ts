@@ -339,6 +339,13 @@ app.post('/__e2e/venue-clash', (_req, res) => {
   database.seedVenueClash();
   res.status(204).end();
 });
+// SG2-98 AC3: a block recorded under SG2-45 as the SG2-80 upgrade leaves it,
+// filed under 'other' with no recorder or time.
+app.post('/__e2e/legacy-venue-block', (_req, res) => {
+  database.tables.venue_unavailability.push({ unavailability_id: 98, venue_id: 1, starts_at: '2030-06-18T00:00:00.000Z',
+    ends_at: '2030-06-19T00:00:00.000Z', category: 'other', reason: 'Roof repair', created_by: null, created_at: null });
+  res.status(204).end();
+});
 app.post('/__e2e/coordinator-assignment', (_req, res) => {
   database.seedCoordinatorAssignment();
   res.status(204).end();
