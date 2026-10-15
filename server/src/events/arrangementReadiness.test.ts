@@ -26,6 +26,42 @@ function stateOf(result: ReturnType<typeof computeArrangementReadiness>, key: Ar
 }
 
 describe('computeArrangementReadiness (SG2-57)', () => {
+  test('[NORMAL] [SG2-39:AC2] [SG2-57:AC2] affected ready arrangements require rechecking while unaffected registration stays ready', () => {
+    const input = baseInput({ arrangements_recheck_needed: true, outstanding_arrangements: ['venue_recheck', 'equipment_recheck'] });
+    const result = computeArrangementReadiness(input);
+    assert.deepEqual(result.outstanding, ['venue', 'equipment']);
+    assert.deepEqual(result.arrangements.map(item => item.state), ['outstanding', 'outstanding', 'ready']);
+    assert.match(result.arrangements[0].detail, /approved.*recheck.*planning/i);
+    assert.match(result.arrangements[1].detail, /reserved and placed.*recheck.*planning/i);
+    assert.equal(result.ready_for_confirmation, false);
+    assert.equal(result.venue_requested, true);
+    assert.equal(input.venue_requests[0].booked, true);
+    assert.equal(input.equipment_requests[0].reserved, true);
+  });
+
+  test('[BOUNDARY] [SG2-39:AC2] false, null, absent, empty or unknown recheck metadata preserves ordinary readiness', () => {
+    for (const metadata of [
+      {}, { arrangements_recheck_needed: false, outstanding_arrangements: ['venue_recheck'] },
+      { arrangements_recheck_needed: null, outstanding_arrangements: ['equipment_recheck'] },
+      { arrangements_recheck_needed: true, outstanding_arrangements: null },
+      { arrangements_recheck_needed: true, outstanding_arrangements: [] },
+      { arrangements_recheck_needed: true, outstanding_arrangements: ['unknown_recheck'] },
+      { arrangements_recheck_needed: true },
+    ]) {
+      const result = computeArrangementReadiness(baseInput(metadata));
+      assert.deepEqual(result.outstanding, []);
+      assert.equal(result.ready_for_confirmation, true);
+    }
+  });
+
+  test('[CONFLICT] [SG2-39:AC2] duplicate and unknown markers cannot hide known rechecks, including a legacy reservation with no request', () => {
+    const result = computeArrangementReadiness(baseInput({ equipment_requests: [], registration_needed: false,
+      arrangements_recheck_needed: true, outstanding_arrangements: ['registration_recheck', 'unknown', 'equipment_recheck', 'venue_recheck', 'venue_recheck'] }));
+    assert.deepEqual(result.outstanding, ['venue', 'equipment', 'registration']);
+    assert.equal(result.ready_for_confirmation, false);
+    assert.ok(result.arrangements.every(item => item.state === 'outstanding'));
+  });
+
   test('[NORMAL] [SG2-57:AC1] [SG2-57:AC3] all required arrangements ready marks the event ready for confirmation', () => {
     const result = computeArrangementReadiness(baseInput());
 

@@ -108,6 +108,21 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
     assert.equal(res.body.ready_for_confirmation, false);
   });
 
+  test('[CONFLICT] [SG2-39:AC2] [SG2-57:AC2] persisted planning rechecks override otherwise-ready facts only for the affected arrangements', async () => {
+    const event = { ...MOCK_EVENT, arrangements_recheck_needed: true,
+      outstanding_arrangements: ['venue_recheck', 'equipment_recheck'] };
+    const res = await request(buildApp({ planning: { ok: true, event } }))
+      .get('/api/event-requests/101/arrangements');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.outstanding, ['venue', 'equipment']);
+    assert.equal(res.body.ready_for_confirmation, false);
+    assert.deepEqual(res.body.arrangements.map((row: { state: string }) => row.state), ['outstanding', 'outstanding', 'ready']);
+    assert.match(res.body.arrangements[0].detail, /recheck.*planning/i);
+    assert.match(res.body.arrangements[1].detail, /recheck.*planning/i);
+    assert.equal(res.body.venue_requested, true);
+    assert.deepEqual(event.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
+  });
+
   test('[FAILURE] [SG2-57:AC1] returns 401 when the caller is not authenticated', async () => {
     const res = await request(buildApp({ principal: undefined })).get('/api/event-requests/101/arrangements');
 

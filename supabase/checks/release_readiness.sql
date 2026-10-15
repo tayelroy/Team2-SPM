@@ -26,7 +26,8 @@ begin
     ('completed_by', 'uuid'), ('completed_at', 'timestamptz'),
     ('submitted_at', 'timestamptz'), ('registration_capacity', 'integer'),
     ('registration_opens_at', 'timestamptz'), ('registration_closes_at', 'timestamptz'),
-    ('planning_notes', 'text')
+    ('planning_notes', 'text'), ('arrangements_recheck_needed', 'boolean'),
+    ('outstanding_arrangements', 'jsonb')
   ), type_checks as (
     select 'type public.events.' || r.column_name || ' = ' || r.type_name as name,
       exists (select 1 from pg_attribute a
@@ -67,6 +68,17 @@ begin
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
+  ), confirmation_definition as (
+    select pg_get_functiondef(to_regprocedure('public.confirm_event(integer)')) as definition
+  ), required_rechecks(name) as (values
+    ('venue_recheck'), ('equipment_recheck'), ('registration_recheck')
+  ), recheck_function_checks as (
+    -- Structural deployment fingerprint only; rollback SQL tests prove behavior.
+    select 'confirm_event planning recheck ' || name as name,
+      coalesce(position('arrangements_recheck_needed' in definition) > 0
+        and position('outstanding_arrangements' in definition) > 0
+        and position('["' || name || '"]' in definition) > 0, false) as passed
+    from required_rechecks cross join confirmation_definition
   ), required_foreign_keys(relation, column_name, target, target_column) as (values
     ('events', 'organiser_id', 'users', 'user_id'),
     ('events', 'coordinator_id', 'users', 'user_id'),
@@ -120,6 +132,7 @@ begin
     select * from column_checks union all select * from type_checks
     union all select * from relation_checks union all select * from status_checks
     union all select * from function_checks union all select * from foreign_key_checks
+    union all select * from recheck_function_checks
     union all select * from grant_checks union all select * from view_checks
     union all select * from notification_checks
   )

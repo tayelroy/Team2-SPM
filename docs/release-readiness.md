@@ -63,6 +63,11 @@ acceptance tests or the Definition of Done.
 - The planning registration fields/notes exposed by the work queue view.
 - Notification columns and the validated literal `notifications_kind_check`
   allow-list, including `event_confirmed` and all five event lifecycle kinds.
+- The confirmation RPC definition includes the active planning-recheck flag and
+  all three known venue/equipment/registration recheck markers. Migration
+  `202610160004_event_confirmation_rechecks.sql` installs that gate. This is a
+  structural deployment fingerprint; the rollback confirmation SQL suite proves
+  that pending rechecks refuse confirmation without changing receipts or history.
 
 Notification schema drift can produce a partial success: submission changes the
 event state and writes history before its notice insert fails. The UI then
@@ -105,7 +110,8 @@ PostgreSQL service, runs the structural gate, and runs
 [`release-readiness.test.mjs`](../.github/scripts/release-readiness.test.mjs).
 The tests deliberately remove required columns, alter the queue view, rename a
 role, revoke a grant and restore a legacy notification-kind constraint inside
-transactions. Every mutation rolls back, and the
+transactions. They also replace each confirmation recheck marker in turn to
+prove that an older/incomplete RPC cannot pass the structural gate. Every mutation rolls back, and the
 tests prove the next independent check passes again. All four test categories
 are represented. No hosted credentials or automatic hosted migration are used.
 

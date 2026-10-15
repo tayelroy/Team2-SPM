@@ -59,6 +59,15 @@ test('[CONFLICT] [SG2-22:AC3] a stale work queue view cannot pass merely because
   END $$;`, 'internal_work_items planning key planning_notes');
 });
 
+test('[CONFLICT] [SG2-39:AC2] [SG2-58:AC2] a stale confirmation RPC missing any known planning recheck blocks release', () => {
+  for (const marker of ['venue_recheck', 'equipment_recheck', 'registration_recheck']) {
+    assertReadinessRejects(`DO $$ BEGIN
+      EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
+        '${marker}', 'legacy_${marker}');
+    END $$;`, `confirm_event planning recheck ${marker}`);
+  }
+});
+
 test('[FAILURE] [SG2-23:AC1] missing Safety Officer role catalogue entry blocks release without requiring a seeded login', () => {
   assertReadinessRejects("UPDATE public.roles SET role_name = 'Retired Safety Officer' WHERE role_name = 'Safety Officer';", 'Safety Officer');
 });

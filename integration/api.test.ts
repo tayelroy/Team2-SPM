@@ -20,6 +20,9 @@ import { createUpdateEventPlanningHandler } from '../server/src/events/updatePla
 import { createWorkQueueRouter } from '../server/src/workQueue';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
+import express from 'express';
+import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createGetEventArrangementsHandler } from '../server/src/events/getArrangements';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -27,9 +30,9 @@ assert.equal(rest.hostname, '127.0.0.1', 'Integration DB transport must be loopb
 assert.ok(rest.port);
 const secret = process.env.INTEGRATION_JWT_SECRET!;
 assert.equal(secret, 'isolated-integration-jwt-secret-at-least-32-characters');
-const jwt = (role: string) => {
+const jwt = (role: string, sub?: string) => {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const payload = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ role, exp: Math.floor(Date.now() / 1000) + 3600 })}`;
+  const payload = `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ role, ...(sub ? { sub } : {}), exp: Math.floor(Date.now() / 1000) + 3600 })}`;
   return `${payload}.${createHmac('sha256', secret).update(payload).digest('base64url')}`;
 };
 // Supabase's gateway uses /rest/v1; this isolated PostgREST serves the same
@@ -73,6 +76,7 @@ args[19] = createUpdateEventPlanningHandler(dependencies);
 args[21] = createListClarificationsHandler(dependencies);
 args[22] = createAddClarificationHandler(dependencies);
 args[27] = createAssignmentQueueRouter(access, dependencies);
+args[28] = createGetEventArrangementsHandler(dependencies);
 const api = request(createApp(...args));
 const auth = (who: string) => ({ Authorization: `Bearer ${who}` });
 const values = { name: 'Integration workshop', purpose: 'Exercise actual storage', description: 'Synthetic test event',
@@ -98,6 +102,81 @@ async function stored(id: number) {
   return result.data;
 }
 
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-37:AC2] [SG2-30:AC1] a rejected request refuses direct edits and reservations while resubmission returns to coordinator review and preserves its rejection history', async () => {
+  const id = await draft();
+  assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
+  assert.equal((await api.patch(`/api/event-requests/${id}/coordinator`).set(auth('lead')).send({ coordinatorId: ids.coordinator })).status, 200);
+  assert.equal((await api.patch(`/api/event-requests/${id}/review`).set(auth('coordinator')).send({})).status, 200);
+  const decision = await api.patch(`/api/event-requests/${id}/decision`).set(auth('coordinator')).send({ decision: 'rejected', reason: 'This event cannot be accommodated.' });
+  assert.equal(decision.status, 200, JSON.stringify(decision.body));
+  const original = await stored(id);
+  const history = await database.from('event_audit_logs').select('*').eq('event_id', id).order('log_id');
+  assert.equal(history.error, null);
+  assert.ok(history.data!.some(row => row.field_name === 'status' && row.new_value === 'rejected'));
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ name: 'Overwrite rejected event' })).status, 409);
+  const venueApi = request(express().use(express.json()).use('/api/venue-booking-requests',
+    createVenueBookingRequestsRouter(access, { getAdminClient: () => database })));
+  const venue = await venueApi.post('/api/venue-booking-requests').set(auth('coordinator')).send({
+    event_id: id, venue_id: 1, layout: 'theatre', starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z'
+  });
+  assert.equal(venue.status, 409, JSON.stringify(venue.body));
+  assert.match(venue.body.error, /rejected/);
+  const reservation = await fetch(new URL('/rpc/manage_equipment_reservations', rest), {
+    method: 'POST', headers: { Authorization: `Bearer ${jwt('authenticated', ids.support)}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_action: 'reserve', p_event_id: id, p_request_id: 1, p_version: 1,
+      p_starts_at: '2090-06-15T02:00:00Z', p_ends_at: '2090-06-15T04:00:00Z' })
+  });
+  assert.equal(reservation.status, 200);
+  assert.equal((await reservation.json()).outcome, 'closed');
+  for (const table of ['venue_booking_requests', 'venue_bookings', 'equipment_reservations']) {
+    const result = await database.from(table).select('*').eq('event_id', id);
+    assert.equal(result.error, null);
+    assert.deepEqual(result.data, []);
+  }
+  assert.deepEqual(await stored(id), original);
+  const after = await database.from('event_audit_logs').select('*').eq('event_id', id).order('log_id');
+  assert.equal(after.error, null);
+  assert.deepEqual(after.data, history.data);
+  // Rejection is not final under the customer answers. Submitting the unchanged
+  // request returns it to its coordinator; it never auto-approves or reserves.
+  const resubmit = await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({});
+  assert.equal(resubmit.status, 200, JSON.stringify(resubmit.body));
+  assert.equal(resubmit.body.request.status, 'submitted');
+  const resubmitted = await stored(id);
+  assert.equal(resubmitted.coordinator_id, ids.coordinator);
+  assert.equal(resubmitted.name, original.name);
+  assert.equal(resubmitted.decision_reason, original.decision_reason);
+  const resubmissionHistory = await database.from('event_audit_logs').select('*').eq('event_id', id).order('log_id');
+  assert.equal(resubmissionHistory.error, null);
+  assert.deepEqual(resubmissionHistory.data!.slice(0, history.data!.length), history.data);
+  assert.ok(resubmissionHistory.data!.some(row => row.field_name === 'status' && row.old_value === 'rejected' && row.new_value === 'submitted'));
+  const replacement = await draft({ ...values, name: 'New replacement request' });
+  assert.notEqual(replacement, id);
+  assert.equal((await stored(replacement)).status, 'draft');
+  assert.equal((await api.patch(`/api/event-requests/${replacement}/submit`).set(auth('organiser')).send({})).status, 200);
+  assert.equal((await stored(replacement)).status, 'unassigned');
+  assert.equal((await stored(id)).status, 'submitted');
+});
+
+test('[BOUNDARY] [NORMAL] [SG2-36:AC2] clarification-needed requests remain editable and resubmit to the existing coordinator with their history', async () => {
+  const id = await draft();
+  assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
+  assert.equal((await api.patch(`/api/event-requests/${id}/coordinator`).set(auth('lead')).send({ coordinatorId: ids.coordinator })).status, 200);
+  assert.equal((await api.patch(`/api/event-requests/${id}/review`).set(auth('coordinator')).send({})).status, 200);
+  const question = await api.post(`/api/event-requests/${id}/clarifications`).set(auth('coordinator')).send({ message: 'Please amend the seating requirement.' });
+  assert.equal(question.status, 201);
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...values, venue_requirements: 'Theatre seating' })).status, 200);
+  const resubmit = await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({});
+  assert.equal(resubmit.status, 200, JSON.stringify(resubmit.body));
+  assert.equal(resubmit.body.request.status, 'submitted');
+  const row = await stored(id);
+  assert.equal(row.coordinator_id, ids.coordinator);
+  assert.equal(row.venue_requirements, 'Theatre seating');
+  const history = await database.from('event_audit_logs').select('field_name,old_value,new_value').eq('event_id', id);
+  assert.equal(history.error, null);
+  assert.ok(history.data!.some(entry => entry.field_name === 'status' && entry.old_value === 'needs_clarification' && entry.new_value === 'submitted'));
+});
+
 test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] clarification POST immediately returns the stored sender name and matches the reloaded thread', async () => {
   const id = await draft();
   assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
@@ -120,6 +199,52 @@ test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] clarification POST immediately returns 
     assert.deepEqual(reloaded.body.clarifications, [question.body.clarification, reply.body.clarification]);
   }
   assert.equal((await api.get(`/api/event-requests/${id}/clarifications`).set(auth('other'))).status, 404);
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
+  const id = await planned();
+  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({
+    registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z'
+  })).status, 200);
+  const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 200 }).select('venue_id').single();
+  assert.equal(venue.error, null);
+  const equipment = await database.from('equipment').insert({ name: 'Integration projector', quantity_total: 10 }).select('equipment_id').single();
+  assert.equal(equipment.error, null);
+  const period = { event_id: id, starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z' };
+  const booking = await database.from('venue_bookings').insert({ ...period, venue_id: venue.data!.venue_id, status: 'confirmed' }).select('*').single();
+  assert.equal(booking.error, null);
+  const venueRequest = await database.from('venue_booking_requests').insert({ ...period, venue_id: venue.data!.venue_id, status: 'approved', venue_booking_id: booking.data!.booking_id }).select('request_id').single();
+  assert.equal(venueRequest.error, null);
+  const demand = await database.from('equipment_requests').insert({ ...period, equipment_id: equipment.data!.equipment_id, quantity: 1, status: 'approved', shortfall: 0,
+    placement_venue_id: venue.data!.venue_id, placement_position: 'Stage left' }).select('request_id').single();
+  assert.equal(demand.error, null);
+  const receipt = await database.from('equipment_reservations').insert({ ...period, equipment_id: equipment.data!.equipment_id, quantity_reserved: 1,
+    request_id: demand.data!.request_id, reserved_at: '2089-10-01T00:00:00Z' }).select('*').single();
+  assert.equal(receipt.error, null);
+  const initial = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
+  assert.equal(initial.status, 200);
+  assert.equal(initial.body.ready_for_confirmation, true);
+  const warned = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137 });
+  assert.equal(warned.status, 409);
+  assert.deepEqual(warned.body.affected_arrangements, ['venue_recheck', 'equipment_recheck']);
+  assert.equal((await stored(id)).expected_attendance, 136);
+  assert.equal((await stored(id)).arrangements_recheck_needed, false);
+  const saved = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137, confirm_impact: true });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const after = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
+  assert.equal(after.status, 200);
+  assert.deepEqual(after.body.outstanding, ['venue', 'equipment']);
+  assert.equal(after.body.ready_for_confirmation, false);
+  assert.deepEqual(after.body.arrangements.map((item: { state: string }) => item.state), ['outstanding', 'outstanding', 'ready']);
+  assert.match(after.body.arrangements[0].detail, /recheck.*planning/i);
+  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 137, confirm_impact: true })).status, 200);
+  const all = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
+  assert.deepEqual(all.body.outstanding, ['venue', 'equipment', 'registration']);
+  const persisted = await stored(id);
+  assert.equal(persisted.arrangements_recheck_needed, true);
+  assert.deepEqual(persisted.outstanding_arrangements, ['venue_recheck', 'equipment_recheck', 'registration_recheck']);
+  assert.deepEqual((await database.from('venue_bookings').select('*').eq('booking_id', booking.data!.booking_id).single()).data, booking.data);
+  assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
 });
 
 test('[NORMAL] [SG2-28:AC1] [SG2-30:AC1] [SG2-87:AC5] [SG2-39:AC1] organiser submission, Lead assignment and planning preserve actual stored values', async () => {
