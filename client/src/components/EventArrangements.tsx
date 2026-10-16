@@ -10,10 +10,13 @@ import EventArrangementsPanel from './EventArrangementsPanel';
  */
 export default function EventArrangements({
   eventId,
-  accessToken = null
+  accessToken = null,
+  confirmed = false
 }: {
   eventId: number;
   accessToken?: string | null;
+  /** SG2-58: once confirmed, the panel says so rather than "Ready for confirmation". */
+  confirmed?: boolean;
 }) {
   const [arrangements, setArrangements] = useState<EventArrangementsResult | null>(null);
 
@@ -30,5 +33,11 @@ export default function EventArrangements({
   }, [eventId, accessToken]);
 
   if (!arrangements) return null;
-  return <EventArrangementsPanel arrangements={arrangements} style={{ marginTop: '24px' }} />;
+  // Inset like the rest of the event card, so the panel's own border does not
+  // sit on top of the card's edge.
+  return (
+    <div className="organisation-detail-panel">
+      <EventArrangementsPanel arrangements={arrangements} confirmed={confirmed} />
+    </div>
+  );
 }
