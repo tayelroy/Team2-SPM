@@ -130,6 +130,20 @@ test('[FAILURE] [SG2-25:AC2] a missing privileged view read grant blocks release
   assertReadinessRejects('REVOKE SELECT ON public.internal_work_items FROM service_role;', 'service_role SELECT public.internal_work_items');
 });
 
+test('[FAILURE] [SG2-40:AC2] release readiness refuses a missing atomic draft audit RPC', () => {
+  assertReadinessRejects('DROP FUNCTION public.update_event_request_draft(integer,uuid,jsonb);',
+    'RPC public.update_event_request_draft(integer,uuid,jsonb)');
+});
+
+test('[FAILURE] [SG2-25:AC2] [SG2-40:AC2] release readiness requires service-only execution of the draft audit RPC', () => {
+  for (const [mutation, diagnostic] of [
+    ['REVOKE EXECUTE ON FUNCTION public.update_event_request_draft(integer,uuid,jsonb) FROM service_role;', 'draft audit RPC EXECUTE service_role = true'],
+    ['GRANT EXECUTE ON FUNCTION public.update_event_request_draft(integer,uuid,jsonb) TO anon;', 'draft audit RPC EXECUTE anon = false'],
+    ['GRANT EXECUTE ON FUNCTION public.update_event_request_draft(integer,uuid,jsonb) TO authenticated;', 'draft audit RPC EXECUTE authenticated = false'],
+    ['GRANT EXECUTE ON FUNCTION public.update_event_request_draft(integer,uuid,jsonb) TO PUBLIC;', 'draft audit RPC EXECUTE anon = false'],
+  ]) assertReadinessRejects(mutation, diagnostic);
+});
+
 test('[FAILURE] [SG2-22:AC3] [SG2-68:AC1] [SG2-58:AC1] legacy notification kinds block release before lifecycle writes fail', () => {
   assertReadinessRejects(`TRUNCATE public.notifications;
     ALTER TABLE public.notifications DROP CONSTRAINT notifications_kind_check,

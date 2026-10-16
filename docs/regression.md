@@ -261,3 +261,35 @@ integration separately verifies named foreign-key joins and real database
 ownership/receipt behavior. These are local execution results. Pushed-head CI,
 hosted approval workflows and independent peer review remain separate gates;
 this record does not clear every Done criterion.
+
+
+## 16 Oct 2026 — SG2-40 atomic draft-history revision
+
+`SG2-40-DRAFT-HISTORY-01` adds 23 source records: nine executable methods
+(two backend, two native integration, two readiness and three browser methods)
+and fourteen SQL assertions. Two existing methods were revised: the atomic
+adapter case retains legacy alias `TC-f774dfb62d21` for current
+`TC-458d32beacb0`; the Drawer label case retains `TC-022594d51cca`.
+Existing historical history cases and executions remain unchanged.
+
+The public draft PATCH still accepts the existing nine-field full replacement.
+The private service-role-only RPC locks and rechecks creator, current exact
+organisation membership, role and editable status. Saved values and field
+diffs commit together; an audit failure rolls both back. Unchanged saves,
+including equivalent date offsets, add no rows. This covers Draft and Needs
+clarification; it adds no rejected-request rework policy or historical backfill.
+
+Local results: backend 1,468/1,468 and all four coverage measures 100%; native
+API/PostgREST/PostgreSQL 12/12; fourteen tagged SQL rollback assertions;
+readiness 15/15; browser 113/113 with zero skipped, retried or flaky cases.
+Three new draft-history and four smoke cases are subsets of 113. The browser
+fixture proves public UI/API wiring; native/SQL separately prove real database
+locking, grants and rollback. Focused Drawer client checks passed 23/23; this
+is not a claim of a fresh full-client coverage run.
+
+Migration `202610170003` was installed and its single ledger entry and
+service-only grants were verified on the hosted project. That structural
+installation is distinct from repaired-preview save/history acceptance.
+Current-head CI, human peer approval and full hosted Done clearance remain
+separate gates. See [the repeatable checks](testing.md#atomic-draft-history-checks--16-october-2026)
+and [release readiness](release-readiness.md).

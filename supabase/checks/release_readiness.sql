@@ -56,6 +56,7 @@ begin
         and e.enumlabel = r.name) as passed
     from required_statuses r
   ), required_functions(signature) as (values
+    ('public.update_event_request_draft(integer,uuid,jsonb)'),
     ('public.confirm_event(integer)'),
     ('public.decide_venue_booking_request(bigint,text,text)'),
     ('public.manage_equipment_requirements(text,integer,bigint,bigint,jsonb)'),
@@ -71,6 +72,11 @@ begin
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
+  ), draft_rpc_grants as (
+    select 'draft audit RPC EXECUTE ' || r.name || ' = ' || r.expected::text as name,
+      coalesce(has_function_privilege((select oid from pg_roles where rolname = r.name),
+        to_regprocedure('public.update_event_request_draft(integer,uuid,jsonb)'), 'EXECUTE') = r.expected, false) as passed
+    from (values ('service_role', true), ('anon', false), ('authenticated', false)) r(name, expected)
   ), confirmation_definition as (
     select pg_get_functiondef(to_regprocedure('public.confirm_event(integer)')) as definition
   ), required_rechecks(name) as (values
@@ -147,6 +153,7 @@ begin
     select * from column_checks union all select * from type_checks
     union all select * from relation_checks union all select * from status_checks
     union all select * from function_checks union all select * from foreign_key_checks
+    union all select * from draft_rpc_grants
     union all select * from recheck_function_checks
     union all select * from disruption_function_check
     union all select * from grant_checks union all select * from view_checks

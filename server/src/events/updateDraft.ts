@@ -37,11 +37,11 @@ export interface UpdateEventDraftDependencies {
 /**
  * PATCH /api/event-requests/:eventId — updates a draft's own fields
  * (SG2-29). Only the request's own organiser may edit it, only while it is
- * still a draft — mirrors submitEventRequestHandler / createDeleteEventDraftHandler's
+ * a draft or needs_clarification request — mirrors submitEventRequestHandler / createDeleteEventDraftHandler's
  * fetch-then-check shape, reusing fetchManageableEventRequest so a request
  * belonging to someone else is indistinguishable from one that doesn't
- * exist at all. `updateEventRequestDraft` itself also filters on the
- * caller's organiser id (not just this pre-check), so ownership holds even
+ * exist at all. `updateEventRequestDraft` atomically rechecks ownership, membership and
+ * editable status inside the database RPC, so ownership holds even
  * if a future caller of that function skips or reorders this step.
  *
  * The body is validated exactly like create (SG2-28's validateDraftInput —
@@ -100,6 +100,18 @@ export function createUpdateEventDraftHandler({
 
     const updated = await updateDraft(admin, eventId, principal.userId, validated.values);
     if (!updated.ok) {
+      if (updated.reason === 'not_found') {
+        res.status(404).json({ error: 'No event request found for this account.' });
+        return;
+      }
+      if (updated.reason === 'not_editable') {
+        res.status(409).json({ error: 'Only a draft or returned event request can be edited.' });
+        return;
+      }
+      if (updated.reason === 'invalid') {
+        res.status(400).json({ error: 'Invalid event request details' });
+        return;
+      }
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }

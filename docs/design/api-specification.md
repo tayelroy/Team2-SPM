@@ -1,9 +1,9 @@
-# ConnectSphere API specification — PR90 capacity-discovery revision (16 Oct 2026)
+# ConnectSphere API specification — PR90 capacity and draft-history revision (16 Oct 2026)
 
 SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at the documented snapshot. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
 
 - **Ground truth:** `server/src/app.ts` (mounts), the routers it mounts (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue}/*.ts`), `server/src/auth/policy.ts` (`PERMISSIONS`), the `server/src/db/*` adapters, and the RPCs in `supabase/migrations/*.sql`.
-- **Revision scope:** The baseline PR90 head `61416cc` includes merged PR92 (`64b1da6`). Subsequent SG2-46 facility matching and SG2-47 capacity-discovery corrections are described below. Capacity discovery adds one GET endpoint; SG2-81 still uses existing request and decision routes. Original catalogue line numbers locate the baseline; source filenames and current contracts identify later changes. Safety routes remain planned. This specification describes the local capacity revision, not a claim of hosted acceptance or peer approval.
+- **Revision scope:** The baseline PR90 head `61416cc` includes merged PR92 (`64b1da6`). Subsequent SG2-46 facility matching, SG2-47 capacity discovery and SG2-40 atomic draft-history corrections are described below. Capacity discovery adds one GET endpoint; SG2-81 still uses existing request and decision routes. Original catalogue line numbers locate the baseline; source filenames and current contracts identify later changes. Safety routes remain planned. This specification describes the local capacity and draft-history revision, not a claim of hosted acceptance or peer approval.
 - **Endpoint count:** 74 method + path pairs, from 71 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
 - **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `connectsphere.dsl` (C3 API components), `sequence-diagrams.puml`, `data-model.puml`, `class-diagram.puml`, `event-status-model.puml`.
 
@@ -287,16 +287,19 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Rule:** any EO in the same organisation can read it.
 
 ### 4.4 PATCH /api/event-requests/:eventId
-- **Source:** `app.ts:221-225`; `events/updateDraft.ts`.
+- **Source:** `events/updateDraft.ts` (`createUpdateEventDraftHandler`), `db/eventRequests.ts` (`updateEventRequestDraft`), migration `202610170003_event_draft_change_history.sql` (`update_event_request_draft`).
 - **Permission:** `event_request.update` (EO).
-- **Body:** the same fields as 4.1, as a **full replace**: omitted fields become null.
-- **200:** `{ request: DraftRecord, missingForSubmission }`
+- **Body:** the same nine fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
+- **200:** `{ request: DraftRecord, missingForSubmission }`. The DraftRecord shape is unchanged; this endpoint does not submit a request.
 - **Errors:**
-  - 400 details
-  - 404
-  - 409 `Only a draft or returned event request can be edited.`
-  - 503
-- **Rule:** only the creating EO, and only while the status is `draft` or `needs_clarification`. The guard is in the `UPDATE` itself.
+  - 400 `{ error: "Invalid event request details", details[] }` for HTTP validation; a private RPC validation refusal returns the same error without details.
+  - 404 `No event request found for this account.` for a missing event, wrong creator or changed organisation membership.
+  - 409 `Only a draft or returned event request can be edited.` if the status is no longer editable, including a change after the initial lookup.
+  - 503 generic service error if storage or audit insertion fails; private database errors are not exposed.
+- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the nine fields. The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
+- **History:** the same transaction inserts one `event_audit_logs` row per actual changed field with verified actor, old/new values and a common save time. An audit failure rolls back the draft update. Unchanged saves, including equivalent timestamp offsets, add no history. Null remains null; numeric and boolean values are stored as text; dates use canonical UTC timestamp text. History reads still apply the existing owner/internal-field visibility rules.
+- **Internal result:** JSON object `{ outcome: "updated", request }` or `{ outcome: "not_found"|"not_editable"|"invalid" }`; the adapter maps these to the public response above. A successful earlier precheck cannot override a later locked refusal.
+- **Limits:** only the existing draft/clarification edit path is repaired. This adds no rejected-request rework policy and does not reconstruct edits made before the migration.
 
 ### 4.5 DELETE /api/event-requests/:eventId
 - **Source:** `app.ts:215-219`; `events/deleteDraft.ts`.

@@ -5994,5 +5994,106 @@
       ]
     },
     "notes": "Grouped supporting-method record, not 28 independently accepted user workflows. SG2-47-P01/P02/N01 historical executions remain unchanged. Existing permission and POST eligibility rules are reused, not expanded. All four category tags occur in the new source tests; parameterized runner counts differ from declaration counts. DoD test traceability is recorded; independent PR review and full hosted Done acceptance remain open."
+  },
+  {
+    "id": "SG2-40-DRAFT-HISTORY-01",
+    "title": "Draft and clarification edits commit their exact field history atomically",
+    "type": "Normal / boundary / failure / conflict",
+    "story": "SG2-40",
+    "purpose": "Repair the controlled hosted Draft23 reproduction: saved attendance and description persisted while change history remained empty. Record truthful per-field history without inventing earlier values or changing future rework policy.",
+    "preconditions": "Owner draft or needs_clarification request; existing public PATCH and history endpoints. Local SQL/native use disposable PostgreSQL/PostgREST; browser uses resettable external memory RPC fixture. Hosted repaired-preview acceptance is separate.",
+    "steps": [
+      "Edit all nine supported fields, save, reopen and inspect old/new values, actor identity and save time.",
+      "Save unchanged data and an equivalent timestamp instant; verify no phantom history. Clear a nullable value and change registration true to false.",
+      "Refuse wrong role, colleague ownership, changed/blank organisation membership, closed status and invalid private RPC input without a saved change or history.",
+      "Inject an audit insert failure inside a disposable rollback test and verify both event and history remain unchanged. Serialize concurrent native saves and verify the old/new chain; submission closes editing.",
+      "Verify direct authenticated/anonymous RPC execution is refused, missing/broadened/revoked RPC deployment contracts fail readiness, and clarification conversation/review history remains intact."
+    ],
+    "data": "Nine draft fields; attendance null→12; nullable description; registration true→false; equivalent +08:00/UTC date; owner/colleague/attendee identities; concurrent A/B names; transaction-local failing audit trigger.",
+    "expected": "Each actual changed field has one committed row identifying the real actor, old/new values and save time. No-op/refused saves add no rows. Failed audit insertion rolls back all saved values. Only the creator with current membership can edit draft/clarification states; no direct client RPC execution. Existing history privacy and public response shape remain.",
+    "evidence": "server/src/{db/eventRequests.test.ts,updateEventRequestDraft.test.ts}; integration/api.test.ts; supabase/tests/event_draft_audit.sql; .github/scripts/release-readiness.test.mjs; e2e/draft-history.spec.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "HTTP/adapter fixtures; real API/PostgREST/PostgreSQL; rollback SQL; structural readiness; React/Express browser with resettable memory RPC fixture",
+    "status": "Pass",
+    "actual": "Local backend 1,468/1,468 passed with 100% statements, branches, functions and lines. Native integration 12/12, fourteen new tagged SQL rollback assertions and readiness 15/15 passed. Full browser 113/113 passed with zero skipped, retried or flaky cases, including three draft-history journeys and four smoke journeys (subsets). Revised Drawer label checks passed in the focused 23-case client suite; current-head full client coverage and pushed-head CI remain separate checks.",
+    "execution_evidence": "16 Oct 2026 local server/native/SQL/readiness runners and draft-history E2E handoff; ignored verification/draft-history-full-browser-113 membership and draft-history-local traces/videos/screenshots. Hosted structural install verified migration170003 and service-only grants, not hosted save/history acceptance.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (local automated checks; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-29:AC1",
+      "SG2-29:AC2",
+      "SG2-30:AC3",
+      "SG2-31:AC3",
+      "SG2-36:AC1",
+      "SG2-36:AC2",
+      "SG2-36:AC3",
+      "SG2-40:AC1",
+      "SG2-40:AC2",
+      "SG2-40:AC3",
+      "SG2-25:AC1",
+      "SG2-25:AC2",
+      "SG2-25:AC3",
+      "SG2-26:AC2"
+    ],
+    "source_method_ids": [
+      "TC-cf4357b74d4f",
+      "TC-c27aa7ffe629",
+      "TC-6086a521446b",
+      "TC-44ef6b50a004",
+      "TC-5049d40360f1",
+      "TC-7a76d4090428",
+      "TC-c987ebc832db",
+      "TC-95ae3f9ff622",
+      "TC-f8d610cd06a0"
+    ],
+    "source_sql_contract_ids": [
+      "SG2-40:draft-all-field-diffs",
+      "SG2-40:draft-actor-save-time",
+      "SG2-40:draft-typed-values",
+      "SG2-40:draft-equivalent-no-op",
+      "SG2-40:draft-clarification-null-boolean",
+      "SG2-40:draft-invalid-rpc-shape",
+      "SG2-40:draft-invalid-save-unchanged",
+      "SG2-40:draft-creator-role-scope",
+      "SG2-40:draft-stale-membership",
+      "SG2-40:draft-blank-membership",
+      "SG2-40:draft-stale-status",
+      "SG2-40:draft-audit-failure-rollback",
+      "SG2-40:draft-authenticated-execute",
+      "SG2-40:draft-effective-execute-grants"
+    ],
+    "method_scope": {
+      "new_source_records": 23,
+      "new_executable_methods": 9,
+      "new_sql_assertions": 14,
+      "backend_adapter_handler": 2,
+      "native": 2,
+      "readiness": 2,
+      "browser": 3,
+      "revised": 2,
+      "revised_aliases": [
+        {
+          "current": "TC-458d32beacb0",
+          "previous": "TC-f774dfb62d21",
+          "reason": "Existing adapter save case now verifies the atomic RPC rather than direct UPDATE filters."
+        },
+        {
+          "current": "TC-022594d51cca",
+          "previous": "TC-022594d51cca",
+          "reason": "Existing field-label case additionally checks Event Name, Purpose and Description."
+        }
+      ],
+      "browser_case_ids": [
+        "SG2-40-P02",
+        "SG2-40-N02",
+        "SG2-40-P03"
+      ]
+    },
+    "notes": "The23 records are supporting methods/contracts, not23 independently accepted workflows. Existing SG2-40 history records and historical executions remain unchanged. All four required categories are represented. DoD inventory now2,396 methods+758SQL; human peer review and remaining hosted Done acceptance remain open. No earlier missing draft values are fabricated."
   }
 ]

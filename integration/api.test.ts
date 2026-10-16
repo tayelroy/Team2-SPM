@@ -22,6 +22,7 @@ import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
 import { createAddClarificationHandler, createListClarificationsHandler } from '../server/src/events/clarifications';
 import express from 'express';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
+import { createGetEventHistoryHandler } from '../server/src/events/getHistory';
 import { createGetEventArrangementsHandler } from '../server/src/events/getArrangements';
 import { createBookingRequestSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 
@@ -74,6 +75,7 @@ args[15] = createStartEventReviewHandler(dependencies);
 args[16] = createAssignCoordinatorHandler(dependencies);
 args[17] = createDecideEventRequestHandler(dependencies);
 args[19] = createUpdateEventPlanningHandler(dependencies);
+args[20] = createGetEventHistoryHandler(dependencies);
 args[21] = createListClarificationsHandler(dependencies);
 args[22] = createAddClarificationHandler(dependencies);
 args[27] = createAssignmentQueueRouter(access, dependencies);
@@ -414,4 +416,73 @@ test('[NORMAL] [FAILURE] [SG2-47:AC3] [SG2-47:AC5] native capacity discovery enf
     const restored = await database.from('events').update({ organiser_id: ids.organiser }).eq('event_id', otherEvent);
     assert.equal(restored.error, null);
   }
+});
+
+
+test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-40:AC2] [SG2-40:AC3] native draft saves commit exact field history and preserve owner-only access', async () => {
+  const id = await draft({} as typeof values);
+  const edited = { ...values, name: 'Audited draft', accessibility_needs: 'Step-free access' };
+  const result = await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...edited, actor_id: ids.other });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.request.organiser_id, ids.organiser);
+  assert.deepEqual(result.body.missingForSubmission, []);
+  const history = await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'));
+  assert.equal(history.status, 200, JSON.stringify(history.body));
+  assert.equal(history.body.history.length, 9);
+  const names = history.body.history.map((row: { field_name: string }) => row.field_name).sort();
+  assert.deepEqual(names, Object.keys(edited).sort());
+  for (const row of history.body.history) {
+    assert.equal(row.actor_id, ids.organiser);
+    assert.equal(row.actor_name, 'Integration organiser');
+    assert.equal(row.actor_role, 'Event Organiser');
+    assert.equal(row.old_value, null);
+    assert.ok(Number.isFinite(Date.parse(row.created_at)));
+    const expected = edited[row.field_name as keyof typeof edited];
+    if (row.field_name === 'proposed_date') assert.equal(Date.parse(row.new_value), Date.parse(String(expected)));
+    else assert.equal(row.new_value, String(expected));
+  }
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(edited)).status, 200);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 9);
+  assert.equal((await database.from('events').update({ status: 'needs_clarification' }).eq('event_id', id)).error, null);
+  const cleared = { ...edited, description: null, registration_needed: false };
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(cleared)).status, 200);
+  const changed = (await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history;
+  assert.equal(changed.length, 11);
+  assert.deepEqual(changed.filter((row: { old_value: unknown }) => row.old_value !== null).map((row: { field_name: string; new_value: string | null }) => [row.field_name, row.new_value]).sort(), [['description', null], ['registration_needed', 'false']]);
+  assert.equal((await database.from('account_roles').update({ role: 'event_organiser' }).eq('user_id', ids.other)).error, null);
+  assert.equal((await database.from('users').update({ organisation: 'Integration organisation' }).eq('user_id', ids.other)).error, null);
+  try {
+    assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('other')).send(edited)).status, 404);
+    assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('other'))).status, 403);
+  } finally {
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
+    assert.equal((await database.from('users').update({ organisation: null }).eq('user_id', ids.other)).error, null);
+  }
+  const direct = await fetch(new URL('/rpc/update_event_request_draft', rest), {
+    method: 'POST', headers: { Authorization: `Bearer ${jwt('authenticated', ids.organiser)}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_event_id: id, p_actor_id: ids.organiser, p_values: edited })
+  });
+  assert.equal(direct.status, 403);
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('coordinator')).send(edited)).status, 403);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 11);
+});
+
+test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-40:AC2] native concurrent draft saves serialize their old/new chain and submission closes the write path', async () => {
+  const id = await draft();
+  const saved = await Promise.all(['Concurrent A', 'Concurrent B'].map(name => api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...values, name })));
+  assert.deepEqual(saved.map(result => result.status), [200, 200]);
+  const history = await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'));
+  assert.equal(history.status, 200);
+  const chain = history.body.history.filter((row: { field_name: string }) => row.field_name === 'name').reverse();
+  assert.equal(chain.length, 2);
+  assert.equal(chain[0].old_value, values.name);
+  assert.equal(chain[0].new_value, chain[1].old_value);
+  assert.equal(chain[1].new_value, (await stored(id)).name);
+  assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
+  const before = await stored(id);
+  const refused = await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...values, name: 'After submission' });
+  assert.equal(refused.status, 409);
+  assert.deepEqual(await stored(id), before);
+  const after = await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'));
+  assert.equal(after.body.history.filter((row: { field_name: string }) => row.field_name === 'name').length, 2);
 });

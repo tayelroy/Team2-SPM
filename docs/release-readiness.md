@@ -65,6 +65,14 @@ acceptance tests or the Definition of Done.
 - All fourteen lifecycle enum values and all seven fixed role names.
 - Foreign keys required by the organiser, coordinator, booking and audit embeds.
 - Service-role read grants needed by the privileged readers.
+- The atomic draft-save audit RPC and its effective execution grants:
+  `update_event_request_draft(integer,uuid,jsonb)` is callable by `service_role`,
+  with neither anonymous nor authenticated client execution. Migration
+  `202610170003_event_draft_change_history.sql` must be installed before deploying
+  the server that uses it. It saves the nine editable request fields and their
+  actual old/new history together; a no-op save adds no history. Earlier missing
+  draft edits are not reconstructed. Reopen a QA draft, change a field, save,
+  and verify the organiser and authorised internal history after deployment.
 - The planning registration fields/notes exposed by the work queue view.
 - Notification columns and the validated literal `notifications_kind_check`
   allow-list, including `event_confirmed` and all five event lifecycle kinds.
@@ -121,7 +129,9 @@ PostgreSQL service, runs the structural gate, and runs
 The tests deliberately remove required columns, alter the queue view, rename a
 role, revoke a grant and restore a legacy notification-kind constraint inside
 transactions. They also replace each confirmation recheck marker in turn to
-prove that an older/incomplete RPC cannot pass the structural gate. Every mutation rolls back, and the
+prove that an older/incomplete RPC cannot pass the structural gate. Missing
+draft-audit RPCs and incorrectly broadened or revoked execution grants also
+block the gate. Every mutation rolls back, and the
 tests prove the next independent check passes again. All four test categories
 are represented. No hosted credentials or automatic hosted migration are used.
 

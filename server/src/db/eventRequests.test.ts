@@ -225,32 +225,13 @@ function fakeEventsReviewClient(results: Result[], calls: ReviewCall[] = []): Su
 
 function fakeEventsUpdateDraftClient(
   result: Result,
-  capture?: (update: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown; status: unknown }) => void
+  capture?: (update: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown }) => void
 ): SupabaseClient {
   return {
-    from(table: string) {
-      assert.equal(table, 'events');
-      return {
-        update: (row: Record<string, unknown>) => {
-          const filters: { eventId?: unknown; organiserId?: unknown; status?: unknown } = {};
-          const chain = {
-            eq(column: string, value: unknown) {
-              if (column === 'event_id') filters.eventId = value;
-              if (column === 'organiser_id') filters.organiserId = value;
-              return chain;
-            },
-            in(column: string, value: unknown) {
-              if (column === 'status') filters.status = value;
-              return chain;
-            },
-            select: async () => {
-              capture?.({ row, eventId: filters.eventId, organiserId: filters.organiserId, status: filters.status });
-              return result;
-            }
-          };
-          return chain;
-        }
-      };
+    async rpc(name: string, args: { p_event_id: number; p_actor_id: string; p_values: Record<string, unknown> }) {
+      assert.equal(name, 'update_event_request_draft');
+      capture?.({ row: args.p_values, eventId: args.p_event_id, organiserId: args.p_actor_id });
+      return result;
     }
   } as unknown as SupabaseClient;
 }
@@ -305,6 +286,14 @@ function eventDatabase(initial: Record<string, unknown>) {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: async (input, init) => {
       const url = new URL(new Request(input).url);
+      if (url.pathname === '/rest/v1/rpc/update_event_request_draft') {
+        const args = JSON.parse(String(init?.body));
+        const row = rows.find(row => row.event_id === args.p_event_id && row.organiser_id === args.p_actor_id);
+        if (!row) return Response.json({ outcome: 'not_found' });
+        if (!['draft', 'needs_clarification'].includes(String(row.status))) return Response.json({ outcome: 'not_editable' });
+        Object.assign(row, args.p_values);
+        return Response.json({ outcome: 'updated', request: row });
+      }
       assert.equal(url.pathname, '/rest/v1/events');
       const selected = rows.filter(row => [...url.searchParams].every(([column, filter]) => {
         if (filter.startsWith('eq.')) return String(row[column]) === filter.slice(3);
@@ -1028,11 +1017,11 @@ describe('deleteEventRequestDraft', () => {
 });
 
 describe('updateEventRequestDraft', () => {
-  test('[NORMAL] [SG2-29:AC1] [SG2-30:AC3] [SG2-36:AC2] updates the given fields, filtered to the event, organiser and editable statuses', async () => {
-    let captured: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown; status: unknown } | undefined;
+  test('[NORMAL] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC2] sends the verified actor and nine values to the atomic draft-history RPC', async () => {
+    let captured: { row: Record<string, unknown>; eventId: unknown; organiserId: unknown } | undefined;
     const result = await updateEventRequestDraft(
       fakeEventsUpdateDraftClient(
-        { data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft', name: 'Renamed' }], error: null },
+        { data: { outcome: 'updated', request: { event_id: 7, organiser_id: 'user-1', status: 'draft', name: 'Renamed' } }, error: null },
         (c) => (captured = c)
       ),
       7,
@@ -1045,7 +1034,6 @@ describe('updateEventRequestDraft', () => {
     assert.deepEqual(captured?.row, { ...EMPTY_VALUES, name: 'Renamed' });
     assert.equal(captured?.eventId, 7);
     assert.equal(captured?.organiserId, 'user-1');
-    assert.deepEqual(captured?.status, ['draft', 'needs_clarification']);
   });
 
   test('[FAILURE] [SG2-29:AC1] reports unavailable when the update errors', async () => {
@@ -1069,6 +1057,18 @@ describe('updateEventRequestDraft', () => {
       assert.equal(result.ok, false);
       if (!result.ok) assert.match(result.message, /not returned/);
     });
+  }
+});
+
+test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] atomic draft refusals preserve not-found, closed and invalid outcomes', async () => {
+  for (const outcome of ['not_found', 'not_editable', 'invalid'] as const) {
+    const result = await updateEventRequestDraft(fakeEventsUpdateDraftClient({ data: { outcome }, error: null }), 7, 'user-1', EMPTY_VALUES);
+    assert.deepEqual(result, { ok: false, reason: outcome, message: 'The draft save was refused.' });
+  }
+  for (const data of [{ outcome: 'updated', request: null }, { outcome: 'unexpected' }]) {
+    const result = await updateEventRequestDraft(fakeEventsUpdateDraftClient({ data, error: null }), 7, 'user-1', EMPTY_VALUES);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'unavailable');
   }
 });
 

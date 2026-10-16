@@ -258,6 +258,16 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
   });
 });
 
+test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-40:AC2] locked draft save refusals cannot be reported as successful after a stale precheck', async () => {
+  for (const [reason, status] of [['not_found', 404], ['not_editable', 409], ['invalid', 400]] as const) {
+    const response = await request(buildApp({ updateResult: { ok: false, reason, message: 'PRIVATE_SENTINEL' } }))
+      .patch('/api/event-requests/7').send(COMPLETE_BODY);
+    assert.equal(response.status, status);
+    assert.doesNotMatch(response.text, /SENTINEL/);
+    assert.equal(response.body.request, undefined);
+  }
+});
+
 describe('PATCH /api/event-requests/:eventId authorisation wiring', () => {
   const userId = '10000000-0000-4000-8000-000000000001';
   const originalConfig = { ...dbConfig };

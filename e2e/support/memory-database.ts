@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AccessError, type Role } from '../../server/src/auth/policy';
+import { DRAFT_FIELDS, validateDraftInput } from '../../server/src/events/fields';
 
 // Synthetic fixtures only. This adapter deliberately does not emulate Postgres
 // constraints or RLS: the independent database-policy CI job owns that evidence.
@@ -404,6 +405,32 @@ export class MemoryDatabase {
   }
 
   readonly client = {
+    // Test equivalent of the atomic draft-save RPC. Native integration tests
+    // exercise the real SQL lock, permissions and rollback independently.
+    rpc: async (name: string, args: { p_event_id: number; p_actor_id: string; p_values: unknown }) => {
+      if (name !== 'update_event_request_draft') throw new Error(`Unsupported fixture RPC: ${name}`);
+      const result = (data: Row) => ({ data, error: null });
+      const actor = this.tables.users.find(row => row.user_id === args.p_actor_id);
+      const role = this.tables.account_roles.find(row => row.user_id === args.p_actor_id)?.role;
+      const event = this.tables.events.find(row => row.event_id === args.p_event_id && row.organiser_id === args.p_actor_id);
+      if (!actor || role !== 'event_organiser' || !event || !actor.organisation || actor.organisation !== event.organisation) {
+        return result({ outcome: 'not_found' });
+      }
+      if (!['draft', 'needs_clarification'].includes(String(event.status))) return result({ outcome: 'not_editable' });
+      const validated = validateDraftInput(args.p_values);
+      if (!validated.valid) return result({ outcome: 'invalid' });
+      const serialized = (key: string, value: unknown) => value === null || value === undefined ? null
+        : key === 'proposed_date' ? new Date(String(value)).toISOString() : String(value);
+      const changed = DRAFT_FIELDS.filter(key => serialized(key, event[key]) !== serialized(key, validated.values[key]));
+      const createdAt = new Date().toISOString();
+      let logId = Math.max(0, ...this.tables.event_audit_logs.map(row => Number(row.log_id)));
+      const audit = changed.map(key => ({ log_id: ++logId, event_id: event.event_id, actor_id: args.p_actor_id,
+        field_name: key, old_value: serialized(key, event[key]), new_value: serialized(key, validated.values[key]), created_at: createdAt }));
+      Object.assign(event, validated.values);
+      this.tables.event_audit_logs.push(...audit);
+      const columns = ['event_id', 'organiser_id', 'organisation', 'status', ...DRAFT_FIELDS];
+      return result({ outcome: 'updated', request: Object.fromEntries(columns.map(key => [key, event[key] ?? null])) });
+    },
     from: (table: string) => {
       if (table === 'internal_work_items') this.tables[table] = this.workItems();
       if (table === 'venue_booking_occupancy') this.tables[table] = [

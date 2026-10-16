@@ -63,7 +63,7 @@ export type DeleteDraftResult =
 
 export type UpdateDraftResult =
   | { ok: true; request: EventRequestRecord }
-  | { ok: false; reason: 'unavailable'; message: string };
+  | { ok: false; reason: 'not_found' | 'not_editable' | 'invalid' | 'unavailable'; message: string };
 
 export type AssignCoordinatorResult =
   | { ok: true; request: EventRequestRecord }
@@ -399,10 +399,6 @@ export async function fetchOwnEventRequest(
 
 /** Statuses a row may transition from when submitted (SG2-30). */
 const SUBMITTABLE_STATUSES = ['draft', 'rejected', 'needs_clarification'];
-
-/** Statuses an organiser may still edit in (SG2-29, widened by SG2-36 so a
- * request returned with a question can be amended before resubmission). */
-const EDITABLE_STATUSES = ['draft', 'needs_clarification'];
 
 /**
  * Transitions an event request from `draft`, `rejected` or
@@ -773,36 +769,26 @@ export async function assignEventCoordinator(
   return { ok: true, request };
 }
 
-/**
- * Updates a draft's own fields (SG2-29), but only while it is the caller's
- * own and still a draft — `organiser_id` and `status = 'draft'` are both
- * conditions on the write itself, not just the caller's own pre-check (see
- * deleteEventRequestDraft's comment; the same AI security review flagged
- * the same gap here). If either no longer holds, zero rows come back and
- * this reports unavailable rather than silently editing the wrong request
- * or one that has moved on.
- */
+/** SG2-29/36/40: the private RPC locks and rechecks creator, membership and
+ * editable status, then saves the nine fields and their audit rows atomically.
+ * The actor is the verified caller supplied by the HTTP handler, never body data. */
 export async function updateEventRequestDraft(
   admin: SupabaseClient,
   eventId: number,
   organiserId: string,
   values: DraftValues
 ): Promise<UpdateDraftResult> {
-  const { data, error } = await admin
-    .from('events')
-    .update(values)
-    .eq('event_id', eventId)
-    .eq('organiser_id', organiserId)
-    .in('status', EDITABLE_STATUSES)
-    .select(RETURNED_COLUMNS);
-
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
+  const { data, error } = await admin.rpc('update_event_request_draft', {
+    p_event_id: eventId, p_actor_id: organiserId, p_values: values
+  });
+  if (error) return { ok: false, reason: 'unavailable', message: error.message };
+  if (data?.outcome === 'updated' && data.request) {
+    return { ok: true, request: data.request as EventRequestRecord };
   }
-  if (!data || data.length === 0) {
-    return { ok: false, reason: 'unavailable', message: 'The draft was not returned after update.' };
+  if (data?.outcome === 'not_found' || data?.outcome === 'not_editable' || data?.outcome === 'invalid') {
+    return { ok: false, reason: data.outcome, message: 'The draft save was refused.' };
   }
-  return { ok: true, request: data[0] as unknown as EventRequestRecord };
+  return { ok: false, reason: 'unavailable', message: 'The draft was not returned after update.' };
 }
 
 /** A request the Event Coordinator Lead can assign or reassign (SG2-33/34/97). */

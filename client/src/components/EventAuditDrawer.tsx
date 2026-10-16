@@ -16,6 +16,9 @@ import {
 } from '../ui';
 
 const FIELD_LABELS: Record<string, string> = {
+  name: 'Event Name',
+  purpose: 'Purpose',
+  description: 'Description',
   expected_attendance: 'Expected Attendance',
   proposed_date: 'Proposed Date',
   venue_requirements: 'Venue Requirements',

@@ -158,7 +158,7 @@ Constraints act as a backstop below the RPCs:
 **Decision.** A single append-only table, `event_audit_logs`, stores one row per changed field: `event_id, actor_id, field_name, old_value, new_value, created_at`.
 
 - **Status changes** are rows with `field_name = 'status'` (`statusChange()`, `server/src/db/auditLogs.ts`).
-- **Who writes the rows.** Handlers write them through the service-role client after the main write. RPCs write them in the same transaction: venue decisions, holds, release, withdraw, confirm.
+- **Who writes the rows.** Some existing handlers write through the service-role client after the main write. RPCs write within the transaction for venue decisions, holds, release, withdraw and confirm. The SG2-40 draft-history repair adds `update_event_request_draft`: existing draft/clarification saves and all nine field diffs commit together. It locks and rechecks the verified creator, role, exact membership and editable status; only the service role may call it. Unchanged values create no history, and an audit failure rolls back the saved values. Earlier missing draft edits are not backfilled.
 - **System actions** have `actor_id = null`, for example hold expiry.
 - **Internal-only fields** (`INTERNAL_ONLY_AUDIT_FIELDS = ['planning_notes']`) are hidden from Event Organisers, both by the handler and by RLS.
 - **Venue settings** have their own history table: `venue_operation_history` is written only by a trigger (SG2-77 AC6, `202610050003_venue_operations.sql`).
@@ -166,9 +166,9 @@ Constraints act as a backstop below the RPCs:
 **Consequences.**
 
 - One history drawer covers every flow.
-- History written by a handler is not atomic with the change it records (Part C, item 1).
+- History still written separately by other handlers is not atomic with the change it records (Part C, item 1). The repaired draft-save RPC is an explicit exception; this change does not claim that every existing handler has been converted.
 
-**Where:** `supabase/migrations/202609240000_event_planning_and_audit.sql`, `202610130001_event_history_internal_fields.sql`, `server/src/db/auditLogs.ts`, `server/src/events/getHistory.ts`.
+**Where:** `supabase/migrations/202609240000_event_planning_and_audit.sql`, `202610130001_event_history_internal_fields.sql`, `202610170003_event_draft_change_history.sql`, `server/src/db/{auditLogs,eventRequests}.ts`, `server/src/events/{getHistory,updateDraft}.ts`.
 
 ### ADR-07 Notices are rows in a notifications table, which the client polls
 
