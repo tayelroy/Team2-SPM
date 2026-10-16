@@ -21,12 +21,14 @@ const DONE: Record<string, string> = {
  * server records who decided and when (AC3). A request created by a
  * tentative hold (SG2-84) is converted or released from Venue holds instead.
  */
-export default function VenueDecision({ requestId, accessToken, holdId, readiness, onDecided }: {
+export default function VenueDecision({ requestId, accessToken, holdId, readiness, conflictCount = null, onDecided }: {
   requestId: number;
   accessToken?: string | null;
   holdId: number | null;
   /** Null until the suitability check has loaded. */
   readiness: BookingReadiness | null;
+  /** SG2-50 AC2: clashing bookings or holds; null while checking or if the check failed (the server re-checks on approval). */
+  conflictCount?: number | null;
   onDecided: (status: string) => void;
 }) {
   const [reason, setReason] = useState('');
@@ -71,7 +73,10 @@ export default function VenueDecision({ requestId, accessToken, holdId, readines
     onDecided(result.request.status);
   }
 
-  const hint = readiness === null ? 'Checking whether this booking can be approved…' : readiness === 'allowed' ? null : NOT_READY[readiness];
+  const conflicted = conflictCount !== null && conflictCount > 0;
+  const hint = readiness === null ? 'Checking whether this booking can be approved…'
+    : conflicted ? 'This request clashes with another booking or hold at this venue, so it cannot be approved while the conflict stands. You can still reject it.'
+    : readiness === 'allowed' ? null : NOT_READY[readiness];
   return <section className="organisation-detail-footer" aria-label="Decide this booking request">
     <h3>Decision</h3>
     <label htmlFor={`venue-decision-reason-${requestId}`} className="organisation-detail-hint">Decision note (required to reject; shared with the coordinator)</label>
@@ -82,7 +87,7 @@ export default function VenueDecision({ requestId, accessToken, holdId, readines
     {hint && <p className="organisation-detail-hint">{hint}</p>}
     {error && <Notice role="alert" style={{ padding: '14px 18px' }}><span style={{ color: color.platinum }}>{error}</span></Notice>}
     <div className="organisation-detail-actions">
-      <button type="button" className="organisation-button organisation-button-primary" disabled={pending !== null || readiness !== 'allowed'}
+      <button type="button" className="organisation-button organisation-button-primary" disabled={pending !== null || readiness !== 'allowed' || conflicted}
         onClick={() => decide('approve')}>{pending === 'approve' ? 'Approving…' : 'Approve booking'}</button>
       <button type="button" className="organisation-button" disabled={pending !== null}
         onClick={() => decide('reject')}>{pending === 'reject' ? 'Rejecting…' : 'Reject with reason'}</button>

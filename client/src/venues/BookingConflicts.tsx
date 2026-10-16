@@ -6,7 +6,12 @@ import { describeConflict, fetchRequestConflicts, type VenueConflict } from './r
  * already committing the venue over the requested period. While any stands
  * the request cannot be approved, so Venue Staff see the clash before deciding.
  */
-export function BookingRequestConflicts({ accessToken, requestId }: { accessToken?: string | null; requestId: number }) {
+export function BookingRequestConflicts({ accessToken, requestId, onConflicts }: {
+  accessToken?: string | null;
+  requestId: number;
+  /** SG2-50 AC2: told how many clashes stand, so Approve can be held back while any do. */
+  onConflicts?: (count: number) => void;
+}) {
   const [conflicts, setConflicts] = useState<VenueConflict[] | null>(null);
   const [error, setError] = useState('');
 
@@ -14,11 +19,11 @@ export function BookingRequestConflicts({ accessToken, requestId }: { accessToke
     let cancelled = false;
     fetchRequestConflicts(accessToken, requestId).then(result => {
       if (cancelled) return;
-      if (result.ok) setConflicts(result.conflicts);
+      if (result.ok) { setConflicts(result.conflicts); onConflicts?.(result.conflicts.length); }
       else setError(result.error);
     });
     return () => { cancelled = true; };
-  }, [accessToken, requestId]);
+  }, [accessToken, requestId, onConflicts]);
 
   return <section className="organisation-detail-footer" aria-label="Booking conflicts">
     <h3>Booking conflicts</h3>

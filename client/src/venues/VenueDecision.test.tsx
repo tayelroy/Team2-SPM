@@ -83,3 +83,15 @@ test('[FAILURE] [SG2-49:AC1] a request created by a tentative hold points to Ven
   expect(screen.getByText('This request belongs to tentative hold #12. Convert or release it from Venue holds.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Approve booking' })).not.toBeInTheDocument();
 });
+
+test('[FAILURE] [SG2-50:AC2] Approve stays off while a booking or hold clashes with the request, but it can still be rejected', () => {
+  panel('allowed');
+  cleanup();
+  render(<VenueDecision requestId={41} accessToken="staff-token" holdId={null} readiness="allowed" conflictCount={2} onDecided={vi.fn()} />);
+  expect(screen.getByText(/clashes with another booking or hold at this venue/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Approve booking' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Reject with reason' })).toBeEnabled();
+  cleanup();
+  render(<VenueDecision requestId={41} accessToken="staff-token" holdId={null} readiness="allowed" conflictCount={0} onDecided={vi.fn()} />);
+  expect(screen.getByRole('button', { name: 'Approve booking' })).toBeEnabled();
+});
