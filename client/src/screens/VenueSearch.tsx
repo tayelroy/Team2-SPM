@@ -38,13 +38,13 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   const [invalid, setInvalid] = useState(false);
   const [error, setError] = useState('');
   // SG2-48: the venue whose request form is open, what the last request
-  // said, and a counter that reloads the event's requests after one is made.
+  // said, and a counter that revalidates the event's arrangement panels.
   const [requesting, setRequesting] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
   const [requestsVersion, setRequestsVersion] = useState(0);
   // SG2-81 AC4: the affected booking a request made from this search replaces.
   const [replacing, setReplacing] = useState<VenueBooking | null>(null);
-  // A new request, or a released booking (SG2-51), changes the event's requests.
+  // Local changes and a fresh search can reveal another user's decision.
   const refreshRequests = () => setRequestsVersion(version => version + 1);
   const pending = useRef<AbortController | null>(null);
 
@@ -58,8 +58,10 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
     setRequesting(null);
     try {
       const venues = await searchVenues(accessToken, controller.signal, criteria);
+      if (controller.signal.aborted) return;
       setResults(venues);
       setSearched(criteria);
+      if (prefill) refreshRequests();
     } catch (failure) {
       if (controller.signal.aborted) return;
       setResults(null);

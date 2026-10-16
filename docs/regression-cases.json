@@ -6271,5 +6271,49 @@
     "source_sql_aliases": {
       "SG2-58:hold-requests-approved-unlinked": "SG2-58:hold-requests-linked-and-released"
     }
+  },
+  {
+    "id": "REG-VENUE-SEARCH-ARRANGEMENT-REVALIDATION",
+    "title": "A fresh event venue search reconciles external booking decisions across request, booking and arrangement panels",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-82",
+    "purpose": "Keep the event-specific venue request status, confirmed booking list and derived arrangement summary consistent after another user approves a request while the coordinator stays on Find venues. Reuse the existing read invalidation counter without losing entered search criteria or performing writes.",
+    "preconditions": "Coordinator has an event-scoped search with a Pending request and an empty booking list. Venue Staff approve the request in another session. For local regression, render the real search and child panels with controlled public HTTP read responses.",
+    "steps": [
+      "Initially load Pending request41 for event10 with no confirmed booking; model external approval and click the existing Search control with edited criteria.",
+      "Require Approved request, Confirmed booking42 and Venue arrangement ready without navigating away, changing event identity or resetting the form.",
+      "Delay both arrangement reads after a zero-result search; hide prior Pending/empty summaries and show panel loading until responses arrive.",
+      "Exercise a failed search, failed request/booking revalidation and recovery; an invalid period does not reload arrangements.",
+      "Resolve an aborted superseded search late, and leave event10 for event20: stale results cannot trigger obsolete reads or cross event/token scopes."
+    ],
+    "data": "Local Meridian Forum event10, Rooftop Terrace venue3, request41 Pending→Approved, booking42 Confirmed. Initial whole-day15Jun2030SGT search; edited attendance100/layoutBanquet/locationLevel/facilitiesbar/accessibilitylift preserved. Delayed read, search503, request503, booking403, invalid end14Jun23:00, superseding attendance181, then event20/new-token. Hosted before-fix counterexample: event25 request24 was approved into booking20 while search remained open; search excluded the room but lower panels still said Pending/0of1/No booked venues.",
+    "expected": "A successful current search revalidates only its current event request and booking panels, including the derived venue readiness summary. Loading/error states replace invalidated old results; failures never claim approval or readiness. Invalid/failed searches do not spuriously reload panels. Aborted late responses cannot roll back results or refresh an obsolete context. All requests remain reads, and the criteria remain entered.",
+    "evidence": "client/src/screens/VenueSearch.tsx; client/src/screens/VenueSearch.test.tsx; client/src/venues/VenueBookings.tsx",
+    "layer": "Rendered public React component integration with controlled HTTP fetch results; full client coverage. Actual hosted post-fix retest and future CI are separate gates.",
+    "status": "Pass",
+    "actual": "Pre-fix new tests reproduced4 failures (22 existing/boundary checks passed). After the fix,44 focused component cases passed with100% statements/branches/functions/lines on both touched app files. Full client1433/1433 passed across70 files with100% all four coverage metrics; client TypeScript passed. Six new methods, no new SQL; inventory2421 methods/779 SQL assertions. Hosted8eb counterexample is retained; the local fix has not yet been committed, deployed or hosted-retested at this checkpoint.",
+    "execution_evidence": "Local /tmp/spm-venue-search-arrangements-red.log; /tmp/spm-venue-search-arrangements-coverage.log and coverage-summary.json; /tmp/spm-venue-search-arrangements-full-client.log; /tmp/spm-venue-search-arrangements-typecheck.log. Historical deployed failure: ignored verification/venue-search-approved-arrangements-stale-8eb.txt/.png compared with draft25-adjacent-bookings16-and20-confirmed.txt/.png. No existing remote CI result is attributed to this uncommitted source.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex local component verification; not human peer review",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-46:AC2",
+      "SG2-48:AC3",
+      "SG2-82:AC4",
+      "SG2-82:AC5"
+    ],
+    "source_method_ids": [
+      "TC-46857ba61a29",
+      "TC-0fe86dd0560f",
+      "TC-3abe2f6dfd8a",
+      "TC-392972d9707a",
+      "TC-91df6da0dbb1",
+      "TC-8a22bade2fa6"
+    ]
   }
 ]

@@ -354,3 +354,172 @@ test('[BOUNDARY] [SG2-81:AC4] an affected booking whose venue has no recorded na
   fireEvent.click(await screen.findByRole('button', { name: 'Find a replacement venue' }));
   expect(await screen.findByText(/Finding a replacement for venue #1 \(booking #11/)).toBeVisible();
 });
+
+// Real child panels and their public reads: another user can decide a request
+// while this coordinator keeps the same search screen open.
+const confirmedSearchBooking = { ...affectedBooking, booking_id: 42, venue_id: 3, venue_name: 'Rooftop Terrace',
+  starts_at: requested.starts_at, ends_at: requested.ends_at, affected_by: [] };
+function requestSnapshot(approved: boolean) {
+  return Response.json({ requests: [{ ...requested, status: approved ? 'approved' : 'pending',
+    decider_name: approved ? 'Venue Staff' : null, decided_at: approved ? '2030-01-02T00:00:00.000Z' : null }],
+    arrangement: { state: approved ? 'ready' : 'in_progress', needed: 1, approved: approved ? 1 : 0,
+      pending: approved ? 0 : 1, rejected: 0, unbooked: 0, affected: 0 } });
+}
+function bookingSnapshot(approved: boolean) {
+  return Response.json({ bookings: approved ? [confirmedSearchBooking] : [] });
+}
+function liveArrangementFixture() {
+  const state = { approved: false, searchFails: false, panelsFail: false, delayPanels: false, requests: 0, bookings: 0 };
+  const deferred: { requests?: (response: Response) => void; bookings?: (response: Response) => void } = {};
+  const fetch = vi.fn(async (url: string, _init?: RequestInit): Promise<Response> => {
+    if (url.startsWith('/api/venues/suitability')) return Response.json({ venues: [] });
+    if (url === '/api/venue-booking-requests?event_id=10') {
+      state.requests += 1;
+      if (state.delayPanels) return new Promise(resolve => { deferred.requests = resolve; });
+      return state.panelsFail ? Response.json({}, { status: 503 }) : requestSnapshot(state.approved);
+    }
+    if (url === '/api/venue-bookings?event_id=10') {
+      state.bookings += 1;
+      if (state.delayPanels) return new Promise(resolve => { deferred.bookings = resolve; });
+      return state.panelsFail ? Response.json({}, { status: 403 }) : bookingSnapshot(state.approved);
+    }
+    if (url.startsWith('/api/venues/search?')) {
+      return state.searchFails ? Response.json({}, { status: 503 }) : Response.json({ venues: state.approved ? [] : [terrace] });
+    }
+    throw new Error(`Unexpected read: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetch);
+  return { state, deferred, fetch };
+}
+
+test('[NORMAL] [SG2-48:AC3] [SG2-82:AC4] [SG2-82:AC5] searching again reconciles an externally approved venue request, its confirmed booking and ready summary without changing criteria', async () => {
+  const { state, fetch } = liveArrangementFixture();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  const requests = await screen.findByRole('region', { name: 'Venue requests for Meridian Forum' });
+  const bookings = await screen.findByRole('region', { name: 'Booked venues for Meridian Forum' });
+  await within(requests).findByText('Pending');
+  await within(bookings).findByText('No venues are booked for this event yet.');
+  fill({ Attendance: '100', Layout: 'banquet', Location: 'Level', Facilities: 'bar', Accessibility: 'lift' });
+  state.approved = true;
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  await screen.findByRole('heading', { name: 'No venues match' });
+  expect(await within(requests).findByText('Approved', { exact: true })).toBeVisible();
+  expect(within(requests).getByLabelText('Venue arrangement')).toHaveTextContent('Venue arrangement ready: the venue is approved.');
+  expect(await within(bookings).findByRole('listitem', { name: 'Booking #42' })).toHaveTextContent('Confirmed');
+  expect(within(requests).queryByText('Pending')).not.toBeInTheDocument();
+  expect(within(bookings).queryByText('No venues are booked for this event yet.')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Attendance')).toHaveValue(100);
+  expect(screen.getByLabelText('Layout')).toHaveValue('banquet');
+  expect(screen.getByLabelText('Location')).toHaveValue('Level');
+  expect(screen.getByLabelText('Facilities')).toHaveValue('bar');
+  expect(screen.getByLabelText('Accessibility')).toHaveValue('lift');
+  expect(state.requests).toBe(2); expect(state.bookings).toBe(2);
+  expect(fetch.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+});
+
+test('[BOUNDARY] [SG2-48:AC3] [SG2-82:AC4] [SG2-82:AC5] a zero-match search hides stale pending and empty booking panels while their fresh reads are delayed', async () => {
+  const { state, deferred } = liveArrangementFixture();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  const requests = await screen.findByRole('region', { name: 'Venue requests for Meridian Forum' });
+  const bookings = await screen.findByRole('region', { name: 'Booked venues for Meridian Forum' });
+  await within(requests).findByText('Pending');
+  await within(bookings).findByText('No venues are booked for this event yet.');
+  state.approved = true; state.delayPanels = true;
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await screen.findByRole('heading', { name: 'No venues match' });
+  expect(within(requests).getByText('Loading venue requests…')).toBeVisible();
+  expect(within(bookings).getByText('Loading bookings…')).toBeVisible();
+  expect(within(requests).queryByText('Pending')).not.toBeInTheDocument();
+  expect(within(requests).queryByLabelText('Venue arrangement')).not.toBeInTheDocument();
+  expect(within(bookings).queryByText('No venues are booked for this event yet.')).not.toBeInTheDocument();
+  await act(async () => { deferred.requests!(requestSnapshot(true)); deferred.bookings!(bookingSnapshot(true)); });
+  expect(await within(requests).findByText('Approved', { exact: true })).toBeVisible();
+  expect(await within(bookings).findByText('Confirmed', { exact: true })).toBeVisible();
+});
+
+test('[FAILURE] [SG2-48:AC3] [SG2-82:AC4] a failed search leaves known arrangements alone, and failed panel reads report errors until a successful search recovers them', async () => {
+  const { state } = liveArrangementFixture();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  const requests = await screen.findByRole('region', { name: 'Venue requests for Meridian Forum' });
+  const bookings = await screen.findByRole('region', { name: 'Booked venues for Meridian Forum' });
+  await within(requests).findByText('Pending');
+  await within(bookings).findByText('No venues are booked for this event yet.');
+  state.searchFails = true;
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await screen.findByRole('alert');
+  expect(state.requests).toBe(1); expect(state.bookings).toBe(1);
+  expect(within(requests).getByText('Pending')).toBeVisible();
+  state.searchFails = false; state.panelsFail = true; state.approved = true;
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  expect(await within(requests).findByText('Venue requests are unavailable right now. Please try again.')).toBeVisible();
+  expect(await within(bookings).findByText('Your account cannot manage these venue bookings.')).toBeVisible();
+  expect(within(requests).queryByLabelText('Venue arrangement')).not.toBeInTheDocument();
+  expect(within(bookings).queryByText('No venues are booked for this event yet.')).not.toBeInTheDocument();
+  state.panelsFail = false;
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  expect(await within(requests).findByText('Approved', { exact: true })).toBeVisible();
+  expect(await within(bookings).findByText('Confirmed', { exact: true })).toBeVisible();
+  expect(within(requests).queryByText(/unavailable right now/)).not.toBeInTheDocument();
+  expect(within(bookings).queryByText(/cannot manage/)).not.toBeInTheDocument();
+});
+
+test('[BOUNDARY] [SG2-46:AC2] [SG2-48:AC3] an invalid new period does not revalidate or erase the current event arrangement', async () => {
+  const { state } = liveArrangementFixture();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  const requests = await screen.findByRole('region', { name: 'Venue requests for Meridian Forum' });
+  await within(requests).findByText('Pending');
+  fill({ 'Until (Singapore time)': '2030-06-14T23:00' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a period that starts before it ends.');
+  expect(within(requests).getByText('Pending')).toBeVisible();
+  expect(state.requests).toBe(1); expect(state.bookings).toBe(1);
+});
+
+test('[CONFLICT] [SG2-46:search-supersession] [SG2-82:AC4] a superseded late search cannot replace current results or trigger an obsolete arrangement reload', async () => {
+  const fixture = liveArrangementFixture();
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  await screen.findByText('Pending');
+  let old!: (response: Response) => void;
+  const original = fixture.fetch.getMockImplementation()!;
+  let searchCalls = 0;
+  fixture.fetch.mockImplementation((url, init) => url.startsWith('/api/venues/search?') && searchCalls++ === 0
+    ? new Promise(resolve => { old = resolve; }) : original(url, init));
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  fixture.state.approved = true;
+  fill({ Attendance: '181' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await screen.findByRole('heading', { name: 'No venues match' });
+  await screen.findByText('Approved', { exact: true });
+  expect(fixture.state.requests).toBe(2); expect(fixture.state.bookings).toBe(2);
+  await act(async () => old(Response.json({ venues: [terrace] })));
+  expect(screen.getByRole('heading', { name: 'No venues match' })).toBeVisible();
+  // The approved request still names its venue; no obsolete search result
+  // may reintroduce a request action after the newer zero-match search.
+  expect(screen.queryByRole('button', { name: 'Request this venue' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Attendance')).toHaveValue(181);
+  expect(fixture.state.requests).toBe(2); expect(fixture.state.bookings).toBe(2);
+});
+
+test('[BOUNDARY] [SG2-48:AC3] [SG2-82:AC4] leaving an event aborts its search and the next event reads only its own arrangement', async () => {
+  let old!: (response: Response) => void;
+  const fetch = vi.fn(async (url: string, _init?: RequestInit): Promise<Response> => {
+    if (url.startsWith('/api/venues/search?') && fetch.mock.calls.length === 1) return new Promise(resolve => { old = resolve; });
+    if (url.startsWith('/api/venues/search?') || url.startsWith('/api/venues/suitability')) return Response.json({ venues: [] });
+    if (url === '/api/venue-booking-requests?event_id=20') return Response.json({ requests: [], arrangement: {
+      state: 'none', needed: 0, approved: 0, pending: 0, rejected: 0, unbooked: 0, affected: 0 } });
+    if (url === '/api/venue-bookings?event_id=20') return Response.json({ bookings: [] });
+    throw new Error(`Wrong event read: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetch);
+  const first = render(<VenueSearch accessToken="old-token" prefill={prefill} />);
+  first.unmount();
+  render(<VenueSearch accessToken="new-token" prefill={{ ...prefill, eventId: 20, eventName: 'Second Forum' }} />);
+  await screen.findByText('No venues have been requested for this event yet.');
+  await act(async () => old(Response.json({ venues: [terrace] })));
+  expect(screen.getByRole('region', { name: 'Venue requests for Second Forum' })).toBeVisible();
+  expect(screen.getByRole('region', { name: 'Booked venues for Second Forum' })).toBeVisible();
+  expect(screen.queryByText('For: Meridian Forum (#10)')).not.toBeInTheDocument();
+  const eventReads = fetch.mock.calls.filter(([url]) => url.startsWith('/api/venue-book'));
+  expect(eventReads.map(([url]) => url)).toEqual(['/api/venue-booking-requests?event_id=20', '/api/venue-bookings?event_id=20']);
+  expect(eventReads.every(([, init]) => (init?.headers as Record<string, string>).Authorization === 'Bearer new-token')).toBe(true);
+});

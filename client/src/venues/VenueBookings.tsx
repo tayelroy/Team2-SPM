@@ -84,6 +84,9 @@ function BookingList({ accessToken, load, refresh, describe, empty, label: listL
 
   useEffect(() => {
     let cancelled = false;
+    // A refreshed search invalidates even a previously empty booking list.
+    setBookings(null);
+    setError('');
     load().then(result => {
       if (cancelled) return;
       if (result.ok) { setBookings(result.bookings); setError(''); }
