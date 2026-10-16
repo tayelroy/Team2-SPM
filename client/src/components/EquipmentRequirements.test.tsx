@@ -11,9 +11,9 @@ const view: RequirementsView = { event: { event_id: 7, name: 'Forum', status: 'a
 const arranged = { ...record, arrangement_notes: 'Two ready', shortfall: 2, placement_venue_id: 9, placement_venue_name: 'Main hall', placement_position: 'Stage left' };
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(loadEquipmentRequirements).mockResolvedValue(view); vi.mocked(saveEquipmentRequirement).mockResolvedValue(view); vi.mocked(saveEquipmentArrangement).mockResolvedValue({ ...view, can_request: false, can_arrange: true, requests: [arranged] }); });
 afterEach(cleanup);
-async function open(data = view, onChanged?: () => void) {
+async function open(data = view, onChanged?: () => void, onViewUpdated?: (value: RequirementsView) => void) {
   vi.mocked(loadEquipmentRequirements).mockResolvedValue(data);
-  const rendered = render(<EquipmentRequirements eventId={7} accessToken="token" onChanged={onChanged} />);
+  const rendered = render(<EquipmentRequirements eventId={7} accessToken="token" onChanged={onChanged} onViewUpdated={onViewUpdated} />);
   await screen.findByRole('region', { name: 'Equipment requirements' });
   return rendered;
 }
@@ -218,19 +218,24 @@ test('[CONFLICT] [SG2-53:AC1] simultaneous submits send one mutation and disable
 });
 test.each(['resolve', 'reject'] as const)('[CONFLICT] [SG2-53:AC1] a late load %s cannot expose a previous event after event identity changes', async outcome => {
   const pending = deferred<RequirementsView>(); vi.mocked(loadEquipmentRequirements).mockReturnValueOnce(pending.promise).mockResolvedValue({ ...view, requests: [] });
-  const rendered = render(<EquipmentRequirements eventId={7} accessToken="token" />); const signal = vi.mocked(loadEquipmentRequirements).mock.calls[0][2];
-  rendered.rerender(<EquipmentRequirements eventId={8} accessToken="token" />); expect(signal.aborted).toBe(true); await screen.findByText('No equipment requirements recorded.');
+  const previousObserver = vi.fn(); const currentObserver = vi.fn();
+  const rendered = render(<EquipmentRequirements eventId={7} accessToken="token" onViewUpdated={previousObserver} />); const signal = vi.mocked(loadEquipmentRequirements).mock.calls[0][2];
+  rendered.rerender(<EquipmentRequirements eventId={8} accessToken="token" onViewUpdated={currentObserver} />); expect(signal.aborted).toBe(true); await screen.findByText('No equipment requirements recorded.');
   await act(async () => { if (outcome === 'resolve') pending.resolve(view); else pending.reject(new Error('Old event error')); });
   expect(screen.queryByRole('article')).not.toBeInTheDocument(); expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(previousObserver).not.toHaveBeenCalled();
+  expect(currentObserver).toHaveBeenCalledExactlyOnceWith({ ...view, requests: [] });
 });
 test.each(['resolve', 'reject'] as const)('[CONFLICT] [SG2-53:AC2] a late save %s after account changes is aborted and cannot alter the current view', async outcome => {
-  const onChanged = vi.fn();
-  const rendered = await open(view, onChanged); fireEvent.click(screen.getByRole('button', { name: 'Add equipment requirement' })); fillRequirement(); const pending = deferred<RequirementsView>(); vi.mocked(saveEquipmentRequirement).mockReturnValue(pending.promise); submit();
-  const signal = vi.mocked(saveEquipmentRequirement).mock.calls[0][2]; vi.mocked(loadEquipmentRequirements).mockResolvedValue({ ...view, requests: [] }); rendered.rerender(<EquipmentRequirements eventId={7} accessToken="other-token" onChanged={onChanged} />);
+  const onChanged = vi.fn(); const previousObserver = vi.fn(); const currentObserver = vi.fn();
+  const rendered = await open(view, onChanged, previousObserver); fireEvent.click(screen.getByRole('button', { name: 'Add equipment requirement' })); fillRequirement(); const pending = deferred<RequirementsView>(); vi.mocked(saveEquipmentRequirement).mockReturnValue(pending.promise); submit();
+  const signal = vi.mocked(saveEquipmentRequirement).mock.calls[0][2]; vi.mocked(loadEquipmentRequirements).mockResolvedValue({ ...view, requests: [] }); rendered.rerender(<EquipmentRequirements eventId={7} accessToken="other-token" onChanged={onChanged} onViewUpdated={currentObserver} />);
   expect(signal.aborted).toBe(true); await screen.findByText('No equipment requirements recorded.');
   await act(async () => { if (outcome === 'resolve') pending.resolve(view); else pending.reject(new EquipmentRequirementsError(403)); });
   expect(screen.queryByRole('article')).not.toBeInTheDocument(); expect(screen.queryByRole('alert')).not.toBeInTheDocument(); expect(screen.queryByText('Equipment requirement saved.')).not.toBeInTheDocument();
   expect(onChanged).not.toHaveBeenCalled();
+  expect(previousObserver).toHaveBeenCalledExactlyOnceWith(view);
+  expect(currentObserver).toHaveBeenCalledExactlyOnceWith({ ...view, requests: [] });
 });
 
 test.each([false, true])('[NORMAL] [SG2-53:AC2] [SG2-57:AC2] readiness is invalidated once after a successful requirement save, including editing an existing requirement: %s', async editing => {
@@ -272,4 +277,25 @@ test('[NORMAL] [SG2-54:AC1] support availability remains available on a confirme
   render(<EquipmentRequirements eventId={7} accessToken="token" canCheckAvailability />);
   expect(await screen.findByRole('button', { name: 'Check availability for Microphone' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Update arrangement for Microphone' })).not.toBeInTheDocument();
+});
+
+
+test('[BOUNDARY] [SG2-53:AC2] [SG2-41:AC4] changing the successful-view observer preserves an unsaved requirement and publishes its eventual save without another read', async () => {
+  const previousObserver = vi.fn(); const currentObserver = vi.fn();
+  const rendered = await open(view, undefined, previousObserver);
+  expect(previousObserver).toHaveBeenCalledExactlyOnceWith(view);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit requirement for Microphone' }));
+  change('Quantity required', '3'); change('Technical notes', 'Keep this unsaved revision');
+  rendered.rerender(<EquipmentRequirements eventId={7} accessToken="token" onViewUpdated={currentObserver} />);
+  expect(screen.getByLabelText('Quantity required')).toHaveValue('3');
+  expect(screen.getByLabelText('Technical notes')).toHaveValue('Keep this unsaved revision');
+  expect(loadEquipmentRequirements).toHaveBeenCalledTimes(1);
+  expect(currentObserver).not.toHaveBeenCalled();
+  const updated = { ...view, requests: [{ ...record, quantity: 3, notes: 'Keep this unsaved revision', version: 3 }] };
+  vi.mocked(saveEquipmentRequirement).mockResolvedValueOnce(updated);
+  submit('Edit equipment requirement');
+  await screen.findByText('Equipment requirement saved.');
+  expect(currentObserver).toHaveBeenCalledExactlyOnceWith(updated);
+  expect(previousObserver).toHaveBeenCalledExactlyOnceWith(view);
+  expect(loadEquipmentRequirements).toHaveBeenCalledTimes(1);
 });

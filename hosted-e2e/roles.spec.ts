@@ -82,17 +82,110 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
     await expect(page.getByText(/Couldn't load|temporarily unavailable|Could not reach the server/)).toHaveCount(0);
     health();
   };
-  const proof = async (name: string) => {
+  // A heading can render before its effect starts fetching. Require a positive
+  // loaded/empty state, rather than letting absence of loading text win that race.
+  const screenshotReady = async (name: string) => {
+    phase('page-settle');
+    const main = page.getByRole('main');
+    if (name.endsWith('-history')) {
+      const drawer = page.getByRole('dialog', { name: 'Event Change History', exact: true });
+      await expect(drawer.getByTestId(/^audit-entry-/).first()).toBeVisible();
+    } else if (name === 'notifications-readonly') {
+      const drawer = page.getByRole('complementary', { name: 'Notifications', exact: true });
+      await expect(drawer.getByText(/SGT$/).or(drawer.getByText('No notifications yet.', { exact: true })).first()).toBeVisible();
+    } else if (name === 'profile-readonly') {
+      // Profile fields appear only after its load succeeds, never in the shell.
+      await expect(main.getByLabel('Name', { exact: true })).toHaveValue(/\S/);
+    } else if (name === 'signed-in-dashboard' || name === 'dashboard') {
+      if (role === 'organiser') {
+        // The dashboard card has no View prefix; keep the same named Draft23.
+        await expect(main.getByRole('button', { name: /QA 16Oct Audit Probe/ })).toBeVisible();
+      } else if (role === 'coordinator' || role === 'venue' || role === 'support') {
+        await expect(main.getByRole('status').filter({ hasText: /^\d+ items? in your work queue$/ })).toBeVisible();
+        if (role === 'coordinator' || role === 'venue') {
+          const clashes = main.getByRole('region', { name: 'Clashing bookings', exact: true });
+          await expect(clashes.getByRole('listitem').or(clashes.getByText('No bookings clash once setup and turnaround time are included.', { exact: true })).first()).toBeVisible();
+        }
+        if (role === 'coordinator') {
+          await expect(main.getByRole('region', { name: 'My assigned events', exact: true })
+            .getByRole('button', { name: /Event request #22 QA 15Oct Phone Request / })).toBeVisible();
+        }
+      } else if (role === 'lead') {
+        await expect(main.getByText(/^\d+ requests? (?:is|are) awaiting a coordinator\.$/)).toBeVisible();
+      } else if (role === 'safety') {
+        await expect(main.getByRole('heading', { name: 'No safety checks yet', exact: true })).toBeVisible();
+      } else {
+        await expect(main.getByRole('heading', { name: 'Northbridge Investor Forum', exact: true })).toBeVisible();
+      }
+    } else if (name === 'my-events') {
+      // Must precede this page's screenshots, not just the later detail click.
+      await expect(main.getByRole('button', { name: 'View QA 16Oct Audit Probe', exact: true })).toBeVisible();
+    } else if (name === 'my-drafts') {
+      await expect(main.getByRole('region', { name: 'My draft requests', exact: true })
+        .getByRole('heading', { name: 'QA 16Oct Audit Probe', exact: true })).toBeVisible();
+    } else if (name === 'event-23-detail' || name === 'event-detail') {
+      await expect(main.getByRole('heading', { name: 'QA 16Oct Audit Probe', exact: true })).toBeVisible();
+    } else if (name === 'event-22-detail-readiness') {
+      await expect(main.getByRole('article', { name: 'Event request', exact: true })
+        .getByRole('heading', { name: 'QA 15Oct Phone Request', exact: true })).toBeVisible();
+      await expect(main.getByRole('region', { name: 'Equipment requirements', exact: true })).toBeVisible();
+      const reservations = main.getByRole('region', { name: 'Equipment reservations', exact: true });
+      await expect(reservations.getByRole('article').or(reservations.getByText('No equipment reservations recorded.', { exact: true })).first()).toBeVisible();
+      await expect(main.getByTestId('readiness-badge')).toHaveText(/^(?:Ready for confirmation|Arrangements outstanding)$/);
+    } else if (name === 'new-request') {
+      await expect(main.getByLabel(/Event name/i)).toHaveValue('');
+      await expect(main.getByRole('button', { name: 'Submit request', exact: true })).toBeDisabled();
+    } else if (name === 'venues' || name === 'catalogue') {
+      await expect(main.getByRole('region', { name: 'Venue catalogue', exact: true })
+        .getByText(/^\d+ of \d+ venues$/)).toBeVisible();
+    } else if (name === 'find-venues') {
+      await expect(main.getByRole('form', { name: 'Venue search criteria', exact: true })
+        .getByRole('button', { name: 'Search', exact: true })).toBeVisible();
+    } else if (name === 'venue-availability') {
+      await expect(main.getByLabel('Venue availability by day', { exact: true })).toBeVisible();
+      await expect(main.getByRole('region', { name: 'Selected day availability', exact: true })).toBeVisible();
+    } else if (name === 'venue-holds') {
+      await expect(main.getByRole('article', { name: /^Hold #\d+$/ })
+        .or(main.getByText('No venue holds yet.', { exact: true })).first()).toBeVisible();
+    } else if (name === 'equipment') {
+      await expect(main.getByRole('region', { name: 'Equipment records', exact: true })
+        .getByText(/^\d+ equipment records\. Available quantities exclude damaged and maintenance stock\.$/)).toBeVisible();
+    } else if (name === 'capacity-exceptions') {
+      const requests = main.getByRole('region', { name: 'Capacity exception requests', exact: true });
+      await expect(requests.getByRole('button', { name: /^Review exception for / })
+        .or(requests.getByText('No pending requests need a capacity exception you can approve.', { exact: true })).first()).toBeVisible();
+    } else if (name === 'unassigned-queue') {
+      await expect(main.getByRole('region', { name: 'Unassigned queue', exact: true }).getByRole('article')
+        .or(main.getByRole('heading', { name: 'No requests awaiting a coordinator', exact: true })).first()).toBeVisible();
+    } else if (name === 'assign-coordinators') {
+      await expect(main.getByRole('region', { name: 'Requests awaiting a coordinator', exact: true }).getByRole('combobox')
+        .or(main.getByRole('heading', { name: 'Nothing to assign', exact: true })).first()).toBeVisible();
+    } else if (name === 'my-registrations') {
+      await expect(main.getByRole('heading', { name: 'Events I can register for', exact: true })).toBeVisible();
+    } else if (name === 'event-page') {
+      await expect(main.getByRole('heading', { name: 'Northbridge Investor Forum', exact: true })).toBeVisible();
+    } else {
+      throw new Error('Screenshot checkpoint has no reviewed positive ready-state oracle.');
+    }
     await settle();
+  };
+  const proof = async (name: string) => {
+    await screenshotReady(name);
     phase('page-evidence');
     await expect(page.locator('vite-error-overlay, nextjs-portal')).toHaveCount(0);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
+      // Reset the document scroll after navigation/modal controls scrolled it.
+      // This does not inspect storage or change any application/business state.
+      await page.evaluate(() => window.scrollTo(0, 0));
       await expect(page.getByRole('banner')).toBeVisible();
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.getByRole('main').getByRole('heading').first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.evaluate(async () => { await document.fonts.ready; });
+      // Reassert the positive page result and strict health at each width,
+      // immediately before capture; resizing cannot reuse an earlier shell pass.
+      await screenshotReady(name);
       const path = info.outputPath(`${role}-${name}-${width}.png`);
       await page.screenshot({ path, fullPage: true });
       await info.attach(`${role}-${name}-${width}`, { path, contentType: 'image/png' });

@@ -231,3 +231,158 @@ test('[FAILURE] [SG2-39:AC4] [SG2-57:AC2] a failed planning save leaves readines
   expect(screen.getByTestId('arrangement-registration-state')).toHaveTextContent('Not required');
   expect(current.readinessReads()).toBe(1);
 });
+
+function selectedEquipmentFixture(replies: (RequirementsView | Promise<Response> | number)[]) {
+  const item: WorkItem = { ...EVENT, kind: 'equipment', item_id: 51, title: 'Projector',
+    status: 'pending', category: 'equipment', assigned_to_me: false,
+    details: { quantity: 5, notes: 'Original five-projector notes', equipment_requirements: 'Presentation equipment' } };
+  let requirementReads = 0, queueReads = 0;
+  const fetch = vi.fn(async (url: string): Promise<Response> => {
+    if (url.startsWith('/api/work-queue')) { queueReads++; return Response.json({ items: [item] }); }
+    if (url === '/api/equipment-requests?event_id=17') {
+      const reply = replies[requirementReads++];
+      if (typeof reply === 'number') return Response.json({ error: 'Unavailable' }, { status: reply });
+      return reply instanceof Promise ? reply : Response.json(reply);
+    }
+    throw new Error(`Unexpected selected-equipment fixture URL: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetch);
+  return { reads: () => ({ requirementReads, queueReads }) };
+}
+function supportView(requests: EquipmentRequirement[]): RequirementsView {
+  return { event: { event_id: 17, name: EVENT.title, status: 'planning' }, requests,
+    equipment: [{ equipment_id: 3, type: 'Projector' }], venues: [], can_request: false, can_arrange: true };
+}
+const ORIGINAL_EQUIPMENT = { ...REQUIREMENT, quantity: 5, notes: 'Original five-projector notes' };
+const AMENDED_EQUIPMENT = { ...REQUIREMENT, quantity: 3, notes: 'Revised three-projector notes', equipment_type: 'Updated projector', version: 2 };
+async function openSupport() {
+  render(<WorkQueue role="Technical Support Staff" accessToken="support-token" />);
+  fireEvent.click(await screen.findByRole('button', { name: /Projector/ }));
+  await screen.findByRole('region', { name: 'Equipment requirements' });
+  return screen.getByRole('article', { name: 'Equipment request' });
+}
+function summaryFact(article: HTMLElement, name: string) {
+  return within(article.querySelector('.organisation-detail-facts')!).getByText(name, { selector: 'dt' }).nextElementSibling;
+}
+
+test('[NORMAL] [CONFLICT] [SG2-53:AC2] [SG2-41:AC4] refreshing an amended equipment requirement updates the selected request summary by identity rather than the first event requirement', async () => {
+  const other = { ...REQUIREMENT, request_id: 99, quantity: 99, notes: 'Unrelated first requirement' };
+  const state = selectedEquipmentFixture([supportView([ORIGINAL_EQUIPMENT]), supportView([other, AMENDED_EQUIPMENT])]);
+  const article = await openSupport();
+  expect(summaryFact(article, 'Quantity requested')).toHaveTextContent('5');
+  expect(summaryFact(article, 'Request notes')).toHaveTextContent('Original five-projector notes');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await screen.findByRole('article', { name: 'Equipment requirement: Updated projector' });
+  expect(summaryFact(article, 'Quantity requested')).toHaveTextContent(/^3$/);
+  expect(summaryFact(article, 'Request notes')).toHaveTextContent('Revised three-projector notes');
+  expect(within(article).getByRole('heading', { level: 2 })).toHaveTextContent('Updated projector');
+  expect(within(article).queryByText('Original five-projector notes')).not.toBeInTheDocument();
+  expect(summaryFact(article, 'Equipment requirements')).toHaveTextContent('Presentation equipment');
+  expect(state.reads()).toEqual({ requirementReads: 2, queueReads: 2 });
+});
+
+test('[FAILURE] [SG2-53:AC2] [SG2-41:AC4] a failed requirement refresh preserves the selected summary until an authoritative retry succeeds', async () => {
+  const state = selectedEquipmentFixture([supportView([ORIGINAL_EQUIPMENT]), 503, supportView([AMENDED_EQUIPMENT])]);
+  const article = await openSupport();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await screen.findByRole('alert');
+  expect(summaryFact(article, 'Quantity requested')).toHaveTextContent(/^5$/);
+  expect(summaryFact(article, 'Request notes')).toHaveTextContent('Original five-projector notes');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry equipment requirements' }));
+  await screen.findByRole('article', { name: 'Equipment requirement: Updated projector' });
+  expect(summaryFact(article, 'Quantity requested')).toHaveTextContent(/^3$/);
+  expect(summaryFact(article, 'Request notes')).toHaveTextContent('Revised three-projector notes');
+  expect(state.reads()).toEqual({ requirementReads: 3, queueReads: 2 });
+});
+
+test.each([{ request_id: 99, event_id: 17 }, { request_id: 51, event_id: 18 }])('[BOUNDARY] [SG2-41:AC4] a requirements response for a different request/event %j cannot substitute it into the selected summary', async identity => {
+  selectedEquipmentFixture([supportView([ORIGINAL_EQUIPMENT]), supportView([{ ...REQUIREMENT, ...identity, quantity: 99, notes: 'Different request' }])]);
+  const article = await openSupport();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await screen.findByText('Different request');
+  expect(summaryFact(article, 'Quantity requested')).toHaveTextContent(/^5$/);
+  expect(summaryFact(article, 'Request notes')).toHaveTextContent('Original five-projector notes');
+});
+
+function externalPlacementFixture(options: { failRefresh?: boolean; refreshGate?: Promise<Response> } = {}) {
+  const base = fixture();
+  const placed: EquipmentRequirement = { ...REQUIREMENT, status: 'approved', quantity: 3, shortfall: 0,
+    placement_venue_id: 9, placement_venue_name: 'Replacement room', placement_position: 'Front left' };
+  base.state.requests = [placed];
+  const fetch = vi.fn(async (url: string, init?: RequestInit): Promise<Response> => {
+    if (url === '/api/equipment-requests?event_id=17' && base.state.requirementReads === 1) {
+      if (options.failRefresh || options.refreshGate) {
+        base.state.requirementReads++;
+        return options.refreshGate ?? Response.json({ error: 'Equipment service unavailable' }, { status: 503 });
+      }
+    }
+    if (url === '/api/event-requests/17/arrangements') {
+      base.state.readinessReads++;
+      const ready = Boolean(base.state.requests[0].placement_venue_id && base.state.requests[0].placement_position);
+      return Response.json({ event_id: 17,
+        arrangements: [{ key: 'equipment', label: 'Equipment', state: ready ? 'ready' : 'outstanding',
+          detail: ready ? '1 equipment request reserved and placed.' : 'Equipment placement is missing.' }],
+        outstanding: ready ? [] : ['equipment'], ready_for_confirmation: ready } satisfies EventArrangementsResult);
+    }
+    return base.fetch(url, init);
+  });
+  vi.stubGlobal('fetch', fetch);
+  return { state: base.state, placed, clearPlacement: () => { base.state.requests = [{ ...placed, placement_venue_id: null, placement_venue_name: null, placement_position: null }]; } };
+}
+
+async function openPlacedEquipment() {
+  render(<WorkQueue role="Event Coordinator" accessToken="coordinator-token" />);
+  fireEvent.click(await screen.findByRole('button', { name: /Planning readiness forum/ }));
+  await screen.findByText('1 equipment request reserved and placed.');
+  await screen.findByRole('button', { name: 'Refresh equipment requirements' });
+  expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Ready for confirmation');
+}
+
+test('[NORMAL] [SG2-53:AC5] [SG2-57:AC1] [SG2-57:AC2] refreshing externally changed placement updates readiness in both directions without discarding the planning draft', async () => {
+  const current = externalPlacementFixture();
+  await openPlacedEquipment();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
+  fireEvent.change(screen.getByLabelText('Planning Notes (Internal Coordinator Log)'), { target: { value: 'Keep this unsaved planning note' } });
+  current.clearPlacement();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await screen.findByText('Equipment placement is missing.');
+  expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Arrangements outstanding');
+  expect(screen.queryByText('1 equipment request reserved and placed.')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Planning Notes (Internal Coordinator Log)')).toHaveValue('Keep this unsaved planning note');
+  current.state.requests = [current.placed];
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await screen.findByText('1 equipment request reserved and placed.');
+  expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Ready for confirmation');
+  expect(screen.getByLabelText('Planning Notes (Internal Coordinator Log)')).toHaveValue('Keep this unsaved planning note');
+  expect(current.state).toMatchObject({ readinessReads: 3, requirementReads: 3, queueReads: 2 });
+});
+
+test('[FAILURE] [SG2-53:AC5] [SG2-57:AC2] a failed external placement refresh does not publish fresh readiness until an authoritative retry succeeds', async () => {
+  const current = externalPlacementFixture({ failRefresh: true });
+  await openPlacedEquipment();
+  current.clearPlacement();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await screen.findByRole('alert');
+  expect(current.state.readinessReads).toBe(1);
+  expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Ready for confirmation');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry equipment requirements' }));
+  await screen.findByText('Equipment placement is missing.');
+  expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Arrangements outstanding');
+  expect(current.state).toMatchObject({ readinessReads: 2, requirementReads: 3, queueReads: 2 });
+});
+
+test('[CONFLICT] [SG2-53:AC5] [SG2-57:AC2] an aborted equipment refresh cannot refresh or overwrite readiness after the event detail is reloaded', async () => {
+  const pending = deferred<Response>();
+  const current = externalPlacementFixture({ refreshGate: pending.promise });
+  await openPlacedEquipment();
+  current.clearPlacement();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh equipment requirements' }));
+  await waitFor(() => expect(current.state.requirementReads).toBe(2));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  await screen.findByText('Equipment placement is missing.');
+  await screen.findByRole('button', { name: 'Refresh equipment requirements' });
+  await act(async () => pending.resolve(Response.json(supportView([current.placed]))));
+  expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Arrangements outstanding');
+  expect(screen.queryByText('1 equipment request reserved and placed.')).not.toBeInTheDocument();
+  expect(current.state).toMatchObject({ readinessReads: 2, requirementReads: 3, queueReads: 3 });
+});

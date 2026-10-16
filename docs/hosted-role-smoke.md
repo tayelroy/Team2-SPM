@@ -16,10 +16,22 @@ Support1, Lead1, Safety1 and Attendee1 accounts.
 
 Each case signs in through visible controls, checks the exact role navigation,
 and captures every permitted navigation page at 1440 and 390 pixels. Before
-evidence capture it waits for observed loading/search/clash-check text to
-disappear and for granted notification controls to expose a numeric count
-instead of loading/unavailable. These are rendered-state assertions, not timed
-sleeps or suppressed service failures. It reads
+evidence capture it requires a positive loaded result: the named Draft23 card
+on the Organiser dashboard and My events list; loaded queue counts/cards and a
+clash result; catalogue counts; equipment counts; a loaded or explicit empty
+capacity/hold/assignment list; populated profile fields; and an actual history
+entry or notification entry/explicit empty inbox. Event22 additionally requires
+loaded equipment sections and the readiness badge. The named fixtures remain
+mandatory; the suite does not silently substitute another event or accept an
+empty My events list.
+
+These assertions run again after each viewport resize, immediately before each
+screenshot, together with strict absence of loading/search/clash-check text,
+errors and unavailable alerts. Granted notification controls must expose a
+numeric count. Document scroll is reset to the top before full-page capture to
+reduce fixed-header capture artifacts. Positive result checks prevent a page
+heading from passing before its data-loading effect starts. There are no timed
+sleeps or suppressed application failures. It reads
 profile fields without saving and opens the real notifications drawer only for
 roles with that grant. It also opens:
 
