@@ -144,3 +144,19 @@ end $$;`);
   assert.match(ledger.sqlAssertions[0].expectedAssertions[0], /^Reject with insufficient_privilege:/);
   assert.doesNotMatch(ledger.sqlAssertions[0].expectedAssertions[0], /^Must be false:/);
 });
+
+
+test('[NORMAL] [BOUNDARY] [SG2-22:AC3] optional hosted role declarations enter the ledger without a hosted directory being required', t => {
+  const { root, run } = fixture(t);
+  assert.equal(run('--write').status, 0);
+  mkdirSync(join(root, 'hosted-e2e'));
+  writeFileSync(join(root, 'hosted-e2e/roles.spec.ts'), valid.replace('valid record', 'read-only hosted role page'));
+  const details=join(root,'hosted-details.json');
+  assert.equal(run('--write','--details',details).status,0);
+  const inventory=JSON.parse(readFileSync(details,'utf8'));
+  const hosted=inventory.methods.find(item=>item.file==='hosted-e2e/roles.spec.ts');
+  assert.equal(inventory.methods.length,2);
+  assert.match(hosted.preconditions,/explicitly authorised authenticated shared-staging/);
+  assert.match(hosted.preconditions,/runtime-only password/);
+  assert.match(hosted.preconditions,/Not run by default CI/);
+});
