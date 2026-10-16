@@ -384,12 +384,12 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 // SG2-97 gives the Lead its own dedicated test below, so this loop now covers
 // only the Safety Officer.
 for (const role of ['safety_officer'] as const) {
-  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads and read-only equipment placement`, async () => {
+  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads, venue safety details and read-only equipment placement`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, 200);
-    // SG2-100 added the stage and history reads both Week 7 roles need, and
-    // SG2-53 lets the Safety Officer read equipment placement; the queues
+    // SG2-100 added the stage and history reads both Week 7 roles need,
+    // SG2-77 the venue safety details, and SG2-53 equipment placement; the queues
     // they act on arrive with SG2-87/88/91/97.
     assert.deepEqual(res.body, {
       userId,
@@ -397,6 +397,7 @@ for (const role of ['safety_officer'] as const) {
       permissions: [
         'event_request.stage.view',
         'event_request.history.view',
+        'venues.operations.read',
         'equipment_requirements.read',
         'profile.read',
         'profile.update'
@@ -469,12 +470,13 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
   }
 });
 
-test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] the Safety Officer holds exactly the profile grants plus the SG2-100 reads and read-only equipment placement', () => {
+test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] the Safety Officer holds exactly the profile grants plus the SG2-100 reads, venue safety details and read-only equipment placement', () => {
   // Written as an independent literal, never computed from PERMISSIONS: this
   // file's snapshot went stale during SG2-86 for exactly that reason.
   const EXPECTED = [
     'event_request.stage.view',
     'event_request.history.view',
+    'venues.operations.read',
     'equipment_requirements.read',
     'profile.read',
     'profile.update'

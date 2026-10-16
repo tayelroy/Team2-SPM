@@ -25,7 +25,10 @@ const USERS: Record<string, Principal> = {
   venue: { userId: 'user-venue', role: 'venue_staff' },
   organiser: { userId: 'user-organiser', role: 'event_organiser' },
   support: { userId: 'user-support', role: 'technical_support_staff' },
-  attendee: { userId: 'user-attendee', role: 'attendee' }
+  attendee: { userId: 'user-attendee', role: 'attendee' },
+  // SG2-86: the Week 7 roles.
+  lead: { userId: 'user-lead', role: 'event_coordinator_lead' },
+  safety: { userId: 'user-safety', role: 'safety_officer' }
 };
 
 const forum: SuitabilityEventRow = {
@@ -184,9 +187,9 @@ test('[FAILURE] [SG2-50:AC1] a request for an event the coordinator is not assig
   }
 });
 
-test('[FAILURE] [SG2-50:AC1] organisers, attendees and Technical Support Staff cannot read conflicts, and nobody can without signing in', async () => {
+test('[FAILURE] [SG2-50:AC1] [SG2-86:AC2] organisers, attendees, Technical Support Staff and the Week 7 roles cannot read conflicts, and nobody can without signing in', async () => {
   const composed = conflictsApp(conflictStore().store);
-  for (const user of ['organiser', 'support', 'attendee'] satisfies (keyof typeof USERS)[]) {
+  for (const user of ['organiser', 'support', 'attendee', 'lead', 'safety'] satisfies (keyof typeof USERS)[]) {
     assert.equal((await conflictsOf(composed, user)).status, 403, user);
   }
   assert.equal((await request(composed).get('/api/venue-booking-requests/41/conflicts')).status, 401);

@@ -9,7 +9,8 @@ import { DEFAULT_OPERATIONS, validateVenueOperations, type VenueOperationRecord 
 import type { VenueOperationStore } from './db/venueOperations';
 
 const ACCOUNT_ROLES = [
-  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee'
+  'event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee',
+  'event_coordinator_lead', 'safety_officer'
 ] as const;
 
 const saved: VenueOperationRecord = {
@@ -19,7 +20,7 @@ const saved: VenueOperationRecord = {
 };
 const body = { setup_minutes: 30, turnaround_minutes: 45, emergency_access: 'Two exits to the car park', known_restrictions: 'No open flames' };
 
-function fixture(role: Role = 'venue_staff', override?: VenueOperationStore) {
+function fixture(role: Role | (() => Role) = 'venue_staff', override?: VenueOperationStore) {
   const rows = new Map<number, VenueOperationRecord>([[1, saved]]);
   const writes: unknown[] = [];
   const store: VenueOperationStore = override ?? {
@@ -32,7 +33,10 @@ function fixture(role: Role = 'venue_staff', override?: VenueOperationStore) {
       return record;
     }
   };
-  const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'user-1', role }) });
+  // A function lets a test change the caller's role between requests.
+  const access = createAuthorization({
+    resolvePrincipal: async () => ({ userId: 'user-1', role: typeof role === 'function' ? role() : role })
+  });
   const app = express();
   app.use(express.json());
   app.use('/api/venues', createVenueOperationsRouter(access, token => {
@@ -68,7 +72,7 @@ test('[BOUNDARY] [SG2-77:AC3] a venue with nothing saved reads as 0 minutes and 
 });
 
 for (const role of ACCOUNT_ROLES) {
-  const reads = ['venue_staff', 'event_coordinator', 'technical_support_staff'].includes(role);
+  const reads = ['venue_staff', 'event_coordinator', 'technical_support_staff', 'safety_officer'].includes(role);
   test(`${role === 'venue_staff' ? '[NORMAL]' : '[FAILURE]'} [SG2-77:AC6] only Venue Staff change venue operations (${role})`, async () => {
     const { app, writes } = fixture(role);
     const write = await put(app, body);
@@ -77,6 +81,34 @@ for (const role of ACCOUNT_ROLES) {
     assert.equal((await get(app)).status, reads ? 200 : 403);
   });
 }
+
+// SG2-77 AC5 / Week 7 change #6: the Safety Officer reviews emergency access
+// and known restrictions in the operational safety check. They read the whole
+// record (the setup and turnaround minutes are not sensitive); the role loop
+// above shows they cannot change it and the Lead cannot read it.
+test('[NORMAL] [SG2-77:AC5] the Safety Officer reads a venue\'s whole operations record, including emergency access and known restrictions', async () => {
+  const read = await get(fixture('safety_officer').app);
+  assert.equal(read.status, 200);
+  assert.deepEqual(read.body.operations, saved);
+});
+
+test('[BOUNDARY] [SG2-77:AC3] [SG2-77:AC5] a Safety Officer reading a venue with nothing recorded gets 0 minutes and no safety details', async () => {
+  const read = await get(fixture('safety_officer').app, 2);
+  assert.equal(read.status, 200);
+  assert.deepEqual(read.body.operations, {
+    setup_minutes: 0, turnaround_minutes: 0, emergency_access: null, known_restrictions: null, updated_at: null
+  });
+});
+
+test('[CONFLICT] [SG2-77:AC5] [SG2-86:AC2] an account moved off the Safety Officer role is refused on its very next request', async () => {
+  let role: Role = 'safety_officer';
+  const { app } = fixture(() => role);
+  assert.equal((await get(app)).status, 200);
+  role = 'attendee';
+  assert.equal((await get(app)).status, 403);
+  role = 'safety_officer';
+  assert.equal((await get(app)).status, 200);
+});
 
 test('[FAILURE] [SG2-25:AC3] [SG2-77:AC6] the production app protects both operations routes without credentials', async () => {
   for (const method of ['get', 'put'] as const) {

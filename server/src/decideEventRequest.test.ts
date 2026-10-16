@@ -375,6 +375,17 @@ describe('PATCH /api/event-requests/:eventId/decision authorisation wiring', () 
     assert.equal(response.status, 403);
   });
 
+  // SG2-86 AC2: the Week 7 roles assign (Lead) and safety-check (Safety
+  // Officer) events; deciding a request stays with its coordinator.
+  for (const role of ['event_coordinator_lead', 'safety_officer'] as const) {
+    test(`[FAILURE] [SG2-37:AC1] [SG2-86:AC2] denies ${role}, who does not decide requests`, async () => {
+      const response = await request(appForRole(role))
+        .patch('/api/event-requests/7/decision')
+        .set('Authorization', 'Bearer token');
+      assert.equal(response.status, 403);
+    });
+  }
+
   test('[NORMAL] [SG2-37:AC1] lets an Event Coordinator reach the decision handler', async () => {
     const response = await request(appForRole('event_coordinator'))
       .patch('/api/event-requests/7/decision')
