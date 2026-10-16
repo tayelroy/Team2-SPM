@@ -6095,5 +6095,181 @@
       ]
     },
     "notes": "The23 records are supporting methods/contracts, not23 independently accepted workflows. Existing SG2-40 history records and historical executions remain unchanged. All four required categories are represented. DoD inventory now2,396 methods+758SQL; human peer review and remaining hosted Done acceptance remain open. No earlier missing draft values are fabricated."
+  },
+  {
+    "id": "REG-EQUIPMENT-SUMMARY-AND-READINESS-REFRESH",
+    "title": "Equipment refresh keeps the selected request summary and arrangement readiness current",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-53",
+    "purpose": "Repair two independently observed hosted inconsistencies: Support parent summary retained old quantity/notes after child refresh; Coordinator readiness retained Ready after refreshed equipment lost placement.",
+    "preconditions": "Existing assigned event and exact pending equipment request; component/network fixtures for identity, error and race branches. Hosted c04 checks use QA22 requests3/4 and existing placements; no new API/schema contract.",
+    "steps": [
+      "Open exact request4 showing quantity2/baseline notes, amend that same pending request to quantity1/new notes, then use only Support Refresh equipment requirements.",
+      "Verify parent summary and matching child both show the authoritative request4 quantity1/new notes; unrelated microphone request3 remains quantity3.",
+      "Refresh Coordinator equipment after removing placement, restoring placement, then removing and restoring it again; inspect Outstanding→Ready and Ready→Outstanding without navigating away.",
+      "Exercise changed request/event identity, stale/aborted responses, failed refresh and retry, explicit versus mutation refresh, current observer replacement and unsaved planning drafts."
+    ],
+    "data": "Pending request4 quantity2→1 with amended notes; request3 microphone quantity3; valid and absent placement; rejected/aborted responses and event/request identity changes.",
+    "expected": "Only the matching current request updates its parent summary. Successful current child refresh updates readiness in both directions; failed/obsolete requests cannot claim success or replace a later event. Unsaved planning drafts and unrelated request records remain intact.",
+    "evidence": "client/src/components/EquipmentRequirements.test.tsx; client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+    "layer": "React public component seams with controlled HTTP; actual hosted Coordinator/Support UI retests",
+    "status": "Pass",
+    "actual": "Seven new and two revised method declarations. Local focused126 and full client1,427/1,427 passed; all four coverage metrics100%. Exact c04 CI38839394116 passed all eight jobs (tested merge has the same full Git tree as c04). Actual hosted c04 request4 refresh quantity2→1/new notes passed with request3 unchanged; readiness refresh passed both directions and final microphone placement was restored. These successful equipment checkpoints predate the later, separate converted-hold release venue-readiness defect.",
+    "execution_evidence": "16 Oct 2026: c04b2212df1a002b3ceb36e6b2216412ec0f142d, CI38839394116; ignored verification/c04b221-ci-proof/full-ci-evidence.json; equipment-request4-summary-c04-matched.txt/.png; equipment-readiness-c04-refresh-ready.txt/.png; equipment-readiness-c04-refresh-outstanding.txt/.png; equipment-readiness-c04-final-restored.txt/.png. Actual request4 readback and placement restoration are scoped evidence, not all Done acceptance.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (automated tests and authorised hosted QA; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC2",
+      "SG2-53:AC5",
+      "SG2-41:AC4",
+      "SG2-57:AC1",
+      "SG2-57:AC2"
+    ],
+    "source_method_ids": [
+      "TC-16f4536430d9",
+      "TC-0560d21103a2",
+      "TC-382177a106d2",
+      "TC-b438717925a1",
+      "TC-f1acada8cbbe",
+      "TC-c453d326d8f3",
+      "TC-9ea38ff9f207",
+      "TC-39dd94b896da",
+      "TC-d9ace0563980"
+    ]
+  },
+  {
+    "id": "REG-OPTIONAL-HOSTED-SEVEN-ROLE-READONLY",
+    "title": "Opt-in seven-role hosted page proof has strict read-only guards and safe recorded output",
+    "type": "Normal / boundary / failure",
+    "story": "SG2-23",
+    "purpose": "Provide actual approved hosted role/page screenshots and videos without sending application mutations, retaining credentials or conflating read-only page proof with full business acceptance.",
+    "preconditions": "Explicitly approved optional hosted run against the exact allowlisted preview, runtime-only QA password and seven existing authorised QA roles; one fresh context per role, serial logins, no retries. Discovery and CI policy tests require no hosted credentials. The ordinary loopback fixture suite remains the CI default.",
+    "steps": [
+      "Offline, verify exact-origin/read-only request policy, credential-free discovery, refusal before browser startup without runtime credentials, and sanitised JSON/JUnit attachments.",
+      "For each of seven roles, sign in normally, assert role-specific loaded/empty states before every screenshot, visit only allowed read-only pages, then log out to Landing.",
+      "Capture each of47 role/page checkpoints at1440px and390px, recording94 PNGs and seven videos; inspect all94 actual images for loading, overflow, overlap and readability.",
+      "Stop the entire batch on authentication failure, throttling, network/application error or forbidden write; do not retain traces/HAR/auth storage/browser profiles/raw sign-in failures."
+    ],
+    "data": "Existing Organiser Draft23/history and My Events; Coordinator assigned QA22/readiness; Venue Staff calendar/holds/catalogue; TSS equipment; Lead queue; Safety placeholder and real profile; Attendee prototypes and real profile.",
+    "expected": "Seven approved role contexts complete only normal sign-in/logout and navigation; all other application writes and alternate origins are blocked. Reports retain scoped page/media proof without runtime secrets. Positive page-settled assertions run before each width. Safety placeholder and Attendee prototype screens never imply delivery of those full workflows.",
+    "evidence": "hosted-e2e/roles.spec.ts; hosted-e2e/policy.test.mjs; .github/scripts/test-inventory.test.mjs; playwright.hosted.config.ts; .github/scripts/test-hosted-roles.mjs",
+    "layer": "Four offline Node policy declarations plus one inventory declaration; seven optional recorded hosted Playwright declarations, separate from loopback CI browser tests",
+    "status": "Pass",
+    "actual": "Twelve new declarations: seven opt-in hosted role cases, four offline policy cases, one inventory integration case. b3 introduced the harness; c04 strengthened page-settled oracles. Current c04 CI38839394116 passed all eight jobs and its18 inventory/policy runner cases (14 inventory plus4 policy). Approved actual hosted run2026-10-16T02-21-44.294Z passed7/7 roles,47 page checkpoints,94 screenshots and7 videos, with no HTTP/network/application-console/page/write failures. All94 images received scoped visual review, including exact-SHA reuse of67 previously reviewed images and direct inspection of27 changed images.",
+    "execution_evidence": "Source checkpoints b3c6d6b600f63c602af3c9d119a4e9d749a8a11a and c04b2212df1a002b3ceb36e6b2216412ec0f142d; CI38839394116; ignored output/hosted-role-smoke/2026-10-16T02-21-44.294Z/report.json and verification/hosted-playwright-c04-visual-review.json. Private professor evidence bundle remains local; no public upload or human peer approval is implied.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (approved recorded read-only QA and visual review; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1",
+      "SG2-25:AC2",
+      "SG2-40:AC1",
+      "SG2-57:AC1",
+      "SG2-86:AC2"
+    ],
+    "source_method_ids": [
+      "TC-75bdfbc814fb",
+      "TC-ae29d1b8b62b",
+      "TC-dcc55e924120",
+      "TC-8bdef18d29a7",
+      "TC-ef3f16001bee",
+      "TC-e811294c4eb9",
+      "TC-62e073b3223f",
+      "TC-ab057dea8821",
+      "TC-0900841595fc",
+      "TC-f5e67cc9e432",
+      "TC-636d33e52f44",
+      "TC-e35b97c49a37"
+    ]
+  },
+  {
+    "id": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
+    "title": "Converted hold bookings keep canonical request links through release and replacement",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-84",
+    "purpose": "Repair the actual hosted Hold4 sequence: conversion created booking18; its reasoned release preserved original booking16 but left request22 Approved/unlinked, creating phantom venue demand. Show converted holds as historical conversion receipts rather than a claim that their booking is still Confirmed.",
+    "preconditions": "Disposable PostgreSQL migrations and transaction-local fixtures, including true pre-upgrade legacy link shapes; current local client fixtures. Hosted before-fix failure is recorded; new-head CI and hosted repaired-preview retest are separate pending gates.",
+    "steps": [
+      "Convert a valid tentative hold through normal approval and verify its approved request points to the actual canonical booking. Refuse an elapsed/timer-changed or missing booking path.",
+      "Release the converted booking with a real assigned actor and required reason; verify its request stops contributing venue demand while original other booking remains Confirmed, with real history/notices only.",
+      "Approve a replacement for a converted-hold booking and verify the replaced request/booking retires, preserving unaffected arrangements and confirmation guards.",
+      "Upgrade proven legacy converted links, including already-released bookings; reconcile only matching hold/event/venue/period identities, preserve original release metadata and skip ambiguous/mismatched rows. Apply again with no row/history/notification churn.",
+      "At390px/1440px, verify the converted card says Converted to booking, keeps Booking #N and directs users to the booking record for current status. Refresh/in-flight approval retains the receipt; failed approval cannot display it."
+    ],
+    "data": "Linked/unlinked converted holds, released/confirmed canonical bookings, additional original booking, assigned versus other coordinator, missing release reason,15 legacy upgrade variants, repeat migration, converted receipt after later booking release.",
+    "expected": "Converted requests are linked to their real bookings. Release/replacement cannot leave a phantom Approved venue requirement or damage the other booking. Legacy repair changes only verifiable relationships/status, preserving known metadata and adding no invented audit actor/time/notice. Receipt wording truthfully records conversion without pretending to know current booking status.",
+    "evidence": "supabase/migrations/202610170004_venue_hold_booking_links.sql; related hold/confirmation/release/replacement SQL and upgrade tests; client/src/screens/VenueHolds.test.tsx; e2e/regression.spec.ts SG2-84-P02",
+    "layer": "Transaction SQL, full disposable legacy migration upgrade, React component tests and strengthened loopback browser journey; hosted repaired-preview acceptance pending",
+    "status": "Pass",
+    "actual": "Local seven related SQL suites passed; full45-migration legacy upgrade passed15 variants. Actual pre-fix SQL red reproduced the fault; repeat170004 application changed0 rows/unchanged xmin, with no invented activity. Twenty-one new SQL assertions and two revised SQL assertions are linked below. Three existing client methods now assert historical receipt wording; pre-fix copy check failed2/passed17, then focused and full client1,427/1,427 passed with100% statements/branches/functions/lines and build passed. Existing SG2-84-P02 strengthened for390px/1440px passed in the full113/113 browser run (136.9s, zero skips/retries/flaky). Full local npm run ci passed: backend1,468 and frontend1,427, both100% statements/branches/functions/lines; reviewer19 and inventory/policy18. Hosted170004 canonical migration plus atomic ledger was applied: request22 Cancelled and directly linked to booking18; booking18 Released and baseline16 Confirmed. Actual Coordinator child Refresh recovered Ready with venue1/equipment2. Remote new-head CI and native integration completion remain separate pending gates.",
+    "execution_evidence": "16 Oct 2026 local seven-suite/45-migration/15-variant handoff, repeated migration no-op and root client coverage/build results. Historical hosted counterexample: ignored verification/hold4-release-stale-approved-readiness-before.txt/.png and hold4-release-booking16-preserved-before.txt. Full local113-browser/local CI completion and applied-schema existing Hold4 recovery were subsequently verified; ignored verification/hold4-release-readiness-recovered-after.* records actual Ready. An earlier112/1 browser interruption was caused by overlapping build output replacement and is retained as infrastructure history, not a product failure. New-head remote CI and native integration completion remain pending at this checkpoint; a fresh post-fix conversion/release cycle is not claimed.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (local automated verification; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC5",
+      "SG2-51:AC1",
+      "SG2-51:AC2",
+      "SG2-51:AC3",
+      "SG2-51:AC4",
+      "SG2-51:AC5",
+      "SG2-58:AC1",
+      "SG2-58:AC2",
+      "SG2-81:AC3",
+      "SG2-81:AC5",
+      "SG2-57:AC2",
+      "SG2-57:AC3",
+      "SG2-82:AC5"
+    ],
+    "source_method_ids": [
+      "TC-ed49754c98bb",
+      "TC-4845c2416e81",
+      "TC-519eb1370679",
+      "TC-2ac7873148f4"
+    ],
+    "source_sql_contract_ids": [
+      "SG2-84:linked-conversion-fixture",
+      "SG2-84:conversion-records-canonical-booking",
+      "SG2-51:hold-booking-unassigned-release-refused",
+      "SG2-51:hold-booking-release-reason-required",
+      "SG2-51:hold-release-refusal-no-side-effects",
+      "SG2-51:converted-hold-booking-released",
+      "SG2-51:released-hold-request-no-longer-required",
+      "SG2-51:hold-release-keeps-original-booking",
+      "SG2-51:hold-release-history-and-notices",
+      "SG2-58:released-extra-hold-does-not-block-confirmation",
+      "SG2-81:converted-hold-replacement-fixture",
+      "SG2-81:converted-hold-replacement-approved",
+      "SG2-81:replacement-retires-converted-hold-request",
+      "SG2-81:replaced-held-venue-no-phantom-demand",
+      "SG2-84:hold-upgrade-fixture-complete",
+      "SG2-84:legacy-hold-canonical-links-repaired",
+      "SG2-51:legacy-released-hold-requests-cancelled",
+      "SG2-84:legacy-hold-mismatches-not-guessed",
+      "SG2-51:legacy-hold-release-metadata-preserved",
+      "SG2-51:legacy-hold-repair-no-invented-activity",
+      "SG2-84:hold-link-upgrade-idempotent",
+      "SG2-84:converted-booking-missing-or-timer-changed-it",
+      "SG2-58:hold-requests-linked-and-released"
+    ],
+    "source_sql_aliases": {
+      "SG2-58:hold-requests-approved-unlinked": "SG2-58:hold-requests-linked-and-released"
+    }
   }
 ]

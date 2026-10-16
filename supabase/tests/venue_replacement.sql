@@ -395,4 +395,57 @@ begin
 end $$;
 reset role;
 
+-- Replacing a booking converted from a hold must retire its original
+-- request through the same release helper as an ordinary approved booking.
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,expected_attendance,registration_needed) values
+ (98106,'f8100000-0000-4000-8000-000000000003','f8100000-0000-4000-8000-000000000002','Converted hold replacement','planning',10,false);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','f8100000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claims','{"sub":"f8100000-0000-4000-8000-000000000001","role":"authenticated"}',true);
+do $$
+declare placed jsonb; converted jsonb;
+begin
+ placed := public.create_venue_hold(98106,982,'2031-08-01T09:00Z','2031-08-01T17:00Z',clock_timestamp()+interval '2 days');
+ converted := public.change_venue_hold((placed#>>'{hold,hold_id}')::bigint,'convert');
+ if converted->>'outcome' is distinct from 'updated' then
+  raise exception '[SG2-81:converted-hold-replacement-fixture] [SG2-81:AC5] [SG2-84:AC5] [NORMAL] The held original venue must convert before replacement: %',converted;
+ end if;
+ perform set_config('hold_replacement.booking',converted#>>'{hold,booking_id}',true);
+ perform set_config('hold_replacement.request',converted#>>'{hold,request_id}',true);
+ insert into public.venue_unavailability(venue_id,starts_at,ends_at,category,reason)
+  values(982,'2031-08-01T09:00Z','2031-08-01T17:00Z','maintenance','Held venue replacement regression');
+end $$;
+reset role;
+insert into public.venue_booking_requests(request_id,event_id,venue_id,starts_at,ends_at,layout,requested_by,replaces_booking_id)
+ values(98107,98106,983,'2031-08-01T09:00Z','2031-08-01T17:00Z','theatre',
+  'f8100000-0000-4000-8000-000000000002',current_setting('hold_replacement.booking')::bigint);
+set local role authenticated;
+do $$
+begin
+ if public.decide_venue_booking_request(98107,'approve',null)->>'outcome' is distinct from 'updated' then
+  raise exception '[SG2-81:converted-hold-replacement-approved] [SG2-81:AC5] [NORMAL] A replacement for the converted hold booking must approve through normal Venue Staff decision';
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if not exists(select 1 from public.venue_booking_requests r join public.venue_bookings b on b.booking_id=r.venue_booking_id
+      where r.request_id=current_setting('hold_replacement.request')::bigint and r.status='cancelled' and b.status='cancelled')
+    or not exists(select 1 from public.venue_booking_requests r join public.venue_bookings b on b.booking_id=r.venue_booking_id
+      where r.request_id=98107 and r.status='approved' and b.status='confirmed')
+    or (select status from public.venue_bookings where booking_id=98102) is distinct from 'confirmed' then
+  raise exception '[SG2-81:replacement-retires-converted-hold-request] [SG2-81:AC3] [SG2-81:AC5] [CONFLICT] Replacement must cancel the old held request/booking, preserve the new booking and leave other events untouched';
+ end if;
+end $$;
+update public.events set status='preparation' where event_id=98106;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','f8100000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claims','{"sub":"f8100000-0000-4000-8000-000000000002","role":"authenticated"}',true);
+do $$
+begin
+ if public.confirm_event(98106)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-81:replaced-held-venue-no-phantom-demand] [SG2-81:AC5] [SG2-58:AC1] [NORMAL] A released held venue request must not block confirmation after its replacement is approved';
+ end if;
+end $$;
+reset role;
 rollback;

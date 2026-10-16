@@ -121,6 +121,17 @@ persisting its lifecycle/history and delivering messages needs a sweep. Merely
 having the RPC installed, or observing expiry after an application refresh, is
 insufficient evidence that unattended scheduling works.
 
+Migration `202610170004_venue_hold_booking_links.sql` records the confirmed
+booking on a converted hold's original venue request. Normal booking release
+can then cancel that request, so a released hold booking does not leave an
+otherwise-ready event outstanding. The migration also repairs historical links
+only when the hold, request and booking have matching event, venue and period;
+it preserves actor fields, decision history and existing release notices.
+Apply this migration to the intended hosted project as a separate release step.
+Verify a QA hold through conversion and reasoned booking release, then reopen
+the coordinator's event and check its remaining bookings and readiness. The
+structural gate alone does not prove this lifecycle or the historical repair.
+
 ## CI and local verification
 
 The database CI job applies every committed migration to its disposable

@@ -1379,7 +1379,8 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await placeHold(page);
     const first = page.getByRole('article', { name: 'Hold #1', exact: true });
     await first.getByRole('button', { name: 'Approve booking', exact: true }).click();
-    await expect(first.getByText('Confirmed booking', { exact: true })).toBeVisible();
+    await expect(first.getByText('Converted to booking', { exact: true })).toBeVisible();
+    await expect(first.getByText('Check the venue booking record for its current status.', { exact: true })).toBeVisible();
     await expect(page.getByRole('status')).toHaveText('Booking approved. The hold is now a confirmed booking.');
     const headers = await authHeaders(page);
     const converted = (await (await page.request.get('/api/venue-holds', { headers })).json()).holds[0];
@@ -1393,13 +1394,18 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await expect(page.getByRole('status')).toHaveText('Hold released. The period is available for other requests.');
     await clockAt(page, '2030-06-04T02:00:00.000Z');
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-    await expect(first.getByText('Confirmed booking', { exact: true })).toBeVisible();
+    await expect(first.getByText('Converted to booking', { exact: true })).toBeVisible();
     await expect(second.getByText('Released', { exact: true })).toBeVisible();
     const availability = await page.request.get('/api/venues/availability?from=2030-06-05T00:00:00Z&to=2030-06-06T00:00:00Z', { headers });
     const venues = (await availability.json()).venues;
     expect(venues.find((venue: { venueId: number }) => venue.venueId === 1).entries).toEqual([expect.objectContaining({ kind: 'booking', label: 'confirmed · event 81' })]);
     expect(venues.find((venue: { venueId: number }) => venue.venueId === 2).entries).toEqual([]);
     await capture(page, 'converted-and-released');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(first.getByText('Converted to booking', { exact: true })).toBeVisible();
+    await expect(first.getByText('Check the venue booking record for its current status.', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await capture(page, 'converted-and-released-mobile');
   });
 
   test('SG2-85-P01 | [SG2-84:AC6] [SG2-85:AC1] [SG2-85:AC2] [SG2-85:AC3] [SG2-85:AC4] [SG2-85:AC5] [NORMAL] [BOUNDARY] [CONFLICT] an assigned coordinator receives one 24-hour warning, exact expiry and System history, then staff place a new request', async ({ page, request }) => {

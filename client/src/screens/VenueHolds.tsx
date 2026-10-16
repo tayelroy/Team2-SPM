@@ -4,7 +4,7 @@ import { changeHold, createHold, fetchHolds, fetchHoldOptions, type HoldOptions,
 import { sgtToMs } from '../venues/searchApi';
 
 const EMPTY = { event: '', venue: '', start: '', end: '', expiry: '' };
-const LABELS = { tentative: 'Tentative', converted: 'Confirmed booking', released: 'Released', expired: 'Expired' };
+const LABELS = { tentative: 'Tentative', converted: 'Converted to booking', released: 'Released', expired: 'Expired' };
 const formatter = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore', hour12: false });
 
 /** SG2-84/85: persisted venue holds. Staff place, release and approve;
@@ -114,7 +114,7 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
             <p>{formatter.format(new Date(hold.starts_at))} – {formatter.format(new Date(hold.ends_at))} (SGT)</p>
             <p>Expiry: {formatter.format(new Date(hold.expires_at))} (SGT) · Hold #{hold.hold_id}</p>
             {status === 'expired' && <p>A new request is needed. This expired hold cannot be approved.</p>}
-            {status === 'converted' && <p>Booking #{hold.booking_id}</p>}
+            {status === 'converted' && <><p>Booking #{hold.booking_id}</p><p>Check the venue booking record for its current status.</p></>}
             {staff && status === 'tentative' && <>
               <p>Booking request #{hold.request_id}. Approval checks current venue conflicts and suitability.</p>
               <div className="venue-hold-actions">

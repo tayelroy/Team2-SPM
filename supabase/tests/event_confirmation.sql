@@ -372,9 +372,11 @@ reset role;
 update public.events set status='preparation' where event_id in (95891,95892);
 do $$
 begin
- if (select count(*) from public.venue_booking_requests
-     where event_id in (95891,95892) and status='approved' and venue_booking_id is null) <> 2 then
-  raise exception '[SG2-58:hold-requests-approved-unlinked] [SG2-58:AC2] [CONFLICT] Converted hold requests must stay approved without a direct booking link';
+ if not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id)
+      where r.event_id=95891 and r.status='approved' and r.venue_booking_id=h.booking_id)
+    or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id)
+      where r.event_id=95892 and r.status='cancelled' and r.venue_booking_id=h.booking_id) then
+  raise exception '[SG2-58:hold-requests-linked-and-released] [SG2-58:AC2] [CONFLICT] Converted requests must link to their booking and released requests must no longer remain required';
  end if;
 end $$;
 set local role authenticated;
