@@ -179,6 +179,7 @@ uploaded as the `browser-regression` artifact.
 
 ## Documentation
 
+- [Contributing](CONTRIBUTING.md) — branch naming, commit message and pull request conventions (SG2-19)
 - [CI setup and validation](docs/ci.md) — SG2-22 acceptance criteria, required branch protection, and Supabase HTTPS configuration
 - [Test audit and course case guide](docs/testing.md) — test-suite breakdown and how automated checks map to 4–5 functional cases per feature
 - [Purposeful regression register](docs/regression.md) — current cases, Playwright scope and historical-case consolidation
