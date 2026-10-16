@@ -2,7 +2,7 @@
 
 Revision note: the original 14 Oct design described main `1d1e336`. This revision describes PR90 head `61416cc`, including merged PR92; it does not claim that PR90 is merged or that every Done criterion has passed hosted acceptance. Jira status was refreshed on 16 Oct 2026.
 
-As of PR90 head 61416cc (16 Oct 2026). Files: `api-specification.md`, `architectural-decisions.md`.
+Baseline PR90 head 61416cc, extended by the local SG2-46/47 corrections (16 Oct 2026). Files: `api-specification.md`, `architectural-decisions.md`.
 
 ## api-specification.md
 - Mounts and order: `server/src/app.ts:123-320`.
@@ -29,7 +29,8 @@ As of PR90 head 61416cc (16 Oct 2026). Files: `api-specification.md`, `architect
   - RPCs: `202610140002_equipment_reserved_shortfall.sql`, `202610120001_equipment_availability.sql`, `202610140001_equipment_reservations.sql`
 - Week 7 markers: story tags in route and handler comments, plus `git log --diff-filter=A` dates of the router files. Week 7 started 2026-10-05 (first merge: SG2-84/85).
 - SG2-81 changes existing request/decision contracts, adds `replaces_booking_id`, booking `affected_by` / pending `replacement`, disruption counts in readiness, and `venue_unavailable` notifications. No replacement endpoint is invented. Sources: `db/venueDisruptions.ts`, `db/venueBookings.ts`, `venues/bookingRequests.ts`, migration `202610170001`; final confirmation combines those checks with persisted planning flags in `202610170002`.
-- Route-set check: regex over `app.ts` and router files, compared with the §2 index (73 = 73, no differences).
+- Historical route-set check: baseline code and index matched 73 pairs. The capacity revision adds one explicit GET registration (`venues/suitabilityRoutes.ts`) under the existing booking-request mount: current catalogue 74 unique pairs / 71 registrations. Original 73 index rows are preserved.
+- SG2-47 discovery: `db/venueSuitability.ts` uses named joins and ordered 1,000-row batches; creator scope is enforced in both database query and handler. `client/src/screens/CapacityExceptions.tsx` supplies Organiser/TSS navigation to the existing suitability and approval routes. No DDL or permission expansion; the exception remains distinct from Venue Staff booking approval.
 
 ## architectural-decisions.md
 

@@ -232,3 +232,32 @@ disabled. Evidence: `/tmp/sg2-26-required-regression.log` and
 `/tmp/sg2-26-playwright-results.json`. This verifies application/API wiring with
 isolated storage; it does not claim deployed Supabase verification. The new gate
 must still run on GitHub after this change is pushed.
+
+
+## 16 Oct 2026 — SG2-47 capacity discovery revision
+
+`SG2-47-CAPACITY-DISCOVERY-01` groups 28 new test declarations: 15 client,
+10 server/adapter/native and three browser journeys (`SG2-47-P03`, `P04`,
+`N02`). Two existing client declarations were revised. The historical
+`SG2-47-P01`, `P02` and `N01` records and their previous execution evidence are
+preserved. Source-method IDs, category tags and mapped ACs are recorded in
+`regression-cases.json` and the generated method inventory.
+
+Organisers discover only their own eligible requests; Technical Support and
+Venue Staff retain their existing cross-event exception authority. Discovery
+uses the existing approval permission, with no broader event-list permission.
+The selected request opens the existing suitability and approval action.
+The receipt does not approve or reserve a booking: Venue Staff still make that
+separate decision. The list excludes missing facilities, decided or already
+covered requests, and reads all ordered database batches without silently
+truncating at 1,000.
+
+Local verification: frontend 1,419 and backend 1,466 cases passed, both with
+100% statements, branches, functions and lines; native API/PostgREST/PostgreSQL
+integration passed 10/10. The full browser run passed 110/110 with no skipped,
+flaky or retried cases. Its three capacity journeys and four smoke journeys
+are subsets of 110. Browser storage uses the resettable fixture; native
+integration separately verifies named foreign-key joins and real database
+ownership/receipt behavior. These are local execution results. Pushed-head CI,
+hosted approval workflows and independent peer review remain separate gates;
+this record does not clear every Done criterion.

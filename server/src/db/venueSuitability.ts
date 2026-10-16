@@ -44,6 +44,14 @@ export interface CapacityExceptionRecord extends CapacityExceptionGrant {
 export type NewCapacityException = Pick<CapacityExceptionRecord,
   'request_id' | 'approved_by' | 'approver_role' | 'expected_attendance' | 'venue_capacity'>;
 
+/** Internal joined rows; the API projects only the fields needed to choose
+ * an approval. Owner IDs, requirement text and grants never become list fields. */
+export interface PendingCapacityRequest extends BookingRequestRow {
+  event: SuitabilityEventRow;
+  venue: SuitabilityVenueRow;
+  exceptions: CapacityExceptionGrant[];
+}
+
 export interface VenueSuitabilityStore {
   event(eventId: number): Promise<SuitabilityEventRow | null>;
   /** Every venue in name order, or only the one given. */
@@ -53,12 +61,15 @@ export interface VenueSuitabilityStore {
   exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
   /** Null when the same approval was recorded concurrently by someone else. */
   recordException(values: NewCapacityException): Promise<CapacityExceptionRecord | null>;
+  /** Scope an organiser in the database, before any joined rows are returned. */
+  pendingCapacityRequests(organiserId?: string): Promise<PendingCapacityRequest[]>;
 }
 
 const EVENT_COLUMNS = 'event_id,name,organiser_id,coordinator_id,status,expected_attendance,venue_requirements,accessibility_needs';
 const VENUE_COLUMNS = 'venue_id,name,location,capacity,facilities,accessibility_features';
 const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status';
 const EXCEPTION_COLUMNS = 'exception_id,request_id,approved_by,approver_role,expected_attendance,venue_capacity,approved_at';
+const PENDING_CAPACITY_COLUMNS = `${REQUEST_COLUMNS},event:events!venue_booking_requests_event_id_fkey!inner(${EVENT_COLUMNS}),venue:venues!venue_booking_requests_venue_id_fkey!inner(${VENUE_COLUMNS}),exceptions:venue_capacity_exceptions!venue_capacity_exceptions_request_id_fkey(expected_attendance)`;
 
 type Row = Omit<CapacityExceptionRecord, 'approver_name'>;
 
@@ -77,6 +88,21 @@ export function createVenueSuitabilityStore(admin: SupabaseClient): VenueSuitabi
     return rows.map(row => ({ ...row, approver_name: names.get(row.approved_by) ?? null }));
   }
   return {
+    async pendingCapacityRequests(organiserId) {
+      const rows: PendingCapacityRequest[] = [];
+      let more: boolean;
+      do {
+        const offset = rows.length;
+        let query = admin.from('venue_booking_requests').select(PENDING_CAPACITY_COLUMNS).eq('status', 'pending');
+        if (organiserId !== undefined) query = query.eq('event.organiser_id', organiserId);
+        const { data, error } = await query.order('request_id').range(offset, offset + 999);
+        check(error || !data);
+        const page = data as unknown as PendingCapacityRequest[];
+        rows.push(...page);
+        more = page.length === 1000;
+      } while (more);
+      return rows;
+    },
     async event(eventId) {
       const { data, error } = await admin.from('events').select(EVENT_COLUMNS).eq('event_id', eventId).maybeSingle();
       check(error);

@@ -5907,5 +5907,92 @@
       "TC-a23df58c1687"
     ],
     "notes": "Independent PR90 test-case review remains pending. Historical source-test identities and the renamed keyword-boundary workbook identity must be preserved."
+  },
+  {
+    "id": "SG2-47-CAPACITY-DISCOVERY-01",
+    "title": "Eligible Organiser and Technical Support capacity requests are reachable without broadening booking authority",
+    "type": "Normal / boundary / failure / conflict",
+    "story": "SG2-47",
+    "purpose": "Repair the missing normal-navigation approval workflow for roles already authorised by SG2-47 AC3, retaining creator isolation and separate Venue Staff booking decisions.",
+    "preconditions": "Local React/Express and controlled identity/storage for unit/browser layers; separate disposable PostgreSQL/PostgREST for native integration. Hosted acceptance and independent peer review are separate pending gates.",
+    "steps": [
+      "Open Capacity exceptions as an Organiser and Technical Support user; inspect eligible cards and select an existing request.",
+      "Verify Organiser creator-only visibility, role-denied access, query spoof resistance, empty/null-capacity handling, malformed responses and retry states.",
+      "Approve through the existing action and inspect the real receipt; refresh to remove covered requests.",
+      "Verify missing facilities, decided requests and covering grants are excluded; read beyond 1,000 candidates and fail safely on a later-page error.",
+      "Verify approval leaves the request pending and unbooked, then Venue Staff independently approves a booking."
+    ],
+    "data": "Own and colleague requests; capacity 120 / attendance 150; missing facility, missing attendance, null capacity, covered and decided requests; 1,001-row adapter boundary; invalid HTTP response and stale approval conflict.",
+    "expected": "Only eligible scoped requests are discoverable. Denied or spoofed calls expose no other organiser and write nothing. Selected approval shows its own receipt. Exception approval alone never commits a booking; separate Venue Staff decision does. Later-page failure returns an error rather than a partial successful list.",
+    "evidence": "client/src/{App.test.tsx,screens/CapacityExceptions.test.tsx,venues/capacityExceptionsApi.test.ts}; server/src/{db/venueSuitability.test.ts,venue-suitability-routes.test.ts}; integration/api.test.ts; e2e/capacity-exceptions.spec.ts; docs/test-case-inventory.json",
+    "layer": "Public client/UI mocked HTTP; real loopback Express with controlled store; native API/PostgREST/PostgreSQL; browser over resettable memory DB/RPC fixture",
+    "status": "Pass",
+    "actual": "Local frontend 1,419 and backend 1,466 cases passed, each with 100% statements, branches, functions and lines. Native integration 10/10 passed. All 110 browser cases passed once with zero skipped, failed, flaky or retried cases, including three new capacity journeys and four smoke cases (subsets, not additional totals). These results do not establish hosted acceptance.",
+    "execution_evidence": "16 Oct 2026 local runners; capacity server/frontend/E2E handoffs and ignored output/staging-e2e-2026-10-16/verification/capacity-full-browser-110. Native integration uses actual PostgREST and PostgreSQL; browser storage is a fixture. Pushed-head CI and hosted workflow retest pending for this revision.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (local automated runners; not independent peer approval)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC3",
+      "SG2-47:AC5",
+      "SG2-25:AC1",
+      "SG2-25:AC2",
+      "SG2-25:AC3",
+      "SG2-49:AC1",
+      "SG2-49:AC3",
+      "SG2-86:AC2"
+    ],
+    "source_method_ids": [
+      "TC-80ad0eda772a",
+      "TC-25f6cc2ada9f",
+      "TC-87c11af29527",
+      "TC-612910aeb6b4",
+      "TC-849a59c8261d",
+      "TC-1a861da9306d",
+      "TC-df9c4d68d2d7",
+      "TC-519f5123d127",
+      "TC-0336ae9929eb",
+      "TC-3d9c9998d39a",
+      "TC-a6c0b8b9030c",
+      "TC-6b2ad4efa1e3",
+      "TC-a7cfcd286148",
+      "TC-675beceeb96b",
+      "TC-de323dc2531e",
+      "TC-17e7d2dbef7c",
+      "TC-4d06b4d5e4ae",
+      "TC-bced1830aecd",
+      "TC-ba1c733ff50e",
+      "TC-3a48cfcc9d5d",
+      "TC-0961d3a822ea",
+      "TC-c26acc317a71",
+      "TC-392a7ca9c77e",
+      "TC-ab07f7ca796d",
+      "TC-ca259369136a",
+      "TC-040f5bb0680d",
+      "TC-1371b802a92e",
+      "TC-59268c4cd719"
+    ],
+    "method_scope": {
+      "new_declarations": 28,
+      "frontend": 15,
+      "server_adapter_route_native": 10,
+      "browser": 3,
+      "frontend_revised_declarations": 2,
+      "revised_method_ids": [
+        "TC-6aa41d5ab5b0",
+        "TC-7e7ab4e858fd"
+      ],
+      "browser_case_ids": [
+        "SG2-47-P03",
+        "SG2-47-P04",
+        "SG2-47-N02"
+      ]
+    },
+    "notes": "Grouped supporting-method record, not 28 independently accepted user workflows. SG2-47-P01/P02/N01 historical executions remain unchanged. Existing permission and POST eligibility rules are reused, not expanded. All four category tags occur in the new source tests; parameterized runner counts differ from declaration counts. DoD test traceability is recorded; independent PR review and full hosted Done acceptance remain open."
   }
 ]

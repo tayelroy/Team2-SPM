@@ -1,15 +1,15 @@
-# ConnectSphere API specification — as of PR90 head 61416cc (16 Oct 2026)
+# ConnectSphere API specification — PR90 capacity-discovery revision (16 Oct 2026)
 
 SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at the documented snapshot. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
 
 - **Ground truth:** `server/src/app.ts` (mounts), the routers it mounts (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue}/*.ts`), `server/src/auth/policy.ts` (`PERMISSIONS`), the `server/src/db/*` adapters, and the RPCs in `supabase/migrations/*.sql`.
-- **Revision scope:** PR90 head `61416cc` includes merged PR92 (`64b1da6`). The route catalogue retains the original 73 paths; SG2-81 extends existing request and decision routes, and adds no replacement endpoint. Source line numbers inherited from the original catalogue are locators for that baseline; source filenames and the contracts below identify the current implementation. Safety routes remain planned.
-- **Endpoint count:** 73 method + path pairs, from 70 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
+- **Revision scope:** The baseline PR90 head `61416cc` includes merged PR92 (`64b1da6`). Subsequent SG2-46 facility matching and SG2-47 capacity-discovery corrections are described below. Capacity discovery adds one GET endpoint; SG2-81 still uses existing request and decision routes. Original catalogue line numbers locate the baseline; source filenames and current contracts identify later changes. Safety routes remain planned. This specification describes the local capacity revision, not a claim of hosted acceptance or peer approval.
+- **Endpoint count:** 74 method + path pairs, from 71 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
 - **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `connectsphere.dsl` (C3 API components), `sequence-diagrams.puml`, `data-model.puml`, `class-diagram.puml`, `event-status-model.puml`.
 
 ## Contents
 1. [Conventions](#1-conventions)
-2. [Endpoint index](#2-endpoint-index) (all 73, one row each)
+2. [Endpoint index](#2-endpoint-index) (all 74, one row each)
 3. [Auth, accounts and profile](#3-auth-accounts-and-profile)
 4. [Event requests](#4-event-requests)
 5. [Queues and notifications](#5-queues-and-notifications)
@@ -144,6 +144,8 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 71 | GET | `/api/health` | public | anyone | — | [10.1](#101-get-health-and-get-apihealth) |
 | 72 | GET | `/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
 | 73 | GET | `/api/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
+
+| 74 | GET | `/api/venue-booking-requests/capacity-exceptions` | `venue_booking.capacity_exception.approve` | VS, TSS, EO | SG2-47 reachability repair | [7.8](#78-get-apivenue-booking-requestscapacity-exceptions) |
 
 ### What each role can call today
 - **ATT:** only rows 3, 5 and 6 (`/api/auth/me`, `/api/profile`), plus the public endpoints.
@@ -696,7 +698,7 @@ The routers mounted at `/api/venue-booking-requests` are, in order:
 
 Request, conflict, suitability and listing reads use the service-role client. The decide and withdraw writes call RPCs with the caller's token.
 
-**Rule for every route here:** an EC sees only events assigned to them; VS see every event.
+**Scope:** an EC sees only assigned events on routes granting EC access; VS and TSS have cross-event suitability/exception authority. EO suitability and exception access is creator-only. Listing booking requests (§7.2) still grants only EC and VS. Discovery (§7.8) does not widen general event or venue permissions.
 
 **Request record:**
 - identity: `request_id, event_id, venue_id, venue_name`
@@ -803,7 +805,17 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 exception already approved
   - 503
 - **Rule:** an EO only for their own event.
-- **Data:** inserts into `venue_capacity_exceptions`.
+- **Data:** inserts into `venue_capacity_exceptions`. Actor, role, attendance and capacity come from the verified session and current stored rows; no approval body is required. Pending status, ownership, missing facilities and existing coverage are rechecked independently of discovery.
+- **Reachability:** Organiser and Technical Support navigation opens **Capacity exceptions**, then the existing suitability view and approval action. Venue Staff retain their existing request queue. Approval shows the stored receipt but leaves the booking request pending and creates no booking; Venue Staff must make a separate booking decision. Refreshing discovery removes a covered request.
+
+### 7.8 GET /api/venue-booking-requests/capacity-exceptions
+- **Source:** `venues/suitabilityRoutes.ts` (`createBookingRequestSuitabilityRouter`); `db/venueSuitability.ts` (`pendingCapacityRequests`); `client/src/screens/CapacityExceptions.tsx`.
+- **Permission:** existing `venue_booking.capacity_exception.approve` (VS, TSS, EO). EC, ECL, SO and ATT are denied before the store is read.
+- **Input:** no body or supported owner/event selector. Scope comes from the verified principal; caller query parameters cannot select another organiser.
+- **200:** `{ requests: [{ request_id, event_id, event_name, venue_name, starts_at, ends_at, expected_attendance, venue_capacity }] }`. IDs and attendance are positive integers; periods are ISO timestamps. Capacity is an integer or `null` when not recorded. Empty results are `{ requests: [] }`; blank names use `Untitled event` / `Unnamed venue`. Owner IDs, requirement text and approval records are not list fields.
+- **Eligibility:** pending requests with positive recorded attendance, a capacity issue not already covered by an exception, and no missing required facility. Suitability and coverage use the existing assessment rules, including unrecorded venue capacity. A list entry is not an approval or reservation.
+- **Scope and reads:** EO queries filter `event.organiser_id` in the database and the handler independently checks creator ownership. VS/TSS may discover eligible requests across events. Named event/venue/exception foreign keys avoid ambiguous PostgREST embeds. Ordered batches of 1,000 are read until exhausted; later-page failure returns 503 instead of a partial successful list. The response has the protected route's `Cache-Control: no-store`.
+- **Errors:** common 401/403; 503 when the service or any read fails. Existing GET suitability and POST capacity-exception endpoints remain authoritative if a request changes after discovery.
 
 ---
 
@@ -1096,5 +1108,5 @@ In each case the code wins, and this spec follows the code.
 
 ## How the route list was verified
 1. **Registrations:** every `app.(get|post|use)` in `app.ts` and every `router.(get|post|patch|put|delete)` / `eventRequests.*` / `rolesRouter.*` registration in the mounted routers were listed with a regex and joined to their mount prefixes.
-2. **Count:** 70 registrations. Three of them each register two paths (`GET /api/work-queue` + `/:kind/:itemId`, `GET /health` + `/api/health`, `GET /health/db` + `/api/health/db`), giving 73 method + path pairs. The set extracted from code was compared against the §2 index with a script: equal, with no missing and no extra rows.
+2. **Count:** the original code/index comparison established 70 registrations and 73 method/path pairs. This revision adds the explicit GET registration in `createBookingRequestSuitabilityRouter`, mounted at `/api/venue-booking-requests`, giving 71 registrations and 74 unique indexed pairs. The three dual-path registrations (work queue and the two health checks) are unchanged. The original 73 index entries are retained verbatim; the added contract is row 74.
 3. **Permissions:** each permission key in §2 is the literal argument to `requirePermission` at that registration, and each role list is that key's entry in `PERMISSIONS`.

@@ -16,7 +16,7 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
       const builder: Record<string, unknown> = {
         then: (resolve: (value: Result) => unknown) => Promise.resolve(result).then(resolve)
       };
-      for (const method of ['select', 'eq', 'in', 'order', 'maybeSingle', 'insert']) {
+      for (const method of ['select', 'eq', 'in', 'order', 'range', 'maybeSingle', 'insert']) {
         builder[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return builder; };
       }
       return builder;
@@ -26,6 +26,38 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
 
 const exception = { exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_role: 'venue_staff',
   expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' };
+
+test('[NORMAL] [SG2-47:AC3] pending exception discovery applies the organiser scope in its named-FK database query', async () => {
+  const calls: Call[] = [];
+  const row = { request_id: 31, event: { organiser_id: 'owner' }, venue: { name: 'Theatre' }, exceptions: [] };
+  const store = createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [{ data: [row], error: null }] }, calls));
+  assert.deepEqual(await store.pendingCapacityRequests('owner'), [row]);
+  assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => call.args), [['status', 'pending'], ['event.organiser_id', 'owner']]);
+  const selection = String(calls.find(call => call.method === 'select')!.args[0]);
+  assert.match(selection, /event:events!venue_booking_requests_event_id_fkey!inner\(/);
+  assert.match(selection, /venue:venues!venue_booking_requests_venue_id_fkey!inner\(/);
+  assert.match(selection, /exceptions:venue_capacity_exceptions!venue_capacity_exceptions_request_id_fkey\(expected_attendance\)/);
+  assert.deepEqual(calls.find(call => call.method === 'range')!.args, [0, 999]);
+});
+
+test('[BOUNDARY] [SG2-47:AC3] staff discovery reads beyond the default thousand-row database page without an organiser restriction', async () => {
+  const calls: Call[] = [];
+  const first = Array.from({ length: 1000 }, (_, index) => ({ request_id: index + 1 }));
+  const store = createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [
+    { data: first, error: null }, { data: [{ request_id: 1001 }], error: null }
+  ] }, calls));
+  assert.deepEqual((await store.pendingCapacityRequests()).map(row => row.request_id), Array.from({ length: 1001 }, (_, index) => index + 1));
+  assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => call.args), [['status', 'pending'], ['status', 'pending']]);
+  assert.deepEqual(calls.filter(call => call.method === 'range').map(call => call.args), [[0, 999], [1000, 1999]]);
+  assert.deepEqual(calls.filter(call => call.method === 'order').map(call => call.args), [['request_id'], ['request_id']]);
+});
+
+test('[FAILURE] [SG2-47:AC3] missing rows or a failed capacity-worklist read never return a partial successful list', async () => {
+  for (const result of [{ data: null, error: null }, { data: null, error: { message: 'PRIVATE database details' } }]) {
+    await assert.rejects(createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [result] })).pendingCapacityRequests('owner'),
+      (error: unknown) => error instanceof AccessError && error.status === 503);
+  }
+});
 
 test('[NORMAL] [SG2-47:suitability-store] the store reads one event and one booking request by id', async () => {
   const calls: Call[] = [];

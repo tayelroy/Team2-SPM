@@ -23,6 +23,7 @@ import { createAddClarificationHandler, createListClarificationsHandler } from '
 import express from 'express';
 import { createVenueBookingRequestsRouter } from '../server/src/venues/bookingRequests';
 import { createGetEventArrangementsHandler } from '../server/src/events/getArrangements';
+import { createBookingRequestSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -346,5 +347,71 @@ test('[NORMAL] [SG2-41:AC2] [SG2-41:AC3] native venue and equipment request proj
     assert.equal(response.body.items[0].event_id, id);
     assert.equal(response.body.items[0].details.notes, 'Synthetic request');
     assert.equal((await api.get(`/api/work-queue/event/${id}`).set(auth(who))).status, 404);
+  }
+});
+
+test('[NORMAL] [FAILURE] [SG2-47:AC3] [SG2-47:AC5] native capacity discovery enforces ownership, resolves real joins and records approval without deciding the booking', async () => {
+  const ownEvent = await planned();
+  const otherEvent = await planned();
+  try {
+    const changed = await database.from('events').update({ expected_attendance: 14, venue_requirements: 'Projector' }).in('event_id', [ownEvent, otherEvent]);
+    assert.equal(changed.error, null);
+    const otherOwner = await database.from('events').update({ organiser_id: ids.other }).eq('event_id', otherEvent);
+    assert.equal(otherOwner.error, null);
+    const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 10, facilities: 'Projection' }).select('venue_id').single();
+    assert.equal(venue.error, null);
+    const inserted = await database.from('venue_booking_requests').insert([ownEvent, otherEvent].map(event_id => ({
+      event_id, venue_id: venue.data!.venue_id, starts_at: '2090-06-20T02:00:00Z', ends_at: '2090-06-20T04:00:00Z',
+      requested_by: ids.coordinator, layout: 'theatre'
+    }))).select('request_id,event_id');
+    assert.equal(inserted.error, null);
+    const ownRequest = inserted.data!.find(row => row.event_id === ownEvent)!.request_id as number;
+    const otherRequest = inserted.data!.find(row => row.event_id === otherEvent)!.request_id as number;
+    const approvals = request(express().use(express.json()).use('/api/venue-booking-requests',
+      createBookingRequestSuitabilityRouter(access, { getAdminClient: () => database })));
+    const path = '/api/venue-booking-requests/capacity-exceptions';
+    assert.equal((await approvals.get(path)).status, 401);
+    for (const who of ['coordinator', 'lead', 'other']) {
+      assert.equal((await approvals.get(path).set(auth(who))).status, 403, who);
+    }
+    const ownList = await approvals.get(`${path}?organiser_id=${ids.other}&event_id=${otherEvent}`).set(auth('organiser'));
+    assert.equal(ownList.status, 200, JSON.stringify(ownList.body));
+    assert.deepEqual(ownList.body.requests.map((row: { request_id: number }) => row.request_id), [ownRequest]);
+    assert.deepEqual(Object.keys(ownList.body.requests[0]).sort(), [
+      'request_id', 'event_id', 'event_name', 'venue_name', 'starts_at', 'ends_at', 'expected_attendance', 'venue_capacity'
+    ].sort());
+    assert.equal(ownList.body.requests[0].expected_attendance, 14);
+    assert.equal(ownList.body.requests[0].venue_capacity, 10);
+    for (const who of ['support', 'venue']) {
+      const all = await approvals.get(path).set(auth(who));
+      assert.equal(all.status, 200, JSON.stringify(all.body));
+      assert.deepEqual(all.body.requests.map((row: { request_id: number }) => row.request_id), [ownRequest, otherRequest]);
+    }
+    assert.equal((await approvals.get(`/api/venue-booking-requests/${otherRequest}/suitability`).set(auth('organiser'))).status, 404);
+    assert.equal((await approvals.post(`/api/venue-booking-requests/${otherRequest}/capacity-exception`).set(auth('organiser'))).status, 404);
+    for (const [who, requestId] of [['organiser', ownRequest], ['support', otherRequest]] as const) {
+      const approved = await approvals.post(`/api/venue-booking-requests/${requestId}/capacity-exception`).set(auth(who))
+        .send({ approved_by: ids.coordinator, expected_attendance: 1 });
+      assert.equal(approved.status, 201, JSON.stringify(approved.body));
+      assert.equal(approved.body.exception.approved_by, ids[who]);
+      assert.equal(approved.body.exception.expected_attendance, 14);
+      assert.equal(approved.body.exception.venue_capacity, 10);
+      assert.equal(approved.body.booking, 'allowed');
+      const receipt = await approvals.get(`/api/venue-booking-requests/${requestId}/suitability`).set(auth(who));
+      assert.equal(receipt.status, 200, JSON.stringify(receipt.body));
+      assert.deepEqual(receipt.body.exceptions, [approved.body.exception]);
+      const pending = await database.from('venue_booking_requests').select('status,venue_booking_id').eq('request_id', requestId).single();
+      assert.equal(pending.error, null);
+      assert.deepEqual(pending.data, { status: 'pending', venue_booking_id: null });
+      assert.deepEqual((await approvals.get(path).set(auth('organiser'))).body, { requests: [] });
+    }
+    assert.deepEqual((await approvals.get(path).set(auth('support'))).body, { requests: [] });
+    const bookings = await database.from('venue_bookings').select('booking_id').in('event_id', [ownEvent, otherEvent]);
+    assert.equal(bookings.error, null);
+    assert.deepEqual(bookings.data, []);
+  } finally {
+    // Restore cleanup ownership even when an assertion fails in a reused CI DB.
+    const restored = await database.from('events').update({ organiser_id: ids.organiser }).eq('event_id', otherEvent);
+    assert.equal(restored.error, null);
   }
 });
