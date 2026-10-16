@@ -42,7 +42,8 @@ insert into public.account_roles (user_id, role) values
 insert into public.venues (venue_id, name, location, capacity, facilities, accessibility_features, operating_information) values
   (97701, 'Main Hall', 'Level 1', 200, 'Stage', 'Step-free', '08:00-22:00'),
   (97702, 'Quiet Room', 'Level 2', 20, 'Whiteboard', 'Lift', '09:00-18:00'),
-  (97703, 'No operations yet', 'Level 3', 10, 'Projector', 'Lift', '09:00-18:00');
+  (97703, 'No operations yet', 'Level 3', 10, 'Projector', 'Lift', '09:00-18:00'),
+  (97704, 'Audit probe', 'Level 4', 10, 'Projector', 'Lift', '09:00-18:00');
 
 -- 1. Values and limits:
 do $$
@@ -124,6 +125,87 @@ begin
     raise exception '[SG2-77:history-forgery] [SG2-77:AC6] [FAILURE] Nobody may write change history directly';
   exception when insufficient_privilege then null;
   end;
+end $$;
+
+-- 2b. Real upsert semantics: only the persisted INSERT or UPDATE creates
+-- field history. A discarded INSERT attempt is not a recorded user change.
+do $$
+declare
+  initial_history jsonb;
+  before_failure jsonb;
+  history_count integer;
+begin
+  insert into public.venue_operations (venue_id, setup_minutes, turnaround_minutes, emergency_access)
+    values (97704, 10, 15, 'Signed east exit')
+    on conflict (venue_id) do update set setup_minutes = excluded.setup_minutes,
+      turnaround_minutes = excluded.turnaround_minutes, emergency_access = excluded.emergency_access;
+  if (select count(*) from public.venue_operation_history where venue_id = 97704) <> 3
+     or (select count(*) from public.venue_operation_history where venue_id = 97704
+       and old_value is null and changed_by = auth.uid() and changed_at =
+         (select updated_at from public.venue_operations where venue_id = 97704)
+       and ((field_name = 'setup_minutes' and new_value = '10')
+         or (field_name = 'turnaround_minutes' and new_value = '15')
+         or (field_name = 'emergency_access' and new_value = 'Signed east exit'))) <> 3 then
+    raise exception '[SG2-77:upsert-initial-persisted-audit] [SG2-77:AC6] [NORMAL] The first actual insert records each initialized field once with the real Staff actor and persisted timestamp';
+  end if;
+  select jsonb_agg(to_jsonb(h) order by history_id) into initial_history
+    from public.venue_operation_history h where venue_id = 97704;
+  insert into public.venue_operations (venue_id, setup_minutes, turnaround_minutes, emergency_access)
+    values (97704, 10, 16, 'Signed east exit')
+    on conflict (venue_id) do update set setup_minutes = excluded.setup_minutes,
+      turnaround_minutes = excluded.turnaround_minutes, emergency_access = excluded.emergency_access;
+  if (select count(*) from public.venue_operation_history where venue_id = 97704) <> 4
+     or (select count(*) from public.venue_operation_history where venue_id = 97704
+       and field_name = 'turnaround_minutes' and old_value = '15' and new_value = '16'
+       and changed_by = auth.uid()) <> 1 then
+    raise exception '[SG2-77:upsert-only-actual-transition] [SG2-77:AC6] [NORMAL] Updating one field through upsert adds exactly its actual old-to-new transition, without false insertion history';
+  end if;
+  if (select jsonb_agg(to_jsonb(h) order by history_id) from
+       (select * from public.venue_operation_history where venue_id = 97704 order by history_id limit 3) h)
+       is distinct from initial_history then
+    raise exception '[SG2-77:upsert-history-preserved] [SG2-77:AC6] [BOUNDARY] A later upsert must preserve all existing audit records unchanged';
+  end if;
+  insert into public.venue_operations (venue_id, setup_minutes, turnaround_minutes, emergency_access)
+    values (97704, 10, 16, 'Signed east exit')
+    on conflict (venue_id) do update set setup_minutes = excluded.setup_minutes,
+      turnaround_minutes = excluded.turnaround_minutes, emergency_access = excluded.emergency_access;
+  if (select count(*) from public.venue_operation_history where venue_id = 97704) <> 4 then
+    raise exception '[SG2-77:upsert-no-op-no-history] [SG2-77:AC6] [BOUNDARY] An unchanged upsert adds no field history';
+  end if;
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000006', true);
+  insert into public.venue_operations (venue_id, setup_minutes, turnaround_minutes, emergency_access)
+    values (97704, 10, 16, null)
+    on conflict (venue_id) do update set emergency_access = excluded.emergency_access;
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000001', true);
+  insert into public.venue_operations (venue_id, setup_minutes, turnaround_minutes, emergency_access)
+    values (97704, 10, 16, 'Signed west exit')
+    on conflict (venue_id) do update set emergency_access = excluded.emergency_access;
+  if (select count(*) from public.venue_operation_history where venue_id = 97704) <> 6
+     or (select count(*) from public.venue_operation_history where venue_id = 97704
+       and field_name = 'emergency_access' and old_value = 'Signed east exit' and new_value is null
+       and changed_by = 'e0000000-0000-4000-8000-000000000006') <> 1
+     or (select count(*) from public.venue_operation_history where venue_id = 97704
+       and field_name = 'emergency_access' and old_value is null and new_value = 'Signed west exit'
+       and changed_by = 'e0000000-0000-4000-8000-000000000001') <> 1 then
+    raise exception '[SG2-77:upsert-nullable-actor-chain] [SG2-77:AC6] [CONFLICT] Clearing and refilling a note records exactly the two real transitions with their separate Staff actors';
+  end if;
+  select to_jsonb(o) into before_failure from public.venue_operations o where venue_id = 97704;
+  select count(*) into history_count from public.venue_operation_history where venue_id = 97704;
+  begin
+    insert into public.venue_operations (venue_id, setup_minutes) values (97704, -1)
+      on conflict (venue_id) do update set setup_minutes = excluded.setup_minutes;
+    raise exception '[SG2-77:upsert-invalid-refused] [SG2-77:AC4] [FAILURE] An invalid upsert must be refused';
+  exception when check_violation then null;
+  end;
+  begin
+    update public.venue_operations set turnaround_minutes = 999 where venue_id = 97704;
+    raise no_data_found; -- Roll back an otherwise valid write and its history.
+  exception when no_data_found then null;
+  end;
+  if (select to_jsonb(o) from public.venue_operations o where venue_id = 97704) is distinct from before_failure
+     or (select count(*) from public.venue_operation_history where venue_id = 97704) <> history_count then
+    raise exception '[SG2-77:upsert-failure-rolls-back-history] [SG2-77:AC6] [FAILURE] Invalid and rolled-back writes preserve the stored values, metadata and complete audit history';
+  end if;
 end $$;
 
 -- 3. Coordinators and Technical Support Staff read but cannot change values:

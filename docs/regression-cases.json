@@ -6337,5 +6337,49 @@
       "TC-91df6da0dbb1",
       "TC-8a22bade2fa6"
     ]
+  },
+  {
+    "id": "SG2-77-PERSISTED-AUDIT",
+    "title": "Venue-operation history records persisted changes rather than discarded upsert insertion attempts",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-77",
+    "purpose": "Repair SG2-77 AC6: the former BEFORE INSERT trigger generated false null-to-current audit rows when a Staff upsert updated an existing venue. Split metadata stamping before persistence from field history after the actual insert/update, retaining every existing audit row.",
+    "preconditions": "Owned disposable PostgreSQL/PostgREST; real Express operations route and caller-JWT adapter; two synthetic Venue Staff and a Coordinator. No hosted credentials or business data.",
+    "steps": [
+      "Save a new venue operation through the normal Staff PUT with setup10/turnaround15 and null notes; verify exactly two initialized numeric fields, Staff identity and matching persisted timestamp.",
+      "Save turnaround16 and require exactly one15-to16 audit transition; repeat the same save and require no extra history.",
+      "Set and clear an emergency-access note with two different Staff; require exactly the real null/value transitions with each actor.",
+      "Refuse Coordinator403 and invalidnegative400 saves without history; run simultaneous Staff17/18 saves and require a coherent serialized old/new chain, final actor and metadata.",
+      "In rollback SQL exercise failed and rolled-back writes; preserve old records. Reproduce the old trigger failure, install170006 twice over legacy populated data and compare exact values, metadata and old history; rerun operations RLS, venue-clash and release-readiness suites."
+    ],
+    "data": "Native setup10, turnaround15→16→17/18; emergency_access null→Use the signed east exit→null; SQL probe97704 with Signed east exit→null→Signed west exit; upgrade preservation fixture97790. Synthetic fixed local JWTs only.",
+    "expected": "Exactly one audit row per actual changed field, zero additional field history on unchanged saves, and no false insertion-attempt rows. Real Staff actor/timestamp and nullable transitions are retained. Invalid/forbidden/rolled-back writes do not add history. Upgrade/replay preserves existing records and does not rewrite ambiguous old history; role security and venue clashes remain unchanged.",
+    "evidence": "supabase/migrations/202610170006_venue_operations_persisted_audit.sql; supabase/tests/venue_operations.sql; integration/api.test.ts",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration + rollback SQL + explicit upgrade/replay verification",
+    "status": "Pass (local automated)",
+    "actual": "Before the fix, new real API case failed: turnaround15→16 added false null→setup10 and null→turnaround16 plus the actual15→16 transition (13 existing native cases passed). After170006 all14 native API cases passed; operations SQL and venue-clash SQL passed;17 readiness regressions passed. The old SQL suite failed at upsert-only-actual-transition before migration, and exact historical row/value/metadata preservation passed after two installs. Integration TypeScript compilation passed. No production TypeScript/React code changed; prior coverage is not represented as a new run.",
+    "execution_evidence": "Ignored output/staging-e2e-2026-10-16/verification/venue-operations-persisted-audit/ contains red/green logs, upgrade runner and source/case handoff. Current local source is uncommitted; new pushed CI and hosted retest remain separate gates.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex local automated verification; not human peer review",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-77:AC6",
+      "SG2-77:AC4"
+    ],
+    "source_method_ids": [
+      "TC-aad027991f96",
+      "SG2-77:upsert-initial-persisted-audit",
+      "SG2-77:upsert-only-actual-transition",
+      "SG2-77:upsert-history-preserved",
+      "SG2-77:upsert-no-op-no-history",
+      "SG2-77:upsert-nullable-actor-chain",
+      "SG2-77:upsert-invalid-refused",
+      "SG2-77:upsert-failure-rolls-back-history"
+    ]
   }
 ]

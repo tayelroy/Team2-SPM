@@ -570,3 +570,106 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-77:AC5] [SG2-77:AC6] [SG2-86:AC2] Safet
     assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', safetyId)).error, null);
   }
 });
+
+test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-77:AC6] actual Staff upserts record only persisted venue-operation changes, no-op saves add no history, and concurrent actors retain their exact old/new chain', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const tokens = { first: jwt('authenticated', ids.venue), second: jwt('authenticated', ids.other), coordinator: jwt('authenticated', ids.coordinator) };
+  const userIds = { first: ids.venue, second: ids.other, coordinator: ids.coordinator };
+  const anonKey = jwt('anon');
+  const operationAccess = createAuthorization({ resolvePrincipal: async token => {
+    const name = (Object.keys(tokens) as (keyof typeof tokens)[]).find(name => tokens[name] === token);
+    if (!name) throw new AccessError(401);
+    const userId = userIds[name];
+    const role = await getAccountRole(database, userId);
+    if (!role.ok) throw new AccessError(403);
+    return { userId, role: role.role as Role };
+  } });
+  const operationApi = request(createApp(undefined, operationAccess));
+  let venueId: number | undefined;
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    assert.equal((await database.from('account_roles').update({ role: 'venue_staff' }).eq('user_id', ids.other)).error, null);
+    const created = await database.from('venues').insert({ name: 'Integration operations exact audit', location: 'Local fixture', capacity: 10,
+      facilities: 'Projector', accessibility_features: 'Step-free', operating_information: '09:00-18:00' }).select('venue_id').single();
+    assert.equal(created.error, null);
+    venueId = created.data!.venue_id;
+    Object.assign(dbConfig, { supabaseUrl: 'https://operations-audit-integration.supabase.test', supabaseAnonKey: anonKey });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://operations-audit-integration.supabase.test') {
+        assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`));
+        assert.equal(original.headers.get('apikey'), anonKey);
+        assert.ok(url.pathname.startsWith('/rest/v1/'));
+        url.pathname = url.pathname.slice('/rest/v1'.length);
+        url.protocol = rest.protocol;
+        url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const values = { setup_minutes: 10, turnaround_minutes: 15, emergency_access: null as string | null, known_restrictions: null };
+    const save = (who: keyof typeof tokens, body = values) => operationApi.put(`/api/venues/${venueId}/operations`)
+      .set({ Authorization: `Bearer ${tokens[who]}` }).send(body);
+    const history = async () => {
+      const result = await database.from('venue_operation_history').select('history_id,field_name,old_value,new_value,changed_by,changed_at').eq('venue_id', venueId!).order('history_id');
+      assert.equal(result.error, null);
+      return result.data!;
+    };
+    const changes = (rows: Awaited<ReturnType<typeof history>>) => rows.map(({ field_name, old_value, new_value, changed_by }) => ({ field_name, old_value, new_value, changed_by }));
+    const initial = await save('first');
+    assert.equal(initial.status, 200, JSON.stringify(initial.body));
+    const firstHistory = await history();
+    assert.deepEqual(changes(firstHistory), [
+      { field_name: 'setup_minutes', old_value: null, new_value: '10', changed_by: ids.venue },
+      { field_name: 'turnaround_minutes', old_value: null, new_value: '15', changed_by: ids.venue }
+    ]);
+    assert.ok(firstHistory.every(row => Number.isFinite(Date.parse(row.changed_at)) && row.changed_at === initial.body.operations.updated_at));
+    values.turnaround_minutes = 16;
+    assert.equal((await save('first')).status, 200);
+    const afterChange = await history();
+    assert.deepEqual(afterChange.slice(0, firstHistory.length), firstHistory, 'Earlier audit rows remain byte-for-byte unchanged.');
+    assert.deepEqual(changes(afterChange.slice(firstHistory.length)), [
+      { field_name: 'turnaround_minutes', old_value: '15', new_value: '16', changed_by: ids.venue }
+    ]);
+    assert.equal((await save('first')).status, 200);
+    assert.deepEqual(await history(), afterChange, 'An identical public upsert must add zero audit rows.');
+    values.emergency_access = 'Use the signed east exit';
+    assert.equal((await save('second')).status, 200);
+    values.emergency_access = null;
+    assert.equal((await save('first')).status, 200);
+    const afterClear = await history();
+    assert.deepEqual(changes(afterClear.slice(afterChange.length)), [
+      { field_name: 'emergency_access', old_value: null, new_value: 'Use the signed east exit', changed_by: ids.other },
+      { field_name: 'emergency_access', old_value: 'Use the signed east exit', new_value: null, changed_by: ids.venue }
+    ]);
+    assert.equal((await save('coordinator', { ...values, turnaround_minutes: 500 })).status, 403);
+    assert.equal((await save('first', { ...values, setup_minutes: -1 })).status, 400);
+    assert.deepEqual(await history(), afterClear, 'Refused and invalid public saves do not fabricate change history.');
+    const parallel = await Promise.all([
+      save('first', { ...values, turnaround_minutes: 17 }),
+      save('second', { ...values, turnaround_minutes: 18 })
+    ]);
+    assert.deepEqual(parallel.map(response => response.status), [200, 200]);
+    const finalHistory = await history();
+    assert.deepEqual(finalHistory.slice(0, afterClear.length), afterClear);
+    const chain = finalHistory.slice(afterClear.length);
+    assert.equal(chain.length, 2);
+    assert.ok(chain.every(row => row.field_name === 'turnaround_minutes' && Number.isFinite(Date.parse(row.changed_at))));
+    assert.equal(chain[0].old_value, '16');
+    assert.equal(chain[1].old_value, chain[0].new_value);
+    assert.deepEqual(chain.map(row => row.new_value).sort(), ['17', '18']);
+    for (const row of chain) assert.equal(row.changed_by, row.new_value === '17' ? ids.venue : ids.other);
+    const final = await database.from('venue_operations').select('*').eq('venue_id', venueId!).single();
+    assert.equal(final.error, null);
+    assert.equal(String(final.data!.turnaround_minutes), chain[1].new_value);
+    assert.equal(final.data!.updated_by, chain[1].changed_by);
+    assert.equal(final.data!.updated_at, chain[1].changed_at);
+    assert.equal(final.data!.emergency_access, null);
+  } finally {
+    transport?.mock.restore();
+    Object.assign(dbConfig, originalConfig);
+    if (venueId !== undefined) assert.equal((await database.from('venues').delete().eq('venue_id', venueId)).error, null);
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
+  }
+});
