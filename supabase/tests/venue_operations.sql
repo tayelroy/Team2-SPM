@@ -41,7 +41,8 @@ insert into public.account_roles (user_id, role) values
 
 insert into public.venues (venue_id, name, location, capacity, facilities, accessibility_features, operating_information) values
   (97701, 'Main Hall', 'Level 1', 200, 'Stage', 'Step-free', '08:00-22:00'),
-  (97702, 'Quiet Room', 'Level 2', 20, 'Whiteboard', 'Lift', '09:00-18:00');
+  (97702, 'Quiet Room', 'Level 2', 20, 'Whiteboard', 'Lift', '09:00-18:00'),
+  (97703, 'No operations yet', 'Level 3', 10, 'Projector', 'Lift', '09:00-18:00');
 
 -- 1. Values and limits:
 do $$
@@ -177,6 +178,47 @@ begin
   end;
 end $$;
 
+-- 3c. The narrow identity RPC does not require catalogue read access and
+-- does not grant that access. Its caller identity comes from auth.uid().
+do $$
+declare reader uuid;
+begin
+  foreach reader in array array[
+    'e0000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000002',
+    'e0000000-0000-4000-8000-000000000003', 'e0000000-0000-4000-8000-000000000007'
+  ]::uuid[] loop
+    perform set_config('request.jwt.claim.sub', reader::text, true);
+    if public.venue_exists_for_operations_read(97701) is distinct from true then
+      raise exception '[SG2-77:operations-reader-venue-identity] [SG2-77:AC5] [NORMAL] Each of the four operations readers must resolve an existing venue';
+    end if;
+    if public.venue_exists_for_operations_read(97703) is distinct from true
+       or public.venue_exists_for_operations_read(97799) is distinct from false
+       or public.venue_exists_for_operations_read(null) is distinct from false then
+      raise exception '[SG2-77:operations-identity-no-row-and-missing] [SG2-77:AC3] [SG2-77:AC5] [BOUNDARY] Existing venues without operations remain identifiable; missing or null identities return false';
+    end if;
+  end loop;
+  if exists (select 1 from public.venues where venue_id = 97701) then
+    raise exception '[SG2-77:safety-identity-without-catalogue] [SG2-77:AC5] [SG2-86:AC2] [FAILURE] Resolving venue identity must not reveal its catalogue row to Safety';
+  end if;
+  foreach reader in array array[
+    'e0000000-0000-4000-8000-000000000004', 'e0000000-0000-4000-8000-000000000005',
+    'e0000000-0000-4000-8000-000000000008'
+  ]::uuid[] loop
+    perform set_config('request.jwt.claim.sub', reader::text, true);
+    begin
+      perform public.venue_exists_for_operations_read(97701);
+      raise exception '[SG2-77:operations-identity-role-denied] [SG2-77:AC6] [SG2-86:AC2] [FAILURE] Organiser, Attendee and Lead cannot probe venue identity through the operations RPC';
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  perform set_config('request.jwt.claim.sub', 'e0000000-0000-4000-8000-000000000099', true);
+  begin
+    perform public.venue_exists_for_operations_read(97701);
+    raise exception '[SG2-77:operations-identity-missing-role] [SG2-77:AC6] [FAILURE] An authenticated identity without a role cannot probe venues';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
 -- 4. Organisers and attendees see nothing:
 do $$
 declare caller uuid;
@@ -204,6 +246,21 @@ begin
   begin
     perform * from public.venue_operations;
     raise exception '[SG2-77:anonymous-read] [SG2-77:AC6] [FAILURE] Anonymous caller should not read venue operations';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+-- Execution grants do not turn an anonymous request into an identity reader.
+do $$
+begin
+  if has_function_privilege('anon', 'public.venue_exists_for_operations_read(integer)', 'EXECUTE')
+     or has_function_privilege('service_role', 'public.venue_exists_for_operations_read(integer)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.venue_exists_for_operations_read(integer)', 'EXECUTE') then
+    raise exception '[SG2-77:operations-identity-execute-grants] [SG2-77:AC6] [FAILURE] Only authenticated callers receive RPC execution; its internal role check still applies';
+  end if;
+  begin
+    perform public.venue_exists_for_operations_read(97701);
+    raise exception '[SG2-77:operations-identity-anonymous-denied] [SG2-77:AC6] [FAILURE] Anonymous callers cannot execute the identity RPC';
   exception when insufficient_privilege then null;
   end;
 end $$;
@@ -246,6 +303,11 @@ begin
   if exists (select 1 from public.venue_operations) then
     raise exception '[SG2-77:revoked-safety-officer-read] [SG2-77:AC5] [SG2-86:AC2] [CONFLICT] An account moved off the Safety Officer role must not read venue operations';
   end if;
+  begin
+    perform public.venue_exists_for_operations_read(97701);
+    raise exception '[SG2-77:operations-identity-revoked-safety] [SG2-77:AC5] [SG2-86:AC2] [CONFLICT] An account moved off Safety loses identity RPC access on its next call';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 reset role;
 rollback;

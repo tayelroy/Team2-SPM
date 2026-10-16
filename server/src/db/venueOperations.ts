@@ -38,7 +38,12 @@ export function createVenueOperationStore(token: string): VenueOperationStore {
   }
   return {
     async get(venueId) {
-      if (!(await venueExists(venueId))) return null;
+      // Safety may read operations without reading the venue catalogue. Resolve
+      // only existence through the role-checked RPC, still using its own JWT.
+      const identity = await client.rpc('venue_exists_for_operations_read', { p_venue_id: venueId });
+      check(identity.error, identity.status);
+      if (typeof identity.data !== 'boolean') throw new AccessError(503);
+      if (!identity.data) return null;
       const { data, error, status } = await client.from('venue_operations').select(COLUMNS)
         .eq('venue_id', venueId).maybeSingle();
       check(error, status);

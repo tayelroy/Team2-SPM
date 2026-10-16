@@ -157,3 +157,17 @@ test('[FAILURE] [SG2-22:AC3] [SG2-68:AC1] [SG2-58:AC1] legacy notification kinds
   'notifications_kind_check allows event_approved',
   'notifications_kind_check allows event_rejected');
 });
+
+test('[FAILURE] [SG2-77:AC5] release readiness refuses a missing operations identity RPC', () => {
+  assertReadinessRejects('DROP FUNCTION public.venue_exists_for_operations_read(integer);',
+    'RPC public.venue_exists_for_operations_read(integer)');
+});
+
+test('[FAILURE] [SG2-25:AC2] [SG2-77:AC6] release readiness requires authenticated-only execution of the operations identity RPC', () => {
+  for (const [mutation, diagnostic] of [
+    ['REVOKE EXECUTE ON FUNCTION public.venue_exists_for_operations_read(integer) FROM authenticated;', 'operations identity RPC EXECUTE authenticated = true'],
+    ['GRANT EXECUTE ON FUNCTION public.venue_exists_for_operations_read(integer) TO anon;', 'operations identity RPC EXECUTE anon = false'],
+    ['GRANT EXECUTE ON FUNCTION public.venue_exists_for_operations_read(integer) TO service_role;', 'operations identity RPC EXECUTE service_role = false'],
+    ['GRANT EXECUTE ON FUNCTION public.venue_exists_for_operations_read(integer) TO PUBLIC;', 'operations identity RPC EXECUTE anon = false'],
+  ]) assertReadinessRejects(mutation, diagnostic);
+});

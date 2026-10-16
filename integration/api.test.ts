@@ -1,7 +1,7 @@
 /** Real API handlers and DB adapters over PostgREST/PostgreSQL. Only identity
  * verification is a synthetic token map; authorisation and role reads are real.
  * Run only through test-api-integration.mjs, which owns disposable containers. */
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import request from 'supertest';
@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createApp } from '../server/src/app';
 import { createAuthorization, AccessError, type Role } from '../server/src/auth';
 import { getAccountRole } from '../server/src/db/accountRoles';
+import { dbConfig } from '../server/src/db/config';
 import { createEventDraftHandler } from '../server/src/events/createDraft';
 import { createUpdateEventDraftHandler } from '../server/src/events/updateDraft';
 import { submitEventRequestHandler } from '../server/src/events/submit';
@@ -485,4 +486,87 @@ test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-40:AC2] native concurrent draft 
   assert.deepEqual(await stored(id), before);
   const after = await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'));
   assert.equal(after.body.history.filter((row: { field_name: string }) => row.field_name === 'name').length, 2);
+});
+
+
+test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-77:AC5] [SG2-77:AC6] [SG2-86:AC2] Safety reads saved venue operations through its actual caller JWT without gaining catalogue, write or history access', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const safetyId = ids.other;
+  const tokens = { safety: jwt('authenticated', safetyId), venue: jwt('authenticated', ids.venue) };
+  const anonKey = jwt('anon');
+  const operationAccess = createAuthorization({ resolvePrincipal: async token => {
+    const userId = token === tokens.safety ? safetyId : token === tokens.venue ? ids.venue : undefined;
+    if (!userId) throw new AccessError(401);
+    const role = await getAccountRole(database, userId);
+    if (!role.ok) throw new AccessError(403);
+    return { userId, role: role.role as Role };
+  } });
+  const operationApi = request(createApp(undefined, operationAccess));
+  const venueIds: number[] = [];
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    assert.equal((await database.from('account_roles').update({ role: 'safety_officer' }).eq('user_id', safetyId)).error, null);
+    for (const name of ['Integration operations saved', 'Integration operations default']) {
+      const created = await database.from('venues').insert({ name, location: 'Local fixture', capacity: 10,
+        facilities: 'Projector', accessibility_features: 'Step-free', operating_information: '09:00-18:00' }).select('venue_id').single();
+      assert.equal(created.error, null);
+      venueIds.push(created.data!.venue_id);
+    }
+    const saved = { setup_minutes: 10, turnaround_minutes: 15, emergency_access: 'Integration signed east exit', known_restrictions: 'Integration no open flames' };
+    assert.equal((await database.from('venue_operations').insert({ venue_id: venueIds[0], ...saved })).error, null);
+    Object.assign(dbConfig, { supabaseUrl: 'https://operations-integration.supabase.test', supabaseAnonKey: anonKey });
+    // Keep the production HTTPS-only adapter and caller headers. The sole test
+    // transport substitution maps this synthetic gateway to disposable loopback.
+    const calls: string[] = [];
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://operations-integration.supabase.test') {
+        assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`));
+        assert.equal(original.headers.get('apikey'), anonKey);
+        assert.ok(url.pathname.startsWith('/rest/v1/'));
+        calls.push(url.pathname);
+        url.pathname = url.pathname.slice('/rest/v1'.length);
+        url.protocol = rest.protocol;
+        url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const get = (id: number) => operationApi.get(`/api/venues/${id}/operations`).set({ Authorization: `Bearer ${tokens.safety}` });
+    const result = await get(venueIds[0]);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.deepEqual(result.body.operations, { ...saved, updated_at: result.body.operations.updated_at });
+    assert.ok(Number.isFinite(Date.parse(result.body.operations.updated_at)));
+    const defaults = await get(venueIds[1]);
+    assert.equal(defaults.status, 200);
+    assert.deepEqual(defaults.body.operations, { setup_minutes: 0, turnaround_minutes: 0, emergency_access: null, known_restrictions: null, updated_at: null });
+    const start = calls.length;
+    assert.equal((await get(2147483647)).status, 404);
+    assert.deepEqual(calls.slice(start), ['/rest/v1/rpc/venue_exists_for_operations_read']);
+    assert.equal((await operationApi.get('/api/venues').set({ Authorization: `Bearer ${tokens.safety}` })).status, 403);
+    assert.equal((await operationApi.put(`/api/venues/${venueIds[0]}/operations`).set({ Authorization: `Bearer ${tokens.safety}` }).send({ ...saved, setup_minutes: 1 })).status, 403);
+    for (const path of [`/venues?venue_id=eq.${venueIds[0]}&select=venue_id`, `/venue_operation_history?venue_id=eq.${venueIds[0]}&select=history_id`]) {
+      const hidden = await fetch(new URL(path, rest), { headers: { Authorization: `Bearer ${tokens.safety}` } });
+      assert.equal(hidden.status, 200);
+      assert.deepEqual(await hidden.json(), []);
+    }
+    // Venue Staff still saves through its own base-venue check, and the trigger
+    // records its real JWT identity rather than the synthetic fixture owner.
+    const beforeSave = calls.length;
+    const changed = await operationApi.put(`/api/venues/${venueIds[0]}/operations`).set({ Authorization: `Bearer ${tokens.venue}` }).send({ ...saved, turnaround_minutes: 16 });
+    assert.equal(changed.status, 200, JSON.stringify(changed.body));
+    assert.equal(changed.body.operations.turnaround_minutes, 16);
+    assert.deepEqual(calls.slice(beforeSave), ['/rest/v1/venues', '/rest/v1/venue_operations']);
+    const history = await database.from('venue_operation_history').select('changed_by,field_name,old_value,new_value').eq('venue_id', venueIds[0]).eq('field_name', 'turnaround_minutes').eq('old_value', '15').eq('new_value', '16');
+    assert.equal(history.error, null);
+    assert.deepEqual(history.data, [{ changed_by: ids.venue, field_name: 'turnaround_minutes', old_value: '15', new_value: '16' }]);
+    assert.equal((await database.from('account_roles').update({ role: 'attendee' }).eq('user_id', safetyId)).error, null);
+    assert.equal((await get(venueIds[0])).status, 403, 'A revoked Safety role must lose public API access immediately.');
+  } finally {
+    transport?.mock.restore();
+    Object.assign(dbConfig, originalConfig);
+    if (venueIds.length) assert.equal((await database.from('venues').delete().in('venue_id', venueIds)).error, null);
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', safetyId)).error, null);
+  }
 });
