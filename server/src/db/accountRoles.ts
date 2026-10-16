@@ -30,6 +30,10 @@ export async function updateAccountRole(
 ): Promise<AccountRoleUpdateResult> {
   const { data, error } = await admin.from('account_roles').update({ role }).eq('user_id', userId).select('user_id');
 
+  // 22P02 (invalid_text_representation): the id is not a UUID, so no account can match it.
+  if (error?.code === '22P02') {
+    return { ok: false, reason: 'user_not_found' };
+  }
   if (error) {
     return { ok: false, reason: 'error', error: error.message };
   }
