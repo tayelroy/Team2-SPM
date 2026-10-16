@@ -138,10 +138,22 @@ test('[NORMAL] [SG2-47:AC1] a manual search does not check venues against any ev
 });
 
 test('[NORMAL] [SG2-46:AC3] AC3: an event without accessibility needs says accessibility is not used to match', async () => {
-  stubSearch(() => Response.json({ venues: [] }));
+  const fetch = stubSearch(() => Response.json({ venues: [] }));
+  const hint = 'No accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.';
   render(<VenueSearch accessToken="token" prefill={{ ...prefill, accessibilityNeeds: null, values: { ...prefill.values, accessibility: '' } }} />);
-  expect(screen.getByText(/No accessibility needs were specified for this event/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Accessibility')).toHaveValue('');
+  expect(screen.getByText(hint)).toBeInTheDocument();
   await screen.findByRole('heading', { name: 'No venues match' });
+  const searches = () => fetch.mock.calls.filter(([url]) => url.startsWith('/api/venues/search?'));
+  expect(new URL(searches()[0][0], 'http://local').searchParams.has('accessibility')).toBe(false);
+  fill({ Accessibility: 'ramp' });
+  fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  await screen.findByRole('heading', { name: 'No venues match' });
+  expect(searches()).toHaveLength(2);
+  expect(new URL(searches()[1][0], 'http://local').searchParams.get('accessibility')).toBe('ramp');
+  expect(screen.getByLabelText('Accessibility')).toHaveValue('ramp');
+  expect(screen.getByText(hint)).toBeInTheDocument();
+  expect(screen.getByText(/^Searched: .*Accessibility: ramp$/)).toBeInTheDocument();
 });
 
 test('[BOUNDARY] [SG2-46:AC1] an event without a date is pre-filled but not searched until the period is entered', () => {

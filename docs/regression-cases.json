@@ -1731,7 +1731,21 @@
       "SG2-46:AC3",
       "SG2-46:AC4"
     ],
-    "method_id": "TC-414ab324b23c"
+    "method_id": "TC-414ab324b23c",
+    "source_method_ids": [
+      "TC-414ab324b23c",
+      "TC-251098706967"
+    ],
+    "follow_up_verifications": [
+      {
+        "status": "Pass",
+        "case_id": "TC-251098706967",
+        "layer": "Rendered public React component with controlled HTTP responses; local verification only",
+        "actual": "16 Oct 2026 local copy follow-up: the event has no accessibility needs, the initial Accessibility field is empty and its initial search omits the accessibility parameter. The exact hint says “No accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.” After manually entering ramp and searching, the request includes accessibility=ramp, the field retains ramp, the searched criteria display Accessibility: ramp, and the same truthful hint remains. Existing method title and ID were preserved; no new declarations.",
+        "execution_evidence": "Before the one-string change, the strengthened existing case failed on the obsolete hint (/tmp/spm-accessibility-hint-red.log). Afterward all 26 VenueSearch tests passed (/tmp/spm-accessibility-hint-focused.log); full client 1433/1433 across 70 files passed with 100% statements/branches/functions/lines on every app file, including VenueSearch.tsx (/tmp/spm-accessibility-hint-full-client.log; /tmp/spm-accessibility-hint-full-coverage/coverage-summary.json); client TypeScript passed (/tmp/spm-accessibility-hint-typecheck.log). This local follow-up does not claim a new CI pass or hosted retest.",
+        "execution_date": "16 Oct 2026"
+      }
+    ]
   },
   {
     "id": "SG2-46-N01",

@@ -134,7 +134,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
           </div>
           {prefill ? <p style={{ color: color.silver, fontSize: '13px', lineHeight: 1.5 }}>
             {prefill.accessibilityNeeds === null
-              ? 'No accessibility needs were specified for this event, so accessibility is not used to match venues.'
+              ? 'No accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.'
               : `The event's accessibility needs: “${prefill.accessibilityNeeds}”. Keywords in the Accessibility field must all appear in a venue's accessibility features.`}
           </p> : null}
           <p style={{ color: color.silver, fontSize: '13px', lineHeight: 1.5 }}>
