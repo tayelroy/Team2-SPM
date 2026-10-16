@@ -27,7 +27,7 @@ const selectStyle = {
 };
 
 const LEGEND: { label: string; bg: string; bd: string }[] = [
-  { label: 'Free', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
+  { label: 'Free', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(203,255,252,0.35)' },
   { label: 'Booked', bg: 'rgba(0,130,124,0.22)', bd: 'rgba(203,255,252,0.4)' },
   { label: 'Tentative', bg: 'rgba(195,175,90,0.18)', bd: 'rgba(230,209,137,0.5)' },
   { label: 'Setup / turnaround', bg: 'rgba(0,130,124,0.1)', bd: 'rgba(203,255,252,0.22)' },

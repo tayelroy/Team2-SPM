@@ -42,6 +42,8 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   const [requesting, setRequesting] = useState<number | null>(null);
   const [notice, setNotice] = useState('');
   const [requestsVersion, setRequestsVersion] = useState(0);
+  // Each completed search remounts the fit panel so it re-reads suitability (it was fetched once and went stale).
+  const [searchRun, setSearchRun] = useState(0);
   // SG2-81 AC4: the affected booking a request made from this search replaces.
   const [replacing, setReplacing] = useState<VenueBooking | null>(null);
   // Local changes and a fresh search can reveal another user's decision.
@@ -61,6 +63,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
       if (controller.signal.aborted) return;
       setResults(venues);
       setSearched(criteria);
+      setSearchRun(run => run + 1);
       if (prefill) refreshRequests();
     } catch (failure) {
       if (controller.signal.aborted) return;
@@ -218,7 +221,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
         )
       ) : null}
       {/* SG2-47: once a search has run for an event, say which venues do not fit it and why. */}
-      {prefill && searched ? <EventVenueFit accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} /> : null}
+      {prefill && searched ? <EventVenueFit key={searchRun} accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} /> : null}
       {/* SG2-48 AC3: the event's requests, each shown as pending until decided. */}
       {prefill && searched ? <EventVenueRequests accessToken={accessToken} eventId={prefill.eventId} eventName={prefill.eventName} refresh={requestsVersion} /> : null}
       {/* SG2-51: the venues booked for the event, each released on its own. */}

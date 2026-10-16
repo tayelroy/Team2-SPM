@@ -213,3 +213,27 @@ a:hover {
 .venue-hold-status { padding: 6px 10px; border-radius: 6px; font-size: 12px; background: rgba(255,255,255,.08); }
 .venue-hold-tentative { background: rgba(246,190,76,.13); color: #f6be4c; }
 .venue-hold-converted { background: rgba(203,255,252,.15); color: #cbfffc; }
+
+/* Sprint 3 UI fixes. */
+/* Nested panels on an event card sit inside the card's padding, not on its edge. */
+.organisation-detail-panel { margin: 24px 32px; }
+.organisation-textarea { width: 100%; box-sizing: border-box; background: #011d1c; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; padding: 12px 14px; color: #edfffe; font: inherit; font-size: 14px; resize: vertical; }
+/* Checkbox rows are easy to hit with a finger. */
+label:has(> input[type="checkbox"]) { min-height: 32px; }
+input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+@media (max-width: 600px) {
+  .organisation-detail-panel { margin: 20px; }
+  /* The header scrolls away on a phone instead of covering a fifth of the screen. */
+  .app-header { position: relative !important; }
+  .app-nav-item { padding: 8px 0 6px !important; }
+  /* Status filters scroll sideways in one row instead of pushing the list off-screen. */
+  .events-filter { flex-wrap: nowrap !important; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .events-filter > * { flex-shrink: 0; }
+  /* Three whole steps at a time, so no label is cut mid-word. */
+  .stage-track { scroll-snap-type: x mandatory; }
+  .stage-step { flex: 0 0 calc((100% - 16px) / 3) !important; min-width: 0 !important; scroll-snap-align: center; }
+}
+/* On a phone the request form takes the single column; span 2 would add an empty second track. */
+@media (max-width: 700px) {
+  .request-form-card { grid-column: 1 / -1 !important; }
+}

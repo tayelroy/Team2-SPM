@@ -92,9 +92,9 @@ export default function ClarificationThread({
           </ol>}
     {canPost && !loadError && <>
       <label htmlFor={fieldId}>{prompt}</label>
-      <textarea id={fieldId} rows={3} value={draft} onChange={event => setDraft(event.target.value)} />
+      <textarea id={fieldId} rows={3} value={draft} onChange={event => setDraft(event.target.value)} className="organisation-textarea" />
       {sendError && <p role="alert" className="work-queue-empty">{sendError}</p>}
-      <button type="button" className="organisation-button" disabled={sending} onClick={send}>
+      <button type="button" className="organisation-button" style={{ alignSelf: 'flex-start' }} disabled={sending} onClick={send}>
         {sending ? 'Sending…' : 'Send'}
       </button>
     </>}

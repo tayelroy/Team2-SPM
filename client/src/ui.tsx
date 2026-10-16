@@ -26,9 +26,11 @@ export function Card({
   children,
   padding = '36px',
   style,
-}: WithChildren & { padding?: string; style?: CSSProperties }) {
+  className,
+}: WithChildren & { padding?: string; style?: CSSProperties; className?: string }) {
   return (
     <div
+      className={className}
       style={{
         background: color.kelp,
         borderRadius: radius.card,

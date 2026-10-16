@@ -175,6 +175,7 @@ export default function AppShell({
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header
+        className="app-header"
         style={{
           position: 'sticky',
           top: 0,
@@ -241,6 +242,7 @@ export default function AppShell({
                   type="button"
                   onClick={() => onNavigate(item.screen)}
                   aria-current={active ? 'page' : undefined}
+                  className="app-nav-item"
                   style={navItemStyle(active)}
                 >
                   {item.label}

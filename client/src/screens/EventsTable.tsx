@@ -85,6 +85,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
       <div
         role="tablist"
         aria-label="Filter events by status"
+        className="events-filter"
         style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}
       >
         {STATUS_FILTERS.map((f) => {
@@ -232,7 +233,7 @@ export default function EventsTable({ role, accessToken, onOpenEvent }: EventsTa
                         fontSize: '12px',
                         letterSpacing: '0.1em',
                         textTransform: 'uppercase',
-                        color: color.slate,
+                        color: color.silver,
                       }}
                     >
                       #{event.eventId}

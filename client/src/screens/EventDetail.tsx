@@ -312,7 +312,7 @@ export default function EventDetail({
           </div>
 
           {stage && (
-            <div style={{ margin: '20px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="organisation-detail-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <EventStageTracker stage={stage} />
               {stage.arrangements_recheck_needed && (
                 <Notice

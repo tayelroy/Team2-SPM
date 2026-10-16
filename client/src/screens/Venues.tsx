@@ -142,7 +142,7 @@ function VenueCatalogue({ token }: { token: string | null }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: '1 1 280px', maxWidth: '600px' }}>
             <Eyebrow>Search venues</Eyebrow>
             <input type="search" value={query} onChange={e => setQuery(e.target.value)} style={inputStyle}
-              placeholder="Search name, location, facilities or access…" />
+              placeholder="Name, location, facilities or access" />
           </label>
           {can(access, 'venues.create') ? <GradientButton onClick={() => { setSaved(''); setEditing(null); }}>Add venue</GradientButton> : null}
         </div>

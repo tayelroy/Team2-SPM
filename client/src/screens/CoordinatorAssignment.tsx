@@ -110,12 +110,14 @@ export default function CoordinatorAssignment({ accessToken }: { accessToken: st
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                gap: '16px',
+                gap: '12px 16px',
+                // On a phone the status badge moves under the title instead of squeezing it.
+                flexWrap: 'wrap',
                 borderBottom: rule.edge,
                 paddingBottom: '16px',
               }}
             >
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: '1 1 220px' }}>
                 <Eyebrow>{`E-${request.eventId} · ${request.organisation || 'No organisation'}`}</Eyebrow>
                 <h2 style={{ margin: '8px 0 0', fontSize: '22px', fontWeight: 500, overflowWrap: 'anywhere' }}>
                   {title}
