@@ -17,9 +17,9 @@
 .availability-day-details li > span { color: #bbc7c6; font-size: 13px; line-height: 1.5; }
 @media (max-width: 600px) {
   .availability-weekdays, .availability-month-grid { gap: 4px; }
-  .availability-weekdays > span { font-size: 9px; letter-spacing: 0; }
+  .availability-weekdays > span { font-size: 11px; letter-spacing: 0; }
   .availability-day { min-height: 52px; padding: 7px 2px; gap: 5px; align-items: center; text-align: center; }
   .availability-day-number { font-size: 14px; }
   .availability-cell-items { display: none; }
-  .availability-day-marker { display: block; font-size: 9px; line-height: 1; }
+  .availability-day-marker { display: block; font-size: 11px; line-height: 1; }
 }
