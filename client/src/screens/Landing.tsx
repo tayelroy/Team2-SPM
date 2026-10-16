@@ -1,4 +1,3 @@
-import { FOOTER_LINKS } from '../mock/data';
 import { useInertiaScroll } from '../hooks/useInertiaScroll';
 import { useParticleOrb } from '../hooks/useParticleOrb';
 import { color, layout } from '../theme';
@@ -224,12 +223,13 @@ export default function Landing({ onOpenApp }: { onOpenApp: () => void }) {
                   color: color.platinum,
                 }}
               >
-                Connect with our team
+                Ready for your next event?
               </span>
               <GradientButton
+                onClick={onOpenApp}
                 style={{ display: 'flex', alignItems: 'center', gap: '14px' }}
               >
-                Get in touch <span style={{ fontSize: '15px' }}>↗</span>
+                Open planning app <span aria-hidden="true" style={{ fontSize: '15px' }}>↗</span>
               </GradientButton>
             </div>
           </div>
@@ -255,10 +255,9 @@ export default function Landing({ onOpenApp }: { onOpenApp: () => void }) {
                 maxWidth: '640px',
               }}
             >
-              {FOOTER_LINKS.map((link) => (
-                <a
+              {['Event requests', 'Venues', 'Equipment', 'Registrations'].map((link) => (
+                <span
                   key={link}
-                  href="#"
                   style={{
                     fontSize: '15px',
                     letterSpacing: '0.06em',
@@ -267,32 +266,10 @@ export default function Landing({ onOpenApp }: { onOpenApp: () => void }) {
                   }}
                 >
                   {link}
-                </a>
+                </span>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {['X', 'in'].map((handle) => (
-                <a
-                  key={handle}
-                  href="#"
-                  aria-label={handle === 'X' ? 'ConnectSphere on X' : 'ConnectSphere on LinkedIn'}
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    border: '1px solid rgba(255,255,255,0.25)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '13px',
-                    letterSpacing: '0.04em',
-                    color: color.mist,
-                  }}
-                >
-                  {handle}
-                </a>
-              ))}
-            </div>
+
           </div>
 
           <div

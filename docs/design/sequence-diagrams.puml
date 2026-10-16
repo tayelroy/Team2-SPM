@@ -3,7 +3,7 @@
 ' Render: java -jar plantuml.jar -tpng docs/design/sequence-diagrams.puml
 
 @startuml seq-1-availability-and-booking-decision
-title Seq 1 — Availability check and booking decision with setup & turnaround (SG2-78/79)\nas of main 1d1e336 (14 Oct 2026)
+title Seq 1 — Availability check and booking decision with setup & turnaround (SG2-78/79)\nas of PR90 head 61416cc (16 Oct 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 skinparam ParticipantPadding 6
@@ -38,7 +38,7 @@ else
     DB --> API : {outcome:'conflict', kind, starts_at, ends_at, label}
     API --> WEB : 409 + conflict
   else no clash and capacity ok
-    DB -> DB : insert venue_bookings (confirmed)\nupdate events.venue_booking_id (keep earliest, SG2-82)\nupdate venue_booking_requests -> approved\ninsert event_audit_logs, notifications (coordinator)
+    DB -> DB : insert venue_bookings (confirmed)\nupdate events.venue_booking_id (keep earliest, SG2-82)\nupdate venue_booking_requests -> approved\ninsert event_audit_logs, notifications (coordinator + organiser)
     DB -> DB : trigger venue_bookings_refresh_clashes\n-> refresh_venue_booking_clashes(venue_id)
     note right of DB #FFF4CC : <<Week 7>> SG2-79\nflags pairs closer than setup+turnaround\nin venue_booking_clashes, notifies\ncoordinators ('venue_booking_clash')
     DB --> API : {outcome:'updated', ...}
@@ -61,51 +61,57 @@ endlegend
 @enduml
 
 @startuml seq-2-venue-temporarily-unavailable
-title Seq 2 — Venue temporarily unavailable (SG2-80) -> affected bookings flagged -> replacement «planned» (SG2-81)\nas of main 1d1e336 (14 Oct 2026)
+title Seq 2 — Unavailability, affected bookings and replacement (SG2-80/81)\nas of PR90 head 61416cc (16 Oct 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 actor "Venue Staff" as VS
-participant "Web App\nVenueBlocks" as WEB
-participant "API\ncreateVenueBlocksRouter" as API
+participant "Web App" as WEB
+participant "API\nexisting venue routes" as API
 database "Supabase Postgres" as DB
-actor "Event Coordinator" as EC
+actor "Assigned Coordinator" as EC
+actor "Organiser" as EO
 
-VS -> WEB : record unavailable period\n(starts_at, ends_at, category, reason)
-WEB -> API : POST /api/venues/:venueId/blocks [venues.blocks.manage]
-API -> API : validateVenueBlock
-API -> DB : createVenueBlockStore.create (caller JWT):\ninsert venue_unavailability
-activate DB
-DB -> DB : trigger venue_unavailability_stamp\n(recorder + time, venue lock)
-DB -> DB : trigger venue_unavailability_flag_bookings:\ninsert venue_booking_disruptions for every\nconfirmed venue_bookings overlap
-note right of DB #FFF4CC : <<Week 7>> SG2-80\nbooking and event are NOT changed (AC4);\nno notification row is written
-DB --> API : unavailability_id
-deactivate DB
-API -> DB : rpc list_venue_unavailability(p_venue_id, p_after)
-DB --> API : block + affected events
-API --> WEB : 201 {block (affected[])}
-WEB --> VS : "N affected events" warning
-
-EC -> WEB : open availability calendar
-WEB -> API : GET /api/venues/availability
-API -> DB : select venue_affected_bookings (+ occupancy, blocks)
-API --> WEB : affected bookings shown
-
-group #DDDDDD <<planned>> SG2-81 replace a venue (not on main)
-  EC -[#888888]-> WEB : choose replacement venue for affected booking
-  WEB -[#888888]-> API : (no endpoint yet)
-  API -[#888888]-> DB : (no RPC yet)
-  note over EC, DB #DDDDDD : <<planned>> SG2-81. Today a coordinator can only release (POST /api/venue-bookings/:id/release,\nrpc release_venue_booking) and request another venue. SG2-98 remediation is also To Do.
+VS -> WEB : record unavailable period, category and reason
+WEB -> API : POST /api/venues/:venueId/blocks
+API -> DB : insert venue_unavailability (caller JWT)
+DB -> DB : venue_unavailability_flag_bookings\ninsert unique venue_booking_disruptions
+DB -> DB : venue_disruption_notify (new flags only)\nlock affected event; notify Coordinator (venue_unavailable)
+alt event in Preparation or Confirmed
+  DB -> DB : status -> planning; clear confirmed_by/at\nrecord status history; notify Organiser
+  note over DB, EO : Organiser notice is deduplicated if also the Coordinator.
+else other event stage
+  note right of DB : Keep stage; do not cancel the booking.
 end
-
+note right of DB : Keep event date, time, attendance and requirements.\nExisting flags are not announced retrospectively.
+DB --> API : unavailable period + affected bookings
+API --> WEB : 201 {block}
+EC -> WEB : open bookings / arrangements
+WEB -> API : GET /api/venue-bookings?event_id=...\nGET /api/event-requests/:eventId/arrangements
+API -> DB : read disruptions and pending replacement requests
+API --> WEB : affected_by[], replacement; venue Outstanding
+EC -> WEB : choose replacement; period and requirements prefilled
+WEB -> API : POST /api/venue-booking-requests\n{event_id, venue_id, starts_at, ends_at, layout, replaces_booking_id}
+API -> API : assigned Coordinator; own affected booking;\nperiod, layout, suitability and duplicate checks
+API -> DB : create pending replacement request
+API --> WEB : 201 {request, booking, conflicts}
+note over WEB, DB : Pending request reserves nothing; the original booking remains until approval.
+VS -> WEB : approve replacement
+WEB -> API : POST /api/venue-booking-requests/:requestId/decision\n{decision:'approve'}
+API -> DB : decide_venue_booking_request (caller JWT)
+DB -> DB : lock venues; recheck role, period, conflicts and capacity\ninsert new confirmed booking; approve new request\nrelease_replaced_booking; cancel old request; history + notices
+note right of DB : One transaction; a failed decision rolls back.\nReleasing old booking removes its disruption flag.
+DB --> API : decided request
+API --> WEB : 200 {request}; refresh bookings and arrangements
+note over API, DB : Final confirm_event is 202610170002: affected bookings AND\npersisted venue/equipment/registration rechecks block confirmation.\nReplacement alone does not clear unrelated rechecks.
 legend right
-  |= Colour |= Meaning |
-  |<#FFF4CC>| <<Week 7>> addition |
-  |<#DDDDDD>| <<planned>> not built (dashed) |
+  |= Scope |= Meaning |
+  | SG2-81 | implemented using existing request/decision routes |
+  | SG2-83 | general venue change/cancellation remains planned |
 endlegend
 @enduml
 
 @startuml seq-3-tentative-hold-expiry
-title Seq 3 — Tentative venue hold placed -> pg_cron 24-hour warning and expiry (SG2-84/85)\nas of main 1d1e336 (14 Oct 2026)
+title Seq 3 — Tentative venue hold placed -> pg_cron 24-hour warning and expiry (SG2-84/85)\nas of PR90 head 61416cc (16 Oct 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 actor "Venue Staff" as VS
@@ -164,7 +170,7 @@ endlegend
 @enduml
 
 @startuml seq-4-lead-assigns-coordinator
-title Seq 4 — Event Coordinator Lead assigns from the unassigned queue (SG2-87/97) with notices (SG2-68)\nas of main 1d1e336 (14 Oct 2026)
+title Seq 4 — Event Coordinator Lead assigns from the unassigned queue (SG2-87/97) with notices (SG2-68)\nas of PR90 head 61416cc (16 Oct 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #FFF4CC
 actor "Event Coordinator Lead" as LEAD
@@ -198,7 +204,7 @@ else updated
     API --> WEB : 200 {request}
   end
 end
-note over LEAD, DB #FFF4CC : <<Week 7>> Reassignment of a live event (submitted ... confirmed) uses the same PATCH and never changes status (SG2-100).\nSG2-88 "assign/reassign as Lead" is To Do in Jira but this path already serves it; SG2-89 oversight view is <<planned>>.
+note over LEAD, DB #FFF4CC : <<Week 7>> Reassignment of a live event (submitted ... confirmed) uses the same PATCH and never changes status (SG2-100).\nSG2-88 "assign/reassign as Lead" is Done in the 16 Oct Jira snapshot; SG2-89 oversight view is <<planned>>.
 
 legend right
   |= Colour |= Meaning |
@@ -208,7 +214,7 @@ endlegend
 @enduml
 
 @startuml seq-5-safety-check-planned
-title Seq 5 — Operational safety check decision «planned» (SG2-91/92/93/94) against existing statuses\nas of main 1d1e336 (14 Oct 2026)
+title Seq 5 — Operational safety check decision «planned» (SG2-91/92/93/94) against existing statuses\nas of PR90 head 61416cc (16 Oct 2026)
 skinparam sequenceMessageAlign left
 skinparam noteBackgroundColor #DDDDDD
 skinparam sequence {
@@ -225,7 +231,7 @@ note over EC, DB : Built today (SG2-100): statuses awaiting_safety_check, safety
 
 group <<planned>> SG2-91 send for safety check
   EC --> WEB : send planned event for safety check
-  WEB --> API : <<planned>> endpoint (not on main)
+  WEB --> API : <<planned>> endpoint (not at this snapshot)
   API --> DB : events.status planning -> awaiting_safety_check
 end
 group <<planned>> SG2-92 record safety decision

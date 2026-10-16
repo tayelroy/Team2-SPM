@@ -1731,7 +1731,21 @@
       "SG2-46:AC3",
       "SG2-46:AC4"
     ],
-    "method_id": "TC-414ab324b23c"
+    "method_id": "TC-414ab324b23c",
+    "source_method_ids": [
+      "TC-414ab324b23c",
+      "TC-251098706967"
+    ],
+    "follow_up_verifications": [
+      {
+        "status": "Pass",
+        "case_id": "TC-251098706967",
+        "layer": "Rendered public React component with controlled HTTP responses; local verification only",
+        "actual": "16 Oct 2026 local copy follow-up: the event has no accessibility needs, the initial Accessibility field is empty and its initial search omits the accessibility parameter. The exact hint says “No accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.” After manually entering ramp and searching, the request includes accessibility=ramp, the field retains ramp, the searched criteria display Accessibility: ramp, and the same truthful hint remains. Existing method title and ID were preserved; no new declarations.",
+        "execution_evidence": "Before the one-string change, the strengthened existing case failed on the obsolete hint (/tmp/spm-accessibility-hint-red.log). Afterward all 26 VenueSearch tests passed (/tmp/spm-accessibility-hint-focused.log); full client 1433/1433 across 70 files passed with 100% statements/branches/functions/lines on every app file, including VenueSearch.tsx (/tmp/spm-accessibility-hint-full-client.log; /tmp/spm-accessibility-hint-full-coverage/coverage-summary.json); client TypeScript passed (/tmp/spm-accessibility-hint-typecheck.log). This local follow-up does not claim a new CI pass or hosted retest.",
+        "execution_date": "16 Oct 2026"
+      }
+    ]
   },
   {
     "id": "SG2-46-N01",
@@ -4909,5 +4923,1463 @@
     "execution_date": "13 Oct 2026",
     "executed_by": "LIM DAO JUN",
     "execution_evidence": "13 Oct 2026; feature/SG2-82-book-multiple-venues merged with main at 4b45eb1 (SG2-86 #83, SG2-38 #82, SG2-58 #80, SG2-79 #81); npm run test:e2e; 91/91 journeys and 13/13 report-gate checks passed; installed Chromium; npm run ci in a node:22 Linux clone; disposable PostgreSQL 17 replay of every migration and suite (35/35 steps), including venue_multiple_bookings, event_confirmation and the withdrawal race script. No hosted Supabase validation."
+  },
+  {
+    "id": "SG2-71-HOTFIX-LANDING",
+    "title": "Phone hero particles clear the copy after resize; landing actions have real destinations",
+    "type": "Hotfix regression",
+    "story": "SG2-71",
+    "purpose": "Keep animated particles out of the mobile hero text and remove inert contact, social and policy controls.",
+    "preconditions": "Rendered Landing and particle hook tests with controlled canvas geometry, pointer events and animation frames; local production preview for visual checks.",
+    "steps": [
+      "Render the hero at phone width and measure the complete copy bounds.",
+      "Resize from desktop to 390px with canvas CSS height derived from the changed spacer; compare final bitmap size with the final hero box.",
+      "Draw animation frames and check CSS-scaled particle bounds; return to desktop and check spacing and one active animation loop.",
+      "Activate both application entry buttons and verify there are no placeholder contact, social or policy links."
+    ],
+    "data": "390x844 and 1440px local preview; synthetic copy bottom 449.59375px; captured device scale 2; deterministic particle sizes.",
+    "expected": "At phone width the orb clears the complete copy by at least 24px; bitmap follows the final hero height rather than shrinking into the text; desktop composition and animation cleanup remain intact; both entry actions open the application.",
+    "evidence": "client/src/hooks/useParticleOrb.test.tsx; client/src/screens/Landing.test.tsx",
+    "layer": "Rendered React component and canvas hook; local visual check",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-71:AC3",
+      "SG2-71:AC4"
+    ],
+    "status": "Pass",
+    "actual": "Regression reproduced the stale bitmap height before correction and passed afterward. The parent agent confirmed the rebuilt local Landing at 390px and 1440px.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. Focused hook/Landing run: 14 tests passed; /tmp/spm-staging-qa/orb-canvas-regression-before.log and /tmp/spm-staging-qa/orb-canvas-regression-after.log. Visual observation is local browser evidence, not a human review.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-44-HOTFIX-PHONE-DETAILS",
+    "title": "Phone availability calendar exposes full readable day details and resists stale month responses",
+    "type": "Hotfix regression",
+    "story": "SG2-44",
+    "purpose": "Replace unreadable seven-column booking text on phones with compact selectable dates and full-width details while retaining the desktop summary.",
+    "preconditions": "Rendered AvailabilityCalendar with controlled public availability responses and Singapore clock; local production preview.",
+    "steps": [
+      "Load a day with four overlapping entries and select it; inspect all venue labels and full time intervals.",
+      "Select a free day and verify previous details are replaced; blank grid cells are not buttons.",
+      "Navigate months while the earlier response is pending, then complete the earlier response.",
+      "Reject a current month read and an aborted earlier read; verify the current error state and absence of obsolete details."
+    ],
+    "data": "October 2026; four same-day bookings, an entry ending at Singapore midnight and an entry starting at the following midnight; deferred month responses.",
+    "expected": "Phone dates remain usable without compressed booking labels; selected-day details include entries behind + more and use correct Singapore day boundaries; desktop labels remain; stale responses cannot overwrite the current month.",
+    "evidence": "client/src/screens/AvailabilityCalendar.test.tsx; client/src/screens/AvailabilityCalendar.css",
+    "layer": "Rendered React component; local visual check",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-44:AC2",
+      "SG2-71:AC1"
+    ],
+    "status": "Pass",
+    "actual": "All calendar regressions passed. The parent agent confirmed the rebuilt local occupied-day view at phone width and the desktop calendar.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. The responsive targeted run passed 29 tests before the additional canvas regression; the final combined client suite includes that additional test. /tmp/spm-staging-qa/responsive-targeted-tests.log.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-57-HOTFIX-EQUIPMENT-READINESS",
+    "title": "Equipment changes refresh arrangement readiness without discarding a planning draft",
+    "type": "Hotfix regression",
+    "story": "SG2-57",
+    "purpose": "Prevent stale No equipment requested and Ready for confirmation after an equipment requirement is saved.",
+    "preconditions": "Real rendered WorkQueue, EquipmentRequirements, readiness panel and planning drawer with controlled public API responses; reservation forms have their own component suite.",
+    "steps": [
+      "Start with no equipment and ready/not-required readiness, then add one projector.",
+      "Edit its quantity while the first readiness refresh is pending; complete the older read last.",
+      "Complete a pending equipment save while an unsaved planning drawer is open.",
+      "Exercise requirement and arrangement saves and confirmed reservation callbacks; reject or abort mutations and reject a readiness refresh."
+    ],
+    "data": "Synthetic planning event 17; pending projector request 51; quantity 1 then 2; unsaved planning note; 409/503 and late account-change responses.",
+    "expected": "Successful mutations refresh only readiness; new demand becomes Outstanding, edits show the latest quantity, old reads do not overwrite it, and the planning draft and queue selection survive. Failed/aborted saves do not notify; a failed readiness refresh does not retain a false ready badge.",
+    "evidence": "client/src/screens/WorkQueue.equipmentReadiness.test.tsx; client/src/components/EquipmentRequirements.test.tsx",
+    "layer": "Composed rendered React components and public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC2",
+      "SG2-53:AC4",
+      "SG2-57:AC2",
+      "SG2-39:AC1"
+    ],
+    "status": "Pass",
+    "actual": "The targeted three-file run passed 115 tests, including create/edit readiness, draft preservation, stale response and error cases; all remain green in combined CI.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. /tmp/spm-staging-qa/equipment-readiness-tests.log; /tmp/spm-staging-qa/equipment-readiness-coverage.log.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-39-REG-PRESERVE",
+    "title": "Planning saves preserve loaded registration settings and unknown fields",
+    "story": "SG2-39",
+    "type": "Positive / data integrity / recovery",
+    "purpose": "Prevent unrelated planning edits from erasing stored registration capacity, windows or notes.",
+    "preconditions": "Rendered drawer with a fixed clock and synthetic planning records; mocked public planning API.",
+    "steps": [
+      "Load registration capacity 136, one-minute opening window and a planning note; edit equipment requirements and save.",
+      "Clear known loaded fields and save; distinguish explicit nulls from omitted initial values.",
+      "Open an older incomplete queue response while the simulated server retains newer registration data; save an unrelated edit.",
+      "Retry an unavailable save from missing initial values."
+    ],
+    "data": "Synthetic event 17; capacity 136; opens 2026-10-01T13:30Z; closes 2026-10-01T13:31Z; internal note.",
+    "expected": "Loaded values retained; intentional clears submit null; omitted blank values omitted from PATCH; retry never supplies unseen fields as empty.",
+    "evidence": "client/src/screens/EventPlanningDrawer.test.tsx",
+    "layer": "Rendered React component / public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-41:AC4"
+    ],
+    "status": "Pass",
+    "actual": "All 4 new regression tests and 32 existing drawer tests pass; the touched application file has 100% statement, branch, function and line coverage.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. Local 15 Oct 2026; vitest EventPlanningDrawer.test.tsx with V8 coverage. /tmp/spm-planning-tests.log; /tmp/spm-planning-coverage/coverage-summary.json.",
+    "execution_date": "15 Oct 2026",
+    "review": null,
+    "executed_by": "Codex automated verification"
+  },
+  {
+    "id": "SG2-39-DB-PLANNING-DETAILS",
+    "title": "Queue view exposes complete planning details only to the backend",
+    "story": "SG2-39",
+    "type": "SQL projection / data integrity / access control",
+    "purpose": "Ensure the queue projection includes registration capacity, opening/closing times and planning notes, preserving existing service-only access.",
+    "preconditions": "Disposable PostgreSQL with all migrations and auth fixture; suite rolls all data back.",
+    "steps": [
+      "Seed full saved registration fields and an internal planning note.",
+      "Verify queue details match storage and distinguish null fields from missing JSON keys at minimum capacity one.",
+      "Update stored values after first read and verify next queue read returns the latest metadata.",
+      "Verify anon and authenticated cannot directly read planning notes from the queue view."
+    ],
+    "data": "Existing synthetic 941xx queue fixture; capacity 136 then 137; capacity one boundary; null windows and notes.",
+    "expected": "Saved metadata present; nulls explicit; later update reflected; direct client read refused; all existing role and lifecycle queue assertions pass.",
+    "evidence": "supabase/tests/internal_work_queue.sql; supabase/migrations/202610160003_work_queue_planning_details.sql",
+    "layer": "PostgreSQL public view / privileges",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-41:AC4"
+    ],
+    "status": "Pass",
+    "actual": "The complete internal_work_queue SQL suite passed against native PostgreSQL 17, including all four added projection, boundary, refresh and privacy assertions. All data rolled back.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim. Local 15 Oct 2026; native Docker PostgreSQL 17; /tmp/spm-planning-sql.log.",
+    "execution_date": "15 Oct 2026",
+    "review": null,
+    "executed_by": "Codex automated verification"
+  },
+  {
+    "id": "SG2-100-HOTFIX-BOOKING-EMBED",
+    "title": "Event detail explicitly selects the event-to-bookings relationship",
+    "type": "Hotfix regression",
+    "story": "SG2-100",
+    "purpose": "Keep draft/detail and shared detail prechecks readable when PostgREST exposes both the legacy booking pointer and the booking event foreign key.",
+    "preconditions": "Database adapter test uses the real Supabase request builder with a controlled fetch response. No hosted database is required.",
+    "steps": [
+      "Fetch an event detail through the public database adapter.",
+      "Inspect the outgoing PostgREST select and require venue_bookings!venue_bookings_event_id_fkey(ends_at,status).",
+      "Return a confirmed booking and verify detail exposes its latest confirmed end time."
+    ],
+    "data": "Synthetic event 7; confirmed booking ending 15 Jun 2030 10:00 UTC; explicit venue_bookings_event_id_fkey relationship.",
+    "expected": "The detail query identifies the event-to-bookings foreign key explicitly and returns the derived latest confirmed booking end without relying on an ambiguous implicit embed.",
+    "evidence": "server/src/db/eventRequests.test.ts; server/src/db/eventRequests.ts",
+    "layer": "Database adapter / actual Supabase request construction",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC6"
+    ],
+    "status": "Pass",
+    "actual": "The explicit foreign-key selector regression passed in the 1,420-test server suite; the changed adapter file has 100% coverage.",
+    "execution_evidence": "15 Oct 2026; npm run ci passed locally: 1,343 client tests and 1,420 server tests, with 100% changed application statement, branch, function and line coverage. Log: /tmp/spm-hotfix-ci.log. Local verification; no hosted PR check or deployment claim.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-REQUEST-01",
+    "title": "Native organiser submission, Lead assignment and planning retain stored fields",
+    "type": "NORMAL",
+    "story": "SG2-28",
+    "purpose": "Exercise production API handlers and Supabase adapters through real PostgREST/PostgreSQL.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Create, submit, assign, review and approve a request.",
+      "Save registration settings and note; read queue JSON.",
+      "Save unrelated equipment edit; inspect persisted values and audit."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Draft submits, assignment leaves Lead queue, planning stores registration and notes, unrelated edit retains settings and records audit.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + Supabase client + PostgREST + PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC1",
+      "SG2-87:AC5",
+      "SG2-39:AC1"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-BOUNDARY-01",
+    "title": "Incomplete native draft and explicit null planning values",
+    "type": "BOUNDARY",
+    "story": "SG2-28",
+    "purpose": "Prove draft completeness and absent/null boundaries in real storage.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Save empty draft then submit.",
+      "Approve another request, save minimum capacity and null notes, inspect queue fields."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Empty draft creation succeeds but submission returns 400 without transition; capacity one and JSON nulls survive queue projection.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC2",
+      "SG2-39:AC4"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-CONFLICT-01",
+    "title": "Reassigned coordinator cannot save stale native planning",
+    "type": "CONFLICT",
+    "story": "SG2-90",
+    "purpose": "Verify assignment ownership against real persisted changes.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Load queue as original coordinator.",
+      "Reassign through Lead API.",
+      "Try stale planning save and inspect storage."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Old coordinator save 403 and queue 404; new coordinator queue 200; stale note not saved.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-90:AC3"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-FAILURE-01",
+    "title": "Native authentication, role, validation and provider outage preserve data",
+    "type": "FAILURE",
+    "story": "SG2-41",
+    "purpose": "Validate security and failure recovery across actual database boundary.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Attempt unauthenticated and role-inappropriate requests.",
+      "Try capacityzero and anonymous direct PostgREST view read.",
+      "Disable injected provider, attempt save, restore provider and inspect unchanged data."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Unsigned 401; wrong-role 403; capacity zero 400; direct anonymous view denied; unavailable provider 503; stored values unchanged.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-41:AC4",
+      "SG2-39:AC4"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "INT-STAFF-01",
+    "title": "Native request projections reach matching staff queues",
+    "type": "NORMAL",
+    "story": "SG2-41",
+    "purpose": "Verify the repaired view retains venue and equipment branches.",
+    "preconditions": "Disposable local Docker PostgreSQL/PostgREST and synthetic fixture identities; no hosted data.",
+    "steps": [
+      "Create synthetic venue/equipment requests in storage.",
+      "Read exact requests as appropriate roles and refuse coordinator-only details."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Each staff queue returns correct event, resource title and notes; staff cannot open coordinator event detail.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + native PostgreSQL",
+    "status": "Pass",
+    "actual": "Passed as part of all 5 native API integration cases. The production Express handlers and Supabase adapters ran through local PostgREST against disposable PostgreSQL 17; identity verification used synthetic fixture tokens with roles read from the real database.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node .github/scripts/test-api-integration.mjs; 5/5 passed locally. /tmp/spm-api-integration.log. Database suites separately passed 28/28 plus 31 concurrency cases: /tmp/spm-all-sql.log. Local verification; no hosted PR check, deployment or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-41:AC2",
+      "SG2-41:AC3"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SMOKE-ROLES-01",
+    "title": "Each role desk loads and logout revokes fixture session",
+    "type": "NORMAL / FAILURE",
+    "story": "SG2-23",
+    "purpose": "Fast role/session deployment smoke.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Check Landing heading and Open app control fit 390px and 1440px viewports; attach successful screenshots.",
+      "Sign in as each seeded role and inspect banner/work queue.",
+      "As Venue Staff select the booked 15 June 2030 day on a 390px calendar; verify full venue/time details, containment and no horizontal overflow; attach viewport screenshot.",
+      "Logout and reuse prior token."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Seven roles show correct banner; staff pending queues load; logged-out session cannot authenticate; no page errors. Landing controls fit both widths; selected occupied-day venue and exact booking times are readable within the mobile details panel; three successful screenshot attachments accompany the report.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-23:AC1",
+      "SG2-41:AC4",
+      "SG2-44:AC2",
+      "SG2-71:AC1",
+      "SG2-71:AC3"
+    ],
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim. Successful landing 390px/1440px and mobile occupied-day screenshots are attached to the report; preserved copies and locations: /tmp/spm-ui-evidence.json. Bounds, text and overflow assertions passed; screenshots do not represent pixel-baseline assertions.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
+  },
+  {
+    "id": "SMOKE-ASSIGN-01",
+    "title": "Draft boundary and complete submission reach Lead assignment",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-28",
+    "purpose": "Smoke complete organiser-to-Lead path.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Try empty draft submission via API.",
+      "Submit a complete form through UI.",
+      "Open Lead queue and assign coordinator through UI; inspect persisted request."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Empty draft remains unsubmitted; UI submission appears Awaiting Assignment; Lead assigns and queue entry disappears.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-28:AC1",
+      "SG2-30:AC2",
+      "SG2-87:AC5"
+    ],
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
+  },
+  {
+    "id": "SMOKE-PLANNING-01",
+    "title": "Planning reload retains settings at mobile and desktop widths",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-39",
+    "purpose": "Catch missing planning queue fields and unrelated-save data loss through the browser.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Prepare saved settings via API with required impact confirmation.",
+      "Inspect drawer at390px and1440px.",
+      "Edit equipment requirement, save, reload and compare persisted metadata."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Capacity 136, one-minute window and note render at 390/1440 without overflow, survive unrelated save and full page reload, and match fixture ledger.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-41:AC4"
+    ],
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
+  },
+  {
+    "id": "SMOKE-CONFLICT-01",
+    "title": "Open planning drawer loses access after Lead reassignment",
+    "type": "CONFLICT / FAILURE",
+    "story": "SG2-90",
+    "purpose": "Smoke stale open-form ownership protection.",
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
+    "steps": [
+      "Open assigned drawer.",
+      "Reassign through Lead API before saving.",
+      "Submit stale note and inspect error and ledger."
+    ],
+    "data": "Synthetic records and accounts only.",
+    "expected": "Save displays assigned-coordinator error and refuses stale note; new assignment persists.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS: all four existing Playwright smoke cases ran without retries, failures or skips on 16 Oct 2026. The production-build loopback fixture retained 16 success screenshots, four trace ZIPs and four videos, plus HTML/JSON/JUnit reports. Existing 51 smoke assertions are preserved. This is local automated execution; hosted CI for this evidence revision is pending and all-Done staging acceptance is separate.",
+    "execution_evidence": "test-results/regression.json; test-results/regression.xml; browser-smoke artifact after matching CI. Local smoke source SHA256 54de5d27cda9dea66e20bebbc7b02b3d5193c0ca2d6370551ff4a71712886f6f.",
+    "execution_date": "16 Oct 2026, 01:20 SGT",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-90:AC3"
+    ],
+    "executed_by": "Playwright Chromium (isolated local fixture)",
+    "review": null,
+    "execution_history": [
+      {
+        "actual": "Passed in the full 104/104 Chromium regression run against the production frontend build and isolated Express fixture. No skipped, unexpected or flaky cases; no runner errors. External identity and storage used local fixture providers.",
+        "execution_evidence": "15 Oct 2026; npm run test:e2e; 104/104 browser journeys passed in 113.97 seconds, and the required SG2-26 report gate passed. /tmp/spm-full-playwright.log; /tmp/spm-full-playwright-results.json; /tmp/spm-full-playwright-report/index.html. All four smoke journeys also passed independently in 8.8 seconds: /tmp/spm-final-smoke.log. Local verification; no hosted PR check, deployment or human review claim.",
+        "execution_date": "15 Oct 2026",
+        "executed_by": "Codex automated verification"
+      }
+    ]
+  },
+  {
+    "type": "Deployment readiness regression",
+    "preconditions": "Disposable local PostgreSQL 17 with the auth fixture and all repository migrations applied; POSTGRES_CONTAINER identifies only the isolated Docker test container. No hosted mutation.",
+    "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",
+    "layer": "Native PostgreSQL catalogue and privilege checks through the public release gate",
+    "status": "Pass",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 7/7 passed, including the new legacy-notification constraint regression. /tmp/spm-readiness-notifications.log. Every damaged transaction rolled back and the next independent healthy read-only check passed. Local native PostgreSQL verification; no new hosted CI or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null,
+    "id": "SG2-22-READINESS-HEALTHY",
+    "title": "Healthy release structure passes without requiring seeded personal accounts or event content",
+    "story": "SG2-22",
+    "purpose": "Allow deployment readiness to depend on schema, role catalogue and privileges rather than personal demo data.",
+    "steps": [
+      "Run the release check inside an explicit read-only transaction after all migrations.",
+      "Temporarily remove user and dependent event content inside a rollback transaction and rerun structural readiness."
+    ],
+    "data": "Migrated disposable PostgreSQL; healthy schema and fixed seven-role catalogue, with and without synthetic user/event content.",
+    "expected": "Both healthy checks return ready and exit zero; no requirement for personal demo logins is inferred from the structural gate.",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1"
+    ],
+    "actual": "Healthy read-only schema and empty-content checks passed in the seven-case native suite; no personal demo data is required."
+  },
+  {
+    "type": "Deployment readiness regression",
+    "preconditions": "Disposable local PostgreSQL 17 with the auth fixture and all repository migrations applied; POSTGRES_CONTAINER identifies only the isolated Docker test container. No hosted mutation.",
+    "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",
+    "layer": "Native PostgreSQL catalogue and privilege checks through the public release gate",
+    "status": "Pass",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; 7/7 passed, including the new legacy-notification constraint regression. /tmp/spm-readiness-notifications.log. Every damaged transaction rolled back and the next independent healthy read-only check passed. Local native PostgreSQL verification; no new hosted CI or human review claim.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null,
+    "id": "SG2-22-READINESS-MISSING-CONTRACTS",
+    "title": "Missing columns, stale queue projection, role catalogue or service grant blocks release with diagnostics",
+    "story": "SG2-22",
+    "purpose": "Catch schema drift and missing backend read access before deployment while preserving recovery from intentionally damaged test transactions.",
+    "steps": [
+      "Drop completion/submission columns inside an isolated transaction and require named missing-column diagnostics.",
+      "Replace the queue planning_notes JSON key with an obsolete key while backing columns remain present.",
+      "Rename the Safety Officer role catalogue entry and separately revoke the service_role queue SELECT grant.",
+      "After each refused check, close the failed transaction and run an independent healthy read-only check."
+    ],
+    "data": "Four rollback-only fault scenarios: missing completed_by/completed_at/submitted_at, missing planning_notes projection key, absent Safety Officer role name, revoked service-role SELECT on internal_work_items.",
+    "expected": "Every damaged contract produces a nonzero exit and the matching diagnostic; each rollback restores a passing healthy schema. The checks do not replace real PostgREST/API integration testing.",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1",
+      "SG2-25:AC2"
+    ],
+    "actual": "All four damaged-contract scenarios were refused with the expected diagnostics, and every independent post-rollback healthy check passed."
+  },
+  {
+    "id": "SG2-22-READINESS-NOTIFICATION-KINDS",
+    "title": "Legacy notification constraint blocks release before lifecycle writes fail",
+    "type": "Deployment readiness regression",
+    "story": "SG2-22",
+    "purpose": "Detect the hosted drift that allowed an event transition/history row but rejected its lifecycle notice, and separately cover the older event_confirmed notification kind.",
+    "preconditions": "Disposable native PostgreSQL with all repository migrations; POSTGRES_CONTAINER points only to its local Docker container. No hosted mutation.",
+    "steps": [
+      "Run the public structural gate against the healthy migrated schema.",
+      "Inside a rollback transaction, clear synthetic notices and restore the old validated five-kind notifications_kind_check.",
+      "Require a nonzero readiness result naming event_confirmed and all five lifecycle kinds.",
+      "Close the failed transaction and run a separate healthy read-only check, proving the old constraint/data changes rolled back."
+    ],
+    "data": "Old kinds: venue_request_approved, venue_request_rejected, venue_booking_released, equipment_reserved, venue_booking_clash. Expected additional kinds: event_confirmed, event_submitted, coordinator_assigned, clarification_requested, event_approved, event_rejected.",
+    "expected": "All six missing-kind contracts are diagnosed. The structurally healthy schema passes before and after the failed rollback transaction. The gate never inserts a hosted test notification or executes the constraint expression.",
+    "evidence": ".github/scripts/release-readiness.test.mjs:70; supabase/checks/release_readiness.sql",
+    "layer": "Native PostgreSQL catalogue checks through the read-only release gate",
+    "status": "Pass",
+    "actual": "7/7 native readiness tests passed, including the exact old-kind constraint regression. The new case diagnosed all six omitted kinds and confirmed the next independent healthy read-only check passed.",
+    "execution_evidence": "15 Oct 2026; POSTGRES_CONTAINER=spm-hotfix-integration-pg node --test .github/scripts/release-readiness.test.mjs; /tmp/spm-readiness-notifications.log. Local native PostgreSQL; no new hosted CI, deployment or human approval claim.",
+    "execution_date": "15 Oct 2026",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-68:AC1",
+      "SG2-58:AC1"
+    ],
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-36-HOTFIX-SENDER-NAME",
+    "title": "New clarification messages return the stored sender name immediately and match the reloaded thread",
+    "type": "Positive / boundary / API response consistency / role isolation",
+    "story": "SG2-36",
+    "purpose": "Prevent a known coordinator or organiser appearing as Unknown sender immediately after posting because the insert response omits the sender relation.",
+    "preconditions": "Disposable local PostgreSQL 17 and PostgREST v12.2.12 with committed migrations and synthetic identities; real Express routes and Supabase adapters. Adapter unit suite uses controlled query responses. No hosted database changes.",
+    "steps": [
+      "Create and submit an event, assign the coordinator as Lead, and begin review.",
+      "POST the coordinator question and check HTTP 201, needs_clarification, exact sender identity/name and message.",
+      "POST the organiser reply and check its exact sender identity/name and message.",
+      "GET the thread as each participant and compare the entire two-message response with the POST records; another coordinator must receive 404.",
+      "Check the insert selector includes the sender relation and preserve array, null-name, missing-user and existing unavailable-response behavior."
+    ],
+    "data": "Synthetic integration organiser/coordinator identities; question Which room layout do you need?; reply Theatre layout, please.; array and null sender adapter fixtures.",
+    "expected": "Both POST records immediately contain their real stored sender names and exactly match GET records for both participants. Unrelated coordinators cannot read the thread. Genuinely absent names remain null for the existing UI fallback.",
+    "evidence": "integration/api.test.ts; server/src/db/clarifications.test.ts; server/src/db/clarifications.ts",
+    "layer": "Real Express/Supabase/PostgREST/PostgreSQL integration and database adapter unit tests",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-36:AC1",
+      "SG2-36:AC3"
+    ],
+    "status": "Pass",
+    "actual": "Before the fix, the new native API regression failed with sender_name null instead of Integration coordinator while the other five API cases passed. After returning the same joined sender columns as GET, all six native API cases and all fourteen adapter unit cases passed. Changed adapter coverage is 100% statements, branches, functions and lines.",
+    "execution_evidence": "15 Oct 2026 local verification; POSTGRES_CONTAINER=spm-hotfix-integration-pg npm run test:integration; compiled adapter unit test run with c8. Logs /tmp/spm-clarification-native-before.log, /tmp/spm-clarification-native-after.log and /tmp/spm-clarification-coverage.log. Full combined CI and hosted deployment for this follow-up are not claimed.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-57-HOTFIX-PLANNING-READINESS",
+    "title": "Planning saves refresh registration readiness immediately without reloading the event",
+    "type": "Positive / boundary / recovery / UI freshness",
+    "story": "SG2-57",
+    "purpose": "Prevent the readiness panel retaining Registration not required after planning saves enable or configure registration.",
+    "preconditions": "Rendered WorkQueue, planning drawer and readiness panel with controlled public API responses; no hosted writes.",
+    "steps": [
+      "Enable registration, set capacity and valid opening/closing dates, and save planning details.",
+      "Read the updated readiness panel immediately and reopen the drawer to verify capacity and dates.",
+      "Save registration with missing windows and check Outstanding, then disable it and check Not required.",
+      "Reject a planning save and verify the form draft and previous readiness survive without an extra readiness fetch."
+    ],
+    "data": "Synthetic event 17; capacity 20; opening 1 Jun 2030 10:00 and closing 10 Jun 2030 18:00; empty windows and a 503 planning response.",
+    "expected": "Successful planning saves refresh readiness once while leaving queue and equipment data mounted. Complete configuration shows Ready, incomplete configuration shows Outstanding, and disabling registration shows Not required. Failed saves retain the draft and do not refresh readiness.",
+    "evidence": "client/src/screens/WorkQueue.equipmentReadiness.test.tsx; client/src/screens/WorkQueue.tsx",
+    "layer": "Composed rendered React components and public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC1",
+      "SG2-39:AC4",
+      "SG2-57:AC2"
+    ],
+    "status": "Pass",
+    "actual": "The normal and incomplete-registration regressions failed before the callback fix because the old Not required panel remained. After the fix all 104 targeted tests and all 1,351 client tests passed; WorkQueue.tsx has 100% statements, branches, functions and lines. Client typecheck passed.",
+    "execution_evidence": "15 Oct 2026 local runs; /tmp/spm-registration-readiness-before.log, /tmp/spm-registration-readiness-after.log, /tmp/spm-registration-readiness-coverage.log and /tmp/spm-registration-readiness-types.log. No hosted deployment or combined CI result claimed for this follow-up.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-48-HOTFIX-VENUE-REFRESH-LOADING",
+    "title": "Venue request success replaces stale empty results with loading until the refreshed list arrives",
+    "type": "Boundary / conflict / failure / UI freshness",
+    "story": "SG2-48",
+    "purpose": "Avoid contradicting a successfully saved venue request with the old empty list while the existing follow-up read is still pending.",
+    "preconditions": "Composed VenueSearch, real request form and EventVenueRequests components; controlled public HTTP responses; no hosted writes.",
+    "steps": [
+      "Load an event with no venue requests.",
+      "Submit a venue request successfully while holding the subsequent list response pending.",
+      "Check the success notice, loading message, absence of the old empty result, and exactly one refresh.",
+      "Resolve the refreshed list and check Pending and one venue awaiting Venue Staff.",
+      "Repeat with a refused POST and check the form and known list remain without a refresh or success claim."
+    ],
+    "data": "Synthetic event 10, venue 3, request 41; delayed GET; HTTP 409 assignment refusal.",
+    "expected": "A successful request immediately invalidates the previous list and displays loading until current results arrive. A refused request leaves the known list and draft unchanged; no refresh is sent.",
+    "evidence": "client/src/screens/VenueSearch.test.tsx; client/src/venues/VenueRequests.tsx",
+    "layer": "Composed rendered React components and public API boundary",
+    "categories": [
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-48:AC3"
+    ],
+    "status": "Pass",
+    "actual": "The delayed refresh regression failed before the fix because the empty result remained visible. After clearing invalidated list/error state at fetch start, all 36 focused venue tests passed; VenueRequests.tsx has 100% statement, branch, function and line coverage. Client typecheck and diff whitespace validation passed.",
+    "execution_evidence": "15 Oct 2026 local verification; /tmp/spm-venue-refresh-red.log; /tmp/spm-venue-refresh-green.log; /tmp/spm-venue-refresh-typecheck.log; /tmp/spm-venue-refresh-coverage/coverage-summary.json. Hosted deployment and full combined CI are not claimed.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-100-HOTFIX-ASSIGNMENT-STATUS",
+    "title": "Assignment cards immediately display the server-recorded lifecycle status",
+    "type": "Positive / boundary / conflict / failure / UI response consistency",
+    "story": "SG2-100",
+    "purpose": "Prevent a successfully assigned request retaining Awaiting Assignment until the Lead reloads the screen.",
+    "preconditions": "Isolated rendered CoordinatorAssignment and real public assignment API helper with controlled HTTP responses; synthetic event/coordinator identities; no hosted writes.",
+    "steps": [
+      "Assign event7 while holding PATCH pending and verify Awaiting Assignment until success.",
+      "Return the recorded submitted status; verify Submitted and new coordinator immediately.",
+      "Reassign event8 with each advanced returned status and verify the exact lifecycle label.",
+      "Return incomplete or unsupported status payloads and preserve existing known status.",
+      "Reject assignment with409/503 despite a submitted-shaped response and retain unassigned coordinator/status."
+    ],
+    "data": "Events7/8; Sarah/Raj coordinator identities; submitted, under_review, planning, awaiting_safety_check, preparation, confirmed; absent/null/numeric/unknown/terminal status payloads; HTTP409/503.",
+    "expected": "Successful first assignment updates the displayed status from the server response. Reassignment never guesses Submitted. Missing or invalid status leaves the previous state; refused mutations do not change the card.",
+    "evidence": "client/src/screens/CoordinatorAssignment.test.tsx; client/src/api/eventRequests.test.ts; client/src/screens/CoordinatorAssignment.tsx; client/src/api/eventRequests.ts",
+    "layer": "Composed rendered React screen and authenticated public API boundary",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-100:AC3",
+      "SG2-33:AC1",
+      "SG2-34:AC1"
+    ],
+    "status": "Pass",
+    "actual": "Before the fix five rendered instances failed because the old badge remained despite the successful assignment response. After the fix all1368 client tests in68 files pass, all client source coverage metrics100%, and typecheck passes. Four new method declarations and two revised existing methods cover15 extra runner instances.",
+    "execution_evidence": "15 Oct2026 local verification; /tmp/spm-assignment-status-red.log, /tmp/spm-assignment-status-full.log, /tmp/spm-assignment-status-full-coverage/coverage-summary.json and /tmp/spm-assignment-status-types.log. No hosted deployment or combined CI result claimed.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-38-HOTFIX-COORDINATOR-REVISION-GUIDANCE",
+    "title": "Rejected requests direct revisions through the coordinator and stopped stages show their actual outcome",
+    "type": "Boundary / conflict / failure / organiser guidance and lifecycle consistency",
+    "story": "SG2-38",
+    "purpose": "Remove unsupported direct organiser edit/resubmit guidance and waiting counts after rejection, while preserving coordinator-led revised resubmission and avoiding false lifecycle-completion text.",
+    "preconditions": "Rendered EventDetail, Dashboard and EventStageTracker with public API/helper boundaries and controlled request/stage responses; isolated jsdom; synthetic owned and same-organisation colleague events.",
+    "steps": [
+      "Load a rejected owned request with an obsolete waiting flag; verify direct editing is disabled, coordinator revision guidance and change history remain, and no permanent cannot-resubmit or new-request-only instruction is shown.",
+      "Read the dashboard containing own rejected, colleague rejected and explicitly returned clarification requests; verify only clarification counts as waiting on the organiser and the colleague stays view only.",
+      "Read confirmed, completed, cancelled, rejected, on-hold and failed-safety stages with no next actor; verify actual stage description instead of a universal planning-completed claim.",
+      "Check case/padding variants in public normalization and preserve existing draft/explicit clarification amendment behavior."
+    ],
+    "data": "Synthetic rejected event106, dashboard events70–72, case/padding status variants, null-next-actor stage responses.",
+    "expected": "Rejected own requests direct proposed revisions through the coordinator, are not directly editable and do not inflate organiser action counts. Rejection is not described as permanently final: Week4 revised resubmission eligibility remains, subject to later Week9 coordinator-led post-submission changes. Stage fallback displays actual outcome text; history/reason access and explicit clarification flow remain.",
+    "evidence": "client/src/screens/EventDetail.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/components/EventStageTracker.test.tsx; client/src/mock/viewModel.test.ts; client/src/api/eventRequests.test.ts",
+    "layer": "Composed rendered React screens/components and public exported API normalization/view-model contracts",
+    "categories": [
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-31:AC4",
+      "SG2-38:AC1",
+      "SG2-38:AC3"
+    ],
+    "supporting_contracts": [
+      "SG2-37:coordinator-led-revision"
+    ],
+    "status": "Pass",
+    "actual": "All 1,377 frontend tests in 68 files passed with 100% per-file statements, branches, functions and lines; client typecheck and diff whitespace validation passed. Three new and eight revised declarations cover coordinator guidance, action counts, colleague isolation and accurate stopped-stage copy. No hosted acceptance or full Done-story signoff is claimed.",
+    "execution_evidence": "15 Oct 2026 local verification: /tmp/spm-coordinator-revision-client-full.log; /tmp/spm-coordinator-revision-client-typecheck.log; /tmp/spm-coordinator-revision-frontend-handoff.json. Requirement evidence: QA-W4-R5/R38/R68, Sheet1!D5/D38/D68; later QA-W9-R11, G3-5!D11. Latest user confirms later-week precedence. Earlier local permanent-final-rejection choice was superseded after customer answers were reread.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "status": "Pass",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null,
+    "id": "SG2-39-HOTFIX-PERSISTED-RECHECK-READINESS",
+    "title": "Planning-impact rechecks remain outstanding in readiness and confirmation despite existing receipts",
+    "type": "Positive / boundary / conflict / failure / API persistence / transactional SQL guard",
+    "story": "SG2-39",
+    "purpose": "Keep the stored impact warning, readiness panel and atomic confirmation gate consistent without changing reservations or clearing rechecks.",
+    "preconditions": "Native real planning/arrangements APIs; one approved booked venue, reserved/placed equipment, complete registration.",
+    "steps": [
+      "Start with approved venue booking, reserved/placed equipment and fully configured registration.",
+      "Increase attendance, observe impact409 and no mutation, then confirm impact and save.",
+      "Read venue/equipment Outstanding while registration stays Ready; increase registration capacity to mark its recheck too.",
+      "Compare original booking and receipt snapshots.",
+      "Attempt confirmation on otherwise-ready fixtures with each known active recheck and all three.",
+      "Exercise inactive/null/empty/unknown marker compatibility and stale-deployed-function release diagnostics."
+    ],
+    "data": "Synthetic event attendance136→137, registration capacity136→137; venue_recheck/equipment_recheck/registration_recheck; false/null flags, duplicates, unknown markers, JSON null/object arrays.",
+    "expected": "Only known active impacts mark their category Outstanding and prevent confirmation. Rechecks retain booking/reservation facts and remain persisted. Refused confirmation changes no event, history, notification, booking or receipt. Inactive/unknown legacy metadata preserves ordinary readiness.",
+    "evidence": "server/src/events/arrangementReadiness.test.ts; server/src/getEventArrangements.test.ts; integration/api.test.ts; supabase/tests/event_confirmation.sql; .github/scripts/release-readiness.test.mjs",
+    "layer": "Native Express/Supabase/PostgREST/PostgreSQL, public read-model/API tests and rollback SQL",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC2",
+      "SG2-57:AC2",
+      "SG2-58:AC2"
+    ],
+    "actual": "Before the fix, the native API returned no outstanding categories after flags were saved and the SQL RPC confirmed an unchecked fixture. After the fix all1429 backend tests,9 native cases,8 release guard tests and the extended confirmation SQL suite pass; changed readiness source coverage100% all four metrics.",
+    "execution_evidence": "/tmp/spm-planning-rechecks-backend.log; /tmp/spm-planning-rechecks-native-red.log; /tmp/spm-planning-rechecks-native-green.log; /tmp/spm-planning-rechecks-sql-red.log; /tmp/spm-planning-rechecks-sql-green.log; /tmp/spm-planning-rechecks-release-red.log; /tmp/spm-planning-rechecks-release-green.log; /tmp/spm-planning-rechecks-hosted-apply-test.log. Exact operator transaction rehearsed on a disposable copy of the hosted baseline; no hosted deployment claimed."
+  },
+  {
+    "status": "Pass",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null,
+    "id": "SG2-37-COORDINATOR-REWORK-NATIVE",
+    "title": "Rejected requests retain coordinator-mediated review semantics without direct organiser edits or reservations",
+    "type": "Positive / boundary / conflict / failure / customer-policy preservation",
+    "story": "SG2-37",
+    "purpose": "Verify later customer precedence without imposing final rejection or an unsupported direct-edit workflow.",
+    "preconditions": "Real API creates, submits, assigns, reviews and rejects a synthetic event; native PostgreSQL/PostgREST with recorded audit.",
+    "steps": [
+      "Reject an assigned event with a reason and capture its complete event/audit record.",
+      "Attempt direct organiser amendment, venue request and authenticated equipment reservation while rejected.",
+      "Verify no event/audit/resource mutation from those attempts.",
+      "Resubmit unchanged details; verify submitted status, original coordinator, retained rejection reason/history and a new resubmission audit.",
+      "Create and submit a different draft, and verify a needs_clarification request still accepts complete amendments and resubmits."
+    ],
+    "data": "Synthetic rejected event, original rejection reason, coordinator, booking/reservation refusals and complete draft/clarification inputs.",
+    "expected": "Rejected direct edits/reservations are refused. Resubmission returns to coordinator review without auto-approval and preserves prior evidence. Separate new drafts and clarification amendments work. The broader SG2-64 coordinator reopen flow is not claimed.",
+    "evidence": "integration/api.test.ts; supabase/tests/fixtures/auth.sql; existing server/src/submitEventRequest.test.ts",
+    "layer": "Native Express/Supabase/PostgREST/PostgreSQL with synthetic identities",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-37:AC2",
+      "SG2-30:AC1",
+      "SG2-36:AC2"
+    ],
+    "actual": "Final-rejection product guards were restored to committed baseline before verification. All9 native cases pass, including rejected resubmission and clarification amendment. Active positive rejected-resubmit unit case TC-77d84ac446db remains in the passing1429-case backend suite.",
+    "execution_evidence": "/tmp/spm-planning-rechecks-native-green.log; /tmp/spm-planning-rechecks-backend.log. No hosted writes or completed coordinator-reopen workflow claimed."
+  },
+  {
+    "id": "SG2-58-HOTFIX-CONFIRMATION-RECORD-SCHEMA",
+    "title": "Confirmation record schema repair preserves the installed procedure and legacy rows",
+    "type": "Positive / boundary / conflict / failure / release schema drift",
+    "story": "SG2-58",
+    "purpose": "Repair hosted installations where the confirmation procedure exists but confirmed_by/confirmed_at and their constraints were never applied.",
+    "preconditions": "Disposable migrated database; capture confirmation function hash; remove both columns inside a rollback transaction.",
+    "steps": [
+      "Remove confirmation record columns from an isolated schema while retaining the existing procedure.",
+      "Run the exact operator transaction recording only migration005, then apply the source repair twice again.",
+      "Run read-only readiness and the full confirmation SQL suite, including legacy confirmed-null rows and atomic confirmation history/notifications.",
+      "Exercise wrong types, missing/wrong FK and pair constraints through rollback-only release regressions."
+    ],
+    "data": "Missing UUID confirmer/timestamptz confirmation time; correct users FK and paired-null equality; installed procedure hash21d177627354c7b2958a593457f7ac0d.",
+    "expected": "Missing fields are added without invented confirmation values or a function replacement. Correct constraints are reused; incompatible schema fails safely. Release guard catches missing/wrong dependencies; ready confirmation still writes receipt/audit/notice atomically.",
+    "evidence": "supabase/migrations/202610160005_event_confirmation_record_repair.sql; .github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql; existing supabase/tests/event_confirmation.sql",
+    "layer": "Rollback schema mutation regressions and separate disposable PostgreSQL repair rehearsal",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-58:AC1"
+    ],
+    "status": "Pass",
+    "actual": "All12 release regression cases passed. The exact guarded005 operator transaction repaired a separate schema missing both columns; repeated source applications succeeded, full confirmation SQL suite passed and rolled back, release gate returned ready, procedure hash stayed21d177 and only005 was recorded. Missing constraints/types were previously missed by the guard and now fail with diagnostics.",
+    "execution_evidence": "/tmp/spm-confirmation-record-repair-red.log; /tmp/spm-confirmation-record-repair-green.log; /tmp/spm-confirmation-record-repair-rehearsal.log. No hosted writes by this agent.",
+    "execution_date": "15 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-39-SG2-81-HOTFIX-COMBINED-READINESS",
+    "title": "Venue disruptions and planning rechecks both block confirmation after the venue replacement upgrade",
+    "type": "Conflict / failure / native API / migration regression",
+    "story": "SG2-39 / SG2-57 / SG2-58 / SG2-81",
+    "purpose": "Keep the planning impact gate when venue replacement replaces confirm_event; display and enforce both persisted outstanding reasons without releasing bookings or clearing saved markers.",
+    "preconditions": "Disposable native PostgreSQL/PostgREST after all migrations; Preparation event with physically ready arrangements, active known recheck markers and a confirmed booking affected by unavailability. Exact operator rehearsal starts from verified160004/160005 schema.",
+    "steps": [
+      "Run combined public readiness computation and native GET arrangements after a planning impact and venue unavailability.",
+      "Call confirm_event with the venue outstanding only because of its disruption and equipment/registration outstanding only because of saved flags.",
+      "Compare stage, flags, confirmed booking, equipment receipt and audit/notification counts.",
+      "Temporarily remove the disruption gate in an isolated rollback transaction and require release refusal.",
+      "Rehearse170001 and170002 atomically with exact baseline hash, actual migration ledger bodies and duplicate-apply protection."
+    ],
+    "data": "Synthetic event with attendance21, active venue/equipment flags; independent combined SQL fixture with equipment/registration flags and affected confirmed booking. No hosted fixture mutations.",
+    "expected": "Both venue explanations remain visible; effective outstanding keys contain all affected arrangements once. Confirmation refuses unchanged physical receipts, stage and flags with no audit/notice mutations. Healthy release check passes; stale disruption guard fails. Atomic upgrade keeps original event JSON unchanged and finishes with confirm_event hash d58767f00d8611cab462c850fbd7c781.",
+    "evidence": "server/src/events/arrangementReadiness.test.ts; integration/api.test.ts; supabase/tests/venue_replacement.sql; .github/scripts/release-readiness.test.mjs; supabase/migrations/202610170002_confirmation_rechecks_and_disruptions.sql",
+    "layer": "Public readmodel + native API/PostgreSQL + rollback release guard + exact migration rehearsal",
+    "status": "Pass",
+    "relatedCases": [
+      "TC-c9484442bdb1",
+      "TC-f3ea905fb5b6",
+      "TC-0fdb7e7b7c93",
+      "SG2-39:disruptions-and-rechecks-combined",
+      "SG2-39:combined-readiness-no-side-effects"
+    ],
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-39:AC2",
+      "SG2-57:AC2",
+      "SG2-58:AC2",
+      "SG2-81:AC2"
+    ],
+    "actual": "PASS local merged validation: backend1453/1453, native9/9, release13/13,30 SQL suites,31 race cases. Hosted combined deployment pending root application.",
+    "execution_evidence": "/tmp/spm-combined-readiness-backend-retry.log; /tmp/spm-combined-readiness-native.log; /tmp/spm-combined-readiness-release.log; /tmp/spm-combined-readiness-sql.log; /tmp/spm-combined-readiness-upgrade.log; /tmp/spm-combined-readiness-rehearsal.log",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-81-HOTFIX-NOTIFICATION-CONTRACT",
+    "title": "Venue unavailability warnings remain readable alongside the existing inbox",
+    "type": "Positive / conflict / failure / public API and rendered role inbox",
+    "story": "SG2-81",
+    "purpose": "Accept the exact venue_unavailable contract emitted by venue replacement without discarding all of a recipient’s notifications.",
+    "preconditions": "Signed-in Coordinator or Organiser, real browser notification parser; response includes a new venue warning and an older approval.",
+    "steps": [
+      "Load the mixed inbox through the public notification API.",
+      "Open each role’s application notification drawer.",
+      "Check warning label, original message/time, existing notice and authenticated no-store request.",
+      "Check malformed near-miss, inherited and unknown kind names remain refused.",
+      "Verify protected server route forwards exact recipient-specific records."
+    ],
+    "data": "venue_unavailable for event20 plus existing venue_request_approved; trailing-space and wrong-case variants are invalid.",
+    "expected": "Notifications (2) loads and Venue unavailable shows the original warning alongside earlier notices; no unavailable alert. Invalid kinds still fail validation. No database changes or loosened generic acceptance.",
+    "evidence": "client/src/api/notificationsApi.test.ts; client/src/components/HoldNotifications.test.tsx; server/src/notifications.test.ts",
+    "layer": "Browser API boundary + rendered role AppShell + protected Express API",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-81:AC1",
+      "SG2-81:AC6"
+    ],
+    "status": "Pass",
+    "actual": "Red API and both rendered-role cases reproduced the unavailable inbox. After fix: fullfrontend1392/1392, focusednotificationbackend11/11, clienttypecheckgreen, all touchedsource100% statements/branches/functions/lines. Inventory2352methods744SQL.",
+    "execution_evidence": "/tmp/spm-venue-notifications-red.log; /tmp/spm-venue-notifications-client-coverage.log; /tmp/spm-venue-notifications-server.log",
+    "execution_date": "16 Oct2026",
+    "executed_by": "Codex automated verification",
+    "review": null
+  },
+  {
+    "id": "SG2-46-FACILITY-PREFILL-01",
+    "title": "Event facility requirements survive prefill and search without excluding equivalent venue features",
+    "type": "Normal / boundary / conflict",
+    "story": "SG2-46",
+    "purpose": "Repair the hosted QA22 default-search mismatch while keeping recognised facility filters consistent with booking suitability and preserving unknown user phrases.",
+    "preconditions": "Client public helper plus real loopback Express search handler with deterministic venue/provider fixtures. Hosted QA22 failure captured separately; no hosted pass claimed by these tests.",
+    "steps": [
+      "Open prefill for an event requiring projector and verify canonical filter plus unchanged requirement text.",
+      "Exercise multiple facilities, unrelated/blank prose and all twelve recognised requirements.",
+      "Search the real HTTP handler with canonical facility labels against equivalent projection, Wi-Fi and PA venue features.",
+      "Verify a missing required facility excludes the venue and unknown whole phrases remain literal and conjunctive.",
+      "Verify twelve keywords are accepted and thirteen are rejected without weakening the 255-character limit."
+    ],
+    "data": "QA room, 14 seats and projector; Stage/PROJECTOR/microphones/Wi-Fi; all12facilities; venue projection/Wi-Fi/PA; unknown phrase projector balcony.",
+    "expected": "Prefill retains all recognised requirements and raw text; equivalent venue features match; missing or unknown phrase criteria are not silently dropped;12terms allowed and13refused.",
+    "evidence": "client/src/venues/searchPrefill.test.ts; server/src/venue-search.test.ts; docs/test-case-inventory.json",
+    "layer": "Public client helper + native loopback Express API with controlled storage",
+    "status": "Pass",
+    "actual": "Local frontend1396 and backend1457 passed with100% statements/branches/functions/lines on both applications; client/server production builds and13inventory checks passed. Hosted fixed-preview retest and pushed-head CI pending.",
+    "execution_evidence": "16Oct2026 local coverage runners and combined build, recorded in facility-prefill handoff; isolated providers, not hosted acceptance.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (automated local runners)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-46:AC1",
+      "SG2-46:AC2"
+    ],
+    "source_method_ids": [
+      "TC-7374ec3fefa4",
+      "TC-26e7adab3c89",
+      "TC-84c9bb72d424",
+      "TC-9300029d2991",
+      "TC-03588b5b3b63",
+      "TC-b5b1ecf34f9e",
+      "TC-a23df58c1687"
+    ],
+    "notes": "Independent PR90 test-case review remains pending. Historical source-test identities and the renamed keyword-boundary workbook identity must be preserved."
+  },
+  {
+    "id": "SG2-47-CAPACITY-DISCOVERY-01",
+    "title": "Eligible Organiser and Technical Support capacity requests are reachable without broadening booking authority",
+    "type": "Normal / boundary / failure / conflict",
+    "story": "SG2-47",
+    "purpose": "Repair the missing normal-navigation approval workflow for roles already authorised by SG2-47 AC3, retaining creator isolation and separate Venue Staff booking decisions.",
+    "preconditions": "Local React/Express and controlled identity/storage for unit/browser layers; separate disposable PostgreSQL/PostgREST for native integration. Hosted acceptance and independent peer review are separate pending gates.",
+    "steps": [
+      "Open Capacity exceptions as an Organiser and Technical Support user; inspect eligible cards and select an existing request.",
+      "Verify Organiser creator-only visibility, role-denied access, query spoof resistance, empty/null-capacity handling, malformed responses and retry states.",
+      "Approve through the existing action and inspect the real receipt; refresh to remove covered requests.",
+      "Verify missing facilities, decided requests and covering grants are excluded; read beyond 1,000 candidates and fail safely on a later-page error.",
+      "Verify approval leaves the request pending and unbooked, then Venue Staff independently approves a booking."
+    ],
+    "data": "Own and colleague requests; capacity 120 / attendance 150; missing facility, missing attendance, null capacity, covered and decided requests; 1,001-row adapter boundary; invalid HTTP response and stale approval conflict.",
+    "expected": "Only eligible scoped requests are discoverable. Denied or spoofed calls expose no other organiser and write nothing. Selected approval shows its own receipt. Exception approval alone never commits a booking; separate Venue Staff decision does. Later-page failure returns an error rather than a partial successful list.",
+    "evidence": "client/src/{App.test.tsx,screens/CapacityExceptions.test.tsx,venues/capacityExceptionsApi.test.ts}; server/src/{db/venueSuitability.test.ts,venue-suitability-routes.test.ts}; integration/api.test.ts; e2e/capacity-exceptions.spec.ts; docs/test-case-inventory.json",
+    "layer": "Public client/UI mocked HTTP; real loopback Express with controlled store; native API/PostgREST/PostgreSQL; browser over resettable memory DB/RPC fixture",
+    "status": "Pass",
+    "actual": "Local frontend 1,419 and backend 1,466 cases passed, each with 100% statements, branches, functions and lines. Native integration 10/10 passed. All 110 browser cases passed once with zero skipped, failed, flaky or retried cases, including three new capacity journeys and four smoke cases (subsets, not additional totals). These results do not establish hosted acceptance.",
+    "execution_evidence": "16 Oct 2026 local runners; capacity server/frontend/E2E handoffs and ignored output/staging-e2e-2026-10-16/verification/capacity-full-browser-110. Native integration uses actual PostgREST and PostgreSQL; browser storage is a fixture. Pushed-head CI and hosted workflow retest pending for this revision.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (local automated runners; not independent peer approval)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-47:AC3",
+      "SG2-47:AC5",
+      "SG2-25:AC1",
+      "SG2-25:AC2",
+      "SG2-25:AC3",
+      "SG2-49:AC1",
+      "SG2-49:AC3",
+      "SG2-86:AC2"
+    ],
+    "source_method_ids": [
+      "TC-80ad0eda772a",
+      "TC-25f6cc2ada9f",
+      "TC-87c11af29527",
+      "TC-612910aeb6b4",
+      "TC-849a59c8261d",
+      "TC-1a861da9306d",
+      "TC-df9c4d68d2d7",
+      "TC-519f5123d127",
+      "TC-0336ae9929eb",
+      "TC-3d9c9998d39a",
+      "TC-a6c0b8b9030c",
+      "TC-6b2ad4efa1e3",
+      "TC-a7cfcd286148",
+      "TC-675beceeb96b",
+      "TC-de323dc2531e",
+      "TC-17e7d2dbef7c",
+      "TC-4d06b4d5e4ae",
+      "TC-bced1830aecd",
+      "TC-ba1c733ff50e",
+      "TC-3a48cfcc9d5d",
+      "TC-0961d3a822ea",
+      "TC-c26acc317a71",
+      "TC-392a7ca9c77e",
+      "TC-ab07f7ca796d",
+      "TC-ca259369136a",
+      "TC-040f5bb0680d",
+      "TC-1371b802a92e",
+      "TC-59268c4cd719"
+    ],
+    "method_scope": {
+      "new_declarations": 28,
+      "frontend": 15,
+      "server_adapter_route_native": 10,
+      "browser": 3,
+      "frontend_revised_declarations": 2,
+      "revised_method_ids": [
+        "TC-6aa41d5ab5b0",
+        "TC-7e7ab4e858fd"
+      ],
+      "browser_case_ids": [
+        "SG2-47-P03",
+        "SG2-47-P04",
+        "SG2-47-N02"
+      ]
+    },
+    "notes": "Grouped supporting-method record, not 28 independently accepted user workflows. SG2-47-P01/P02/N01 historical executions remain unchanged. Existing permission and POST eligibility rules are reused, not expanded. All four category tags occur in the new source tests; parameterized runner counts differ from declaration counts. DoD test traceability is recorded; independent PR review and full hosted Done acceptance remain open."
+  },
+  {
+    "id": "SG2-40-DRAFT-HISTORY-01",
+    "title": "Draft and clarification edits commit their exact field history atomically",
+    "type": "Normal / boundary / failure / conflict",
+    "story": "SG2-40",
+    "purpose": "Repair the controlled hosted Draft23 reproduction: saved attendance and description persisted while change history remained empty. Record truthful per-field history without inventing earlier values or changing future rework policy.",
+    "preconditions": "Owner draft or needs_clarification request; existing public PATCH and history endpoints. Local SQL/native use disposable PostgreSQL/PostgREST; browser uses resettable external memory RPC fixture. Hosted repaired-preview acceptance is separate.",
+    "steps": [
+      "Edit all nine supported fields, save, reopen and inspect old/new values, actor identity and save time.",
+      "Save unchanged data and an equivalent timestamp instant; verify no phantom history. Clear a nullable value and change registration true to false.",
+      "Refuse wrong role, colleague ownership, changed/blank organisation membership, closed status and invalid private RPC input without a saved change or history.",
+      "Inject an audit insert failure inside a disposable rollback test and verify both event and history remain unchanged. Serialize concurrent native saves and verify the old/new chain; submission closes editing.",
+      "Verify direct authenticated/anonymous RPC execution is refused, missing/broadened/revoked RPC deployment contracts fail readiness, and clarification conversation/review history remains intact."
+    ],
+    "data": "Nine draft fields; attendance null→12; nullable description; registration true→false; equivalent +08:00/UTC date; owner/colleague/attendee identities; concurrent A/B names; transaction-local failing audit trigger.",
+    "expected": "Each actual changed field has one committed row identifying the real actor, old/new values and save time. No-op/refused saves add no rows. Failed audit insertion rolls back all saved values. Only the creator with current membership can edit draft/clarification states; no direct client RPC execution. Existing history privacy and public response shape remain.",
+    "evidence": "server/src/{db/eventRequests.test.ts,updateEventRequestDraft.test.ts}; integration/api.test.ts; supabase/tests/event_draft_audit.sql; .github/scripts/release-readiness.test.mjs; e2e/draft-history.spec.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "layer": "HTTP/adapter fixtures; real API/PostgREST/PostgreSQL; rollback SQL; structural readiness; React/Express browser with resettable memory RPC fixture",
+    "status": "Pass",
+    "actual": "Local backend 1,468/1,468 passed with 100% statements, branches, functions and lines. Native integration 12/12, fourteen new tagged SQL rollback assertions and readiness 15/15 passed. Full browser 113/113 passed with zero skipped, retried or flaky cases, including three draft-history journeys and four smoke journeys (subsets). Revised Drawer label checks passed in the focused 23-case client suite; current-head full client coverage and pushed-head CI remain separate checks.",
+    "execution_evidence": "16 Oct 2026 local server/native/SQL/readiness runners and draft-history E2E handoff; ignored verification/draft-history-full-browser-113 membership and draft-history-local traces/videos/screenshots. Hosted structural install verified migration170003 and service-only grants, not hosted save/history acceptance.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (local automated checks; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-29:AC1",
+      "SG2-29:AC2",
+      "SG2-30:AC3",
+      "SG2-31:AC3",
+      "SG2-36:AC1",
+      "SG2-36:AC2",
+      "SG2-36:AC3",
+      "SG2-40:AC1",
+      "SG2-40:AC2",
+      "SG2-40:AC3",
+      "SG2-25:AC1",
+      "SG2-25:AC2",
+      "SG2-25:AC3",
+      "SG2-26:AC2"
+    ],
+    "source_method_ids": [
+      "TC-cf4357b74d4f",
+      "TC-c27aa7ffe629",
+      "TC-6086a521446b",
+      "TC-44ef6b50a004",
+      "TC-5049d40360f1",
+      "TC-7a76d4090428",
+      "TC-c987ebc832db",
+      "TC-95ae3f9ff622",
+      "TC-f8d610cd06a0"
+    ],
+    "source_sql_contract_ids": [
+      "SG2-40:draft-all-field-diffs",
+      "SG2-40:draft-actor-save-time",
+      "SG2-40:draft-typed-values",
+      "SG2-40:draft-equivalent-no-op",
+      "SG2-40:draft-clarification-null-boolean",
+      "SG2-40:draft-invalid-rpc-shape",
+      "SG2-40:draft-invalid-save-unchanged",
+      "SG2-40:draft-creator-role-scope",
+      "SG2-40:draft-stale-membership",
+      "SG2-40:draft-blank-membership",
+      "SG2-40:draft-stale-status",
+      "SG2-40:draft-audit-failure-rollback",
+      "SG2-40:draft-authenticated-execute",
+      "SG2-40:draft-effective-execute-grants"
+    ],
+    "method_scope": {
+      "new_source_records": 23,
+      "new_executable_methods": 9,
+      "new_sql_assertions": 14,
+      "backend_adapter_handler": 2,
+      "native": 2,
+      "readiness": 2,
+      "browser": 3,
+      "revised": 2,
+      "revised_aliases": [
+        {
+          "current": "TC-458d32beacb0",
+          "previous": "TC-f774dfb62d21",
+          "reason": "Existing adapter save case now verifies the atomic RPC rather than direct UPDATE filters."
+        },
+        {
+          "current": "TC-022594d51cca",
+          "previous": "TC-022594d51cca",
+          "reason": "Existing field-label case additionally checks Event Name, Purpose and Description."
+        }
+      ],
+      "browser_case_ids": [
+        "SG2-40-P02",
+        "SG2-40-N02",
+        "SG2-40-P03"
+      ]
+    },
+    "notes": "The23 records are supporting methods/contracts, not23 independently accepted workflows. Existing SG2-40 history records and historical executions remain unchanged. All four required categories are represented. DoD inventory now2,396 methods+758SQL; human peer review and remaining hosted Done acceptance remain open. No earlier missing draft values are fabricated."
+  },
+  {
+    "id": "REG-EQUIPMENT-SUMMARY-AND-READINESS-REFRESH",
+    "title": "Equipment refresh keeps the selected request summary and arrangement readiness current",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-53",
+    "purpose": "Repair two independently observed hosted inconsistencies: Support parent summary retained old quantity/notes after child refresh; Coordinator readiness retained Ready after refreshed equipment lost placement.",
+    "preconditions": "Existing assigned event and exact pending equipment request; component/network fixtures for identity, error and race branches. Hosted c04 checks use QA22 requests3/4 and existing placements; no new API/schema contract.",
+    "steps": [
+      "Open exact request4 showing quantity2/baseline notes, amend that same pending request to quantity1/new notes, then use only Support Refresh equipment requirements.",
+      "Verify parent summary and matching child both show the authoritative request4 quantity1/new notes; unrelated microphone request3 remains quantity3.",
+      "Refresh Coordinator equipment after removing placement, restoring placement, then removing and restoring it again; inspect Outstanding→Ready and Ready→Outstanding without navigating away.",
+      "Exercise changed request/event identity, stale/aborted responses, failed refresh and retry, explicit versus mutation refresh, current observer replacement and unsaved planning drafts."
+    ],
+    "data": "Pending request4 quantity2→1 with amended notes; request3 microphone quantity3; valid and absent placement; rejected/aborted responses and event/request identity changes.",
+    "expected": "Only the matching current request updates its parent summary. Successful current child refresh updates readiness in both directions; failed/obsolete requests cannot claim success or replace a later event. Unsaved planning drafts and unrelated request records remain intact.",
+    "evidence": "client/src/components/EquipmentRequirements.test.tsx; client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+    "layer": "React public component seams with controlled HTTP; actual hosted Coordinator/Support UI retests",
+    "status": "Pass",
+    "actual": "Seven new and two revised method declarations. Local focused126 and full client1,427/1,427 passed; all four coverage metrics100%. Exact c04 CI38839394116 passed all eight jobs (tested merge has the same full Git tree as c04). Actual hosted c04 request4 refresh quantity2→1/new notes passed with request3 unchanged; readiness refresh passed both directions and final microphone placement was restored. These successful equipment checkpoints predate the later, separate converted-hold release venue-readiness defect.",
+    "execution_evidence": "16 Oct 2026: c04b2212df1a002b3ceb36e6b2216412ec0f142d, CI38839394116; ignored verification/c04b221-ci-proof/full-ci-evidence.json; equipment-request4-summary-c04-matched.txt/.png; equipment-readiness-c04-refresh-ready.txt/.png; equipment-readiness-c04-refresh-outstanding.txt/.png; equipment-readiness-c04-final-restored.txt/.png. Actual request4 readback and placement restoration are scoped evidence, not all Done acceptance.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (automated tests and authorised hosted QA; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-53:AC2",
+      "SG2-53:AC5",
+      "SG2-41:AC4",
+      "SG2-57:AC1",
+      "SG2-57:AC2"
+    ],
+    "source_method_ids": [
+      "TC-16f4536430d9",
+      "TC-0560d21103a2",
+      "TC-382177a106d2",
+      "TC-b438717925a1",
+      "TC-f1acada8cbbe",
+      "TC-c453d326d8f3",
+      "TC-9ea38ff9f207",
+      "TC-39dd94b896da",
+      "TC-d9ace0563980"
+    ]
+  },
+  {
+    "id": "REG-OPTIONAL-HOSTED-SEVEN-ROLE-READONLY",
+    "title": "Opt-in seven-role hosted page proof has strict read-only guards and safe recorded output",
+    "type": "Normal / boundary / failure",
+    "story": "SG2-23",
+    "purpose": "Provide actual approved hosted role/page screenshots and videos without sending application mutations, retaining credentials or conflating read-only page proof with full business acceptance.",
+    "preconditions": "Explicitly approved optional hosted run against the exact allowlisted preview, runtime-only QA password and seven existing authorised QA roles; one fresh context per role, serial logins, no retries. Discovery and CI policy tests require no hosted credentials. The ordinary loopback fixture suite remains the CI default.",
+    "steps": [
+      "Offline, verify exact-origin/read-only request policy, credential-free discovery, refusal before browser startup without runtime credentials, and sanitised JSON/JUnit attachments.",
+      "For each of seven roles, sign in normally, assert role-specific loaded/empty states before every screenshot, visit only allowed read-only pages, then log out to Landing.",
+      "Capture each of47 role/page checkpoints at1440px and390px, recording94 PNGs and seven videos; inspect all94 actual images for loading, overflow, overlap and readability.",
+      "Stop the entire batch on authentication failure, throttling, network/application error or forbidden write; do not retain traces/HAR/auth storage/browser profiles/raw sign-in failures."
+    ],
+    "data": "Existing Organiser Draft23/history and My Events; Coordinator assigned QA22/readiness; Venue Staff calendar/holds/catalogue; TSS equipment; Lead queue; Safety placeholder and real profile; Attendee prototypes and real profile.",
+    "expected": "Seven approved role contexts complete only normal sign-in/logout and navigation; all other application writes and alternate origins are blocked. Reports retain scoped page/media proof without runtime secrets. Positive page-settled assertions run before each width. The Organiser's own Draft23 detail must show the separately loaded Event stage progress region, stage Draft, waiting-on Event Organiser, and next step Complete and submit event request; the heading alone is not a ready-state oracle. Coordinator QA22 uses its distinct equipment/readiness view rather than requiring an Organiser-only region. Safety placeholder and Attendee prototype screens never imply delivery of those full workflows.",
+    "evidence": "hosted-e2e/roles.spec.ts; hosted-e2e/policy.test.mjs; .github/scripts/test-inventory.test.mjs; playwright.hosted.config.ts; .github/scripts/test-hosted-roles.mjs",
+    "layer": "Four offline Node policy declarations plus one inventory declaration; seven optional recorded hosted Playwright declarations, separate from loopback CI browser tests",
+    "status": "Pass",
+    "actual": "Twelve new declarations: seven opt-in hosted role cases, four offline policy cases, one inventory integration case. b3 introduced the harness; c04 strengthened page-settled oracles. Current c04 CI38839394116 passed all eight jobs and its18 inventory/policy runner cases (14 inventory plus4 policy). Approved actual hosted run2026-10-16T02-21-44.294Z passed7/7 roles,47 page checkpoints,94 screenshots and7 videos, with no HTTP/network/application-console/page/write failures. All94 images received scoped visual review, including exact-SHA reuse of67 previously reviewed images and direct inspection of27 changed images.",
+    "execution_evidence": "Source checkpoints b3c6d6b600f63c602af3c9d119a4e9d749a8a11a and c04b2212df1a002b3ceb36e6b2216412ec0f142d; CI38839394116; ignored output/hosted-role-smoke/2026-10-16T02-21-44.294Z/report.json and verification/hosted-playwright-c04-visual-review.json. Private professor evidence bundle remains local; no public upload or human peer approval is implied.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (approved recorded read-only QA and visual review; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1",
+      "SG2-25:AC2",
+      "SG2-40:AC1",
+      "SG2-57:AC1",
+      "SG2-86:AC2"
+    ],
+    "source_method_ids": [
+      "TC-75bdfbc814fb",
+      "TC-ae29d1b8b62b",
+      "TC-dcc55e924120",
+      "TC-8bdef18d29a7",
+      "TC-ef3f16001bee",
+      "TC-e811294c4eb9",
+      "TC-62e073b3223f",
+      "TC-ab057dea8821",
+      "TC-0900841595fc",
+      "TC-f5e67cc9e432",
+      "TC-636d33e52f44",
+      "TC-e35b97c49a37"
+    ]
+  },
+  {
+    "id": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
+    "title": "Converted hold bookings keep canonical request links through release and replacement",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-84",
+    "purpose": "Repair the actual hosted Hold4 sequence: conversion created booking18; its reasoned release preserved original booking16 but left request22 Approved/unlinked, creating phantom venue demand. Show converted holds as historical conversion receipts rather than a claim that their booking is still Confirmed.",
+    "preconditions": "Disposable PostgreSQL migrations and transaction-local fixtures, including true pre-upgrade legacy link shapes; current local client fixtures. Hosted before-fix failure is recorded; new-head CI and hosted repaired-preview retest are separate pending gates.",
+    "steps": [
+      "Convert a valid tentative hold through normal approval and verify its approved request points to the actual canonical booking. Refuse an elapsed/timer-changed or missing booking path.",
+      "Release the converted booking with a real assigned actor and required reason; verify its request stops contributing venue demand while original other booking remains Confirmed, with real history/notices only.",
+      "Approve a replacement for a converted-hold booking and verify the replaced request/booking retires, preserving unaffected arrangements and confirmation guards.",
+      "Upgrade proven legacy converted links, including already-released bookings; reconcile only matching hold/event/venue/period identities, preserve original release metadata and skip ambiguous/mismatched rows. Apply again with no row/history/notification churn.",
+      "At390px/1440px, verify the converted card says Converted to booking, keeps Booking #N and directs users to the booking record for current status. Refresh/in-flight approval retains the receipt; failed approval cannot display it."
+    ],
+    "data": "Linked/unlinked converted holds, released/confirmed canonical bookings, additional original booking, assigned versus other coordinator, missing release reason,15 legacy upgrade variants, repeat migration, converted receipt after later booking release.",
+    "expected": "Converted requests are linked to their real bookings. Release/replacement cannot leave a phantom Approved venue requirement or damage the other booking. Legacy repair changes only verifiable relationships/status, preserving known metadata and adding no invented audit actor/time/notice. Receipt wording truthfully records conversion without pretending to know current booking status.",
+    "evidence": "supabase/migrations/202610170004_venue_hold_booking_links.sql; related hold/confirmation/release/replacement SQL and upgrade tests; client/src/screens/VenueHolds.test.tsx; e2e/regression.spec.ts SG2-84-P02",
+    "layer": "Transaction SQL, full disposable legacy migration upgrade, React component tests and strengthened loopback browser journey; hosted repaired-preview acceptance pending",
+    "status": "Pass",
+    "actual": "Local seven related SQL suites passed; full45-migration legacy upgrade passed15 variants. Actual pre-fix SQL red reproduced the fault; repeat170004 application changed0 rows/unchanged xmin, with no invented activity. Twenty-one new SQL assertions and two revised SQL assertions are linked below. Three existing client methods now assert historical receipt wording; pre-fix copy check failed2/passed17, then focused and full client1,427/1,427 passed with100% statements/branches/functions/lines and build passed. Existing SG2-84-P02 strengthened for390px/1440px passed in the full113/113 browser run (136.9s, zero skips/retries/flaky). Full local npm run ci passed: backend1,468 and frontend1,427, both100% statements/branches/functions/lines; reviewer19 and inventory/policy18. Hosted170004 canonical migration plus atomic ledger was applied: request22 Cancelled and directly linked to booking18; booking18 Released and baseline16 Confirmed. Actual Coordinator child Refresh recovered Ready with venue1/equipment2. Remote new-head CI and native integration completion remain separate pending gates.",
+    "execution_evidence": "16 Oct 2026 local seven-suite/45-migration/15-variant handoff, repeated migration no-op and root client coverage/build results. Historical hosted counterexample: ignored verification/hold4-release-stale-approved-readiness-before.txt/.png and hold4-release-booking16-preserved-before.txt. Full local113-browser/local CI completion and applied-schema existing Hold4 recovery were subsequently verified; ignored verification/hold4-release-readiness-recovered-after.* records actual Ready. An earlier112/1 browser interruption was caused by overlapping build output replacement and is retained as infrastructure history, not a product failure. New-head remote CI and native integration completion remain pending at this checkpoint; a fresh post-fix conversion/release cycle is not claimed.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (local automated verification; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-84:AC5",
+      "SG2-51:AC1",
+      "SG2-51:AC2",
+      "SG2-51:AC3",
+      "SG2-51:AC4",
+      "SG2-51:AC5",
+      "SG2-58:AC1",
+      "SG2-58:AC2",
+      "SG2-81:AC3",
+      "SG2-81:AC5",
+      "SG2-57:AC2",
+      "SG2-57:AC3",
+      "SG2-82:AC5"
+    ],
+    "source_method_ids": [
+      "TC-ed49754c98bb",
+      "TC-4845c2416e81",
+      "TC-519eb1370679",
+      "TC-2ac7873148f4"
+    ],
+    "source_sql_contract_ids": [
+      "SG2-84:linked-conversion-fixture",
+      "SG2-84:conversion-records-canonical-booking",
+      "SG2-51:hold-booking-unassigned-release-refused",
+      "SG2-51:hold-booking-release-reason-required",
+      "SG2-51:hold-release-refusal-no-side-effects",
+      "SG2-51:converted-hold-booking-released",
+      "SG2-51:released-hold-request-no-longer-required",
+      "SG2-51:hold-release-keeps-original-booking",
+      "SG2-51:hold-release-history-and-notices",
+      "SG2-58:released-extra-hold-does-not-block-confirmation",
+      "SG2-81:converted-hold-replacement-fixture",
+      "SG2-81:converted-hold-replacement-approved",
+      "SG2-81:replacement-retires-converted-hold-request",
+      "SG2-81:replaced-held-venue-no-phantom-demand",
+      "SG2-84:hold-upgrade-fixture-complete",
+      "SG2-84:legacy-hold-canonical-links-repaired",
+      "SG2-51:legacy-released-hold-requests-cancelled",
+      "SG2-84:legacy-hold-mismatches-not-guessed",
+      "SG2-51:legacy-hold-release-metadata-preserved",
+      "SG2-51:legacy-hold-repair-no-invented-activity",
+      "SG2-84:hold-link-upgrade-idempotent",
+      "SG2-84:converted-booking-missing-or-timer-changed-it",
+      "SG2-58:hold-requests-linked-and-released"
+    ],
+    "source_sql_aliases": {
+      "SG2-58:hold-requests-approved-unlinked": "SG2-58:hold-requests-linked-and-released"
+    }
+  },
+  {
+    "id": "REG-VENUE-SEARCH-ARRANGEMENT-REVALIDATION",
+    "title": "A fresh event venue search reconciles external booking decisions across request, booking and arrangement panels",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-82",
+    "purpose": "Keep the event-specific venue request status, confirmed booking list and derived arrangement summary consistent after another user approves a request while the coordinator stays on Find venues. Reuse the existing read invalidation counter without losing entered search criteria or performing writes.",
+    "preconditions": "Coordinator has an event-scoped search with a Pending request and an empty booking list. Venue Staff approve the request in another session. For local regression, render the real search and child panels with controlled public HTTP read responses.",
+    "steps": [
+      "Initially load Pending request41 for event10 with no confirmed booking; model external approval and click the existing Search control with edited criteria.",
+      "Require Approved request, Confirmed booking42 and Venue arrangement ready without navigating away, changing event identity or resetting the form.",
+      "Delay both arrangement reads after a zero-result search; hide prior Pending/empty summaries and show panel loading until responses arrive.",
+      "Exercise a failed search, failed request/booking revalidation and recovery; an invalid period does not reload arrangements.",
+      "Resolve an aborted superseded search late, and leave event10 for event20: stale results cannot trigger obsolete reads or cross event/token scopes."
+    ],
+    "data": "Local Meridian Forum event10, Rooftop Terrace venue3, request41 Pending→Approved, booking42 Confirmed. Initial whole-day15Jun2030SGT search; edited attendance100/layoutBanquet/locationLevel/facilitiesbar/accessibilitylift preserved. Delayed read, search503, request503, booking403, invalid end14Jun23:00, superseding attendance181, then event20/new-token. Hosted before-fix counterexample: event25 request24 was approved into booking20 while search remained open; search excluded the room but lower panels still said Pending/0of1/No booked venues.",
+    "expected": "A successful current search revalidates only its current event request and booking panels, including the derived venue readiness summary. Loading/error states replace invalidated old results; failures never claim approval or readiness. Invalid/failed searches do not spuriously reload panels. Aborted late responses cannot roll back results or refresh an obsolete context. All requests remain reads, and the criteria remain entered.",
+    "evidence": "client/src/screens/VenueSearch.tsx; client/src/screens/VenueSearch.test.tsx; client/src/venues/VenueBookings.tsx",
+    "layer": "Rendered public React component integration with controlled HTTP fetch results; full client coverage. Actual hosted post-fix retest and future CI are separate gates.",
+    "status": "Pass",
+    "actual": "Pre-fix new tests reproduced4 failures (22 existing/boundary checks passed). After the fix,44 focused component cases passed with100% statements/branches/functions/lines on both touched app files. Full client1433/1433 passed across70 files with100% all four coverage metrics; client TypeScript passed. Six new methods, no new SQL; inventory2421 methods/779 SQL assertions. Hosted8eb counterexample is retained; the local fix has not yet been committed, deployed or hosted-retested at this checkpoint.",
+    "execution_evidence": "Local /tmp/spm-venue-search-arrangements-red.log; /tmp/spm-venue-search-arrangements-coverage.log and coverage-summary.json; /tmp/spm-venue-search-arrangements-full-client.log; /tmp/spm-venue-search-arrangements-typecheck.log. Historical deployed failure: ignored verification/venue-search-approved-arrangements-stale-8eb.txt/.png compared with draft25-adjacent-bookings16-and20-confirmed.txt/.png. No existing remote CI result is attributed to this uncommitted source.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex local component verification; not human peer review",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-46:AC2",
+      "SG2-48:AC3",
+      "SG2-82:AC4",
+      "SG2-82:AC5"
+    ],
+    "source_method_ids": [
+      "TC-46857ba61a29",
+      "TC-0fe86dd0560f",
+      "TC-3abe2f6dfd8a",
+      "TC-392972d9707a",
+      "TC-91df6da0dbb1",
+      "TC-8a22bade2fa6"
+    ]
+  },
+  {
+    "id": "SG2-77-PERSISTED-AUDIT",
+    "title": "Venue-operation history records persisted changes rather than discarded upsert insertion attempts",
+    "type": "Normal / boundary / conflict / failure",
+    "story": "SG2-77",
+    "purpose": "Repair SG2-77 AC6: the former BEFORE INSERT trigger generated false null-to-current audit rows when a Staff upsert updated an existing venue. Split metadata stamping before persistence from field history after the actual insert/update, retaining every existing audit row.",
+    "preconditions": "Owned disposable PostgreSQL/PostgREST; real Express operations route and caller-JWT adapter; two synthetic Venue Staff and a Coordinator. No hosted credentials or business data.",
+    "steps": [
+      "Save a new venue operation through the normal Staff PUT with setup10/turnaround15 and null notes; verify exactly two initialized numeric fields, Staff identity and matching persisted timestamp.",
+      "Save turnaround16 and require exactly one15-to16 audit transition; repeat the same save and require no extra history.",
+      "Set and clear an emergency-access note with two different Staff; require exactly the real null/value transitions with each actor.",
+      "Refuse Coordinator403 and invalidnegative400 saves without history; run simultaneous Staff17/18 saves and require a coherent serialized old/new chain, final actor and metadata.",
+      "In rollback SQL exercise failed and rolled-back writes; preserve old records. Reproduce the old trigger failure, install170006 twice over legacy populated data and compare exact values, metadata and old history; rerun operations RLS, venue-clash and release-readiness suites."
+    ],
+    "data": "Native setup10, turnaround15→16→17/18; emergency_access null→Use the signed east exit→null; SQL probe97704 with Signed east exit→null→Signed west exit; upgrade preservation fixture97790. Synthetic fixed local JWTs only.",
+    "expected": "Exactly one audit row per actual changed field, zero additional field history on unchanged saves, and no false insertion-attempt rows. Real Staff actor/timestamp and nullable transitions are retained. Invalid/forbidden/rolled-back writes do not add history. Upgrade/replay preserves existing records and does not rewrite ambiguous old history; role security and venue clashes remain unchanged.",
+    "evidence": "supabase/migrations/202610170006_venue_operations_persisted_audit.sql; supabase/tests/venue_operations.sql; integration/api.test.ts",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration + rollback SQL + explicit upgrade/replay verification",
+    "status": "Pass (local automated)",
+    "actual": "Before the fix, new real API case failed: turnaround15→16 added false null→setup10 and null→turnaround16 plus the actual15→16 transition (13 existing native cases passed). After170006 all14 native API cases passed; operations SQL and venue-clash SQL passed;17 readiness regressions passed. The old SQL suite failed at upsert-only-actual-transition before migration, and exact historical row/value/metadata preservation passed after two installs. Integration TypeScript compilation passed. No production TypeScript/React code changed; prior coverage is not represented as a new run.",
+    "execution_evidence": "Ignored output/staging-e2e-2026-10-16/verification/venue-operations-persisted-audit/ contains red/green logs, upgrade runner and source/case handoff. Current local source is uncommitted; new pushed CI and hosted retest remain separate gates.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex local automated verification; not human peer review",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-77:AC6",
+      "SG2-77:AC4"
+    ],
+    "source_method_ids": [
+      "TC-aad027991f96",
+      "SG2-77:upsert-initial-persisted-audit",
+      "SG2-77:upsert-only-actual-transition",
+      "SG2-77:upsert-history-preserved",
+      "SG2-77:upsert-no-op-no-history",
+      "SG2-77:upsert-nullable-actor-chain",
+      "SG2-77:upsert-invalid-refused",
+      "SG2-77:upsert-failure-rolls-back-history"
+    ]
   }
 ]

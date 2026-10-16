@@ -229,7 +229,7 @@ describe('submitEventRequest', () => {
 });
 
 describe('isWaitingOnOrganiser', () => {
-  test.each(['draft', 'Draft', 'DRAFT', 'rejected', 'Rejected', '  rejected  '])(
+  test.each(['draft', 'Draft', 'DRAFT', 'needs_clarification', '  NEEDS_CLARIFICATION  '])(
     '[NORMAL] [SG2-31:AC4] returns true for organiser actionable status %s',
     (status) => {
       expect(isWaitingOnOrganiser(status)).toBe(true);
@@ -243,6 +243,9 @@ describe('isWaitingOnOrganiser', () => {
     'confirmed',
     'completed',
     'cancelled',
+    'rejected',
+    'Rejected',
+    '  rejected  ',
     'unknown',
   ])('[NORMAL] [SG2-31:AC4] returns false for coordinator/system status %s', (status) => {
     expect(isWaitingOnOrganiser(status)).toBe(false);
@@ -624,7 +627,7 @@ describe('fetchOwnEventDetail', () => {
       coordinatorId: 'coord-uuid-5',
       coordinatorName: 'Coordinator Jane',
       canManage: true,
-      waitingOnMe: true,
+      waitingOnMe: false,
       decisionReason: 'Clashes with the AGM.',
       coordinatorPhone: '+65 9123 4567',
       decidedAt: '2026-09-25T02:00:00.000Z',
@@ -1697,16 +1700,24 @@ describe('fetchAssignable (SG2-33/34)', () => {
 });
 
 describe('assignCoordinator (SG2-33/34)', () => {
-  test('[NORMAL] [SG2-33:AC1] patches the coordinator endpoint with the chosen coordinator', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: {} }));
+  test('[NORMAL] [SG2-33:AC1] [SG2-100:AC3] patches the coordinator endpoint with the chosen coordinator', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: { status: 'submitted' } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true, status: 'submitted' });
     expect(fetchMock).toHaveBeenCalledWith('/api/event-requests/7/coordinator', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
       body: JSON.stringify({ coordinatorId: 'c1' }),
     });
+  });
+
+  test.each([
+    null, {}, { request: null }, { request: {} }, { request: { status: 42 } },
+    { request: { status: 'unknown_status' } }, { request: { status: 'completed' } },
+  ])('[BOUNDARY] [FAILURE] [SG2-100:AC3] an absent or invalid assignment status does not invent a lifecycle change (%j)', async body => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)));
+    expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
   });
 
   test.each([401, 403])('[FAILURE] [SG2-33:AC1] [SG2-97:AC1] tells the user only the Event Coordinator Lead can assign on %i', async (status) => {

@@ -147,18 +147,28 @@ test('[BOUNDARY] [SG2-46:AC2] search accepts exactly 31 days and refuses the nex
   });
 });
 
-test('[BOUNDARY] [SG2-46:AC2] text and keyword counts stop at 255 characters and 10 terms', () => {
+test('[BOUNDARY] [SG2-46:AC2] text and keyword counts stop at 255 characters and 12 terms', async () => {
   const text = '🏛'.repeat(255);
-  const ten = 'a,b,c,d,e,f,g,h,i,j';
-  assert.deepEqual(parseVenueSearch({ from: FROM, to: TO, location: text, facilities: ten }), {
+  const twelve = 'a,b,c,d,e,f,g,h,i,j,k,l';
+  const expectedTerms = twelve.split(',');
+  assert.deepEqual(parseVenueSearch({ from: FROM, to: TO, location: text, facilities: twelve, accessibility: twelve }), {
     ok: true, criteria: { starts_at: FROM, ends_at: TO, attendance: null, location: text, layout: null,
-      facilities: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'], accessibility: [] }
+      facilities: expectedTerms, accessibility: expectedTerms }
   });
-  for (const query of [{ location: '🏛'.repeat(256) }, { facilities: `${ten},k` }]) {
+  for (const query of [{ location: '🏛'.repeat(256) }, { facilities: `${twelve},m` }, { accessibility: `${twelve},m` }]) {
     assert.deepEqual(parseVenueSearch({ from: FROM, to: TO, ...query }), {
-      ok: false, message: 'Text criteria must be single values within 255 characters, with at most 10 keywords each.'
+      ok: false, message: 'Text criteria must be single values within 255 characters, with at most 12 keywords each.'
     });
   }
+  const server = app('event_coordinator');
+  const accepted = await request(server).get('/api/venues/search')
+    .query({ from: FROM, to: TO, facilities: twelve }).set(auth);
+  assert.equal(accepted.status, 200);
+  assert.deepEqual(accepted.body.venues[0].searched.facilities, expectedTerms);
+  const rejected = await request(server).get('/api/venues/search')
+    .query({ from: FROM, to: TO, facilities: `${twelve},m` }).set(auth);
+  assert.equal(rejected.status, 400);
+  assert.equal(rejected.body.error, 'Text criteria must be single values within 255 characters, with at most 12 keywords each.');
 });
 
 test('[NORMAL] [SG2-46:AC3] AC3: no accessibility keywords means accessibility is not a matching requirement', async () => {
@@ -195,7 +205,7 @@ test('[BOUNDARY] [FAILURE] [SG2-46:AC2] parseVenueSearch rejects malformed perio
     [{ ...period, attendance: '0' }, /attendance/], [{ ...period, attendance: '1.5' }, /attendance/],
     [{ ...period, attendance: '2147483648' }, /attendance/], [{ ...period, attendance: ['1', '2'] }, /attendance/],
     [{ ...period, location: ['a', 'b'] }, /single values/], [{ ...period, location: 'x'.repeat(256) }, /single values/],
-    [{ ...period, facilities: 'a,b,c,d,e,f,g,h,i,j,k' }, /at most 10/], [{ ...period, accessibility: ['a'] }, /single values/],
+    [{ ...period, facilities: 'a,b,c,d,e,f,g,h,i,j,k,l,m' }, /at most 12/], [{ ...period, accessibility: ['a'] }, /single values/],
     [{ ...period, layout: 'stadium' }, /listed layouts/]
   ];
   for (const [query, message] of cases) {
@@ -228,6 +238,43 @@ test('[NORMAL] [SG2-46:AC2] the handler passes the parsed criteria to the search
   const response = await request(app('event_coordinator')).get(`/api/venues/search?${query}`).set(auth);
   assert.equal(response.headers['cache-control'], 'no-store');
   assert.deepEqual(response.body.venues[0].searched, { ...criteria(), attendance: 80 });
+});
+
+test('[NORMAL] [SG2-46:AC1] [SG2-46:AC2] canonical event facility filters accept the established projection, Wi-Fi and PA aliases', async () => {
+  const handler = createVenueSearchHandler(searchVenues, () => catalogue({ venues: { data: [
+    { ...hall, facilities: 'Stage, projection, Wi-Fi, PA' }, seminar, unrecorded
+  ], error: null } }));
+  const response = await request(app('event_coordinator', handler))
+    .get('/api/venues/search').query({ from: FROM, to: TO, facilities: 'PROJECTOR, wifi, PA system' }).set(auth);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.venues.map((venue: { name: string }) => venue.name), ['Atrium Hall']);
+});
+
+test('[CONFLICT] [SG2-46:AC2] a venue missing any canonical required facility is excluded despite matching the others', async () => {
+  const handler = createVenueSearchHandler(searchVenues, () => catalogue({ venues: { data: [
+    { ...hall, facilities: 'Projection and PA' }, { ...seminar, facilities: 'Wi-Fi and PA' }, unrecorded
+  ], error: null } }));
+  const response = await request(app('event_coordinator', handler))
+    .get('/api/venues/search').query({ from: FROM, to: TO, facilities: 'projector,wifi,PA system' }).set(auth);
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.venues, []);
+});
+
+test('[BOUNDARY] [SG2-46:AC2] unknown facility phrases stay literal and every canonical or freeform criterion must match', async () => {
+  const handler = createVenueSearchHandler(searchVenues, () => catalogue({ venues: { data: [
+    { ...hall, facilities: 'Projection, motorised blinds' },
+    { ...seminar, facilities: 'Projector balcony, motorised blinds' },
+    { ...terrace, facilities: 'Projection' }
+  ], error: null } }));
+  const server = app('event_coordinator', handler);
+  const phrase = await request(server).get('/api/venues/search')
+    .query({ from: FROM, to: TO, facilities: 'projector balcony' }).set(auth);
+  assert.equal(phrase.status, 200);
+  assert.deepEqual(phrase.body.venues.map((venue: { name: string }) => venue.name), ['Seminar Room A']);
+  const combined = await request(server).get('/api/venues/search')
+    .query({ from: FROM, to: TO, facilities: 'projector,motorised blinds' }).set(auth);
+  assert.equal(combined.status, 200);
+  assert.deepEqual(combined.body.venues.map((venue: { name: string }) => venue.name), ['Atrium Hall', 'Seminar Room A']);
 });
 
 test('[FAILURE] [SG2-46:AC2] invalid criteria are rejected before any query', async () => {

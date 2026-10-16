@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeEvent } from '../api/eventRequests';
 import { ARRANGEMENT_LABELS, confirmEvent, type ArrangementKey } from '../api/eventConfirmation';
 import { decideEventRequest, fetchWorkQueue, startEventReview, type Decision, type QueueResult, type WorkItem, type WorkSelection } from '../api/workQueue';
@@ -6,6 +6,7 @@ import type { Role } from '../mock/types';
 import EventPlanningDrawer from './EventPlanningDrawer';
 import ClarificationThread from '../components/ClarificationThread';
 import EquipmentRequirements from '../components/EquipmentRequirements';
+import type { RequirementsView } from '../api/equipmentRequirements';
 import EventArrangements from '../components/EventArrangements';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
@@ -187,9 +188,21 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   const [currentDetails, setCurrentDetails] = useState(item.details);
+  const [currentTitle, setCurrentTitle] = useState(item.title);
+  const synchronizeEquipment = useCallback((view: RequirementsView) => {
+    const record = view.requests.find(request => request.request_id === item.item_id && request.event_id === item.event_id);
+    if (!record) return;
+    setCurrentTitle(record.equipment_type);
+    setCurrentStatus(record.status);
+    setCurrentDetails(previous => ({ ...previous, quantity: record.quantity, notes: record.notes }));
+  }, [item.item_id, item.event_id]);
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
+  // Refresh only readiness after equipment changes or explicit reloads, and
+  // after planning changes. Reloading the
+  // whole queue would discard any planning draft still open in the drawer.
+  const [arrangementsRevision, setArrangementsRevision] = useState(0);
   // SG2-58: kept here, not in ConfirmPanel, so it outlives the panel.
   const [confirmedNotice, setConfirmedNotice] = useState('');
 
@@ -223,7 +236,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
       {item.kind === 'event' && !item.assigned_to_me &&
         <p className="work-queue-empty">Awaiting assignment. The Event Coordinator Lead assigns a coordinator before it can be reviewed.</p>}
       <div className="organisation-detail-intro">
-        <h2 tabIndex={-1} ref={node => node?.focus()}>{item.title}</h2>
+        <h2 tabIndex={-1} ref={node => node?.focus()}>{currentTitle}</h2>
         <p>{context(item)}</p>
         {/* An event's start is its proposed date but its end is its latest
             confirmed booking (SG2-100), so the two are not shown as one range. */}
@@ -242,6 +255,8 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
       {(item.kind === 'equipment' || (item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus))) && (
         <EquipmentRequirements eventId={item.event_id} accessToken={accessToken} canCheckAvailability={role === 'Technical Support Staff'}
+          onViewUpdated={item.kind === 'equipment' ? synchronizeEquipment : undefined}
+          onChanged={() => setArrangementsRevision(value => value + 1)}
           onReserved={item.kind === 'equipment' ? requestId => { if (requestId === item.item_id) setStatus('approved'); } : undefined} />
       )}
       {/* SG2-57: the assigned coordinator sees which arrangements are still
@@ -249,7 +264,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           arrangement-through-confirmed window as the requirements above. */}
       {item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
-        <EventArrangements eventId={item.event_id} accessToken={accessToken} />
+        <EventArrangements key={arrangementsRevision} eventId={item.event_id} accessToken={accessToken} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread
@@ -325,6 +340,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
             status: currentStatus,
           }}
           onSuccess={(updatedEvent) => {
+            setArrangementsRevision(value => value + 1);
             setCurrentStatus(updatedEvent.status);
             setStartsAt(updatedEvent.proposed_date);
             setCurrentDetails((prev) => ({

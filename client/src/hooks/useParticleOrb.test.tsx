@@ -124,7 +124,7 @@ test('[NORMAL] [SG2-20:orb-interaction] sizes the spacer for desktop and narrowe
     width: 400, height: 600, toJSON: () => ({}),
   });
   fireEvent(window, new Event('resize'));
-  expect(getByTestId('spacer')).toHaveStyle({ height: '48px' });
+  expect(getByTestId('spacer')).toHaveStyle({ height: '424px' });
 });
 
 test('[BOUNDARY] [SG2-20:orb-interaction] renders without a spacer or a reported device scale', () => {
@@ -223,4 +223,77 @@ test('[FAILURE] [SG2-20:orb-interaction] does not start drawing or schedule work
   expect(ctx.setTransform).not.toHaveBeenCalled();
   expect(ctx.arc).not.toHaveBeenCalled();
   expect(frames.size).toBe(0);
+});
+
+
+test('[BOUNDARY] [SG2-20:orb-interaction] [SG2-71:AC3] [VISUAL-QA-01] a phone orb clears the entire hero copy after the viewport settles', () => {
+  vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 390, bottom: 844,
+    width: 390, height: 844, toJSON: () => ({}),
+  });
+  const { getByText, getByTestId } = render(<Harness />);
+  vi.spyOn(getByText('hero copy'), 'getBoundingClientRect').mockReturnValue({
+    x: 28, y: 150, top: 150, left: 28, right: 362, bottom: 400,
+    width: 334, height: 250, toJSON: () => ({}),
+  });
+  ctx.arc.mockClear();
+  tick();
+  expect(ctx.arc.mock.calls.length).toBeGreaterThan(0);
+  expect(ctx.arc.mock.calls.every(([, y, radius]) => y - radius >= 424)).toBe(true);
+  expect(parseFloat(getByTestId('spacer').style.height)).toBeGreaterThan(390);
+});
+
+test('[CONFLICT] [SG2-20:orb-interaction] [SG2-71:AC3] [VISUAL-QA-01] resizing back to desktop restores its original spacing and keeps one animation loop', () => {
+  vi.stubGlobal('innerHeight', 1000);
+  const { getByTestId } = render(<Harness />);
+  tick();
+  expect(getByTestId('spacer')).toHaveStyle({ height: '748px' });
+  vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 600, bottom: 844,
+    width: 600, height: 844, toJSON: () => ({}),
+  });
+  fireEvent(window, new Event('resize'));
+  expect(getByTestId('spacer')).toHaveStyle({ height: '711px' });
+  vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockReturnValue({
+    x: 0, y: 0, top: 0, left: 0, right: 800, bottom: 1000,
+    width: 800, height: 1000, toJSON: () => ({}),
+  });
+  fireEvent(window, new Event('resize'));
+  expect(getByTestId('spacer')).toHaveStyle({ height: '748px' });
+  tick();
+  expect(frames.size).toBe(1);
+});
+
+test('[CONFLICT] [SG2-20:orb-interaction] [SG2-71:AC3] [VISUAL-QA-01] the bitmap follows the final hero height when a desktop spacer shrinks on a phone', () => {
+  vi.stubGlobal('innerHeight', 1000);
+  vi.stubGlobal('devicePixelRatio', 2);
+  let viewportWidth = 800;
+  const copyBottom = 449.59375;
+  // The absolute canvas fills the hero. Its CSS height changes immediately
+  // when the hook changes the spacer below the copy, like the rendered page.
+  vi.mocked(HTMLCanvasElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLCanvasElement) {
+    const spacer = this.parentElement?.querySelector<HTMLDivElement>('[data-testid="spacer"]');
+    const heroHeight = Math.max(844, copyBottom + (parseFloat(spacer?.style.height ?? '') || 0));
+    return { x: 0, y: 0, top: 0, left: 0, right: viewportWidth, bottom: heroHeight,
+      width: viewportWidth, height: heroHeight, toJSON: () => ({}) };
+  });
+  const { getByText, getByTestId } = render(<Harness />);
+  vi.spyOn(getByText('hero copy'), 'getBoundingClientRect').mockReturnValue({
+    x: 28, y: 360, top: 360, left: 28, right: 362, bottom: copyBottom,
+    width: 334, height: copyBottom - 360, toJSON: () => ({}),
+  });
+  tick();
+  viewportWidth = 390;
+  vi.stubGlobal('innerHeight', 844);
+  fireEvent(window, new Event('resize'));
+  const canvas = getByTestId('orb') as HTMLCanvasElement;
+  const box = canvas.getBoundingClientRect();
+  expect(getByTestId('spacer')).toHaveStyle({ height: '412px' });
+  expect(canvas.width).toBe(780);
+  expect(canvas.height).toBe(Math.round(box.height * 2));
+  ctx.arc.mockClear();
+  tick();
+  const displayedScale = box.height / (canvas.height / 2);
+  expect(ctx.arc.mock.calls.every(([, y, radius]) => (y - radius) * displayedScale >= copyBottom + 24)).toBe(true);
+  expect(frames.size).toBe(1);
 });

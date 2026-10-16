@@ -56,11 +56,6 @@ export function useParticleOrb() {
       const box = el.getBoundingClientRect();
       width = box.width;
       height = box.height;
-      el.width = Math.round(width * dpr);
-      el.height = Math.round(height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const count = Math.max(2100, Math.min(6600, Math.round((width * height) / 300)));
       // Radius keys off the viewport, not the hero, so growing the spacer
       // below cannot feed back into the size.
       const r = Math.min(width, window.innerHeight) * 0.36;
@@ -70,10 +65,24 @@ export function useParticleOrb() {
       const textBottom = copy
         ? copy.getBoundingClientRect().bottom - box.top
         : height * 0.5;
+      // Desktop keeps the atmospheric overlap; on phones the entire orb
+      // sits below the copy, with breathing room instead of dots through text.
+      const overlap = width <= 600 ? -24 : 164;
       if (spacerRef.current) {
-        spacerRef.current.style.height = `${Math.ceil(Math.max(0, 2 * projected - 328))}px`;
+        spacerRef.current.style.height = `${Math.ceil(Math.max(0, 2 * projected - 2 * overlap))}px`;
       }
-      centreY = textBottom + projected - 164;
+      centreY = textBottom + projected - overlap;
+
+      // Changing the spacer changes the absolutely positioned canvas's CSS
+      // height. Size its bitmap from that final box so the browser does not
+      // scale the old bitmap upward across the copy after a viewport change.
+      const finalBox = el.getBoundingClientRect();
+      width = finalBox.width;
+      height = finalBox.height;
+      el.width = Math.round(width * dpr);
+      el.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.max(2100, Math.min(6600, Math.round((width * height) / 300)));
 
       points = [];
       for (let i = 0; i < count; i += 1) {

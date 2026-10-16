@@ -1,10 +1,12 @@
 # Purposeful regression cases
 
-> The current exhaustive method register and execution limits are in [Test case review — 1 October 2026](test-case-review.md) and [test-case-inventory.json](test-case-inventory.json). The scenario register remains [regression-cases.json](regression-cases.json); dated records below are historical.
+> The current method register is [test-case-inventory.json](test-case-inventory.json).
+> [CI execution evidence](ci.md#reviewing-playwright-execution-evidence) explains
+> repeatable Playwright runs and their reports, screenshots and traces. Dated
+> reviews below preserve their original counts and execution limits as history.
 
-The current register is [`regression-cases.json`](regression-cases.json): **29
-scenarios: 19 browser journeys, 4 supporting backend cases, 4 SQL cases and 2
-hosted CI cases**. A scenario groups assertions around one observable outcome;
+The current scenario register is [`regression-cases.json`](regression-cases.json).
+A scenario groups assertions around one observable outcome;
 it is not a list of every unit test. Positive, negative and boundary partitions
 can share a case when they establish the same rule. Counts are not a coverage
 or quality target.
@@ -21,10 +23,11 @@ the register does not automatically write to that Sheet.
 
 | Layer | Purpose and limit |
 | --- | --- |
-| Playwright, 19 cases | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
-| Backend, 4 cases | Existing unit/API suites retain denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
-| PostgreSQL, 4 cases | The committed SQL scripts apply policy/constraint assertions to disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests or a full application transaction. |
-| Hosted CI, 2 cases | Check the required aggregate and workflow event behavior, including the new browser job. Local script inspection or a past workflow run cannot establish current hosted execution or branch protection. |
+| Playwright browser suite | Chromium drives the built React app over HTTP through real Express handlers. Test-only identity and storage providers are replaced by [`e2e/server.ts`](../e2e/server.ts) and [`MemoryDatabase`](../e2e/support/memory-database.ts). Persistence means data survives page reload in that running fixture. It does not prove durable database storage, deployed Supabase Auth/RLS, real session expiry, or cross-browser compatibility. |
+| Supporting unit/API suites | Cover denied credentials/outages, changed-role decisions, draft validation and storage-failure behavior using controlled providers/stores. They are not Playwright cases. |
+| Native API integration | Real Express/Supabase-client/PostgREST/PostgreSQL checks use disposable containers and committed migrations. They verify adapter and database contracts separately from browser fixtures and hosted Supabase. |
+| PostgreSQL contracts | Committed SQL scripts check policies and constraints in disposable PostgreSQL with the Auth identity fixture. These are actual SQL checks, but not deployed Supabase tests. |
+| Hosted CI evidence | The matching run records job outcomes and the required aggregate. Local script inspection or a past run cannot establish current hosted execution or branch protection. |
 
 Run `npm run test:regression` for the browser journeys after installing Chromium
 with `npx playwright install chromium`. The regression command builds the app;
@@ -229,3 +232,64 @@ disabled. Evidence: `/tmp/sg2-26-required-regression.log` and
 `/tmp/sg2-26-playwright-results.json`. This verifies application/API wiring with
 isolated storage; it does not claim deployed Supabase verification. The new gate
 must still run on GitHub after this change is pushed.
+
+
+## 16 Oct 2026 — SG2-47 capacity discovery revision
+
+`SG2-47-CAPACITY-DISCOVERY-01` groups 28 new test declarations: 15 client,
+10 server/adapter/native and three browser journeys (`SG2-47-P03`, `P04`,
+`N02`). Two existing client declarations were revised. The historical
+`SG2-47-P01`, `P02` and `N01` records and their previous execution evidence are
+preserved. Source-method IDs, category tags and mapped ACs are recorded in
+`regression-cases.json` and the generated method inventory.
+
+Organisers discover only their own eligible requests; Technical Support and
+Venue Staff retain their existing cross-event exception authority. Discovery
+uses the existing approval permission, with no broader event-list permission.
+The selected request opens the existing suitability and approval action.
+The receipt does not approve or reserve a booking: Venue Staff still make that
+separate decision. The list excludes missing facilities, decided or already
+covered requests, and reads all ordered database batches without silently
+truncating at 1,000.
+
+Local verification: frontend 1,419 and backend 1,466 cases passed, both with
+100% statements, branches, functions and lines; native API/PostgREST/PostgreSQL
+integration passed 10/10. The full browser run passed 110/110 with no skipped,
+flaky or retried cases. Its three capacity journeys and four smoke journeys
+are subsets of 110. Browser storage uses the resettable fixture; native
+integration separately verifies named foreign-key joins and real database
+ownership/receipt behavior. These are local execution results. Pushed-head CI,
+hosted approval workflows and independent peer review remain separate gates;
+this record does not clear every Done criterion.
+
+
+## 16 Oct 2026 — SG2-40 atomic draft-history revision
+
+`SG2-40-DRAFT-HISTORY-01` adds 23 source records: nine executable methods
+(two backend, two native integration, two readiness and three browser methods)
+and fourteen SQL assertions. Two existing methods were revised: the atomic
+adapter case retains legacy alias `TC-f774dfb62d21` for current
+`TC-458d32beacb0`; the Drawer label case retains `TC-022594d51cca`.
+Existing historical history cases and executions remain unchanged.
+
+The public draft PATCH still accepts the existing nine-field full replacement.
+The private service-role-only RPC locks and rechecks creator, current exact
+organisation membership, role and editable status. Saved values and field
+diffs commit together; an audit failure rolls both back. Unchanged saves,
+including equivalent date offsets, add no rows. This covers Draft and Needs
+clarification; it adds no rejected-request rework policy or historical backfill.
+
+Local results: backend 1,468/1,468 and all four coverage measures 100%; native
+API/PostgREST/PostgreSQL 12/12; fourteen tagged SQL rollback assertions;
+readiness 15/15; browser 113/113 with zero skipped, retried or flaky cases.
+Three new draft-history and four smoke cases are subsets of 113. The browser
+fixture proves public UI/API wiring; native/SQL separately prove real database
+locking, grants and rollback. Focused Drawer client checks passed 23/23; this
+is not a claim of a fresh full-client coverage run.
+
+Migration `202610170003` was installed and its single ledger entry and
+service-only grants were verified on the hosted project. That structural
+installation is distinct from repaired-preview save/history acceptance.
+Current-head CI, human peer approval and full hosted Done clearance remain
+separate gates. See [the repeatable checks](testing.md#atomic-draft-history-checks--16-october-2026)
+and [release readiness](release-readiness.md).

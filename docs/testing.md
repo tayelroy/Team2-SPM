@@ -5,10 +5,13 @@ see [Equipment reservations](equipment-reservations.md#verification) and cases
 SG2-55-P01/B01/C01/C02/N01 in [the regression register](regression-cases.json).
 Execution status is recorded separately from the case specification.
 
-> The current exhaustive review is [Test case review — 2 October 2026](test-case-review.md): 87 files, 1,191 test declarations and 154 SQL assertion contracts. The dated sections below preserve earlier evidence.
+> The current source register is [test-case-inventory.json](test-case-inventory.json),
+> verified by `npm run test:inventory`. See [CI execution evidence](ci.md#reviewing-playwright-execution-evidence)
+> for repeatable Playwright runs, reports, screenshots and traces. The dated
+> reviews below retain their original scope and counts as historical evidence.
 
-> The current register is [Purposeful regression cases](regression.md):
-> 29 scenarios including 19 browser journeys. The 22 September revalidation
+> Behavioral scenarios are recorded in [regression-cases.json](regression-cases.json).
+> The 22 September revalidation
 > below supersedes earlier test-quality and execution summaries. Older dated
 > sections are historical evidence, not current results.
 
@@ -290,3 +293,42 @@ Run `npm run ci` with the documented Node 22 runtime. The GitHub Actions workflo
 also runs database-policy tests before and after merges. See [CI configuration
 and required checks](ci.md) for execution triggers, coverage reports and the
 repository rule needed to block a failing pull request.
+
+
+## Atomic draft-history checks — 16 October 2026
+
+The SG2-40 repair keeps the existing public draft PATCH contract. Its private
+RPC migration, `202610170003_event_draft_change_history.sql`, must be applied
+before deploying the adapter that calls it. Use the operator process and
+read-only checks in [release readiness](release-readiness.md); never run the
+failure-injection suite against hosted data. Earlier missing draft changes
+cannot be reconstructed from current values.
+
+Run backend and client coverage with `npm run test:coverage --workspace server`
+and `npm run test:coverage --workspace client`. `npm run test:integration`
+creates its own disposable PostgreSQL/PostgREST containers and verifies real
+public PATCH → history behavior, named actor joins, creator privacy, direct
+RPC denial and concurrent old/new chains. Only identity verification uses a
+synthetic token map. No hosted URL or credentials are needed.
+
+In the disposable CI database after migrations, run
+`supabase/tests/event_draft_audit.sql` through psql with `ON_ERROR_STOP=1`.
+Its transaction rolls back fixture records and the temporary audit-failure
+trigger. It verifies the nine deltas, typed/null/no-op values, refused writes
+and all-or-nothing rollback. The CI SQL list includes this suite. The separate
+readiness tests require the atomic RPC and effective service-only grants.
+
+`npm run test:e2e` runs the three new `e2e/draft-history.spec.ts` journeys along
+with existing regressions. The full 113-case local run passed once per case;
+three draft-history and four smoke cases are included in that total. Browser
+React/Express interactions use a resettable memory RPC boundary and do not
+prove PostgreSQL atomicity; native and rollback suites provide that evidence.
+The source register is 2,396 method declarations plus 758 SQL assertions.
+These counts describe supporting checks, not accepted user workflows.
+
+After the fixed application deploys, use an owned QA draft: change a field,
+save, reopen and inspect the actual actor/time/old/new history. Repeat an
+unchanged save, then verify an unrelated organiser cannot read that history.
+Keep the original empty-history reproduction as historical evidence. A schema
+readiness pass, local coverage or fixture browser pass does not replace this
+hosted acceptance or independent peer approval.

@@ -6,6 +6,7 @@ import type { VenueRecord } from './fields';
 import type { VenueLayoutRecord } from './layoutFields';
 import { parseVenueSearch, type VenueSearchCriteria } from './searchFields';
 import { MAX_GAP_MINUTES, clashes, preparationByVenue, shiftIso, type PreparationTimes } from './preparation';
+import { FACILITY_KEYWORDS, recognise } from './suitability';
 
 const VENUE_COLUMNS = 'venue_id,name,location,capacity,facilities,accessibility_features,operating_information';
 
@@ -22,6 +23,17 @@ interface OccupancyRow { venue_id: number; starts_at: string; ends_at: string; s
 function includesAll(text: string | null, keywords: string[]): boolean {
   const haystack = (text ?? '').toLowerCase();
   return keywords.every(keyword => haystack.includes(keyword));
+}
+
+/** Canonical event-prefill labels use the same aliases as suitability.
+ * Unknown user criteria remain complete literal substrings; recognising one
+ * word inside a longer phrase must not silently drop its other requirements. */
+function includesFacilities(text: string | null, keywords: string[]): boolean {
+  const offered = new Set(recognise(text, FACILITY_KEYWORDS));
+  return keywords.every(keyword => {
+    const known = FACILITY_KEYWORDS.find(([label]) => label.toLowerCase() === keyword.toLowerCase());
+    return known ? offered.has(known[0]) : includesAll(text, [keyword]);
+  });
 }
 
 /**
@@ -65,7 +77,7 @@ export async function searchVenues(criteria: VenueSearchCriteria, client: Supaba
       && (criteria.attendance === null || (venue.capacity ?? 0) >= criteria.attendance)
       && (criteria.location === null || includesAll(venue.location, [criteria.location]))
       && (criteria.layout === null || venueLayouts.some(item => item.layout === criteria.layout))
-      && includesAll(venue.facilities, criteria.facilities)
+      && includesFacilities(venue.facilities, criteria.facilities)
       && includesAll(venue.accessibility_features, criteria.accessibility);
   }).map(venue => ({
     ...venue,

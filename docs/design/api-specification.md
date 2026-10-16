@@ -1,14 +1,15 @@
-# ConnectSphere API specification — as of main 1d1e336 (14 Oct 2026)
+# ConnectSphere API specification — PR90 capacity and draft-history revision (16 Oct 2026)
 
-SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts on `main`. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
+SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at the documented snapshot. It was written from the router and handler code, not from memory or older docs. Where a feature doc disagrees with the code, the code is what is described here, and [Doc vs code](#doc-vs-code) lists the differences.
 
 - **Ground truth:** `server/src/app.ts` (mounts), the routers it mounts (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue}/*.ts`), `server/src/auth/policy.ts` (`PERMISSIONS`), the `server/src/db/*` adapters, and the RPCs in `supabase/migrations/*.sql`.
-- **Endpoint count:** 73 method + path pairs, from 70 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
+- **Revision scope:** The baseline PR90 head `61416cc` includes merged PR92 (`64b1da6`). Subsequent SG2-46 facility matching, SG2-47 capacity discovery and SG2-40 atomic draft-history corrections are described below. Capacity discovery adds one GET endpoint; SG2-81 still uses existing request and decision routes. Original catalogue line numbers locate the baseline; source filenames and current contracts identify later changes. Safety routes remain planned. This specification describes the local capacity and draft-history revision, not a claim of hosted acceptance or peer approval.
+- **Endpoint count:** 74 method + path pairs, from 71 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
 - **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `connectsphere.dsl` (C3 API components), `sequence-diagrams.puml`, `data-model.puml`, `class-diagram.puml`, `event-status-model.puml`.
 
 ## Contents
 1. [Conventions](#1-conventions)
-2. [Endpoint index](#2-endpoint-index) (all 73, one row each)
+2. [Endpoint index](#2-endpoint-index) (all 74, one row each)
 3. [Auth, accounts and profile](#3-auth-accounts-and-profile)
 4. [Event requests](#4-event-requests)
 5. [Queues and notifications](#5-queues-and-notifications)
@@ -143,6 +144,8 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 71 | GET | `/api/health` | public | anyone | — | [10.1](#101-get-health-and-get-apihealth) |
 | 72 | GET | `/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
 | 73 | GET | `/api/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
+
+| 74 | GET | `/api/venue-booking-requests/capacity-exceptions` | `venue_booking.capacity_exception.approve` | VS, TSS, EO | SG2-47 reachability repair | [7.8](#78-get-apivenue-booking-requestscapacity-exceptions) |
 
 ### What each role can call today
 - **ATT:** only rows 3, 5 and 6 (`/api/auth/me`, `/api/profile`), plus the public endpoints.
@@ -284,16 +287,19 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Rule:** any EO in the same organisation can read it.
 
 ### 4.4 PATCH /api/event-requests/:eventId
-- **Source:** `app.ts:221-225`; `events/updateDraft.ts`.
+- **Source:** `events/updateDraft.ts` (`createUpdateEventDraftHandler`), `db/eventRequests.ts` (`updateEventRequestDraft`), migration `202610170003_event_draft_change_history.sql` (`update_event_request_draft`).
 - **Permission:** `event_request.update` (EO).
-- **Body:** the same fields as 4.1, as a **full replace**: omitted fields become null.
-- **200:** `{ request: DraftRecord, missingForSubmission }`
+- **Body:** the same nine fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
+- **200:** `{ request: DraftRecord, missingForSubmission }`. The DraftRecord shape is unchanged; this endpoint does not submit a request.
 - **Errors:**
-  - 400 details
-  - 404
-  - 409 `Only a draft or returned event request can be edited.`
-  - 503
-- **Rule:** only the creating EO, and only while the status is `draft` or `needs_clarification`. The guard is in the `UPDATE` itself.
+  - 400 `{ error: "Invalid event request details", details[] }` for HTTP validation; a private RPC validation refusal returns the same error without details.
+  - 404 `No event request found for this account.` for a missing event, wrong creator or changed organisation membership.
+  - 409 `Only a draft or returned event request can be edited.` if the status is no longer editable, including a change after the initial lookup.
+  - 503 generic service error if storage or audit insertion fails; private database errors are not exposed.
+- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the nine fields. The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
+- **History:** the same transaction inserts one `event_audit_logs` row per actual changed field with verified actor, old/new values and a common save time. An audit failure rolls back the draft update. Unchanged saves, including equivalent timestamp offsets, add no history. Null remains null; numeric and boolean values are stored as text; dates use canonical UTC timestamp text. History reads still apply the existing owner/internal-field visibility rules.
+- **Internal result:** JSON object `{ outcome: "updated", request }` or `{ outcome: "not_found"|"not_editable"|"invalid" }`; the adapter maps these to the public response above. A successful earlier precheck cannot override a later locked refusal.
+- **Limits:** only the existing draft/clarification edit path is repaired. This adds no rejected-request rework policy and does not reconstruct edits made before the migration.
 
 ### 4.5 DELETE /api/event-requests/:eventId
 - **Source:** `app.ts:215-219`; `events/deleteDraft.ts`.
@@ -424,7 +430,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 403 `Only the assigned event coordinator can view these arrangements.`
   - 404 `Event not found.`
   - 503
-- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding.
+- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding. SG2-81 additionally counts affected confirmed bookings as outstanding. Persisted `arrangements_recheck_needed` with `venue_recheck`, `equipment_recheck` or `registration_recheck` keeps the corresponding arrangement outstanding even when its booking/receipt data exists.
 
 ### 4.15 PATCH /api/event-requests/:eventId/confirm
 - **Week 7:** New since W7 — SG2-58; #3 — SG2-82.
@@ -437,11 +443,11 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `{ error: "Only an event in Preparation can be confirmed.", code: "closed" }`
   - 409 `{ error: "Confirmation refused: arrangements are still outstanding.", code: "outstanding", outstanding[] }`
   - 401/403/503 mapped from the RPC
-- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610150003_confirm_event_rejected_venues.sql`. Under `for update` the RPC:
+- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610170002_confirmation_rechecks_and_disruptions.sql` (merges PR90 rechecks with PR92 disruption checks). Under `for update` the RPC:
   - rechecks the caller's role and assignment
-  - applies the readiness gate
+  - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment or registration needs, and persisted venue/equipment/registration rechecks; refusal changes no event, booking, receipt, history or notification
   - writes the status, a history row and an `event_confirmed` notice
-- **Note:** no endpoint on `main` moves an event into `preparation`. That is the safety-check outcome (SG2-91..94, «planned»).
+- **Note:** no endpoint at this snapshot moves an event into `preparation`. That is the safety-check outcome (SG2-91..94, «planned»).
 
 ### 4.16 GET /api/event-requests/:eventId/confirmation
 - **Week 7:** New since W7 — SG2-58.
@@ -517,7 +523,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Permission:** `notifications.read` (EC, VS, TSS, EO, ECL). The Safety Officer does not hold it.
 - **200:** `{ notifications: [{ notification_id, event_id, request_id, kind, message, created_at }] }`
   - The newest 50 for the caller.
-  - `kind` is one of: `venue_request_approved`, `venue_request_rejected`, `venue_booking_released`, `equipment_reserved`, `venue_booking_clash`, `event_confirmed`, `event_submitted`, `coordinator_assigned`, `clarification_requested`, `event_approved`, `event_rejected`.
+  - `kind` is one of: `venue_request_approved`, `venue_request_rejected`, `venue_booking_released`, `equipment_reserved`, `venue_booking_clash`, `event_confirmed`, `event_submitted`, `coordinator_assigned`, `clarification_requested`, `event_approved`, `event_rejected`, `venue_unavailable`.
 - **Errors:** 503.
 - **Data:** `notifications`, filtered on `recipient_id` = caller and by RLS (user-scoped client).
 - **Hold notices** are a separate endpoint: 8.3.
@@ -627,8 +633,9 @@ All venue routers are `protectedRouter`s mounted at `/api/venues`. Except for su
   - `attendance`: optional
   - `location`: optional, at most 255 characters
   - `layout`: optional
-  - `facilities`, `accessibility`: optional comma-separated keywords, at most 10 each
+  - `facilities`, `accessibility`: optional comma-separated keywords, at most 12 each (255 characters per text criterion)
 - **200:** `{ venues: [{ venue_id, name, location, capacity, facilities, accessibility_features, operating_information, layouts[], held[] }] }`
+- **Matching:** event search prefills recognised facility requirements as well as attendance/accessibility. Exact canonical facility labels use the same aliases as suitability (for example projector/projection and wifi/Wi-Fi); other user phrases retain literal substring matching, and every supplied criterion must match. The 12-keyword limit accommodates the full recognised facility vocabulary. This SG2-46 correction follows the recorded `61416cc` snapshot.
 - **Exclusions:** a venue is left out when:
   - it is unavailable for the period
   - a confirmed or tentative occupancy clashes once the venue's setup + turnaround gap is applied (SG2-78)
@@ -670,7 +677,7 @@ All venue routers are `protectedRouter`s mounted at `/api/venues`. Except for su
 - **Behaviour:**
   - A period that covers confirmed bookings is **accepted** (SG2-80 AC2).
   - Trigger `venue_unavailability_flag_bookings` writes those bookings to `venue_booking_disruptions`, and they appear in `affected`.
-  - Neither the bookings nor their events are changed.
+  - The booking is retained. Since SG2-81 (`202610170001`), each new disruption flag notifies the current Coordinator (`venue_unavailable`). If the event is in Preparation or Confirmed, the same trigger returns it to Planning, clears `confirmed_by/at`, writes status history and notifies the Organiser (unless the same recipient). Date, time, attendance and requirements remain unchanged. Other stages stay unchanged; pre-migration flags are not retrospectively announced.
 - **Errors:**
   - 400 `Invalid venue ID.`
   - 400 `Enter a start and an end, with the end after the start and not in the past, a listed reason, and a note within 500 characters.`
@@ -694,7 +701,7 @@ The routers mounted at `/api/venue-booking-requests` are, in order:
 
 Request, conflict, suitability and listing reads use the service-role client. The decide and withdraw writes call RPCs with the caller's token.
 
-**Rule for every route here:** an EC sees only events assigned to them; VS see every event.
+**Scope:** an EC sees only assigned events on routes granting EC access; VS and TSS have cross-event suitability/exception authority. EO suitability and exception access is creator-only. Listing booking requests (§7.2) still grants only EC and VS. Discovery (§7.8) does not widen general event or venue permissions.
 
 **Request record:**
 - identity: `request_id, event_id, venue_id, venue_name`
@@ -702,6 +709,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - requested: `requester_name, requested_at`
 - decided: `decider_name, decided_at, decision_reason`
 - withdrawn: `withdrawer_name, withdrawn_at`
+- replacement: `replaces_booking_id` (nullable old booking reference, SG2-81)
 
 ### 7.1 POST /api/venue-booking-requests
 - **Week 7:** New since W7 — SG2-48; #1 — SG2-78.
@@ -712,15 +720,18 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - `starts_at`: in the future
   - `ends_at`: after `starts_at`
   - `layout`: one of the layouts in 6.5
+  - `replaces_booking_id`: optional positive whole ID of an affected confirmed booking belonging to this event; omit or send null for an ordinary request (SG2-81)
 - **201:** `{ request, booking: "allowed"|"needs_capacity_exception", conflicts: [{ kind: "booking"|"hold", reference_id, event_id, event_name, starts_at, ends_at, status }] }`
 - **Errors:**
   - 400 `Choose an event, a venue, a layout and a future period that starts before it ends.`
   - 404 `Event not found.` / `Venue not found.`
-  - 409 event not `approved` or `planning`
+  - 409 ordinary request event not `approved` or `planning`; replacement additionally permits `preparation` and `confirmed`
+  - 409 replacement reference is not an affected booking of this event
   - 409 layout not offered
   - 409 required facility missing
   - 409 overlapping duplicate request for the same event and venue
 - **Rule:** only the assigned EC. An event may have **several** requests for different venues; SG2-82 is change #3.
+- **Replacement:** uses this same route and the existing 7.4 decision route. A pending replacement reserves nothing. Approval creates the new booking and releases the referenced old one atomically; rejection leaves the old booking intact. The Coordinator UI prefills the affected booking's period and event requirements for the existing venue search.
 - **Conflicts:**
   - Cover confirmed bookings and live holds within the venue's setup + turnaround gap (SG2-78).
   - They are reported, not refused.
@@ -731,7 +742,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Source:** `venues/bookingRequests.ts:207`.
 - **Permission:** `venue_booking.request.view` (EC, VS).
 - **Query:** `event_id` (required).
-- **200:** `{ requests[], arrangement: { state: "none"|"in_progress"|"ready", needed, approved, pending, rejected, unbooked } }`. A rejected request keeps the state `in_progress` until it is withdrawn (SG2-82).
+- **200:** `{ requests[], arrangement: { state: "none"|"in_progress"|"ready", needed, approved, pending, rejected, unbooked, affected } }`. A rejected request keeps the state `in_progress` until it is withdrawn (SG2-82); affected confirmed bookings also prevent `ready` (SG2-81).
 - **Errors:** 400 `event_id must be a positive whole number.`; 404 `Event not found.`
 
 ### 7.3 GET /api/venue-booking-requests/:requestId/conflicts
@@ -756,11 +767,12 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 `Approve a capacity exception for this request before approving the booking.`
   - 409 `closed`
   - 409 `{ error, conflict: { kind: "booking"|"block"|"hold", starts_at, ends_at, label } }`
-- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610160001_event_notifications.sql`.
+- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610170001_venue_replacement.sql`.
 - **What the RPC does:**
   - Under the venue lock it refuses confirmed bookings and live holds within the setup + turnaround gap (`venue_preparation_gap`, SG2-78), and unavailability without the gap.
   - It inserts a confirmed `venue_bookings` row and keeps the event's first booking (`events.venue_booking_id = coalesce(...)`, SG2-82).
   - It writes history and notifies the coordinator and organiser.
+  - For a replacement, it locks the relevant venues in ascending ID order, then approves the new booking and calls internal `release_replaced_booking` in the same transaction. The old confirmed booking becomes cancelled, its old request is cancelled, the primary booking pointer is updated when needed, and history plus `venue_booking_released` notices are written to distinct Coordinator/Organiser recipients. A failed approval rolls back.
   - The exclusion constraint `venue_bookings_no_double_booking` is the backstop.
 
 ### 7.5 POST /api/venue-booking-requests/:requestId/withdraw
@@ -796,7 +808,17 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 exception already approved
   - 503
 - **Rule:** an EO only for their own event.
-- **Data:** inserts into `venue_capacity_exceptions`.
+- **Data:** inserts into `venue_capacity_exceptions`. Actor, role, attendance and capacity come from the verified session and current stored rows; no approval body is required. Pending status, ownership, missing facilities and existing coverage are rechecked independently of discovery.
+- **Reachability:** Organiser and Technical Support navigation opens **Capacity exceptions**, then the existing suitability view and approval action. Venue Staff retain their existing request queue. Approval shows the stored receipt but leaves the booking request pending and creates no booking; Venue Staff must make a separate booking decision. Refreshing discovery removes a covered request.
+
+### 7.8 GET /api/venue-booking-requests/capacity-exceptions
+- **Source:** `venues/suitabilityRoutes.ts` (`createBookingRequestSuitabilityRouter`); `db/venueSuitability.ts` (`pendingCapacityRequests`); `client/src/screens/CapacityExceptions.tsx`.
+- **Permission:** existing `venue_booking.capacity_exception.approve` (VS, TSS, EO). EC, ECL, SO and ATT are denied before the store is read.
+- **Input:** no body or supported owner/event selector. Scope comes from the verified principal; caller query parameters cannot select another organiser.
+- **200:** `{ requests: [{ request_id, event_id, event_name, venue_name, starts_at, ends_at, expected_attendance, venue_capacity }] }`. IDs and attendance are positive integers; periods are ISO timestamps. Capacity is an integer or `null` when not recorded. Empty results are `{ requests: [] }`; blank names use `Untitled event` / `Unnamed venue`. Owner IDs, requirement text and approval records are not list fields.
+- **Eligibility:** pending requests with positive recorded attendance, a capacity issue not already covered by an exception, and no missing required facility. Suitability and coverage use the existing assessment rules, including unrecorded venue capacity. A list entry is not an approval or reservation.
+- **Scope and reads:** EO queries filter `event.organiser_id` in the database and the handler independently checks creator ownership. VS/TSS may discover eligible requests across events. Named event/venue/exception foreign keys avoid ambiguous PostgREST embeds. Ordered batches of 1,000 are read until exhausted; later-page failure returns 503 instead of a partial successful list. The response has the protected route's `Cache-Control: no-store`.
+- **Errors:** common 401/403; 503 when the service or any read fails. Existing GET suitability and POST capacity-exception endpoints remain authoritative if a request changes after discovery.
 
 ---
 
@@ -881,7 +903,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Source:** `venues/bookings.ts:89`.
 - **Permission:** `venue_bookings.view` (VS, EC). The `?venue_id` form also needs `venue_bookings.by_venue` (VS), checked in the handler.
 - **Query:** exactly one of `event_id` or `venue_id`.
-- **200:** `{ bookings: [{ booking_id, venue_id, venue_name, event_id, event_name, starts_at, ends_at, status, cancelled_at, cancellation_reason, canceller_name }] }`
+- **200:** `{ bookings: [{ booking_id, venue_id, venue_name, event_id, event_name, starts_at, ends_at, status, cancelled_at, cancellation_reason, canceller_name, affected_by: [{ starts_at, ends_at, category, reason }], replacement: { request_id, venue_name }|null }] }`
 - **Errors:**
   - 400 `Give either event_id or venue_id.` (or a bad ID)
   - 403 `Access denied` (`venue_id` without VS)
@@ -1067,14 +1089,13 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 
 ## 11. Week 7 work with no endpoint yet («planned»)
 
-No endpoint on `main` delivers these stories. They are listed so that nobody reads an endpoint into them. The API surface they will add is not yet designed, so no path is proposed here.
+SG2-81 replacement is implemented by 7.1/7.4, 8.7 and arrangement readiness; SG2-88 is Done using 4.7/4.8. SG2-98 is also Done in the 16 Oct Jira snapshot; overlapping unavailability is accepted (6.13), with removal through 6.14. These are not planned endpoints.
 
-| Change | Story (Jira To Do) | What exists on `main` today |
+No endpoint at this snapshot delivers these planned stories. They are listed so that nobody reads an endpoint into them. The API surface they will add is not yet designed, so no path is proposed here.
+
+| Change | Story (Jira To Do) | What exists at this snapshot today |
 |---|---|---|
-| #2 | SG2-81 replace a venue | No replace endpoint. A coordinator can release a booking (8.8) and request another venue (7.1) as separate calls. |
-| #2 | SG2-98 remediation of SG2-80 | — |
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
-| #5 | SG2-88 assign/reassign as Lead | 4.7 and 4.8 already let the ECL assign **and** reassign (SG2-97). No code is tagged SG2-88. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
 | #6 | SG2-91, SG2-92, SG2-93, SG2-94 safety check | No endpoint. Already in place: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation` (SG2-100), the SO grants in §2, venue safety details (6.6), and SO read access to equipment placement (9.4). Nothing moves an event out of `planning` into `awaiting_safety_check` or `preparation`. |
 
@@ -1090,5 +1111,5 @@ In each case the code wins, and this spec follows the code.
 
 ## How the route list was verified
 1. **Registrations:** every `app.(get|post|use)` in `app.ts` and every `router.(get|post|patch|put|delete)` / `eventRequests.*` / `rolesRouter.*` registration in the mounted routers were listed with a regex and joined to their mount prefixes.
-2. **Count:** 70 registrations. Three of them each register two paths (`GET /api/work-queue` + `/:kind/:itemId`, `GET /health` + `/api/health`, `GET /health/db` + `/api/health/db`), giving 73 method + path pairs. The set extracted from code was compared against the §2 index with a script: equal, with no missing and no extra rows.
+2. **Count:** the original code/index comparison established 70 registrations and 73 method/path pairs. This revision adds the explicit GET registration in `createBookingRequestSuitabilityRouter`, mounted at `/api/venue-booking-requests`, giving 71 registrations and 74 unique indexed pairs. The three dual-path registrations (work queue and the two health checks) are unchanged. The original 73 index entries are retained verbatim; the added contract is row 74.
 3. **Permissions:** each permission key in §2 is the literal argument to `requirePermission` at that registration, and each role list is that key's entry in `PERMISSIONS`.

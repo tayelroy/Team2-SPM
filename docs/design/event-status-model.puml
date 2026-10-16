@@ -1,6 +1,6 @@
 @startuml event-status-model
 !pragma layout smetana
-title Event status model — generated from STATUS_TRANSITIONS (server/src/events/fields.ts)\nas of main 1d1e336 (14 Oct 2026)
+title Event status model — generated from STATUS_TRANSITIONS (server/src/events/fields.ts)\nas of PR90 head 61416cc (16 Oct 2026)
 hide empty description
 skinparam state {
   BackgroundColor<<Week 7>> #FFF4CC
@@ -51,8 +51,16 @@ cancelled --> [*]
 
 needs_clarification -[#C0392B]-> submitted : PATCH /:id/submit\n(coordinator held; off-table)
 rejected -[#C0392B]-> submitted : PATCH /:id/submit\n(coordinator held; off-table)
-preparation -[#C0392B]-> planning : PATCH /:id/planning\n(edit with arrangement impact)
-confirmed -[#C0392B]-> planning : PATCH /:id/planning\n(edit with arrangement impact)
+preparation --> planning : venue_disruption_notify (SG2-81)\nor PATCH /:id/planning (arrangement impact)
+confirmed --> planning : venue_disruption_notify (SG2-81)\nor PATCH /:id/planning (arrangement impact)
+
+note left of confirmed
+  202610170001: a new disruption flag returns Preparation/Confirmed
+  to Planning, clears confirmed_by/at, writes history and notifies
+  the Coordinator and Organiser. Other event details remain.
+  202610170002: confirmation refuses affected bookings AND
+  persisted venue/equipment/registration rechecks.
+end note
 
 note right of cancelled
   <<planned>> SG2-67 "Cancel an event";
@@ -69,7 +77,7 @@ end note
 legend right
   |= Style |= Meaning |
   |<#FFF4CC>| <<Week 7>> state (SG2-100) |
-  | solid | writer exists on main |
+  | solid | writer exists at this snapshot |
   |<#DDDDDD>| dashed grey: <<planned>> (story on edge) |
   | red | written by code, not in STATUS_TRANSITIONS |
   All /:id paths are under /api/event-requests.

@@ -7,6 +7,7 @@ import { buildCalendarDays, monthRange, MONTH_LABELS } from '../venues/calendarV
 import type { DayKind } from '../venues/calendarView';
 import { color, radius, rule } from '../theme';
 import { Card, IconButton } from '../ui';
+import './AvailabilityCalendar.css';
 
 type Status = 'loading' | 'ready' | 'no-access' | 'error';
 
@@ -42,6 +43,9 @@ const KIND_STYLE: Record<DayKind, { bg: string; bd: string; labelFg: string }> =
   mixed: { bg: color.teal, bd: color.teal, labelFg: color.abyss }
 };
 
+const dayLabel = new Intl.DateTimeFormat('en-SG', { dateStyle: 'full', timeZone: 'Asia/Singapore' });
+const entryTime = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore', hour12: false });
+
 const BLANK_STYLE = { bg: 'transparent', bd: 'transparent', labelFg: color.slate };
 
 /** Month grid across every venue: available, booked, and unavailable days. */
@@ -49,6 +53,7 @@ export default function AvailabilityCalendar() {
   const [reference, setReference] = useState(() => new Date());
   const [status, setStatus] = useState<Status>('loading');
   const [venues, setVenues] = useState<VenueAvailabilitySummary[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const range = monthRange(reference);
 
@@ -59,6 +64,7 @@ export default function AvailabilityCalendar() {
 
     loadAllVenuesAvailability(session?.accessToken ?? null, range.from, range.to, controller.signal)
       .then((result) => {
+        if (controller.signal.aborted) return;
         if (result === null) {
           setStatus('no-access');
           return;
@@ -84,10 +90,18 @@ export default function AvailabilityCalendar() {
   }
 
   function jumpTo(year: number, month: number) {
+    setSelectedDate(null);
     setReference(new Date(Date.UTC(year, month, 1, 12)));
   }
 
   const days = buildCalendarDays(reference, venues);
+  const selectedDay = days.find(day => day.date === selectedDate && day.inMonth);
+  // The grid deliberately summarises crowded days. Details use the complete
+  // source entries so choosing a day also reveals everything behind '+ more'.
+  const selectedStart = selectedDate === null ? 0 : Date.parse(`${selectedDate}T00:00:00+08:00`);
+  const selectedEntries = selectedDay ? venues.flatMap(venue => venue.entries
+    .filter(entry => Date.parse(entry.start) < selectedStart + 86_400_000 && Date.parse(entry.end) > selectedStart)
+    .map(entry => ({ ...entry, venue: venue.name }))) : [];
   // Keep the dropdown in sync even if the arrows navigated past the fixed
   // window (unbounded, unlike the dropdown) — extend it rather than showing
   // a year that doesn't match the current selection.
@@ -117,7 +131,7 @@ export default function AvailabilityCalendar() {
         >
           {range.label}
         </h2>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
           <select
             aria-label="Jump to month"
             value={range.month}
@@ -175,79 +189,51 @@ export default function AvailabilityCalendar() {
       {status === 'error' && <Card padding="28px">Couldn't load venue availability. Try again.</Card>}
 
       {status === 'ready' && (
-        <Card padding="28px" style={{ gap: '14px' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7,minmax(0,1fr))',
-              gap: '10px',
-            }}
-          >
-            {WEEKDAYS.map((day) => (
-              <span
-                key={day}
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 500,
-                  letterSpacing: '0.15em',
-                  textTransform: 'uppercase',
-                  color: color.silver,
-                  textAlign: 'center',
-                }}
-              >
-                {day}
-              </span>
-            ))}
+        <Card padding="clamp(12px, 3vw, 28px)" style={{ gap: '14px', minWidth: 0 }}>
+          <p className="availability-day-hint">Choose a day to read its full venue details.</p>
+          <div className="availability-weekdays" aria-hidden="true">
+            {WEEKDAYS.map(day => <span key={day}>{day}</span>)}
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(7,minmax(0,1fr))',
-              // Tighter on phones so each day keeps room for its date and items.
-              gap: 'clamp(4px, 1.5vw, 10px)',
-            }}
-          >
+          <div className="availability-month-grid" aria-label="Venue availability by day">
             {days.map((day, i) => {
               const style = day.inMonth ? KIND_STYLE[day.kind] : BLANK_STYLE;
-              return (
-                <div
-                  key={i}
-                  aria-label={day.date ? `${day.date}: ${day.kind}` : undefined}
-                  style={{
-                    minHeight: '96px',
-                    minWidth: 0,
-                    borderRadius: radius.sm,
-                    padding: 'clamp(4px, 1.5vw, 10px)',
-                    background: style.bg,
-                    border: `1px solid ${style.bd}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                  }}
-                >
-                  <span style={{ fontSize: '12px', color: day.inMonth ? color.silver : 'transparent' }}>
-                    {day.n}
-                  </span>
-                  {day.items.map((item, j) => (
-                    <span
-                      key={j}
-                      style={{
-                        fontSize: '11px',
-                        lineHeight: 1.3,
-                        letterSpacing: '0.02em',
-                        color: style.labelFg,
-                        // Narrow phone cells: break long words (e.g. "Turnaround")
-                        // inside the day instead of spilling into the next one.
-                        overflowWrap: 'anywhere',
-                      }}
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
+              const content = <>
+                <span className="availability-day-number">{day.n}</span>
+                <span className="availability-cell-items">
+                  {day.items.map((item, j) => <span key={j} style={{ color: style.labelFg }}>{item}</span>)}
+                </span>
+                {day.inMonth && <span className="availability-day-marker" aria-hidden="true">
+                  {day.kind === 'free' ? 'Free' : '●'}
+                </span>}
+              </>;
+              const dayStyle = { background: style.bg, borderColor: style.bd };
+              return day.inMonth ? (
+                <button
+                  key={day.date}
+                  type="button"
+                  className="availability-day"
+                  aria-label={`${day.date}: ${day.kind}`}
+                  aria-pressed={selectedDate === day.date}
+                  aria-controls="selected-venue-day"
+                  onClick={() => setSelectedDate(day.date)}
+                  style={dayStyle}
+                >{content}</button>
+              ) : (
+                <div key={`blank-${i}`} className="availability-day availability-day-blank" aria-hidden="true" style={dayStyle}>{content}</div>
               );
             })}
           </div>
+          {selectedDay && <section id="selected-venue-day" className="availability-day-details" aria-label="Selected day availability" aria-live="polite">
+            <h3>{dayLabel.format(new Date(`${selectedDate}T12:00:00+08:00`))}</h3>
+            {selectedEntries.length === 0 ? <p>No bookings or unavailability recorded for this day.</p> : (
+              <ul>
+                {selectedEntries.map((entry, i) => <li key={i}>
+                  <strong>{entry.venue} · {entry.label}</strong>
+                  <span><time dateTime={entry.start}>{entryTime.format(new Date(entry.start))}</time> – <time dateTime={entry.end}>{entryTime.format(new Date(entry.end))}</time> (Singapore time)</span>
+                </li>)}
+              </ul>
+            )}
+          </section>}
         </Card>
       )}
     </div>

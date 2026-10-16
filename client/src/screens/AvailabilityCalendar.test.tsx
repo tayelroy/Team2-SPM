@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import AvailabilityCalendar from './AvailabilityCalendar';
@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 function stubJson(body: unknown) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)));
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(Response.json(body))));
 }
 
 test('[NORMAL] [SG2-44:AC1] shows a loading state before the response resolves', () => {
@@ -63,7 +63,7 @@ test('[NORMAL] [SG2-84:AC4] displays a distinct Tentative legend and hold state 
   render(<AvailabilityCalendar />);
   const hold = await screen.findByText('Atrium · Tentative');
   expect(screen.getByText('Tentative')).toBeInTheDocument();
-  expect(hold.parentElement).toHaveAttribute('aria-label', '2026-10-15: tentative');
+  expect(hold.closest('button')).toHaveAttribute('aria-label', '2026-10-15: tentative');
   expect(screen.queryByText('Atrium · Booked')).not.toBeInTheDocument();
 });
 
@@ -195,4 +195,75 @@ test('[BOUNDARY] [SG2-44:AC1] just after midnight on 1 November in Singapore the
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
   fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
   expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
+});
+
+
+test('[NORMAL] [SG2-44:AC2] [SG2-71:AC1] [VISUAL-QA-02] choosing a day exposes readable full details including entries hidden by the grid summary', async () => {
+  stubJson({ from: '', to: '', venues: [{ venueId: 1, name: 'Atrium Hall', entries: [
+    ...['Main programme', 'Breakout session', 'Evening reception', 'Late equipment turnaround'].map(label => ({
+      start: '2026-10-15T01:00:00Z', end: '2026-10-15T04:00:00Z', kind: 'booking', label,
+    })),
+    { start: '2026-10-15T16:00:00Z', end: '2026-10-16T01:00:00Z', kind: 'unavailable', label: 'Next day only' },
+    { start: '2026-10-14T14:00:00Z', end: '2026-10-14T16:00:00Z', kind: 'setup', label: 'Previous day only' },
+  ] }] });
+  render(<AvailabilityCalendar />);
+  const day = await screen.findByRole('button', { name: '2026-10-15: booked' });
+  expect(within(day).getByText('+1 more')).toBeInTheDocument();
+  fireEvent.click(day);
+  const details = screen.getByRole('region', { name: 'Selected day availability' });
+  expect(day).toHaveAttribute('aria-pressed', 'true');
+  expect(details).toHaveAttribute('id', day.getAttribute('aria-controls'));
+  expect(within(details).getByRole('heading', { name: 'Thursday, 15 October 2026' })).toBeInTheDocument();
+  expect(within(details).getAllByRole('listitem')).toHaveLength(4);
+  expect(within(details).getByText('Atrium Hall · Late equipment turnaround')).toBeInTheDocument();
+  expect(within(details).getAllByText('15 Oct 2026, 09:00')).toHaveLength(4);
+  expect(within(details).queryByText(/Next day only|Previous day only/)).not.toBeInTheDocument();
+});
+
+test('[BOUNDARY] [SG2-44:AC2] [SG2-71:AC1] [VISUAL-QA-02] selecting a free day replaces previous booking details and blanks are not buttons', async () => {
+  stubJson({ from: '', to: '', venues: [{ venueId: 1, name: 'Atrium', entries: [{
+    start: '2026-10-15T01:00:00Z', end: '2026-10-15T04:00:00Z', kind: 'booking', label: 'Programme',
+  }] }] });
+  render(<AvailabilityCalendar />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-15: booked' }));
+  fireEvent.click(screen.getByRole('button', { name: '2026-10-01: free' }));
+  expect(screen.getByRole('button', { name: '2026-10-15: booked' })).toHaveAttribute('aria-pressed', 'false');
+  const details = screen.getByRole('region', { name: 'Selected day availability' });
+  expect(within(details).getByText('No bookings or unavailability recorded for this day.')).toBeInTheDocument();
+  expect(within(details).queryByRole('listitem')).not.toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: /^2026-10-/ })).toHaveLength(31);
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  await screen.findByRole('button', { name: '2026-11-01: free' });
+  expect(screen.queryByRole('region', { name: 'Selected day availability' })).not.toBeInTheDocument();
+});
+
+test('[CONFLICT] [SG2-44:AC2] [SG2-71:AC1] [VISUAL-QA-02] an older month response cannot overwrite the current month after navigation', async () => {
+  let resolveOld!: (response: Response) => void;
+  const fetchMock = vi.fn().mockImplementationOnce(() => new Promise<Response>(resolve => { resolveOld = resolve; }))
+    .mockResolvedValue(Response.json({ from: '', to: '', venues: [] }));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<AvailabilityCalendar />);
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  await screen.findByRole('button', { name: '2026-11-01: free' });
+  await act(async () => resolveOld(Response.json({ from: '', to: '', venues: [{ venueId: 1, name: 'Stale venue', entries: [{
+    start: '2026-11-01T01:00:00Z', end: '2026-11-01T04:00:00Z', kind: 'booking', label: 'Old answer',
+  }] }] })));
+  expect(screen.getByRole('button', { name: '2026-11-01: free' })).toBeInTheDocument();
+  expect(screen.queryByText('Stale venue · Old answer')).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-44:AC2] [SG2-71:AC1] [VISUAL-QA-02] a failed month load removes selected details and an aborted failure stays silent', async () => {
+  let rejectOld!: (error: Error) => void;
+  const fetchMock = vi.fn().mockResolvedValueOnce(Response.json({ from: '', to: '', venues: [] }))
+    .mockImplementationOnce(() => new Promise<Response>((_, reject) => { rejectOld = reject; }))
+    .mockRejectedValueOnce(new Error('service unavailable'));
+  vi.stubGlobal('fetch', fetchMock);
+  render(<AvailabilityCalendar />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-01: free' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+  await screen.findByText("Couldn't load venue availability. Try again.");
+  await act(async () => rejectOld(new Error('cancelled old request')));
+  expect(screen.queryByRole('region', { name: 'Selected day availability' })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'December 2026' })).toBeInTheDocument();
 });

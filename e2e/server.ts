@@ -319,6 +319,10 @@ app.post('/__e2e/venue-suitability', (_req, res) => {
   database.seedVenueSuitability();
   res.status(204).end();
 });
+app.post('/__e2e/capacity-exceptions', (_req, res) => {
+  database.seedCapacityExceptions();
+  res.status(204).end();
+});
 app.post('/__e2e/venue-decision', (_req, res) => {
   database.seedVenueDecision();
   res.status(204).end();

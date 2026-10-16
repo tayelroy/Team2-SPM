@@ -104,6 +104,24 @@ export function createVenueSuitabilityRouter(access: ReturnType<typeof createAut
 export function createBookingRequestSuitabilityRouter(access: ReturnType<typeof createAuthorization>, dependencies: VenueSuitabilityDependencies = {}) {
   const router = access.protectedRouter();
 
+  // Discovery uses the existing approval grant, not broader event or venue
+  // listing permissions. An organiser's scope comes only from the principal.
+  router.get('/capacity-exceptions', access.requirePermission('venue_booking.capacity_exception.approve'), handler(access, dependencies, async (database, principal, _req, respond) => {
+    const candidates = await database.pendingCapacityRequests(principal.role === 'event_organiser' ? principal.userId : undefined);
+    const requests = candidates.filter(row => row.status === 'pending'
+      && canSeeEvent(principal, row.event)
+      && row.event.expected_attendance !== null && row.event.expected_attendance > 0
+      && bookingReadiness(assessSuitability(row.event, row.venue), row.exceptions) === 'needs_capacity_exception')
+      .map(row => ({
+        request_id: row.request_id, event_id: row.event_id,
+        event_name: row.event.name?.trim() || 'Untitled event',
+        venue_name: row.venue.name.trim() || 'Unnamed venue',
+        starts_at: row.starts_at, ends_at: row.ends_at,
+        expected_attendance: row.event.expected_attendance, venue_capacity: row.venue.capacity
+      }));
+    respond(200, { requests });
+  }));
+
   async function load(database: VenueSuitabilityStore, principal: Principal, rawId: string, respond: Respond) {
     const requestId = parseId(rawId);
     if (requestId === null) {

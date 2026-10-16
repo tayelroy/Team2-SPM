@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AccessError, type Role } from '../../server/src/auth/policy';
+import { DRAFT_FIELDS, validateDraftInput } from '../../server/src/events/fields';
 
 // Synthetic fixtures only. This adapter deliberately does not emulate Postgres
 // constraints or RLS: the independent database-policy CI job owns that evidence.
@@ -125,6 +126,31 @@ export class MemoryDatabase {
     });
     const request = { event_id: 61, starts_at: '2030-06-17T02:00:00Z', ends_at: '2030-06-17T10:00:00Z', status: 'pending', notes: null };
     this.tables.venue_booking_requests.push({ ...request, request_id: 21, venue_id: 3 }, { ...request, request_id: 22, venue_id: 1 });
+  }
+
+  /** Capacity discovery includes only pending requests that still need an
+   * exception. The colleague shares an organisation but is a different owner. */
+  seedCapacityExceptions() {
+    this.seedVenueSuitability();
+    const event = this.tables.events.find(row => row.event_id === 61)!;
+    const request = this.tables.venue_booking_requests.find(row => row.request_id === 21)!;
+    this.tables.events.push(
+      { ...event, event_id: 62, name: 'Colleague Capacity Forum', organiser_id: 'user-colleague' },
+      { ...event, event_id: 63, name: 'Covered Capacity Forum' },
+      { ...event, event_id: 64, name: 'Withdrawn Capacity Forum' },
+      { ...event, event_id: 65, name: 'Adequate Capacity Forum', expected_attendance: 100 },
+      { ...event, event_id: 66, name: 'Unknown Attendance Forum', expected_attendance: null }
+    );
+    this.tables.venue_booking_requests.push(
+      { ...request, request_id: 23, event_id: 62, starts_at: '2030-06-18T02:00:00Z', ends_at: '2030-06-18T10:00:00Z' },
+      { ...request, request_id: 24, event_id: 63 },
+      { ...request, request_id: 25, event_id: 64, status: 'cancelled' },
+      { ...request, request_id: 26, event_id: 65 },
+      { ...request, request_id: 27, event_id: 66 }
+    );
+    this.tables.venue_capacity_exceptions.push({ exception_id: 1, request_id: 24,
+      approved_by: 'user-venue', approver_role: 'venue_staff', expected_attendance: 150,
+      venue_capacity: 120, approved_at: '2026-10-01T02:00:00Z' });
   }
 
   /** SG2-33/34: an unassigned submitted request, plus a second coordinator
@@ -343,7 +369,7 @@ export class MemoryDatabase {
       kind: 'event', item_id: event.event_id, event_id: event.event_id, title: event.name || 'Untitled event', event_name: event.name || 'Untitled event',
       status: event.status, starts_at: event.proposed_date, ends_at: this.eventEndsAt(event.event_id), audience: 'event_coordinator', assigned_to: event.coordinator_id,
       category: REVIEW_STATUSES.includes(String(event.status)) ? 'review' : 'assigned',
-      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed'].map(key => [key, event[key]])),
+      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'registration_capacity', 'registration_opens_at', 'registration_closes_at', 'planning_notes'].map(key => [key, event[key]])),
     } as Row));
     for (const [table, kind, resourceTable, resourceKey, audience] of [
       ['venue_booking_requests', 'venue', 'venues', 'venue_id', 'venue_staff'],
@@ -379,6 +405,32 @@ export class MemoryDatabase {
   }
 
   readonly client = {
+    // Test equivalent of the atomic draft-save RPC. Native integration tests
+    // exercise the real SQL lock, permissions and rollback independently.
+    rpc: async (name: string, args: { p_event_id: number; p_actor_id: string; p_values: unknown }) => {
+      if (name !== 'update_event_request_draft') throw new Error(`Unsupported fixture RPC: ${name}`);
+      const result = (data: Row) => ({ data, error: null });
+      const actor = this.tables.users.find(row => row.user_id === args.p_actor_id);
+      const role = this.tables.account_roles.find(row => row.user_id === args.p_actor_id)?.role;
+      const event = this.tables.events.find(row => row.event_id === args.p_event_id && row.organiser_id === args.p_actor_id);
+      if (!actor || role !== 'event_organiser' || !event || !actor.organisation || actor.organisation !== event.organisation) {
+        return result({ outcome: 'not_found' });
+      }
+      if (!['draft', 'needs_clarification'].includes(String(event.status))) return result({ outcome: 'not_editable' });
+      const validated = validateDraftInput(args.p_values);
+      if (!validated.valid) return result({ outcome: 'invalid' });
+      const serialized = (key: string, value: unknown) => value === null || value === undefined ? null
+        : key === 'proposed_date' ? new Date(String(value)).toISOString() : String(value);
+      const changed = DRAFT_FIELDS.filter(key => serialized(key, event[key]) !== serialized(key, validated.values[key]));
+      const createdAt = new Date().toISOString();
+      let logId = Math.max(0, ...this.tables.event_audit_logs.map(row => Number(row.log_id)));
+      const audit = changed.map(key => ({ log_id: ++logId, event_id: event.event_id, actor_id: args.p_actor_id,
+        field_name: key, old_value: serialized(key, event[key]), new_value: serialized(key, validated.values[key]), created_at: createdAt }));
+      Object.assign(event, validated.values);
+      this.tables.event_audit_logs.push(...audit);
+      const columns = ['event_id', 'organiser_id', 'organisation', 'status', ...DRAFT_FIELDS];
+      return result({ outcome: 'updated', request: Object.fromEntries(columns.map(key => [key, event[key] ?? null])) });
+    },
     from: (table: string) => {
       if (table === 'internal_work_items') this.tables[table] = this.workItems();
       if (table === 'venue_booking_occupancy') this.tables[table] = [
@@ -424,7 +476,17 @@ class MemoryQuery implements PromiseLike<QueryResult> {
 
   constructor(private database: MemoryDatabase, private table: string) {}
   select(columns = '*') { this.columns = columns; return this; }
-  eq(key: string, value: unknown) { this.filters.push(row => row[key] === value); return this; }
+  eq(key: string, value: unknown) {
+    this.filters.push(row => {
+      const [alias, field, extra] = key.split('.');
+      if (field === undefined) return row[key] === value;
+      if (extra !== undefined) throw new Error(`Unsupported fixture filter: ${key}`);
+      const related = this.relation(row, alias, alias === 'event' ? 'events' : alias === 'venue' ? 'venues' : '');
+      if (Array.isArray(related)) throw new Error(`Unsupported fixture array filter: ${key}`);
+      return related?.[field] === value;
+    });
+    return this;
+  }
   // A column a fixture row never set is undefined, not null — but Postgres
   // has no "undefined", so `.is(column, null)` has to match it too. A fresh
   // draft created through the API carries no coordinator_id key at all.
@@ -443,9 +505,64 @@ class MemoryQuery implements PromiseLike<QueryResult> {
   delete() { this.operation = 'delete'; return this; }
   maybeSingle() { this.single = true; return this; }
 
+  private columnsAtLevel(columns: string) {
+    const result: string[] = [];
+    let depth = 0, start = 0;
+    for (let index = 0; index < columns.length; index++) {
+      if (columns[index] === '(') depth++;
+      else if (columns[index] === ')') depth--;
+      else if (columns[index] === ',' && depth === 0) {
+        result.push(columns.slice(start, index).trim()); start = index + 1;
+      }
+      if (depth < 0) throw new Error('Unbalanced fixture projection');
+    }
+    if (depth !== 0) throw new Error('Unbalanced fixture projection');
+    result.push(columns.slice(start).trim());
+    return result;
+  }
+
+  private relation(row: Row, alias: string, table: string): Row | Row[] | null {
+    if (table === 'users' && ['coordinator', 'actor', 'sender', 'organiser'].includes(alias)) {
+      return this.database.tables.users.find(user => user.user_id === row[`${alias}_id`]) ?? null;
+    }
+    if (this.table === 'venue_booking_requests') {
+      if (alias === 'event' && table === 'events') return this.database.tables.events.find(event => event.event_id === row.event_id) ?? null;
+      if (alias === 'venue' && table === 'venues') return this.database.tables.venues.find(venue => venue.venue_id === row.venue_id) ?? null;
+      if (alias === 'exceptions' && table === 'venue_capacity_exceptions') {
+        return this.database.tables.venue_capacity_exceptions.filter(exception => exception.request_id === row.request_id);
+      }
+    }
+    throw new Error(`Unsupported fixture relation: ${alias}:${table}`);
+  }
+
+  private embed(column: string) {
+    return /^(\w+):(\w+)((?:!\w+)*)\((.*)\)$/.exec(column);
+  }
+
+  private project(row: Row, columns: string): Row {
+    if (columns === '*') return structuredClone(row);
+    return Object.fromEntries(this.columnsAtLevel(columns).map(column => {
+      const embed = this.embed(column);
+      if (embed) {
+        const [, alias, table, , fields] = embed;
+        const related = this.relation(row, alias, table);
+        return [alias, Array.isArray(related) ? related.map(item => this.project(item, fields)) : related ? this.project(related, fields) : null];
+      }
+      if (column.includes(':')) throw new Error(`Unsupported fixture projection: ${column}`);
+      return [column, structuredClone(row[column] ?? null)];
+    }));
+  }
+
   private execute(): QueryResult {
     const table = this.database.tables[this.table];
-    let rows = table.filter(row => this.filters.every(filter => filter(row)));
+    const inner = this.columnsAtLevel(this.columns).flatMap(column => {
+      const embed = this.embed(column);
+      return embed?.[3].split('!').includes('inner') ? [embed] : [];
+    });
+    let rows = table.filter(row => this.filters.every(filter => filter(row)) && inner.every(([, alias, target]) => {
+      const related = this.relation(row, alias, target);
+      return Array.isArray(related) ? related.length > 0 : related !== null;
+    }));
     if (this.operation === 'insert') {
       const incoming = Array.isArray(this.values) ? this.values : [this.values];
       const id = { events: 'event_id', venues: 'venue_id', venue_unavailability: 'unavailability_id',
@@ -456,6 +573,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         const row = structuredClone(value);
         if (id) row[id] = nextId++;
         if (['event_clarifications', 'event_audit_logs', 'notifications'].includes(this.table)) row.created_at ??= new Date().toISOString();
+        if (this.table === 'venue_capacity_exceptions') row.approved_at ??= new Date().toISOString();
         // SG2-68: event notices carry no venue request.
         if (this.table === 'notifications') row.request_id ??= null;
         // SG2-48: the column defaults a new venue request takes.
@@ -477,33 +595,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
       return 0;
     });
     if (this.window) rows = rows.slice(this.window[0], this.window[1] + 1);
-    const projected = rows.map(row => {
-      if (this.columns === '*') return structuredClone(row);
-      // Split on commas outside parentheses, so an embedded `(name, phone)`
-      // stays one column, and return the fields the embed asks for (SG2-97).
-      return Object.fromEntries(this.columns.split(/,(?![^(]*\))/).map(column => {
-        const key = column.trim();
-        const embed = /^(coordinator|actor|sender|organiser):users!\w+\(([^)]*)\)$/.exec(key);
-        if (embed) {
-          const [, alias, fields] = embed;
-          const user = this.database.tables.users.find(candidate => candidate.user_id === row[`${alias}_id`]);
-          return [alias, user ? Object.fromEntries(fields.split(',').map(field => [field.trim(), user[field.trim()] ?? null])) : null];
-        }
-        if (key.startsWith('coordinator:')) {
-          const coordinator = this.database.tables.users.find(user => user.user_id === row.coordinator_id);
-          return ['coordinator', coordinator ? { name: coordinator.name } : null];
-        }
-        if (key.startsWith('actor:')) {
-          const actor = this.database.tables.users.find(user => user.user_id === row.actor_id);
-          return ['actor', actor ? { name: actor.name } : null];
-        }
-        if (key.startsWith('sender:')) {
-          const sender = this.database.tables.users.find(user => user.user_id === row.sender_id);
-          return ['sender', sender ? { name: sender.name } : null];
-        }
-        return [key, structuredClone(row[key] ?? null)];
-      }));
-    });
+    const projected = rows.map(row => this.project(row, this.columns));
     if (this.single && projected.length > 1) throw new Error('Fixture query expected at most one row');
     return { data: this.single ? projected[0] ?? null : projected, error: null, status: 200 };
   }

@@ -307,3 +307,27 @@ test('[BOUNDARY] [SG2-49:AC1] [SG2-84:AC6] both inboxes failing shows both reaso
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load hold notifications. Could not load notifications.');
   expect(screen.queryByText('No notifications yet.')).not.toBeInTheDocument();
 });
+
+
+test.each(['Event Coordinator', 'Event Organiser'] as const)('[NORMAL] [CONFLICT] [SG2-81:AC1] [SG2-81:AC6] %s sees a real venue disruption warning without losing their existing inbox', async role => {
+  vi.mocked(notices.loadNotifications).mockRestore();
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [] });
+  const message = 'QA room is unavailable on 14 Nov: maintenance. Find a replacement venue; the event requirements are unchanged.';
+  const fetch = vi.fn(async () => Response.json({ notifications: [
+    { notification_id: 51, event_id: 20, request_id: null, kind: 'venue_unavailable', message, created_at: '2026-10-16T02:00:00.000Z' },
+    { notification_id: 50, event_id: 20, request_id: 14, kind: 'venue_request_approved', message: 'Original booking approved.', created_at: '2026-10-15T02:00:00.000Z' }
+  ] }));
+  vi.stubGlobal('fetch', fetch);
+  try {
+    render(<AppShell role={role} screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="recipient-token">Dashboard</AppShell>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Notifications (2)' }));
+    expect(screen.getByText('Venue unavailable')).toBeVisible();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.getByText('Venue request approved')).toBeVisible();
+    expect(screen.getByText('Original booking approved.')).toBeVisible();
+    expect(screen.getByText('16 Oct 2026, 10:00 SGT')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith('/api/notifications', { headers: { Authorization: 'Bearer recipient-token' }, cache: 'no-store' });
+    if (role === 'Event Organiser') expect(api.loadHoldNotifications).not.toHaveBeenCalled();
+  } finally { vi.unstubAllGlobals(); }
+});

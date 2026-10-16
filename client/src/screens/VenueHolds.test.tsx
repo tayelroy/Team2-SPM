@@ -94,10 +94,20 @@ test('[CONFLICT] [SG2-84:AC1,AC5] rapid repeats issue one placement or approval 
 test('[NORMAL] [SG2-84:AC5] approval updates only that hold to a confirmed booking and removes its actions', async () => {
   vi.mocked(changeHold).mockResolvedValue({ ok: true, data: { ...hold, status: 'converted', booking_id: 9 } });
   await open(); fireEvent.click(screen.getByRole('button', { name: 'Approve booking' }));
-  expect(await screen.findByText('Confirmed booking', { exact: true })).toBeInTheDocument();
+  expect(await screen.findByText('Converted to booking', { exact: true })).toBeInTheDocument();
   expect(screen.getByText('Booking #9')).toBeInTheDocument();
+  expect(screen.getByText("Check the venue booking record for its current status.")).toBeInTheDocument();
+  expect(screen.queryByText('Confirmed booking', { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Approve booking' })).not.toBeInTheDocument();
   expect(changeHold).toHaveBeenCalledWith('token', 7, 'convert');
+  // A converted hold remains a historical receipt after its booking is released.
+  // The hold API deliberately does not claim the booking's current live status.
+  vi.mocked(fetchHolds).mockResolvedValue({ ok: true, data: [{ ...hold, status: 'converted', booking_id: 9 }] });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Refresh' })); });
+  expect(fetchHolds).toHaveBeenCalledTimes(2);
+  expect(screen.getByText('Converted to booking', { exact: true })).toBeInTheDocument();
+  expect(screen.getByText('Booking #9')).toBeInTheDocument();
+  expect(screen.queryByText('Confirmed booking', { exact: true })).not.toBeInTheDocument();
 });
 
 test('[NORMAL] [SG2-84:AC5] release frees the period and retains the record', async () => {
@@ -113,6 +123,7 @@ test('[FAILURE] [SG2-85:AC3] a failed approval cannot display a confirmed bookin
   await open(); fireEvent.click(screen.getByRole('button', { name: 'Approve booking' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Hold expired. Create a new request.');
   expect(screen.getByText('Tentative', { exact: true })).toBeInTheDocument();
+  expect(screen.queryByText('Converted to booking', { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByText('Confirmed booking', { exact: true })).not.toBeInTheDocument();
 });
 
@@ -179,7 +190,7 @@ test('[CONFLICT] [SG2-84:AC5] deadline refresh waits for an in-flight approval a
   await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
   expect(fetchHolds).toHaveBeenCalledTimes(1);
   await act(async () => resolve({ ok: true, data: { ...hold, status: 'converted', booking_id: 19 } }));
-  expect(screen.getByText('Confirmed booking', { exact: true })).toBeInTheDocument();
+  expect(screen.getByText('Converted to booking', { exact: true })).toBeInTheDocument();
   expect(screen.getByText('Booking #19')).toBeInTheDocument();
 });
 

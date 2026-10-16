@@ -1,8 +1,10 @@
-# ConnectSphere architectural decisions and Week 7 change log — as of main 1d1e336 (14 Oct 2026)
+# ConnectSphere architectural decisions and Week 7 change log — as of PR90 head 61416cc (16 Oct 2026)
+
+Revision note: the original 14 Oct design described main `1d1e336`. This revision describes PR90 head `61416cc`, including merged PR92; it does not claim that PR90 is merged or that every Done criterion has passed hosted acceptance. Jira status was refreshed on 16 Oct 2026.
 
 SG2-95. This document has three parts:
 
-- **Part A** records the architecture decisions that are visible in the code on `main` today, as short ADRs.
+- **Part A** records the architecture decisions that are visible in the code at this snapshot today, as short ADRs.
 - **Part B** is the Week 7 change log for customer changes #1–#6.
 - **Part C** lists known limits.
 
@@ -23,7 +25,7 @@ The companion artefacts in `docs/design/` are:
 
 ## Part A — Architecture decisions (ADRs)
 
-Each ADR is **Accepted**, meaning it is in force on `main`.
+Each ADR is **Accepted**, meaning it is in force at this snapshot.
 
 ### ADR-01 Three tiers: React SPA, Express API, Supabase
 
@@ -156,7 +158,7 @@ Constraints act as a backstop below the RPCs:
 **Decision.** A single append-only table, `event_audit_logs`, stores one row per changed field: `event_id, actor_id, field_name, old_value, new_value, created_at`.
 
 - **Status changes** are rows with `field_name = 'status'` (`statusChange()`, `server/src/db/auditLogs.ts`).
-- **Who writes the rows.** Handlers write them through the service-role client after the main write. RPCs write them in the same transaction: venue decisions, holds, release, withdraw, confirm.
+- **Who writes the rows.** Some existing handlers write through the service-role client after the main write. RPCs write within the transaction for venue decisions, holds, release, withdraw and confirm. The SG2-40 draft-history repair adds `update_event_request_draft`: existing draft/clarification saves and all nine field diffs commit together. It locks and rechecks the verified creator, role, exact membership and editable status; only the service role may call it. Unchanged values create no history, and an audit failure rolls back the saved values. Earlier missing draft edits are not backfilled.
 - **System actions** have `actor_id = null`, for example hold expiry.
 - **Internal-only fields** (`INTERNAL_ONLY_AUDIT_FIELDS = ['planning_notes']`) are hidden from Event Organisers, both by the handler and by RLS.
 - **Venue settings** have their own history table: `venue_operation_history` is written only by a trigger (SG2-77 AC6, `202610050003_venue_operations.sql`).
@@ -164,9 +166,9 @@ Constraints act as a backstop below the RPCs:
 **Consequences.**
 
 - One history drawer covers every flow.
-- History written by a handler is not atomic with the change it records (Part C, item 1).
+- History still written separately by other handlers is not atomic with the change it records (Part C, item 1). The repaired draft-save RPC is an explicit exception; this change does not claim that every existing handler has been converted.
 
-**Where:** `supabase/migrations/202609240000_event_planning_and_audit.sql`, `202610130001_event_history_internal_fields.sql`, `server/src/db/auditLogs.ts`, `server/src/events/getHistory.ts`.
+**Where:** `supabase/migrations/202609240000_event_planning_and_audit.sql`, `202610130001_event_history_internal_fields.sql`, `202610170003_event_draft_change_history.sql`, `server/src/db/{auditLogs,eventRequests}.ts`, `server/src/events/{getHistory,updateDraft}.ts`.
 
 ### ADR-07 Notices are rows in a notifications table, which the client polls
 
@@ -219,16 +221,16 @@ The log follows the IS212 Managing Changes guide:
 
 The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 
-**Story status** is taken from Jira as given in the SG2-95 brief; built stories were checked against commits on `main`. Diagrams mark Week 7 additions `<<Week 7>>` (`#FFF4CC`) and work not yet built `<<planned>>` (dashed, `#DDDDDD`).
+**Story status** originally came from the SG2-95 brief and is refreshed against the 16 Oct 2026 Jira export for SG2-81/88/98. Implementation claims below describe PR90 head 61416cc, including PR92; status alone is not acceptance evidence. Diagrams mark Week 7 additions `<<Week 7>>` (`#FFF4CC`) and work not yet built `<<planned>>` (dashed, `#DDDDDD`).
 
 ### Summary
-| # | Change | Type | Built on `main` | «planned» (To Do) |
+| # | Change | Type | Built at this snapshot | «planned» (To Do) |
 |---|---|---|---|---|
 | 1 | Venue setup & turnaround time in availability and conflicts | New requirement that changes the existing conflict rule | SG2-77, SG2-78, SG2-79 | — |
-| 2 | Venue temporarily unavailable; replace it | Change to an existing requirement (supersedes SG2-45 AC2) + new requirement (replace) | SG2-80 | SG2-81 (replace), SG2-98 (SG2-80 remediation) |
+| 2 | Venue temporarily unavailable; replace it | Change to an existing requirement (supersedes SG2-45 AC2) + new requirement (replace) | SG2-80, SG2-81 (replace), SG2-98 (remediation) | — |
 | 3 | More than one venue per event | Clarification of an existing requirement (SG2-48 AC4 already allowed several requests) | SG2-82 | SG2-83 (change/cancel one venue) |
 | 4 | Tentative venue holds with expiry | New requirement (the legacy `held` booking status had no expiry or lifecycle) | SG2-84, SG2-85 | — |
-| 5 | Event Coordinator Lead assigns coordinators | Change to an existing requirement: the assigning role moves from TSS to a new role | SG2-86, SG2-87, SG2-90, SG2-97 | SG2-88, SG2-89 |
+| 5 | Event Coordinator Lead assigns coordinators | Change to an existing requirement: the assigning role moves from TSS to a new role | SG2-86, SG2-87, SG2-88, SG2-90, SG2-97 | SG2-89 |
 | 6 | Operational safety check by a Safety Officer | New requirement | SG2-86 (role), SG2-77 (venue safety details), SG2-100 (statuses) | SG2-91, SG2-92, SG2-93, SG2-94 (epic SG2-76) |
 
 ### Change #1 — Setup and turnaround time count towards availability and conflicts
@@ -264,26 +266,28 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 **§1 The change.**
 - Venue Staff can mark a venue unavailable for a period, choosing a reason category (maintenance, equipment failure, renovation, safety concern, other) and adding a note.
 - This is allowed even when confirmed bookings fall inside the period.
-- Those bookings are flagged as affected; neither the booking nor its event is changed.
-- Replacing the venue for affected events is part of the change, but is not yet built.
+- Those bookings are flagged as affected and retained. Since SG2-81, each new flag notifies the current Coordinator; Preparation/Confirmed events return to Planning, clear confirmation stamps, record history and notify the Organiser. Date, time, attendance and requirements remain unchanged; other stages stay unchanged.
+- An assigned Coordinator requests a replacement through the existing booking-request POST with `replaces_booking_id`. The reference must identify an affected confirmed booking of that event. Pending replacements reserve nothing.
+- Venue Staff approval atomically creates the new confirmed booking, releases the original booking/cancels its request, updates the primary booking pointer and writes history/notices. Failure rolls back. Rejection leaves the old booking intact.
+- `202610170002` is the final confirmation RPC: affected bookings and persisted venue/equipment/registration rechecks both prevent confirmation. Other ready arrangements do not erase a recheck flag.
 
 **Why** (`202610100001_venue_temporary_unavailability.sql`): the venue may genuinely be unusable. The old refusal (SG2-45 AC2) made it impossible to record that.
 
 **§2 Type.** A change to an existing requirement: SG2-45 AC2 is replaced, and the trigger `venue_unavailability_refuse_confirmed_overlap` is dropped. Replacing a venue is a new requirement.
 
 **Stories:**
-- **Built:** SG2-80.
-- **«planned»:** SG2-81, replace the venue. SG2-98, remediation of SG2-80.
+- **Built / Jira Done:** SG2-80, SG2-81 replacement and SG2-98 overlapping-unavailability remediation. SG2-98 AC1/AC4 are historical delivered context; AC2/AC3 cover retained blocks, removal and restored search.
+- **Separate planned work:** SG2-83 general change/cancellation of one venue, not the affected-booking replacement contract.
 
 **§5 Artefacts changed:**
 
 | Artefact | What changed |
 |---|---|
-| C4 | Venue Staff's description now includes marking a venue unavailable. The replacement flow is «planned». |
-| Class | VenueUnavailability gains `category`, `created_by`, `created_at`, and an association to the affected VenueBookings. Replacement is «planned». |
-| Data model | `venue_unavailability` gains `category`, `created_by` and `created_at`. New table `venue_booking_disruptions` and view `venue_affected_bookings` (`202610100001`). |
-| Sequence | Diagram 2 shows the venue marked unavailable, the bookings flagged, and the replacement «planned» (SG2-81). |
-| API | Changed: `GET`/`POST /api/venues/:venueId/blocks` (category, note, who/when, `affected[]`), and both availability endpoints (affected-booking label). No replace endpoint exists. |
+| C4 | Venue Staff marks unavailability; the built replacement responsibility extends existing booking routes and DB adapters. General SG2-83 stays planned. |
+| Class | VenueUnavailability links affected bookings; VenueBookingRequest optionally references the booking it replaces. No separate replacement entity is invented. |
+| Data model | `venue_unavailability` gains `category`, `created_by` and `created_at`. New table `venue_booking_disruptions` and view `venue_affected_bookings` (`202610100001`); replacement FK/partial index, notification kind and notify/reversion trigger (`202610170001`). |
+| Sequence | Diagram 2 shows new disruption notices/status reversion, replacement request and atomic approval/release, with combined confirmation gates. |
+| API | Changed: `GET`/`POST /api/venues/:venueId/blocks` (category, note, who/when, `affected[]`), and both availability endpoints (affected-booking label). Replacement extends existing `POST /api/venue-booking-requests` (`replaces_booking_id`) and its decision route; lists expose affected periods/pending replacement, and readiness counts affected bookings. No new replacement endpoint is added. |
 
 ### Change #3 — An event can have more than one venue
 
@@ -351,9 +355,9 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
   - SG2-87: the unassigned queue and `GET /api/assignment-queue`.
   - SG2-90: only the current assignee may act.
   - SG2-97: the permission moves to the Lead, and the Lead sees history.
+  - SG2-88: assignment/reassignment as Lead through the existing coordinator route (Done in the refreshed Jira snapshot).
   - Related: SG2-68 (the Lead is notified of submissions) and SG2-100 (`unassigned` status).
 - **«planned»:**
-  - SG2-88, assign or reassign as Lead. Main already supports both through `PATCH /api/event-requests/:eventId/coordinator`, and no code is tagged SG2-88; its remaining scope is not visible in the code.
   - SG2-89, oversight.
 
 **§5 Artefacts changed:**
@@ -395,7 +399,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 | State | Adds `planning → awaiting_safety_check → preparation \| safety_rejected → …` from `STATUS_TRANSITIONS`. Those transitions have no API trigger yet. |
 | API | New: `PATCH /api/event-requests/:eventId/complete`. Changed: `…/stage` and `…/history` (SO added), `GET /api/equipment-requests` and `GET /api/equipment-reservations` (SO read). There are no safety-check endpoints (api-specification §11). |
 
-### Also on `main` since Week 7 (not one of the six changes)
+### Also at this snapshot since Week 7 (not one of the six changes)
 
 These stories changed the same artefacts, so each artefact shows them as current, without the `<<Week 7>>` stereotype:
 
@@ -408,6 +412,13 @@ These stories changed the same artefacts, so each artefact shows them as current
 | SG2-48–SG2-54 | Venue requests, decisions, conflicts, release, and equipment records, requirements and availability |
 
 ---
+
+## Replacement revision sources (16 Oct 2026)
+
+- PR92 implemented SG2-81: `venues/bookingRequests.ts`, `db/venueBookings.ts`, `db/venueDisruptions.ts`, `202610170001_venue_replacement.sql`.
+- PR90 combines persisted planning rechecks with disruption checks in `202610170002_confirmation_rechecks_and_disruptions.sql`; additive `202610160005_event_confirmation_record_repair.sql` supplies confirmation columns without replacing that function.
+- Client/API/server notification contracts accept and render `venue_unavailable` at head 61416cc. New disruption flags notify once; flags predating the trigger are not announced retrospectively. Organiser warning is conditional on Preparation/Confirmed reverting to Planning.
+- The source model documents implemented contracts. Natural end-to-end entry into Preparation still depends on planned Safety stories; fixture verification is not a hosted full-lifecycle pass.
 
 ## Part C — Known limits
 
@@ -440,9 +451,8 @@ These stories changed the same artefacts, so each artefact shows them as current
 
     | Change | Stories |
     |---|---|
-    | #2 | SG2-81 (replace venue), SG2-98 (SG2-80 remediation) |
     | #3 | SG2-83 (change/cancel one venue) |
-    | #5 | SG2-88 (Lead assign/reassign: endpoint exists, remaining scope in Jira), SG2-89 (oversight) |
+    | #5 | SG2-89 (oversight) |
     | #6 | SG2-91, SG2-92, SG2-93, SG2-94 (safety check) |
 
     The diagrams draw these with dashed borders and grey `<<planned>>` styling, naming the story.

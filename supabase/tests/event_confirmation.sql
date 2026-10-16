@@ -372,9 +372,11 @@ reset role;
 update public.events set status='preparation' where event_id in (95891,95892);
 do $$
 begin
- if (select count(*) from public.venue_booking_requests
-     where event_id in (95891,95892) and status='approved' and venue_booking_id is null) <> 2 then
-  raise exception '[SG2-58:hold-requests-approved-unlinked] [SG2-58:AC2] [CONFLICT] Converted hold requests must stay approved without a direct booking link';
+ if not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id)
+      where r.event_id=95891 and r.status='approved' and r.venue_booking_id=h.booking_id)
+    or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id)
+      where r.event_id=95892 and r.status='cancelled' and r.venue_booking_id=h.booking_id) then
+  raise exception '[SG2-58:hold-requests-linked-and-released] [SG2-58:AC2] [CONFLICT] Converted requests must link to their booking and released requests must no longer remain required';
  end if;
 end $$;
 set local role authenticated;
@@ -401,6 +403,65 @@ begin
    or (select status from public.events where event_id=95891) <> 'confirmed' then
   raise exception '[SG2-58:unbooked-venue-no-side-effects] [SG2-58:AC2] [FAILURE] Refusing an unbooked venue must not confirm, audit or notify';
  end if;
+end $$;
+
+-- SG2-39: existing receipts do not settle a persisted planning-impact recheck.
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed,
+ registration_capacity,registration_opens_at,registration_closes_at,arrangements_recheck_needed,outstanding_arrangements)
+ select 95900+n,'d5800000-0000-4000-8000-000000000002','d5800000-0000-4000-8000-000000000003',
+  'Planning recheck event '||n,'preparation',true,20,'2049-10-01T00:00Z','2049-10-02T00:00Z',n<>5,
+  case n when 1 then '["venue_recheck"]'::jsonb when 2 then '["equipment_recheck"]'::jsonb
+   when 3 then '["registration_recheck"]'::jsonb
+   when 4 then '["registration_recheck","unknown","equipment_recheck","venue_recheck","venue_recheck"]'::jsonb
+   when 5 then '["venue_recheck","equipment_recheck","registration_recheck"]'::jsonb
+   when 6 then '[]'::jsonb when 7 then '["unknown_recheck"]'::jsonb
+   when 8 then 'null'::jsonb else '{"venue_recheck":true}'::jsonb end
+ from generate_series(1,9) n;
+do $$
+declare n integer; booking bigint;
+begin
+ for n in 1..9 loop
+  insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status)
+   values(95860,95900+n,'2050-11-01T09:00Z'::timestamptz+n*interval '1 day',
+    '2050-11-01T17:00Z'::timestamptz+n*interval '1 day','confirmed') returning booking_id into booking;
+  insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status,venue_booking_id)
+   values(95900+n,95860,'2050-11-01T09:00Z'::timestamptz+n*interval '1 day',
+    '2050-11-01T17:00Z'::timestamptz+n*interval '1 day','approved',booking);
+  insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,status,shortfall,placement_venue_id,placement_position)
+   values(95900+n,95900+n,95860,1,'approved',0,95860,'Stage left');
+  insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at)
+   values(95900+n,95860,1,'2050-11-01T09:00Z'::timestamptz+n*interval '1 day',
+    '2050-11-01T17:00Z'::timestamptz+n*interval '1 day',95900+n,'2049-10-01T00:00Z');
+ end loop;
+end $$;
+do $$
+declare n integer; result jsonb; expected jsonb; events_before jsonb; bookings_before jsonb; receipts_before jsonb;
+begin
+ select jsonb_agg(to_jsonb(e) order by event_id) into events_before from public.events e where event_id between 95901 and 95904;
+ select jsonb_agg(to_jsonb(b) order by booking_id) into bookings_before from public.venue_bookings b where event_id between 95901 and 95904;
+ select jsonb_agg(to_jsonb(r) order by reservation_id) into receipts_before from public.equipment_reservations r where event_id between 95901 and 95904;
+ perform set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+ for n in 1..4 loop
+  expected := case n when 1 then '["venue"]'::jsonb when 2 then '["equipment"]'::jsonb
+   when 3 then '["registration"]'::jsonb else '["venue","equipment","registration"]'::jsonb end;
+  result := public.confirm_event(95900+n);
+  if result is distinct from jsonb_build_object('outcome','outstanding','outstanding',expected) then
+   raise exception '[SG2-39:known-rechecks-block-confirmation] [SG2-39:AC2] [SG2-58:AC2] [CONFLICT] Known planning rechecks must block only their affected arrangements, once each in display order: %',result;
+  end if;
+ end loop;
+ if events_before is distinct from (select jsonb_agg(to_jsonb(e) order by event_id) from public.events e where event_id between 95901 and 95904)
+  or bookings_before is distinct from (select jsonb_agg(to_jsonb(b) order by booking_id) from public.venue_bookings b where event_id between 95901 and 95904)
+  or receipts_before is distinct from (select jsonb_agg(to_jsonb(r) order by reservation_id) from public.equipment_reservations r where event_id between 95901 and 95904)
+  or exists(select 1 from public.event_audit_logs where event_id between 95901 and 95904)
+  or exists(select 1 from public.notifications where event_id between 95901 and 95904) then
+  raise exception '[SG2-39:recheck-refusal-preserves-arrangements] [SG2-39:AC2] [SG2-58:AC2] [FAILURE] Refused rechecks must preserve the entire event, flags, bookings and receipts without auditing or notifying';
+ end if;
+ for n in 5..9 loop
+  result := public.confirm_event(95900+n);
+  if result->>'outcome' is distinct from 'ok' then
+   raise exception '[SG2-39:inactive-unknown-rechecks-compatible] [SG2-39:AC2] [SG2-58:AC1] [BOUNDARY] False flags or absent/unknown/malformed marker arrays must preserve ordinary readiness: %',result;
+  end if;
+ end loop;
 end $$;
 
 -- Hosted rows confirmed before SG2-58 keep a null record; halves are refused.

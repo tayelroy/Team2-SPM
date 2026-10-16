@@ -15,10 +15,10 @@ const textFits = (value: string) => Array.from(value.trim()).length <= 2000;
 const whole = (value: string, minimum: number, maximum: number) => /^\d+$/.test(value) && Number(value) >= minimum && Number(value) <= maximum;
 
 /** Each event and session owns its records, drafts and cancellable requests. */
-export default function EquipmentRequirements({ eventId, accessToken = null, canCheckAvailability = false, onReserved }: { eventId: number; accessToken?: string | null; canCheckAvailability?: boolean; onReserved?: (requestId: number) => void }) {
-  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} canCheckAvailability={canCheckAvailability} onReserved={onReserved} />;
+export default function EquipmentRequirements({ eventId, accessToken = null, canCheckAvailability = false, onReserved, onChanged, onViewUpdated }: { eventId: number; accessToken?: string | null; canCheckAvailability?: boolean; onReserved?: (requestId: number) => void; onChanged?: () => void; onViewUpdated?: (view: RequirementsView) => void }) {
+  return <Requirements key={`${eventId}:${accessToken}`} eventId={eventId} token={accessToken} canCheckAvailability={canCheckAvailability} onReserved={onReserved} onChanged={onChanged} onViewUpdated={onViewUpdated} />;
 }
-function Requirements({ eventId, token, canCheckAvailability, onReserved }: { eventId: number; token: string | null; canCheckAvailability: boolean; onReserved?: (requestId: number) => void }) {
+function Requirements({ eventId, token, canCheckAvailability, onReserved, onChanged, onViewUpdated }: { eventId: number; token: string | null; canCheckAvailability: boolean; onReserved?: (requestId: number) => void; onChanged?: () => void; onViewUpdated?: (view: RequirementsView) => void }) {
   const [view, setView] = useState<RequirementsView | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
   const [attempt, setAttempt] = useState(0);
@@ -29,12 +29,21 @@ function Requirements({ eventId, token, canCheckAvailability, onReserved }: { ev
   const [saved, setSaved] = useState('');
   const [reservedRequestIds, setReservedRequestIds] = useState<number[]>([]);
   const pending = useRef<AbortController | null>(null);
+  // Notify the current observer without making its identity a fetch trigger.
+  const viewObserver = useRef(onViewUpdated);
+  const changedObserver = useRef(onChanged);
+  useEffect(() => { viewObserver.current = onViewUpdated; changedObserver.current = onChanged; }, [onViewUpdated, onChanged]);
   useEffect(() => {
     if (!token) return;
     const controller = new AbortController();
     setLoading(true); setView(null); setError('');
     void loadEquipmentRequirements(eventId, token, controller.signal).then(result => {
-      if (!controller.signal.aborted) setView(result);
+      if (!controller.signal.aborted) {
+        setView(result); viewObserver.current?.(result);
+        // A successful explicit reload can reveal another user's arrangement
+        // changes. Initial load and local saves already have readiness reads.
+        if (attempt > 0) changedObserver.current?.();
+      }
     }).catch(failure => {
       if (!controller.signal.aborted) setError(failure instanceof EquipmentRequirementsError ? failure.message : 'Unable to load equipment requirements. Please try again.');
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -53,6 +62,8 @@ function Requirements({ eventId, token, canCheckAvailability, onReserved }: { ev
         : await saveEquipmentArrangement(eventId, token!, controller.signal, values as ArrangementValues, editor!.record!);
       if (controller.signal.aborted) return;
       setView(result); setSaved(editor!.kind === 'requirement' ? 'Equipment requirement saved.' : 'Equipment arrangement saved.'); setEditor(null);
+      viewObserver.current?.(result);
+      onChanged?.();
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (failure instanceof EquipmentRequirementsError && [401, 403, 404].includes(failure.status)) { setView(null); setEditor(null); }
@@ -100,6 +111,7 @@ function Requirements({ eventId, token, canCheckAvailability, onReserved }: { ev
         setReservedRequestIds(current => [...new Set([...current, requestId])]);
         setView({ ...view, requests: view.requests.map(record => record.request_id === requestId ? { ...record, status: 'approved', shortfall: 0, version: record.version + 1 } : record) });
         onReserved?.(requestId);
+        onChanged?.();
       }} /> : null}
   </section>;
 }

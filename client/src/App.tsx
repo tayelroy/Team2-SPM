@@ -9,6 +9,7 @@ import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import AssignmentQueue from './screens/AssignmentQueue';
+import CapacityExceptions from './screens/CapacityExceptions';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
@@ -242,6 +243,7 @@ export default function App() {
     ),
     calendar: <AvailabilityCalendar />,
     holds: <VenueHolds key={session!.accessToken} role={role} accessToken={session!.accessToken} />,
+    capacityExceptions: <CapacityExceptions key={session!.accessToken} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,

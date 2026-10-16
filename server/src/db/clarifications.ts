@@ -21,8 +21,6 @@ export type InsertClarificationResult =
 const SELECT_COLUMNS =
   'clarification_id, event_id, sender_id, message, created_at, sender:users!sender_id(name)';
 
-const INSERT_COLUMNS = 'clarification_id, event_id, sender_id, message, created_at';
-
 /** The join returns either an object or a single-element array depending on
  * how PostgREST resolves the relationship, so both shapes are handled. */
 function extractSenderName(row: Record<string, unknown>): string | null {
@@ -87,7 +85,7 @@ export async function insertClarification(
   const { data, error } = await admin
     .from('event_clarifications')
     .insert({ event_id: eventId, sender_id: senderId, message })
-    .select(INSERT_COLUMNS);
+    .select(SELECT_COLUMNS);
 
   if (error) {
     return { ok: false, reason: 'unavailable', message: error.message };

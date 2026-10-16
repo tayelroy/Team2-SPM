@@ -89,9 +89,10 @@ const SETTLED_STATUSES: Readonly<Record<string, true>> = {
  */
 export function eventActionLabel(event: EventProgressInput): string {
   if (!event.canManage) return 'View only';
-  if (event.waitingOnMe) return 'Waiting on you';
   const status = event.status.trim().toLowerCase();
+  if (status === 'rejected') return 'Contact coordinator';
   if (SETTLED_STATUSES[status] === true) return 'No action needed';
+  if (event.waitingOnMe) return 'Waiting on you';
   if (status === 'awaiting_safety_check') return 'With safety officer';
   if (status === 'unassigned' || !event.coordinatorId) return 'Awaiting coordinator assignment';
   return 'With coordinator';
@@ -120,6 +121,7 @@ const LOCKED_NOTICES: Readonly<Record<string, string>> = {
   confirmed: 'This event is confirmed. No action is needed from you.',
   completed: 'This event has been completed. No action is needed.',
   cancelled: 'This event has been cancelled. No action is needed.',
+  rejected: 'This request was rejected. Contact your coordinator to discuss revisions and resubmission. Changes after submission must go through your coordinator.',
 };
 
 /**

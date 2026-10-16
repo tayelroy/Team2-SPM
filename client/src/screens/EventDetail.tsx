@@ -228,11 +228,11 @@ export default function EventDetail({
 
     if (detail) {
       const badge = badgeStyle(detail.status);
-      const isLocked = !detail.waitingOnMe;
       const isRejected = detail.status.toLowerCase() === 'rejected';
       // SG2-36: the coordinator has asked a question and is waiting on the organiser.
       const needsClarification = detail.status.toLowerCase() === 'needs_clarification';
       const isTerminal = ['cancelled', 'completed', 'rejected'].includes(detail.status.toLowerCase());
+      const isLocked = isTerminal || !detail.waitingOnMe;
 
       const session = loadSession();
       const resolvedUserId = currentUserId ?? session?.user?.userId;
@@ -361,7 +361,7 @@ export default function EventDetail({
             {detail.description ? <p className="organisation-detail-description">{detail.description}</p> : null}
           </section>
           {/* SG2-37: a rejection always explains itself, so the organiser can
-              see what to change before resubmitting. */}
+              understand the decision and discuss revisions with the coordinator. */}
           {isRejected && detail.decisionReason ? (
             <section className="organisation-detail-intro" aria-label="Why this request was rejected">
               <h3>Why this was rejected</h3>
@@ -406,12 +406,6 @@ export default function EventDetail({
                   <div className="organisation-detail-notice" role="status" aria-label="Your coordinator has a question">
                     <strong>Your coordinator has a question</strong>
                     <p>Answer it in the conversation above, then edit the request if anything needs changing and resubmit it.</p>
-                  </div>
-                ) : null}
-                {isRejected && isOrganiser ? (
-                  <div className="organisation-detail-notice">
-                    <strong>Request returned for revision</strong>
-                    <p>This request was returned by your coordinator. Please review the details, make necessary amendments, and resubmit.</p>
                   </div>
                 ) : null}
                 {completeError ? (
@@ -464,9 +458,11 @@ export default function EventDetail({
                     : 'Awaiting assignment to coordinator.'
                 : !detail.canManage
                   ? 'Contact the request creator if this event needs updating.'
-                  : isLocked
-                    ? 'Your coordinator will be in touch if clarification is needed.'
-                    : 'You can edit and resubmit this request while it is with you.'}
+                  : isRejected
+                    ? 'The rejection reason and change history remain available.'
+                    : isLocked
+                      ? 'Your coordinator will be in touch if clarification is needed.'
+                      : 'You can edit and resubmit this request while it is with you.'}
             </p>
           </footer>
           {canEditPlanning && (

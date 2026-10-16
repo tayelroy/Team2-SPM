@@ -65,6 +65,9 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
     });
 
     test('[NORMAL] [SG2-40:AC2] humanizeFieldName translates snake_case fields into user-friendly labels', () => {
+      expect(humanizeFieldName('name')).toBe('Event Name');
+      expect(humanizeFieldName('purpose')).toBe('Purpose');
+      expect(humanizeFieldName('description')).toBe('Description');
       expect(humanizeFieldName('expected_attendance')).toBe('Expected Attendance');
       expect(humanizeFieldName('proposed_date')).toBe('Proposed Date');
       expect(humanizeFieldName('venue_requirements')).toBe('Venue Requirements');

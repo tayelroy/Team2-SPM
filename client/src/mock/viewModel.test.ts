@@ -331,7 +331,7 @@ describe('eventActionLabel (SG2-38, SG2-31)', () => {
     ['completed', 'No action needed'],
     ['cancelled', 'No action needed'],
     ['safety_rejected', 'No action needed'],
-    ['rejected', 'No action needed'],
+    ['rejected', 'Contact coordinator'],
   ])('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] an assigned %s request reads "%s"', (status, label) => {
     expect(eventActionLabel({ ...own, status })).toBe(label);
   });
@@ -339,6 +339,11 @@ describe('eventActionLabel (SG2-38, SG2-31)', () => {
   test('[NORMAL] [SG2-31:AC4] a request waiting on its organiser says so, whatever the coordinator', () => {
     expect(eventActionLabel({ ...own, status: 'needs_clarification', waitingOnMe: true })).toBe('Waiting on you');
     expect(eventActionLabel({ ...own, status: 'draft', coordinatorId: null, waitingOnMe: true })).toBe('Waiting on you');
+  });
+
+  test('[CONFLICT] [SG2-37:coordinator-led-revision] rejected requests direct revisions through the coordinator despite an obsolete waiting flag', () => {
+    expect(eventActionLabel({ ...own, status: ' REJECTED ', waitingOnMe: true })).toBe('Contact coordinator');
+    expect(lockedRequestNotice({ status: 'rejected', coordinatorId: null })).toContain('Contact your coordinator to discuss revisions and resubmission');
   });
 
   test('[BOUNDARY] [SG2-38:AC2] a request nobody has been assigned to is awaiting assignment, never with a coordinator', () => {
@@ -372,6 +377,7 @@ describe('lockedRequestNotice (SG2-38 AC3)', () => {
     ['confirmed', 'This event is confirmed. No action is needed from you.'],
     ['completed', 'This event has been completed. No action is needed.'],
     ['cancelled', 'This event has been cancelled. No action is needed.'],
+    ['rejected', 'This request was rejected. Contact your coordinator to discuss revisions and resubmission. Changes after submission must go through your coordinator.'],
   ])('[NORMAL] [SG2-38:AC3] an assigned %s request explains where it is', (status, notice) => {
     expect(lockedRequestNotice({ status, coordinatorId: 'coord-1' })).toBe(notice);
   });

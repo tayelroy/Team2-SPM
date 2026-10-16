@@ -159,12 +159,14 @@ export type FetchEventDetailResult =
  * Determines whether an event request is waiting on the organiser.
  *
  * Organisers must take action when a request is in `draft` (initial entry)
- * or `rejected` (needs revision). Other states (submitted, under_review,
+ * or `needs_clarification` (a coordinator has requested amendments).
+ * Rejected requests require coordinator-led revision (Week 9 clarification);
+ * other states (submitted, under_review,
  * confirmed, etc.) are locked or awaiting coordinator/system action.
  */
 export function isWaitingOnOrganiser(status: string): boolean {
   const normalized = status.trim().toLowerCase();
-  return normalized === 'draft' || normalized === 'rejected' || normalized === 'needs_clarification';
+  return normalized === 'draft' || normalized === 'needs_clarification';
 }
 
 function mapEventRequestSummary(raw: Record<string, unknown>): EventRequestSummary {
@@ -215,7 +217,8 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
 }
 
 /**
- * Transitions an event request from `draft` (or `rejected`) → `submitted` (SG2-30).
+ * Submits an eligible event request for review (SG2-30).
+ * Rejected-request revisions must be coordinated with the Event Coordinator.
  *
  * Maps to `PATCH /api/event-requests/:eventId/submit`.
  *
@@ -903,7 +906,7 @@ export async function fetchAssignable(token: string): Promise<FetchAssignableRes
   };
 }
 
-export type AssignCoordinatorOutcome = { ok: true } | { ok: false; message: string };
+export type AssignCoordinatorOutcome = { ok: true; status?: string } | { ok: false; message: string };
 
 /**
  * Assigns (SG2-33) or reassigns (SG2-34) an event's coordinator. Maps to
@@ -926,7 +929,16 @@ export async function assignCoordinator(
     return unavailable;
   }
 
-  if (response.ok) return { ok: true };
+  if (response.ok) {
+    const data = await readEventRequestJson(response, null);
+    const status = data?.request?.status;
+    // Mirror the server's live assignable states. An absent or invalid status
+    // preserves the caller's existing state instead of inventing a transition.
+    return typeof status === 'string' && [
+      'unassigned', 'submitted', 'under_review', 'approved', 'planning',
+      'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed',
+    ].includes(status) ? { ok: true, status } : { ok: true };
+  }
   if (response.status === 401 || response.status === 403) {
     return { ok: false, message: 'Only the Event Coordinator Lead can assign a coordinator. Sign in again.' };
   }

@@ -673,6 +673,18 @@
       }
     },
     {
+      "id": "SG2-71",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-71",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-15",
+      "acceptanceCriteria": {
+        "AC1": "Event list, event detail, venue availability, equipment and registration screens are readable and usable on a phone-sized screen without sideways scrolling",
+        "AC2": "Event Organisers can create, save, reopen, edit and submit their event requests on a phone without sideways scrolling",
+        "AC3": "Layouts adapt on larger screens rather than stretching",
+        "AC4": "Controls can be operated by touch"
+      }
+    },
+    {
       "id": "SG2-88",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-88",
       "originalPullRequests": [],
@@ -688,7 +700,7 @@
     {
       "id": "SG2-81",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-81",
-      "originalPullRequests": [],
+      "originalPullRequests": ["https://github.com/tayelroy/Team2-SPM/pull/92"],
       "sourceReadDate": "2026-10-15",
       "acceptanceCriteria": {
         "AC1": "Given a booking for an event I coordinate that is affected by venue unavailability, I am notified with the venue, the period and the reason",

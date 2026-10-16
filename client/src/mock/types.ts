@@ -27,6 +27,7 @@ export type Screen =
   | 'venues'
   | 'calendar'
   | 'holds'
+  | 'capacityExceptions'
   | 'equipment'
   | 'attendee'
   | 'change'

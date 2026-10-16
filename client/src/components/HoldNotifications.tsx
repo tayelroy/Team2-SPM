@@ -14,6 +14,7 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   venue_booking_released: 'Venue booking released',
   // SG2-79: a booking now clashes once setup and turnaround apply.
   venue_booking_clash: 'Booking clash flagged',
+  venue_unavailable: 'Venue unavailable',
   equipment_reserved: 'Equipment reserved',
   // SG2-58: the organiser's event was confirmed by its coordinator.
   event_confirmed: 'Event confirmed',
@@ -29,6 +30,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   venue_request_approved: color.accent, venue_request_rejected: color.silver,
   venue_booking_released: color.silver,
   venue_booking_clash: color.silver,
+  venue_unavailable: color.silver,
   equipment_reserved: color.accent,
   event_confirmed: color.accent,
   event_submitted: color.accent,

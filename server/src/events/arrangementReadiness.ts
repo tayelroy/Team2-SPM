@@ -16,8 +16,9 @@ import type {
  * `confirm_event` RPC applies the same three rules in SQL as its gate, so the
  * panel and the Confirm action never disagree; any change here must be made
  * there too (supabase/migrations/202610150001_event_confirmation.sql, whose
- * venue rule SG2-82 replaced in 202610150003_confirm_event_rejected_venues.sql
- * and SG2-81 extended in 202610170001_venue_replacement.sql).
+ * venue rule SG2-82 replaced in 202610150003_confirm_event_rejected_venues.sql.
+ * 202610170002_confirmation_rechecks_and_disruptions.sql combines persisted
+ * planning rechecks with SG2-81's affected-booking guard).
  */
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
@@ -40,6 +41,9 @@ export interface ArrangementReadinessInput {
   /** SG2-81 AC2: confirmed bookings a venue's unavailability affects. */
   affected_bookings?: number;
   equipment_requests: EquipmentRequestArrangementRow[];
+  /** Persisted SG2-39 impacts; absent/null values preserve legacy readiness. */
+  arrangements_recheck_needed?: boolean | null;
+  outstanding_arrangements?: string[] | null;
 }
 
 export interface ArrangementReadinessResult {
@@ -239,7 +243,10 @@ export function computeArrangementReadiness(
     computeVenue(input.venue_requests, input.affected_bookings ?? 0),
     computeEquipment(input.equipment_requests),
     computeRegistration(input)
-  ];
+  ].map(arrangement => input.arrangements_recheck_needed === true
+    && input.outstanding_arrangements?.includes(`${arrangement.key}_recheck`)
+    ? { ...arrangement, state: 'outstanding', detail: `${arrangement.detail} Recheck required after planning changes.` }
+    : arrangement);
 
   const outstanding = arrangements
     .filter(arrangement => arrangement.state === 'outstanding')

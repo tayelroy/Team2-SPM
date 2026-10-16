@@ -117,12 +117,26 @@ describe('EventStageTracker (SG2-38)', () => {
 
     expect(screen.getByTestId('stage-badge')).toHaveTextContent('Confirmed');
     expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent(
-      'None (Planning completed)',
+      'No active next step',
     );
     expect(screen.getByTestId('waiting-on-action')).toHaveTextContent(
-      'No further actions pending. All lifecycle requirements are satisfied.',
+      'Event confirmed; all arrangements and reservations finalized.',
     );
     expect(screen.queryByText('Arrangements Recheck Needed')).not.toBeInTheDocument();
+  });
+
+  test.each([
+    ['cancelled', 'Cancelled', 'Event cancelled.'],
+    ['completed', 'Completed', 'Event successfully concluded.'],
+    ['rejected', 'Rejected', 'Event request was not approved.'],
+    ['on_hold', 'On_hold', 'Event is currently on_hold.'],
+  ])('[BOUNDARY] [SG2-38:AC1] [SG2-38:AC3] a %s stage without a next actor uses its actual description rather than claiming planning completed', (raw_status, name, description) => {
+    render(<EventStageTracker stage={{ ...mockPlanningStage, raw_status, stage: name, stage_key: raw_status, description, waiting_on: null }} />);
+    expect(screen.getByTestId('stage-badge')).toHaveTextContent(name);
+    expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('No active next step');
+    expect(screen.getByTestId('waiting-on-action')).toHaveTextContent(description);
+    expect(screen.queryByText('None (Planning completed)')).not.toBeInTheDocument();
+    expect(screen.queryByText('No further actions pending. All lifecycle requirements are satisfied.')).not.toBeInTheDocument();
   });
 });
 
@@ -193,7 +207,7 @@ describe('EventStageTracker at seven steps (SG2-100 AC9)', () => {
     }
   });
 
-  test('[FAILURE] [SG2-100:AC5] a stage with nobody waiting on it renders without a responsibility card', () => {
+  test('[FAILURE] [SG2-100:AC5] a failed safety check is never described as completed planning', () => {
     render(
       <EventStageTracker
         stage={{
@@ -208,6 +222,9 @@ describe('EventStageTracker at seven steps (SG2-100 AC9)', () => {
     );
     expect(screen.getByTestId('stage-badge')).toHaveTextContent('Safety Rejected');
     expect(screen.getAllByRole('listitem')).toHaveLength(7);
+    expect(screen.getByTestId('waiting-on-persona')).toHaveTextContent('No active next step');
+    expect(screen.getByTestId('waiting-on-action')).toHaveTextContent('The operational safety check was not passed.');
+    expect(screen.queryByText('No further actions pending. All lifecycle requirements are satisfied.')).not.toBeInTheDocument();
   });
 
   test('[CONFLICT] [SG2-100:AC5] an empty stepper payload renders nothing rather than throwing', () => {

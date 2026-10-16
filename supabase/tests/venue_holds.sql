@@ -128,7 +128,7 @@ begin
  perform public.process_venue_hold_deadlines();
  if (select status from public.venue_holds where hold_id = current_setting('holds.convert')::bigint) <> 'converted'
   or not exists(select 1 from public.venue_bookings where event_id = 98401 and status = 'confirmed')
-  or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id) where h.hold_id = current_setting('holds.convert')::bigint and r.status = 'approved')
+  or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id) where h.hold_id = current_setting('holds.convert')::bigint and r.status = 'approved' and r.venue_booking_id = h.booking_id)
   then raise exception '[SG2-84:converted-booking-missing-or-timer-changed-it] [NORMAL] [SG2-84:AC5] converted booking missing or timer changed it'; end if;
  if (select status from public.events where event_id = 98401) <> 'planning' then raise exception '[SG2-84:venue-approval-falsely-confirmed-event] [FAILURE] [SG2-84:AC4] venue approval falsely confirmed event'; end if;
 end;
@@ -438,4 +438,101 @@ begin
   then raise exception '[SG2-85:warning-notice-retry-records-once] [NORMAL] [SG2-85:AC4] Retried warning failed to set its marker or was delivered more than once'; end if;
 end;
 $$;
+-- A converted hold follows the ordinary request/booking release lifecycle.
+-- Preserve a second confirmed venue so release cannot leave a phantom demand.
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,expected_attendance,registration_needed) values
+ (98404,'d8400000-0000-4000-8000-000000000003','d8400000-0000-4000-8000-000000000002','Hold release round-trip','planning',10,false);
+insert into public.venue_bookings(booking_id,venue_id,event_id,starts_at,ends_at,status) values
+ (98404,98401,98404,now()+interval '100 days',now()+interval '100 days 1 hour','confirmed');
+insert into public.venue_booking_requests(request_id,event_id,venue_id,starts_at,ends_at,status,venue_booking_id) values
+ (98404,98404,98401,now()+interval '100 days',now()+interval '100 days 1 hour','approved',98404);
+update public.events set venue_booking_id=98404 where event_id=98404;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+do $$
+declare placed jsonb; converted jsonb;
+begin
+ placed := public.create_venue_hold(98404,98402,now()+interval '101 days',now()+interval '101 days 1 hour',clock_timestamp()+interval '2 days');
+ converted := public.change_venue_hold((placed#>>'{hold,hold_id}')::bigint,'convert');
+ if placed->>'outcome' is distinct from 'created' or converted->>'outcome' is distinct from 'updated' then
+  raise exception '[SG2-84:linked-conversion-fixture] [SG2-84:AC5] [NORMAL] The disposable round-trip hold must convert: % %',placed,converted;
+ end if;
+ perform set_config('holds.release_round_trip',converted#>>'{hold,hold_id}',true);
+ perform set_config('holds.release_booking',converted#>>'{hold,booking_id}',true);
+end $$;
+reset role;
+do $$
+begin
+ if not exists(select 1 from public.venue_holds h join public.venue_booking_requests r using(request_id)
+   where h.hold_id=current_setting('holds.release_round_trip')::bigint and h.status='converted'
+    and r.status='approved' and r.venue_booking_id=h.booking_id)
+   or (select venue_booking_id from public.events where event_id=98404) is distinct from current_setting('holds.release_booking')::bigint then
+  raise exception '[SG2-84:conversion-records-canonical-booking] [SG2-84:AC5] [NORMAL] Hold and approved request must reference the same newly confirmed booking';
+ end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000004',true);
+do $$
+begin
+ if public.release_venue_booking(current_setting('holds.release_booking')::bigint,'Not assigned')->>'outcome' is distinct from 'missing' then
+  raise exception '[SG2-51:hold-booking-unassigned-release-refused] [SG2-51:AC1] [FAILURE] A different coordinator must not release a converted hold booking';
+ end if;
+end $$;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+do $$
+begin
+ if public.release_venue_booking(current_setting('holds.release_booking')::bigint,'  ')->>'outcome' is distinct from 'invalid' then
+  raise exception '[SG2-51:hold-booking-release-reason-required] [SG2-51:AC1] [BOUNDARY] A converted hold booking still requires a release reason';
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if not exists(select 1 from public.venue_holds h join public.venue_booking_requests r using(request_id)
+    join public.venue_bookings b on b.booking_id=h.booking_id
+    where h.hold_id=current_setting('holds.release_round_trip')::bigint and r.status='approved' and b.status='confirmed')
+    or exists(select 1 from public.event_audit_logs where event_id=98404 and field_name='venue_booking') then
+  raise exception '[SG2-51:hold-release-refusal-no-side-effects] [SG2-51:AC1] [FAILURE] Refused releases must preserve the request, booking and release audit';
+ end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+do $$
+begin
+ if public.release_venue_booking(current_setting('holds.release_booking')::bigint,'QA hold conversion cleanup')->>'outcome' is distinct from 'released' then
+  raise exception '[SG2-51:converted-hold-booking-released] [SG2-51:AC1] [SG2-84:AC5] [NORMAL] Venue Staff must release the converted booking through the normal reasoned release';
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if not exists(select 1 from public.venue_holds h join public.venue_booking_requests r using(request_id)
+   join public.venue_bookings b on b.booking_id=h.booking_id
+   where h.hold_id=current_setting('holds.release_round_trip')::bigint and h.status='converted'
+    and r.status='cancelled' and r.venue_booking_id=b.booking_id and b.status='cancelled'
+    and b.cancelled_by='d8400000-0000-4000-8000-000000000001' and b.cancelled_at is not null
+    and b.cancellation_reason='QA hold conversion cleanup') then
+  raise exception '[SG2-51:released-hold-request-no-longer-required] [SG2-51:AC2] [SG2-84:AC5] [NORMAL] Releasing a converted booking must cancel its request while retaining the hold, booking and real release metadata';
+ end if;
+ if (select status from public.venue_bookings where booking_id=98404) is distinct from 'confirmed'
+    or (select status from public.venue_booking_requests where request_id=98404) is distinct from 'approved'
+    or (select venue_booking_id from public.events where event_id=98404) is distinct from 98404::bigint then
+  raise exception '[SG2-51:hold-release-keeps-original-booking] [SG2-51:AC3] [NORMAL] The original venue and request must remain live and become the event primary booking again';
+ end if;
+ if (select count(*) from public.event_audit_logs where event_id=98404 and field_name='venue_booking'
+      and actor_id='d8400000-0000-4000-8000-000000000001' and new_value like '%QA hold conversion cleanup') <> 1
+    or (select count(*) from public.notifications where event_id=98404 and kind='venue_booking_released') <> 2 then
+  raise exception '[SG2-51:hold-release-history-and-notices] [SG2-51:AC4] [SG2-51:AC5] [NORMAL] Real release must retain one actor/reason history entry and notify the coordinator and organiser';
+ end if;
+end $$;
+update public.events set status='preparation' where event_id=98404;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000002',true);
+do $$
+begin
+ if public.confirm_event(98404)->>'outcome' is distinct from 'ok' then
+  raise exception '[SG2-58:released-extra-hold-does-not-block-confirmation] [SG2-58:AC1] [SG2-51:AC3] [NORMAL] A released extra hold request must not block confirmation when the original venue remains booked and all required arrangements are ready';
+ end if;
+end $$;
+reset role;
 rollback;

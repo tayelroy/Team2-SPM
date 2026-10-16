@@ -1,12 +1,12 @@
 /*
  * ConnectSphere C4 model (C1 context, C2 containers, C3 API components).
- * As of main 1d1e336 (14 Oct 2026). Every element is traced to its source file
+ * As of PR90 head 61416cc (16 Oct 2026). Every element is traced to its source file
  * in docs/design/c4-notes.md, which also has the export/render commands.
  *
  * Tags: "Week 7" = added for the Week 7 customer changes (built);
  *       "Planned" = not built yet, the description names the Jira story.
  */
-workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as of main 1d1e336 (14 Oct 2026)" {
+workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as of PR90 head 61416cc (16 Oct 2026)" {
 
     model {
         # Roles: ROLES in server/src/auth/policy.ts. Full per-role capability list (PERMISSIONS + screens): c4-notes.md.
@@ -56,7 +56,11 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
                 safetyCheck = component "Safety check review" "Planned SG2-91/92/93/94: Safety Officer passes, rejects or requests changes for events awaiting_safety_check. Statuses exist (SG2-100); no route or writer yet." "not built" {
                     tags "Planned"
                 }
-                venueReplacement = component "Venue replacement" "Planned SG2-81 (replace an unavailable venue) and SG2-83 (change or cancel one venue of several). Not built." "not built" {
+                venueReplacement = component "Venue replacement (existing booking routes)" "SG2-81: affected bookings/readiness; POST /api/venue-booking-requests with replaces_booking_id; existing decision RPC atomically approves the new booking and releases the old one." "venues/bookingRequests.ts, db/venueDisruptions.ts, db/venueBookings.ts" {
+                    tags "Week 7"
+                }
+
+                venueChange = component "Change/cancel one venue" "Planned SG2-83 general change/cancellation flow; distinct from built SG2-81 replacement of an unavailable booking." "not built" {
                     tags "Planned"
                 }
 
@@ -67,7 +71,7 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
             group "Supabase project (managed)" {
                 supabaseAuth = container "Supabase Auth" "Email/password sign-in; issues and verifies the JWT access token. Accounts are pre-seeded (no self-registration)." "Supabase Auth (GoTrue)"
                 rls = container "Row Level Security" "Policies on public tables limit an authenticated caller to rows their role may see or change (defence in depth behind the API's checks)." "PostgreSQL RLS policies"
-                rpcs = container "SECURITY DEFINER RPCs & triggers" "Concurrency-sensitive writes lock rows and recheck the caller's role: decide/withdraw/release bookings, holds, confirm_event, equipment requirements/reservations; triggers flag disruptions and clashes." "PL/pgSQL functions"
+                rpcs = container "SECURITY DEFINER RPCs & triggers" "Concurrency-sensitive writes lock rows and recheck the caller's role: decide/withdraw/release bookings, holds, confirm_event, equipment requirements/reservations; disruption triggers notify and return Preparation/Confirmed to Planning; confirmation rechecks persisted flags and affected bookings (202610170002)." "PL/pgSQL functions"
                 database = container "Postgres tables" "public schema: events, venues, venue_booking_requests, venue_bookings, venue_holds, venue_unavailability, venue_operations, equipment, notifications, event_audit_logs, account_roles, ..." "PostgreSQL (Supabase)" {
                     tags "Database"
                 }
@@ -108,7 +112,8 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
             authMiddleware -> safetyCheck "SG2-91/92" {
                 tags "Planned"
             }
-            authMiddleware -> venueReplacement "SG2-81/83" {
+            authMiddleware -> venueReplacement "Existing booking permissions (SG2-81)"
+            authMiddleware -> venueChange "SG2-83" {
                 tags "Planned"
             }
 
@@ -122,6 +127,8 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
             venueHolds -> userScopedDb "Hold RPCs"
             venueBooking -> userScopedDb "decide / withdraw / release RPCs"
             venueBooking -> serviceRoleDb "Requests, conflicts, booking lists"
+            venueReplacement -> serviceRoleDb "Affected bookings, replacement requests, readiness"
+            venueReplacement -> userScopedDb "Existing decide_venue_booking_request RPC"
             venueClashes -> serviceRoleDb "venue_booking_clashes"
             equipment -> userScopedDb "Equipment tables and RPCs"
             personal -> userScopedDb "Own notifications"
@@ -178,13 +185,13 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
         }
 
         systemContext connectSphere "C1_Context" {
-            title "C1 System Context - ConnectSphere, as of main 1d1e336 (14 Oct 2026)"
+            title "C1 System Context - ConnectSphere, as of PR90 head 61416cc (16 Oct 2026)"
             include *
             autoLayout tb
         }
 
         container connectSphere "C2_Containers" {
-            title "C2 Containers - ConnectSphere, as of main 1d1e336 (14 Oct 2026)"
+            title "C2 Containers - ConnectSphere, as of PR90 head 61416cc (16 Oct 2026)"
             include *
             autoLayout lr
         }
@@ -193,13 +200,13 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
         # Pages 2-4 omit the middleware's account_roles read (shown on page 1); with it,
         # the smetana layout pushes elements into the title.
         component apiApplication "C3_API_Components" {
-            title "C3 Components (1/4) - API Application: request pipeline and auth - as of main 1d1e336 (14 Oct 2026)"
+            title "C3 Components (1/4) - API Application: request pipeline and auth - as of PR90 head 61416cc (16 Oct 2026)"
             include webApplication authRoutes authMiddleware policy serviceRoleDb supabaseAuth rls database
             autoLayout lr
         }
 
         component apiApplication "C3_API_Components_Events" {
-            title "C3 Components (2/4) - API Application: events, assignment, safety - as of main 1d1e336 (14 Oct 2026)"
+            title "C3 Components (2/4) - API Application: events, assignment, safety - as of PR90 head 61416cc (16 Oct 2026)"
             include webApplication authMiddleware eventHandlers assignment personal safetyCheck
             include userScopedDb serviceRoleDb rls rpcs database
             exclude "authMiddleware -> rls"
@@ -207,7 +214,7 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
         }
 
         component apiApplication "C3_API_Components_Venues" {
-            title "C3 Components (3/4) - API Application: venues, unavailability, holds - as of main 1d1e336 (14 Oct 2026)"
+            title "C3 Components (3/4) - API Application: venues, unavailability, holds - as of PR90 head 61416cc (16 Oct 2026)"
             include webApplication authMiddleware venueCatalogue venueOperations venueBlocks venueHolds
             include userScopedDb serviceRoleDb rls rpcs database holdCron
             exclude "authMiddleware -> rls"
@@ -215,8 +222,8 @@ workspace "ConnectSphere" "Event Planning & Venue Booking System - C4 model as o
         }
 
         component apiApplication "C3_API_Components_Bookings" {
-            title "C3 Components (4/4) - API Application: venue bookings, clashes, equipment - as of main 1d1e336 (14 Oct 2026)"
-            include webApplication authMiddleware venueBooking venueClashes venueReplacement equipment
+            title "C3 Components (4/4) - API Application: venue bookings, clashes, equipment - as of PR90 head 61416cc (16 Oct 2026)"
+            include webApplication authMiddleware venueBooking venueClashes venueReplacement venueChange equipment
             include userScopedDb serviceRoleDb rls rpcs database
             exclude "authMiddleware -> rls"
             autoLayout lr

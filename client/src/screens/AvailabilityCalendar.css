@@ -1,0 +1,25 @@
+.availability-day-hint { margin: 0; color: #bbc7c6; font-size: 14px; line-height: 1.5; }
+.availability-weekdays, .availability-month-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 10px; }
+.availability-weekdays > span { font-size: 10px; font-weight: 500; letter-spacing: .15em; text-transform: uppercase; color: #bbc7c6; text-align: center; }
+.availability-day { min-height: 96px; min-width: 0; padding: 10px; border: 1px solid; border-radius: 6px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; text-align: left; color: #edfffe; cursor: pointer; }
+.availability-day-number { font-size: 12px; color: #bbc7c6; }
+.availability-cell-items { display: contents; }
+.availability-cell-items > span { font-size: 11px; line-height: 1.3; letter-spacing: .02em; overflow-wrap: anywhere; }
+.availability-day-marker { display: none; }
+.availability-day[aria-pressed="true"] { outline: 2px solid #cbfffc; outline-offset: 1px; }
+.availability-day-blank { cursor: default; }
+.availability-day-details { min-width: 0; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.15); overflow-wrap: anywhere; }
+.availability-day-details h3 { margin: 0 0 16px; font-size: 18px; font-weight: 500; color: #edfffe; }
+.availability-day-details p { margin: 0; color: #bbc7c6; line-height: 1.5; }
+.availability-day-details ul { display: grid; gap: 16px; padding: 0; margin: 0; list-style: none; }
+.availability-day-details li { display: grid; gap: 6px; min-width: 0; }
+.availability-day-details strong { color: #edfffe; font-size: 15px; font-weight: 500; }
+.availability-day-details li > span { color: #bbc7c6; font-size: 13px; line-height: 1.5; }
+@media (max-width: 600px) {
+  .availability-weekdays, .availability-month-grid { gap: 4px; }
+  .availability-weekdays > span { font-size: 9px; letter-spacing: 0; }
+  .availability-day { min-height: 52px; padding: 7px 2px; gap: 5px; align-items: center; text-align: center; }
+  .availability-day-number { font-size: 14px; }
+  .availability-cell-items { display: none; }
+  .availability-day-marker { display: block; font-size: 9px; line-height: 1; }
+}

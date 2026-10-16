@@ -70,7 +70,7 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     );
   });
 
-  test('[NORMAL] [SG2-34:AC1] reassigns a request to a different coordinator (SG2-34)', async () => {
+  test('[NORMAL] [SG2-34:AC1] [SG2-100:AC3] reassigns a request to a different coordinator (SG2-34)', async () => {
     api();
     render(<CoordinatorAssignment accessToken="tok" />);
     await screen.findByRole('heading', { name: 'Partner Forum' });
@@ -82,6 +82,55 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
 
     expect(await screen.findByText('Assigned to Raj Coordinator.')).toBeInTheDocument();
     expect(screen.getByText('Coordinator: Raj Coordinator')).toBeInTheDocument();
+    // Older/incomplete success bodies carry no status: preserve the known stage.
+    expect(screen.getByText('Under Review', { exact: true })).toBeVisible();
+  });
+
+  test('[NORMAL] [BOUNDARY] [SG2-100:AC3] first assignment displays the recorded Submitted status only after the save succeeds', async () => {
+    let finish!: (response: Response) => void;
+    api(() => Response.json({ requests: [{ ...REQUESTS[0], status: 'unassigned' }], coordinators: COORDINATORS }),
+      () => new Promise<Response>(resolve => { finish = resolve; }));
+    render(<CoordinatorAssignment accessToken="tok" />);
+    await screen.findByText('Awaiting Assignment');
+    fireEvent.change(screen.getByLabelText('Coordinator for Partner Forum'), { target: { value: 'c2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
+    expect(screen.getByText('Awaiting Assignment')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    await act(async () => finish(Response.json({ request: { event_id: 7, status: 'submitted', coordinator_id: 'c2' } })));
+    expect(await screen.findByText('Assigned to Raj Coordinator.')).toBeVisible();
+    expect(screen.getByText('Submitted', { exact: true })).toBeVisible();
+    expect(screen.queryByText('Awaiting Assignment')).not.toBeInTheDocument();
+    expect(screen.getByText('Coordinator: Raj Coordinator')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Reassign' })).toBeDisabled();
+  });
+
+  test.each(['under_review', 'planning', 'awaiting_safety_check', 'preparation', 'confirmed'])(
+    '[BOUNDARY] [SG2-100:AC3] reassignment displays the server-recorded advanced status %s without assuming Submitted', async status => {
+      api(() => Response.json({ requests: [REQUESTS[1]], coordinators: COORDINATORS }),
+        () => Response.json({ request: { event_id: 8, status, coordinator_id: 'c2' } }));
+      render(<CoordinatorAssignment accessToken="tok" />);
+      await screen.findByRole('heading', { name: 'Untitled request' });
+      fireEvent.change(screen.getByLabelText('Coordinator for Untitled request'), { target: { value: 'c2' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Reassign' }));
+      await screen.findByText('Assigned to Raj Coordinator.');
+      const labels = { under_review: 'Under Review', planning: 'Arrangements', awaiting_safety_check: 'Awaiting Safety Check', preparation: 'Preparation', confirmed: 'Confirmed' };
+      expect(screen.getByText(labels[status as keyof typeof labels], { exact: true })).toBeVisible();
+      expect(screen.queryByText('Submitted', { exact: true })).not.toBeInTheDocument();
+      expect(screen.getByText('Coordinator: Raj Coordinator')).toBeVisible();
+    });
+
+  test.each([409, 503])('[CONFLICT] [FAILURE] [SG2-100:AC3] a refused assignment %i never changes the unassigned status or coordinator', async status => {
+    api(() => Response.json({ requests: [{ ...REQUESTS[0], status: 'unassigned' }], coordinators: COORDINATORS }),
+      () => Response.json({ error: 'This assignment was not saved.', request: { status: 'submitted' } }, { status }));
+    render(<CoordinatorAssignment accessToken="tok" />);
+    await screen.findByText('Awaiting Assignment');
+    fireEvent.change(screen.getByLabelText('Coordinator for Partner Forum'), { target: { value: 'c2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
+    expect(await screen.findByRole('alert')).toBeVisible();
+    expect(screen.getByText('Awaiting Assignment')).toBeVisible();
+    expect(screen.getByText('Coordinator: Unassigned')).toBeVisible();
+    expect(screen.queryByText('Submitted', { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Assign' })).toBeEnabled();
   });
 
   test('[CONFLICT] [SG2-33:AC1] shows the reason and keeps the old coordinator when the save is refused', async () => {

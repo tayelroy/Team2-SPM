@@ -104,8 +104,12 @@ is public):
 | Event Coordinator Lead | `event.coordinator.lead1@connectsphere.test` |
 | Safety Officer | `safety.officer1@connectsphere.test` |
 
-Two more numbered accounts (`2`, `3`) exist per role except Technical
-Support Staff, Event Coordinator Lead and Safety Officer. From the landing page, click **Open app**, then sign in.
+Two more numbered accounts (`2`, `3`) exist for Event Organiser, Event
+Coordinator, Venue Staff and Attendee. Technical Support Staff, Event
+Coordinator Lead and Safety Officer have one listed demo account each.
+The Lead and Safety Officer accounts were provisioned in staging on
+15 October 2026; schema migrations define roles but do not create Auth users.
+From the landing page, click **Open app**, then sign in.
 What you see afterward — the nav, the dashboard, which buttons even appear
 — is scoped to your role, and the backend checks the same permission
 independently of what the UI shows.

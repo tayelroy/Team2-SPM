@@ -25,9 +25,10 @@ beforeAll(() => {
 
 // Mirrors the grants in server/src/auth/policy.ts that these screens use.
 const POLICY_PERMISSIONS: Partial<Record<Role, string[]>> = {
-  'Venue Staff': ['venues.read', 'venues.create', 'venues.update'],
+  'Event Organiser': ['venue_booking.capacity_exception.approve'],
+  'Venue Staff': ['venues.read', 'venues.create', 'venues.update', 'venue_booking.capacity_exception.approve'],
   'Event Coordinator': ['venues.read'],
-  'Technical Support Staff': ['equipment.read', 'equipment.create', 'equipment.update'],
+  'Technical Support Staff': ['equipment.read', 'equipment.create', 'equipment.update', 'venue_booking.capacity_exception.approve'],
   'Event Coordinator Lead': ['event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view',
     'event_request.history.view', 'profile.read', 'profile.update'],
   'Safety Officer': ['event_request.stage.view', 'event_request.history.view', 'equipment_requirements.read',
@@ -39,6 +40,7 @@ function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ??
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
       if (url === '/api/auth/me') return Response.json({ userId: 'user-1', role: role.toLowerCase().replace(/ /g, '_'), permissions });
+      if (url === '/api/venue-booking-requests/capacity-exceptions') return Response.json({ requests: [] });
       if (url === '/api/venue-holds') return Response.json({ holds: [] });
       if (url === '/api/venue-holds/options') return Response.json({ events: [], venues: [] });
       if (url === '/api/equipment') return Response.json({ equipment: [{ equipment_id: 1, type: 'Wireless microphone',
@@ -172,6 +174,7 @@ describe('every role can reach every screen in its navigation', () => {
       ['My events', 'Your events'], ['New request', 'Event request'],
       ['My drafts', 'My draft requests'],
       ['Event detail', 'Event detail'],
+      ['Capacity exceptions', 'Capacity exceptions'],
     ],
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
@@ -186,6 +189,7 @@ describe('every role can reach every screen in its navigation', () => {
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
+      ['Capacity exceptions', 'Capacity exceptions'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
     // SG2-86: only the screens these roles can use; neither holds
@@ -936,3 +940,55 @@ test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] [SG2-55:AC4] a coordinator opens equipm
   expect(screen.getByText('Search venues')).toBeInTheDocument();
   expect(screen.getByLabelText('Attendance')).toHaveValue(null);
 });
+
+test.each([
+  ['Event Organiser', true], ['Technical Support Staff', true], ['Venue Staff', false],
+  ['Event Coordinator', false], ['Event Coordinator Lead', false], ['Safety Officer', false], ['Attendee', false],
+] as const)('[NORMAL] [SG2-47:AC3] [SG2-86:AC2] %s capacity-exception discovery navigation is offered: %s', async (role, offered) => {
+  // Even an unexpected grant cannot add this discovery screen to unrelated roles.
+  await signInAs(role, [...(POLICY_PERMISSIONS[role] ?? []), 'venue_booking.capacity_exception.approve']);
+  const entry = within(await loadedNav()).queryByRole('button', { name: 'Capacity exceptions' });
+  if (offered) expect(entry).toBeInTheDocument();
+  else expect(entry).not.toBeInTheDocument();
+  expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/venue-booking-requests/capacity-exceptions')).toBe(false);
+});
+
+test.each(['Event Organiser', 'Technical Support Staff'] as const)(
+  '[FAILURE] [SG2-47:AC3] [SG2-86:AC2] %s is not offered capacity approval without the actual server permission', async role => {
+    await signInAs(role, ['profile.read']);
+    expect(within(await loadedNav()).queryByRole('button', { name: 'Capacity exceptions' })).not.toBeInTheDocument();
+  }
+);
+
+test.each(['Event Organiser', 'Technical Support Staff'] as const)(
+  '[NORMAL] [SG2-47:AC3] [SG2-47:AC5] %s reaches a pending capacity request from navigation and sees its real approval receipt without approving the booking', async role => {
+    mockLoginResponse(role);
+    const base = globalThis.fetch;
+    const request = { request_id: 18, event_id: 22, event_name: 'Capacity forum', venue_name: 'QA small room',
+      starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10 };
+    const exception = { exception_id: 6, approver_name: 'Test approver', approver_role: role.toLowerCase().replace(/ /g, '_'),
+      expected_attendance: 14, approved_at: '2030-11-01T03:00:00Z' };
+    const api = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/venue-booking-requests/capacity-exceptions') return Response.json({ requests: [request] });
+      if (url === '/api/venue-booking-requests/18/suitability') return Response.json({ venue: { venue_id: 8, name: request.venue_name,
+        location: 'QA floor', capacity: 10, suitability: { suitable: false, issues: [{ kind: 'capacity', message: '14 people exceeds capacity 10.' }] } },
+        exceptions: [], booking: 'needs_capacity_exception' });
+      if (url === '/api/venue-booking-requests/18/capacity-exception') {
+        expect(init?.method).toBe('POST'); expect(init?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
+        return Response.json({ exception, booking: 'allowed' });
+      }
+      return base(url, init);
+    });
+    vi.stubGlobal('fetch', api); render(<App />); await submitSignIn();
+    fireEvent.click(within(await loadedNav()).getByRole('button', { name: 'Capacity exceptions' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Capacity exceptions' })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Review exception for Capacity forum at QA small room' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve capacity exception' }));
+    expect(await screen.findByText(new RegExp(`approved by Test approver \\(${role}\\)`))).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve booking' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(api.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url]) => url)).toEqual([
+      '/api/auth/login', '/api/venue-booking-requests/18/capacity-exception'
+    ]);
+  }
+);
