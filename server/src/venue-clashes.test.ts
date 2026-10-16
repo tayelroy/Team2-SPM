@@ -19,7 +19,10 @@ const USERS: Record<string, Principal> = {
   other_coordinator: { userId: 'user-other-coordinator', role: 'event_coordinator' },
   organiser: { userId: 'user-organiser', role: 'event_organiser' },
   support: { userId: 'user-support', role: 'technical_support_staff' },
-  attendee: { userId: 'user-attendee', role: 'attendee' }
+  attendee: { userId: 'user-attendee', role: 'attendee' },
+  // SG2-86: the Week 7 roles.
+  lead: { userId: 'user-lead', role: 'event_coordinator_lead' },
+  safety: { userId: 'user-safety', role: 'safety_officer' }
 };
 
 /** Morning Summit (the coordinator's) and Afternoon Forum (another
@@ -78,9 +81,9 @@ test('[BOUNDARY] [SG2-79:AC3] with nothing flagged, or nothing flagged for the c
   assert.deepEqual((await get(withRows([rows[0]]), 'other_coordinator')).body, { clashes: [] });
 });
 
-test('[FAILURE] [SG2-79:AC3] organisers, Technical Support Staff and attendees cannot see clashes, and nobody can without signing in', async () => {
+test('[FAILURE] [SG2-79:AC3] [SG2-86:AC2] organisers, Technical Support Staff, attendees and the Week 7 roles cannot see clashes, and nobody can without signing in', async () => {
   const composed = withRows(rows);
-  for (const user of ['organiser', 'support', 'attendee']) assert.equal((await get(composed, user)).status, 403, user);
+  for (const user of ['organiser', 'support', 'attendee', 'lead', 'safety']) assert.equal((await get(composed, user)).status, 403, user);
   assert.equal((await get(composed)).status, 401);
 });
 

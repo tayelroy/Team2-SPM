@@ -32,6 +32,8 @@ An npm-workspaces monorepo:
 | Venue Staff | View pending booking requests and details in the dashboard; maintain the venue catalogue and check availability |
 | Technical Support Staff | View pending and reserved equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; reserve equipment for events; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
+| Event Coordinator Lead | See the unassigned queue of submitted requests; assign and reassign Event Coordinators; view an event's stage and history; receive submitted-event notices |
+| Safety Officer | View an event's stage and history; read equipment placement and a venue's full operations record (setup and turnaround minutes, emergency access, known restrictions) via the API, read-only. The Operational Safety Check screens (SG2-91 to SG2-94) are not built yet |
 
 Every account can view and update its own profile. Technical Support Staff's
 Equipment screen reads and writes stored equipment records, including operational
@@ -99,9 +101,11 @@ is public):
 | Venue Staff | `venue.staff1@connectsphere.test` |
 | Technical Support Staff | `technical.support1@connectsphere.test` |
 | Attendee | `attendee1@connectsphere.test` |
+| Event Coordinator Lead | `event.coordinator.lead1@connectsphere.test` |
+| Safety Officer | `safety.officer1@connectsphere.test` |
 
 Two more numbered accounts (`2`, `3`) exist per role except Technical
-Support Staff. From the landing page, click **Open app**, then sign in.
+Support Staff, Event Coordinator Lead and Safety Officer. From the landing page, click **Open app**, then sign in.
 What you see afterward — the nav, the dashboard, which buttons even appear
 — is scoped to your role, and the backend checks the same permission
 independently of what the UI shows.

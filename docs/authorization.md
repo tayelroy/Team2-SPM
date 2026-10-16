@@ -83,7 +83,8 @@ accounts or expose an endpoint for changing roles.
 | Safety Officer | `safety_officer` |
 
 Event Coordinator Lead and Safety Officer (SG2-86, Week 7 customer changes)
-start with only `profile.read`/`profile.update`, the grants every role gets.
+started with only `profile.read`/`profile.update`, the grants every role gets;
+the stories below widen them.
 SG2-97 gives the Event Coordinator Lead `event_request.assign_coordinator`,
 taken away from Technical Support Staff, so the Lead is the only role that
 assigns or reassigns coordinators, plus `event_request.history.view` to see
@@ -108,6 +109,12 @@ coordinator marks an event that has been held as completed; which event is
 enforced per-row by the assignment and by the guards on the write itself, not
 by this grant. The coordinator reaches it from their work queue, not from the
 organiser-only event detail read.
+
+SG2-77 AC5 gives the Safety Officer `venues.operations.read`, read-only, so
+the Operational Safety Check can weigh a venue's emergency access and known
+restrictions; the `venue_operations` read policy
+(`202610160002_safety_officer_reads_venue_operations.sql`) matches it. The
+Event Coordinator Lead does not get it.
 Both are treated as internal roles; `INTERNAL_ROLES` in `policy.ts` is
 mirrored in the `event_audit_logs` RLS policy (latest version:
 `supabase/migrations/202610130001_event_history_internal_fields.sql`), and the
