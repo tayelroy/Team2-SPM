@@ -509,3 +509,18 @@ describe('humanizeFieldValue (SG2-100 AC5)', () => {
     expect(humanizeFieldValue('planning_notes', null)).toBe('(empty)');
   });
 });
+
+describe('humanizeFieldValue dates and yes/no (SG2-40 AC2)', () => {
+  test('[NORMAL] [SG2-40:AC2] date-time changes read in Singapore time and registration reads Yes/No', () => {
+    expect(humanizeFieldValue('proposed_date', '2031-03-04T02:00:00+00:00')).toBe('4 Mar 2031, 10:00 SGT');
+    expect(humanizeFieldValue('registration_closes_at', '2030-06-19T16:00:00.000Z')).toBe('20 Jun 2030, 00:00 SGT');
+    expect(humanizeFieldValue('registration_needed', 'true')).toBe('Yes');
+    expect(humanizeFieldValue('registration_needed', 'false')).toBe('No');
+  });
+
+  test('[BOUNDARY] [SG2-40:AC2] a value that is not a date or a yes/no is shown exactly as recorded', () => {
+    expect(humanizeFieldValue('registration_opens_at', 'not recorded')).toBe('not recorded');
+    expect(humanizeFieldValue('registration_needed', 'unknown')).toBe('unknown');
+    expect(humanizeFieldValue('planning_notes', 'true')).toBe('true');
+  });
+});
