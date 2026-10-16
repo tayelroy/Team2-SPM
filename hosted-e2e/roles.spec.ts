@@ -125,6 +125,13 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
         .getByRole('heading', { name: 'QA 16Oct Audit Probe', exact: true })).toBeVisible();
     } else if (name === 'event-23-detail' || name === 'event-detail') {
       await expect(main.getByRole('heading', { name: 'QA 16Oct Audit Probe', exact: true })).toBeVisible();
+      // Own Draft23 loads its stage separately after the event detail. The
+      // heading alone cannot establish that this second read has completed.
+      const stage = main.getByRole('region', { name: 'Event stage progress', exact: true });
+      await expect(stage).toBeVisible();
+      await expect(stage.getByTestId('stage-badge')).toHaveText('Draft');
+      await expect(stage.getByTestId('waiting-on-persona')).toHaveText('Event Organiser');
+      await expect(stage.getByTestId('waiting-on-action')).toHaveText('Next step: Complete and submit event request');
     } else if (name === 'event-22-detail-readiness') {
       await expect(main.getByRole('article', { name: 'Event request', exact: true })
         .getByRole('heading', { name: 'QA 15Oct Phone Request', exact: true })).toBeVisible();

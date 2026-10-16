@@ -20,9 +20,14 @@ evidence capture it requires a positive loaded result: the named Draft23 card
 on the Organiser dashboard and My events list; loaded queue counts/cards and a
 clash result; catalogue counts; equipment counts; a loaded or explicit empty
 capacity/hold/assignment list; populated profile fields; and an actual history
-entry or notification entry/explicit empty inbox. Event22 additionally requires
-loaded equipment sections and the readiness badge. The named fixtures remain
-mandatory; the suite does not silently substitute another event or accept an
+entry or notification entry/explicit empty inbox. The Organiser's own Draft23
+detail also requires the separately loaded `Event stage progress` region,
+current stage `Draft`, waiting-on persona `Event Organiser`, and next step
+`Complete and submit event request`. Its heading alone is insufficient because
+the stage request starts after the detail has loaded. Event22 additionally requires
+loaded equipment sections and the readiness badge; its Coordinator work-queue
+detail has a different view and does not require the Organiser's stage region.
+The named fixtures remain mandatory; the suite does not silently substitute another event or accept an
 empty My events list.
 
 These assertions run again after each viewport resize, immediately before each
