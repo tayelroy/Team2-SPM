@@ -147,3 +147,10 @@ test.each(['resolve', 'reject'])('[CONFLICT] [SG2-55:AC1] changed session aborts
   rendered.rerender(<EquipmentReservations eventId={7} accessToken="replacement-token" requests={[record]} onReserved={onReserved} onRefresh={onRefresh} onReceipts={onReceipts} />); expect(signal.aborted).toBe(true); await screen.findByRole('button', { name: 'Reserve Microphone' });
   await act(async () => { if (outcome === 'resolve') pending.resolve(saved); else pending.reject(new Error('Late save failure')); }); expect(onReserved).not.toHaveBeenCalled(); expect(screen.queryByRole('article')).not.toBeInTheDocument(); expect(screen.queryByRole('alert')).not.toBeInTheDocument(); expect(screen.queryByText(/has been notified/)).not.toBeInTheDocument();
 });
+
+test('[BOUNDARY] [SG2-55:AC1] a whole-minute period shows hours and minutes only, without seconds or milliseconds', async () => {
+  await form();
+  expect(screen.getByLabelText('Reserve from (Singapore time)')).toHaveValue('2030-06-01T10:00');
+  expect(screen.getByLabelText('Reserve from (Singapore time)')).not.toHaveAttribute('step');
+  expect(screen.getByLabelText('Reserve until (Singapore time)')).not.toHaveAttribute('step');
+});
