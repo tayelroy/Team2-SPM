@@ -222,7 +222,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   venues:
     'Search venue details, facilities and accessibility features. Keep planning information current.',
   calendar:
-    'Available, held, confirmed and blocked days for the selected venue.',
+    'Available, held, confirmed and blocked days across all venues. Choose a day to see which venue is in use.',
   holds: 'Reserve a venue while arrangements are finalised, with a clear expiry and approval decision.',
   capacityExceptions: 'Review pending capacity exceptions. Approval does not reserve a venue or decide its booking.',
   equipment:

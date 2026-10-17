@@ -100,7 +100,8 @@ export function computeEventStage(event: EventStageInput): EventStageResult {
       // dedicated "Submitted" step; it shares the Under Review step.
       stage = 'Under Review';
       stageKey = 'under_review';
-      description = 'Event request under review by the assigned coordinator.';
+      // LC-01: the coordinator has not opened it yet, so do not claim it is under review.
+      description = 'Event request assigned to a coordinator, who has not started the review yet.';
       waitingOn = {
         persona: coordinatorPersona,
         action: 'Review and assess event request',

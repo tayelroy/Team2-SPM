@@ -368,7 +368,7 @@ export default function RequestForm({
         alignItems: 'start',
       }}
     >
-      <Card style={{ gap: '28px', gridColumn: 'span 2', minWidth: 0 }}>
+      <Card className="request-form-card" style={{ gap: '28px', gridColumn: 'span 2', minWidth: 0 }}>
         {/* Server-error alert banner (AC2) */}
         {submitStatus === 'error' && errorMessage && (
           <Notice
@@ -426,6 +426,8 @@ export default function RequestForm({
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
             gap: '20px',
+            // Line inputs up across a row even when only some fields carry a hint line.
+            alignItems: 'end',
           }}
         >
           <FormField
@@ -526,6 +528,7 @@ export default function RequestForm({
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
             gap: '20px',
+            alignItems: 'end',
           }}
         >
           <OptionalTextField

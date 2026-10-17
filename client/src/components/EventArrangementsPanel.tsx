@@ -9,12 +9,14 @@ import { Badge, Eyebrow } from '../ui';
 export interface EventArrangementsPanelProps {
   arrangements: EventArrangementsResult;
   style?: CSSProperties;
+  /** The event is already confirmed (SG2-58), so it is no longer "ready for confirmation". */
+  confirmed?: boolean;
 }
 
 const STATE_BADGE: Record<ArrangementState, { label: string; bg: string; fg: string }> = {
   ready: { label: 'Ready', bg: 'rgba(0, 130, 124, 0.35)', fg: color.accent },
   outstanding: { label: 'Outstanding', bg: 'rgba(255, 180, 0, 0.16)', fg: '#fde047' },
-  not_required: { label: 'Not required', bg: 'rgba(255, 255, 255, 0.06)', fg: color.slate }
+  not_required: { label: 'Not required', bg: 'rgba(255, 255, 255, 0.06)', fg: color.silver }
 };
 
 /**
@@ -22,8 +24,8 @@ const STATE_BADGE: Record<ArrangementState, { label: string; bg: string; fg: str
  * for confirmation (SG2-57). Each arrangement is labelled Ready, Outstanding or
  * Not required, with a one-line detail; the header states overall readiness.
  */
-export default function EventArrangementsPanel({ arrangements, style }: EventArrangementsPanelProps) {
-  const ready = arrangements.ready_for_confirmation;
+export default function EventArrangementsPanel({ arrangements, style, confirmed = false }: EventArrangementsPanelProps) {
+  const ready = confirmed || arrangements.ready_for_confirmation;
 
   return (
     <section
@@ -56,7 +58,7 @@ export default function EventArrangementsPanel({ arrangements, style }: EventArr
             fg={ready ? color.accent : '#fde047'}
             size={11}
           >
-            {ready ? 'Ready for confirmation' : 'Arrangements outstanding'}
+            {confirmed ? 'Confirmed' : ready ? 'Ready for confirmation' : 'Arrangements outstanding'}
           </Badge>
         </span>
       </div>

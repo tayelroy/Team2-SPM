@@ -1680,10 +1680,15 @@ test('SG2-50-P01 | [SG2-50:AC1] [SG2-50:AC2] [CONFLICT] a request overlapping a 
   await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /11:00/ }).click();
   await expect(conflicts.getByRole('listitem')).toHaveText([/^Confirmed booking #1 for Planning workshop, 15 Jun 2030, 10:00( am)? – 15 Jun 2030, 12:00( pm)?$/]);
   await expect(conflicts.getByText('This request cannot be approved while this conflict stands.', { exact: true })).toBeVisible();
-  // AC2: approving it is refused while booking #1 stands, and it stays pending.
+  // AC2: approval is held back while booking #1 stands: the button is disabled with the reason,
+  // and the server refuses a direct approval too. The request stays pending.
   const decision = detail.getByRole('region', { name: 'Decide this booking request' });
-  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
-  await expect(decision.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(decision.getByRole('button', { name: 'Approve booking', exact: true })).toBeDisabled();
+  await expect(decision.getByText(/clashes with another booking or hold at this venue/)).toBeVisible();
+  const clashId = Number((await detail.getByText(/^Venue booking request #\d+$/).textContent())!.replace(/\D/g, ''));
+  const clashRefusal = await page.request.post(`/api/venue-booking-requests/${clashId}/decision`, { headers: await authHeaders(page), data: { decision: 'approve' } });
+  expect(clashRefusal.status()).toBe(409);
+  expect((await clashRefusal.json()).error).toBe('Regression Hall is already booked for Planning workshop during this period.');
   await expect(detail.getByText('pending', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to work queue' }).click();
   await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /08:00/ }).click();
@@ -1711,7 +1716,8 @@ test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:A
   await expect(hall.getByRole('alert')).toHaveText('Give a reason for releasing this booking. The coordinator and Event Organiser will see it.');
   await hall.getByLabel('Reason for releasing').fill('The keynote moved online');
   await hall.getByRole('button', { name: 'Confirm release', exact: true }).click();
-  await expect(booked.getByRole('status')).toContainText('Regression Hall released for');
+  // The list reloads after a release, so "Loading bookings…" can briefly be a second status.
+  await expect(booked.getByRole('status').filter({ hasText: 'Regression Hall released for' })).toBeVisible();
   // AC5: who released it and why; AC3: the other venue is untouched.
   await expect(hall.getByText('Released', { exact: true })).toBeVisible();
   await expect(hall.getByText(/^Released by Regression coordinator on .*: The keynote moved online$/)).toBeVisible();
@@ -1823,8 +1829,11 @@ test('SG2-78-P01 | [SG2-78:AC1] [SG2-78:AC2] [SG2-78:AC3] [SG2-78:AC4] [SG2-78:A
   const decision = detail.getByRole('region', { name: 'Decide this booking request' });
   await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /12:30/ }).click();
   await expect(detail.getByRole('region', { name: 'Booking conflicts' }).getByRole('listitem')).toHaveText([/^Confirmed booking #1 for Planning workshop/]);
-  await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
-  await expect(decision.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(decision.getByRole('button', { name: 'Approve booking', exact: true })).toBeDisabled();
+  const widenedId = Number((await detail.getByText(/^Venue booking request #\d+$/).textContent())!.replace(/\D/g, ''));
+  const widenedRefusal = await page.request.post(`/api/venue-booking-requests/${widenedId}/decision`, { headers: await authHeaders(page), data: { decision: 'approve' } });
+  expect(widenedRefusal.status()).toBe(409);
+  expect((await widenedRefusal.json()).error).toBe('Regression Hall is already booked for Planning workshop during this period.');
   await page.getByRole('button', { name: 'Back to work queue' }).click();
   await queue.getByRole('button', { name: /Regression Hall/ }).filter({ hasText: /13:15/ }).click();
   await decision.getByRole('button', { name: 'Approve booking', exact: true }).click();
@@ -2190,8 +2199,10 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
 
   // AC1: Regression Hall is already booked for the Planning workshop then.
   detail = await openVenueDecision(page, 104);
-  await detail.getByRole('button', { name: 'Approve booking', exact: true }).click();
-  await expect(detail.getByRole('alert')).toHaveText('Regression Hall is already booked for Planning workshop during this period.');
+  await expect(detail.getByRole('button', { name: 'Approve booking', exact: true })).toBeDisabled();
+  const clash = await page.request.post('/api/venue-booking-requests/104/decision', { headers: await authHeaders(page), data: { decision: 'approve' } });
+  expect(clash.status()).toBe(409);
+  expect((await clash.json()).error).toBe('Regression Hall is already booked for Planning workshop during this period.');
   await expect(detail.locator('.work-queue-status')).toHaveText('pending');
 
   // A request decided once cannot be decided again.

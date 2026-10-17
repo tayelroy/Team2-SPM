@@ -98,6 +98,12 @@ describe('updateAccountRole', () => {
     const result = await updateAccountRole(admin, 'target-1', 'venue_staff');
     assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
   });
+
+  test('[BOUNDARY] [SG2-24:AC2] a malformed account id (not a UUID) is reported as not found, not as an outage', async () => {
+    const admin = fakeAdmin({ update: async () => ({ data: null, error: { code: '22P02', message: 'invalid input syntax for type uuid: "not-a-uuid"' } }) });
+    const result = await updateAccountRole(admin, 'not-a-uuid', 'venue_staff');
+    assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
+  });
 });
 
 describe('deleteAccountRole', () => {

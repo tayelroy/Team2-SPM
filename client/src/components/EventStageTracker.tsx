@@ -121,6 +121,9 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
         role="list"
         aria-label="Lifecycle steps"
         data-testid="stepper-track"
+        className="stage-track"
+        // Focusable so a keyboard user can scroll the track with the arrow keys.
+        tabIndex={0}
         onScroll={(event) => syncOverflow(event.currentTarget)}
         style={{
           display: 'flex',
@@ -172,6 +175,7 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
             <div
               key={step.key}
               role="listitem"
+              className="stage-step"
               aria-current={isCurrent ? 'step' : undefined}
               style={{
                 flex: 1,
@@ -291,7 +295,7 @@ export default function EventStageTracker({ stage, style }: EventStageTrackerPro
               lineHeight: 1.4,
             }}
           >
-            <span style={{ color: color.silver }}>Next step: </span>
+            <span style={{ color: color.silver, flexShrink: 0, whiteSpace: 'nowrap', alignSelf: 'flex-start' }}>Next step: </span>
             <span>{waitingOn.action}</span>
           </div>
         ) : (

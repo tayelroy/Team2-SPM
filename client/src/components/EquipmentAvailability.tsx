@@ -41,7 +41,7 @@ function AvailabilityCheck({ eventId, requestId, equipmentType, token }: { event
     void check({ starts_at: from.toISOString(), ends_at: until.toISOString() });
   }
   return <section aria-label={`Availability for ${equipmentType}`} style={{ display: 'grid', gap: '14px', minWidth: 0 }}>
-    {!opened ? <GhostButton onClick={() => void check()}>Check availability for {equipmentType}</GhostButton> : <>
+    {!opened ? <GhostButton style={{ justifySelf: 'start' }} onClick={() => void check()}>Check availability for {equipmentType}</GhostButton> : <>
       <h5 style={{ margin: 0, fontSize: '18px' }}>Availability check</h5>
       <p style={{ margin: 0 }}>This check does not reserve equipment or guarantee stock. It does not change the recorded arrangement shortfall.</p>
       {loading ? <p role="status">Checking equipment availability…</p> : null}
@@ -64,10 +64,10 @@ function AvailabilityCheck({ eventId, requestId, equipmentType, token }: { event
         <fieldset disabled={loading} style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', border: 0, margin: 0, padding: 0, minWidth: 0 }}>
           <label style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }} htmlFor={`${id}-start`}>Availability starts (Singapore time)<input id={`${id}-start`} type="datetime-local" required value={start} onChange={event => setStart(event.target.value)} style={{ ...inputStyle, minWidth: 0 }} /></label>
           <label style={{ ...label, display: 'grid', gap: '8px', minWidth: 0 }} htmlFor={`${id}-end`}>Availability ends (Singapore time)<input id={`${id}-end`} type="datetime-local" required value={end} onChange={event => setEnd(event.target.value)} style={{ ...inputStyle, minWidth: 0 }} /></label>
-          <button type="submit" className="organisation-button" disabled={loading}>Check selected dates</button>
+          <button type="submit" className="organisation-button" style={{ justifySelf: 'start', alignSelf: 'end' }} disabled={loading}>Check selected dates</button>
         </fieldset>
       </form>
-      <GhostButton disabled={loading} onClick={() => void check(period)}>Refresh availability</GhostButton>
+      <GhostButton style={{ justifySelf: 'start' }} disabled={loading} onClick={() => void check(period)}>Refresh availability</GhostButton>
     </>}
   </section>;
 }

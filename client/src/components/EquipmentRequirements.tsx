@@ -4,7 +4,7 @@ import {
   type ArrangementValues, type EquipmentRequirement, type RequirementsView, type RequirementValues,
 } from '../api/equipmentRequirements';
 import { Card, Fact, GhostButton, GradientButton } from '../ui';
-import { color, label } from '../theme';
+import { color, label, rule } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
 import EquipmentAvailability from './EquipmentAvailability';
 import EquipmentReservations from './EquipmentReservations';
@@ -89,12 +89,12 @@ function Requirements({ eventId, token, canCheckAvailability, onReserved, onChan
       </div>
       {view.requests.length === 0 ? <p>No equipment requirements recorded.</p> : null}
       {view.requests.map(record => <article key={record.request_id} aria-label={`Equipment requirement: ${record.equipment_type}`} style={{ minWidth: 0 }}>
-        <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '16px', overflowWrap: 'anywhere' }}>
+        <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '16px', overflowWrap: 'anywhere', border: rule.edge }}>
           <h4 style={{ margin: 0, fontSize: '20px' }}>{record.equipment_type}</h4>
           {canCheckAvailability ? <EquipmentAvailability eventId={eventId} requestId={record.request_id} equipmentType={record.equipment_type} accessToken={token} /> : null}
           <Fact label="Quantity requested" value={String(record.quantity)} />
           <Fact label="Technical notes" value={record.notes ?? 'Not recorded'} />
-          <Fact label="Request status" value={record.status} />
+          <Fact label="Request status" value={record.status.charAt(0).toUpperCase() + record.status.slice(1)} />
           <Fact label="Arrangement update" value={record.arrangement_notes ?? 'Not recorded'} />
           <Fact label="Shortfall" value={record.shortfall === null ? 'Not recorded' : String(record.shortfall)} />
           <Fact label="Placement venue" value={record.placement_venue_name ?? 'Not recorded'} />

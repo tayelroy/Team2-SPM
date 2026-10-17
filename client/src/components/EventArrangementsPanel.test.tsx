@@ -62,3 +62,11 @@ describe('EventArrangementsPanel (SG2-57)', () => {
     expect(within(screen.getByTestId('arrangement-registration-state')).getByText(/not required/i)).toBeInTheDocument();
   });
 });
+
+describe('EventArrangementsPanel once confirmed (SG2-58)', () => {
+  test('[NORMAL] [SG2-58:AC1] a confirmed event says Confirmed, not "Ready for confirmation"', () => {
+    render(<EventArrangementsPanel arrangements={READY} confirmed />);
+    expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Confirmed');
+    expect(screen.queryByText(/ready for confirmation/i)).not.toBeInTheDocument();
+  });
+});

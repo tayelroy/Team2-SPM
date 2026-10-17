@@ -92,3 +92,11 @@ test('[FAILURE] [SG2-50:AC1] a request reply with malformed conflicts is treated
 test('[NORMAL] [SG2-50:AC1] a held booking and one whose event has no name are still described by number', () => {
   expect(describeConflict({ ...gala, status: 'held', event_name: null })).toBe(`Held booking #12 for event #9, ${formatSgt(gala.starts_at)} – ${formatSgt(gala.ends_at)}`);
 });
+
+test('[NORMAL] [SG2-50:AC2] the number of standing conflicts is reported so Approve can be held back', async () => {
+  respond(() => Response.json({ conflicts: [gala, hidden] }));
+  const onConflicts = vi.fn();
+  render(<BookingRequestConflicts accessToken="staff-token" requestId={41} onConflicts={onConflicts} />);
+  expect(await within(panel()).findByText(galaText)).toBeInTheDocument();
+  expect(onConflicts).toHaveBeenCalledWith(2);
+});

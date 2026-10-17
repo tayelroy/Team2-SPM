@@ -3,7 +3,7 @@ import { EquipmentReservationsError, loadEquipmentReservations, reserveEquipment
 import { EquipmentAvailabilityError, loadEquipmentAvailability, type AvailabilityReady } from '../api/equipmentAvailability';
 import type { EquipmentRequirement } from '../api/equipmentRequirements';
 import { Card, Fact, GhostButton } from '../ui';
-import { color, label } from '../theme';
+import { color, label, rule } from '../theme';
 import { inputStyle } from '../venues/VenueForm';
 
 type Props = { eventId: number; accessToken: string; requests: EquipmentRequirement[]; onReserved: (requestId: number) => void; onRefresh: () => void; onReceipts: (requestIds: number[]) => void };
@@ -13,6 +13,9 @@ const submillisecond = (value: string) => /[1-9]/.test((value.match(/\.(\d+)/)?.
 // datetime-local supports milliseconds. Expand finer source periods outwards so
 // confirming the suggested dates always covers the entire request/booking.
 const singaporeInput = (value: string, roundEnd = false) => new Date(new Date(value).getTime() + (roundEnd && submillisecond(value) ? 1 : 0) + 8 * 60 * 60 * 1000).toISOString().slice(0, -1);
+// Only a period with seconds or milliseconds needs the finer input: whole-minute
+// periods show hours and minutes like every other date field (and keep AM/PM visible on a phone).
+const inputStep = (value: string) => (/T\d\d:\d\d:(?!00(?:\.0*)?$)/.test(value) ? '0.001' : undefined);
 export default function EquipmentReservations(props: Props) {
   return <Reservations key={`${props.eventId}:${props.accessToken}`} {...props} />;
 }
@@ -56,7 +59,7 @@ function Reservations({ eventId, accessToken, requests, onReserved, onRefresh, o
         {view.can_reserve && eligible.length === 0 ? <p>No unreserved pending equipment requests are available.</p> : null}
       </>}
       {view.reservations.length === 0 ? <p>No equipment reservations recorded.</p> : view.reservations.map(item => <article key={item.reservation_id} aria-label={`Reserved equipment: ${item.equipment_type}`} style={{ minWidth: 0 }}>
-        <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '12px', minWidth: 0, overflowWrap: 'anywhere' }}>
+        <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '12px', minWidth: 0, overflowWrap: 'anywhere', border: rule.edge }}>
           <h4 style={{ margin: 0 }}>{item.equipment_type}</h4>
           <Fact label="Quantity reserved" value={String(item.quantity_reserved)} />
           <Fact label="Reservation starts (Singapore time)" value={item.starts_at ? timestamp(item.starts_at) : 'Not recorded'} />
@@ -114,7 +117,7 @@ function ReservationForm({ eventId, token, record, onSaved, onCancel, onRefresh,
     } finally { pending.current = null; if (!controller.signal.aborted) setSaving(false); }
   }
   const fieldStyle = { ...label, display: 'grid', gap: '8px', minWidth: 0 };
-  return <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '16px', minWidth: 0 }}>
+  return <Card padding="clamp(16px, 3vw, 28px)" style={{ gap: '16px', minWidth: 0, border: rule.edge }}>
     <h4 style={{ margin: 0 }}>Reserve equipment for this event</h4>
     <p style={{ margin: 0 }}>Reserve the full request: {record.quantity} × {record.equipment_type}.</p>
     <p style={{ margin: 0 }}>Availability is advisory. Stock is checked again when you reserve. A successful reservation notifies the assigned Event Coordinator.</p>
@@ -127,8 +130,8 @@ function ReservationForm({ eventId, token, record, onSaved, onCancel, onRefresh,
     </div> : null}
     <form aria-label={`Reserve equipment: ${record.equipment_type}`} onSubmit={submit} noValidate>
       <fieldset disabled={checking || saving || conflict} style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 230px), 1fr))', border: 0, margin: 0, padding: 0, minWidth: 0 }}>
-        <label htmlFor={`${id}-start`} style={fieldStyle}>Reserve from (Singapore time)<input id={`${id}-start`} type="datetime-local" step="0.001" required value={start} onChange={event => { setStart(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
-        <label htmlFor={`${id}-end`} style={fieldStyle}>Reserve until (Singapore time)<input id={`${id}-end`} type="datetime-local" step="0.001" required value={end} onChange={event => { setEnd(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
+        <label htmlFor={`${id}-start`} style={fieldStyle}>Reserve from (Singapore time)<input id={`${id}-start`} type="datetime-local" step={inputStep(start)} required value={start} onChange={event => { setStart(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
+        <label htmlFor={`${id}-end`} style={fieldStyle}>Reserve until (Singapore time)<input id={`${id}-end`} type="datetime-local" step={inputStep(end)} required value={end} onChange={event => { setEnd(event.target.value); setAvailability(null); }} style={{ ...inputStyle, minWidth: 0 }} /></label>
       </fieldset>
       {error ? <p role="alert">{error}</p> : null}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '16px' }}>

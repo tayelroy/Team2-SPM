@@ -55,14 +55,18 @@ export function humanizeFieldName(field: string): string {
 }
 
 /**
- * The reader-facing form of a recorded value (SG2-100 AC5). Only `status`
- * rows are translated: every other field's values are already free text or
- * numbers, and passing those through `statusLabel` would rewrite anything
- * that happened to collide with a status name.
+ * The reader-facing form of a recorded value (SG2-100 AC5). `status` rows use
+ * the status label; date-time fields (`proposed_date`, `*_at`) are shown in
+ * Singapore time like the rest of the app; `registration_needed` reads Yes/No. Free
+ * text and numbers pass through unchanged, so nothing that merely collides
+ * with a status name is rewritten.
  */
 export function humanizeFieldValue(field: string, value: string | null): string {
   if (value === null) return '(empty)';
-  return field === 'status' ? statusLabel(value) : value;
+  if (field === 'status') return statusLabel(value);
+  if ((field === 'proposed_date' || field.endsWith('_at')) && !Number.isNaN(Date.parse(value))) return formatSgtTimestamp(value);
+  if (field === 'registration_needed' && (value === 'true' || value === 'false')) return value === 'true' ? 'Yes' : 'No';
+  return value;
 }
 
 export interface EventAuditDrawerProps {
@@ -124,6 +128,12 @@ export function EventAuditDrawer({
     }
   }, [isOpen, fetchHistory]);
 
+  // Move focus into the drawer when it opens, so Escape (handled on the dialog) works at once.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isOpen) dialogRef.current?.focus();
+  }, [isOpen]);
+
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
       onClose();
@@ -152,6 +162,7 @@ export function EventAuditDrawer({
 
       {/* Drawer Dialog */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Event Change History"
@@ -159,6 +170,8 @@ export function EventAuditDrawer({
         tabIndex={-1}
         style={{
           position: 'fixed',
+          // Focus is moved here programmatically so Escape works; the container itself needs no ring.
+          outline: 'none',
           top: 0,
           right: 0,
           bottom: 0,
@@ -286,12 +299,13 @@ export function EventAuditDrawer({
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '12px',
+                    alignItems: 'flex-start',
+                    flexWrap: 'wrap',
+                    gap: '6px 12px',
                     fontSize: '12px',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px', minWidth: 0 }}>
                     <strong style={{ color: color.platinum, fontSize: '13px' }}>
                       {entry.actor_id === null ? 'System' : entry.actor_name}
                     </strong>
@@ -301,7 +315,7 @@ export function EventAuditDrawer({
                       </Badge>
                     )}
                   </div>
-                  <span style={{ color: color.silver, fontSize: '12px' }}>
+                  <span style={{ color: color.silver, fontSize: '12px', whiteSpace: 'nowrap' }}>
                     {formatSgtTimestamp(entry.created_at)}
                   </span>
                 </div>

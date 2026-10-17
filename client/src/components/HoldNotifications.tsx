@@ -6,6 +6,10 @@ import { formatSgtTimestamp } from './EventAuditDrawer';
 import { color, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, IconButton, Notice } from '../ui';
 
+// Hold notices are written by the database with the expiry as a raw UTC
+// instant (e.g. "expiry 2030-06-03T02:00:00.000Z"); show it in Singapore time.
+const UTC_INSTANT = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})\b/g;
+
 const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: 'Tentative hold placed', warning: 'Hold expiring soon', expired: 'Hold expired',
   // SG2-49: Venue Staff decisions on the coordinator's venue requests.
@@ -78,8 +82,8 @@ function HoldNotificationDrawer({ notifications, loading, error, onClose, onRetr
             <Dot tone={TONE[notification.kind]} style={{ marginTop: '7px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               <span style={{ fontSize: '15px', lineHeight: 1.4, color: color.platinum }}>{LABEL[notification.kind]}</span>
-              <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>{notification.message}</span>
-              <span style={{ fontSize: '10px', letterSpacing: '0.1em', color: color.slate }}>{formatSgtTimestamp(notification.created_at)}</span>
+              <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>{notification.message.replace(UTC_INSTANT, instant => formatSgtTimestamp(instant))}</span>
+              <span style={{ fontSize: '10px', letterSpacing: '0.1em', color: color.silver }}>{formatSgtTimestamp(notification.created_at)}</span>
             </div>
           </div>)}
     </aside>

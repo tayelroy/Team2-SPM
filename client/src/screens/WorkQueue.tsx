@@ -97,13 +97,16 @@ function DecisionPanel({ eventId, accessToken, onDecided }: {
     else setError(result.error);
   }
 
-  return <section className="work-queue-decision" aria-label="Decide this request">
-    <label htmlFor={`decision-reason-${eventId}`}>Reason (required to reject)</label>
+  // Laid out like the other footers on this card (the venue decision included),
+  // inside the card's padding rather than as bare browser-default controls.
+  return <section className="organisation-detail-footer" aria-label="Decide this request">
+    <h3>Decision</h3>
+    <label htmlFor={`decision-reason-${eventId}`} className="organisation-detail-hint">Reason (required to reject)</label>
     <textarea id={`decision-reason-${eventId}`} value={reason} rows={3}
-      onChange={event => setReason(event.target.value)} />
+      onChange={event => setReason(event.target.value)} className="organisation-textarea" />
     {error && <p role="alert" className="work-queue-empty">{error}</p>}
-    <div className="work-queue-decision-actions">
-      <button type="button" className="organisation-button" disabled={pending !== null}
+    <div className="organisation-detail-actions">
+      <button type="button" className="organisation-button organisation-button-primary" disabled={pending !== null}
         onClick={() => decide('approved')}>{pending === 'approved' ? 'Approving…' : 'Approve'}</button>
       <button type="button" className="organisation-button" disabled={pending !== null}
         onClick={() => decide('rejected')}>{pending === 'rejected' ? 'Rejecting…' : 'Reject'}</button>
@@ -199,6 +202,8 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   const [startsAt, setStartsAt] = useState(item.starts_at);
   // SG2-49: whether the venue request may be approved, from its suitability check.
   const [readiness, setReadiness] = useState<BookingReadiness | null>(null);
+  // SG2-50 AC2: how many bookings or holds clash with this venue request (null while checking).
+  const [conflictCount, setConflictCount] = useState<number | null>(null);
   // Refresh only readiness after equipment changes or explicit reloads, and
   // after planning changes. Reloading the
   // whole queue would discard any planning draft still open in the drawer.
@@ -264,7 +269,7 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
           arrangement-through-confirmed window as the requirements above. */}
       {item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
-        <EventArrangements key={arrangementsRevision} eventId={item.event_id} accessToken={accessToken} />
+        <EventArrangements key={arrangementsRevision} eventId={item.event_id} accessToken={accessToken} confirmed={currentStatus === 'confirmed'} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread
@@ -360,9 +365,10 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
       )}
       {item.kind === 'venue' && <BookingRequestFit accessToken={accessToken} requestId={item.item_id} onReadiness={setReadiness} />}
       {/* SG2-50 AC1: anything else committing the venue over the requested period. */}
-      {item.kind === 'venue' && <BookingRequestConflicts accessToken={accessToken} requestId={item.item_id} />}
+      {item.kind === 'venue' && <BookingRequestConflicts accessToken={accessToken} requestId={item.item_id} onConflicts={setConflictCount} />}
       {item.kind === 'venue' && <VenueDecision requestId={item.item_id} accessToken={accessToken}
-        holdId={typeof currentDetails.hold_id === 'number' ? currentDetails.hold_id : null} readiness={readiness} onDecided={setStatus} />}
+        holdId={typeof currentDetails.hold_id === 'number' ? currentDetails.hold_id : null} readiness={readiness}
+        conflictCount={conflictCount} onDecided={setStatus} />}
       {item.kind === 'event' && (
         <EventAuditDrawer
           isOpen={historyDrawerOpen}

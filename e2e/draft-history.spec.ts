@@ -173,8 +173,14 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
       const row = drawer.getByTestId(`audit-entry-${entry.log_id}`);
       await expect(row).toContainText('Regression organiser'); await expect(row).toContainText('Event Organiser');
       await expect(row).toContainText('SGT');
-      await expect(row.getByTestId('diff-old')).toHaveText(entry.old_value ?? '(empty)');
-      await expect(row.getByTestId('diff-new')).toHaveText(entry.new_value ?? '(empty)');
+      // The drawer shows dates in Singapore time and the registration flag as Yes/No,
+      // not the stored ISO instant or boolean text.
+      const shown: Record<string, [string, string]> = {
+        proposed_date: ['1 Jul 2030, 10:00 SGT', '2 Jul 2030, 11:00 SGT'],
+        registration_needed: ['No', 'Yes']
+      };
+      await expect(row.getByTestId('diff-old')).toHaveText(shown[entry.field_name]?.[0] ?? entry.old_value ?? '(empty)');
+      await expect(row.getByTestId('diff-new')).toHaveText(shown[entry.field_name]?.[1] ?? entry.new_value ?? '(empty)');
     }
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });

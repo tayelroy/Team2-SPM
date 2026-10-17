@@ -331,3 +331,11 @@ test.each(['Event Coordinator', 'Event Organiser'] as const)('[NORMAL] [CONFLICT
     if (role === 'Event Organiser') expect(api.loadHoldNotifications).not.toHaveBeenCalled();
   } finally { vi.unstubAllGlobals(); }
 });
+
+test('[NORMAL] [SG2-84:AC6] a hold expiry stored as a UTC instant is shown in Singapore time', async () => {
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [{ ...placed,
+    message: 'Tentative hold placed on Quiet Room; expiry 2030-06-03T02:00:00.000Z.' }] });
+  render(<HoldNotifications accessToken="coordinator-token" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
+  expect(await screen.findByText('Tentative hold placed on Quiet Room; expiry 3 Jun 2030, 10:00 SGT.')).toBeVisible();
+});
