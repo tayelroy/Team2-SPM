@@ -1716,7 +1716,8 @@ test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:A
   await expect(hall.getByRole('alert')).toHaveText('Give a reason for releasing this booking. The coordinator and Event Organiser will see it.');
   await hall.getByLabel('Reason for releasing').fill('The keynote moved online');
   await hall.getByRole('button', { name: 'Confirm release', exact: true }).click();
-  await expect(booked.getByRole('status')).toContainText('Regression Hall released for');
+  // The list reloads after a release, so "Loading bookings…" can briefly be a second status.
+  await expect(booked.getByRole('status').filter({ hasText: 'Regression Hall released for' })).toBeVisible();
   // AC5: who released it and why; AC3: the other venue is untouched.
   await expect(hall.getByText('Released', { exact: true })).toBeVisible();
   await expect(hall.getByText(/^Released by Regression coordinator on .*: The keynote moved online$/)).toBeVisible();
