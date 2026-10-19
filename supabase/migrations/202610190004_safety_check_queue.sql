@@ -170,6 +170,21 @@ begin
     insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value)
       values (p_event_id, actor, 'status', e.status::text, next_status::text);
   end if;
+  -- SG2-66 AC7: the organiser and the assigned coordinator are told whenever an
+  -- event goes back to Planning. Same kind and wording as
+  -- apply_accepted_event_change() (202610190003_event_change_impact.sql).
+  if next_status = 'planning' then
+    insert into public.notifications (recipient_id, event_id, kind, message)
+      values (e.organiser_id, p_event_id, 'event_returned_to_planning',
+        left(coalesce(nullif(e.name, ''), 'Untitled event'), 500)
+          || ' has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.');
+    if e.coordinator_id is not null and e.coordinator_id is distinct from e.organiser_id then
+      insert into public.notifications (recipient_id, event_id, kind, message)
+        values (e.coordinator_id, p_event_id, 'event_returned_to_planning',
+          left(coalesce(nullif(e.name, ''), 'Untitled event'), 500)
+            || ' is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.');
+    end if;
+  end if;
 end;
 $$;
 revoke all on function public.refresh_safety_check_status(integer, boolean) from public, anon, authenticated;

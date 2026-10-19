@@ -317,6 +317,16 @@ begin
  if (select status from public.events where event_id=99107) <> 'planning' then
   raise exception '[SG2-91:disrupted-booking-returns-to-planning] [SG2-91:AC1] [CONFLICT] A booked venue made unavailable must return an awaiting event to Planning';
  end if;
+ -- SG2-66 AC7: both people hear the event is back in Planning, once each.
+ if (select array_agg(recipient_id::text||'|'||message order by recipient_id) from public.notifications
+     where event_id=99107 and kind='event_returned_to_planning') is distinct from array[
+     'd9100000-0000-4000-8000-000000000001|Safety event 7 has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.',
+     'd9100000-0000-4000-8000-000000000002|Safety event 7 is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.'] then
+  raise exception '[SG2-91:return-to-planning-notified] [SG2-91:AC1] [CONFLICT] Leaving the check must notify the organiser and the coordinator exactly once each';
+ end if;
+ if exists(select 1 from public.notifications where event_id=99101 and kind='event_returned_to_planning') then
+  raise exception '[SG2-91:entering-check-not-notified] [SG2-91:AC1] [BOUNDARY] Entering the check must not send a back-to-Planning notice';
+ end if;
 end $$;
 
 -- AC1 with SG2-66: any outstanding recheck, registration included, keeps a
