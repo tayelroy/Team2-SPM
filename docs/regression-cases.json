@@ -3061,7 +3061,7 @@
       "Prototype event name 'Product Launch — Tideline' (must not appear)"
     ],
     "expected": [
-      "Safety desk heading, a 'No safety checks yet' empty state, a menu of exactly [Dashboard] and no prototype event",
+      "Safety desk heading, a live '0 events are awaiting a safety check.' count (SG2-91 replaced the earlier 'No safety checks yet' placeholder), a menu of exactly [Dashboard, Safety checks] and no prototype event",
       "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
       "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
     ],
@@ -6740,5 +6740,82 @@
     "execution_date": "19 Oct 2026",
     "executed_by": "Automated local validation",
     "review": null
+  },
+  {
+    "id": "SG2-91-P01",
+    "title": "the Safety Officer reviews each awaiting event with everything the check needs, including the crowd movement its coordinator recorded",
+    "story": "SG2-91",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-91:AC2",
+      "SG2-91:AC3"
+    ],
+    "method_id": null,
+    "purpose": "Verify that a coordinator can record an event's expected crowd movement during planning without taking it out of the safety check, and that the Safety Officer's desk (a card per awaiting event, each opening that event's review on its own) and Safety checks list show exactly the events awaiting a check, oldest wait first, each with expected attendance, accessibility requirements, crowd movement, every booked venue's capacity, layout, emergency access and known restrictions, and every piece of equipment with where it will be placed, laid out without sideways scrolling on phone and laptop widths.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks: 911 Harbour Lecture and 913 Studio Talk await their check (since 1 and 2 Jul 2030); 912 Riverside Gala is still in Planning with a pending venue request. All three are coordinated by coordinator@example.test.",
+    "steps": [
+      "Sign in as coordinator@example.test; open Harbour Lecture from My assigned events; Edit Planning Information",
+      "Fill Expected Crowd Movement and Save Planning Details",
+      "Sign in as safety@example.test; read the desk count and its event cards",
+      "Click the Studio Talk card, then Show all 2 safety checks; return to the Dashboard and click Open safety checks",
+      "Read the Harbour Lecture and Studio Talk cards",
+      "Resize to 390px and 1440px"
+    ],
+    "data": [
+      "Harbour Lecture: 80 attendees, 'Wheelchair seating near the aisle'; Regression Hall (Level 1, capacity 100, theatre layout, 'Two exits onto the north concourse', 'No open flames'); 4 wireless microphones placed 'Either side of the stage' with 'Cable ramps across the aisle'",
+      "Crowd movement entered: 'Arrive through the north doors, leave by the south exits after the talk'",
+      "Studio Talk: 80 attendees in Quiet Room (capacity 20, no recorded operations), no equipment"
+    ],
+    "expected": [
+      "The planning drawer saves and closes; the desk says '2 events are awaiting a safety check.'",
+      "The desk shows a card for Harbour Lecture (with Regression Hall) then Studio Talk; clicking Studio Talk opens its safety check on its own, and Show all returns both events",
+      "The list heading reads '2 events awaiting a safety check'; the cards are Harbour Lecture then Studio Talk; Riverside Gala is not listed",
+      "Harbour Lecture shows 80, the accessibility need, the entered crowd movement, 'Regression Hall · Level 1', 100, Theatre, the step-free access, emergency access and restriction, '4 × Wireless microphones', 'Regression Hall — Either side of the stage' and the cable ramps note",
+      "Studio Talk shows '20 (below expected attendance of 80)', 'No equipment requested.' and 'Not recorded' for its emergency access and restrictions",
+      "Neither width scrolls sideways"
+    ],
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "executed_by": "Automated test runner",
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-91-safety-check-queue working tree; npx playwright test e2e/regression.spec.ts -g \"SG2-91\" (2 passed); local Playwright Chromium against the production client build. No hosted Supabase validation.",
+    "status": "Pass"
+  },
+  {
+    "id": "SG2-91-N01",
+    "title": "no role but the Safety Officer can open the safety check list, in the menu or through the API",
+    "story": "SG2-91",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-91:AC4"
+    ],
+    "method_id": null,
+    "purpose": "Verify that every other role is refused the safety check list by the real HTTP route, an unsigned request is refused as unauthenticated, and neither the coordinator nor the Event Coordinator Lead is offered Safety checks in the menu.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks so the list is not empty.",
+    "steps": [
+      "As organiser, coordinator, venue, support, attendee and lead: GET /api/safety-checks",
+      "Without a token: GET /api/safety-checks",
+      "Sign in as coordinator@example.test, then lead@example.test, and read the navigation once permissions load"
+    ],
+    "data": [
+      "The seeded awaiting events 911 and 913"
+    ],
+    "expected": [
+      "Each of the six roles receives 403 {error: 'Access denied'}",
+      "The unsigned request receives 401",
+      "Neither navigation offers Safety checks"
+    ],
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "executed_by": "Automated test runner",
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-91-safety-check-queue working tree; npx playwright test e2e/regression.spec.ts -g \"SG2-91\" (2 passed); local Playwright Chromium against the production client build. No hosted Supabase validation.",
+    "status": "Pass"
   }
 ]

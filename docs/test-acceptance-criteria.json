@@ -738,6 +738,18 @@
         "AC6": "Once an event is Confirmed or in Preparation, its details cannot be edited directly: a direct planning edit is refused on the server side with a message pointing to a change request (SG2-64). Registration settings are the exception (SG2-63). This replaces the direct-edit rule in SG2-39 for those statuses",
         "AC7": "The Event Organiser and the assigned Event Coordinator are notified when an event goes back to Planning, and the move is recorded in the event history"
       }
+    },
+    {
+      "id": "SG2-91",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-91",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-19",
+      "acceptanceCriteria": {
+        "AC1": "When all of an event's venue bookings are approved and its required equipment is reserved, the event's status becomes Awaiting Safety Check",
+        "AC2": "The Safety Officer can see a list of events awaiting a check",
+        "AC3": "Each event shows the information needed for the review: expected attendance, venue capacity and layout, emergency access, accessibility requirements, equipment and where it will be placed, expected crowd movement, and known venue restrictions",
+        "AC4": "Only Safety Officers can open the safety check list"
+      }
     }
   ]
 }

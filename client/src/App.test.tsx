@@ -31,7 +31,7 @@ const POLICY_PERMISSIONS: Partial<Record<Role, string[]>> = {
   'Event Coordinator Lead': ['event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view',
     'event_request.history.view', 'profile.read', 'profile.update'],
   'Safety Officer': ['event_request.stage.view', 'event_request.history.view', 'equipment_requirements.read',
-    'profile.read', 'profile.update'],
+    'safety_checks.read', 'profile.read', 'profile.update'],
 };
 
 function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ?? []) {
@@ -49,6 +49,8 @@ function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ??
       // SG2-87: the Lead's desk counts the unassigned queue.
       if (url === '/api/assignment-queue') return Response.json({ entries: [{ event_id: 41, name: 'Queued forum',
         organiser_name: 'Org', proposed_date: null, expected_attendance: null, submitted_at: '2030-06-01T01:00:00Z' }] });
+      // SG2-91: the Safety Officer's desk counts the events awaiting a check.
+      if (url === '/api/safety-checks') return Response.json({ events: [] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
@@ -197,7 +199,8 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Coordination lead desk'], ['Unassigned queue', 'Unassigned queue'],
       ['Assign coordinators', 'Assign coordinators'],
     ],
-    'Safety Officer': [['Dashboard', 'Safety desk']],
+    // SG2-91: the list of events awaiting a safety check.
+    'Safety Officer': [['Dashboard', 'Safety desk'], ['Safety checks', 'Safety checks']],
   };
   test('[NORMAL] [SG2-24:AC1] [SG2-86:AC1] the role catalogue contains all seven documented roles', () => {
     expect(ROLES).toEqual(expectedRoles);
@@ -251,6 +254,22 @@ test.each([
   const button = within(header()).queryByRole('button', { name: 'Assign coordinators' });
   if (offered) expect(button).toBeInTheDocument();
   else expect(button).not.toBeInTheDocument();
+});
+
+// SG2-91 AC4: only a Safety Officer is offered the safety check list.
+test.each([
+  ['Event Organiser', false], ['Event Coordinator', false], ['Venue Staff', false], ['Technical Support Staff', false],
+  ['Event Coordinator Lead', false], ['Safety Officer', true],
+] as const)('[FAILURE] [SG2-91:AC4] %s sees Safety checks in the navigation: %s', async (role, offered) => {
+  await signInAs(role);
+  const button = within(header()).queryByRole('button', { name: 'Safety checks' });
+  if (offered) expect(button).toBeInTheDocument();
+  else expect(button).not.toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-91:AC4] a Safety Officer the server has not granted the list is not offered it', async () => {
+  await signInAs('Safety Officer', ['profile.read', 'profile.update']);
+  expect(within(await loadedNav()).getAllByRole('button').map((button) => button.textContent)).toEqual(['Dashboard']);
 });
 
 test('[FAILURE] [SG2-86:AC2] a Lead the server has not granted the queue or assignment is not offered them', async () => {

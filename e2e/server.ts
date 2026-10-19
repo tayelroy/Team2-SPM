@@ -63,6 +63,8 @@ import { seedEventNotifications } from './support/event-notifications';
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
 import { createMemoryChangeImpact, seedChangeImpact } from './support/change-impact';
+import { createSafetyChecksRouter } from '../server/src/safetyChecks';
+import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -234,7 +236,10 @@ const app = createApp(
   createGetEventConfirmationHandler(eventDependencies),
   // SG2-66: impact reads go through the in-memory client; acceptance and
   // settling mirror their SQL functions over the in-memory tables.
-  createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) })
+  createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) }),
+  // SG2-91: the Safety Officer's list mirrors safety_check_queue over the
+  // in-memory tables.
+  createSafetyChecksRouter(access, token => createMemorySafetyChecksStore(database, token))
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -284,6 +289,10 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
     bookings: database.tables.venue_bookings.filter(seeded),
   });
+});
+app.post('/__e2e/safety-checks', (_req, res) => {
+  seedSafetyChecks(database);
+  res.status(204).end();
 });
 app.post('/__e2e/event-notifications', (_req, res) => {
   seedEventNotifications(database);
