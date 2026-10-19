@@ -442,6 +442,19 @@
       }
     },
     {
+      "id": "SG2-106",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-106",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-17",
+      "acceptanceCriteria": {
+        "AC1": "I can delete a venue that has no current or future bookings, holds or pending booking requests; otherwise the deletion is refused and what blocks it is listed",
+        "AC2": "A deleted venue no longer appears in venue search, availability or new booking requests, while past bookings and event history keep its name",
+        "AC3": "I can change an active hold's expiry to another time in the future; a hold that has expired, been converted or been released cannot be changed",
+        "AC4": "When a hold's expiry changes, the Event Coordinator is notified of the new expiry, and the warning before expiry (SG2-85) is based on the new time",
+        "AC5": "Only Venue Staff can delete venues or change hold expiries, and each action is recorded with who did it and when"
+      }
+    },
+    {
       "id": "SG2-50",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
       "originalPullRequests": [],

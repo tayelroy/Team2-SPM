@@ -18,3 +18,13 @@ export function validateVenue(input: unknown): VenueValues | null {
     operating_information: (body.operating_information as string).trim()
   };
 }
+
+/** SG2-106: live work that stops a venue being deleted. */
+export interface VenueBlocker {
+  kind: 'booking' | 'hold' | 'request';
+  id: number;
+  event_id: number | null;
+  event_name: string | null;
+  starts_at: string;
+  ends_at: string;
+}

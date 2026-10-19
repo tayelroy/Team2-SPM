@@ -46,7 +46,7 @@ function includesFacilities(text: string | null, keywords: string[]): boolean {
 export async function searchVenues(criteria: VenueSearchCriteria, client: SupabaseClient): Promise<SearchResult> {
   const { starts_at: from, ends_at: to } = criteria;
   const [venues, layouts, blocks, bookings, operations] = await Promise.all([
-    client.from('venues').select(VENUE_COLUMNS).order('name', { ascending: true }),
+    client.from('venues').select(VENUE_COLUMNS).is('deleted_at', null).order('name', { ascending: true }),
     client.from('venue_layouts').select('venue_id,layout,other_description'),
     client.from('venue_unavailability').select('venue_id,starts_at,ends_at').lt('starts_at', to).gt('ends_at', from),
     // Wide enough for any venue's setup and turnaround; each row is then

@@ -30,3 +30,29 @@ export async function venueRequest(token: string, signal: AbortSignal, values?: 
   if (!response.ok) throw new VenueError(response.status);
   return response.json();
 }
+
+/** SG2-106: live work that stops a venue being deleted. */
+export interface VenueBlocker {
+  kind: 'booking' | 'hold' | 'request';
+  id: number;
+  event_id: number | null;
+  event_name: string | null;
+  starts_at: string;
+  ends_at: string;
+}
+export class VenueDeleteBlocked extends Error {
+  constructor(public blockers: VenueBlocker[]) {
+    super('This venue still has current or future bookings, holds or pending requests.');
+  }
+}
+
+export async function deleteVenue(token: string, signal: AbortSignal, id: number): Promise<void> {
+  const response = await fetch(`/api/venues/${id}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal
+  });
+  if (response.status === 409) {
+    const body = await response.json().catch(() => null);
+    throw new VenueDeleteBlocked(Array.isArray(body?.blockers) ? body.blockers : []);
+  }
+  if (!response.ok) throw new VenueError(response.status);
+}

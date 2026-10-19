@@ -18,7 +18,7 @@ export interface HoldNotification {
   notification_id: number;
   event_id: number;
   hold_id: number;
-  kind: 'placed' | 'warning' | 'expired';
+  kind: 'placed' | 'warning' | 'expired' | 'expiry_changed';
   message: string;
   created_at: string;
 }
@@ -42,4 +42,13 @@ export function validateVenueHold(body: unknown, now: number): VenueHoldValues |
   const start = instant(record.starts_at); const end = instant(record.ends_at); const expiry = instant(record.expires_at);
   if (start === null || end === null || expiry === null || end <= start || end <= now || expiry <= now) return null;
   return { event_id, venue_id, starts_at: new Date(start).toISOString(), ends_at: new Date(end).toISOString(), expires_at: new Date(expiry).toISOString() };
+}
+
+/** SG2-106 AC3: a new expiry needs a zone and must be in the future. */
+export function validateHoldExpiry(body: unknown, now: number): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const record = body as Record<string, unknown>;
+  if (Object.keys(record).some(key => key !== 'expires_at')) return null;
+  const expiry = instant(record.expires_at);
+  return expiry === null || expiry <= now ? null : new Date(expiry).toISOString();
 }

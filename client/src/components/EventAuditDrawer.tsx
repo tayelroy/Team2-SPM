@@ -33,6 +33,8 @@ const FIELD_LABELS: Record<string, string> = {
   status: 'Status',
   coordinator_id: 'Coordinator',
   venue_hold_status: 'Tentative Hold Status',
+  // SG2-106: Venue Staff changed the hold's expiry.
+  venue_hold_expiry: 'Tentative Hold Expiry',
 };
 
 /** Formats an ISO string into Singapore Standard Time (SGT). */
@@ -66,6 +68,8 @@ export function humanizeFieldValue(field: string, value: string | null): string 
   if (field === 'status') return statusLabel(value);
   if ((field === 'proposed_date' || field.endsWith('_at')) && !Number.isNaN(Date.parse(value))) return formatSgtTimestamp(value);
   if (field === 'registration_needed' && (value === 'true' || value === 'false')) return value === 'true' ? 'Yes' : 'No';
+  // SG2-106: "Hold 7 expires 2090-06-25T02:00:00Z" shows the time in Singapore time.
+  if (field === 'venue_hold_expiry') return value.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/, instant => formatSgtTimestamp(instant));
   return value;
 }
 

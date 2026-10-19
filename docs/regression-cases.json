@@ -5436,6 +5436,145 @@
     ]
   },
   {
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts. No hosted Supabase.",
+    "data": "Fixture venues 1 (future booking #1) and 2 (no live work); synthetic staff and coordinator accounts.",
+    "evidence": "e2e/smoke.spec.ts; e2e/support/venue-holds.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "executed_by": "Claude (automated local verification)",
+    "review": null,
+    "execution_date": "17 Oct 2026",
+    "id": "SMOKE-VENUE-DELETE-01",
+    "title": "Venue Staff delete an unused venue; live work blocks a delete",
+    "type": "NORMAL / CONFLICT / FAILURE",
+    "story": "SG2-106",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC1",
+      "SG2-106:AC2",
+      "SG2-106:AC5"
+    ],
+    "purpose": "Smoke the venue delete flow, its blocker list and its removal from new-booking lists.",
+    "steps": [
+      "At 390px, try to delete Regression Hall, which has a future booking; read the blocker list.",
+      "At 1440px, delete Quiet Room, which has no live work.",
+      "Check the catalogue and hold venue choices no longer list it; repeat delete returns 404; a coordinator gets 403."
+    ],
+    "expected": "Blocked delete lists Booking #1 and keeps the venue; unused venue is removed from catalogue and hold choices; no horizontal overflow at 390px or 1440px.",
+    "actual": "PASS: ran in the 6/6 local smoke run on 17 Oct 2026 against the production build and loopback fixture. Hosted CI for this revision is pending.",
+    "execution_evidence": "npx playwright test e2e/smoke.spec.ts (local Chromium 1194); screenshots venue-delete-blocked-mobile.png and venue-deleted-desktop.png attached to the run."
+  },
+  {
+    "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts. No hosted Supabase.",
+    "data": "Fixture event 81, venue 1; fixture clock from 1 Jun 2030 02:00Z.",
+    "evidence": "e2e/smoke.spec.ts; e2e/support/venue-holds.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "executed_by": "Claude (automated local verification)",
+    "review": null,
+    "execution_date": "17 Oct 2026",
+    "id": "SMOKE-HOLD-EXPIRY-01",
+    "title": "Venue Staff change a hold expiry; coordinator notified and warning follows new time",
+    "type": "NORMAL / BOUNDARY",
+    "story": "SG2-106",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC3",
+      "SG2-106:AC4"
+    ],
+    "purpose": "Smoke the hold expiry change and its coordinator notice and warning.",
+    "steps": [
+      "Place a hold expiring 3 Jun 2030 10:00 SGT.",
+      "At 390px, change its expiry to 4 Jun 2030 10:00 SGT.",
+      "A past expiry returns 400 and a coordinator returns 403.",
+      "Advance the fixture clock past the old expiry; read coordinator notices and hold status."
+    ],
+    "expected": "Card shows the new expiry; hold stays Tentative after the old deadline; coordinator has placed, expiry_changed and a warning for the new time.",
+    "actual": "PASS: ran in the 6/6 local smoke run on 17 Oct 2026 against the production build and loopback fixture. Hosted CI for this revision is pending.",
+    "execution_evidence": "npx playwright test e2e/smoke.spec.ts (local Chromium 1194); screenshot hold-expiry-changed-mobile.png attached to the run."
+  },
+  {
+    "preconditions": "Disposable PostgreSQL with all migrations applied; every fixture rolled back or removed. No hosted Supabase.",
+    "data": "Synthetic records and accounts only.",
+    "evidence": "supabase/tests/venue_delete_hold_expiry.sql; .github/scripts/test-venue-delete-concurrency.mjs",
+    "layer": "PostgreSQL contract + concurrency",
+    "status": "Pass",
+    "executed_by": "Claude (automated local verification)",
+    "review": null,
+    "execution_date": "17 Oct 2026",
+    "id": "SG2-106-DB01",
+    "title": "Database delete and expiry rules under locks",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "story": "SG2-106",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC1",
+      "SG2-106:AC2",
+      "SG2-106:AC3",
+      "SG2-106:AC4",
+      "SG2-106:AC5"
+    ],
+    "purpose": "Prove delete_venue() and change_venue_hold_expiry() rules, role checks, audit and lock ordering.",
+    "steps": [
+      "Delete with a future booking, active hold and pending request; then an unused venue; then a venue with only past work.",
+      "Insert requests, bookings and edits for a deleted venue; read past booking name.",
+      "Call both RPCs as coordinator and technical support.",
+      "Change expiry: valid, same, past, null, infinite, unknown, released, expired; check audit, notices and warning reset.",
+      "Race a request against a delete, a delete against a new hold, and an expiry change against a release."
+    ],
+    "expected": "Blocked deletes list all live work; deleted venues refuse new work but keep their name; only Venue Staff succeed; each expiry change is audited and notified, and the warning follows the new time; races serialize on the venue lock.",
+    "actual": "PASS: SQL suite and all 3 concurrency checks passed locally on PostgreSQL 16 on 17 Oct 2026; existing SQL suites and venue concurrency scripts re-run with no regressions. CI runs the same files on PostgreSQL 17.",
+    "execution_evidence": "psql < supabase/tests/venue_delete_hold_expiry.sql; node .github/scripts/test-venue-delete-concurrency.mjs (3 PASS)."
+  },
+  {
+    "preconditions": "Disposable PostgreSQL and loopback PostgREST v12.2.12 seeded by integration/seed.sql. No hosted Supabase.",
+    "data": "Synthetic records and accounts only.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + PostgREST integration",
+    "status": "Pass",
+    "executed_by": "Claude (automated local verification)",
+    "review": null,
+    "execution_date": "17 Oct 2026",
+    "id": "SG2-106-INT01",
+    "title": "Native API delete and expiry change through caller JWT",
+    "type": "NORMAL / CONFLICT / FAILURE",
+    "story": "SG2-106",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC1",
+      "SG2-106:AC2",
+      "SG2-106:AC3",
+      "SG2-106:AC4",
+      "SG2-106:AC5"
+    ],
+    "purpose": "Prove the production adapters call the new RPCs with the caller's JWT and that results persist.",
+    "steps": [
+      "Place a hold; delete its venue (409 with the hold listed).",
+      "Coordinator delete (403) and direct deleted_at write (refused).",
+      "Delete an unused venue (who and when returned); repeat (404); check catalogue and hold choices.",
+      "Change expiry as coordinator (403), to the past (400), then valid; read coordinator notice and audit row; change after release (409)."
+    ],
+    "expected": "All responses as listed; audit row records Venue Staff with old and new expiry; deleted venue row and name remain.",
+    "actual": "PASS: 15/15 integration tests passed locally on 17 Oct 2026 against PostgreSQL 16 and PostgREST 12.2.12 on loopback.",
+    "execution_evidence": "tsx --test integration/api.test.ts with INTEGRATION_REST_URL on 127.0.0.1."
+  },
+  {
     "type": "Deployment readiness regression",
     "preconditions": "Disposable local PostgreSQL 17 with the auth fixture and all repository migrations applied; POSTGRES_CONTAINER identifies only the isolated Docker test container. No hosted mutation.",
     "evidence": ".github/scripts/release-readiness.test.mjs; supabase/checks/release_readiness.sql",

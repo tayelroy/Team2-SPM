@@ -524,3 +524,9 @@ describe('humanizeFieldValue dates and yes/no (SG2-40 AC2)', () => {
     expect(humanizeFieldValue('planning_notes', 'true')).toBe('true');
   });
 });
+
+test('[NORMAL] [SG2-106:AC5] an expiry change reads as a labelled entry with old and new times in Singapore time', () => {
+  expect(humanizeFieldName('venue_hold_expiry')).toBe('Tentative Hold Expiry');
+  expect(humanizeFieldValue('venue_hold_expiry', 'Hold 7 expires 2090-06-20T02:00:00Z')).toBe('Hold 7 expires 20 Jun 2090, 10:00 SGT');
+  expect(humanizeFieldValue('venue_hold_expiry', 'Hold 7 expires soon')).toBe('Hold 7 expires soon');
+});

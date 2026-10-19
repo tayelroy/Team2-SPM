@@ -12,6 +12,8 @@ const UTC_INSTANT = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+
 
 const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: 'Tentative hold placed', warning: 'Hold expiring soon', expired: 'Hold expired',
+  // SG2-106: Venue Staff moved the hold's expiry.
+  expiry_changed: 'Hold expiry changed',
   // SG2-49: Venue Staff decisions on the coordinator's venue requests.
   venue_request_approved: 'Venue request approved', venue_request_rejected: 'Venue request rejected',
   // SG2-51: a venue booked for the event was released.
@@ -30,7 +32,7 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   event_rejected: 'Event not approved',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
-  placed: color.accent, warning: color.silver, expired: color.slate,
+  placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
   venue_request_approved: color.accent, venue_request_rejected: color.silver,
   venue_booking_released: color.silver,
   venue_booking_clash: color.silver,

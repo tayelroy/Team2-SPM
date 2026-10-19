@@ -673,3 +673,103 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-77:AC6] actual Staff upserts
     assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
   }
 });
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC3] [SG2-106:AC4] [SG2-106:AC5] native venue delete and hold expiry change go through the caller JWT, refuse live work and record who and when', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const tokens = { venue: jwt('authenticated', ids.venue), coordinator: jwt('authenticated', ids.coordinator) };
+  const anonKey = jwt('anon');
+  const callerAccess = createAuthorization({ resolvePrincipal: async token => {
+    const userId = token === tokens.venue ? ids.venue : token === tokens.coordinator ? ids.coordinator : undefined;
+    if (!userId) throw new AccessError(401);
+    const role = await getAccountRole(database, userId);
+    if (!role.ok) throw new AccessError(403);
+    return { userId, role: role.role as Role };
+  } });
+  const callerApi = request(createApp(undefined, callerAccess));
+  const as = (who: keyof typeof tokens) => ({ Authorization: `Bearer ${tokens[who]}` });
+  const venueIds: number[] = [];
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    for (const name of ['Integration delete unused', 'Integration delete held']) {
+      const created = await database.from('venues').insert({ name, location: 'Local fixture', capacity: 500,
+        facilities: 'Projector', accessibility_features: 'Step-free', operating_information: '09:00-18:00' }).select('venue_id').single();
+      assert.equal(created.error, null);
+      venueIds.push(created.data!.venue_id);
+    }
+    const [unused, held] = venueIds;
+    const eventId = await planned();
+    Object.assign(dbConfig, { supabaseUrl: 'https://venue-delete-integration.supabase.test', supabaseAnonKey: anonKey });
+    // Production HTTPS adapters and caller headers; only this synthetic gateway
+    // is mapped to the disposable loopback PostgREST.
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://venue-delete-integration.supabase.test') {
+        assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`));
+        url.pathname = url.pathname.slice('/rest/v1'.length);
+        url.protocol = rest.protocol;
+        url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+
+    const placed = await callerApi.post('/api/venue-holds').set(as('venue')).send({ event_id: eventId, venue_id: held,
+      starts_at: '2090-07-01T02:00:00.000Z', ends_at: '2090-07-01T04:00:00.000Z', expires_at: '2090-06-20T02:00:00.000Z' });
+    assert.equal(placed.status, 201, JSON.stringify(placed.body));
+    const holdId = placed.body.hold.hold_id as number;
+
+    // AC1: live work blocks the delete and is listed.
+    const blocked = await callerApi.delete(`/api/venues/${held}`).set(as('venue'));
+    assert.equal(blocked.status, 409, JSON.stringify(blocked.body));
+    assert.deepEqual(blocked.body.blockers.map((item: { kind: string; id: number }) => [item.kind, item.id]), [['hold', holdId]]);
+    // AC5: only Venue Staff, and deleted_at cannot be written directly.
+    assert.equal((await callerApi.delete(`/api/venues/${unused}`).set(as('coordinator'))).status, 403);
+    const direct = await originalFetch(new URL(`/venues?venue_id=eq.${unused}`, rest), { method: 'PATCH',
+      headers: { Authorization: `Bearer ${tokens.venue}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ deleted_at: new Date().toISOString() }) });
+    assert.ok([401, 403].includes(direct.status), `direct deleted_at write returned ${direct.status}`);
+    // AC1/AC5: an unused venue is deleted with who and when.
+    const deleted = await callerApi.delete(`/api/venues/${unused}`).set(as('venue'));
+    assert.equal(deleted.status, 200, JSON.stringify(deleted.body));
+    assert.equal(deleted.body.venue.deleted_by, ids.venue);
+    assert.ok(Number.isFinite(Date.parse(deleted.body.venue.deleted_at)));
+    assert.equal((await callerApi.delete(`/api/venues/${unused}`).set(as('venue'))).status, 404);
+    // AC2: gone from the catalogue and hold choices, but the row and name stay.
+    const listed = await callerApi.get('/api/venues').set(as('venue'));
+    assert.equal(listed.status, 200);
+    assert.ok(!listed.body.venues.some((venue: { venue_id: number }) => venue.venue_id === unused));
+    assert.ok(listed.body.venues.some((venue: { venue_id: number }) => venue.venue_id === held));
+    const choices = await callerApi.get('/api/venue-holds/options').set(as('venue'));
+    assert.ok(!choices.body.venues.some((venue: { venue_id: number }) => venue.venue_id === unused));
+    assert.equal((await callerApi.post('/api/venue-holds').set(as('venue')).send({ event_id: eventId, venue_id: unused,
+      starts_at: '2090-08-01T02:00:00.000Z', ends_at: '2090-08-01T04:00:00.000Z', expires_at: '2090-06-20T02:00:00.000Z' })).status, 404);
+    assert.equal((await database.from('venues').select('name').eq('venue_id', unused).single()).data!.name, 'Integration delete unused');
+
+    // AC3/AC4/AC5: expiry change, coordinator notice and audit.
+    assert.equal((await callerApi.post(`/api/venue-holds/${holdId}/expiry`).set(as('coordinator')).send({ expires_at: '2090-06-25T02:00:00Z' })).status, 403);
+    assert.equal((await callerApi.post(`/api/venue-holds/${holdId}/expiry`).set(as('venue')).send({ expires_at: '2020-01-01T00:00:00Z' })).status, 400);
+    const moved = await callerApi.post(`/api/venue-holds/${holdId}/expiry`).set(as('venue')).send({ expires_at: '2090-06-25T10:00:00+08:00' });
+    assert.equal(moved.status, 200, JSON.stringify(moved.body));
+    assert.equal(Date.parse(moved.body.hold.expires_at), Date.parse('2090-06-25T02:00:00.000Z'));
+    assert.equal((await callerApi.post(`/api/venue-holds/${holdId}/expiry`).set(as('venue')).send({ expires_at: '2090-06-25T02:00:00Z' })).status, 400);
+    const notices = await callerApi.get('/api/venue-holds/notifications').set(as('coordinator'));
+    assert.equal(notices.status, 200);
+    const changed = notices.body.notifications.filter((notice: { hold_id: number; kind: string }) => notice.hold_id === holdId && notice.kind === 'expiry_changed');
+    assert.equal(changed.length, 1);
+    assert.match(changed[0].message, /2090-06-25T02:00:00Z/);
+    const audit = await database.from('event_audit_logs').select('actor_id,old_value,new_value').eq('event_id', eventId).eq('field_name', 'venue_hold_expiry');
+    assert.equal(audit.error, null);
+    assert.deepEqual(audit.data, [{ actor_id: ids.venue, old_value: `Hold ${holdId} expires 2090-06-20T02:00:00Z`, new_value: `Hold ${holdId} expires 2090-06-25T02:00:00Z` }]);
+    // AC3: a released hold cannot be changed.
+    assert.equal((await callerApi.post(`/api/venue-holds/${holdId}/release`).set(as('venue'))).status, 200);
+    assert.equal((await callerApi.post(`/api/venue-holds/${holdId}/expiry`).set(as('venue')).send({ expires_at: '2090-06-26T02:00:00Z' })).status, 409);
+  } finally {
+    transport?.mock.restore();
+    Object.assign(dbConfig, originalConfig);
+    if (venueIds.length) {
+      assert.equal((await database.from('venue_holds').delete().in('venue_id', venueIds)).error, null);
+      assert.equal((await database.from('venue_booking_requests').delete().in('venue_id', venueIds)).error, null);
+      assert.equal((await database.from('venues').delete().in('venue_id', venueIds)).error, null);
+    }
+  }
+});

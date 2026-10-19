@@ -16,7 +16,7 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
       const builder: Record<string, unknown> = {
         then: (resolve: (value: Result) => unknown) => Promise.resolve(result).then(resolve)
       };
-      for (const method of ['select', 'eq', 'in', 'order', 'range', 'maybeSingle', 'insert']) {
+      for (const method of ['select', 'eq', 'is', 'in', 'order', 'range', 'maybeSingle', 'insert']) {
         builder[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return builder; };
       }
       return builder;
@@ -130,4 +130,14 @@ test('[FAILURE] [SG2-47:suitability-unavailable] any database failure is reporte
   for (const [name, tables, attempt] of attempts) {
     await assert.rejects(attempt(createVenueSuitabilityStore(fakeAdmin(tables))), (error: unknown) => error instanceof AccessError && error.status === 503, name);
   }
+});
+
+test('[NORMAL] [BOUNDARY] [SG2-106:AC2] deleted venues are left out of suggestions and new bookings, but a past request still finds its venue by ID', async () => {
+  const calls: Call[] = [];
+  const store = createVenueSuitabilityStore(fakeAdmin({}, calls));
+  await store.venues();
+  await store.venues(4);
+  await store.venues(4, true);
+  const filters = calls.filter(call => call.table === 'venues' && ['is', 'eq'].includes(call.method)).map(call => [call.method, ...call.args]);
+  assert.deepEqual(filters, [['is', 'deleted_at', null], ['is', 'deleted_at', null], ['eq', 'venue_id', 4], ['eq', 'venue_id', 4]]);
 });

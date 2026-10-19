@@ -271,3 +271,13 @@ SG2-80 flags every confirmed booking that falls in a period a venue is marked un
 Migration `202610170001_venue_replacement.sql` adds the notice kind, `venue_booking_requests.replaces_booking_id`, the flag trigger, `release_replaced_booking()`, and new versions of `confirm_event()` and `decide_venue_booking_request()`. It must be applied after `202610150001_event_confirmation.sql` and `202610160001_event_notifications.sql`. SG2-80's SQL test now expects an affected confirmed event to be in Planning.
 
 Verification: `supabase/tests/venue_replacement.sql` (CI database job), `server/src/venue-booking-requests.test.ts`, `server/src/venue-bookings.test.ts`, `server/src/db/venueBookings.test.ts`, `server/src/db/venueBookingRequests.test.ts`, `server/src/db/eventArrangements.test.ts`, `server/src/events/arrangementReadiness.test.ts`, `server/src/events/fields.test.ts`, `client/src/venues/VenueBookings.test.tsx`, `client/src/venues/VenueRequests.test.tsx` and `client/src/screens/VenueSearch.test.tsx`. There is no browser journey yet: the in-memory fixture cannot flag a booking.
+
+## SG2-106: Deleting a venue
+
+| Route | Role | Result |
+| --- | --- | --- |
+| `DELETE /api/venues/:venueId` | Venue Staff | `200 { venue: { venue_id, name, deleted_at, deleted_by } }`; `409 { error, blockers }` while the venue has a current or future booking, an active hold or a pending booking request; `404` if unknown or already deleted; `400` for a bad ID |
+
+Deletion is a soft delete through `public.delete_venue(integer)` (migration `202610170007_venue_delete_hold_expiry.sql`). The row stays, so past bookings, requests and event history keep the venue name. `deleted_at` and `deleted_by` record when and who. A deleted venue is left out of the catalogue, venue search, availability, suitability suggestions, hold choices and new booking requests, and the database refuses new requests, bookings, holds, blocks and edits for it. Users cannot write `deleted_at` directly. The delete locks the venue row, the same lock every booking and hold write takes, so a request arriving during a delete waits and is then refused.
+
+Tests: `supabase/tests/venue_delete_hold_expiry.sql`, `.github/scripts/test-venue-delete-concurrency.mjs`, `server/src/venue-delete-hold-expiry.test.ts`, `client/src/venues/VenueDelete.test.tsx`, `integration/api.test.ts` and the `SMOKE-VENUE-DELETE-01` and `SMOKE-HOLD-EXPIRY-01` smoke journeys.

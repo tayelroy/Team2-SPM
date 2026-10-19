@@ -55,7 +55,7 @@ export interface PendingCapacityRequest extends BookingRequestRow {
 export interface VenueSuitabilityStore {
   event(eventId: number): Promise<SuitabilityEventRow | null>;
   /** Every venue in name order, or only the one given. */
-  venues(venueId?: number): Promise<SuitabilityVenueRow[]>;
+  venues(venueId?: number, includeDeleted?: boolean): Promise<SuitabilityVenueRow[]>;
   request(requestId: number): Promise<BookingRequestRow | null>;
   /** Approvals for the request, earliest first, with the approver's name. */
   exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
@@ -108,8 +108,11 @@ export function createVenueSuitabilityStore(admin: SupabaseClient): VenueSuitabi
       check(error);
       return data as SuitabilityEventRow | null;
     },
-    async venues(venueId) {
+    async venues(venueId, includeDeleted = false) {
       let query = admin.from('venues').select(VENUE_COLUMNS);
+      // SG2-106: a deleted venue is never suggested or checked for a new
+      // booking. Reads of past requests and bookings still find it by ID.
+      if (!includeDeleted) query = query.is('deleted_at', null);
       if (venueId !== undefined) query = query.eq('venue_id', venueId);
       const { data, error } = await query.order('name').order('venue_id');
       check(error);

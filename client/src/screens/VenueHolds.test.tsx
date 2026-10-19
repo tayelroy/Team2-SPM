@@ -3,9 +3,9 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import VenueHolds from './VenueHolds';
-import { changeHold, createHold, fetchHolds, fetchHoldOptions, type VenueHold } from '../venues/holdsApi';
+import { changeHold, changeHoldExpiry, createHold, fetchHolds, fetchHoldOptions, type VenueHold } from '../venues/holdsApi';
 
-vi.mock('../venues/holdsApi', () => ({ changeHold: vi.fn(), createHold: vi.fn(), fetchHolds: vi.fn(), fetchHoldOptions: vi.fn() }));
+vi.mock('../venues/holdsApi', () => ({ changeHold: vi.fn(), changeHoldExpiry: vi.fn(), createHold: vi.fn(), fetchHolds: vi.fn(), fetchHoldOptions: vi.fn() }));
 const hold: VenueHold = { hold_id: 7, event_id: 41, event_name: 'Partner forum', venue_id: 1, venue_name: 'Atrium Hall',
   starts_at: '2030-06-15T01:00:00.000Z', ends_at: '2030-06-15T09:00:00.000Z', expires_at: '2030-06-14T01:00:00.000Z',
   status: 'tentative', booking_id: null, request_id: 11, created_at: '2030-06-12T01:00:00.000Z' };
@@ -203,4 +203,74 @@ test('[CONFLICT] [SG2-84:AC4] obsolete account responses cannot replace the late
   await act(async () => resolve({ ok: true, data: [{ ...hold, event_name: 'Old account private event' }] }));
   expect(screen.queryByText(/Old account private event/)).not.toBeInTheDocument();
   expect(within(screen.getByRole('article')).getByText('Tentative')).toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-106:AC3] [SG2-106:AC4] staff move an active hold expiry, typed in Singapore time', async () => {
+  vi.mocked(changeHoldExpiry).mockResolvedValue({ ok: true, data: { ...hold, expires_at: '2030-06-20T02:00:00.000Z' } });
+  await open();
+  fireEvent.click(screen.getByRole('button', { name: 'Change expiry' }));
+  const form = screen.getByRole('form', { name: 'Change expiry for hold #7' });
+  fireEvent.change(within(form).getByLabelText('New expiry (Singapore time)'), { target: { value: '2030-06-20T10:00' } });
+  fireEvent.submit(form);
+  expect(await screen.findByRole('status')).toHaveTextContent('Expiry changed. The Event Coordinator has been notified of the new time.');
+  expect(changeHoldExpiry).toHaveBeenCalledWith('token', 7, '2030-06-20T02:00:00.000Z');
+  expect(screen.getByText(/Expiry: 20 Jun 2030, 10:00 \(SGT\)/)).toBeInTheDocument();
+  expect(screen.queryByRole('form', { name: 'Change expiry for hold #7' })).not.toBeInTheDocument();
+});
+
+test('[BOUNDARY] [SG2-106:AC3] an empty or past expiry is refused before any request, and cancel closes the form', async () => {
+  await open();
+  fireEvent.click(screen.getByRole('button', { name: 'Change expiry' }));
+  const form = screen.getByRole('form', { name: 'Change expiry for hold #7' });
+  fireEvent.submit(form);
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a new expiry in the future.');
+  // 09:00 SGT is exactly now (01:00 UTC), which is not in the future.
+  fireEvent.change(within(form).getByLabelText('New expiry (Singapore time)'), { target: { value: '2030-06-12T09:00' } });
+  fireEvent.submit(form);
+  expect(screen.getByRole('alert')).toHaveTextContent('Enter a new expiry in the future.');
+  expect(changeHoldExpiry).not.toHaveBeenCalled();
+  fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('button', { name: 'Change expiry' })).toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-106:AC3] a refused change shows the server reason and keeps the old expiry', async () => {
+  vi.mocked(changeHoldExpiry).mockResolvedValue({ ok: false, error: 'This hold is no longer active. Place a new request.' });
+  await open();
+  fireEvent.click(screen.getByRole('button', { name: 'Change expiry' }));
+  const form = screen.getByRole('form', { name: 'Change expiry for hold #7' });
+  fireEvent.change(within(form).getByLabelText('New expiry (Singapore time)'), { target: { value: '2030-06-20T10:00' } });
+  fireEvent.submit(form);
+  expect(await screen.findByRole('alert')).toHaveTextContent('This hold is no longer active. Place a new request.');
+  expect(screen.getByText(/Expiry: 14 Jun 2030, 09:00 \(SGT\)/)).toBeInTheDocument();
+});
+
+test('[CONFLICT] [SG2-106:AC3] a second save while one is in flight sends one request', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof changeHoldExpiry>>) => void;
+  vi.mocked(changeHoldExpiry).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  await open();
+  fireEvent.click(screen.getByRole('button', { name: 'Change expiry' }));
+  const form = screen.getByRole('form', { name: 'Change expiry for hold #7' });
+  fireEvent.change(within(form).getByLabelText('New expiry (Singapore time)'), { target: { value: '2030-06-20T10:00' } });
+  fireEvent.submit(form); fireEvent.submit(form);
+  expect(within(form).getByRole('button', { name: 'Saving…' })).toBeDisabled();
+  expect(changeHoldExpiry).toHaveBeenCalledTimes(1);
+  await act(async () => finish({ ok: true, data: hold }));
+});
+
+test('[FAILURE] [SG2-106:AC5] coordinators see the hold but no expiry control', async () => {
+  await open('Event Coordinator');
+  expect(screen.queryByRole('button', { name: 'Change expiry' })).not.toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-106:AC3] changing one hold expiry leaves the other holds as they were', async () => {
+  const other = { ...hold, hold_id: 8, event_id: 42, event_name: 'Other forum', venue_name: 'Garden Room' };
+  vi.mocked(fetchHolds).mockResolvedValue({ ok: true, data: [hold, other] });
+  vi.mocked(changeHoldExpiry).mockResolvedValue({ ok: true, data: { ...hold, expires_at: '2030-06-20T02:00:00.000Z' } });
+  await open();
+  const card = screen.getByRole('article', { name: 'Hold #7' });
+  fireEvent.click(within(card).getByRole('button', { name: 'Change expiry' }));
+  fireEvent.change(within(card).getByLabelText('New expiry (Singapore time)'), { target: { value: '2030-06-20T10:00' } });
+  fireEvent.submit(within(card).getByRole('form', { name: 'Change expiry for hold #7' }));
+  expect(await within(card).findByText(/Expiry: 20 Jun 2030, 10:00 \(SGT\)/)).toBeInTheDocument();
+  expect(within(screen.getByRole('article', { name: 'Hold #8' })).getByText(/Expiry: 14 Jun 2030, 09:00 \(SGT\)/)).toBeInTheDocument();
 });

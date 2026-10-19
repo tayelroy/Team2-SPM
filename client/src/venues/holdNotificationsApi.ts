@@ -3,7 +3,7 @@ export interface HoldNotification {
   notification_id: number;
   event_id: number;
   hold_id: number;
-  kind: 'placed' | 'warning' | 'expired';
+  kind: 'placed' | 'warning' | 'expired' | 'expiry_changed';
   message: string;
   created_at: string;
 }
@@ -27,7 +27,7 @@ function isId(value: unknown): value is number {
 function isNotification(value: unknown): value is HoldNotification {
   return isRecord(value) &&
     isId(value.notification_id) && isId(value.event_id) && isId(value.hold_id) &&
-    (value.kind === 'placed' || value.kind === 'warning' || value.kind === 'expired') &&
+    (value.kind === 'placed' || value.kind === 'warning' || value.kind === 'expired' || value.kind === 'expiry_changed') &&
     typeof value.message === 'string' && typeof value.created_at === 'string' &&
     Number.isFinite(Date.parse(value.created_at));
 }
