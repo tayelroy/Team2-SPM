@@ -447,7 +447,7 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture, with the SG2-105 fields filled in.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields off origin/main 8d2e5ec; npm run test:e2e locally in Chromium: 120/120 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
     "execution_date": "19 Oct 2026",
     "review": {
       "date": "2026-10-01",
@@ -561,7 +561,7 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields off origin/main 8d2e5ec; npm run test:e2e locally in Chromium: 120/120 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
     "execution_date": "19 Oct 2026",
     "review": {
       "date": "2026-10-01",
@@ -613,7 +613,7 @@
     "executed_by": "MARCUS CHUA",
     "review": null,
     "execution_date": "19 Oct 2026",
-    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields off origin/main 8d2e5ec; npm run test:e2e locally in Chromium: 120/120 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
     "story": "SG2-105",
     "id": "SG2-105-P01",
     "title": "an organiser must answer layout, accessibility, equipment and registration before submitting, and \"None\" is an answer",
@@ -633,10 +633,11 @@
       "Fill only the six fields that used to be enough; check Submit is disabled, 4 required fields are counted and the registration question is flagged.",
       "At 390px and 1440px, check the form has no horizontal overflow and attach screenshots.",
       "Fill the preferred layout, choose No accessibility needs and No equipment needed; check Submit is still disabled until No registration needed is chosen.",
-      "Submit; check the confirmation, the Preferred room layout row on the detail page and the stored API detail."
+      "Submit; check the confirmation, the Preferred room layout row on the detail page and the stored API detail.",
+      "Assign the request to the coordinator as the Event Coordinator Lead; in a second tab, sign in as the coordinator, open it from Awaiting review and read the Preferred room layout row."
     ],
-    "data": "Layout workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 SGT; attendance 25; Projector; layout Banquet rounds of ten; None; None; no registration",
-    "expected": "Submit stays disabled until all ten answers are given; no overflow at 390px or 1440px; after submit the detail shows Banquet rounds of ten and the API stores status unassigned, preferred_layout Banquet rounds of ten, accessibility_needs None, equipment_requirements None, registration_needed false.",
+    "data": "Layout workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 SGT; attendance 25; Projector; layout Banquet rounds of ten; None; None; no registration; assigned to Regression coordinator by the Lead",
+    "expected": "Submit stays disabled until all ten answers are given; no overflow at 390px or 1440px; after submit the detail shows Banquet rounds of ten and the API stores status unassigned, preferred_layout Banquet rounds of ten, accessibility_needs None, equipment_requirements None, registration_needed false. The assigned coordinator's review panel shows Preferred room layout: Banquet rounds of ten.",
     "actual": "PASS: ran in the full local Chromium run on 19 Oct 2026 against the production build and loopback fixture."
   },
   {
@@ -647,7 +648,7 @@
     "executed_by": "MARCUS CHUA",
     "review": null,
     "execution_date": "19 Oct 2026",
-    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields off origin/main 8d2e5ec; npm run test:e2e locally in Chromium: 120/120 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
     "story": "SG2-105",
     "id": "SG2-105-F01",
     "title": "a draft missing the customer minimum saves, but submitting it is refused, lists every missing item and leaves it a draft",
