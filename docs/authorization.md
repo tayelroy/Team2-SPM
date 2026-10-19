@@ -229,8 +229,8 @@ venue request or booking, Technical Support when it has an equipment request
 or reservation, and the Safety Officer from its safety check on.
 
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
-`change_account_roles()`), `202610180002_acting_role_functions.sql`,
-`202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`.
+`change_account_roles()`), `202610200001_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
+`202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.
 Tests: `supabase/tests/account_multi_roles.sql`, `server/src/multiRoles.test.ts`,
 `client/src/screens/RoleSwitcher.test.tsx`, browser journey `SG2-104-P01`.
 

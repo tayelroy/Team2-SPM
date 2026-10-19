@@ -1,23 +1,31 @@
--- SG2-104: functions that read the caller's role now act as the request's
--- acting role (202610180001). Each body below is the latest definition copied
--- verbatim; only its role lookup changed. Before SG2-104 these read a single
--- account_roles row with SELECT INTO, which with several roles picks an
--- arbitrary one. Writes take lock_acting_role(), which share-locks all of the
--- caller's role rows, so a role change waits for the action in progress.
--- release_venue_booking() previously took no such lock; it now does.
+-- SG2-104: the functions that read the caller's role act as the request's
+-- acting role (202610180001), and decide_venue_booking_request() refuses a
+-- request the deciding Venue Staff member raised themselves.
 --
--- update_event_request_draft() is service-only and receives the verified
--- actor; it now asks whether that actor holds event_organiser instead of
--- reading one role.
+-- Each body below is the LATEST definition, copied verbatim; only its role
+-- lookup (or, for the venue decision, the own-request check) changed. This
+-- migration is deliberately the last one: if a later migration redefines one
+-- of these functions, it must keep the acting-role line (and the own-request
+-- check), or this story's behaviour is lost.
 --
--- Sources: venue_hold_occupancy() and list_venue_holds() from
--- 202610050001_venue_holds.sql; release_venue_booking() from
--- 202610100002_venue_booking_release.sql; manage_equipment_requirements()
--- from 202610140002_equipment_reserved_shortfall.sql;
--- manage_equipment_reservations() from 202610140001_equipment_reservations.sql;
--- confirm_event() from 202610170002_confirmation_rechecks_and_disruptions.sql;
--- update_event_request_draft() from 202610170003_event_draft_change_history.sql.
+-- Before SG2-104 these read a single account_roles row with SELECT INTO,
+-- which with several roles picks an arbitrary one. Writes take
+-- lock_acting_role(), which share-locks all of the caller's role rows, so a
+-- role change waits for the action in progress. update_event_request_draft()
+-- is service-only and receives the verified actor; it now asks whether that
+-- actor holds event_organiser instead of reading one role.
 -- CREATE OR REPLACE keeps each function's existing grants.
+--
+-- Sources:
+--   venue_hold_occupancy() from 202610050001_venue_holds.sql
+--   list_venue_holds() from 202610050001_venue_holds.sql
+--   release_venue_booking() from 202610100002_venue_booking_release.sql
+--   manage_equipment_requirements() from 202610190004_safety_check_queue.sql
+--   manage_equipment_reservations() from 202610140001_equipment_reservations.sql
+--   confirm_event() from 202610170002_confirmation_rechecks_and_disruptions.sql
+--   update_event_request_draft() from 202610170003_event_draft_change_history.sql
+--   safety_check_queue() from 202610190004_safety_check_queue.sql
+--   decide_venue_booking_request() from 202610190002_venue_staff_capacity_exceptions.sql
 begin;
 
 create or replace function public.venue_hold_occupancy()
@@ -170,7 +178,7 @@ begin
     return jsonb_build_object('outcome', 'missing');
   end if;
   if p_action <> 'read' then
-    if event_row.status not in ('approved', 'planning') then
+    if event_row.status not in ('approved', 'planning', 'awaiting_safety_check') then
       return jsonb_build_object('outcome', 'closed');
     end if;
     if jsonb_typeof(p_values) is distinct from 'object' then
@@ -270,6 +278,9 @@ begin
     end if;
   end if;
 
+  -- SG2-91: a new or amended request sends an awaiting event back to
+  -- Planning in this transaction, so report the status after the write.
+  select * into event_row from public.events where event_id = p_event_id;
   return jsonb_build_object('outcome', 'ok',
     'event', jsonb_build_object('event_id', event_row.event_id, 'name', event_row.name, 'status', event_row.status),
     'requests', coalesce((select jsonb_agg(jsonb_build_object(
@@ -284,8 +295,8 @@ begin
       from public.equipment), '[]'::jsonb),
     'venues', coalesce((select jsonb_agg(jsonb_build_object('venue_id', venue_id, 'name', name) order by venue_id)
       from public.venues), '[]'::jsonb),
-    'can_request', caller_role = 'event_coordinator' and event_row.status in ('approved', 'planning'),
-    'can_arrange', caller_role = 'technical_support_staff' and event_row.status in ('approved', 'planning'));
+    'can_request', caller_role = 'event_coordinator' and event_row.status in ('approved', 'planning', 'awaiting_safety_check'),
+    'can_arrange', caller_role = 'technical_support_staff' and event_row.status in ('approved', 'planning', 'awaiting_safety_check'));
 end;
 $$;
 
@@ -595,5 +606,223 @@ begin
     || (select jsonb_object_agg(k, updated_values -> k) from unnest(fields) k));
 end;
 $function$;
+
+create or replace function public.safety_check_queue()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare
+  caller uuid := auth.uid();
+  caller_role text;
+begin
+  if caller is null then raise exception using errcode = '42501', message = 'Access denied'; end if;
+  caller_role := public.acting_role();
+  if caller_role is distinct from 'safety_officer' then
+    raise exception using errcode = '42501', message = 'Access denied';
+  end if;
+
+  return coalesce((
+    select jsonb_agg(item order by since, id)
+    from (
+      select e.awaiting_safety_check_since as since, e.event_id as id, jsonb_build_object(
+        'event_id', e.event_id,
+        'safety_check_revision', e.safety_check_revision,
+        'name', e.name,
+        'organisation', e.organisation,
+        'proposed_date', e.proposed_date,
+        'awaiting_since', e.awaiting_safety_check_since,
+        'expected_attendance', e.expected_attendance,
+        'accessibility_needs', e.accessibility_needs,
+        'expected_crowd_movement', e.expected_crowd_movement,
+        'venues', coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'request_id', r.request_id,
+            'venue_id', v.venue_id,
+            'venue_name', v.name,
+            'location', v.location,
+            'capacity', v.capacity,
+            'layout', r.layout,
+            'starts_at', r.starts_at,
+            'ends_at', r.ends_at,
+            'accessibility_features', v.accessibility_features,
+            'emergency_access', o.emergency_access,
+            'known_restrictions', o.known_restrictions
+          ) order by r.starts_at, r.request_id)
+          from public.venue_booking_requests r
+          join public.venues v on v.venue_id = r.venue_id
+          left join public.venue_operations o on o.venue_id = v.venue_id
+          where r.event_id = e.event_id and lower(r.status) = 'approved'), '[]'::jsonb),
+        'equipment', coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'request_id', q.request_id,
+            'equipment_name', eq.name,
+            'quantity', q.quantity,
+            'placement_venue_name', pv.name,
+            'placement_position', q.placement_position,
+            'arrangement_notes', q.arrangement_notes
+          ) order by q.starts_at, q.request_id)
+          from public.equipment_requests q
+          join public.equipment eq on eq.equipment_id = q.equipment_id
+          left join public.venues pv on pv.venue_id = q.placement_venue_id
+          where q.event_id = e.event_id and lower(q.status) not in ('rejected', 'cancelled')), '[]'::jsonb)
+      ) as item
+      from public.events e
+      where e.status = 'awaiting_safety_check'
+    ) awaiting
+  ), '[]'::jsonb);
+end;
+$$;
+
+create or replace function public.decide_venue_booking_request(p_request_id bigint, p_decision text, p_reason text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r public.venue_booking_requests;
+  e public.events;
+  v public.venues;
+  venue integer;
+  hold bigint;
+  booking bigint;
+  clash record;
+  replaced_venue integer;
+  reason text := nullif(btrim(p_reason), '');
+  instant timestamptz;
+  gap interval;
+begin
+  if not exists (select 1 from public.account_roles where user_id = auth.uid() and role = 'venue_staff') then
+    raise exception using errcode = '42501', message = 'Access denied';
+  end if;
+  if p_decision is null or p_decision not in ('approve', 'reject')
+      or (p_decision = 'reject' and reason is null) or char_length(reason) > 500 then
+    return jsonb_build_object('outcome', 'invalid');
+  end if;
+
+  select venue_id into venue from public.venue_booking_requests where request_id = p_request_id;
+  if not found then return jsonb_build_object('outcome', 'missing'); end if;
+  -- SG2-81: a replacement also releases the booking it replaces, which takes
+  -- that venue's lock. Take the two venue locks lowest id first so two
+  -- decisions on swapped venues cannot wait on each other.
+  select b.venue_id into replaced_venue
+    from public.venue_booking_requests q join public.venue_bookings b on b.booking_id = q.replaces_booking_id
+    where q.request_id = p_request_id;
+  if replaced_venue is not null and replaced_venue < venue then
+    perform 1 from public.venues where venue_id = replaced_venue for update;
+  end if;
+  -- Venue before request: the order every booking, block and hold write uses.
+  select * into v from public.venues where venue_id = venue for update;
+  select * into r from public.venue_booking_requests where request_id = p_request_id for update;
+  if r.status <> 'pending' then
+    return jsonb_build_object('outcome', 'decided', 'status', r.status);
+  end if;
+  -- SG2-104 separation of duties: Venue Staff never decide a request they
+  -- raised themselves as the event's coordinator. Requests a hold or an older
+  -- release created have no requester and are not anyone's own.
+  if r.requested_by = auth.uid() then
+    return jsonb_build_object('outcome', 'own_request');
+  end if;
+  -- A hold's request is converted or released through the hold (SG2-84).
+  select hold_id into hold from public.venue_holds where request_id = r.request_id;
+  if hold is not null then return jsonb_build_object('outcome', 'hold', 'hold_id', hold); end if;
+  select * into e from public.events where event_id = r.event_id for update;
+  instant := clock_timestamp();
+  -- SG2-78: setup before and turnaround after every booking at this venue.
+  gap := public.venue_preparation_gap(r.venue_id);
+
+  if p_decision = 'approve' then
+    -- SG2-81: a replacement for an unavailable venue is also decided once the
+    -- event has reached preparation or been confirmed.
+    if (e.status not in ('approved', 'planning')
+        and not (r.replaces_booking_id is not null and e.status in ('preparation', 'confirmed')))
+      or r.ends_at <= instant then
+      return jsonb_build_object('outcome', 'closed');
+    end if;
+    -- AC1: no booking conflict, under the venue lock taken above. SG2-78: the
+    -- effective periods (setup and turnaround included) must not overlap.
+    select 'booking'::text as kind, b.starts_at, b.ends_at, coalesce(nullif(oe.name, ''), 'Untitled event')::text as label
+      into clash
+      from public.venue_bookings b left join public.events oe on oe.event_id = b.event_id
+      where b.venue_id = r.venue_id and b.status = 'confirmed' and b.starts_at < r.ends_at + gap and b.ends_at > r.starts_at - gap
+      order by b.starts_at limit 1;
+    if not found then
+      select 'block'::text as kind, u.starts_at, u.ends_at, u.reason::text as label
+        into clash
+        from public.venue_unavailability u
+        where u.venue_id = r.venue_id and u.starts_at < r.ends_at and u.ends_at > r.starts_at
+        order by u.starts_at limit 1;
+    end if;
+    if not found then
+      select 'hold'::text as kind, h.starts_at, h.ends_at, coalesce(nullif(he.name, ''), 'Untitled event')::text as label
+        into clash
+        from public.venue_holds h join public.events he on he.event_id = h.event_id
+        where h.venue_id = r.venue_id and h.status = 'tentative' and h.expires_at > instant
+          and h.starts_at < r.ends_at + gap and h.ends_at > r.starts_at - gap
+        order by h.starts_at limit 1;
+    end if;
+    if found then
+      return jsonb_build_object('outcome', 'conflict', 'kind', clash.kind,
+        'starts_at', clash.starts_at, 'ends_at', clash.ends_at, 'label', clash.label);
+    end if;
+    -- AC1: enough capacity, or an approved exception covering the attendance
+    -- (SG2-47), recorded by Venue Staff (SG2-66 AC5). Missing facilities are
+    -- refused by the API before this point.
+    if e.expected_attendance is not null and (v.capacity is null or e.expected_attendance > v.capacity)
+        and not exists (select 1 from public.venue_capacity_exceptions x
+          where x.request_id = r.request_id and x.expected_attendance >= e.expected_attendance
+            and x.approver_role = 'venue_staff') then
+      return jsonb_build_object('outcome', 'capacity');
+    end if;
+
+    insert into public.venue_bookings (venue_id, event_id, starts_at, ends_at, status)
+      values (r.venue_id, r.event_id, r.starts_at, r.ends_at, 'confirmed')
+      returning booking_id into booking;
+    -- The event's own venue, unless an earlier one is already set (SG2-82).
+    update public.events set venue_booking_id = coalesce(venue_booking_id, booking) where event_id = e.event_id;
+    update public.venue_booking_requests
+      set status = 'approved', decided_by = auth.uid(), decided_at = instant,
+        decision_reason = reason, venue_booking_id = booking
+      where request_id = r.request_id
+      returning * into r;
+    -- SG2-81 AC5: once the replacement is approved, the booking it replaces is
+    -- released (its request is cancelled, the event's history records it and
+    -- the coordinator and organiser are told), so the event no longer shows
+    -- alternative arrangements as required. A booking already released, or
+    -- over, is left as it is.
+    if r.replaces_booking_id is not null and exists (select 1 from public.venue_bookings x
+        where x.booking_id = r.replaces_booking_id and x.event_id = r.event_id) then
+      perform public.release_replaced_booking(r.replaces_booking_id, v.name);
+    end if;
+  else
+    update public.venue_booking_requests
+      set status = 'rejected', decided_by = auth.uid(), decided_at = instant, decision_reason = reason
+      where request_id = r.request_id
+      returning * into r;
+  end if;
+
+  -- AC3: the decision appears in the event's history (SG2-40).
+  insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value)
+    values (r.event_id, auth.uid(), 'venue_booking_request',
+      'Pending: ' || v.name || ' (request ' || r.request_id || ')',
+      initcap(r.status) || ': ' || v.name || ' (request ' || r.request_id || ')' || coalesce(' — ' || reason, ''));
+  -- AC1/AC2: the coordinator is told, with the reason for a rejection.
+  if e.coordinator_id is not null then
+    insert into public.notifications (recipient_id, event_id, request_id, kind, message)
+      values (e.coordinator_id, r.event_id, r.request_id, 'venue_request_' || r.status,
+        v.name || ' was ' || r.status || ' for ' || coalesce(nullif(e.name, ''), 'Untitled event')
+          || case when r.status = 'rejected' then ': ' || reason else '.' end)
+      on conflict (request_id, recipient_id, kind) do nothing;
+  end if;
+  -- SG2-68 AC1: the organiser is told the same, unless they are the coordinator just told.
+  if e.organiser_id is not null and e.organiser_id is distinct from e.coordinator_id then
+    insert into public.notifications (recipient_id, event_id, request_id, kind, message)
+      values (e.organiser_id, r.event_id, r.request_id, 'venue_request_' || r.status,
+        v.name || ' was ' || r.status || ' for ' || coalesce(nullif(e.name, ''), 'Untitled event')
+          || case when r.status = 'rejected' then ': ' || reason else '.' end)
+      on conflict (request_id, recipient_id, kind) do nothing;
+  end if;
+  return jsonb_build_object('outcome', 'updated', 'request_id', r.request_id, 'status', r.status,
+    'venue_booking_id', r.venue_booking_id, 'decided_at', r.decided_at);
+end;
+$$;
 
 commit;
