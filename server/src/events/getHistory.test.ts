@@ -39,6 +39,7 @@ const BASE_EVENT_REQUEST: EventRequestRecord = {
   purpose: 'Annual gathering',
   description: 'A great tech summit',
   venue_requirements: 'Large hall with projector',
+  preferred_layout: null,
   accessibility_needs: 'Wheelchair ramp',
   equipment_requirements: '2 mics, 1 projector',
   registration_needed: true

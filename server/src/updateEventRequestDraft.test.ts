@@ -20,6 +20,7 @@ const COMPLETE_BODY = {
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
+  preferred_layout: 'Theatre',
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'Lectern, 2 radio mics',
   registration_needed: true
@@ -36,6 +37,7 @@ const DRAFT_REQUEST = {
   proposed_date: null,
   expected_attendance: null,
   venue_requirements: null,
+  preferred_layout: null,
   accessibility_needs: null,
   equipment_requirements: null,
   registration_needed: null
@@ -119,18 +121,19 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, ...COMPLETE_BODY });
   });
 
-  test('[NORMAL] [SG2-28:AC2] [SG2-29:AC1] an update omitting only accessibility needs is submission-ready', async () => {
+  test('[NORMAL] [SG2-105:AC4] [SG2-29:AC1] an update clearing the accessibility answer is still saved and reports it outstanding', async () => {
     const { accessibility_needs, ...withoutAccessibility } = COMPLETE_BODY;
     const response = await request(buildApp()).patch('/api/event-requests/7').send(withoutAccessibility);
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body.missingForSubmission, []);
+    assert.deepEqual(response.body.missingForSubmission, ['accessibility_needs']);
   });
 
   test('[NORMAL] [SG2-28:AC4] [SG2-29:AC1] reports what is still outstanding for an incomplete update', async () => {
     const response = await request(buildApp()).patch('/api/event-requests/7').send({ name: 'Partner Forum' });
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, [
-      'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements'
+      'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
+      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
     ]);
   });
 
@@ -175,7 +178,8 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, name: null });
     assert.deepEqual(response.body.missingForSubmission, [
-      'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements'
+      'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
+      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
     ]);
   });
 
