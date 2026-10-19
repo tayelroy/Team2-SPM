@@ -61,6 +61,8 @@ export class MemoryDatabase {
       notifications: [],
       equipment_requests: [],
       equipment_reservations: [],
+      // SG2-66: attendee registrations, counted when a change is assessed.
+      registrations: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
         quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [
@@ -128,8 +130,11 @@ export class MemoryDatabase {
     this.tables.venue_booking_requests.push({ ...request, request_id: 21, venue_id: 3 }, { ...request, request_id: 22, venue_id: 1 });
   }
 
-  /** Capacity discovery includes only pending requests that still need an
-   * exception. The colleague shares an organisation but is a different owner. */
+  /** Capacity discovery lists pending requests, and booked ones whose live
+   * event outgrew the venue (SG2-66 AC2), that still need a Venue Staff
+   * exception. The colleague shares an organisation but is a different owner;
+   * their request carries only an approval Technical Support recorded before
+   * SG2-66, which no longer counts (SG2-66 AC5). */
   seedCapacityExceptions() {
     this.seedVenueSuitability();
     const event = this.tables.events.find(row => row.event_id === 61)!;
@@ -139,18 +144,29 @@ export class MemoryDatabase {
       { ...event, event_id: 63, name: 'Covered Capacity Forum' },
       { ...event, event_id: 64, name: 'Withdrawn Capacity Forum' },
       { ...event, event_id: 65, name: 'Adequate Capacity Forum', expected_attendance: 100 },
-      { ...event, event_id: 66, name: 'Unknown Attendance Forum', expected_attendance: null }
+      { ...event, event_id: 66, name: 'Unknown Attendance Forum', expected_attendance: null },
+      { ...event, event_id: 67, name: 'Booked Capacity Forum', status: 'confirmed', venue_booking_id: 67 }
     );
+    this.tables.venue_bookings.push({ booking_id: 67, venue_id: 3, event_id: 67,
+      starts_at: '2030-06-19T02:00:00Z', ends_at: '2030-06-19T10:00:00Z', status: 'confirmed' });
     this.tables.venue_booking_requests.push(
       { ...request, request_id: 23, event_id: 62, starts_at: '2030-06-18T02:00:00Z', ends_at: '2030-06-18T10:00:00Z' },
       { ...request, request_id: 24, event_id: 63 },
       { ...request, request_id: 25, event_id: 64, status: 'cancelled' },
       { ...request, request_id: 26, event_id: 65 },
-      { ...request, request_id: 27, event_id: 66 }
+      { ...request, request_id: 27, event_id: 66 },
+      { ...request, request_id: 28, event_id: 67, status: 'approved', venue_booking_id: 67,
+        starts_at: '2030-06-19T02:00:00Z', ends_at: '2030-06-19T10:00:00Z' }
     );
-    this.tables.venue_capacity_exceptions.push({ exception_id: 1, request_id: 24,
-      approved_by: 'user-venue', approver_role: 'venue_staff', expected_attendance: 150,
-      venue_capacity: 120, approved_at: '2026-10-01T02:00:00Z' });
+    this.tables.venue_capacity_exceptions.push(
+      { exception_id: 1, request_id: 24, approved_by: 'user-venue', approver_role: 'venue_staff', expected_attendance: 150,
+        venue_capacity: 120, approved_at: '2026-10-01T02:00:00Z' },
+      { exception_id: 2, request_id: 23, approved_by: 'user-support', approver_role: 'technical_support_staff', expected_attendance: 150,
+        venue_capacity: 120, approved_at: '2026-10-01T03:00:00Z' },
+      // Booked for 130 people; attendance has since risen to 150.
+      { exception_id: 3, request_id: 28, approved_by: 'user-venue', approver_role: 'venue_staff', expected_attendance: 130,
+        venue_capacity: 120, approved_at: '2026-10-01T04:00:00Z' }
+    );
   }
 
   /** SG2-33/34: an unassigned submitted request, plus a second coordinator
@@ -530,6 +546,10 @@ class MemoryQuery implements PromiseLike<QueryResult> {
       if (alias === 'venue' && table === 'venues') return this.database.tables.venues.find(venue => venue.venue_id === row.venue_id) ?? null;
       if (alias === 'exceptions' && table === 'venue_capacity_exceptions') {
         return this.database.tables.venue_capacity_exceptions.filter(exception => exception.request_id === row.request_id);
+      }
+      // SG2-66 AC2: the booking an approved request holds.
+      if (alias === 'venue_booking' && table === 'venue_bookings') {
+        return this.database.tables.venue_bookings.find(booking => booking.booking_id === row.venue_booking_id) ?? null;
       }
     }
     throw new Error(`Unsupported fixture relation: ${alias}:${table}`);

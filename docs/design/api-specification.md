@@ -120,7 +120,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 47 | POST | `/api/venue-booking-requests/:requestId/decision` | `venue_booking.decide` | VS | New since W7 — SG2-49; W7 #1 — SG2-78; W7 #3 — SG2-82 | [7.4](#74-post-apivenue-booking-requestsrequestiddecision) |
 | 48 | POST | `/api/venue-booking-requests/:requestId/withdraw` | `venue_booking.withdraw` | EC | W7 #3 — SG2-82 | [7.5](#75-post-apivenue-booking-requestsrequestidwithdraw) |
 | 49 | GET | `/api/venue-booking-requests/:requestId/suitability` | `venues.suitability.view` | EC, VS, TSS, EO | — | [7.6](#76-get-apivenue-booking-requestsrequestidsuitability) |
-| 50 | POST | `/api/venue-booking-requests/:requestId/capacity-exception` | `venue_booking.capacity_exception.approve` | VS, TSS, EO | — | [7.7](#77-post-apivenue-booking-requestsrequestidcapacity-exception) |
+| 50 | POST | `/api/venue-booking-requests/:requestId/capacity-exception` | `venue_booking.capacity_exception.approve` | VS | SG2-66 AC5 | [7.7](#77-post-apivenue-booking-requestsrequestidcapacity-exception) |
 | 51 | GET | `/api/venue-holds` | `venues.holds.read` | EC, VS, TSS | W7 #4 — SG2-84/85 | [8.1](#81-get-apivenue-holds) |
 | 52 | GET | `/api/venue-holds/options` | `venues.holds.manage` | VS | W7 #4 — SG2-84 | [8.2](#82-get-apivenue-holdsoptions) |
 | 53 | GET | `/api/venue-holds/notifications` | `venues.holds.read` | EC, VS, TSS | W7 #4 — SG2-84/85 | [8.3](#83-get-apivenue-holdsnotifications) |
@@ -145,7 +145,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
 | 72 | GET | `/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
 | 73 | GET | `/api/health/db` | public | anyone | — | [10.2](#102-get-healthdb-and-get-apihealthdb) |
 
-| 74 | GET | `/api/venue-booking-requests/capacity-exceptions` | `venue_booking.capacity_exception.approve` | VS, TSS, EO | SG2-47 reachability repair | [7.8](#78-get-apivenue-booking-requestscapacity-exceptions) |
+| 74 | GET | `/api/venue-booking-requests/capacity-exceptions` | `venue_booking.capacity_exception.approve` | VS | SG2-47 reachability repair; SG2-66 AC2/AC5 | [7.8](#78-get-apivenue-booking-requestscapacity-exceptions) |
 
 ### What each role can call today
 - **ATT:** only rows 3, 5 and 6 (`/api/auth/me`, `/api/profile`), plus the public endpoints.
@@ -411,15 +411,17 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - registration must open before it closes
   - registration must close before the event
 - **200:** `{ event: PlanningRecord, arrangements_recheck_needed, outstanding_arrangements[] }`. The status becomes `planning` when it was `approved` or when an arrangement impact is confirmed.
+- **SG2-66 AC6:** on a `confirmed` or `preparation` event only registration settings and `planning_notes` may change; unchanged values are ignored.
 - **Errors:**
   - 400 `{ error: "Invalid planning details", details[] }`
   - 403 `Only the assigned event coordinator can update planning details.`
   - 404 `Event request not found.`
   - 409 `Cannot update planning information for a <status> event.`
   - 409 `{ error: "Arrangements require rechecking.", requires_confirmation: true, affected_arrangements[], impact_notes[] }`
+  - 409 `{ error: "This event is <Confirmed|in Preparation>, so its details can no longer be edited directly. …", code: "change_request_required", fields[] }` (SG2-66 AC6)
   - 409 `This event is no longer assigned to you. Refresh and try again.` (SG2-90: the guarded update matched no row)
   - 503
-- **Side effect:** one history row per audited field. `planning_notes` rows are internal-only.
+- **Side effect:** one history row per audited field. `planning_notes` rows are internal-only. A move from `awaiting_safety_check`, `preparation` or `confirmed` back to `planning` clears `confirmed_by`/`confirmed_at` and sends `event_returned_to_planning` notices to the organiser and the coordinator (SG2-66 AC7; 503 if they cannot be stored).
 
 ### 4.14 GET /api/event-requests/:eventId/arrangements
 - **Week 7:** New since W7 — SG2-57; #3 — SG2-82.
@@ -767,7 +769,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 `Approve a capacity exception for this request before approving the booking.`
   - 409 `closed`
   - 409 `{ error, conflict: { kind: "booking"|"block"|"hold", starts_at, ends_at, label } }`
-- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610170001_venue_replacement.sql`.
+- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610190001_venue_staff_capacity_exceptions.sql`: only a capacity exception recorded by Venue Staff covers the attendance (SG2-66 AC5). The API applies the same rule before calling it.
 - **What the RPC does:**
   - Under the venue lock it refuses confirmed bookings and live holds within the setup + turnaround gap (`venue_preparation_gap`, SG2-78), and unavailability without the gap.
   - It inserts a confirmed `venue_bookings` row and keeps the event's first booking (`events.venue_booking_id = coalesce(...)`, SG2-82).
@@ -796,28 +798,28 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Errors:** 400 `Invalid booking request ID.`; 404 `Booking request not found.`; 503.
 
 ### 7.7 POST /api/venue-booking-requests/:requestId/capacity-exception
-- **Source:** `venues/suitabilityRoutes.ts:132`.
-- **Permission:** `venue_booking.capacity_exception.approve` (VS, TSS, EO). Never an EC.
+- **Source:** `venues/suitabilityRoutes.ts` (`createBookingRequestSuitabilityRouter`).
+- **Permission:** `venue_booking.capacity_exception.approve` (VS only, SG2-66 AC5; this replaces the SG2-47 AC3 list of VS, TSS and EO). Every other role gets 403.
 - **201:** `{ exception: { exception_id, request_id, approved_by, approver_role, expected_attendance, venue_capacity, approved_at, approver_name }, booking }`
 - **Errors:**
   - 400
   - 404
-  - 409 request not pending
+  - 409 `Only a booking request awaiting a decision, or a booked venue for an event still going ahead, can be given a capacity exception.`
   - 409 facility missing (no exception allowed)
   - 409 no capacity issue
   - 409 exception already approved
   - 503
-- **Rule:** an EO only for their own event.
-- **Data:** inserts into `venue_capacity_exceptions`. Actor, role, attendance and capacity come from the verified session and current stored rows; no approval body is required. Pending status, ownership, missing facilities and existing coverage are rechecked independently of discovery.
-- **Reachability:** Organiser and Technical Support navigation opens **Capacity exceptions**, then the existing suitability view and approval action. Venue Staff retain their existing request queue. Approval shows the stored receipt but leaves the booking request pending and creates no booking; Venue Staff must make a separate booking decision. Refreshing discovery removes a covered request.
+- **Eligible requests:** a pending request, or (SG2-66 AC2) an approved request that still holds its confirmed booking for an event in `approved`, `planning`, `awaiting_safety_check`, `preparation` or `confirmed` whose expected attendance now exceeds the venue's capacity. The exception is for the revised attendance; the booking is not changed.
+- **Data:** inserts into `venue_capacity_exceptions`. Actor, role, attendance and capacity come from the verified session and current stored rows; no approval body is required. Request status, its booking, missing facilities and existing coverage are rechecked independently of discovery. Only exceptions recorded by Venue Staff count as coverage; exceptions recorded by Technical Support Staff or organisers before SG2-66 are still returned in GET suitability `exceptions[]` as history but never count.
+- **Reachability:** Venue Staff navigation opens **Capacity exceptions**, then the existing suitability view and approval action; the same action is on the Venue Staff request queue. Approval shows the stored receipt but leaves a pending booking request pending and creates no booking; Venue Staff make a separate booking decision. Refreshing discovery removes a covered request.
 
 ### 7.8 GET /api/venue-booking-requests/capacity-exceptions
-- **Source:** `venues/suitabilityRoutes.ts` (`createBookingRequestSuitabilityRouter`); `db/venueSuitability.ts` (`pendingCapacityRequests`); `client/src/screens/CapacityExceptions.tsx`.
-- **Permission:** existing `venue_booking.capacity_exception.approve` (VS, TSS, EO). EC, ECL, SO and ATT are denied before the store is read.
-- **Input:** no body or supported owner/event selector. Scope comes from the verified principal; caller query parameters cannot select another organiser.
-- **200:** `{ requests: [{ request_id, event_id, event_name, venue_name, starts_at, ends_at, expected_attendance, venue_capacity }] }`. IDs and attendance are positive integers; periods are ISO timestamps. Capacity is an integer or `null` when not recorded. Empty results are `{ requests: [] }`; blank names use `Untitled event` / `Unnamed venue`. Owner IDs, requirement text and approval records are not list fields.
-- **Eligibility:** pending requests with positive recorded attendance, a capacity issue not already covered by an exception, and no missing required facility. Suitability and coverage use the existing assessment rules, including unrecorded venue capacity. A list entry is not an approval or reservation.
-- **Scope and reads:** EO queries filter `event.organiser_id` in the database and the handler independently checks creator ownership. VS/TSS may discover eligible requests across events. Named event/venue/exception foreign keys avoid ambiguous PostgREST embeds. Ordered batches of 1,000 are read until exhausted; later-page failure returns 503 instead of a partial successful list. The response has the protected route's `Cache-Control: no-store`.
+- **Source:** `venues/suitabilityRoutes.ts` (`createBookingRequestSuitabilityRouter`); `db/venueSuitability.ts` (`capacityCandidates`); `client/src/screens/CapacityExceptions.tsx`.
+- **Permission:** existing `venue_booking.capacity_exception.approve` (VS only since SG2-66 AC5). Every other role is denied before the store is read.
+- **Input:** no body or supported owner/event selector.
+- **200:** `{ requests: [{ request_id, event_id, event_name, venue_name, starts_at, ends_at, expected_attendance, venue_capacity, booked }] }`. IDs and attendance are positive integers; periods are ISO timestamps. Capacity is an integer or `null` when not recorded. `booked` is true for an approved request that holds a confirmed booking (SG2-66 AC2); the screen marks it "Booked — attendance raised". Empty results are `{ requests: [] }`; blank names use `Untitled event` / `Unnamed venue`. Owner IDs, requirement text and approval records are not list fields.
+- **Eligibility:** requests eligible under 7.7 with positive recorded attendance, a capacity issue not already covered by a Venue Staff exception, and no missing required facility. Suitability and coverage use the existing assessment rules, including unrecorded venue capacity. A list entry is not an approval or reservation.
+- **Reads:** Venue Staff discover eligible requests across events. Named request-booking/event/venue/exception foreign keys avoid ambiguous PostgREST embeds. Ordered batches of 1,000 are read until exhausted; later-page failure returns 503 instead of a partial successful list. The response has the protected route's `Cache-Control: no-store`.
 - **Errors:** common 401/403; 503 when the service or any read fails. Existing GET suitability and POST capacity-exception endpoints remain authoritative if a request changes after discovery.
 
 ---
@@ -896,7 +898,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 conflict
   - 409 `Approve a capacity exception for this booking request before converting the hold.`
   - 409 `Required venue facilities are missing. Choose a suitable venue.`
-- **Data:** RPC `change_venue_hold(p_hold_id, 'convert')`. The latest definition is in `202610160001_event_notifications.sql`.
+- **Data:** RPC `change_venue_hold(p_hold_id, 'convert')`. The latest definition is in `202610190001_venue_staff_capacity_exceptions.sql` (only a Venue Staff capacity exception counts, SG2-66 AC5).
 
 ### 8.7 GET /api/venue-bookings
 - **Week 7:** New since W7 — SG2-51.

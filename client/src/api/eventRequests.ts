@@ -735,6 +735,13 @@ export type UpdateEventPlanningResult =
       message: string;
     }
   | {
+      /** SG2-66 AC6: a Confirmed or Preparation event's details need a change request. */
+      ok: false;
+      kind: 'change_request_required';
+      message: string;
+      fields: string[];
+    }
+  | {
       ok: false;
       kind:
         | 'validation'
@@ -789,6 +796,14 @@ export async function updateEventPlanning(
           : [],
         impact_notes: Array.isArray(body?.impact_notes) ? body.impact_notes : [],
         message: body?.error ?? 'Arrangements require rechecking.'
+      };
+    }
+    if (response.status === 409 && body?.code === 'change_request_required') {
+      return {
+        ok: false,
+        kind: 'change_request_required',
+        message: body?.error ?? 'Ask for this change through a change request.',
+        fields: Array.isArray(body?.fields) ? body.fields : []
       };
     }
     if (response.status === 409) {

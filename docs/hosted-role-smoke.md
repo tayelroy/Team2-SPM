@@ -44,8 +44,8 @@ roles with that grant. It also opens:
 - Coordinator's assigned event22 (`QA 15Oct Phone Request`), arrangement
   readiness and history; its card is located by the accessible button name
   within My assigned events, not concatenated descendant text;
-- Venue calendars and a selected day's details, catalogue and holds;
-- Technical Support equipment and capacity-exception discovery;
+- Venue calendars and a selected day's details, catalogue, holds and capacity-exception discovery (Venue Staff only since SG2-66 AC5);
+- Technical Support equipment;
 - Lead queue and assignment page without selecting or saving assignments;
 - Safety's explicit placeholder and Attendee prototype pages, qualified as
   rendered prototypes rather than completed safety/registration workflows.

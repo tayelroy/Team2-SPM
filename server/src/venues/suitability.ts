@@ -101,17 +101,22 @@ export function assessSuitability(event: SuitabilityEvent, venue: SuitabilityVen
   };
 }
 
+/** The only role whose capacity exception counts (SG2-66 AC5). Approvals
+ * recorded by other roles before SG2-66 are kept as history but are inert. */
+export const CAPACITY_EXCEPTION_APPROVER = 'venue_staff';
+
 /** An approved capacity exception covers the attendance it was approved for;
  * if attendance later rises above that, a new approval is needed. */
-export interface CapacityExceptionGrant { expected_attendance: number }
+export interface CapacityExceptionGrant { expected_attendance: number; approver_role: string }
 
 export type BookingReadiness = 'allowed' | 'needs_capacity_exception' | 'blocked';
 
 /**
  * Whether a booking request for this venue may go ahead. A missing required
  * facility blocks it outright: no exception is permitted (AC2). Exceeding the
- * capacity needs an approved exception (AC3). Allowed only means the request
- * may be decided: Venue Staff still approve or reject the booking (AC5).
+ * capacity needs an exception approved by Venue Staff (SG2-47 AC3, narrowed
+ * by SG2-66 AC5). Allowed only means the request may be decided: Venue Staff
+ * still approve or reject the booking (AC5).
  *
  * SG2-48 (request a venue) refuses 'blocked'; SG2-49 (decide a request) may
  * approve only when 'allowed'.
@@ -119,7 +124,8 @@ export type BookingReadiness = 'allowed' | 'needs_capacity_exception' | 'blocked
 export function bookingReadiness(suitability: Suitability, exceptions: readonly CapacityExceptionGrant[] = []): BookingReadiness {
   if (suitability.issues.some(issue => issue.kind === 'facility')) return 'blocked';
   const capacity = suitability.issues.find(issue => issue.kind === 'capacity');
-  if (capacity && !exceptions.some(grant => grant.expected_attendance >= capacity.expected_attendance)) {
+  if (capacity && !exceptions.some(grant => grant.approver_role === CAPACITY_EXCEPTION_APPROVER
+      && grant.expected_attendance >= capacity.expected_attendance)) {
     return 'needs_capacity_exception';
   }
   return 'allowed';

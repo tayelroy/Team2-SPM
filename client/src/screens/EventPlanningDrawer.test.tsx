@@ -840,6 +840,47 @@ describe('EventPlanningDrawer Component', () => {
       ).toBeDefined();
     });
   });
+
+  for (const [status, stage] of [['confirmed', 'Confirmed'], ['PREPARATION', 'in Preparation']] as const) {
+    test(`[NORMAL] [SG2-66:AC6] a ${status} event locks its details, points to a change request and saves only registration and notes`, async () => {
+      const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+        ok: true, event: { ...savedPlanning, status }, arrangements_recheck_needed: false, outstanding_arrangements: [],
+      });
+      const onClose = vi.fn();
+      render(<EventPlanningDrawer eventId={17} initialValues={{ ...savedPlanning, status }} onClose={onClose} />);
+      expect(screen.getByTestId('change-request-lock-notice')).toHaveTextContent(
+        `This event is ${stage}, so its date, attendance and requirements can no longer be edited here. Ask for those changes through a change request; registration settings and planning notes can still be updated.`);
+      for (const label of ['Proposed Date & Time', 'Expected Attendance', 'Venue Requirements', 'Equipment Requirements', 'Accessibility Needs']) {
+        expect(screen.getByLabelText(label)).toBeDisabled();
+      }
+      expect(screen.getByLabelText('Registration Capacity')).toBeEnabled();
+      expect(screen.getByLabelText(/Planning Notes/i)).toBeEnabled();
+      fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '120' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(update).toHaveBeenCalledWith(17, {
+        ...storedRegistration, registration_capacity: 120, confirm_impact: false,
+      }, 'valid-token');
+    });
+  }
+
+  test('[BOUNDARY] [SG2-66:AC6] an awaiting safety check event keeps every field editable and shows no lock', () => {
+    render(<EventPlanningDrawer eventId={17} initialValues={{ ...savedPlanning, status: 'awaiting_safety_check' }} onClose={vi.fn()} />);
+    expect(screen.queryByTestId('change-request-lock-notice')).toBeNull();
+    expect(screen.getByLabelText('Expected Attendance')).toBeEnabled();
+  });
+
+  test('[CONFLICT] [SG2-66:AC6] the server refusing a direct edit shows its change request message and keeps the drawer open', async () => {
+    const message = 'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.';
+    vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
+      ok: false, kind: 'change_request_required', message, fields: ['expected_attendance'],
+    });
+    const onClose = vi.fn();
+    render(<EventPlanningDrawer eventId={17} initialValues={savedPlanning} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    expect(await screen.findByTestId('server-error-notice')).toHaveTextContent(message);
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
 
 afterAll(() => vi.unstubAllEnvs());

@@ -27,34 +27,35 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
 const exception = { exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_role: 'venue_staff',
   expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' };
 
-test('[NORMAL] [SG2-47:AC3] pending exception discovery applies the organiser scope in its named-FK database query', async () => {
+test('[NORMAL] [SG2-47:AC3] [SG2-66:AC2] [SG2-66:AC5] capacity discovery reads pending and booked requests with each approver\'s role in its named-FK database query', async () => {
   const calls: Call[] = [];
-  const row = { request_id: 31, event: { organiser_id: 'owner' }, venue: { name: 'Theatre' }, exceptions: [] };
+  const row = { request_id: 31, event: { organiser_id: 'owner' }, venue: { name: 'Theatre' }, venue_booking: null, exceptions: [] };
   const store = createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [{ data: [row], error: null }] }, calls));
-  assert.deepEqual(await store.pendingCapacityRequests('owner'), [row]);
-  assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => call.args), [['status', 'pending'], ['event.organiser_id', 'owner']]);
+  assert.deepEqual(await store.capacityCandidates(), [row]);
+  assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => call.args), []);
+  assert.deepEqual(calls.filter(call => call.method === 'in').map(call => call.args), [['status', ['pending', 'approved']]]);
   const selection = String(calls.find(call => call.method === 'select')!.args[0]);
+  assert.match(selection, /venue_booking:venue_bookings!venue_booking_requests_venue_booking_id_fkey\(status\)/);
   assert.match(selection, /event:events!venue_booking_requests_event_id_fkey!inner\(/);
   assert.match(selection, /venue:venues!venue_booking_requests_venue_id_fkey!inner\(/);
-  assert.match(selection, /exceptions:venue_capacity_exceptions!venue_capacity_exceptions_request_id_fkey\(expected_attendance\)/);
+  assert.match(selection, /exceptions:venue_capacity_exceptions!venue_capacity_exceptions_request_id_fkey\(expected_attendance,approver_role\)/);
   assert.deepEqual(calls.find(call => call.method === 'range')!.args, [0, 999]);
 });
 
-test('[BOUNDARY] [SG2-47:AC3] staff discovery reads beyond the default thousand-row database page without an organiser restriction', async () => {
+test('[BOUNDARY] [SG2-47:AC3] staff discovery reads beyond the default thousand-row database page', async () => {
   const calls: Call[] = [];
   const first = Array.from({ length: 1000 }, (_, index) => ({ request_id: index + 1 }));
   const store = createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [
     { data: first, error: null }, { data: [{ request_id: 1001 }], error: null }
   ] }, calls));
-  assert.deepEqual((await store.pendingCapacityRequests()).map(row => row.request_id), Array.from({ length: 1001 }, (_, index) => index + 1));
-  assert.deepEqual(calls.filter(call => call.method === 'eq').map(call => call.args), [['status', 'pending'], ['status', 'pending']]);
+  assert.deepEqual((await store.capacityCandidates()).map(row => row.request_id), Array.from({ length: 1001 }, (_, index) => index + 1));
   assert.deepEqual(calls.filter(call => call.method === 'range').map(call => call.args), [[0, 999], [1000, 1999]]);
   assert.deepEqual(calls.filter(call => call.method === 'order').map(call => call.args), [['request_id'], ['request_id']]);
 });
 
 test('[FAILURE] [SG2-47:AC3] missing rows or a failed capacity-worklist read never return a partial successful list', async () => {
   for (const result of [{ data: null, error: null }, { data: null, error: { message: 'PRIVATE database details' } }]) {
-    await assert.rejects(createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [result] })).pendingCapacityRequests('owner'),
+    await assert.rejects(createVenueSuitabilityStore(fakeAdmin({ venue_booking_requests: [result] })).capacityCandidates(),
       (error: unknown) => error instanceof AccessError && error.status === 503);
   }
 });
@@ -110,7 +111,7 @@ test('[CONFLICT] [SG2-47:AC3] an approval already recorded by a concurrent appro
   const store = createVenueSuitabilityStore(fakeAdmin({
     venue_capacity_exceptions: [{ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } }]
   }, calls));
-  const values = { request_id: 31, approved_by: 'user-support', approver_role: 'technical_support_staff', expected_attendance: 150, venue_capacity: 120 };
+  const values = { request_id: 31, approved_by: 'user-other-venue', approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120 };
   assert.equal(await store.recordException(values), null);
   assert.equal(calls.filter(call => call.table === 'users').length, 0);
 });

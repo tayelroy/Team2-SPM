@@ -304,6 +304,7 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
         respond(409, { error: `${venue!.name} cannot be booked for this event. ${missing.message}` });
         return;
       }
+      // SG2-66 AC5: only an exception recorded by Venue Staff counts here.
       if (booking === 'needs_capacity_exception') {
         respond(409, { error: CAPACITY_MESSAGE });
         return;

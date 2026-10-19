@@ -35,6 +35,9 @@ const FIELD_LABELS: Record<string, string> = {
   venue_hold_status: 'Tentative Hold Status',
   // SG2-106: Venue Staff changed the hold's expiry.
   venue_hold_expiry: 'Tentative Hold Expiry',
+  // SG2-66 AC4: an accepted change request and each settled recheck.
+  change_request: 'Change Request',
+  arrangement_recheck: 'Arrangement Recheck',
 };
 
 /** Formats an ISO string into Singapore Standard Time (SGT). */

@@ -6,7 +6,8 @@ export interface Notification {
   event_id: number | null;
   request_id: number | null;
   kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
-    | 'venue_unavailable' | 'event_confirmed' | 'event_submitted' | 'coordinator_assigned' | 'clarification_requested' | 'event_approved' | 'event_rejected';
+    | 'venue_unavailable' | 'event_confirmed' | 'event_submitted' | 'coordinator_assigned' | 'clarification_requested' | 'event_approved' | 'event_rejected'
+    | 'event_returned_to_planning';
   message: string;
   created_at: string;
 }
@@ -20,7 +21,7 @@ const UNAVAILABLE: NotificationsOutcome = { ok: false, message: 'Could not load 
 const KINDS: Record<Notification['kind'], true> = {
   venue_request_approved: true, venue_request_rejected: true, venue_booking_released: true, equipment_reserved: true,
   venue_booking_clash: true, venue_unavailable: true, event_confirmed: true, event_submitted: true, coordinator_assigned: true,
-  clarification_requested: true, event_approved: true, event_rejected: true
+  clarification_requested: true, event_approved: true, event_rejected: true, event_returned_to_planning: true
 };
 
 function isNotification(value: unknown): value is Notification {

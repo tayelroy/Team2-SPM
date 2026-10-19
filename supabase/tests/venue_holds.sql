@@ -148,6 +148,20 @@ begin
 end;
 $$;
 reset role;
+-- SG2-66 AC5: an approval recorded by another role before SG2-66 is kept but
+-- inert. Recreate one past the NOT VALID check, then restore the check.
+alter table public.venue_capacity_exceptions drop constraint venue_capacity_exceptions_approver_role_check;
+insert into public.venue_capacity_exceptions(request_id,approved_by,approver_role,expected_attendance,venue_capacity)
+ select request_id,'d8400000-0000-4000-8000-000000000002','technical_support_staff',30,20 from public.venue_holds where hold_id = current_setting('holds.capacity')::bigint;
+alter table public.venue_capacity_exceptions add constraint venue_capacity_exceptions_approver_role_check
+ check (approver_role = 'venue_staff') not valid;
+set local role authenticated;
+do $$
+begin
+ if public.change_venue_hold(current_setting('holds.capacity')::bigint,'convert')->>'outcome' is distinct from 'capacity' then raise exception '[SG2-66:legacy-exception-inert-for-hold] [FAILURE] [SG2-66:AC5] an exception recorded by Technical Support Staff authorized converting a hold'; end if;
+end;
+$$;
+reset role;
 insert into public.venue_capacity_exceptions(request_id,approved_by,approver_role,expected_attendance,venue_capacity)
  select request_id,'d8400000-0000-4000-8000-000000000001','venue_staff',30,20 from public.venue_holds where hold_id = current_setting('holds.capacity')::bigint;
 update public.venue_holds set starts_at = now()-interval '2 hours',ends_at = now()-interval '1 hour' where hold_id = current_setting('holds.stale')::bigint;

@@ -1262,7 +1262,7 @@ test('SG2-47-P02 | [SG2-47:AC3] [SG2-47:AC5] [NORMAL] venue staff approve a capa
     exceptions: [{ approver_role: 'venue_staff', approved_by: 'user-venue', expected_attendance: 150 }] });
 });
 
-test('SG2-47-N01 | [SG2-47:AC2] [SG2-47:AC3] [FAILURE] a missing facility cannot be excepted, and coordinators cannot approve exceptions', async ({ page, request }) => {
+test('SG2-47-N01 | [SG2-47:AC2] [SG2-47:AC3] [SG2-66:AC5] [FAILURE] a missing facility cannot be excepted, and only Venue Staff can approve exceptions', async ({ page, request }) => {
   expect((await request.post('/__e2e/venue-suitability')).ok()).toBeTruthy();
   await signIn(page, 'venue');
   await page.getByRole('region', { name: 'Booking requests awaiting decision' }).getByRole('button', { name: /Regression Hall/ }).click();
@@ -1273,8 +1273,9 @@ test('SG2-47-N01 | [SG2-47:AC2] [SG2-47:AC3] [FAILURE] a missing facility cannot
   expect(blocked.status()).toBe(409);
   expect((await blocked.json()).error).toMatch(/Missing required facility: stage\. No exception is permitted/);
 
-  // Acknowledging the warning is all a coordinator can do; another organiser's event is not found.
-  for (const [account, status] of [['coordinator', 403], ['attendee', 403], ['organiser2', 404]] as const) {
+  // Acknowledging the warning is all a coordinator can do; since SG2-66 AC5
+  // organisers (even the event's own) and Technical Support cannot approve either.
+  for (const [account, status] of [['coordinator', 403], ['attendee', 403], ['organiser', 403], ['organiser2', 403], ['support', 403]] as const) {
     await test.step(account, async () => {
       await page.goto('/');
       await page.evaluate(() => sessionStorage.clear());

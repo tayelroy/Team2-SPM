@@ -46,9 +46,9 @@ const ownHold: VenueConflictRow = { kind: 'hold', reference_id: 3, event_id: 8, 
   starts_at: '2030-06-15T09:00:00.000Z', ends_at: '2030-06-15T12:00:00.000Z', status: 'tentative' };
 
 const period = { starts_at: '2030-06-15T08:00:00.000Z', ends_at: '2030-06-15T11:00:00.000Z' };
-const pending: BookingRequestRow = { request_id: 41, event_id: 7, venue_id: 1, ...period, status: 'pending' };
-const pendingRecord: VenueBookingRequestRecord = { ...pending, venue_name: 'Atrium Hall', layout: 'theatre', venue_requirements: 'A stage',
+const pendingRecord: VenueBookingRequestRecord = { request_id: 41, event_id: 7, venue_id: 1, ...period, status: 'pending', venue_name: 'Atrium Hall', layout: 'theatre', venue_requirements: 'A stage',
   requester_name: 'Casey', requested_at: '2030-01-01T00:00:00.000Z', decider_name: null, decided_at: null, decision_reason: null, withdrawer_name: null, withdrawn_at: null };
+const pending: BookingRequestRow = { request_id: 41, event_id: 7, venue_id: 1, ...period, status: 'pending', venue_booking: null };
 
 function overlapping(rows: VenueConflictRow[], at: ConflictPeriod) {
   return rows.filter(row => row.starts_at < at.ends_at && row.ends_at > at.starts_at);
@@ -106,8 +106,7 @@ test('[NORMAL] [SG2-50:AC1] a request overlapping another event\'s confirmed boo
   // Another coordinator's event: the coordinator learns the booking, not the event.
   assert.deepEqual(response.body.conflicts, [{ kind: 'booking', reference_id: 12, event_id: null, event_name: null,
     starts_at: gala.starts_at, ends_at: gala.ends_at, status: 'confirmed' }]);
-  assert.deepEqual(checked, [[{ ...pending, layout: 'theatre', venue_name: 'Atrium Hall', requester_name: 'Casey',
-    requested_at: '2030-01-01T00:00:00.000Z', venue_requirements: 'A stage', decider_name: null, decided_at: null, decision_reason: null, withdrawer_name: null, withdrawn_at: null }, { now: '2030-01-01T00:00:00.000Z', excludeRequestId: 41 }]]);
+  assert.deepEqual(checked, [[pendingRecord, { now: '2030-01-01T00:00:00.000Z', excludeRequestId: 41 }]]);
 });
 
 test('[NORMAL] [SG2-50:AC1] a coordinator sees which of their own events holds the venue', async () => {

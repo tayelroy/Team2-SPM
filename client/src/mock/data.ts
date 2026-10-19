@@ -103,7 +103,6 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['form', 'New request'],
     ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
-    ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
   ],
   // SG2-26: a coordinator opens events from the work queue on the dashboard.
   // All events and event detail list organisation requests (event_request.view,
@@ -120,12 +119,13 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['calendar', 'Venue Availability'],
     ['venues', 'Catalogue'],
     ['holds', 'Venue holds'],
+    // SG2-66 AC5: only Venue Staff approve capacity exceptions.
+    ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['calendar', 'Venue Availability'],
     ['equipment', 'Equipment'],
-    ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
@@ -224,7 +224,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   calendar:
     'Available, held, confirmed and blocked days across all venues. Choose a day to see which venue is in use.',
   holds: 'Reserve a venue while arrangements are finalised, with a clear expiry and approval decision.',
-  capacityExceptions: 'Review pending capacity exceptions. Approval does not reserve a venue or decide its booking.',
+  capacityExceptions: 'Approve capacity exceptions for pending requests and booked venues whose attendance was raised. Approval does not reserve a venue or decide its booking.',
   equipment:
     'Keep equipment type, stock, location and operational status current for request assessment.',
   attendee: 'Confirmed event details, registration, and your current status.',

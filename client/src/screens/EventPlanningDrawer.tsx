@@ -51,6 +51,15 @@ const ARRANGEMENT_LABELS: Record<string, string> = {
   registration_recheck: 'Registration Capacity Recheck',
 };
 
+/** Details a Confirmed or Preparation event no longer takes directly (SG2-66 AC6). */
+const LOCKED_DETAIL_FIELDS = [
+  'proposed_date',
+  'expected_attendance',
+  'venue_requirements',
+  'equipment_requirements',
+  'accessibility_needs',
+] as const;
+
 /** Formats an ISO datetime string for an HTML datetime-local input (YYYY-MM-DDTHH:mm). */
 export function formatForDateTimeInput(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
@@ -274,6 +283,11 @@ function PlanningDrawerPanel({
 
   const statusLower = initialValues?.status?.toLowerCase() ?? '';
   const isTerminal = ['cancelled', 'completed', 'rejected'].includes(statusLower);
+  // SG2-66 AC6: once Confirmed or in Preparation, only registration settings
+  // and planning notes are edited here; everything else needs a change request.
+  const lockedStage = statusLower === 'confirmed' ? 'Confirmed'
+    : statusLower === 'preparation' ? 'in Preparation' : null;
+  const detailsDisabled = isTerminal || isSaving || lockedStage !== null;
 
   const handleKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Escape') {
@@ -339,6 +353,11 @@ function PlanningDrawerPanel({
         && (payload[field] === null || payload[field] === false)) {
         delete payload[field];
       }
+    }
+    if (lockedStage) {
+      // The server refuses a change to these; leave them out so a re-sent value
+      // (rounded to the minute by the date input) can never look like one.
+      for (const field of LOCKED_DETAIL_FIELDS) delete payload[field];
     }
 
     setIsSaving(true);
@@ -443,6 +462,19 @@ function PlanningDrawerPanel({
               <NoticeMark size={20} />
               <span role="alert" style={{ fontSize: '14px', color: '#ff8a80' }}>
                 Cannot update planning details for a {initialValues?.status} event.
+              </span>
+            </div>
+          </Notice>
+        )}
+
+        {lockedStage && (
+          <Notice data-testid="change-request-lock-notice">
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <NoticeMark size={20} />
+              <span style={{ fontSize: '14px', color: color.mist, lineHeight: 1.45 }}>
+                This event is {lockedStage}, so its date, attendance and requirements can no longer be
+                edited here. Ask for those changes through a change request; registration settings
+                and planning notes can still be updated.
               </span>
             </div>
           </Notice>
@@ -604,7 +636,7 @@ function PlanningDrawerPanel({
               <input
                 id="epd-proposed-date"
                 type="datetime-local"
-                disabled={isTerminal || isSaving}
+                disabled={detailsDisabled}
                 value={proposedDate}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setProposedDate(e.target.value)}
                 style={{
@@ -627,7 +659,7 @@ function PlanningDrawerPanel({
                 id="epd-expected-attendance"
                 type="number"
                 min="1"
-                disabled={isTerminal || isSaving}
+                disabled={detailsDisabled}
                 value={expectedAttendance}
                 placeholder="e.g. 150"
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -654,7 +686,7 @@ function PlanningDrawerPanel({
             <textarea
               id="epd-venue-requirements"
               rows={3}
-              disabled={isTerminal || isSaving}
+              disabled={detailsDisabled}
               value={venueRequirements}
               placeholder="e.g. Step-free access, banquet setup, breakout rooms"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
@@ -682,7 +714,7 @@ function PlanningDrawerPanel({
             <textarea
               id="epd-equipment-requirements"
               rows={3}
-              disabled={isTerminal || isSaving}
+              disabled={detailsDisabled}
               value={equipmentRequirements}
               placeholder="e.g. 2 Wireless mics, dual HDMI projectors, audio recording"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
@@ -711,7 +743,7 @@ function PlanningDrawerPanel({
             <textarea
               id="epd-accessibility-needs"
               rows={2}
-              disabled={isTerminal || isSaving}
+              disabled={detailsDisabled}
               value={accessibilityNeeds}
               placeholder="e.g. Hearing loop required, ramp access to main stage"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>

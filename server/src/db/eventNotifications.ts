@@ -12,7 +12,8 @@ export type EventNoticeKind =
   | 'coordinator_assigned'
   | 'clarification_requested'
   | 'event_approved'
-  | 'event_rejected';
+  | 'event_rejected'
+  | 'event_returned_to_planning';
 
 export interface EventNotice {
   recipient_id: string | null | undefined;
@@ -53,7 +54,13 @@ export const eventNoticeMessages = {
   // The question itself stays in the clarification thread, behind its own access check.
   clarificationRequested: (event: string) => `Your coordinator has a question about ${event}.`,
   approved: (event: string) => `${event} was approved.`,
-  rejected: (event: string, reason: string) => clip(`${event} was not approved: ${reason}`, MAX_MESSAGE_LENGTH)
+  rejected: (event: string, reason: string) => clip(`${event} was not approved: ${reason}`, MAX_MESSAGE_LENGTH),
+  // SG2-66 AC7: an event moved back from Awaiting Safety Check, Preparation or
+  // Confirmed to Planning. Matches the SQL wording in 202610190002.
+  returnedToPlanningOrganiser: (event: string) =>
+    `${event} has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.`,
+  returnedToPlanningCoordinator: (event: string) =>
+    `${event} is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.`
 };
 
 /**

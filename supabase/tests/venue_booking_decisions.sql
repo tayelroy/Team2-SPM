@@ -61,11 +61,24 @@ begin
     raise exception '[SG2-49:capacity-needs-exception] [SG2-49:AC1] [FAILURE] A venue too small for the attendance was approved without an exception';
   end if;
   reset role;
+  -- SG2-66 AC5: an approval recorded by an organiser before SG2-66 is kept
+  -- but inert. Recreate one the way the old check allowed, then restore the
+  -- NOT VALID check the migration added (all inside this rolled-back test).
+  alter table public.venue_capacity_exceptions drop constraint venue_capacity_exceptions_approver_role_check;
   insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance, venue_capacity)
     values (94903, 'c4900000-0000-4000-8000-000000000003', 'event_organiser', 80, 20);
+  alter table public.venue_capacity_exceptions add constraint venue_capacity_exceptions_approver_role_check
+    check (approver_role = 'venue_staff') not valid;
   set local role authenticated;
-  if public.decide_venue_booking_request(94903, 'approve', 'Organiser accepted standing room')->>'outcome' is distinct from 'updated' then
-    raise exception '[SG2-49:exception-allows-approval] [SG2-49:AC1] [NORMAL] An approved capacity exception did not allow the approval';
+  if public.decide_venue_booking_request(94903, 'approve', 'Organiser accepted standing room')->>'outcome' is distinct from 'capacity' then
+    raise exception '[SG2-66:legacy-exception-inert] [SG2-66:AC5] [FAILURE] An exception recorded by an organiser allowed Venue Staff to approve the booking';
+  end if;
+  reset role;
+  insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance, venue_capacity)
+    values (94903, 'c4900000-0000-4000-8000-000000000001', 'venue_staff', 80, 20);
+  set local role authenticated;
+  if public.decide_venue_booking_request(94903, 'approve', 'Venue Staff accepted standing room')->>'outcome' is distinct from 'updated' then
+    raise exception '[SG2-49:exception-allows-approval] [SG2-49:AC1] [SG2-66:AC5] [NORMAL] A capacity exception approved by Venue Staff did not allow the approval';
   end if;
 
   if public.decide_venue_booking_request(94904, 'reject', null)->>'outcome' is distinct from 'invalid'
