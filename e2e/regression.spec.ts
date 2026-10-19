@@ -1909,9 +1909,10 @@ test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prot
 
   await signIn(page, 'safety');
   await expect(page.getByRole('heading', { level: 1, name: 'Safety desk' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'No safety checks yet' })).toBeVisible();
+  // SG2-91 replaced the placeholder with the live count of the safety check list.
+  await expect(page.getByText('0 events are awaiting a safety check.', { exact: true })).toBeVisible();
   await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
-  await expect(menu).toHaveText(['Dashboard']);
+  await expect(menu).toHaveText(['Dashboard', 'Safety checks']);
   await expect(prototypeEvent).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
