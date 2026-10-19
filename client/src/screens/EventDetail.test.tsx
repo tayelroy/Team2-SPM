@@ -736,6 +736,7 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
           registration_opens_at: null,
           registration_closes_at: null,
           planning_notes: null,
+          expected_crowd_movement: null,
           arrangements_recheck_needed: true,
           outstanding_arrangements: ['venue_recheck', 'equipment_recheck'],
         },

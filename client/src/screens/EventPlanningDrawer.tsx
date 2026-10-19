@@ -28,6 +28,7 @@ export interface EventPlanningInitialValues {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  expected_crowd_movement?: string | null;
   status?: string | null;
 }
 
@@ -93,6 +94,7 @@ export function validatePlanningForm({
   equipmentRequirements,
   accessibilityNeeds,
   planningNotes,
+  expectedCrowdMovement = '',
 }: {
   proposedDate: string;
   /** The proposed date the drawer opened with, in the same input format. */
@@ -108,6 +110,8 @@ export function validatePlanningForm({
   equipmentRequirements: string;
   accessibilityNeeds: string;
   planningNotes: string;
+  /** SG2-91 AC3. */
+  expectedCrowdMovement?: string;
 }): string[] {
   const errors: string[] = [];
   let startTime: number | null = null;
@@ -138,6 +142,7 @@ export function validatePlanningForm({
     { label: 'Equipment requirements', value: equipmentRequirements },
     { label: 'Accessibility needs', value: accessibilityNeeds },
     { label: 'Planning notes', value: planningNotes },
+    { label: 'Expected crowd movement', value: expectedCrowdMovement },
   ];
 
   for (const tf of textFields) {
@@ -231,6 +236,10 @@ function PlanningDrawerPanel({
   const [planningNotes, setPlanningNotes] = useState(
     () => initialValues?.planning_notes ?? '',
   );
+  // SG2-91 AC3: what the Safety Officer reviews about how people move.
+  const [expectedCrowdMovement, setExpectedCrowdMovement] = useState(
+    () => initialValues?.expected_crowd_movement ?? '',
+  );
   const [registrationNeeded, setRegistrationNeeded] = useState(
     () => Boolean(initialValues?.registration_needed),
   );
@@ -298,6 +307,7 @@ function PlanningDrawerPanel({
       equipmentRequirements,
       accessibilityNeeds,
       planningNotes,
+      expectedCrowdMovement,
     });
 
     if (validationErrors.length > 0) {
@@ -321,6 +331,7 @@ function PlanningDrawerPanel({
       equipment_requirements: equipmentRequirements.trim() || null,
       accessibility_needs: accessibilityNeeds.trim() || null,
       planning_notes: planningNotes.trim() || null,
+      expected_crowd_movement: expectedCrowdMovement.trim() || null,
       registration_needed: registrationNeeded,
       registration_capacity:
         registrationNeeded && registrationCapacity.trim()
@@ -716,6 +727,35 @@ function PlanningDrawerPanel({
               placeholder="e.g. Hearing loop required, ramp access to main stage"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                 setAccessibilityNeeds(e.target.value)
+              }
+              style={{
+                background: surface.fieldOnAbyss,
+                border: rule.control,
+                borderRadius: radius.sm,
+                padding: '12px 14px',
+                color: color.mist,
+                fontSize: '14px',
+                lineHeight: 1.4,
+                outline: 'none',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          {/* SG2-91 AC3: reviewed by the Safety Officer in the safety check */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label htmlFor="epd-expected-crowd-movement" style={labelToken}>
+              Expected Crowd Movement
+            </label>
+            <textarea
+              id="epd-expected-crowd-movement"
+              rows={2}
+              disabled={isTerminal || isSaving}
+              value={expectedCrowdMovement}
+              placeholder="e.g. Arrive through the east doors, queue in the foyer, leave by the west exits"
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                setExpectedCrowdMovement(e.target.value)
               }
               style={{
                 background: surface.fieldOnAbyss,

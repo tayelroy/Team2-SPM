@@ -153,17 +153,54 @@ test('[CONFLICT] [SG2-86:AC2] a late queue count for the previous session cannot
   expect(screen.getByText('1 request is awaiting a coordinator.')).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-86:AC2] the Safety Officer desk is an honest empty state with no events and nothing to open', () => {
-  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+const awaitingEvent = (eventId: number) => ({ event_id: eventId, safety_check_revision: 1, name: `Awaiting ${eventId}`, venues: [], equipment: [] });
+
+test('[NORMAL] [SG2-86:AC2] [SG2-91:AC2] the Safety Officer desk counts the events awaiting a check and opens only the safety check list', async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ events: [awaitingEvent(41), awaitingEvent(42)] }));
+  vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
   render(<Dashboard role="Safety Officer" accessToken="safety-token" onNavigate={onNavigate} />);
-  expect(screen.getByRole('heading', { level: 2, name: 'No safety checks yet' })).toBeInTheDocument();
-  expect(screen.getByText(/Safety checks arrive with the safety review flow/)).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Loading events awaiting a safety check');
+  expect(await screen.findByText('2 events are awaiting a safety check.')).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/safety-checks', { method: 'GET', headers: { Authorization: 'Bearer safety-token' } });
   for (const name of prototypeEvents) expect(screen.queryByText(name)).not.toBeInTheDocument();
-  expect(screen.queryByText('Events needing attention')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  expect(fetch).not.toHaveBeenCalled();
-  expect(onNavigate).not.toHaveBeenCalled();
+  expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Open safety checks']);
+  fireEvent.click(screen.getByRole('button', { name: 'Open safety checks' }));
+  expect(onNavigate).toHaveBeenCalledTimes(1);
+  expect(onNavigate).toHaveBeenCalledWith('safetyChecks');
+});
+
+test.each([
+  [[], '0 events are awaiting a safety check.'],
+  [[awaitingEvent(41)], '1 event is awaiting a safety check.'],
+] as const)('[BOUNDARY] [SG2-91:AC2] the Safety Officer desk counts a list of %j exactly', async (events, text) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ events })));
+  render(<Dashboard role="Safety Officer" accessToken="safety-token" onNavigate={vi.fn()} />);
+  expect(await screen.findByText(text)).toBeInTheDocument();
+});
+
+test.each([
+  ['a refused request', 'safety-token', 403, 'Only Safety Officers can open the safety check list.'],
+  ['no session token', undefined, 200, 'Only Safety Officers can open the safety check list.'],
+  ['an unavailable list', 'safety-token', 503, 'The safety check list is temporarily unavailable. Open it to try again.'],
+] as const)('[FAILURE] [SG2-91:AC4] the Safety Officer desk reports %s instead of a count', async (_, token, status, message) => {
+  const fetch = vi.fn().mockResolvedValue(new Response(null, { status }));
+  vi.stubGlobal('fetch', fetch);
+  render(<Dashboard role="Safety Officer" accessToken={token} onNavigate={vi.fn()} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  expect(fetch).toHaveBeenCalledTimes(token ? 1 : 0);
+});
+
+test('[CONFLICT] [SG2-91:AC2] a late count for the previous session cannot replace the current one', async () => {
+  let resolve!: (response: Response) => void;
+  vi.stubGlobal('fetch', vi.fn()
+    .mockImplementationOnce(() => new Promise<Response>((yes) => { resolve = yes; }))
+    .mockResolvedValueOnce(Response.json({ events: [awaitingEvent(41)] })));
+  const { rerender } = render(<Dashboard role="Safety Officer" accessToken="old-token" onNavigate={vi.fn()} />);
+  rerender(<Dashboard role="Safety Officer" accessToken="new-token" onNavigate={vi.fn()} />);
+  await screen.findByText('1 event is awaiting a safety check.');
+  await act(async () => resolve(Response.json({ events: [awaitingEvent(41), awaitingEvent(42), awaitingEvent(43)] })));
+  expect(screen.getByText('1 event is awaiting a safety check.')).toBeInTheDocument();
 });
 
 test('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] [SG2-31:AC4] each dashboard card says who the event is waiting on, in step with its status', async () => {

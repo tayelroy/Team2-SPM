@@ -696,6 +696,8 @@ export interface PlanningUpdatePayload {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  /** SG2-91 AC3: shown to the Safety Officer in the safety check. */
+  expected_crowd_movement?: string | null;
   confirm_impact?: boolean;
 }
 
@@ -715,6 +717,8 @@ export interface PlanningEventRecord {
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   planning_notes: string | null;
+  /** SG2-91 AC3. */
+  expected_crowd_movement: string | null;
   arrangements_recheck_needed: boolean;
   outstanding_arrangements: string[];
   [key: string]: unknown;

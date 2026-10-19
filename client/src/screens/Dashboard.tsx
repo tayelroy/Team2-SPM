@@ -9,12 +9,12 @@ import {
   Dot,
   GhostButton,
   IconButton,
-  Notice,
   RecessedCard,
   StatFigure,
 } from '../ui';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { fetchAssignmentQueue } from '../api/assignmentQueue';
+import { fetchSafetyChecks } from '../api/safetyChecks';
 import { badgeStyle, eventActionLabel, statusLabel } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
@@ -216,18 +216,52 @@ function LeadDashboard({ accessToken, onNavigate }: DashboardProps) {
 }
 
 /**
- * The Safety Officer's desk (SG2-86 AC2). The role has no safety checks to
- * act on until the safety review flow lands, so the desk says so instead
- * of showing events.
+ * The Safety Officer's desk (SG2-86 AC2): a live count of the events awaiting
+ * an operational safety check (SG2-91 AC2, `GET /api/safety-checks`) and the
+ * way into the list.
  */
-function SafetyDashboard() {
+function SafetyDashboard({ accessToken, onNavigate }: DashboardProps) {
+  const [waiting, setWaiting] = useState(0);
+  const [state, setState] = useState<'loading' | 'ready' | 'unauthorized' | 'unavailable'>('loading');
+  useEffect(() => {
+    if (!accessToken) {
+      setState('unauthorized');
+      return;
+    }
+    let cancelled = false;
+    fetchSafetyChecks(accessToken).then((result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        setWaiting(result.events.length);
+        setState('ready');
+      } else {
+        setState(result.kind);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
   return (
-    <Notice>
-      <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500, color: color.platinum }}>No safety checks yet</h2>
-      <p style={{ margin: 0, color: color.silver }}>
-        Safety checks arrive with the safety review flow. There is nothing for you to review until then.
-      </p>
-    </Notice>
+    <Card padding="28px" style={{ gap: '16px' }}>
+      <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500, color: color.platinum }}>Safety checks</h2>
+      {state === 'loading' ? (
+        <p role="status" style={{ margin: 0 }}>Loading events awaiting a safety check…</p>
+      ) : state === 'ready' ? (
+        <p style={{ margin: 0, fontSize: '18px', color: color.mist }}>
+          {waiting} {waiting === 1 ? 'event is' : 'events are'} awaiting a safety check.
+        </p>
+      ) : (
+        <p role="alert" style={{ margin: 0 }}>
+          {state === 'unauthorized'
+            ? 'Only Safety Officers can open the safety check list.'
+            : 'The safety check list is temporarily unavailable. Open it to try again.'}
+        </p>
+      )}
+      <GhostButton onClick={() => onNavigate('safetyChecks')} style={{ alignSelf: 'flex-start' }}>
+        Open safety checks
+      </GhostButton>
+    </Card>
   );
 }
 
@@ -236,7 +270,7 @@ export default function Dashboard(props: DashboardProps) {
   if (role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
   if (isQueueRole(role)) return <WorkQueue key={`${role}:${props.accessToken}`} role={role} accessToken={props.accessToken} onFindVenues={props.onFindVenues} />;
   if (role === 'Event Coordinator Lead') return <LeadDashboard key={props.accessToken} {...props} />;
-  if (role === 'Safety Officer') return <SafetyDashboard />;
+  if (role === 'Safety Officer') return <SafetyDashboard key={props.accessToken} {...props} />;
   return <AttendeeDashboard onNavigate={props.onNavigate} />;
 }
 

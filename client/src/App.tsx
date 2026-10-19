@@ -20,6 +20,7 @@ import Landing from './screens/Landing';
 import Login from './screens/Login';
 import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
+import SafetyChecks from './screens/SafetyChecks';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
 import VenueHolds from './screens/VenueHolds';
@@ -250,6 +251,7 @@ export default function App() {
     profile: <Profile role={role} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
+    safetyChecks: <SafetyChecks key={session!.accessToken} accessToken={session!.accessToken} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
       accessToken={session!.accessToken} prefill={venuePrefill} />
   }[screen];
