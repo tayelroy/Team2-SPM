@@ -74,8 +74,9 @@ and action that moves it forward:
 4. **Arrangements** (`approved`/`planning`, `stage_key: 'in_planning'`) — the
    coordinator arranges the venue and equipment.
 5. **Safety Check** (`awaiting_safety_check`) — the Safety Officer completes
-   the operational safety check; `safety_rejected` is a stop at this step with
-   no waiting-on card, not a recoverable state.
+   the operational safety check (SG2-92). `safety_rejected` stays at this step:
+   the event cannot move on to Preparation, and the assigned coordinator reworks
+   it back to Planning and resubmits it for a new check.
 6. **Preparation** (`preparation`) — arrangements and the safety check are
    done; the event is being readied.
 7. **Confirmed** (`confirmed`) — ready to be held. Once its end time has

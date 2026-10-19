@@ -113,7 +113,10 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
       } else if (role === 'lead') {
         await expect(main.getByText(/^\d+ requests? (?:is|are) awaiting a coordinator\.$/)).toBeVisible();
       } else if (role === 'safety') {
-        await expect(main.getByRole('heading', { name: 'No safety checks yet', exact: true })).toBeVisible();
+        // SG2-92: the desk lists the events awaiting a check (stand-in for SG2-91); read-only here.
+        await expect(main.getByRole('heading', { name: 'Safety checks', exact: true })).toBeVisible();
+        await expect(main.getByRole('list', { name: 'Events awaiting a safety check', exact: true })
+          .or(main.getByText('No events are awaiting a safety check.', { exact: true })).first()).toBeVisible();
       } else {
         await expect(main.getByRole('heading', { name: 'Northbridge Investor Forum', exact: true })).toBeVisible();
       }
@@ -253,7 +256,7 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
       if (label === 'Catalogue' || label === 'Venues') await expect(page.getByRole('region', { name: 'Venue catalogue', exact: true })).toBeVisible();
       if (label === 'Equipment') await expect(page.getByRole('region', { name: 'Equipment records', exact: true })).toBeVisible();
       if (label === 'Capacity exceptions') await expect(page.getByRole('region', { name: 'Capacity exception requests', exact: true })).toBeVisible();
-      if (role === 'safety') await expect(page.getByRole('heading', { name: 'No safety checks yet', exact: true })).toBeVisible();
+      if (role === 'safety') await expect(page.getByRole('heading', { name: 'Safety checks', exact: true })).toBeVisible();
       await proof(slug);
       if (role === 'organiser' && label === 'My events') {
         phase('event-detail');
@@ -316,5 +319,5 @@ test('HOSTED-ROLE-2 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] [SG2-57:AC1]
 test('HOSTED-ROLE-3 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] venue staff pages, calendar, holds and catalogue are read-only', async ({ page }, info) => { await expectHostedRole('venue', page, info); });
 test('HOSTED-ROLE-4 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] technical support pages and equipment are read-only', async ({ page }, info) => { await expectHostedRole('support', page, info); });
 test('HOSTED-ROLE-5 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] Lead queue and assignment pages are inspected without assigning', async ({ page }, info) => { await expectHostedRole('lead', page, info); });
-test('HOSTED-ROLE-6 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] Safety placeholder and profile render without claiming safety workflow delivery', async ({ page }, info) => { await expectHostedRole('safety', page, info); });
+test('HOSTED-ROLE-6 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] [SG2-92:AC1] Safety Officer desk lists the safety checks and profile renders without recording a decision', async ({ page }, info) => { await expectHostedRole('safety', page, info); });
 test('HOSTED-ROLE-7 | [NORMAL] [BOUNDARY] [SG2-23:AC1] [SG2-86:AC2] Attendee prototype pages and real profile render without registration mutations', async ({ page }, info) => { await expectHostedRole('attendee', page, info); });

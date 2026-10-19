@@ -1099,7 +1099,7 @@ No endpoint at this snapshot delivers these planned stories. They are listed so 
 |---|---|---|
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
-| #6 | SG2-91, SG2-92, SG2-93, SG2-94 safety check | No endpoint. Already in place: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation` (SG2-100), the SO grants in §2, venue safety details (6.6), and SO read access to equipment placement (9.4). Nothing moves an event out of `planning` into `awaiting_safety_check` or `preparation`. |
+| #6 | SG2-91, SG2-93, SG2-94 safety check | SG2-92 (19 Oct 2026) added `GET /api/safety-checks` (a stand-in for SG2-91's list), `POST /api/event-requests/:eventId/safety-decision`, `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; see [safety-checks.md](../safety-checks.md). Already in place before it: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation` (SG2-100), the SO grants in §2, venue safety details (6.6), and SO read access to equipment placement (9.4). Nothing yet moves an event out of `planning` into `awaiting_safety_check` (SG2-91). |
 
 ---
 

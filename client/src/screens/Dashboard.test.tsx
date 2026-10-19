@@ -153,17 +153,24 @@ test('[CONFLICT] [SG2-86:AC2] a late queue count for the previous session cannot
   expect(screen.getByText('1 request is awaiting a coordinator.')).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-86:AC2] the Safety Officer desk is an honest empty state with no events and nothing to open', () => {
-  const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+test('[NORMAL] [SG2-86:AC2] [SG2-92:AC1] the Safety Officer desk lists the safety checks from the server, never prototype events', async () => {
+  const fetch = vi.fn(async () => Response.json({ source: 'stand-in', events: [] }));
+  vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
   render(<Dashboard role="Safety Officer" accessToken="safety-token" onNavigate={onNavigate} />);
-  expect(screen.getByRole('heading', { level: 2, name: 'No safety checks yet' })).toBeInTheDocument();
-  expect(screen.getByText(/Safety checks arrive with the safety review flow/)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 2, name: 'Safety checks' })).toBeInTheDocument();
+  expect(await screen.findByText('No events are awaiting a safety check.')).toBeInTheDocument();
   for (const name of prototypeEvents) expect(screen.queryByText(name)).not.toBeInTheDocument();
   expect(screen.queryByText('Events needing attention')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  expect(fetch).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledWith('/api/safety-checks', { method: 'GET', headers: { Authorization: 'Bearer safety-token' } });
   expect(onNavigate).not.toHaveBeenCalled();
+});
+
+test('[FAILURE] [SG2-92:AC1] without a session token the Safety Officer desk is refused and offers a retry', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'Authentication required' }, { status: 401 })));
+  render(<Dashboard role="Safety Officer" accessToken={null} onNavigate={vi.fn()} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Authentication required');
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
 test('[NORMAL] [SG2-38:AC2] [SG2-38:AC3] [SG2-31:AC4] each dashboard card says who the event is waiting on, in step with its status', async () => {

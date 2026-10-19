@@ -28,6 +28,8 @@ vi.mock('../components/ChangeRequestsPanel', () => ({
 }));
 vi.mock('../components/EquipmentRequirements', () => ({ default: () => null }));
 vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
+// SG2-92: its own suites cover it; stubbed so its fetch stays out of this one.
+vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
 
 // jsdom has no scrollIntoView; the planning drawer uses it (SG2-39).
 Element.prototype.scrollIntoView = vi.fn();

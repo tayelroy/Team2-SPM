@@ -38,6 +38,8 @@ const FIELD_LABELS: Record<string, string> = {
   // SG2-66 AC4: an accepted change request and each settled recheck.
   change_request: 'Change Request',
   arrangement_recheck: 'Arrangement Recheck',
+  // SG2-92 AC6: the Safety Officer's operational safety check decision and its reason.
+  safety_decision: 'Safety Decision',
 };
 
 /** Formats an ISO string into Singapore Standard Time (SGT). */

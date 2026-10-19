@@ -12,6 +12,8 @@ vi.mock('../components/EquipmentReservations', () => ({ default: () => null }));
 // SG2-66: change requests and rechecks have their own suites and fetches.
 vi.mock('../components/ArrangementRechecks', () => ({ default: () => null }));
 vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
+// SG2-92: the safety decision summary has its own suites and fetch.
+vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
 
 // jsdom has no scrolling implementation; the real drawer focuses save errors.
 beforeEach(() => { HTMLElement.prototype.scrollIntoView = vi.fn(); });

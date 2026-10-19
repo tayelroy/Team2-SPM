@@ -9,7 +9,6 @@ import {
   Dot,
   GhostButton,
   IconButton,
-  Notice,
   RecessedCard,
   StatFigure,
 } from '../ui';
@@ -18,6 +17,7 @@ import { fetchAssignmentQueue } from '../api/assignmentQueue';
 import { badgeStyle, eventActionLabel, statusLabel } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
+import SafetyCheckQueue from '../components/SafetyCheckQueue';
 
 /** One event summary in the left-hand list — the whole tile is the trigger. */
 function EventTile({ event, onOpen }: { event: EventCard; onOpen: () => void }) {
@@ -216,27 +216,17 @@ function LeadDashboard({ accessToken, onNavigate }: DashboardProps) {
 }
 
 /**
- * The Safety Officer's desk (SG2-86 AC2). The role has no safety checks to
- * act on until the safety review flow lands, so the desk says so instead
- * of showing events.
+ * The Safety Officer's desk (SG2-86 AC2, SG2-92): the events awaiting an
+ * operational safety check and the decision on each. The list is a stand-in
+ * for SG2-91 until it ships.
  */
-function SafetyDashboard() {
-  return (
-    <Notice>
-      <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500, color: color.platinum }}>No safety checks yet</h2>
-      <p style={{ margin: 0, color: color.silver }}>
-        Safety checks arrive with the safety review flow. There is nothing for you to review until then.
-      </p>
-    </Notice>
-  );
-}
 
 export default function Dashboard(props: DashboardProps) {
   const { role } = props;
   if (role === 'Event Organiser') return <OrganisationDashboard key={props.accessToken} {...props} />;
   if (isQueueRole(role)) return <WorkQueue key={`${role}:${props.accessToken}`} role={role} accessToken={props.accessToken} onFindVenues={props.onFindVenues} />;
   if (role === 'Event Coordinator Lead') return <LeadDashboard key={props.accessToken} {...props} />;
-  if (role === 'Safety Officer') return <SafetyDashboard />;
+  if (role === 'Safety Officer') return <SafetyCheckQueue key={props.accessToken ?? ''} accessToken={props.accessToken ?? ''} />;
   return <AttendeeDashboard onNavigate={props.onNavigate} />;
 }
 

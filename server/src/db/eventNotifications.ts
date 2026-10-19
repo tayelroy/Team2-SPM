@@ -13,7 +13,8 @@ export type EventNoticeKind =
   | 'clarification_requested'
   | 'event_approved'
   | 'event_rejected'
-  | 'event_returned_to_planning';
+  | 'event_returned_to_planning'
+  | 'safety_decision';
 
 export interface EventNotice {
   recipient_id: string | null | undefined;
@@ -60,7 +61,22 @@ export const eventNoticeMessages = {
   returnedToPlanningOrganiser: (event: string) =>
     `${event} has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.`,
   returnedToPlanningCoordinator: (event: string) =>
-    `${event} is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.`
+    `${event} is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.`,
+  // SG2-92 AC5: the organiser and the assigned coordinator get the same
+  // notice of a safety check decision. The database function writes them;
+  // these match its SQL wording in 202610190004 word for word.
+  safetyApproved: (event: string, note: string | null) => clip(
+    `${event} passed its operational safety check and has moved to Preparation.${note ? ` Note: ${note}` : ''}`,
+    MAX_MESSAGE_LENGTH
+  ),
+  safetyRejected: (event: string, reason: string) => clip(
+    `${event} did not pass its operational safety check: ${reason}. The coordinator will rework the arrangements for a new check.`,
+    MAX_MESSAGE_LENGTH
+  ),
+  safetyChangesRequested: (event: string, arrangements: string, reason: string) => clip(
+    `${event} needs changes before it can pass its operational safety check (${arrangements}): ${reason}. It has moved back to Planning.`,
+    MAX_MESSAGE_LENGTH
+  )
 };
 
 /**

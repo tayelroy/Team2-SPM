@@ -738,6 +738,20 @@
         "AC6": "Once an event is Confirmed or in Preparation, its details cannot be edited directly: a direct planning edit is refused on the server side with a message pointing to a change request (SG2-64). Registration settings are the exception (SG2-63). This replaces the direct-edit rule in SG2-39 for those statuses",
         "AC7": "The Event Organiser and the assigned Event Coordinator are notified when an event goes back to Planning, and the move is recorded in the event history"
       }
+    },
+    {
+      "id": "SG2-92",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-92",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-19",
+      "acceptanceCriteria": {
+        "AC1": "For an event awaiting a check, I can record one of three decisions: Approve, Reject, or Request Changes",
+        "AC2": "Reject and Request Changes require me to give a reason, and Request Changes also requires me to name the arrangements to change (venue, equipment/technical, or other)",
+        "AC3": "On Approve, the event can move on to Preparation",
+        "AC4": "On Reject, the event is shown as Safety Rejected, cannot move on to Preparation, and goes back to Planning so the coordinator can rework the arrangements and resubmit them for a new check (the status flow allows safety_rejected → planning)",
+        "AC5": "The assigned Event Coordinator and the Event Organiser are notified of the decision and its reason",
+        "AC6": "Each decision is recorded with who made it, when, and the reason"
+      }
     }
   ]
 }

@@ -43,6 +43,7 @@ import { createConfirmEventHandler } from './events/confirm';
 import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
+import { createSafetyCheckHandlers } from './events/safetyChecks';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -106,7 +107,9 @@ export function createApp(
   confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
   eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal }),
   // SG2-66: appended last for the same reason.
-  changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal })
+  changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-92: appended last for the same reason.
+  safetyCheckHandlers = createSafetyCheckHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -261,6 +264,25 @@ export function createApp(
     access.requirePermission('event_request.rechecks.settle'),
     changeRequestHandlers.settle
   );
+  // SG2-92 AC1-AC6: the Safety Officer records a safety check decision; the
+  // decisions are read by the Safety Officer, the assigned coordinator and the
+  // organiser (per-row), and the assigned coordinator reworks a Safety
+  // Rejected event back to Planning.
+  eventRequests.post(
+    '/:eventId/safety-decision',
+    access.requirePermission('event_request.safety_decision.record'),
+    safetyCheckHandlers.record
+  );
+  eventRequests.get(
+    '/:eventId/safety-decisions',
+    access.requirePermission('event_request.safety_decisions.view'),
+    safetyCheckHandlers.decisions
+  );
+  eventRequests.post(
+    '/:eventId/rework',
+    access.requirePermission('event_request.safety_rework'),
+    safetyCheckHandlers.rework
+  );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(
     '/:eventId/history',
@@ -283,6 +305,10 @@ export function createApp(
     assignCoordinatorHandler
   );
   app.use('/api/event-requests', eventRequests);
+  // SG2-92: the events awaiting a safety check (stand-in for SG2-91's list).
+  const safetyChecks = access.protectedRouter();
+  safetyChecks.get('/', access.requirePermission('safety_checks.view'), safetyCheckHandlers.queue);
+  app.use('/api/safety-checks', safetyChecks);
 
   app.use('/api/venues', routers.venues);
   app.use('/api/venues', routers.layouts);

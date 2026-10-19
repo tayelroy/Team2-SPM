@@ -17,6 +17,9 @@ vi.mock('../components/ConfirmedArrangements', () => ({ default: ({ eventId, acc
 // panel and its wiring are covered in ChangeRequestsPanel.test.tsx and
 // EventDetail.changeImpact.test.tsx.
 vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
+// SG2-92: stubbed for the same reason; covered in SafetyDecisionSummary.test.tsx
+// and EventDetail.safety.test.tsx.
+vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
 
 // jsdom has no scrollIntoView; the planning drawer scrolls its messages into
 // view (SG2-39), so the impact-confirmation journey below needs it defined.

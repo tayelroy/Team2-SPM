@@ -536,3 +536,9 @@ test('[NORMAL] [SG2-66:AC4] an accepted change request and a settled recheck rea
   expect(humanizeFieldName('arrangement_recheck')).toBe('Arrangement Recheck');
   expect(humanizeFieldValue('arrangement_recheck', 'venue_recheck settled')).toBe('venue_recheck settled');
 });
+
+test('[NORMAL] [SG2-92:AC6] a safety check decision reads as a labelled history entry with its reason as recorded', () => {
+  expect(humanizeFieldName('safety_decision')).toBe('Safety Decision');
+  expect(humanizeFieldValue('safety_decision', 'Changes requested (Venue, Other): Widen the aisles'))
+    .toBe('Changes requested (Venue, Other): Widen the aisles');
+});

@@ -11,6 +11,7 @@ import EventArrangements from '../components/EventArrangements';
 import EventAuditDrawer from '../components/EventAuditDrawer';
 import ArrangementRechecks from '../components/ArrangementRechecks';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
+import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
 import { BookingRequestConflicts } from '../venues/BookingConflicts';
@@ -289,6 +290,12 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
           <ArrangementRechecks eventId={item.event_id} accessToken={accessToken} onSettled={onReload} />
           <ChangeRequestsPanel eventId={item.event_id} accessToken={accessToken} onAccepted={onReload} />
         </>
+      )}
+      {/* SG2-92 AC4–AC6: the latest safety decision, and reworking a Safety
+          Rejected event back to Planning, for the assigned coordinator. */}
+      {item.kind === 'event' && item.assigned_to_me && accessToken
+        && ['planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
+        <SafetyDecisionSummary eventId={item.event_id} accessToken={accessToken} status={currentStatus} canRework onReworked={onReload} />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread

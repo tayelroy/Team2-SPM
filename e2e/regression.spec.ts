@@ -1904,13 +1904,15 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
 });
 
-test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prototype events and offer only their own screens', async ({ page }) => {
+test('SG2-86-P02 | [SG2-86:AC2] [SG2-92:AC1] [NORMAL] [FAILURE] the Week 7 desks show no prototype events and offer only their own screens', async ({ page }) => {
   const prototypeEvent = page.getByText('Product Launch — Tideline', { exact: true });
   const menu = page.getByRole('navigation').getByRole('button');
 
   await signIn(page, 'safety');
   await expect(page.getByRole('heading', { level: 1, name: 'Safety desk' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'No safety checks yet' })).toBeVisible();
+  // SG2-92: the desk lists the real events awaiting a check (none in the reset fixture).
+  await expect(page.getByRole('heading', { name: 'Safety checks', exact: true })).toBeVisible();
+  await expect(page.getByText('No events are awaiting a safety check.', { exact: true })).toBeVisible();
   await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
   await expect(menu).toHaveText(['Dashboard']);
   await expect(prototypeEvent).toHaveCount(0);

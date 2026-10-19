@@ -77,6 +77,16 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.change_request.view': ['event_coordinator'],
   'event_request.change_request.accept': ['event_coordinator'],
   'event_request.rechecks.settle': ['event_coordinator'],
+  // SG2-92: the Safety Officer sees the events awaiting a check (a stand-in
+  // for SG2-91's list) and records Approve / Reject / Request Changes. The
+  // decisions are read by the Safety Officer, the assigned coordinator and
+  // the organiser (per-row, 404 otherwise), and the assigned coordinator
+  // reworks a Safety Rejected event back to Planning (per-row, in the
+  // database function).
+  'safety_checks.view': ['safety_officer'],
+  'event_request.safety_decision.record': ['safety_officer'],
+  'event_request.safety_decisions.view': ['safety_officer', 'event_coordinator', 'event_organiser'],
+  'event_request.safety_rework': ['event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing

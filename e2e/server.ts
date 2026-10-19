@@ -63,6 +63,8 @@ import { seedEventNotifications } from './support/event-notifications';
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
 import { createMemoryChangeImpact, seedChangeImpact } from './support/change-impact';
+import { createSafetyCheckHandlers } from '../server/src/events/safetyChecks';
+import { createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -234,7 +236,10 @@ const app = createApp(
   createGetEventConfirmationHandler(eventDependencies),
   // SG2-66: impact reads go through the in-memory client; acceptance and
   // settling mirror their SQL functions over the in-memory tables.
-  createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) })
+  createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) }),
+  // SG2-92: the stand-in queue and decision history read the in-memory client;
+  // recording and reworking mirror their SQL functions over the in-memory tables.
+  createSafetyCheckHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -273,6 +278,18 @@ app.get('/__e2e/change-impact-ledger', (_req, res) => res.json({
   audit: database.tables.event_audit_logs.filter(row => row.event_id === 661),
   notifications: database.tables.notifications.filter(row => row.event_id === 661),
 }));
+// SG2-92: three events awaiting the Safety Officer's check (SG2-91 would put them there).
+app.post('/__e2e/safety-decisions', (_req, res) => {
+  seedSafetyDecisions(database);
+  res.status(204).end();
+});
+app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [921, 922, 923].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), decisions: database.tables.event_safety_decisions,
+    audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
+  });
+});
 app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
   prepareConvertedForum(database);
   res.status(204).end();

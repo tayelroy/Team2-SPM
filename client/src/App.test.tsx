@@ -49,6 +49,9 @@ function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ??
       // SG2-87: the Lead's desk counts the unassigned queue.
       if (url === '/api/assignment-queue') return Response.json({ entries: [{ event_id: 41, name: 'Queued forum',
         organiser_name: 'Org', proposed_date: null, expected_attendance: null, submitted_at: '2030-06-01T01:00:00Z' }] });
+      // SG2-92: the Safety Officer's desk lists the events awaiting a check (stand-in for SG2-91);
+      // the queue itself is covered in SafetyCheckQueue.test.tsx.
+      if (url === '/api/safety-checks') return Response.json({ source: 'stand-in', events: [] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{

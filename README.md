@@ -193,6 +193,7 @@ uploaded as the `browser-regression` artifact.
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 - [Change impact](docs/change-impact.md) — SG2-66 what an accepted change breaks, returning to Planning, settling rechecks, and the sample change requests standing in for SG2-64/SG2-65
+- [Safety checks](docs/safety-checks.md) — SG2-92 the Safety Officer's Approve / Reject / Request Changes decision, its notices and history, reworking a rejection, and the stand-in list of events awaiting a check (SG2-91)
 
 CI runs the complete regression suite before and after each PR merge.
 
