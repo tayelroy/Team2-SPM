@@ -89,6 +89,33 @@ request yet) saves at once and marks nothing outstanding; an `approved` event
 still moves to `planning`. If the arrangements cannot be read the edit is not
 saved (503).
 
+**Confirmed and Preparation events (SG2-66 AC6).** Once an event is
+`confirmed` or in `preparation`, its details change only through a change
+request (SG2-64). The handler compares the body with the stored record
+(`computePlanningDiffs`, so values the drawer re-sends unchanged are not
+edits) and refuses, before anything is written, any change outside the
+registration settings (`registration_needed`, `registration_capacity`,
+`registration_opens_at`, `registration_closes_at`, SG2-63) and
+`planning_notes`: 409 `{ error, code: 'change_request_required', fields }`,
+where `error` is `This event is <Confirmed|in Preparation>, so its details can
+no longer be edited directly. Ask for the change through a change request
+instead; only registration settings can still be edited here.` Planning notes
+stay editable because they are the coordinator's internal log, not event
+details. The drawer shows a notice saying so, disables the date, attendance
+and requirement fields, leaves them out of the save, and shows the server's
+message if a refusal still comes back. `awaiting_safety_check` events keep the
+full SG2-39 edit (AC6 names only Confirmed and Preparation).
+
+**Back to Planning (SG2-66 AC7).** When a confirmed recheck moves an
+`awaiting_safety_check`, `preparation` or `confirmed` event to `planning`
+(for example a registration capacity rise on a confirmed event), the save also
+clears `confirmed_by`/`confirmed_at`, records the status change in the history
+and tells the organiser and the assigned coordinator with an
+`event_returned_to_planning` notice (see [Notifications](notifications.md)).
+If the notices cannot be stored the request answers 503 while the saved edit
+stands, as for the other notice paths. An `approved` event moving to
+`planning`, or an event already in `planning`, sends no notice.
+
 Legacy reservations still commit stock even when they have no equipment request.
 The facts reader checks for a reservation belonging to the event, so changing its
 date or increasing attendance also asks the coordinator to confirm an equipment

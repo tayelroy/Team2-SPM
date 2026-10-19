@@ -42,6 +42,8 @@ import { createEquipmentReservationsRouter } from './equipment/reservations';
 import { createConfirmEventHandler } from './events/confirm';
 import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
+import { createChangeRequestHandlers } from './events/changeRequests';
+import { createSafetyChecksRouter } from './safetyChecks';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -103,7 +105,12 @@ export function createApp(
   venueClashesRouter = createVenueClashesRouter(access),
   // SG2-58: appended last for the same reason.
   confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
-  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal })) {
+  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-66: appended last for the same reason.
+  changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-91: appended last to keep every positional argument in place.
+  safetyChecksRouter = createSafetyChecksRouter(access)
+) {
   const app = express();
 
   // Vercel puts one proxy hop in front of every request, setting
@@ -146,6 +153,8 @@ export function createApp(
   app.use('/api/equipment-requests', equipmentRequirementsRouter);
   // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
   app.use('/api/assignment-queue', assignmentQueueRouter);
+  // SG2-91: the Safety Officer's list of events awaiting a safety check.
+  app.use('/api/safety-checks', safetyChecksRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
@@ -239,6 +248,23 @@ export function createApp(
     '/:eventId/confirmation',
     access.requirePermission('event_request.confirmation.view'),
     eventConfirmationHandler
+  );
+  // SG2-66 AC1-AC4/AC7: the assigned coordinator sees what each change
+  // request would break, accepts one, and settles the rechecks it leaves.
+  eventRequests.get(
+    '/:eventId/change-requests',
+    access.requirePermission('event_request.change_request.view'),
+    changeRequestHandlers.list
+  );
+  eventRequests.post(
+    '/:eventId/change-requests/:changeRequestId/accept',
+    access.requirePermission('event_request.change_request.accept'),
+    changeRequestHandlers.accept
+  );
+  eventRequests.post(
+    '/:eventId/rechecks/:key/settle',
+    access.requirePermission('event_request.rechecks.settle'),
+    changeRequestHandlers.settle
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

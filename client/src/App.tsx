@@ -20,6 +20,7 @@ import Landing from './screens/Landing';
 import Login from './screens/Login';
 import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
+import SafetyChecks from './screens/SafetyChecks';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
 import VenueHolds from './screens/VenueHolds';
@@ -72,6 +73,8 @@ export default function App() {
   const [editingRequest, setEditingRequest] = useState<EventRequestDraft | null>(null);
   // The approved event venue search was opened from, if any (SG2-46).
   const [venuePrefill, setVenuePrefill] = useState<VenueSearchPrefill | null>(null);
+  // SG2-91: the awaiting event a Safety desk card opened, if any.
+  const [safetyFocus, setSafetyFocus] = useState<number | undefined>(undefined);
   // The server's permissions for the signed-in account (SG2-86 AC2), tagged
   // with the token they were loaded for so a previous session's never leak
   // into the next one's navigation.
@@ -186,7 +189,8 @@ export default function App() {
         role={role}
         accessToken={session!.accessToken}
         onNavigate={(nextScreen, id) => {
-          if (id !== undefined) setSelectedEventId(id);
+          if (nextScreen === 'safetyChecks') setSafetyFocus(id);
+          else if (id !== undefined) setSelectedEventId(id);
           setScreen(nextScreen);
         }}
         onFindVenues={(prefill) => {
@@ -265,6 +269,7 @@ export default function App() {
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
+    safetyChecks: <SafetyChecks key={session!.accessToken} accessToken={session!.accessToken} focusEventId={safetyFocus} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
       accessToken={session!.accessToken} prefill={venuePrefill} />
   }[screen];
@@ -272,8 +277,10 @@ export default function App() {
   return (
     <AppShell key={`${session!.accessToken}:${role}`} accessToken={session!.accessToken} role={role} roles={roles} onSwitchRole={handleSwitchRole}
       access={access} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
-      // Menu navigation opens venue search blank, not for the last event.
+      // Menu navigation opens venue search blank, not for the last event,
+      // and the safety check list at the top (SG2-91).
       setVenuePrefill(null);
+      setSafetyFocus(undefined);
       setScreen(nextScreen);
     }}>
       {body}

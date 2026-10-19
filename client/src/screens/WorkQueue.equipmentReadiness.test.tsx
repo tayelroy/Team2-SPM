@@ -9,6 +9,9 @@ import type { EventArrangementsResult, PlanningEventRecord } from '../api/eventR
 // Reservation forms have a separate public-component suite. Keep the real
 // requirements, readiness, planning drawer and queue together in this suite.
 vi.mock('../components/EquipmentReservations', () => ({ default: () => null }));
+// SG2-66: change requests and rechecks have their own suites and fetches.
+vi.mock('../components/ArrangementRechecks', () => ({ default: () => null }));
+vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
 
 // jsdom has no scrolling implementation; the real drawer focuses save errors.
 beforeEach(() => { HTMLElement.prototype.scrollIntoView = vi.fn(); });
@@ -152,6 +155,7 @@ function registrationFixture(failSave = false) {
     venue_requirements: null, equipment_requirements: null, accessibility_needs: null,
     registration_needed: false, registration_capacity: null, registration_opens_at: null, registration_closes_at: null,
     planning_notes: 'Stored notes', arrangements_recheck_needed: false, outstanding_arrangements: [],
+    expected_crowd_movement: null,
   };
   let readinessReads = 0;
   const fetch = vi.fn(async (url: string, init?: RequestInit): Promise<Response> => {

@@ -44,7 +44,8 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
         if (held) return { outcome: 'conflict', kind: 'hold', starts_at: String(held.starts_at), ends_at: String(held.ends_at), label: name(held.event_id) };
         const attendance = event.expected_attendance as number | null;
         if (attendance !== null && (venue.capacity === null || attendance > Number(venue.capacity))
-            && !database.tables.venue_capacity_exceptions.some(row => row.request_id === requestId && Number(row.expected_attendance) >= attendance)) {
+            && !database.tables.venue_capacity_exceptions.some(row => row.request_id === requestId && row.approver_role === 'venue_staff'
+              && Number(row.expected_attendance) >= attendance)) {
           return { outcome: 'capacity' };
         }
         booking = nextId(database.tables.venue_bookings, 'booking_id');

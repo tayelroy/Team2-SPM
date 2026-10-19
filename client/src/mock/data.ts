@@ -103,7 +103,6 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['form', 'New request'],
     ['drafts', 'My drafts'],
     ['detail', 'Event detail'],
-    ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
   ],
   // SG2-26: a coordinator opens events from the work queue on the dashboard.
   // All events and event detail list organisation requests (event_request.view,
@@ -120,12 +119,13 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['calendar', 'Venue Availability'],
     ['venues', 'Catalogue'],
     ['holds', 'Venue holds'],
+    // SG2-66 AC5: only Venue Staff approve capacity exceptions.
+    ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['calendar', 'Venue Availability'],
     ['equipment', 'Equipment'],
-    ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
@@ -142,9 +142,10 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['queue', 'Unassigned queue', 'event_request.queue.view'],
     ['assign', 'Assign coordinators', 'event_request.assign_coordinator'],
   ],
-  // SG2-86: the safety-check screens arrive with the safety review flow.
+  // SG2-91 AC2/AC4: the list of events awaiting a safety check.
   'Safety Officer': [
     ['dashboard', 'Dashboard'],
+    ['safetyChecks', 'Safety checks', 'safety_checks.read'],
   ],
 };
 
@@ -190,7 +191,7 @@ export const HEAD: Record<
   'Safety Officer': {
     eyebrow: 'Safety Officer',
     title: 'Safety desk',
-    blurb: 'Safety checks arrive with the safety review flow.',
+    blurb: 'Events whose venues and equipment are in place, waiting for your operational safety check.',
   },
 };
 
@@ -211,6 +212,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   profile: 'My profile',
   assign: 'Assign coordinators',
   queue: 'Unassigned queue',
+  safetyChecks: 'Safety checks',
   search: 'Find venues',
 };
 
@@ -224,7 +226,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   calendar:
     'Available, held, confirmed and blocked days across all venues. Choose a day to see which venue is in use.',
   holds: 'Reserve a venue while arrangements are finalised, with a clear expiry and approval decision.',
-  capacityExceptions: 'Review pending capacity exceptions. Approval does not reserve a venue or decide its booking.',
+  capacityExceptions: 'Approve capacity exceptions for pending requests and booked venues whose attendance was raised. Approval does not reserve a venue or decide its booking.',
   equipment:
     'Keep equipment type, stock, location and operational status current for request assessment.',
   attendee: 'Confirmed event details, registration, and your current status.',
@@ -235,6 +237,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   editDraft: 'Update the details, then save your changes or submit when ready.',
   profile: 'View and update your contact details and communication preferences.',
   queue: 'Submitted requests no coordinator holds yet, oldest first. Assign them from Assign coordinators.',
+  safetyChecks: 'Events awaiting an operational safety check, oldest first, with everything the review needs.',
   assign:
     'Give each submitted request a named coordinator, or hand it to someone else when plans change.',
   search:

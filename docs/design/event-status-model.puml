@@ -34,11 +34,12 @@ under_review --> approved : PATCH /:id/decision\n(decideEventRequestHandler)
 needs_clarification --> unassigned : PATCH /:id/submit\n(only if no coordinator)
 rejected --> unassigned : PATCH /:id/submit\n(only if no coordinator)
 approved --> planning : PATCH /:id/planning\n(updateEventPlanningHandler)
-planning -[#888888,dashed]-> awaiting_safety_check : <<planned>> SG2-91
+approved --> awaiting_safety_check : safety_check_refresh trigger\n(SG2-91: venues booked, equipment reserved)
+planning --> awaiting_safety_check : safety_check_refresh trigger\n(SG2-91: venues booked, equipment reserved)
 planning -[#888888,dashed]-> cancelled : <<planned>> SG2-67
 awaiting_safety_check -[#888888,dashed]-> preparation : <<planned>> SG2-92 pass
 awaiting_safety_check -[#888888,dashed]-> safety_rejected : <<planned>> SG2-92 fail
-awaiting_safety_check --> planning : PATCH /:id/planning\n(edit with arrangement impact);\nSG2-92 return <<planned>>
+awaiting_safety_check --> planning : PATCH /:id/planning (arrangement impact),\nor safety_check_refresh trigger (SG2-91: an arrangement\nadded, released or disrupted); SG2-92 return <<planned>>
 awaiting_safety_check -[#888888,dashed]-> cancelled : <<planned>> SG2-67
 safety_rejected -[#888888,dashed]-> cancelled : <<planned>> SG2-67
 preparation --> confirmed : PATCH /:id/confirm\n(rpc confirm_event, SG2-58)

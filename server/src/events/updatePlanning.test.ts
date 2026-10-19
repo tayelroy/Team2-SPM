@@ -14,6 +14,7 @@ import {
   validatePlanningSchedule,
   computePlanningDiffs,
   formatAuditValue,
+  changeRequestRequiredMessage,
   type UpdateEventPlanningDependencies
 } from './updatePlanning';
 import type {
@@ -24,6 +25,7 @@ import type {
 } from '../db/eventPlanning';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from '../db/auditLogs';
 import type { EventArrangementFacts, FetchEventArrangementFactsResult } from '../db/eventArrangements';
+import type { EventNotice, NotifyEventResult } from '../db/eventNotifications';
 import { computeEventStage } from './stageCalculator';
 
 const COORDINATOR_ID = '10000000-0000-4000-8000-000000000001';
@@ -46,6 +48,7 @@ const BASE_EVENT: EventPlanningRecord = {
   registration_opens_at: '2026-10-01T09:00:00.000Z',
   registration_closes_at: '2026-11-01T18:00:00.000Z',
   planning_notes: 'Initial planning notes',
+  expected_crowd_movement: null,
   arrangements_recheck_needed: false,
   outstanding_arrangements: []
 };
@@ -897,6 +900,9 @@ interface HandlerHarnessOptions {
   /** Arrangement facts read for impact detection; defaults to ARRANGED. */
   arrangementFacts?: FetchEventArrangementFactsResult;
   captureFactsEventId?: (eventId: number) => void;
+  /** SG2-66 AC7 notices; defaults to a successful send. */
+  captureNotices?: (notices: EventNotice[]) => void;
+  notifyResult?: NotifyEventResult;
 }
 
 function buildApp(options: HandlerHarnessOptions = {}) {
@@ -949,7 +955,11 @@ function buildApp(options: HandlerHarnessOptions = {}) {
         options.captureFactsEventId?.(eventId);
         return options.arrangementFacts ?? { ok: true, facts: ARRANGED };
       },
-      now: () => HANDLER_NOW
+      now: () => HANDLER_NOW,
+      notify: async (_admin, notices) => {
+        options.captureNotices?.(notices);
+        return options.notifyResult ?? { ok: true };
+      }
     })
   );
   return app;
@@ -1580,6 +1590,163 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
   });
 });
 
+describe('SG2-66 direct-edit lock and return to Planning on the planning path', () => {
+  const UNAVAILABLE = { error: 'Event requests are temporarily unavailable. Please try again later.' };
+
+  function recording(event: EventPlanningRecord, extra: HandlerHarnessOptions = {}) {
+    const writes: UpdatePlanningFieldsInput[] = [];
+    const audits: InsertAuditLogInput[][] = [];
+    const notices: EventNotice[][] = [];
+    let factsRead = 0;
+    const app = buildApp({
+      fetchResult: { ok: true, event },
+      captureUpdateFields: fields => { writes.push(fields); },
+      captureAuditEntries: entries => { audits.push(entries); },
+      captureNotices: sent => { notices.push(sent); },
+      captureFactsEventId: () => { factsRead++; },
+      ...extra
+    });
+    return { app, writes, audits, notices, facts: () => factsRead };
+  }
+
+  test('[NORMAL] [SG2-66:AC6] the refusal message names the stage and points to a change request', () => {
+    assert.equal(changeRequestRequiredMessage('confirmed'),
+      'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.');
+    assert.equal(changeRequestRequiredMessage('preparation'),
+      'This event is in Preparation, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.');
+  });
+
+  for (const status of ['confirmed', 'preparation'] as const) {
+    test(`[CONFLICT] [SG2-66:AC6] a ${status} event refuses a direct change to its details with 409 and writes nothing`, async () => {
+      const { app, writes, audits, notices, facts } = recording({ ...BASE_EVENT, status });
+      const response = await request(app).patch('/api/event-requests/10/planning').send({
+        expected_attendance: 150, venue_requirements: 'Bigger hall', registration_capacity: 120,
+        planning_notes: 'Asked for more seats', confirm_impact: true
+      });
+      assert.equal(response.status, 409);
+      assert.deepEqual(response.body, {
+        error: changeRequestRequiredMessage(status),
+        code: 'change_request_required',
+        fields: ['expected_attendance', 'venue_requirements']
+      });
+      assert.deepEqual(writes, []);
+      assert.deepEqual(audits, []);
+      assert.deepEqual(notices, []);
+      assert.equal(facts(), 0);
+    });
+  }
+
+  test('[BOUNDARY] [SG2-66:AC6] every non-registration detail is locked once confirmed, including clearing a value', async () => {
+    const { app, writes } = recording({ ...BASE_EVENT, status: 'confirmed' });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({
+      proposed_date: '2026-11-20T09:00:00.000Z', accessibility_needs: null, equipment_requirements: 'More mics'
+    });
+    assert.equal(response.status, 409);
+    assert.equal(response.body.code, 'change_request_required');
+    assert.deepEqual(response.body.fields, ['proposed_date', 'accessibility_needs', 'equipment_requirements']);
+    assert.deepEqual(writes, []);
+  });
+
+  test('[NORMAL] [SG2-66:AC6] registration settings on a confirmed event still save directly and keep it confirmed', async () => {
+    const { app, writes, audits, notices } = recording({ ...BASE_EVENT, status: 'confirmed' });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({
+      registration_capacity: 90, registration_closes_at: '2026-11-02T18:00:00.000Z'
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(writes, [{ registration_capacity: 90, registration_closes_at: '2026-11-02T18:00:00.000Z' }]);
+    assert.deepEqual(audits[0].map(entry => entry.field_name), ['registration_capacity', 'registration_closes_at']);
+    assert.equal(response.body.event.status, 'confirmed');
+    assert.deepEqual(notices, []);
+  });
+
+  test('[NORMAL] [SG2-66:AC6] planning notes alone on a preparation event still save directly', async () => {
+    const { app, writes, audits } = recording({ ...BASE_EVENT, status: 'preparation' });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({ planning_notes: 'Catering confirmed' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(writes, [{ planning_notes: 'Catering confirmed' }]);
+    assert.deepEqual(audits[0].map(entry => entry.field_name), ['planning_notes']);
+    assert.equal(response.body.event.status, 'preparation');
+  });
+
+  test('[BOUNDARY] [SG2-66:AC6] the drawer re-sending unchanged details on a confirmed event is not an edit', async () => {
+    const { app, writes, audits } = recording({ ...BASE_EVENT, status: 'confirmed' });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({
+      expected_attendance: 100, proposed_date: '2026-11-15T17:00:00+08:00', venue_requirements: 'Large hall with projector',
+      accessibility_needs: 'Wheelchair access', equipment_requirements: 'Wireless mics', registration_needed: true,
+      registration_capacity: 100, registration_opens_at: '2026-10-01T09:00:00.000Z', registration_closes_at: '2026-11-01T18:00:00.000Z',
+      planning_notes: 'Initial planning notes'
+    });
+    assert.equal(response.status, 200);
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].status, undefined);
+    assert.deepEqual(audits, []);
+  });
+
+  test('[NORMAL] [SG2-66:AC6] [SG2-66:AC7] an awaiting safety check event can still be edited; an impact returns it to Planning and tells organiser and coordinator', async () => {
+    const { app, writes, audits, notices } = recording({ ...BASE_EVENT, status: 'awaiting_safety_check', name: 'Partner Forum' });
+    const response = await request(app).patch('/api/event-requests/10/planning')
+      .send({ expected_attendance: 120, confirm_impact: true });
+    assert.equal(response.status, 200);
+    assert.deepEqual(writes, [{ expected_attendance: 120, arrangements_recheck_needed: true,
+      outstanding_arrangements: ['venue_recheck', 'equipment_recheck'], status: 'planning' }]);
+    assert.deepEqual(audits[0].at(-1), { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'status',
+      old_value: 'awaiting_safety_check', new_value: 'planning' });
+    assert.deepEqual(notices, [[
+      { recipient_id: 'org-user-1', event_id: 10, kind: 'event_returned_to_planning',
+        message: 'Partner Forum has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.' },
+      { recipient_id: COORDINATOR_ID, event_id: 10, kind: 'event_returned_to_planning',
+        message: 'Partner Forum is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.' }
+    ]]);
+  });
+
+  for (const status of ['confirmed', 'preparation'] as const) {
+    test(`[NORMAL] [SG2-66:AC7] a registration capacity rise on a ${status} event returns it to Planning, clears the confirmation and sends both notices`, async () => {
+      const { app, writes, audits, notices } = recording({ ...BASE_EVENT, status, name: null });
+      const response = await request(app).patch('/api/event-requests/10/planning')
+        .send({ registration_capacity: 120, confirm_impact: true });
+      assert.equal(response.status, 200);
+      assert.deepEqual(writes, [{ registration_capacity: 120, arrangements_recheck_needed: true,
+        outstanding_arrangements: ['registration_recheck'], status: 'planning', confirmed_by: null, confirmed_at: null }]);
+      assert.deepEqual(audits[0].map(entry => [entry.field_name, entry.old_value, entry.new_value]),
+        [['registration_capacity', '100', '120'], ['status', status, 'planning']]);
+      assert.deepEqual(notices[0].map(notice => [notice.recipient_id, notice.message]), [
+        ['org-user-1', 'Untitled event has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.'],
+        [COORDINATOR_ID, 'Untitled event is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.']
+      ]);
+    });
+  }
+
+  for (const status of ['approved', 'planning']) {
+    test(`[BOUNDARY] [SG2-66:AC7] an impact on an event already ${status === 'approved' ? 'approved' : 'in planning'} is no return to Planning and sends no notice`, async () => {
+      const { app, writes, notices } = recording({ ...BASE_EVENT, status });
+      const response = await request(app).patch('/api/event-requests/10/planning')
+        .send({ expected_attendance: 120, confirm_impact: true });
+      assert.equal(response.status, 200);
+      assert.equal(writes[0].status, 'planning');
+      assert.equal(writes[0].confirmed_by, undefined);
+      assert.deepEqual(notices, []);
+    });
+  }
+
+  test('[NORMAL] [SG2-66:AC7] an awaiting safety check edit without impact stays put and sends no notice', async () => {
+    const { app, writes, notices } = recording({ ...BASE_EVENT, status: 'awaiting_safety_check' });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({ venue_requirements: 'Stage left' });
+    assert.equal(response.status, 200);
+    assert.equal(writes[0].status, undefined);
+    assert.deepEqual(notices, []);
+  });
+
+  test('[FAILURE] [SG2-66:AC7] a return to Planning whose notices cannot be stored answers 503', async () => {
+    const { app, writes, notices } = recording({ ...BASE_EVENT, status: 'awaiting_safety_check' }, { notifyResult: { ok: false } });
+    const response = await request(app).patch('/api/event-requests/10/planning')
+      .send({ expected_attendance: 120, confirm_impact: true });
+    assert.equal(response.status, 503);
+    assert.deepEqual(response.body, UNAVAILABLE);
+    assert.equal(writes.length, 1);
+    assert.equal(notices.length, 1);
+  });
+});
+
 describe('PATCH /api/event-requests/:eventId/planning integration & authorization wiring', () => {
   const userId = COORDINATOR_ID;
   const originalConfig = { ...dbConfig };
@@ -1654,5 +1821,54 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
       .set('Authorization', 'Bearer test-token');
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { reached: true });
+  });
+});
+
+describe('expected crowd movement for the safety check (SG2-91)', () => {
+  const AWAITING: FetchEventPlanningResult = { ok: true, event: { ...BASE_EVENT, status: 'awaiting_safety_check' } };
+
+  test('[NORMAL] [SG2-91:AC3] the coordinator records expected crowd movement, trimmed and in the event history, without leaving the safety check', async () => {
+    let saved: UpdatePlanningFieldsInput | undefined;
+    let history: InsertAuditLogInput[] | undefined;
+    const app = buildApp({ fetchResult: AWAITING, captureUpdateFields: fields => { saved = fields; },
+      captureAuditEntries: entries => { history = entries; } });
+    const response = await request(app).patch('/api/event-requests/10/planning')
+      .send({ expected_crowd_movement: '  Enter by the east doors, leave by the west doors  ' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(saved, { expected_crowd_movement: 'Enter by the east doors, leave by the west doors' });
+    assert.equal(response.body.event.status, 'awaiting_safety_check');
+    assert.deepEqual(history, [{ event_id: 10, actor_id: COORDINATOR_ID, field_name: 'expected_crowd_movement',
+      old_value: null, new_value: 'Enter by the east doors, leave by the west doors' }]);
+  });
+
+  test('[BOUNDARY] [SG2-91:AC3] expected crowd movement takes up to 5000 characters, and blank text clears it', () => {
+    assert.deepEqual(validatePlanningUpdateInput({ expected_crowd_movement: 'x'.repeat(5000) }),
+      { valid: true, values: { expected_crowd_movement: 'x'.repeat(5000) }, confirm_impact: false });
+    assert.deepEqual(validatePlanningUpdateInput({ expected_crowd_movement: 'x'.repeat(5001) }),
+      { valid: false, errors: ['expected_crowd_movement must be 5000 characters or fewer.'] });
+    assert.deepEqual(validatePlanningUpdateInput({ expected_crowd_movement: '   ' }),
+      { valid: true, values: { expected_crowd_movement: null }, confirm_impact: false });
+  });
+
+  test('[FAILURE] [SG2-91:AC3] expected crowd movement that is not text is refused and nothing is saved', async () => {
+    let updates = 0;
+    const app = buildApp({ fetchResult: AWAITING, captureUpdateFields: () => { updates++; } });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({ expected_crowd_movement: 42 });
+    assert.deepEqual([response.status, response.body],
+      [400, { error: 'Invalid planning details', details: ['expected_crowd_movement must be text.'] }]);
+    assert.equal(updates, 0);
+  });
+
+  test('[CONFLICT] [SG2-91:AC1] an edit that needs arrangements rechecked takes an event awaiting its safety check back to Planning', async () => {
+    let saved: UpdatePlanningFieldsInput | undefined;
+    let history: InsertAuditLogInput[] | undefined;
+    const app = buildApp({ fetchResult: AWAITING, captureUpdateFields: fields => { saved = fields; },
+      captureAuditEntries: entries => { history = entries; } });
+    const response = await request(app).patch('/api/event-requests/10/planning')
+      .send({ expected_attendance: 150, confirm_impact: true });
+    assert.equal(response.status, 200);
+    assert.equal(saved?.status, 'planning');
+    assert.deepEqual(history?.at(-1), { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'status',
+      old_value: 'awaiting_safety_check', new_value: 'planning' });
   });
 });

@@ -1,4 +1,6 @@
-/** Pending venue requests the signed-in account may approve a capacity exception for (SG2-47 AC3). */
+/** Venue requests Venue Staff may approve a capacity exception for (SG2-47 AC3,
+ * SG2-66 AC5): pending ones, and booked ones whose event's attendance has
+ * risen above the venue's capacity (`booked`, SG2-66 AC2). */
 export interface CapacityExceptionRequest {
   request_id: number;
   event_id: number;
@@ -8,6 +10,7 @@ export interface CapacityExceptionRequest {
   ends_at: string;
   expected_attendance: number;
   venue_capacity: number | null;
+  booked: boolean;
 }
 
 type Result = { ok: true; requests: CapacityExceptionRequest[] } | { ok: false; error: string };
@@ -24,7 +27,8 @@ function isRequest(value: unknown): value is CapacityExceptionRequest {
     typeof row.ends_at === 'string' && Number.isFinite(Date.parse(row.ends_at)) &&
     Date.parse(row.ends_at) > Date.parse(row.starts_at) &&
     Number.isInteger(row.expected_attendance) && row.expected_attendance > 0 &&
-    (row.venue_capacity === null || (Number.isInteger(row.venue_capacity) && row.venue_capacity >= 0));
+    (row.venue_capacity === null || (Number.isInteger(row.venue_capacity) && row.venue_capacity >= 0)) &&
+    typeof row.booked === 'boolean';
 }
 
 /** Only the public scoped list is read; the server remains authoritative for eligibility and approval. */

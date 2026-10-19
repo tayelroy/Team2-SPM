@@ -11,6 +11,7 @@ import {
   type VenueFit
 } from './suitabilityApi';
 
+// Other roles approved exceptions before SG2-66 AC5; their records are still shown.
 const APPROVER_ROLES: Record<string, string> = {
   venue_staff: 'Venue Staff', technical_support_staff: 'Technical Support Staff', event_organiser: 'Event Organiser'
 };
@@ -19,7 +20,7 @@ const APPROVER_ROLES: Record<string, string> = {
 export function consequence(suitability: Suitability): string | null {
   const kinds = suitability.issues.map(issue => issue.kind);
   if (kinds.includes('facility')) return 'Cannot be booked: no exception is permitted for a missing facility.';
-  if (kinds.includes('capacity')) return 'Can be booked only once Venue Staff, Technical Support Staff or the Event Organiser approve a capacity exception.';
+  if (kinds.includes('capacity')) return 'Can be booked only once Venue Staff approve a capacity exception.';
   if (kinds.length > 0) return 'Raise the missing accessibility features with the organiser before booking.';
   return null;
 }
@@ -77,7 +78,9 @@ export function EventVenueFit({ accessToken, eventId, eventName }: { accessToken
 
 function approvalText(exception: RequestFit['exceptions'][number]) {
   const when = new Date(exception.approved_at).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore', hour12: false });
-  return `Capacity exception for ${exception.expected_attendance} people approved by ${exception.approver_name ?? 'an unnamed account'} (${APPROVER_ROLES[exception.approver_role] ?? exception.approver_role}) on ${when}.`;
+  const text = `Capacity exception for ${exception.expected_attendance} people approved by ${exception.approver_name ?? 'an unnamed account'} (${APPROVER_ROLES[exception.approver_role] ?? exception.approver_role}) on ${when}.`;
+  // SG2-66 AC5: an approval recorded by another role is kept as history only.
+  return exception.approver_role === 'venue_staff' ? text : `${text} It no longer counts: only Venue Staff approve capacity exceptions.`;
 }
 
 /**
@@ -129,7 +132,7 @@ export function BookingRequestFit({ accessToken, requestId, onReadiness }: {
     {fit?.exceptions.map(exception => <p key={exception.exception_id} className="organisation-detail-hint">{approvalText(exception)}</p>)}
     {error && <p role="alert" className="work-queue-empty">{error}</p>}
     {fit?.booking === 'needs_capacity_exception' && <>
-      <p className="organisation-detail-hint">Approving the exception does not approve the booking. The booking request still needs a decision.</p>
+      <p className="organisation-detail-hint">Approving the exception does not approve the booking. A pending booking request still needs a decision; a venue already booked keeps its booking.</p>
       <button type="button" className="organisation-button organisation-button-primary" style={{ alignSelf: 'flex-start' }}
         disabled={approving} onClick={approve}>{approving ? 'Approving…' : 'Approve capacity exception'}</button>
     </>}

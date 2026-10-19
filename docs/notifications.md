@@ -26,7 +26,10 @@ here.
 Every message names the event as `coalesce(nullif(name, ''), 'Untitled event')`
 (at most 500 characters of the name in the app). Messages are at most 2000
 characters. Nobody is told about their own action, and one person gets one
-notice of a kind per action even if they hold two parts in the event.
+notice of a kind per action even if they hold two parts in the event. The one
+exception is `event_returned_to_planning` (SG2-66 AC7), which names both the
+organiser and the assigned coordinator, so the coordinator is told even when
+their own edit or acceptance moved the event.
 
 | Kind | Bell label | Trigger | Recipients | Message | Written by |
 | --- | --- | --- | --- | --- | --- |
@@ -45,6 +48,7 @@ notice of a kind per action even if they hold two parts in the event.
 | `venue_booking_clash` | Booking clash flagged | A booking newly clashes once setup and turnaround apply (SG2-79) | Each affected event's coordinator | names both bookings and periods | `public.refresh_venue_booking_clashes` |
 | `venue_unavailable` | Venue unavailable | A confirmed booking is flagged because its venue was marked unavailable (SG2-81) | The affected event's coordinator and, when the event moved back to Planning, its organiser | the venue, the period (SGT), the reason, and the booking or event affected | `public.venue_disruption_notify` |
 | `event_confirmed` | Event confirmed | The coordinator confirms the event (SG2-58) | Organiser | `Your event <Event> is confirmed.` | `public.confirm_event` |
+| `event_returned_to_planning` | Back in Planning | The event moves from `awaiting_safety_check`, `preparation` or `confirmed` back to `planning` (SG2-66 AC7): a planning edit with confirmed arrangement rechecks, or an accepted change request with affected arrangements | Organiser and assigned coordinator (one notice if they are the same person) | organiser: `<Event> has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.`; coordinator: `<Event> is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.` | `server/src/events/updatePlanning.ts` (via `notifyEvent`); `public.apply_accepted_event_change` |
 
 The SG2-68 event-request notices are written by the API with the service-role
 client (`notifyEvent` and `fetchLeadIds` in
@@ -94,7 +98,8 @@ answer 503. The SQL suite is `supabase/tests/event_notifications.sql`.
 
 - Server: `server/src/db/eventNotifications.test.ts` and the handler suites
   (`submitEventRequest`, `assignCoordinator`, `clarifications`,
-  `decideEventRequest`, `notifications`, `authorization`).
+  `decideEventRequest`, `notifications`, `authorization`, and for SG2-66 AC7
+  `events/updatePlanning`).
 - Client: `client/src/api/notificationsApi.test.ts`,
   `client/src/components/HoldNotifications.test.tsx`.
 - Browser: `e2e/event-notifications.spec.ts` (SG2-68-P01…P06, N01, B01, F01 in

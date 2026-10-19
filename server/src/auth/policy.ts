@@ -84,6 +84,13 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-58 AC1/AC3: the confirmed arrangements, for the organiser who created
   // the event and its assigned coordinator (enforced per-row by the handler).
   'event_request.confirmation.view': ['event_organiser', 'event_coordinator'],
+  // SG2-66 AC1-AC4: the assigned coordinator sees what a change request would
+  // break, accepts it, and marks each outstanding recheck settled. Which
+  // event is enforced per-row by the assignment (404 otherwise), not by this
+  // grant.
+  'event_request.change_request.view': ['event_coordinator'],
+  'event_request.change_request.accept': ['event_coordinator'],
+  'event_request.rechecks.settle': ['event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing
@@ -124,10 +131,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // venue does or does not fit it. Which events a coordinator or organiser
   // may see is enforced per-row by the handler.
   'venues.suitability.view': ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_organiser'],
-  // SG2-47 AC3: a capacity exception is approved by Venue Staff, Technical
-  // Support Staff or the event's own organiser (enforced per-row). Never a
+  // SG2-66 AC5 (replaces the SG2-47 AC3 / SG2-49 AC1 approver list): only
+  // Venue Staff approve a capacity exception, for a new booking request or
+  // for a booked venue whose event's attendance was raised. Never a
   // coordinator: acknowledging the warning does not approve an exception.
-  'venue_booking.capacity_exception.approve': ['venue_staff', 'technical_support_staff', 'event_organiser'],
+  'venue_booking.capacity_exception.approve': ['venue_staff'],
   // SG2-48 AC1: the coordinator assigned to an approved event requests a
   // venue for it. Which event is enforced per-row by the assignment.
   'venue_booking.request': ['event_coordinator'],
@@ -177,6 +185,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],
   'equipment_requirements.request': ['event_coordinator'],
   'equipment_requirements.arrange': ['technical_support_staff'],
+  // SG2-91 AC2/AC4: only Safety Officers open the list of events awaiting an
+  // operational safety check; safety_check_queue() rechecks the stored role.
+  'safety_checks.read': ['safety_officer'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

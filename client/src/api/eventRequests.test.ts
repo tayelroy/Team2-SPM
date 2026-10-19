@@ -1324,6 +1324,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     registration_opens_at: '2026-10-01T00:00:00.000Z',
     registration_closes_at: '2026-11-10T23:59:59.000Z',
     planning_notes: 'All catering set',
+    expected_crowd_movement: null,
     arrangements_recheck_needed: true,
     outstanding_arrangements: ['venue_recheck'],
   };
@@ -1459,6 +1460,21 @@ describe('updateEventPlanning (SG2-39)', () => {
       ok: false,
       kind: 'conflict',
       message: 'Cannot update planning information for this event.',
+    });
+  });
+
+  test('[CONFLICT] [SG2-66:AC6] a direct edit refused for a change request keeps the server message and the locked fields', async () => {
+    const error = 'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      error, code: 'change_request_required', fields: ['expected_attendance', 'proposed_date'],
+    }, 409)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false, kind: 'change_request_required', message: error, fields: ['expected_attendance', 'proposed_date'],
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'change_request_required' }, 409)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false, kind: 'change_request_required', message: 'Ask for this change through a change request.', fields: [],
     });
   });
 

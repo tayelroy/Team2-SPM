@@ -144,7 +144,7 @@ export class VenueHoldFixture {
           venue_requirements: event.venue_requirements as string | null, accessibility_needs: event.accessibility_needs as string | null },
         { capacity: venue.capacity as number | null, facilities: venue.facilities as string | null, accessibility_features: venue.accessibility_features as string | null });
         const readiness = bookingReadiness(suitability, this.database.tables.venue_capacity_exceptions.filter(exception => exception.request_id === request.request_id)
-          .map(exception => ({ expected_attendance: Number(exception.expected_attendance) })));
+          .map(exception => ({ expected_attendance: Number(exception.expected_attendance), approver_role: String(exception.approver_role) })));
         if (readiness === 'blocked') return { outcome: 'suitability' };
         if (readiness === 'needs_capacity_exception') return { outcome: 'capacity' };
         const booking = { booking_id: nextId(this.database.tables.venue_bookings, 'booking_id'), venue_id: hold.venue_id,

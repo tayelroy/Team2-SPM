@@ -696,6 +696,8 @@ export interface PlanningUpdatePayload {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  /** SG2-91 AC3: shown to the Safety Officer in the safety check. */
+  expected_crowd_movement?: string | null;
   confirm_impact?: boolean;
 }
 
@@ -715,6 +717,8 @@ export interface PlanningEventRecord {
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   planning_notes: string | null;
+  /** SG2-91 AC3. */
+  expected_crowd_movement: string | null;
   arrangements_recheck_needed: boolean;
   outstanding_arrangements: string[];
   [key: string]: unknown;
@@ -733,6 +737,13 @@ export type UpdateEventPlanningResult =
       affected_arrangements: string[];
       impact_notes: string[];
       message: string;
+    }
+  | {
+      /** SG2-66 AC6: a Confirmed or Preparation event's details need a change request. */
+      ok: false;
+      kind: 'change_request_required';
+      message: string;
+      fields: string[];
     }
   | {
       ok: false;
@@ -789,6 +800,14 @@ export async function updateEventPlanning(
           : [],
         impact_notes: Array.isArray(body?.impact_notes) ? body.impact_notes : [],
         message: body?.error ?? 'Arrangements require rechecking.'
+      };
+    }
+    if (response.status === 409 && body?.code === 'change_request_required') {
+      return {
+        ok: false,
+        kind: 'change_request_required',
+        message: body?.error ?? 'Ask for this change through a change request.',
+        fields: Array.isArray(body?.fields) ? body.fields : []
       };
     }
     if (response.status === 409) {

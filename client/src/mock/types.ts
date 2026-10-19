@@ -36,6 +36,7 @@ export type Screen =
   | 'profile'
   | 'assign'
   | 'queue'
+  | 'safetyChecks'
   | 'search';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */

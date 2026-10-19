@@ -28,6 +28,7 @@ export interface EventPlanningInitialValues {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  expected_crowd_movement?: string | null;
   status?: string | null;
 }
 
@@ -50,6 +51,15 @@ const ARRANGEMENT_LABELS: Record<string, string> = {
   equipment_recheck: 'Equipment Recheck',
   registration_recheck: 'Registration Capacity Recheck',
 };
+
+/** Details a Confirmed or Preparation event no longer takes directly (SG2-66 AC6). */
+const LOCKED_DETAIL_FIELDS = [
+  'proposed_date',
+  'expected_attendance',
+  'venue_requirements',
+  'equipment_requirements',
+  'accessibility_needs',
+] as const;
 
 /** Formats an ISO datetime string for an HTML datetime-local input (YYYY-MM-DDTHH:mm). */
 export function formatForDateTimeInput(dateStr: string | null | undefined): string {
@@ -93,6 +103,7 @@ export function validatePlanningForm({
   equipmentRequirements,
   accessibilityNeeds,
   planningNotes,
+  expectedCrowdMovement = '',
 }: {
   proposedDate: string;
   /** The proposed date the drawer opened with, in the same input format. */
@@ -108,6 +119,8 @@ export function validatePlanningForm({
   equipmentRequirements: string;
   accessibilityNeeds: string;
   planningNotes: string;
+  /** SG2-91 AC3. */
+  expectedCrowdMovement?: string;
 }): string[] {
   const errors: string[] = [];
   let startTime: number | null = null;
@@ -138,6 +151,7 @@ export function validatePlanningForm({
     { label: 'Equipment requirements', value: equipmentRequirements },
     { label: 'Accessibility needs', value: accessibilityNeeds },
     { label: 'Planning notes', value: planningNotes },
+    { label: 'Expected crowd movement', value: expectedCrowdMovement },
   ];
 
   for (const tf of textFields) {
@@ -231,6 +245,10 @@ function PlanningDrawerPanel({
   const [planningNotes, setPlanningNotes] = useState(
     () => initialValues?.planning_notes ?? '',
   );
+  // SG2-91 AC3: what the Safety Officer reviews about how people move.
+  const [expectedCrowdMovement, setExpectedCrowdMovement] = useState(
+    () => initialValues?.expected_crowd_movement ?? '',
+  );
   const [registrationNeeded, setRegistrationNeeded] = useState(
     () => Boolean(initialValues?.registration_needed),
   );
@@ -274,6 +292,11 @@ function PlanningDrawerPanel({
 
   const statusLower = initialValues?.status?.toLowerCase() ?? '';
   const isTerminal = ['cancelled', 'completed', 'rejected'].includes(statusLower);
+  // SG2-66 AC6: once Confirmed or in Preparation, only registration settings
+  // and planning notes are edited here; everything else needs a change request.
+  const lockedStage = statusLower === 'confirmed' ? 'Confirmed'
+    : statusLower === 'preparation' ? 'in Preparation' : null;
+  const detailsDisabled = isTerminal || isSaving || lockedStage !== null;
 
   const handleKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Escape') {
@@ -298,6 +321,7 @@ function PlanningDrawerPanel({
       equipmentRequirements,
       accessibilityNeeds,
       planningNotes,
+      expectedCrowdMovement,
     });
 
     if (validationErrors.length > 0) {
@@ -321,6 +345,7 @@ function PlanningDrawerPanel({
       equipment_requirements: equipmentRequirements.trim() || null,
       accessibility_needs: accessibilityNeeds.trim() || null,
       planning_notes: planningNotes.trim() || null,
+      expected_crowd_movement: expectedCrowdMovement.trim() || null,
       registration_needed: registrationNeeded,
       registration_capacity:
         registrationNeeded && registrationCapacity.trim()
@@ -339,6 +364,11 @@ function PlanningDrawerPanel({
         && (payload[field] === null || payload[field] === false)) {
         delete payload[field];
       }
+    }
+    if (lockedStage) {
+      // The server refuses a change to these; leave them out so a re-sent value
+      // (rounded to the minute by the date input) can never look like one.
+      for (const field of LOCKED_DETAIL_FIELDS) delete payload[field];
     }
 
     setIsSaving(true);
@@ -443,6 +473,19 @@ function PlanningDrawerPanel({
               <NoticeMark size={20} />
               <span role="alert" style={{ fontSize: '14px', color: '#ff8a80' }}>
                 Cannot update planning details for a {initialValues?.status} event.
+              </span>
+            </div>
+          </Notice>
+        )}
+
+        {lockedStage && (
+          <Notice data-testid="change-request-lock-notice">
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <NoticeMark size={20} />
+              <span style={{ fontSize: '14px', color: color.mist, lineHeight: 1.45 }}>
+                This event is {lockedStage}, so its date, attendance and requirements can no longer be
+                edited here. Ask for those changes through a change request; registration settings
+                and planning notes can still be updated.
               </span>
             </div>
           </Notice>
@@ -604,7 +647,7 @@ function PlanningDrawerPanel({
               <input
                 id="epd-proposed-date"
                 type="datetime-local"
-                disabled={isTerminal || isSaving}
+                disabled={detailsDisabled}
                 value={proposedDate}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setProposedDate(e.target.value)}
                 style={{
@@ -627,7 +670,7 @@ function PlanningDrawerPanel({
                 id="epd-expected-attendance"
                 type="number"
                 min="1"
-                disabled={isTerminal || isSaving}
+                disabled={detailsDisabled}
                 value={expectedAttendance}
                 placeholder="e.g. 150"
                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -654,7 +697,7 @@ function PlanningDrawerPanel({
             <textarea
               id="epd-venue-requirements"
               rows={3}
-              disabled={isTerminal || isSaving}
+              disabled={detailsDisabled}
               value={venueRequirements}
               placeholder="e.g. Step-free access, banquet setup, breakout rooms"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
@@ -682,7 +725,7 @@ function PlanningDrawerPanel({
             <textarea
               id="epd-equipment-requirements"
               rows={3}
-              disabled={isTerminal || isSaving}
+              disabled={detailsDisabled}
               value={equipmentRequirements}
               placeholder="e.g. 2 Wireless mics, dual HDMI projectors, audio recording"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
@@ -711,11 +754,40 @@ function PlanningDrawerPanel({
             <textarea
               id="epd-accessibility-needs"
               rows={2}
-              disabled={isTerminal || isSaving}
+              disabled={detailsDisabled}
               value={accessibilityNeeds}
               placeholder="e.g. Hearing loop required, ramp access to main stage"
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
                 setAccessibilityNeeds(e.target.value)
+              }
+              style={{
+                background: surface.fieldOnAbyss,
+                border: rule.control,
+                borderRadius: radius.sm,
+                padding: '12px 14px',
+                color: color.mist,
+                fontSize: '14px',
+                lineHeight: 1.4,
+                outline: 'none',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
+          {/* SG2-91 AC3: reviewed by the Safety Officer in the safety check */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label htmlFor="epd-expected-crowd-movement" style={labelToken}>
+              Expected Crowd Movement
+            </label>
+            <textarea
+              id="epd-expected-crowd-movement"
+              rows={2}
+              disabled={isTerminal || isSaving}
+              value={expectedCrowdMovement}
+              placeholder="e.g. Arrive through the east doors, queue in the foyer, leave by the west exits"
+              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                setExpectedCrowdMovement(e.target.value)
               }
               style={{
                 background: surface.fieldOnAbyss,

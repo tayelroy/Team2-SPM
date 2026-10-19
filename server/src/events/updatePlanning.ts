@@ -20,7 +20,9 @@ import {
   type EventArrangementFacts,
   type FetchEventArrangementFactsResult
 } from '../db/eventArrangements';
+import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import { computeArrangementReadiness } from './arrangementReadiness';
+import { REGISTRATION_SETTINGS, RETURNS_TO_PLANNING } from './changeImpact';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -38,6 +40,8 @@ export interface PlanningUpdateValues {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  /** SG2-91 AC3: how attendees arrive, move through and leave the venue. */
+  expected_crowd_movement?: string | null;
 }
 
 export type PlanningValidationResult =
@@ -74,13 +78,16 @@ export interface UpdateEventPlanningDependencies {
   ) => Promise<FetchEventArrangementFactsResult>;
   /** Current time in epoch milliseconds; a new proposed date must be after it. */
   now?: () => number;
+  /** SG2-66 AC7: tells the organiser and coordinator the event is back in Planning. */
+  notify?: typeof notifyEvent;
 }
 
 const TEXT_FIELDS = [
   'venue_requirements',
   'equipment_requirements',
   'accessibility_needs',
-  'planning_notes'
+  'planning_notes',
+  'expected_crowd_movement'
 ] as const;
 
 export const AUDITED_PLANNING_FIELDS = [
@@ -93,8 +100,34 @@ export const AUDITED_PLANNING_FIELDS = [
   'registration_capacity',
   'registration_opens_at',
   'registration_closes_at',
-  'planning_notes'
+  'planning_notes',
+  'expected_crowd_movement'
 ] as const;
+
+/**
+ * Fields a coordinator may still edit directly once an event is Confirmed or in
+ * Preparation (SG2-66 AC6): registration settings (SG2-63) and the
+ * coordinator's own planning notes, which are an internal log rather than
+ * event details. Everything else needs a change request (SG2-64).
+ */
+const LOCKED_STATUS_EDITABLE_FIELDS: Record<string, true> = {
+  registration_needed: true,
+  registration_capacity: true,
+  registration_opens_at: true,
+  registration_closes_at: true,
+  planning_notes: true
+} satisfies Record<(typeof REGISTRATION_SETTINGS)[number] | 'planning_notes', true>;
+
+const LOCKED_STATUS_LABELS: Record<'confirmed' | 'preparation', string> = {
+  confirmed: 'Confirmed',
+  preparation: 'in Preparation'
+};
+
+/** The message a refused direct edit shows, pointing to a change request (SG2-66 AC6). */
+export function changeRequestRequiredMessage(status: 'confirmed' | 'preparation'): string {
+  return `This event is ${LOCKED_STATUS_LABELS[status]}, so its details can no longer be edited directly. ` +
+    'Ask for the change through a change request instead; only registration settings can still be edited here.';
+}
 
 /**
  * Validates coordinator planning update input (AC 4).
@@ -418,7 +451,8 @@ export function createUpdateEventPlanningHandler({
   updatePlanningFields = updateEventPlanningFields,
   insertAudit = insertAuditLogs,
   fetchArrangementFacts = fetchEventArrangementFacts,
-  now = Date.now
+  now = Date.now,
+  notify = notifyEvent
 }: UpdateEventPlanningDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -474,6 +508,22 @@ export function createUpdateEventPlanningHandler({
       return;
     }
 
+    // SG2-66 AC6: a Confirmed or Preparation event's details change only through
+    // a change request. Unchanged values the drawer re-sends are not edits.
+    if (currentEvent.status === 'confirmed' || currentEvent.status === 'preparation') {
+      const lockedFields = computePlanningDiffs(eventId, principal.userId, currentEvent, validated.values)
+        .map(diff => diff.field_name)
+        .filter(field => LOCKED_STATUS_EDITABLE_FIELDS[field] !== true);
+      if (lockedFields.length > 0) {
+        res.status(409).json({
+          error: changeRequestRequiredMessage(currentEvent.status),
+          code: 'change_request_required',
+          fields: lockedFields
+        });
+        return;
+      }
+    }
+
     // Dates against each other, the stored values and the clock (AC 4)
     const scheduleErrors = validatePlanningSchedule(currentEvent, validated.values, now());
     if (scheduleErrors.length > 0) {
@@ -507,6 +557,11 @@ export function createUpdateEventPlanningHandler({
         new Set([...currentEvent.outstanding_arrangements, ...impact.affected_arrangements])
       );
       fieldsToUpdate.status = 'planning';
+      if (currentEvent.status === 'confirmed' || currentEvent.status === 'preparation') {
+        // A confirmation no longer holds once the event is back in planning.
+        fieldsToUpdate.confirmed_by = null;
+        fieldsToUpdate.confirmed_at = null;
+      }
     } else if (currentEvent.status === 'approved') {
       fieldsToUpdate.status = 'planning';
     }
@@ -537,6 +592,26 @@ export function createUpdateEventPlanningHandler({
     if (auditEntries.length > 0) {
       const auditResult = await insertAudit(admin, auditEntries);
       if (!auditResult.ok) {
+        res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+        return;
+      }
+    }
+
+    // SG2-66 AC7: back in Planning from a later stage. Both the organiser and the
+    // assigned coordinator are told, even though the coordinator made the edit:
+    // AC7 names them both, a deliberate exception to "nobody is told about
+    // their own action".
+    const returnedToPlanning = fieldsToUpdate.status === 'planning'
+      && (RETURNS_TO_PLANNING as readonly string[]).includes(currentEvent.status);
+    if (returnedToPlanning) {
+      const label = eventLabel(currentEvent.name);
+      const notified = await notify(admin, [
+        { recipient_id: currentEvent.organiser_id, event_id: eventId, kind: 'event_returned_to_planning' as const,
+          message: eventNoticeMessages.returnedToPlanningOrganiser(label) },
+        { recipient_id: principal.userId, event_id: eventId, kind: 'event_returned_to_planning' as const,
+          message: eventNoticeMessages.returnedToPlanningCoordinator(label) }
+      ]);
+      if (!notified.ok) {
         res.status(503).json({ error: UNAVAILABLE_MESSAGE });
         return;
       }

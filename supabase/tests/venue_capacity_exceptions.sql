@@ -1,9 +1,10 @@
--- SG2-47: run only in disposable CI/local PostgreSQL. Everything rolls back.
+-- SG2-47 / SG2-66: run only in disposable CI/local PostgreSQL. Everything rolls back.
 --
 -- Capacity exceptions are recorded only through the API, against a real
--- booking request and approver, by one of the three approving roles. Clients
--- cannot read or write them directly, and approving one leaves the booking
--- request's own status untouched.
+-- booking request and approver, by Venue Staff alone (SG2-66 AC5 replaced
+-- the SG2-47 AC3 approver list). Approvals recorded earlier by other roles
+-- are kept as history but never count. Clients cannot read or write them
+-- directly, and approving one leaves the booking request's own status untouched.
 begin;
 insert into auth.users (id) values
   ('c0000000-0000-4000-8000-000000000001'),
@@ -24,7 +25,7 @@ begin
   insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance, venue_capacity)
     values (94701, 'c0000000-0000-4000-8000-000000000002', 'venue_staff', 80, 50);
   insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance, venue_capacity)
-    values (94701, 'c0000000-0000-4000-8000-000000000001', 'event_organiser', 90, 50);
+    values (94701, 'c0000000-0000-4000-8000-000000000002', 'venue_staff', 90, 50);
   if (select count(*) from public.venue_capacity_exceptions where request_id = 94701) <> 2 then
     raise exception '[SG2-47:approval-history] [SG2-47:AC3] [NORMAL] Every approval must be kept as history';
   end if;
@@ -39,6 +40,16 @@ begin
     insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
       values (94701, 'c0000000-0000-4000-8000-000000000002', 'event_coordinator', 80);
     raise exception '[SG2-47:coordinator-cannot-approve] [SG2-47:AC3] [FAILURE] A coordinator was recorded as approving an exception';
+  exception when check_violation then null; end;
+  begin
+    insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
+      values (94701, 'c0000000-0000-4000-8000-000000000001', 'event_organiser', 95);
+    raise exception '[SG2-66:organiser-cannot-approve] [SG2-66:AC5] [FAILURE] An organiser was recorded as approving an exception';
+  exception when check_violation then null; end;
+  begin
+    insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
+      values (94701, 'c0000000-0000-4000-8000-000000000001', 'technical_support_staff', 95);
+    raise exception '[SG2-66:support-cannot-approve] [SG2-66:AC5] [FAILURE] Technical Support Staff were recorded as approving an exception';
   exception when check_violation then null; end;
   begin
     insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
@@ -61,6 +72,25 @@ begin
       values (94701, 'c0000000-0000-4000-8000-000000000002', 'venue_staff', 80);
     raise exception '[SG2-47:sequential-duplicate-approval] [SG2-47:AC3] [CONFLICT] A sequential duplicate of the same approval was recorded';
   exception when unique_violation then null; end;
+
+  -- SG2-66 AC5: a legacy approval by another role survives the NOT VALID
+  -- check, and one for the same attendance does not stop Venue Staff from
+  -- recording the approval that counts.
+  reset role;
+  if (select convalidated from pg_constraint where conname = 'venue_capacity_exceptions_approver_role_check') then
+    raise exception '[SG2-66:legacy-kept] [SG2-66:AC5] [BOUNDARY] The Venue Staff check must be NOT VALID so legacy approvals stay as history';
+  end if;
+  alter table public.venue_capacity_exceptions drop constraint venue_capacity_exceptions_approver_role_check;
+  insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
+    values (94701, 'c0000000-0000-4000-8000-000000000001', 'event_organiser', 100);
+  alter table public.venue_capacity_exceptions add constraint venue_capacity_exceptions_approver_role_check
+    check (approver_role = 'venue_staff') not valid;
+  set local role service_role;
+  insert into public.venue_capacity_exceptions (request_id, approved_by, approver_role, expected_attendance)
+    values (94701, 'c0000000-0000-4000-8000-000000000002', 'venue_staff', 100);
+  if (select count(*) from public.venue_capacity_exceptions where request_id = 94701 and expected_attendance = 100) <> 2 then
+    raise exception '[SG2-66:legacy-does-not-block] [SG2-66:AC5] [CONFLICT] A legacy approval stopped Venue Staff recording theirs';
+  end if;
 
   delete from public.venue_booking_requests where request_id = 94701;
   if exists (select 1 from public.venue_capacity_exceptions where request_id = 94701) then

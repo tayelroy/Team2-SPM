@@ -4,10 +4,12 @@ import { type createAuthorization, AccessError, type Principal } from '../auth';
 import { getSupabaseAdminClient } from '../db';
 import {
   createVenueSuitabilityStore,
+  type BookingRequestRow,
   type SuitabilityEventRow,
   type SuitabilityVenueRow,
   type VenueSuitabilityStore
 } from '../db/venueSuitability';
+import { CHANGEABLE_STATUSES } from '../events/changeImpact';
 import { assessSuitability, bookingReadiness } from './suitability';
 
 export interface VenueSuitabilityDependencies {
@@ -58,6 +60,14 @@ function handler(
   };
 }
 
+/** SG2-66 AC2: an approved request still holding its confirmed booking, for
+ * an event that is going ahead, needs a new capacity check once attendance
+ * rises above the venue's capacity. */
+function isBooked(request: BookingRequestRow, event: SuitabilityEventRow) {
+  return request.status === 'approved' && request.venue_booking?.status === 'confirmed'
+    && (CHANGEABLE_STATUSES as readonly string[]).includes(event.status);
+}
+
 /**
  * GET /api/venues/suitability?event_id=&venue_id= — how each venue (or the
  * one given) fits an event (SG2-47 AC1, AC2, AC4). Shown to coordinators
@@ -95,30 +105,35 @@ export function createVenueSuitabilityRouter(access: ReturnType<typeof createAut
  * GET /:requestId/suitability — how the requested venue fits the event, the
  * capacity exceptions approved so far, and whether the booking may go ahead.
  *
- * POST /:requestId/capacity-exception — Venue Staff, Technical Support Staff
- * or the event's own organiser approve booking a venue too small for the
- * expected attendance (AC3). Coordinators hold no grant, so acknowledging a
- * warning never approves one. The request's own status is not changed: Venue
- * Staff still decide on the booking (AC5).
+ * POST /:requestId/capacity-exception — Venue Staff approve booking a venue
+ * too small for the expected attendance (SG2-47 AC3; only Venue Staff since
+ * SG2-66 AC5). Coordinators hold no grant, so acknowledging a warning never
+ * approves one. The request's own status is not changed: Venue Staff still
+ * decide on a pending booking (AC5). A request already booked for a live
+ * event is covered too, once its attendance rises above the capacity (SG2-66
+ * AC2): the new exception is for the revised attendance.
  */
 export function createBookingRequestSuitabilityRouter(access: ReturnType<typeof createAuthorization>, dependencies: VenueSuitabilityDependencies = {}) {
   const router = access.protectedRouter();
 
-  // Discovery uses the existing approval grant, not broader event or venue
-  // listing permissions. An organiser's scope comes only from the principal.
-  router.get('/capacity-exceptions', access.requirePermission('venue_booking.capacity_exception.approve'), handler(access, dependencies, async (database, principal, _req, respond) => {
-    const candidates = await database.pendingCapacityRequests(principal.role === 'event_organiser' ? principal.userId : undefined);
-    const requests = candidates.filter(row => row.status === 'pending'
-      && canSeeEvent(principal, row.event)
-      && row.event.expected_attendance !== null && row.event.expected_attendance > 0
-      && bookingReadiness(assessSuitability(row.event, row.venue), row.exceptions) === 'needs_capacity_exception')
-      .map(row => ({
-        request_id: row.request_id, event_id: row.event_id,
-        event_name: row.event.name?.trim() || 'Untitled event',
-        venue_name: row.venue.name.trim() || 'Unnamed venue',
-        starts_at: row.starts_at, ends_at: row.ends_at,
-        expected_attendance: row.event.expected_attendance, venue_capacity: row.venue.capacity
-      }));
+  // Discovery uses the approval grant itself, not broader event or venue
+  // listing permissions. Venue Staff work across every event.
+  router.get('/capacity-exceptions', access.requirePermission('venue_booking.capacity_exception.approve'), handler(access, dependencies, async (database, _principal, _req, respond) => {
+    const candidates = await database.capacityCandidates();
+    const requests = candidates.flatMap(row => {
+      const booked = isBooked(row, row.event);
+      return (row.status === 'pending' || booked)
+        && row.event.expected_attendance !== null && row.event.expected_attendance > 0
+        && bookingReadiness(assessSuitability(row.event, row.venue), row.exceptions) === 'needs_capacity_exception'
+        ? [{
+          request_id: row.request_id, event_id: row.event_id,
+          event_name: row.event.name?.trim() || 'Untitled event',
+          venue_name: row.venue.name.trim() || 'Unnamed venue',
+          starts_at: row.starts_at, ends_at: row.ends_at,
+          expected_attendance: row.event.expected_attendance, venue_capacity: row.venue.capacity,
+          booked
+        }] : [];
+    });
     respond(200, { requests });
   }));
 
@@ -150,9 +165,9 @@ export function createBookingRequestSuitabilityRouter(access: ReturnType<typeof 
   router.post('/:requestId/capacity-exception', access.requirePermission('venue_booking.capacity_exception.approve'), handler(access, dependencies, async (database, principal, req, respond) => {
     const loaded = await load(database, principal, req.params.requestId, respond);
     if (!loaded) return;
-    const { request, venue, suitability, booking } = loaded;
-    if (request.status !== 'pending') {
-      respond(409, { error: 'Only a booking request awaiting a decision can be given a capacity exception.' });
+    const { request, event, venue, suitability, booking } = loaded;
+    if (request.status !== 'pending' && !isBooked(request, event)) {
+      respond(409, { error: 'Only a booking request awaiting a decision, or a booked venue for an event still going ahead, can be given a capacity exception.' });
       return;
     }
     if (booking === 'blocked') {

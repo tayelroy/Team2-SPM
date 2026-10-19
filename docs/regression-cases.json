@@ -2457,26 +2457,33 @@
   },
   {
     "id": "SG2-47-N01",
-    "title": "A missing facility cannot be excepted, and coordinators cannot approve exceptions",
+    "title": "A missing facility cannot be excepted, and only Venue Staff can approve exceptions",
     "type": "Negative / role isolation",
     "story": "SG2-47",
-    "purpose": "Verify AC2 and AC3: no exception is permitted for a missing required facility, a coordinator acknowledging the warning cannot approve one, and an organiser cannot approve for another organiser's event.",
+    "purpose": "Verify SG2-47 AC2 and AC3: no exception is permitted for a missing required facility and a coordinator acknowledging the warning cannot approve one. SG2-66 AC5 (19 Oct 2026) replaces the SG2-47 AC3 approver list: the event's own organiser, another organiser and Technical Support are now refused too.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Booking requests are seeded directly until SG2-48.",
     "steps": [
       "Seed the venue suitability fixture, sign in as venue staff and open the Regression Hall booking request.",
       "Try to approve a capacity exception for it through the API.",
-      "Sign in as coordinator, attendee and another organisation's organiser and try to approve the Lecture Theatre exception through the API.",
+      "Sign in as coordinator, attendee, the event's organiser, another organisation's organiser and Technical Support, and try to approve the Lecture Theatre exception through the API.",
       "Try without credentials."
     ],
     "data": "Booking request 22 (Regression Hall, no stage) and 21 (Lecture Theatre) for event 61",
-    "expected": "Regression Hall says it cannot be booked and offers no approval; the API answers 409 naming the missing stage; coordinator and attendee receive 403, the other organiser 404 and an unauthenticated call 401.",
+    "expected": "Regression Hall says it cannot be booked and offers no approval; the API answers 409 naming the missing stage; coordinator, attendee, both organisers and Technical Support receive 403 and an unauthenticated call 401.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
-    "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
-    "execution_date": "2 Oct 2026",
+    "actual": "PASS: ran in the 117/117 local Chromium run against the production app build and reset loopback fixture on 19 Oct 2026. Hosted CI for this revision is pending.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; npm run test:e2e; 117 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. No hosted Supabase validation.",
+    "execution_date": "19 Oct 2026",
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the 33-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results (organiser approval of another organiser's request answered 404 under the SG2-47 AC3 rule).",
+        "execution_evidence": "2 Oct 2026; feature/SG2-47-venue-suitability-warnings merged with main at a6905c4; npm run test:e2e; 33/33 journeys and 13/13 report-gate checks passed; installed Chromium. No hosted Supabase validation.",
+        "execution_date": "2 Oct 2026",
+        "executed_by": "LIM DAO JUN"
+      },
       {
         "status": "Pass",
         "actual": "Current browser assertions passed as expected.",
@@ -2484,13 +2491,14 @@
         "execution_date": "1 Oct 2026"
       }
     ],
-    "executed_by": "LIM DAO JUN",
+    "executed_by": "Claude (automated local verification)",
     "categories": [
       "FAILURE"
     ],
     "mapped_acs": [
       "SG2-47:AC2",
-      "SG2-47:AC3"
+      "SG2-47:AC3",
+      "SG2-66:AC5"
     ],
     "method_id": "TC-ad0afb3cedb0"
   },
@@ -3053,7 +3061,7 @@
       "Prototype event name 'Product Launch — Tideline' (must not appear)"
     ],
     "expected": [
-      "Safety desk heading, a 'No safety checks yet' empty state, a menu of exactly [Dashboard] and no prototype event",
+      "Safety desk heading, a live '0 events are awaiting a safety check.' count (SG2-91 replaced the earlier 'No safety checks yet' placeholder), a menu of exactly [Dashboard, Safety checks] and no prototype event",
       "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
       "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
     ],
@@ -6071,27 +6079,36 @@
   },
   {
     "id": "SG2-47-CAPACITY-DISCOVERY-01",
-    "title": "Eligible Organiser and Technical Support capacity requests are reachable without broadening booking authority",
+    "title": "Venue Staff discover every request needing a capacity exception, including booked venues whose attendance rose, without broadening booking authority",
     "type": "Normal / boundary / failure / conflict",
     "story": "SG2-47",
-    "purpose": "Repair the missing normal-navigation approval workflow for roles already authorised by SG2-47 AC3, retaining creator isolation and separate Venue Staff booking decisions.",
+    "purpose": "Originally repaired the missing normal-navigation approval workflow for the roles SG2-47 AC3 authorised (Organiser, Technical Support), retaining creator isolation and separate Venue Staff booking decisions. SG2-66 AC5 (19 Oct 2026) replaces that approver list: discovery and approval are Venue Staff only, legacy non-Venue-Staff approvals no longer count toward a booking, and SG2-66 AC2 adds booked requests whose live event's attendance now exceeds the venue. Journeys SG2-47-P03/P04/N02 were rewritten to match.",
     "preconditions": "Local React/Express and controlled identity/storage for unit/browser layers; separate disposable PostgreSQL/PostgREST for native integration. Hosted acceptance and independent peer review are separate pending gates.",
     "steps": [
-      "Open Capacity exceptions as an Organiser and Technical Support user; inspect eligible cards and select an existing request.",
-      "Verify Organiser creator-only visibility, role-denied access, query spoof resistance, empty/null-capacity handling, malformed responses and retry states.",
+      "Open Capacity exceptions as Venue Staff; inspect pending and booked ('Booked — attendance raised') cards and select a request.",
+      "Verify Organiser, Technical Support, coordinator and Lead have no navigation and receive 403 from the list and approval API; check empty/null-capacity handling, malformed responses and retry states.",
       "Approve through the existing action and inspect the real receipt; refresh to remove covered requests.",
-      "Verify missing facilities, decided requests and covering grants are excluded; read beyond 1,000 candidates and fail safely on a later-page error.",
-      "Verify approval leaves the request pending and unbooked, then Venue Staff independently approves a booking."
+      "Verify missing facilities, decided requests without a live booking and covering Venue Staff grants are excluded; a legacy Technical Support grant does not cover; read beyond 1,000 candidates and fail safely on a later-page error.",
+      "Verify approval leaves the request pending and unbooked, then Venue Staff independently approves a booking only once their own exception covers the attendance."
     ],
-    "data": "Own and colleague requests; capacity 120 / attendance 150; missing facility, missing attendance, null capacity, covered and decided requests; 1,001-row adapter boundary; invalid HTTP response and stale approval conflict.",
-    "expected": "Only eligible scoped requests are discoverable. Denied or spoofed calls expose no other organiser and write nothing. Selected approval shows its own receipt. Exception approval alone never commits a booking; separate Venue Staff decision does. Later-page failure returns an error rather than a partial successful list.",
-    "evidence": "client/src/{App.test.tsx,screens/CapacityExceptions.test.tsx,venues/capacityExceptionsApi.test.ts}; server/src/{db/venueSuitability.test.ts,venue-suitability-routes.test.ts}; integration/api.test.ts; e2e/capacity-exceptions.spec.ts; docs/test-case-inventory.json",
+    "data": "Pending and booked requests; capacity 120 / attendance 150; booked request 28 with raised attendance; legacy Technical Support exception on request 23; missing facility, missing attendance, null capacity, covered and decided requests; 1,001-row adapter boundary; invalid HTTP response and stale approval conflict.",
+    "expected": "Only Venue Staff discover and approve; every other role is refused (403) and writes nothing. Booked venues outgrown by a live event are listed and can be covered for the revised attendance. Selected approval shows its own receipt. Exception approval alone never commits a booking; a separate Venue Staff decision does, and only a Venue Staff exception unblocks it. Later-page failure returns an error rather than a partial successful list.",
+    "evidence": "client/src/{App.test.tsx,screens/CapacityExceptions.test.tsx,venues/capacityExceptionsApi.test.ts,venues/VenueFit.test.tsx}; server/src/{db/venueSuitability.test.ts,venue-suitability-routes.test.ts,venue-booking-requests.test.ts}; supabase/tests/{venue_capacity_exceptions.sql,venue_booking_decisions.sql,venue_holds.sql}; integration/api.test.ts; e2e/capacity-exceptions.spec.ts; docs/test-case-inventory.json",
     "layer": "Public client/UI mocked HTTP; real loopback Express with controlled store; native API/PostgREST/PostgreSQL; browser over resettable memory DB/RPC fixture",
     "status": "Pass",
-    "actual": "Local frontend 1,419 and backend 1,466 cases passed, each with 100% statements, branches, functions and lines. Native integration 10/10 passed. All 110 browser cases passed once with zero skipped, failed, flaky or retried cases, including three new capacity journeys and four smoke cases (subsets, not additional totals). These results do not establish hosted acceptance.",
-    "execution_evidence": "16 Oct 2026 local runners; capacity server/frontend/E2E handoffs and ignored output/staging-e2e-2026-10-16/verification/capacity-full-browser-110. Native integration uses actual PostgREST and PostgreSQL; browser storage is a fixture. Pushed-head CI and hosted workflow retest pending for this revision.",
-    "execution_date": "16 Oct 2026",
-    "executed_by": "Codex (local automated runners; not independent peer approval)",
+    "actual": "PASS (local): frontend 1,503 and backend 1,574 cases passed with 100% statements, branches, functions and lines; native integration 17/17; SQL replay of every CI suite passed; all 117 browser cases passed once with zero skipped, failed, flaky or retried cases. These results do not establish hosted acceptance.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; npm run ci (coverage), local native PostgreSQL 16 + PostgREST integration run, npm run test:e2e. Pushed-head CI pending for this revision.",
+    "execution_date": "19 Oct 2026",
+    "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Organiser and Technical Support discovery under the SG2-47 AC3 approver list: local frontend 1,419 and backend 1,466 cases passed, each with 100% statements, branches, functions and lines. Native integration 10/10 passed. All 110 browser cases passed once with zero skipped, failed, flaky or retried cases, including three new capacity journeys and four smoke cases (subsets, not additional totals). These results do not establish hosted acceptance.",
+        "execution_evidence": "16 Oct 2026 local runners; capacity server/frontend/E2E handoffs and ignored output/staging-e2e-2026-10-16/verification/capacity-full-browser-110. Native integration uses actual PostgREST and PostgreSQL; browser storage is a fixture. Pushed-head CI and hosted workflow retest pending for that revision.",
+        "execution_date": "16 Oct 2026",
+        "executed_by": "Codex (local automated runners; not independent peer approval)"
+      }
+    ],
+    "executed_by": "Claude (automated local verification)",
     "categories": [
       "NORMAL",
       "BOUNDARY",
@@ -6106,7 +6123,9 @@
       "SG2-25:AC3",
       "SG2-49:AC1",
       "SG2-49:AC3",
-      "SG2-86:AC2"
+      "SG2-86:AC2",
+      "SG2-66:AC2",
+      "SG2-66:AC5"
     ],
     "source_method_ids": [
       "TC-80ad0eda772a",
@@ -6522,6 +6541,173 @@
     ]
   },
   {
+    "id": "SG2-66-P01",
+    "title": "The coordinator sees what a change would break, accepts it, the Confirmed event returns to Planning and the organiser is told",
+    "type": "NORMAL",
+    "story": "SG2-66",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-66:AC1",
+      "SG2-66:AC2",
+      "SG2-66:AC3",
+      "SG2-66:AC4",
+      "SG2-66:AC7"
+    ],
+    "purpose": "Browser journey for the coordinator's change-impact panel. Change requests are sample data standing in for SG2-64/SG2-65 (not built yet); the impact, acceptance, return to Planning, notices, history and rechecks are real.",
+    "preconditions": "Production React build served by the isolated loopback Express fixture; /__e2e/reset then /__e2e/change-impact seed event 661 Harbour Showcase: Confirmed, 80 guests, Regression Hall (capacity 100) booked 20 Jun 2030 10:00-14:00 SGT, 12 wireless microphones reserved, registration open for 120 with two live registrations and one cancelled. No hosted Supabase.",
+    "steps": [
+      "Sign in as the coordinator at 1440px and open Harbour Showcase from My assigned events.",
+      "Read the sample-data note and the three sample requests: attendance 80 -> 120, date +7 days, description wording.",
+      "Accept the attendance change.",
+      "Try Mark venue rechecked, then Mark registrations rechecked.",
+      "Sign in as the organiser and open the notifications drawer."
+    ],
+    "data": "Event 661; attendance change to 120 against capacity 100; date change to 27 Jun 2030 10:00 SGT; two live registrations.",
+    "expected": "Attendance lists the hall (revalidate + capacity check naming Venue Staff), the microphones and Registrations (2 received); the date change adds period rechecks against 27 Jun 2030 10:00 SGT to the hall and microphones only; the wording change needs no revalidation. Accepting stores attendance 120, clears the confirmation, moves the event to Planning with all three rechecks outstanding, records the field, the accepted request and the status move in history, and notifies organiser and coordinator with the exact wording. The venue recheck is refused with the capacity blocker; the registration recheck settles. The organiser sees the Back in Planning notice. No horizontal overflow; the refused recheck is the only failed request.",
+    "evidence": "e2e/change-impact.spec.ts; e2e/support/change-impact.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS: ran in the 117/117 local Chromium run on 19 Oct 2026 and again after the SGT wording fix (5/5 with the capacity journeys). Hosted CI for this revision is pending.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; npm run test:e2e and npx playwright test e2e/change-impact.spec.ts e2e/capacity-exceptions.spec.ts. Manual visual check of the panel at 1440px and the recheck banner at 390px.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SG2-66-F01",
+    "title": "Only the assigned coordinator sees or accepts change requests, and nothing outstanding cannot be settled",
+    "type": "FAILURE",
+    "story": "SG2-66",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-66:AC1",
+      "SG2-66:AC4"
+    ],
+    "purpose": "Role and per-row isolation of the change-request routes, and refusal of a settle with nothing outstanding.",
+    "preconditions": "Same fixture as SG2-66-P01.",
+    "steps": [
+      "As the organiser, GET and accept event 661's change requests.",
+      "As the coordinator, GET change requests for an event assigned to someone else.",
+      "As the coordinator, settle venue_recheck on the still-Confirmed event 661, and accept an unknown request id."
+    ],
+    "data": "Event 661; event 1 (not assigned to the coordinator); request id mock-1-attendance.",
+    "expected": "Organiser 403 on both; unassigned event 404; settle 409 'That arrangement is not waiting for a recheck.'; unknown request 404. The event stays Confirmed with no history or notices written.",
+    "evidence": "e2e/change-impact.spec.ts",
+    "layer": "Playwright Chromium + isolated production app (API level)",
+    "status": "Pass",
+    "actual": "PASS: ran in the 117/117 local Chromium run on 19 Oct 2026 and the 5/5 rerun. Hosted CI for this revision is pending.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; npm run test:e2e.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SG2-66-INT01",
+    "title": "Native change impact: listing, Venue Staff-only exception, acceptance back to Planning and recheck settling through real PostgREST and PostgreSQL",
+    "type": "NORMAL / CONFLICT / FAILURE",
+    "story": "SG2-66",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-66:AC1",
+      "SG2-66:AC2",
+      "SG2-66:AC3",
+      "SG2-66:AC4",
+      "SG2-66:AC5",
+      "SG2-66:AC7"
+    ],
+    "purpose": "Prove the real Express handlers, DB adapters and the two new RPCs (apply_accepted_event_change, settle_arrangement_recheck) end to end, including the AC2/AC5 hand-off to Venue Staff.",
+    "preconditions": "Disposable PostgreSQL with every migration and integration/seed.sql, PostgREST in front; synthetic loopback JWTs only (.github/scripts/test-api-integration.mjs).",
+    "steps": [
+      "Plan an event (136 guests, registration closes 2 Oct 2089), book a 150-seat hall and reserve equipment over its start, add two live and one cancelled registration, then mark it Confirmed.",
+      "List its change requests as organiser, another coordinator and the assigned coordinator.",
+      "Accept the attendance change (136 -> 204) and read the stored event, history and notices; accept it again.",
+      "Settle venue_recheck; approve the capacity exception as Technical Support, organiser and coordinator, then as Venue Staff; settle venue, equipment and registration rechecks."
+    ],
+    "data": "Attendance 136 -> 204 against capacity 150; booking 01:00-05:00 UTC on 15 Jun 2090 around the 02:00 UTC start.",
+    "expected": "403 / 404 / 200; attendance lists booking, reservation and registrations (2) with capacity_check on the hall; date lists period rechecks; wording lists nothing. Accept returns {confirmed -> planning, returned_to_planning, three rechecks}, stores 204 with the confirmation cleared, writes expected_attendance, change_request and status history rows and the two exact notices, leaves the booking row unchanged; a second accept is 404. The venue recheck is blocked until Venue Staff (only) record a 204-person exception; each recheck then settles, the last clears the flag, three arrangement_recheck history rows exist and readiness shows nothing outstanding.",
+    "evidence": "integration/api.test.ts; supabase/migrations/202610190003_event_change_impact.sql; server/src/events/changeRequests.ts; server/src/db/changeImpact.ts",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration",
+    "status": "Pass",
+    "actual": "PASS (local): 17/17 native integration tests on PostgreSQL 16 + PostgREST 16.4 (CI uses PostgreSQL 17 + PostgREST 12.2.12 in Docker). Hosted CI for this revision is pending.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; local equivalent of npm run test:integration without Docker.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SG2-66-INT02",
+    "title": "Confirmed and Preparation events refuse direct detail edits but keep registration edits; a later-stage impact edit returns to Planning with notices",
+    "type": "CONFLICT / NORMAL",
+    "story": "SG2-66",
+    "categories": [
+      "CONFLICT",
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-66:AC6",
+      "SG2-66:AC7"
+    ],
+    "purpose": "Prove the AC6 lock on PATCH /planning against real storage and the AC7 notices on the direct-edit path.",
+    "preconditions": "Same disposable PostgreSQL/PostgREST harness as SG2-66-INT01.",
+    "steps": [
+      "For Confirmed then Preparation, PATCH expected_attendance with confirm_impact, then PATCH only registration_capacity and planning_notes.",
+      "Move the event to Awaiting Safety Check with a pending venue request and PATCH expected_attendance with confirm_impact."
+    ],
+    "data": "Attendance 136 -> 137; registration capacity 130.",
+    "expected": "Detail edits answer 409 change_request_required naming expected_attendance with nothing written; registration/notes edits answer 200 and keep the status. The Awaiting Safety Check edit moves the event to Planning with a status history row and the two exact back-to-Planning notices.",
+    "evidence": "integration/api.test.ts; server/src/events/updatePlanning.ts",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration",
+    "status": "Pass",
+    "actual": "PASS (local): 17/17 native integration tests on 19 Oct 2026. Hosted CI for this revision is pending.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; local equivalent of npm run test:integration without Docker.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SG2-66-DB01",
+    "title": "Database contracts: accepted changes, recheck settling and Venue Staff-only capacity exceptions",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "story": "SG2-66",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-66:AC4",
+      "SG2-66:AC5",
+      "SG2-66:AC7"
+    ],
+    "purpose": "Rolled-back SQL suites for the two SG2-66 migrations.",
+    "preconditions": "Disposable PostgreSQL with supabase/tests/fixtures/auth.sql and every migration; each suite runs in its own rolled-back transaction (CI database job).",
+    "steps": [
+      "event_change_impact.sql: accept from Confirmed and from Planning, stale status/coordinator, whitelist of changed keys, settle (including the last key and a key not outstanding), and execute grants for anon/authenticated.",
+      "venue_capacity_exceptions.sql: organiser and Technical Support inserts rejected by the new check; the check is NOT VALID so legacy rows survive; a legacy row does not stop Venue Staff recording theirs.",
+      "venue_booking_decisions.sql and venue_holds.sql: booking approval and hold conversion refuse when only a legacy non-Venue-Staff exception exists, and succeed with a Venue Staff one.",
+      "Replay the CI upgrade job (legacy blocks and hold links, then 202610170004 re-applied)."
+    ],
+    "data": "Synthetic events, venues, bookings, requests and exceptions created inside each rolled-back transaction.",
+    "expected": "Every raise-exception assertion stays silent; anon and authenticated cannot execute the new functions; the upgrade replay passes.",
+    "evidence": "supabase/tests/event_change_impact.sql; supabase/tests/venue_capacity_exceptions.sql; supabase/tests/venue_booking_decisions.sql; supabase/tests/venue_holds.sql; supabase/migrations/202610190002_venue_staff_capacity_exceptions.sql; supabase/migrations/202610190003_event_change_impact.sql",
+    "layer": "Rolled-back SQL against disposable PostgreSQL",
+    "status": "Pass",
+    "actual": "PASS (local): every migration, release_readiness.sql and every CI-listed suite passed on PostgreSQL 16; the upgrade-job replay passed. CI uses PostgreSQL 17; hosted CI for this revision is pending.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; local replay of the CI database and upgrade jobs without Docker.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
     "id": "SMOKE-VENUE-DELETE-PAST-HOLD-01",
     "title": "Delete a venue at a held period end without rewriting hold history",
     "type": "NORMAL / BOUNDARY / CONFLICT",
@@ -6554,6 +6740,83 @@
     "execution_date": "19 Oct 2026",
     "executed_by": "Automated local validation",
     "review": null
+  },
+  {
+    "id": "SG2-91-P01",
+    "title": "the Safety Officer reviews each awaiting event with everything the check needs, including the crowd movement its coordinator recorded",
+    "story": "SG2-91",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-91:AC2",
+      "SG2-91:AC3"
+    ],
+    "method_id": null,
+    "purpose": "Verify that a coordinator can record an event's expected crowd movement during planning without taking it out of the safety check, and that the Safety Officer's desk (a card per awaiting event, each opening that event's review on its own) and Safety checks list show exactly the events awaiting a check, oldest wait first, each with expected attendance, accessibility requirements, crowd movement, every booked venue's capacity, layout, emergency access and known restrictions, and every piece of equipment with where it will be placed, laid out without sideways scrolling on phone and laptop widths.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks: 911 Harbour Lecture and 913 Studio Talk await their check (since 1 and 2 Jul 2030); 912 Riverside Gala is still in Planning with a pending venue request. All three are coordinated by coordinator@example.test.",
+    "steps": [
+      "Sign in as coordinator@example.test; open Harbour Lecture from My assigned events; Edit Planning Information",
+      "Fill Expected Crowd Movement and Save Planning Details",
+      "Sign in as safety@example.test; read the desk count and its event cards",
+      "Click the Studio Talk card, then Show all 2 safety checks; return to the Dashboard and click Open safety checks",
+      "Read the Harbour Lecture and Studio Talk cards",
+      "Resize to 390px and 1440px"
+    ],
+    "data": [
+      "Harbour Lecture: 80 attendees, 'Wheelchair seating near the aisle'; Regression Hall (Level 1, capacity 100, theatre layout, 'Two exits onto the north concourse', 'No open flames'); 4 wireless microphones placed 'Either side of the stage' with 'Cable ramps across the aisle'",
+      "Crowd movement entered: 'Arrive through the north doors, leave by the south exits after the talk'",
+      "Studio Talk: 80 attendees in Quiet Room (capacity 20, no recorded operations), no equipment"
+    ],
+    "expected": [
+      "The planning drawer saves and closes; the desk says '2 events are awaiting a safety check.'",
+      "The desk shows a card for Harbour Lecture (with Regression Hall) then Studio Talk; clicking Studio Talk opens its safety check on its own, and Show all returns both events",
+      "The list heading reads '2 events awaiting a safety check'; the cards are Harbour Lecture then Studio Talk; Riverside Gala is not listed",
+      "Harbour Lecture shows 80, the accessibility need, the entered crowd movement, 'Regression Hall · Level 1', 100, Theatre, the step-free access, emergency access and restriction, '4 × Wireless microphones', 'Regression Hall — Either side of the stage' and the cable ramps note",
+      "Studio Talk shows '20 (below expected attendance of 80)', 'No equipment requested.' and 'Not recorded' for its emergency access and restrictions",
+      "Neither width scrolls sideways"
+    ],
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "executed_by": "Automated test runner",
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-91-safety-check-queue working tree; npx playwright test e2e/regression.spec.ts -g \"SG2-91\" (2 passed); local Playwright Chromium against the production client build. No hosted Supabase validation.",
+    "status": "Pass"
+  },
+  {
+    "id": "SG2-91-N01",
+    "title": "no role but the Safety Officer can open the safety check list, in the menu or through the API",
+    "story": "SG2-91",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-91:AC4"
+    ],
+    "method_id": null,
+    "purpose": "Verify that every other role is refused the safety check list by the real HTTP route, an unsigned request is refused as unauthenticated, and neither the coordinator nor the Event Coordinator Lead is offered Safety checks in the menu.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks so the list is not empty.",
+    "steps": [
+      "As organiser, coordinator, venue, support, attendee and lead: GET /api/safety-checks",
+      "Without a token: GET /api/safety-checks",
+      "Sign in as coordinator@example.test, then lead@example.test, and read the navigation once permissions load"
+    ],
+    "data": [
+      "The seeded awaiting events 911 and 913"
+    ],
+    "expected": [
+      "Each of the six roles receives 403 {error: 'Access denied'}",
+      "The unsigned request receives 401",
+      "Neither navigation offers Safety checks"
+    ],
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "executed_by": "Automated test runner",
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-91-safety-check-queue working tree; npx playwright test e2e/regression.spec.ts -g \"SG2-91\" (2 passed); local Playwright Chromium against the production client build. No hosted Supabase validation.",
+    "status": "Pass"
   },
   {
     "id": "SG2-104-P01",

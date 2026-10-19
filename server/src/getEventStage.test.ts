@@ -48,6 +48,7 @@ const MOCK_EVENT: EventPlanningRecord = {
   registration_opens_at: null,
   registration_closes_at: null,
   planning_notes: null,
+  expected_crowd_movement: null,
   arrangements_recheck_needed: false,
   outstanding_arrangements: []
 };

@@ -530,3 +530,9 @@ test('[NORMAL] [SG2-106:AC5] an expiry change reads as a labelled entry with old
   expect(humanizeFieldValue('venue_hold_expiry', 'Hold 7 expires 2090-06-20T02:00:00Z')).toBe('Hold 7 expires 20 Jun 2090, 10:00 SGT');
   expect(humanizeFieldValue('venue_hold_expiry', 'Hold 7 expires soon')).toBe('Hold 7 expires soon');
 });
+
+test('[NORMAL] [SG2-66:AC4] an accepted change request and a settled recheck read as labelled history entries', () => {
+  expect(humanizeFieldName('change_request')).toBe('Change Request');
+  expect(humanizeFieldName('arrangement_recheck')).toBe('Arrangement Recheck');
+  expect(humanizeFieldValue('arrangement_recheck', 'venue_recheck settled')).toBe('venue_recheck settled');
+});

@@ -3,10 +3,10 @@ const { createHash } = require('node:crypto');
 // No application-origin fallback or credential persistence is supported.
 const HOSTED_ORIGIN = 'https://team2-spm-server-git-hotfix-ui-bug-de-e658c2-tayelroys-projects.vercel.app';
 const ROLES = {
-  organiser: { label: 'Event Organiser', email: 'event.organiser3@connectsphere.test', nav: ['My events', 'New request', 'My drafts', 'Event detail', 'Capacity exceptions'] },
+  organiser: { label: 'Event Organiser', email: 'event.organiser3@connectsphere.test', nav: ['My events', 'New request', 'My drafts', 'Event detail'] },
   coordinator: { label: 'Event Coordinator', email: 'event.coordinator2@connectsphere.test', nav: ['Dashboard', 'Venues', 'Find venues', 'Venue Availability', 'Venue holds'] },
-  venue: { label: 'Venue Staff', email: 'venue.staff1@connectsphere.test', nav: ['Dashboard', 'Venue Availability', 'Catalogue', 'Venue holds'] },
-  support: { label: 'Technical Support Staff', email: 'technical.support1@connectsphere.test', nav: ['Dashboard', 'Venue Availability', 'Equipment', 'Capacity exceptions'] },
+  venue: { label: 'Venue Staff', email: 'venue.staff1@connectsphere.test', nav: ['Dashboard', 'Venue Availability', 'Catalogue', 'Venue holds', 'Capacity exceptions'] },
+  support: { label: 'Technical Support Staff', email: 'technical.support1@connectsphere.test', nav: ['Dashboard', 'Venue Availability', 'Equipment'] },
   lead: { label: 'Event Coordinator Lead', email: 'event.coordinator.lead1@connectsphere.test', nav: ['Dashboard', 'Unassigned queue', 'Assign coordinators'] },
   safety: { label: 'Safety Officer', email: 'safety.officer1@connectsphere.test', nav: ['Dashboard'] },
   attendee: { label: 'Attendee', email: 'attendee1@connectsphere.test', nav: ['My registrations', 'Event page'] },

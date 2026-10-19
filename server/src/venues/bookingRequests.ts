@@ -55,8 +55,9 @@ export function venueArrangement(requests: VenueBookingStatusRow[], affectedBook
 }
 
 /** Venues are requested once the event has been approved and before it is
- * confirmed (SG2-48 AC1). */
-const REQUESTABLE_EVENT_STATUSES = ['approved', 'planning'];
+ * confirmed (SG2-48 AC1). SG2-91: also while it awaits its safety check; the
+ * new pending request returns it to Planning (202610190004_safety_check_queue.sql). */
+const REQUESTABLE_EVENT_STATUSES = ['approved', 'planning', 'awaiting_safety_check'];
 /** SG2-81: a replacement for an unavailable venue is also requested once the
  * event has reached preparation or been confirmed. */
 const REPLACEMENT_EVENT_STATUSES = [...REQUESTABLE_EVENT_STATUSES, 'preparation', 'confirmed'];
@@ -305,6 +306,7 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
         respond(409, { error: `${venue!.name} cannot be booked for this event. ${missing.message}` });
         return;
       }
+      // SG2-66 AC5: only an exception recorded by Venue Staff counts here.
       if (booking === 'needs_capacity_exception') {
         respond(409, { error: CAPACITY_MESSAGE });
         return;

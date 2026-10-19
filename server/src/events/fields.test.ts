@@ -46,6 +46,16 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
     assert.equal(canTransition('cancelled', 'planning'), false);
   });
 
+  test('[NORMAL] [SG2-91:AC1] an Approved or Planning event whose arrangements are in place can move to Awaiting Safety Check', () => {
+    assert.equal(canTransition('approved', 'awaiting_safety_check'), true);
+    assert.equal(canTransition('planning', 'awaiting_safety_check'), true);
+  });
+
+  test('[BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check', () => {
+    const into = EVENT_STATUSES.filter(from => canTransition(from, 'awaiting_safety_check'));
+    assert.deepEqual([...into].sort(), ['approved', 'planning']);
+  });
+
   test('[BOUNDARY] [SG2-100:AC4] every EVENT_STATUSES member has a STATUS_TRANSITIONS entry', () => {
     for (const status of EVENT_STATUSES) {
       assert.ok(

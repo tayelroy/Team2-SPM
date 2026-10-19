@@ -361,14 +361,20 @@ test('[FAILURE] [SG2-49:AC1] [SG2-47:AC2] a venue missing a required facility ca
   assert.equal((await decide(blocked.composed, 'venue', { decision: 'reject', reason: 'No stage' })).status, 200);
 });
 
-test('[FAILURE] [SG2-49:AC1] [SG2-47:AC3] a venue too small is approved only once a capacity exception covers the attendance', async () => {
+test('[FAILURE] [SG2-49:AC1] [SG2-47:AC3] [SG2-66:AC5] a venue too small is approved only once a Venue Staff capacity exception covers the attendance', async () => {
   const refused = decisionApp({ requests: [pendingRequest({ venue_id: 3, venue_name: 'Lecture Theatre' })] });
   const response = await decide(refused.composed, 'venue', { decision: 'approve' });
   assert.deepEqual([response.status, response.body], [409, { error: 'Approve a capacity exception for this request before approving the booking.' }]);
   assert.equal(refused.calls.length, 0);
-  const exception: CapacityExceptionRecord = { exception_id: 1, request_id: 41, approved_by: 'user-organiser', approver_name: 'Olive',
-    approver_role: 'event_organiser', expected_attendance: 150, venue_capacity: 120, approved_at: '2030-01-01T00:00:00.000Z' };
-  const covered = decisionApp({ requests: [pendingRequest({ venue_id: 3, venue_name: 'Lecture Theatre' })], exceptions: [exception] });
+  // An approval recorded by an organiser before SG2-66 is kept as history but does not count.
+  const legacy: CapacityExceptionRecord = { exception_id: 1, request_id: 41, approved_by: 'user-organiser', approver_name: 'Olive',
+    approver_role: 'event_organiser', expected_attendance: 150, venue_capacity: 120, approved_at: '2026-01-01T00:00:00.000Z' };
+  const inert = decisionApp({ requests: [pendingRequest({ venue_id: 3, venue_name: 'Lecture Theatre' })], exceptions: [legacy] });
+  const ignored = await decide(inert.composed, 'venue', { decision: 'approve' });
+  assert.deepEqual([ignored.status, ignored.body], [409, { error: 'Approve a capacity exception for this request before approving the booking.' }]);
+  assert.equal(inert.calls.length, 0);
+  const exception: CapacityExceptionRecord = { ...legacy, exception_id: 2, approved_by: 'user-venue', approver_name: 'Vera', approver_role: 'venue_staff' };
+  const covered = decisionApp({ requests: [pendingRequest({ venue_id: 3, venue_name: 'Lecture Theatre' })], exceptions: [legacy, exception] });
   assert.equal((await decide(covered.composed, 'venue', { decision: 'approve' })).status, 200);
 });
 
@@ -645,4 +651,12 @@ test('[FAILURE] [SG2-82:AC5] a refused or failing database withdrawal is reporte
   }
   // Without a configured database the default store cannot sign in as the caller.
   assert.equal((await withdraw(app(store), 'coordinator')).status, 503);
+});
+
+test('[CONFLICT] [SG2-91:AC1] the coordinator can still request another venue while the event awaits its safety check', async () => {
+  const { store, created } = fakeStore({ events: [{ ...forum, status: 'awaiting_safety_check' }] });
+  const response = await post(app(store), 'coordinator', body());
+  assert.equal(response.status, 201);
+  assert.equal(response.body.request.status, 'pending');
+  assert.equal(created.length, 1);
 });

@@ -4,14 +4,14 @@ import { afterEach, expect, test, vi } from 'vitest';
 import CapacityExceptions from './CapacityExceptions';
 
 const row = { request_id: 18, event_id: 22, event_name: 'QA forum', venue_name: 'Small hall',
-  starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10 };
+  starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10, booked: false };
 const fit = { venue: { venue_id: 8, name: 'Small hall', location: 'QA', capacity: 10,
   suitability: { suitable: false, issues: [{ kind: 'capacity', message: 'Expected attendance 14 exceeds capacity 10.' }] } },
   exceptions: [], booking: 'needs_capacity_exception' };
-const receipt = { exception_id: 6, approver_name: 'QA approver', approver_role: 'technical_support_staff', expected_attendance: 14, approved_at: '2030-11-01T03:00:00Z' };
+const receipt = { exception_id: 6, approver_name: 'QA approver', approver_role: 'venue_staff', expected_attendance: 14, approved_at: '2030-11-01T03:00:00Z' };
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] selecting a real request approves only its capacity exception and retains the authoritative receipt until refresh', async () => {
+test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] selecting a real request approves only its capacity exception and retains the authoritative receipt until refresh', async () => {
   let approved = false;
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).toEqual({ Authorization: 'Bearer token' });
@@ -28,12 +28,12 @@ test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] selecting a real request approves only 
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Review exception for QA forum at Small hall' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Approve capacity exception' }));
-  expect(await screen.findByText(/Capacity exception for 14 people approved by QA approver \(Technical Support Staff\)/)).toBeInTheDocument();
+  expect(await screen.findByText(/Capacity exception for 14 people approved by QA approver \(Venue Staff\) on/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Approve capacity exception' })).not.toBeInTheDocument();
   expect(screen.getByText(/An exception does not reserve the venue or approve its booking/)).toBeInTheDocument();
   expect(fetch.mock.calls.filter(([url]) => url.endsWith('/capacity-exceptions'))).toHaveLength(1);
   fireEvent.click(screen.getByRole('button', { name: 'Refresh requests' }));
-  expect(await screen.findByText('No pending requests need a capacity exception you can approve.')).toBeInTheDocument();
+  expect(await screen.findByText('No booking requests need a capacity exception right now.')).toBeInTheDocument();
   expect(screen.queryByText(/approved by QA approver/)).not.toBeInTheDocument();
 });
 
@@ -44,12 +44,21 @@ test('[BOUNDARY] [SG2-47:AC3] unknown recorded venue capacity is displayed expli
   expect(screen.queryByRole('button', { name: 'Approve capacity exception' })).not.toBeInTheDocument();
 });
 
+test('[NORMAL] [SG2-66:AC2] a booked venue whose attendance was raised is marked distinctly from a pending request', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ requests: [row, { ...row, request_id: 19, event_name: 'Booked forum', booked: true }] })));
+  render(<CapacityExceptions accessToken="token" />);
+  expect(await screen.findByText('Booked forum')).toBeInTheDocument();
+  expect(screen.getAllByText('Booked — attendance raised')).toHaveLength(1);
+  expect(screen.getByText('Booked — attendance raised').closest('div')).toHaveTextContent('Booked forum');
+  expect(screen.getByText(/needs a new exception for the revised attendance/)).toBeInTheDocument();
+});
+
 test('[FAILURE] [SG2-47:AC3] a refused list shows an alert and refresh recovers instead of misrepresenting an empty inbox', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response('', { status: 403 }))
     .mockResolvedValueOnce(Response.json({ requests: [row] })));
   render(<CapacityExceptions accessToken="token" />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Your account cannot approve capacity exceptions.');
-  expect(screen.queryByText('No pending requests need a capacity exception you can approve.')).not.toBeInTheDocument();
+  expect(screen.queryByText('No booking requests need a capacity exception right now.')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Refresh requests' }));
   expect(await screen.findByText('QA forum')).toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -62,7 +71,7 @@ test('[CONFLICT] [SG2-47:AC3] a refresh supersedes an older list response and ca
   render(<CapacityExceptions accessToken="token" />);
   expect(screen.getByRole('status')).toHaveTextContent('Loading capacity exception requests');
   fireEvent.click(screen.getByRole('button', { name: 'Refresh requests' }));
-  await screen.findByText('No pending requests need a capacity exception you can approve.');
+  await screen.findByText('No booking requests need a capacity exception right now.');
   await act(async () => resolveOld(Response.json({ requests: [row] })));
   expect(screen.queryByText('QA forum')).not.toBeInTheDocument();
 });
