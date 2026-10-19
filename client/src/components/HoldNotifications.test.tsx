@@ -236,6 +236,16 @@ test('[NORMAL] [SG2-68:AC2] each event lifecycle notice is labelled with what ha
   expect(screen.getAllByText('13 Oct 2026, 10:00 SGT')).toHaveLength(4);
 });
 
+test('[NORMAL] [SG2-66:AC7] a back-to-Planning notice is labelled and shows its message', async () => {
+  const message = 'Partner Forum is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.';
+  vi.mocked(notices.loadNotifications).mockResolvedValue({ ok: true, notifications: [{
+    notification_id: 61, event_id: 7, request_id: null, kind: 'event_returned_to_planning', message, created_at: '2026-10-13T02:00:00.000Z' }] });
+  render(<HoldNotifications accessToken="coordinator-token" holds={false} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
+  expect(screen.getByText('Back in Planning')).toBeVisible();
+  expect(screen.getByText(message)).toBeVisible();
+});
+
 test('[BOUNDARY] [SG2-68:AC3] the Safety Officer, who receives no notices yet, keeps the empty placeholder and makes no notice request', () => {
   render(<AppShell role="Safety Officer" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="safety-token">Dashboard</AppShell>);
   expect(screen.getByRole('button', { name: 'Notifications (0)' })).toBeInTheDocument();

@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { fetchCapacityExceptions } from './capacityExceptionsApi';
 
 const request = { request_id: 18, event_id: 22, event_name: 'QA forum', venue_name: 'Small hall',
-  starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10 };
+  starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10, booked: false };
 afterEach(() => vi.unstubAllGlobals());
 
 test('[NORMAL] [SG2-47:AC3] capacity approvers read the scoped pending list with their bearer session and no cached response', async () => {
@@ -13,11 +13,11 @@ test('[NORMAL] [SG2-47:AC3] capacity approvers read the scoped pending list with
   });
 });
 
-test('[BOUNDARY] [SG2-47:AC3] an empty list and a venue with unrecorded capacity remain usable without inventing a capacity', async () => {
+test('[BOUNDARY] [SG2-47:AC3] [SG2-66:AC2] an empty list, a venue with unrecorded capacity and a booked venue remain usable without inventing a capacity', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(Response.json({ requests: [] }))
-    .mockResolvedValueOnce(Response.json({ requests: [{ ...request, venue_capacity: null }] })));
+    .mockResolvedValueOnce(Response.json({ requests: [{ ...request, venue_capacity: null }, { ...request, request_id: 19, booked: true }] })));
   expect(await fetchCapacityExceptions('token')).toEqual({ ok: true, requests: [] });
-  expect(await fetchCapacityExceptions('token')).toEqual({ ok: true, requests: [{ ...request, venue_capacity: null }] });
+  expect(await fetchCapacityExceptions('token')).toEqual({ ok: true, requests: [{ ...request, venue_capacity: null }, { ...request, request_id: 19, booked: true }] });
 });
 
 test('[FAILURE] [SG2-47:AC3] a missing session refuses the capacity list locally without sending an anonymous request', async () => {
@@ -46,7 +46,7 @@ test('[FAILURE] [SG2-47:AC3] malformed identifiers, names, attendance, capacity 
     { ...request, starts_at: null }, { ...request, starts_at: 'invalid' }, { ...request, ends_at: null },
     { ...request, ends_at: 'invalid' }, { ...request, ends_at: request.starts_at },
     { ...request, expected_attendance: 1.5 }, { ...request, expected_attendance: 0 },
-    { ...request, venue_capacity: 1.5 }, { ...request, venue_capacity: -1 }];
+    { ...request, venue_capacity: 1.5 }, { ...request, venue_capacity: -1 }, { ...request, booked: 'yes' }, { ...request, booked: undefined }];
   const badBodies = [null, {}, { requests: null }, { requests: {} }, ...badRows.map(row => ({ requests: [row] }))];
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
   for (const body of badBodies) {

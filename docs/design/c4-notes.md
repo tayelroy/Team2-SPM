@@ -33,12 +33,12 @@ The Structurizr export cannot write `!pragma layout smetana` into its `.puml` fi
 
 | Role | What it does at this snapshot |
 |---|---|
-| Event Organiser | Creates, edits, submits and deletes own drafts. Views own organisation's requests, stage, history and confirmation. Clarifications. Discovers eligible own-event capacity requests through Capacity exceptions and approves an exception using the existing suitability action. Own notifications. |
+| Event Organiser | Creates, edits, submits and deletes own drafts. Views own organisation's requests, stage, history and confirmation. Clarifications. Own notifications. No longer approves capacity exceptions (SG2-66 AC5). |
 | Event Coordinator | Reviews, decides and plans assigned requests. Clarifications. Venue search and suitability. Requests venues and withdraws a request (SG2-82). Views and releases bookings. Sees clashes and conflicts. Requests equipment. Views arrangements. Confirms and completes events. Work queue. Notifications. |
 | Event Coordinator Lead «Week 7» | Unassigned queue (`event_request.queue.view`, SG2-87). Lists assignable coordinators and assigns or reassigns one (`event_request.assign_coordinator`, SG2-97). Stage and history. Notifications (SG2-68). Oversight «planned» SG2-89. |
 | Safety Officer «Week 7» | Placeholder desk (`SafetyDashboard`). API grants only `event_request.stage.view`, `event_request.history.view`, `equipment_requirements.read` and profile. Safety check «planned» SG2-91/92/93/94. |
-| Venue Staff | Venue CRUD and layouts. Setup/turnaround and safety details (SG2-77). Blocks and temporary unavailability (SG2-80). Holds (SG2-84/85). Decides venue requests. Bookings by venue and release. Clashes and conflicts. Capacity exceptions. Work queue. Notifications. |
-| Technical Support Staff | Equipment records, availability and reservations. Requirement arrangements. `PATCH /api/users/:userId/role`. Reads venue availability, operations and holds. Discovers eligible cross-event capacity requests through Capacity exceptions and records exceptions; Venue Staff separately decide the booking. Work queue. Notifications. |
+| Venue Staff | Venue CRUD and layouts. Setup/turnaround and safety details (SG2-77). Blocks and temporary unavailability (SG2-80). Holds (SG2-84/85). Decides venue requests. Bookings by venue and release. Clashes and conflicts. The only role that approves capacity exceptions (SG2-66 AC5): discovers pending requests and booked venues whose attendance was raised through Capacity exceptions. Work queue. Notifications. |
+| Technical Support Staff | Equipment records, availability and reservations. Requirement arrangements. `PATCH /api/users/:userId/role`. Reads venue availability, operations and holds. No longer approves capacity exceptions (SG2-66 AC5). Work queue. Notifications. |
 | Attendee | Profile only. Dashboard and `AttendeeEvent` use mock data (`client/src/mock`). |
 
 ## Containers

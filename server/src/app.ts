@@ -42,6 +42,7 @@ import { createEquipmentReservationsRouter } from './equipment/reservations';
 import { createConfirmEventHandler } from './events/confirm';
 import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
+import { createChangeRequestHandlers } from './events/changeRequests';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -103,7 +104,9 @@ export function createApp(
   venueClashesRouter = createVenueClashesRouter(access),
   // SG2-58: appended last for the same reason.
   confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
-  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal })
+  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal }),
+  // SG2-66: appended last for the same reason.
+  changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -240,6 +243,23 @@ export function createApp(
     '/:eventId/confirmation',
     access.requirePermission('event_request.confirmation.view'),
     eventConfirmationHandler
+  );
+  // SG2-66 AC1-AC4/AC7: the assigned coordinator sees what each change
+  // request would break, accepts one, and settles the rechecks it leaves.
+  eventRequests.get(
+    '/:eventId/change-requests',
+    access.requirePermission('event_request.change_request.view'),
+    changeRequestHandlers.list
+  );
+  eventRequests.post(
+    '/:eventId/change-requests/:changeRequestId/accept',
+    access.requirePermission('event_request.change_request.accept'),
+    changeRequestHandlers.accept
+  );
+  eventRequests.post(
+    '/:eventId/rechecks/:key/settle',
+    access.requirePermission('event_request.rechecks.settle'),
+    changeRequestHandlers.settle
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

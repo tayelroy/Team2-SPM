@@ -6,6 +6,8 @@ export interface EventPlanningRecord {
   coordinator_id: string | null;
   coordinator_name?: string | null;
   organiser_id: string;
+  /** The event's name, for the notices that name it (SG2-66 AC7). */
+  name?: string | null;
   expected_attendance: number | null;
   proposed_date: string | null;
   venue_requirements: string | null;
@@ -34,6 +36,9 @@ export interface UpdatePlanningFieldsInput {
   arrangements_recheck_needed?: boolean;
   outstanding_arrangements?: string[];
   status?: string;
+  /** Cleared when a confirmed or preparation event returns to planning (SG2-66 AC7). */
+  confirmed_by?: null;
+  confirmed_at?: null;
 }
 
 export type FetchEventPlanningResult =
@@ -45,13 +50,13 @@ export type UpdateEventPlanningResult =
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
 
 const PLANNING_SELECT_COLUMNS =
-  'event_id, status, coordinator_id, organiser_id, expected_attendance, proposed_date, ' +
+  'event_id, status, coordinator_id, organiser_id, name, expected_attendance, proposed_date, ' +
   'venue_requirements, accessibility_needs, equipment_requirements, registration_needed, ' +
   'registration_capacity, registration_opens_at, registration_closes_at, planning_notes, ' +
   'arrangements_recheck_needed, outstanding_arrangements, coordinator:users!coordinator_id(name)';
 
 const PLANNING_UPDATE_COLUMNS =
-  'event_id, status, coordinator_id, organiser_id, expected_attendance, proposed_date, ' +
+  'event_id, status, coordinator_id, organiser_id, name, expected_attendance, proposed_date, ' +
   'venue_requirements, accessibility_needs, equipment_requirements, registration_needed, ' +
   'registration_capacity, registration_opens_at, registration_closes_at, planning_notes, ' +
   'arrangements_recheck_needed, outstanding_arrangements';

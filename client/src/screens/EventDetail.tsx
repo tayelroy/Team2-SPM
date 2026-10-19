@@ -13,6 +13,8 @@ import EventStageTracker from '../components/EventStageTracker';
 import ClarificationThread from '../components/ClarificationThread';
 import EquipmentRequirements from '../components/EquipmentRequirements';
 import ConfirmedArrangements from '../components/ConfirmedArrangements';
+import RecheckSettleActions from '../components/RecheckSettleActions';
+import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -333,21 +335,32 @@ export default function EventDetail({
                       coordinator.
                     </span>
                     {stage.outstanding_arrangements && stage.outstanding_arrangements.length > 0 && (
-                      <div
-                        data-testid="outstanding-arrangements-tags"
-                        style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}
-                      >
-                        {stage.outstanding_arrangements.map((arr) => (
-                          <Badge
-                            key={arr}
-                            bg="rgba(255, 180, 0, 0.2)"
-                            fg="#fde047"
-                            size={10}
-                          >
-                            {ARRANGEMENT_LABELS[arr] ?? arr}
-                          </Badge>
-                        ))}
-                      </div>
+                      <>
+                        <div
+                          data-testid="outstanding-arrangements-tags"
+                          style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}
+                        >
+                          {stage.outstanding_arrangements.map((arr) => (
+                            <Badge
+                              key={arr}
+                              bg="rgba(255, 180, 0, 0.2)"
+                              fg="#fde047"
+                              size={10}
+                            >
+                              {ARRANGEMENT_LABELS[arr] ?? arr}
+                            </Badge>
+                          ))}
+                        </div>
+                        {/* SG2-66 AC4: settling re-reads the event so the banner and stage move. */}
+                        {isAssignedCoordinator && (
+                          <RecheckSettleActions
+                            eventId={detail.eventId}
+                            accessToken={accessToken}
+                            outstanding={stage.outstanding_arrangements}
+                            onSettled={() => setReloadKey((value) => value + 1)}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </Notice>
@@ -391,6 +404,15 @@ export default function EventDetail({
           )}
           {isAssignedCoordinator && ['approved', 'planning', 'confirmed'].includes(detail.status.toLowerCase()) && (
             <EquipmentRequirements eventId={detail.eventId} accessToken={accessToken} />
+          )}
+          {/* SG2-66 AC1–AC4: the assigned coordinator decides change requests
+              knowing what each would break. */}
+          {isAssignedCoordinator && !isTerminal && (
+            <ChangeRequestsPanel
+              eventId={detail.eventId}
+              accessToken={accessToken}
+              onAccepted={() => setReloadKey((value) => value + 1)}
+            />
           )}
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>

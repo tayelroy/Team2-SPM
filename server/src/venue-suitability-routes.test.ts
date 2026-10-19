@@ -24,6 +24,7 @@ const USERS: Record<string, { userId: string; role: Role }> = {
   organiser: { userId: 'user-organiser', role: 'event_organiser' },
   other_organiser: { userId: 'user-other-organiser', role: 'event_organiser' },
   venue: { userId: 'user-venue', role: 'venue_staff' },
+  other_venue: { userId: 'user-other-venue', role: 'venue_staff' },
   support: { userId: 'user-support', role: 'technical_support_staff' },
   lead: { userId: 'user-lead', role: 'event_coordinator_lead' },
   safety: { userId: 'user-safety', role: 'safety_officer' },
@@ -44,8 +45,12 @@ const theatre: SuitabilityVenueRow = { venue_id: 3, name: 'Lecture Theatre', loc
 
 const pending = (overrides: Partial<BookingRequestRow> = {}): BookingRequestRow => ({
   request_id: 31, event_id: 7, venue_id: 3, starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z',
-  status: 'pending', ...overrides
+  status: 'pending', venue_booking: null, ...overrides
 });
+// SG2-66 AC2: an approved request that holds a confirmed booking.
+const booked = (overrides: Partial<BookingRequestRow> = {}) => pending({ status: 'approved', venue_booking: { status: 'confirmed' }, ...overrides });
+const legacy: CapacityExceptionRecord = { exception_id: 9, request_id: 31, approved_by: 'user-organiser', approver_name: 'Olive',
+  approver_role: 'event_organiser', expected_attendance: 150, venue_capacity: 120, approved_at: '2026-01-01T00:00:00.000Z' };
 
 function fakeStore(seed: {
   events?: SuitabilityEventRow[];
@@ -59,11 +64,11 @@ function fakeStore(seed: {
   const exceptions = seed.exceptions ?? [];
   const recorded: NewCapacityException[] = [];
   const store: VenueSuitabilityStore = {
-    async pendingCapacityRequests(organiserId) {
+    async capacityCandidates() {
       return requests.flatMap(row => {
         const event = events.find(event => event.event_id === row.event_id)!;
         const venue = venues.find(venue => venue.venue_id === row.venue_id)!;
-        return row.status === 'pending' && (organiserId === undefined || event.organiser_id === organiserId)
+        return ['pending', 'approved'].includes(row.status)
           ? [{ ...row, event, venue, exceptions: exceptions.filter(grant => grant.request_id === row.request_id) }] : [];
       });
     },
@@ -74,8 +79,9 @@ function fakeStore(seed: {
     async request(id) { return requests.find(row => row.request_id === id) ?? null; },
     async exceptions(id) { return exceptions.filter(row => row.request_id === id); },
     async recordException(values) {
-      // Mirrors the unique (request_id, expected_attendance) index.
-      if (exceptions.some(row => row.request_id === values.request_id && row.expected_attendance === values.expected_attendance)) return null;
+      // Mirrors the unique (request_id, expected_attendance) index on Venue Staff approvals.
+      if (exceptions.some(row => row.request_id === values.request_id && row.expected_attendance === values.expected_attendance
+        && row.approver_role === 'venue_staff')) return null;
       recorded.push(values);
       const record = { ...values, exception_id: exceptions.length + 1, approver_name: 'Approver', approved_at: '2030-06-01T00:00:00.000Z' };
       exceptions.push(record);
@@ -101,20 +107,18 @@ const as = (user: string) => ({ Authorization: `Bearer ${user}` });
 
 // --- GET /api/venue-booking-requests/capacity-exceptions ----------------------
 
-test('[NORMAL] [SG2-47:AC3] Venue Staff and Technical Support Staff discover only actionable capacity exceptions with a minimal row projection', async () => {
+test('[NORMAL] [SG2-47:AC3] [SG2-66:AC5] Venue Staff discover only actionable capacity exceptions with a minimal row projection', async () => {
   const expected = { request_id: 31, event_id: 7, event_name: 'Leadership Forum', venue_name: 'Lecture Theatre',
-    starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', expected_attendance: 150, venue_capacity: 120 };
-  for (const who of ['venue', 'support']) {
-    const response = await request(app(fakeStore().store)).get('/api/venue-booking-requests/capacity-exceptions').set(as(who));
-    assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { requests: [expected] });
-  }
+    starts_at: '2030-06-15T02:00:00.000Z', ends_at: '2030-06-15T10:00:00.000Z', expected_attendance: 150, venue_capacity: 120, booked: false };
+  const response = await request(app(fakeStore().store)).get('/api/venue-booking-requests/capacity-exceptions').set(as('venue'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { requests: [expected] });
 });
 
-test('[FAILURE] [SG2-47:AC3] capacity discovery refuses unauthenticated and non-approver roles before reading any candidates', async () => {
+test('[FAILURE] [SG2-47:AC3] [SG2-66:AC5] capacity discovery refuses unauthenticated and non-approver roles before reading any candidates', async () => {
   let reads = 0;
   const store = fakeStore().store;
-  store.pendingCapacityRequests = async () => { reads++; return []; };
+  store.capacityCandidates = async () => { reads++; return []; };
   const server = app(store);
   const path = '/api/venue-booking-requests/capacity-exceptions?organiser_id=user-organiser&request_id=31';
   assert.equal((await request(server).get(path)).status, 401);
@@ -124,35 +128,33 @@ test('[FAILURE] [SG2-47:AC3] capacity discovery refuses unauthenticated and non-
   assert.equal(reads, 0);
 });
 
-test('[FAILURE] [NORMAL] [SG2-47:AC3] organiser discovery derives its database scope from identity and independently excludes another owner despite query spoofing', async () => {
-  const other = { ...forum, event_id: 8, name: 'PRIVATE other event', organiser_id: 'user-other-organiser' };
-  const { store } = fakeStore({ events: [forum, other], requests: [pending(), pending({ request_id: 40, event_id: 8 })] });
-  const unscoped = await store.pendingCapacityRequests();
-  const owners: (string | undefined)[] = [];
-  // A faulty adapter returning extra rows must not turn the projection into a leak.
-  store.pendingCapacityRequests = async owner => { owners.push(owner); return unscoped; };
-  const response = await request(app(store)).get('/api/venue-booking-requests/capacity-exceptions?organiser_id=user-other-organiser&event_id=8').set(as('organiser'));
-  assert.equal(response.status, 200);
-  assert.deepEqual(owners, ['user-organiser']);
-  assert.deepEqual(response.body.requests.map((row: { request_id: number }) => row.request_id), [31]);
-  assert.equal(JSON.stringify(response.body).includes('PRIVATE'), false);
+test('[FAILURE] [SG2-47:AC3] [SG2-66:AC5] organisers and Technical Support Staff can no longer discover capacity exceptions, even for their own events', async () => {
+  let reads = 0;
+  const store = fakeStore().store;
+  store.capacityCandidates = async () => { reads++; return []; };
+  for (const who of ['organiser', 'support']) {
+    const response = await request(app(store)).get('/api/venue-booking-requests/capacity-exceptions?organiser_id=user-organiser').set(as(who));
+    assert.deepEqual([response.status, response.body], [403, { error: 'Access denied' }], who);
+  }
+  assert.equal(reads, 0);
 });
 
-test('[BOUNDARY] [SG2-47:AC3] missing capacity is actionable but missing attendance, covered requests and decided requests are not', async () => {
+test('[BOUNDARY] [SG2-47:AC3] [SG2-66:AC2] missing capacity is actionable but missing attendance, covered requests and decided requests without a live booking are not', async () => {
   const events = [forum, { ...forum, event_id: 8, expected_attendance: null },
     { ...forum, event_id: 9, expected_attendance: 0 }, { ...forum, event_id: 10, name: null },
-    { ...forum, event_id: 11, name: '   ' }];
+    { ...forum, event_id: 11, name: '   ' }, { ...forum, event_id: 12, status: 'cancelled' }];
   const unknown = { ...theatre, venue_id: 4, name: '   ', capacity: null };
   const covered = { exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_name: 'Venue Staff',
     approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' };
   const { store } = fakeStore({ events, venues: [atrium, theatre, seminar, unknown], exceptions: [covered], requests: [
     pending(), pending({ request_id: 32, venue_id: 2 }), pending({ request_id: 33, venue_id: 1 }),
     pending({ request_id: 34, event_id: 8 }), pending({ request_id: 35, event_id: 9 }),
-    pending({ request_id: 36, event_id: 10, venue_id: 4 }), pending({ request_id: 37, event_id: 11, venue_id: 4 })
+    pending({ request_id: 36, event_id: 10, venue_id: 4 }), pending({ request_id: 37, event_id: 11, venue_id: 4 }),
+    // Approved, but its booking was released, the event is cancelled, or it holds no booking.
+    booked({ request_id: 38, venue_booking: { status: 'cancelled' } }), booked({ request_id: 39, event_id: 12 }),
+    pending({ request_id: 40, status: 'approved' }), pending({ request_id: 41, status: 'rejected' })
   ] });
-  const rows = await store.pendingCapacityRequests();
-  store.pendingCapacityRequests = async () => [...rows, { ...rows[0], request_id: 38, status: 'approved' }];
-  const response = await request(app(store)).get('/api/venue-booking-requests/capacity-exceptions').set(as('support'));
+  const response = await request(app(store)).get('/api/venue-booking-requests/capacity-exceptions').set(as('venue'));
   assert.equal(response.status, 200);
   assert.deepEqual(response.body.requests.map((row: { request_id: number }) => row.request_id), [36, 37]);
   for (const row of response.body.requests) {
@@ -163,32 +165,41 @@ test('[BOUNDARY] [SG2-47:AC3] missing capacity is actionable but missing attenda
   }
 });
 
-test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] an organiser or support approver can discover, approve and reload the receipt while the booking request stays pending', async () => {
-  for (const who of ['organiser', 'support']) {
-    const { store, requests } = fakeStore();
-    const server = app(store);
-    const path = '/api/venue-booking-requests/capacity-exceptions';
-    assert.equal((await request(server).get(path).set(as(who))).body.requests.length, 1);
-    const approved = await request(server).post('/api/venue-booking-requests/31/capacity-exception').set(as(who))
-      .send({ approved_by: 'forged-user', expected_attendance: 1, approver_role: 'event_coordinator' });
-    assert.equal(approved.status, 201);
-    assert.equal(approved.body.exception.approved_by, USERS[who].userId);
-    assert.equal(approved.body.exception.expected_attendance, 150);
-    assert.equal(approved.body.exception.approver_role, USERS[who].role);
-    assert.equal(requests[0].status, 'pending');
-    const receipt = await request(server).get('/api/venue-booking-requests/31/suitability').set(as(who));
-    assert.equal(receipt.status, 200);
-    assert.deepEqual(receipt.body.exceptions, [approved.body.exception]);
-    assert.equal(receipt.body.booking, 'allowed');
-    assert.deepEqual((await request(server).get(path).set(as(who))).body, { requests: [] });
-  }
+test('[NORMAL] [SG2-66:AC2] [SG2-66:AC5] a booked venue whose live event now outgrows it is listed for Venue Staff as booked, with only an earlier lower approval', async () => {
+  const lower = { ...legacy, exception_id: 1, request_id: 50, approver_role: 'venue_staff', approved_by: 'user-venue', expected_attendance: 130 };
+  const events = ['approved', 'planning', 'awaiting_safety_check', 'preparation', 'confirmed']
+    .map((status, index) => ({ ...forum, event_id: 20 + index, status }));
+  const { store } = fakeStore({ events, exceptions: [lower], requests: events.map((event, index) => booked({ request_id: 50 + index, event_id: event.event_id })) });
+  const response = await request(app(store)).get('/api/venue-booking-requests/capacity-exceptions').set(as('venue'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.requests.map((row: { request_id: number; booked: boolean }) => [row.request_id, row.booked]),
+    [[50, true], [51, true], [52, true], [53, true], [54, true]]);
+});
+
+test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] Venue Staff discover, approve and reload the receipt while the booking request stays pending', async () => {
+  const { store, requests } = fakeStore();
+  const server = app(store);
+  const path = '/api/venue-booking-requests/capacity-exceptions';
+  assert.equal((await request(server).get(path).set(as('venue'))).body.requests.length, 1);
+  const approved = await request(server).post('/api/venue-booking-requests/31/capacity-exception').set(as('venue'))
+    .send({ approved_by: 'forged-user', expected_attendance: 1, approver_role: 'event_coordinator' });
+  assert.equal(approved.status, 201);
+  assert.equal(approved.body.exception.approved_by, 'user-venue');
+  assert.equal(approved.body.exception.expected_attendance, 150);
+  assert.equal(approved.body.exception.approver_role, 'venue_staff');
+  assert.equal(requests[0].status, 'pending');
+  const receipt = await request(server).get('/api/venue-booking-requests/31/suitability').set(as('venue'));
+  assert.equal(receipt.status, 200);
+  assert.deepEqual(receipt.body.exceptions, [approved.body.exception]);
+  assert.equal(receipt.body.booking, 'allowed');
+  assert.deepEqual((await request(server).get(path).set(as('venue'))).body, { requests: [] });
 });
 
 test('[FAILURE] [SG2-47:AC3] unavailable capacity discovery reports a safe retryable error rather than private database details', async () => {
   const { store } = fakeStore();
-  store.pendingCapacityRequests = async () => { throw new Error('PRIVATE database details'); };
+  store.capacityCandidates = async () => { throw new Error('PRIVATE database details'); };
   for (const server of [app(store), app(store, { getAdminClient: () => null })]) {
-    const response = await request(server).get('/api/venue-booking-requests/capacity-exceptions').set(as('support'));
+    const response = await request(server).get('/api/venue-booking-requests/capacity-exceptions').set(as('venue'));
     assert.equal(response.status, 503);
     assert.equal(JSON.stringify(response.body).includes('PRIVATE'), false);
   }
@@ -296,17 +307,40 @@ test('[NORMAL] [SG2-47:AC3] [SG2-47:AC5] Venue Staff approve a capacity exceptio
   assert.equal(requests[0].status, 'pending');
 });
 
-test('[NORMAL] [FAILURE] [SG2-47:AC3] Technical Support Staff and the event\'s own organiser may also approve', async () => {
-  for (const user of ['support', 'organiser']) {
-    const { store, recorded } = fakeStore();
-    const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as(user));
-    assert.equal(response.status, 201, user);
-    assert.equal(recorded[0].approver_role, USERS[user].role);
-  }
+test('[FAILURE] [SG2-47:AC3] [SG2-66:AC5] Technical Support Staff and organisers, even the event\'s own, can no longer approve', async () => {
   const { store, recorded } = fakeStore();
-  const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as('other_organiser'));
-  assert.equal(response.status, 404);
+  const composed = app(store);
+  for (const user of ['support', 'organiser', 'other_organiser']) {
+    const response = await request(composed).post('/api/venue-booking-requests/31/capacity-exception').set(as(user));
+    assert.deepEqual([response.status, response.body], [403, { error: 'Access denied' }], user);
+  }
   assert.deepEqual(recorded, []);
+});
+
+test('[NORMAL] [SG2-66:AC2] [SG2-66:AC5] Venue Staff approve an exception for the revised attendance of a booked venue; the booking stays as it is', async () => {
+  const lower: CapacityExceptionRecord = { ...legacy, approver_role: 'venue_staff', approved_by: 'user-venue', expected_attendance: 130 };
+  const { store, recorded, requests } = fakeStore({ events: [{ ...forum, status: 'confirmed' }], requests: [booked()], exceptions: [lower] });
+  const server = app(store);
+  const before = await request(server).get('/api/venue-booking-requests/31/suitability').set(as('venue'));
+  assert.equal(before.body.booking, 'needs_capacity_exception');
+  const response = await request(server).post('/api/venue-booking-requests/31/capacity-exception').set(as('venue'));
+  assert.equal(response.status, 201);
+  assert.deepEqual(recorded, [{ request_id: 31, approved_by: 'user-venue', approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120 }]);
+  assert.equal(response.body.booking, 'allowed');
+  assert.deepEqual([requests[0].status, requests[0].venue_booking], ['approved', { status: 'confirmed' }]);
+  assert.deepEqual((await request(server).get('/api/venue-booking-requests/capacity-exceptions').set(as('venue'))).body, { requests: [] });
+});
+
+test('[CONFLICT] [SG2-66:AC5] an exception recorded by another role before SG2-66 does not count; Venue Staff still record the one that does', async () => {
+  const { store, recorded } = fakeStore({ exceptions: [legacy] });
+  const server = app(store);
+  const fit = await request(server).get('/api/venue-booking-requests/31/suitability').set(as('venue'));
+  assert.deepEqual([fit.body.exceptions.length, fit.body.booking], [1, 'needs_capacity_exception']);
+  const listed = await request(server).get('/api/venue-booking-requests/capacity-exceptions').set(as('venue'));
+  assert.deepEqual(listed.body.requests.map((row: { request_id: number }) => row.request_id), [31]);
+  const response = await request(server).post('/api/venue-booking-requests/31/capacity-exception').set(as('venue'));
+  assert.deepEqual([response.status, response.body.booking], [201, 'allowed']);
+  assert.equal(recorded[0].approver_role, 'venue_staff');
 });
 
 test('[FAILURE] [SG2-47:AC3] a coordinator cannot approve an exception, even for their own event', async () => {
@@ -318,6 +352,16 @@ test('[FAILURE] [SG2-47:AC3] a coordinator cannot approve an exception, even for
   assert.deepEqual(recorded, []);
 });
 
+test('[BOUNDARY] [SG2-66:AC5] Venue Staff approving an exception for a malformed or unknown request id are refused without recording one', async () => {
+  const { store, recorded } = fakeStore();
+  const composed = app(store);
+  const malformed = await request(composed).post('/api/venue-booking-requests/0/capacity-exception').set(as('venue'));
+  assert.deepEqual([malformed.status, malformed.body], [400, { error: 'Invalid booking request ID.' }]);
+  const unknown = await request(composed).post('/api/venue-booking-requests/999/capacity-exception').set(as('venue'));
+  assert.deepEqual([unknown.status, unknown.body], [404, { error: 'Booking request not found.' }]);
+  assert.deepEqual(recorded, []);
+});
+
 test('[FAILURE] [SG2-47:AC2] no exception is permitted for a venue missing a required facility', async () => {
   const { store, recorded } = fakeStore();
   const response = await request(app(store)).post('/api/venue-booking-requests/32/capacity-exception').set(as('venue'));
@@ -326,13 +370,18 @@ test('[FAILURE] [SG2-47:AC2] no exception is permitted for a venue missing a req
   assert.deepEqual(recorded, []);
 });
 
-test('[CONFLICT] [SG2-47:AC3] [SG2-47:AC5] an exception is refused when it is not needed, already covered or the request is decided', async () => {
+test('[CONFLICT] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC2] an exception is refused when it is not needed, already covered, or the request is decided without a live booking', async () => {
   const covered: CapacityExceptionRecord = { exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_name: null,
     approver_role: 'venue_staff', expected_attendance: 150, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' };
+  const decided = 'Only a booking request awaiting a decision, or a booked venue for an event still going ahead, can be given a capacity exception.';
   const cases: [string, ReturnType<typeof fakeStore>, number, string][] = [
     ['fits', fakeStore(), 33, "The event's expected attendance fits this venue, so no capacity exception is needed."],
     ['covered', fakeStore({ exceptions: [covered] }), 31, 'A capacity exception covering this attendance has already been approved.'],
-    ['decided', fakeStore({ requests: [pending({ status: 'approved' })] }), 31, 'Only a booking request awaiting a decision can be given a capacity exception.']
+    ['booked and covered', fakeStore({ requests: [booked()], exceptions: [covered] }), 31, 'A capacity exception covering this attendance has already been approved.'],
+    ['decided', fakeStore({ requests: [pending({ status: 'approved' })] }), 31, decided],
+    ['rejected', fakeStore({ requests: [pending({ status: 'rejected' })] }), 31, decided],
+    ['booking released', fakeStore({ requests: [booked({ venue_booking: { status: 'cancelled' } })] }), 31, decided],
+    ['event over', fakeStore({ events: [{ ...forum, status: 'completed' }], requests: [booked()] }), 31, decided]
   ];
   for (const [name, { store, recorded }, id, error] of cases) {
     const response = await request(app(store)).post(`/api/venue-booking-requests/${id}/capacity-exception`).set(as('venue'));
@@ -356,7 +405,7 @@ test('[CONFLICT] [SG2-47:AC3] two approvers acting at once record one exception;
     return rows;
   };
   const composed = app(store);
-  const responses = await Promise.all(['venue', 'support'].map(user =>
+  const responses = await Promise.all(['venue', 'other_venue'].map(user =>
     request(composed).post('/api/venue-booking-requests/31/capacity-exception').set(as(user))));
   assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
   assert.deepEqual(responses.find(response => response.status === 409)!.body,
@@ -368,7 +417,7 @@ test('[CONFLICT] [SG2-47:AC3] two approvers acting at once record one exception;
 test('[BOUNDARY] [SG2-47:AC3] an exception for a lower attendance does not cover a rise; a new approval is recorded', async () => {
   const { store, recorded } = fakeStore({ exceptions: [{ exception_id: 1, request_id: 31, approved_by: 'user-venue', approver_name: null,
     approver_role: 'venue_staff', expected_attendance: 130, venue_capacity: 120, approved_at: '2030-06-01T00:00:00.000Z' }] });
-  const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as('support'));
+  const response = await request(app(store)).post('/api/venue-booking-requests/31/capacity-exception').set(as('venue'));
   assert.equal(response.status, 201);
   assert.equal(recorded[0].expected_attendance, 150);
 });

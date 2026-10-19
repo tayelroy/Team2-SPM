@@ -67,6 +67,14 @@ test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] every event lifecycle notice survives r
   expect(await loadNotifications('token')).toEqual({ ok: true, notifications: lifecycle });
 });
 
+test('[NORMAL] [SG2-66:AC7] a back-to-Planning notice survives response validation', async () => {
+  const returned = { notification_id: 61, event_id: 7, request_id: null, kind: 'event_returned_to_planning',
+    message: 'Partner Forum has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.',
+    created_at: '2026-10-19T02:00:00.000Z' };
+  respond(() => Response.json({ notifications: [returned] }));
+  expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [returned] });
+});
+
 test('[FAILURE] [SG2-68:AC2] a near-miss or inherited kind name is refused rather than shown unlabelled', async () => {
   for (const kind of ['event_submitted ', 'Event_approved', 'event_cancelled', 'venue_unavailable ', 'Venue_unavailable', 'toString', 7]) {
     respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));

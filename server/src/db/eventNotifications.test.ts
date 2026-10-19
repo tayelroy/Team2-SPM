@@ -125,4 +125,20 @@ describe('event notice text (SG2-68 AC2)', () => {
     assert.equal(eventNoticeMessages.rejected('Partner Forum', fits), prefix + fits);
     assert.equal(eventNoticeMessages.rejected('Partner Forum', `${fits}rr`), prefix + fits);
   });
+
+  test('[NORMAL] [SG2-66:AC7] the back-to-Planning notices tell the organiser and the coordinator what happens next', () => {
+    assert.equal(eventNoticeMessages.returnedToPlanningOrganiser('Partner Forum'),
+      'Partner Forum has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.');
+    assert.equal(eventNoticeMessages.returnedToPlanningCoordinator('Partner Forum'),
+      'Partner Forum is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.');
+  });
+
+  test('[BOUNDARY] [SG2-66:AC7] an organiser who also coordinates the event gets one back-to-Planning notice', async () => {
+    const { admin, calls } = insertingAdmin();
+    await notifyEvent(admin, [
+      { recipient_id: 'same-1', event_id: 7, kind: 'event_returned_to_planning', message: eventNoticeMessages.returnedToPlanningOrganiser('X') },
+      { recipient_id: 'same-1', event_id: 7, kind: 'event_returned_to_planning', message: eventNoticeMessages.returnedToPlanningCoordinator('X') }
+    ]);
+    assert.equal((calls[0].rows as unknown[]).length, 1);
+  });
 });

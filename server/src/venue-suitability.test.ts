@@ -85,14 +85,22 @@ test('[NORMAL] [SG2-47:AC1] [SG2-47:AC2] [SG2-47:AC4] every problem is reported 
 
 test('[CONFLICT] [SG2-47:AC2] a missing required facility blocks booking, even with a capacity exception', () => {
   const result = assessSuitability(event({ expected_attendance: 150, venue_requirements: 'Kitchen' }), venue());
-  assert.equal(bookingReadiness(result, [{ expected_attendance: 150 }]), 'blocked');
+  assert.equal(bookingReadiness(result, [{ expected_attendance: 150, approver_role: 'venue_staff' }]), 'blocked');
 });
 
 test('[BOUNDARY] [SG2-47:AC3] exceeding capacity needs an approved exception covering the attendance', () => {
   const result = assessSuitability(event({ expected_attendance: 150 }), venue());
   assert.equal(bookingReadiness(result), 'needs_capacity_exception');
-  assert.equal(bookingReadiness(result, [{ expected_attendance: 120 }]), 'needs_capacity_exception');
-  assert.equal(bookingReadiness(result, [{ expected_attendance: 120 }, { expected_attendance: 150 }]), 'allowed');
+  assert.equal(bookingReadiness(result, [{ expected_attendance: 120, approver_role: 'venue_staff' }]), 'needs_capacity_exception');
+  assert.equal(bookingReadiness(result, [{ expected_attendance: 120, approver_role: 'venue_staff' }, { expected_attendance: 150, approver_role: 'venue_staff' }]), 'allowed');
+});
+
+test('[CONFLICT] [SG2-66:AC5] only an exception recorded by Venue Staff counts; one by another role before SG2-66 is inert', () => {
+  const result = assessSuitability(event({ expected_attendance: 150 }), venue());
+  for (const role of ['event_organiser', 'technical_support_staff']) {
+    assert.equal(bookingReadiness(result, [{ expected_attendance: 200, approver_role: role }]), 'needs_capacity_exception', role);
+  }
+  assert.equal(bookingReadiness(result, [{ expected_attendance: 200, approver_role: 'event_organiser' }, { expected_attendance: 150, approver_role: 'venue_staff' }]), 'allowed');
 });
 
 test('[NORMAL] [SG2-47:AC4] [SG2-47:AC5] a suitable venue, or one missing only accessibility features, may be decided', () => {

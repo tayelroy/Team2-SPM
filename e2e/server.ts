@@ -60,6 +60,9 @@ import { createConfirmEventHandler } from '../server/src/events/confirm';
 import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
 import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
 import { seedEventNotifications } from './support/event-notifications';
+import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
+import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
+import { createMemoryChangeImpact, seedChangeImpact } from './support/change-impact';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -70,6 +73,8 @@ const venueHolds = new VenueHoldFixture(database);
 const getClient = () => database.client;
 const access = createAuthorization({ resolvePrincipal: token => database.principal(token) });
 const eventDependencies = { getPrincipal: access.getPrincipal, getAdminClient: getClient };
+// SG2-66: the SG2-64/SG2-65 stand-in, reset with the database.
+const changeRequests = createMockChangeRequestSource();
 const availability = access.protectedRouter();
 availability.get('/availability', access.requirePermission('venues.availability.view'), createAllVenuesAvailabilityHandler(undefined, getClient));
 availability.get('/:venueId/availability', access.requirePermission('venues.availability.view'), createAvailabilityHandler(undefined, getClient));
@@ -226,7 +231,10 @@ const app = createApp(
   // SG2-58: confirmation mirrors confirm_event over the in-memory tables; the
   // confirmed-arrangements view reads them through the in-memory client.
   createConfirmEventHandler({ getPrincipal: access.getPrincipal, confirm: createMemoryConfirm(database) }),
-  createGetEventConfirmationHandler(eventDependencies)
+  createGetEventConfirmationHandler(eventDependencies),
+  // SG2-66: impact reads go through the in-memory client; acceptance and
+  // settling mirror their SQL functions over the in-memory tables.
+  createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -234,6 +242,7 @@ const app = createApp(
 app.post('/__e2e/reset', (_req, res) => {
   database.reset();
   venueHolds.reset();
+  changeRequests.reset();
   rateLimiter.resetKey('127.0.0.1');
   rateLimiter.resetKey('::ffff:127.0.0.1');
   res.status(204).end();
@@ -254,6 +263,16 @@ app.post('/__e2e/event-confirmation', (_req, res) => {
   seedEventConfirmation(database);
   res.status(204).end();
 });
+// SG2-66: a Confirmed event whose sample attendance change outgrows its venue.
+app.post('/__e2e/change-impact', (_req, res) => {
+  seedChangeImpact(database);
+  res.status(204).end();
+});
+app.get('/__e2e/change-impact-ledger', (_req, res) => res.json({
+  events: database.tables.events.filter(row => row.event_id === 661),
+  audit: database.tables.event_audit_logs.filter(row => row.event_id === 661),
+  notifications: database.tables.notifications.filter(row => row.event_id === 661),
+}));
 app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
   prepareConvertedForum(database);
   res.status(204).end();

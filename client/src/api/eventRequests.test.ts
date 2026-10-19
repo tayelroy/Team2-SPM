@@ -1462,6 +1462,21 @@ describe('updateEventPlanning (SG2-39)', () => {
     });
   });
 
+  test('[CONFLICT] [SG2-66:AC6] a direct edit refused for a change request keeps the server message and the locked fields', async () => {
+    const error = 'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      error, code: 'change_request_required', fields: ['expected_attendance', 'proposed_date'],
+    }, 409)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false, kind: 'change_request_required', message: error, fields: ['expected_attendance', 'proposed_date'],
+    });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'change_request_required' }, 409)));
+    expect(await updateEventPlanning(42, mockPayload, 'coord-token')).toEqual({
+      ok: false, kind: 'change_request_required', message: 'Ask for this change through a change request.', fields: [],
+    });
+  });
+
   test('[FAILURE] [SG2-39:planning-validation] handles 400 validation error with and without details', async () => {
     vi.stubGlobal(
       'fetch',
