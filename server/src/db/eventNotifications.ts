@@ -56,7 +56,7 @@ export const eventNoticeMessages = {
   approved: (event: string) => `${event} was approved.`,
   rejected: (event: string, reason: string) => clip(`${event} was not approved: ${reason}`, MAX_MESSAGE_LENGTH),
   // SG2-66 AC7: an event moved back from Awaiting Safety Check, Preparation or
-  // Confirmed to Planning. Matches the SQL wording in 202610190002.
+  // Confirmed to Planning. Matches the SQL wording in 202610190003.
   returnedToPlanningOrganiser: (event: string) =>
     `${event} has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.`,
   returnedToPlanningCoordinator: (event: string) =>

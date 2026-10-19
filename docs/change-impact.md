@@ -149,7 +149,7 @@ Preparation or Confirmed.
 
 ## Database
 
-Migration `supabase/migrations/202610190002_event_change_impact.sql` adds the notice kind
+Migration `supabase/migrations/202610190003_event_change_impact.sql` adds the notice kind
 and both functions (`security definer`, empty `search_path`, executable by
 `service_role` only). `supabase/tests/event_change_impact.sql` proves acceptance from each
 stage, the cleared confirmation, the outstanding union, the history rows, the exact

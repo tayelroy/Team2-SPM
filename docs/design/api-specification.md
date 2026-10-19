@@ -769,7 +769,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 `Approve a capacity exception for this request before approving the booking.`
   - 409 `closed`
   - 409 `{ error, conflict: { kind: "booking"|"block"|"hold", starts_at, ends_at, label } }`
-- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610190001_venue_staff_capacity_exceptions.sql`: only a capacity exception recorded by Venue Staff covers the attendance (SG2-66 AC5). The API applies the same rule before calling it.
+- **Data:** RPC `decide_venue_booking_request(p_request_id, p_decision, p_reason)`, run as the caller. The latest definition is in `202610190002_venue_staff_capacity_exceptions.sql`: only a capacity exception recorded by Venue Staff covers the attendance (SG2-66 AC5). The API applies the same rule before calling it.
 - **What the RPC does:**
   - Under the venue lock it refuses confirmed bookings and live holds within the setup + turnaround gap (`venue_preparation_gap`, SG2-78), and unavailability without the gap.
   - It inserts a confirmed `venue_bookings` row and keeps the event's first booking (`events.venue_booking_id = coalesce(...)`, SG2-82).
@@ -898,7 +898,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
   - 409 conflict
   - 409 `Approve a capacity exception for this booking request before converting the hold.`
   - 409 `Required venue facilities are missing. Choose a suitable venue.`
-- **Data:** RPC `change_venue_hold(p_hold_id, 'convert')`. The latest definition is in `202610190001_venue_staff_capacity_exceptions.sql` (only a Venue Staff capacity exception counts, SG2-66 AC5).
+- **Data:** RPC `change_venue_hold(p_hold_id, 'convert')`. The latest definition is in `202610190002_venue_staff_capacity_exceptions.sql` (only a Venue Staff capacity exception counts, SG2-66 AC5).
 
 ### 8.7 GET /api/venue-bookings
 - **Week 7:** New since W7 — SG2-51.

@@ -188,7 +188,7 @@ export class VenueHoldFixture {
     const item = (kind: 'booking' | 'hold' | 'request', row: Row, key: string) => ({ kind, id: Number(row[key]),
       event_id: row.event_id === null || row.event_id === undefined ? null : Number(row.event_id), event_name: name(row),
       starts_at: String(row.starts_at), ends_at: String(row.ends_at) });
-    const holds = this.database.tables.venue_holds.filter(hold => hold.venue_id === venueId && hold.status === 'tentative');
+    const holds = this.database.tables.venue_holds.filter(hold => hold.venue_id === venueId && hold.status === 'tentative' && later(hold));
     const blockers = [
       ...this.database.tables.venue_bookings.filter(row => row.venue_id === venueId && ['held', 'confirmed'].includes(String(row.status)) && later(row))
         .map(row => item('booking', row, 'booking_id')),

@@ -6633,7 +6633,7 @@
     ],
     "data": "Attendance 136 -> 204 against capacity 150; booking 01:00-05:00 UTC on 15 Jun 2090 around the 02:00 UTC start.",
     "expected": "403 / 404 / 200; attendance lists booking, reservation and registrations (2) with capacity_check on the hall; date lists period rechecks; wording lists nothing. Accept returns {confirmed -> planning, returned_to_planning, three rechecks}, stores 204 with the confirmation cleared, writes expected_attendance, change_request and status history rows and the two exact notices, leaves the booking row unchanged; a second accept is 404. The venue recheck is blocked until Venue Staff (only) record a 204-person exception; each recheck then settles, the last clears the flag, three arrangement_recheck history rows exist and readiness shows nothing outstanding.",
-    "evidence": "integration/api.test.ts; supabase/migrations/202610190002_event_change_impact.sql; server/src/events/changeRequests.ts; server/src/db/changeImpact.ts",
+    "evidence": "integration/api.test.ts; supabase/migrations/202610190003_event_change_impact.sql; server/src/events/changeRequests.ts; server/src/db/changeImpact.ts",
     "layer": "Real local public API/PostgREST/PostgreSQL integration",
     "status": "Pass",
     "actual": "PASS (local): 17/17 native integration tests on PostgreSQL 16 + PostgREST 16.4 (CI uses PostgreSQL 17 + PostgREST 12.2.12 in Docker). Hosted CI for this revision is pending.",
@@ -6698,13 +6698,47 @@
     ],
     "data": "Synthetic events, venues, bookings, requests and exceptions created inside each rolled-back transaction.",
     "expected": "Every raise-exception assertion stays silent; anon and authenticated cannot execute the new functions; the upgrade replay passes.",
-    "evidence": "supabase/tests/event_change_impact.sql; supabase/tests/venue_capacity_exceptions.sql; supabase/tests/venue_booking_decisions.sql; supabase/tests/venue_holds.sql; supabase/migrations/202610190001_venue_staff_capacity_exceptions.sql; supabase/migrations/202610190002_event_change_impact.sql",
+    "evidence": "supabase/tests/event_change_impact.sql; supabase/tests/venue_capacity_exceptions.sql; supabase/tests/venue_booking_decisions.sql; supabase/tests/venue_holds.sql; supabase/migrations/202610190002_venue_staff_capacity_exceptions.sql; supabase/migrations/202610190003_event_change_impact.sql",
     "layer": "Rolled-back SQL against disposable PostgreSQL",
     "status": "Pass",
     "actual": "PASS (local): every migration, release_readiness.sql and every CI-listed suite passed on PostgreSQL 16; the upgrade-job replay passed. CI uses PostgreSQL 17; hosted CI for this revision is pending.",
     "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; local replay of the CI database and upgrade jobs without Docker.",
     "execution_date": "19 Oct 2026",
     "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SMOKE-VENUE-DELETE-PAST-HOLD-01",
+    "title": "Delete a venue at a held period end without rewriting hold history",
+    "type": "NORMAL / BOUNDARY / CONFLICT",
+    "story": "SG2-106",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC1",
+      "SG2-106:AC2",
+      "SG2-106:AC5"
+    ],
+    "purpose": "Keep a venue protected during a held period, allow deletion when it ends even if expiry is later, and preserve history.",
+    "preconditions": "Production React build with real Express handlers on loopback and reset disposable in-memory providers; synthetic Venue Staff. Native SQL separately verifies database behavior.",
+    "data": "Quiet Room (venue 2), event 81; held period 1 Jun 2030 01:00Z–02:30Z; expiry 3 Jun 2030 02:00Z.",
+    "steps": [
+      "Place the hold through the API at fixture time 02:00Z; delete returns 409 with exactly its hold blocker.",
+      "Advance the fixture clock to exactly 02:30Z, before expiry.",
+      "At 390px sign in as Venue Staff, confirm delete in the catalogue and read the success state.",
+      "Compare the entire hold response with its original value; check hold options and reload the catalogue."
+    ],
+    "expected": "Before the period end deletion is blocked; at its end deletion succeeds. Quiet Room stays absent after reload and from new hold options, Regression Hall remains, the entire historical hold response including venue name/status/expiry is unchanged, and there is no horizontal overflow.",
+    "evidence": "e2e/smoke.spec.ts; supabase/tests/venue_delete_hold_expiry.sql",
+    "layer": "Playwright Chromium + fixture API; separate PostgreSQL contracts",
+    "status": "Pass",
+    "actual": "Red before the fixture fix; passed after it. Native PostgreSQL independently reproduced the baseline failure and passed with the forward migration.",
+    "execution_evidence": "19 Oct 2026; targeted Playwright journey 1/1; 50 migrations, all31 SQL suites and three real-session venue delete/expiry concurrency scenarios passed. Full CI evidence is recorded in the follow-up PR.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Automated local validation",
     "review": null
   }
 ]

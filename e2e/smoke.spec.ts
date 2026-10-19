@@ -212,6 +212,45 @@ test('SMOKE-CONFLICT-01 | [CONFLICT] [FAILURE] [SG2-90:AC3] a coordinator loses 
 });
 
 // SG2-106: venue delete and hold expiry change through the production build.
+test('SMOKE-VENUE-DELETE-PAST-HOLD-01 | [NORMAL] [BOUNDARY] [CONFLICT] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC5] a hold blocks deletion until its period ends, then the venue leaves the catalogue while hold history stays', async ({ page, request }, testInfo) => {
+  expect((await request.post('/__e2e/venue-holds')).status()).toBe(204);
+  const staff = await token(request, 'venue');
+  const placed = await request.post('/api/venue-holds', { headers: staff, data: {
+    event_id: 81, venue_id: 2, starts_at: '2030-06-01T01:00:00.000Z',
+    ends_at: '2030-06-01T02:30:00.000Z', expires_at: '2030-06-03T02:00:00.000Z',
+  } });
+  expect(placed.status()).toBe(201);
+  const original = (await placed.json()).hold;
+  const blocked = await request.delete('/api/venues/2', { headers: staff });
+  expect(blocked.status()).toBe(409);
+  expect((await blocked.json()).blockers.map((item: { kind: string; id: number }) => [item.kind, item.id])).toEqual([['hold', original.hold_id]]);
+
+  // The reserved period has ended exactly, while its independent expiry is still two days away.
+  expect((await request.post('/__e2e/hold-time', { data: { now: '2030-06-01T02:30:00.000Z' } })).status()).toBe(204);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'venue');
+  await page.getByRole('navigation').getByRole('button', { name: 'Catalogue', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete Quiet Room', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm delete', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Quiet Room deleted. It no longer appears in search, availability or new bookings.');
+  await expect(page.getByRole('heading', { name: 'Quiet Room', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toBeVisible();
+  expect(await noOverflow(page)).toBe(true);
+  await attachScreenshot(page, testInfo, 'past-hold-venue-deleted-mobile', false);
+
+  // Deletion preserves the full hold, including its name, status and future expiry.
+  const history = await request.get('/api/venue-holds', { headers: staff });
+  expect(history.status()).toBe(200);
+  expect((await history.json()).holds.find((hold: { hold_id: number }) => hold.hold_id === original.hold_id)).toEqual(original);
+  const choices = await request.get('/api/venue-holds/options', { headers: staff });
+  expect(choices.status()).toBe(200);
+  expect((await choices.json()).venues).toEqual([{ venue_id: 1, name: 'Regression Hall' }]);
+  await page.reload();
+  await page.getByRole('navigation').getByRole('button', { name: 'Catalogue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Quiet Room', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Regression Hall', exact: true })).toBeVisible();
+});
+
 test('SMOKE-VENUE-DELETE-01 | [NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC5] staff see what blocks a delete, delete an unused venue, and it leaves every new-booking list', async ({ page, request }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

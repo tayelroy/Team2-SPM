@@ -33,7 +33,7 @@ The data model has four pages, not two or three. With 13 venue tables on one pag
 | venue_bookings | 202609080002 | exclusion constraint: 202610070003; cancelled status and cancelled_*: 202610100002 | 2 |
 | venue_booking_clashes (W7) | 202610140003 (SG2-79) | — | 2 |
 | venue_booking_requests | 202609220001_internal_work_queue | layout, venue_requirements, requested_*, no-duplicate exclusion: 202610050002; decided_*, venue_booking_id: 202610060001; W7 withdrawn_*: 202610150002 (SG2-82); replaces_booking_id + partial index: 202610170001 (SG2-81) | 3 |
-| venue_capacity_exceptions | 202610010001 | approver_role check narrowed to `venue_staff` (added NOT VALID so approvals other roles recorded under SG2-47 stay as history, inert) and the request/attendance unique index limited to Venue Staff rows: 202610190001 (SG2-66 AC5) | 3 |
+| venue_capacity_exceptions | 202610010001 | approver_role check narrowed to `venue_staff` (added NOT VALID so approvals other roles recorded under SG2-47 stay as history, inert) and the request/attendance unique index limited to Venue Staff rows: 202610190002 (SG2-66 AC5) | 3 |
 | venue_holds (W7) | 202610050001 (SG2-84/85) | — | 3 |
 | venue_hold_notifications (W7) | 202610050001 | — | 3 |
 | venue_hold_settings (W7) | 202610050001 | — | 3 |
@@ -61,11 +61,11 @@ pg_cron: the `venue-hold-deadlines` job runs `process_venue_hold_deadlines()` ev
 | Venue, VenueLayout | `venues`, `venue_layouts` |
 | VenueOperations, VenueOperationHistory (W7) | `venue_operations`, `venue_operation_history`; `venue_preparation_gap()` in 202610120002 (SG2-78) |
 | VenueUnavailability, VenueBookingDisruption (W7) | `venue_unavailability`, `venue_booking_disruptions` (202610100001) |
-| VenueBookingRequest | `venue_booking_requests`; `decide_venue_booking_request()` (latest version in 202610190001, which counts only Venue Staff capacity exceptions); `withdraw_venue_booking_request()` (202610150002) |
+| VenueBookingRequest | `venue_booking_requests`; `decide_venue_booking_request()` (latest version in 202610190002, which counts only Venue Staff capacity exceptions); `withdraw_venue_booking_request()` (202610150002) |
 | CapacityException | `venue_capacity_exceptions`; only rows with `approver_role = 'venue_staff'` cover attendance (SG2-66 AC5, `bookingReadiness` in `server/src/venues/suitability.ts`) |
 | VenueBooking | `venue_bookings`; `release_venue_booking()` (202610100002) |
 | BookingClash (W7) | `venue_booking_clashes`; `refresh_venue_booking_clashes()` (202610140003) |
-| VenueHold, VenueHoldNotification, VenueHoldSettings (W7) | `venue_holds`, `venue_hold_notifications`, `venue_hold_settings`; `create_venue_hold` (202610050001, redefined in 202610120002), `change_venue_hold` (202610050001, redefined in 202610120002, 202610160001, 202610170004 and 202610190001) and `process_venue_hold_deadlines` (202610050001) |
+| VenueHold, VenueHoldNotification, VenueHoldSettings (W7) | `venue_holds`, `venue_hold_notifications`, `venue_hold_settings`; `create_venue_hold` (202610050001, redefined in 202610120002), `change_venue_hold` (202610050001, redefined in 202610120002, 202610160001, 202610170004 and 202610190002) and `process_venue_hold_deadlines` (202610050001) |
 | Replacement (SG2-81) | No separate table/class: `VenueBookingRequest.replacesBookingId` points to the old `VenueBooking`; approval calls internal `release_replaced_booking` in the decision transaction (202610170001) |
 | ChangeOneVenue («planned» SG2-83) | General one-venue change/cancellation is separate from implemented affected-booking replacement |
 | Equipment, EquipmentRequest, EquipmentReservation | `equipment`, `equipment_requests`, `equipment_reservations`; `check_equipment_availability`, `manage_equipment_requirements` and `manage_equipment_reservations` |
