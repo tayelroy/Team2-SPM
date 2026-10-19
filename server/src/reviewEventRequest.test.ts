@@ -25,6 +25,7 @@ const REVIEWED_REQUEST = {
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
+  preferred_layout: null,
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'Lectern, 2 radio mics',
   registration_needed: true,

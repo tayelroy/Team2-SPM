@@ -50,7 +50,9 @@ export function prefillFromEvent(item: WorkItem): VenueSearchPrefill {
   const day = item.starts_at === null ? null : isoToSgtLocal(item.starts_at).slice(0, 10);
   const attendance = item.details.expected_attendance;
   const rawNeeds = item.details.accessibility_needs;
-  const needs = typeof rawNeeds === 'string' && rawNeeds.trim() ? rawNeeds.trim() : null;
+  // SG2-105: "None" is how an organiser says there are no needs.
+  const needs = typeof rawNeeds === 'string' && rawNeeds.trim() && rawNeeds.trim().toLowerCase() !== 'none'
+    ? rawNeeds.trim() : null;
   const requirements = item.details.venue_requirements;
   const venueRequirements = typeof requirements === 'string' && requirements.trim() ? requirements.trim() : null;
   return {

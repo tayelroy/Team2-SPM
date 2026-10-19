@@ -576,7 +576,7 @@ describe('fetchOwnEventRequests', () => {
 });
 
 describe('fetchOwnEventDetail', () => {
-  test('[NORMAL] [SG2-26:AC1] fetches event detail and maps all fields', async () => {
+  test('[NORMAL] [SG2-26:AC1] [SG2-105:AC1] fetches event detail and maps all fields', async () => {
     const rawDetail = {
       event_id: 42,
       can_manage: true,
@@ -589,6 +589,7 @@ describe('fetchOwnEventDetail', () => {
       proposed_date: '2026-10-15',
       expected_attendance: 150,
       venue_requirements: 'Large auditorium with stage',
+      preferred_layout: 'Theatre',
       accessibility_needs: 'Wheelchair access',
       equipment_requirements: 'Dual projector and 4 microphones',
       registration_needed: true,
@@ -621,6 +622,7 @@ describe('fetchOwnEventDetail', () => {
       proposedDate: '2026-10-15',
       expectedAttendance: 150,
       venueRequirements: 'Large auditorium with stage',
+      preferredLayout: 'Theatre',
       accessibilityNeeds: 'Wheelchair access',
       equipmentRequirements: 'Dual projector and 4 microphones',
       registrationNeeded: true,
@@ -668,6 +670,7 @@ describe('fetchOwnEventDetail', () => {
         proposedDate: null,
         expectedAttendance: null,
         venueRequirements: null,
+        preferredLayout: null,
         accessibilityNeeds: null,
         equipmentRequirements: null,
         registrationNeeded: false,
@@ -710,6 +713,7 @@ describe('fetchOwnEventDetail', () => {
         proposedDate: null,
         expectedAttendance: null,
         venueRequirements: null,
+        preferredLayout: null,
         accessibilityNeeds: null,
         equipmentRequirements: null,
         registrationNeeded: false,

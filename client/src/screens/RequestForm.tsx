@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { loadSession } from '../auth/session';
 import { createEventRequestDraft, submitEventRequest, updateEventRequestDraft } from '../api/eventRequests';
@@ -20,9 +20,10 @@ import {
 } from '../ui';
 
 /**
- * Mandatory fields that must all be non-empty before the request can be
- * submitted (AC2). Mirrors `SUBMISSION_REQUIRED_FIELDS` on the server
- * (`server/src/events/fields.ts`).
+ * Mandatory text fields that must all be non-empty before the request can be
+ * submitted (AC2). Together with `registration_needed` they mirror
+ * `SUBMISSION_REQUIRED_FIELDS` on the server (`server/src/events/fields.ts`),
+ * which SG2-105 widened to the customer's minimum.
  */
 const REQUIRED_FIELDS = [
   'name',
@@ -31,18 +32,27 @@ const REQUIRED_FIELDS = [
   'proposed_date',
   'expected_attendance',
   'venue_requirements',
+  'preferred_layout',
+  'accessibility_needs',
+  'equipment_requirements',
 ] as const;
 
 type RequiredField = (typeof REQUIRED_FIELDS)[number];
+/** Every answer submission needs: the text fields plus the registration question. */
+type SubmissionField = RequiredField | 'registration_needed';
 
 /** Human-readable labels for inline validation errors and outstanding-field summaries. */
-const FIELD_LABELS: Record<RequiredField, string> = {
+const FIELD_LABELS: Record<SubmissionField, string> = {
   name: 'Event name',
   purpose: 'Purpose',
   description: 'Description',
   proposed_date: 'Date',
   expected_attendance: 'Expected attendance',
   venue_requirements: 'Venue requirements',
+  preferred_layout: 'Preferred room layout',
+  accessibility_needs: 'Accessibility needs',
+  equipment_requirements: 'Equipment requirements',
+  registration_needed: 'Whether registration is needed',
 };
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
@@ -119,33 +129,46 @@ function FormField({
 }
 
 /**
- * A non-mandatory multi-line field for the two optional details a draft can
- * carry (SG2-28): accessibility needs and equipment requirements. Unlike
- * FormField, blank is a valid, final answer — no `*`, no required styling.
+ * A mandatory multi-line answer that may be "None" but not blank (SG2-105):
+ * accessibility needs and equipment requirements. The button beside it
+ * fills in "None" so saying so is one click.
  */
-function OptionalTextField({
+function NoneableTextField({
   label,
+  fieldKey,
+  noneLabel,
   value,
   onChange,
+  hasError,
 }: {
   label: string;
+  fieldKey: RequiredField;
+  noneLabel: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (key: RequiredField, value: string) => void;
+  hasError: boolean;
 }) {
-  const id = useId();
+  const id = `rf-${fieldKey}`;
+  const errorId = `${id}-error`;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <label htmlFor={id} style={labelToken}>
-        {label}
+        {label} <span style={{ color: color.accent }}>*</span>
       </label>
+      <span style={{ fontSize: '12px', color: color.silver, marginTop: '-2px' }}>
+        Answer "None" if there are none
+      </span>
       <textarea
         id={id}
         rows={2}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(fieldKey, e.target.value)}
+        aria-required="true"
+        aria-invalid={hasError}
+        aria-describedby={hasError ? errorId : undefined}
         style={{
           background: surface.fieldOnAbyss,
-          border: rule.control,
+          border: hasError ? '1px solid #ff8a80' : rule.control,
           borderRadius: radius.sm,
           padding: '13px 14px',
           color: color.mist,
@@ -156,6 +179,16 @@ function OptionalTextField({
           fontFamily: 'inherit',
         }}
       />
+      <div>
+        <Chip {...chipStyle(value.trim() === 'None')} onClick={() => onChange(fieldKey, 'None')}>
+          {noneLabel}
+        </Chip>
+      </div>
+      {hasError && (
+        <span id={errorId} role="alert" style={{ fontSize: '12px', color: '#ff8a80' }}>
+          {FIELD_LABELS[fieldKey]} is required
+        </span>
+      )}
     </div>
   );
 }
@@ -185,6 +218,10 @@ function OptionalTextField({
  * inline errors appear on a blank field once touched; server errors
  * (400/409/503) surface as a visible alert banner.
  * AC3 — not in scope for RequestForm itself; see EventDetail for immutability.
+ *
+ * SG2-105 makes the customer's minimum mandatory: preferred room layout,
+ * accessibility needs and equipment requirements ("None" is an answer,
+ * blank is not), and an explicit yes or no on registration.
  *
  * The date is a `datetime-local` input in Singapore time. The form keeps the
  * stored ISO instant and converts only for display, so an untouched date is
@@ -238,11 +275,15 @@ export default function RequestForm({
     expected_attendance:
       initialValues?.expected_attendance != null ? String(initialValues.expected_attendance) : '',
     venue_requirements: initialValues?.venue_requirements ?? '',
+    preferred_layout: initialValues?.preferred_layout ?? '',
+    accessibility_needs: initialValues?.accessibility_needs ?? '',
+    equipment_requirements: initialValues?.equipment_requirements ?? '',
   }));
-  const [accessibility, setAccessibility] = useState(initialValues?.accessibility_needs ?? '');
-  const [equipment, setEquipment] = useState(initialValues?.equipment_requirements ?? '');
-  const [registrationNeeded, setRegistrationNeeded] = useState(initialValues?.registration_needed ?? false);
-  const [touched, setTouched] = useState<Set<RequiredField>>(new Set());
+  // Null until answered: a fresh form must not quietly say "No" (SG2-105).
+  const [registrationNeeded, setRegistrationNeeded] = useState<boolean | null>(
+    initialValues?.registration_needed ?? null,
+  );
+  const [touched, setTouched] = useState<Set<SubmissionField>>(new Set());
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [saveState, setSaveState] = useState<SaveState>({ kind: 'idle' });
@@ -253,7 +294,8 @@ export default function RequestForm({
   // Bumped on every successful save so an open venue-fit check re-reads the draft.
   const [savedVersion, setSavedVersion] = useState(0);
 
-  const emptyFields = REQUIRED_FIELDS.filter((k) => !values[k].trim());
+  const emptyFields: SubmissionField[] = REQUIRED_FIELDS.filter((k) => !values[k].trim());
+  if (registrationNeeded === null) emptyFields.push('registration_needed');
   const effectiveEventId = eventId ?? (createdEventId !== null ? String(createdEventId) : undefined);
 
   // When no real required-field data exists yet (fresh form), the submit
@@ -279,9 +321,12 @@ export default function RequestForm({
         ? { expected_attendance: attendanceValue }
         : {}),
       ...(values.venue_requirements.trim() ? { venue_requirements: values.venue_requirements.trim() } : {}),
-      ...(accessibility.trim() ? { accessibility_needs: accessibility.trim() } : {}),
-      ...(equipment.trim() ? { equipment_requirements: equipment.trim() } : {}),
-      registration_needed: registrationNeeded,
+      ...(values.preferred_layout.trim() ? { preferred_layout: values.preferred_layout.trim() } : {}),
+      ...(values.accessibility_needs.trim() ? { accessibility_needs: values.accessibility_needs.trim() } : {}),
+      ...(values.equipment_requirements.trim()
+        ? { equipment_requirements: values.equipment_requirements.trim() }
+        : {}),
+      ...(registrationNeeded !== null ? { registration_needed: registrationNeeded } : {}),
     };
 
     const token = accessToken ?? loadSession()?.accessToken;
@@ -339,13 +384,13 @@ export default function RequestForm({
 
     if (result.kind === 'missing') {
       const labels = result.missing
-        .map((f) => FIELD_LABELS[f as RequiredField] ?? f)
+        .map((f) => FIELD_LABELS[f as SubmissionField] ?? f)
         .join(', ');
       setErrorMessage(
         `Please complete the following required fields before submitting: ${labels}.`,
       );
       // Mark those fields so inline errors appear.
-      setTouched(new Set(result.missing as RequiredField[]));
+      setTouched(new Set(result.missing as SubmissionField[]));
     } else if (result.kind === 'conflict') {
       setErrorMessage(
         'This request has already been submitted and cannot be submitted again.',
@@ -473,6 +518,14 @@ export default function RequestForm({
               touched.has('venue_requirements') && !values.venue_requirements.trim()
             }
           />
+          <FormField
+            label="Preferred room layout"
+            fieldKey="preferred_layout"
+            value={values.preferred_layout}
+            onChange={setField}
+            hint="For example theatre, classroom or banquet"
+            hasError={touched.has('preferred_layout') && !values.preferred_layout.trim()}
+          />
         </div>
 
         {/* Description — full-width textarea (AC2) */}
@@ -522,7 +575,7 @@ export default function RequestForm({
           )}
         </div>
 
-        {/* Optional details (SG2-28) */}
+        {/* Answers that may be "None" but not blank (SG2-105, replacing SG2-28 AC2) */}
         <div
           style={{
             display: 'grid',
@@ -531,29 +584,49 @@ export default function RequestForm({
             alignItems: 'end',
           }}
         >
-          <OptionalTextField
-            label="Accessibility needs (optional)"
-            value={accessibility}
-            onChange={setAccessibility}
+          <NoneableTextField
+            label="Accessibility needs"
+            fieldKey="accessibility_needs"
+            noneLabel="No accessibility needs"
+            value={values.accessibility_needs}
+            onChange={setField}
+            hasError={touched.has('accessibility_needs') && !values.accessibility_needs.trim()}
           />
-          <OptionalTextField
+          <NoneableTextField
             label="Equipment requirements"
-            value={equipment}
-            onChange={setEquipment}
+            fieldKey="equipment_requirements"
+            noneLabel="No equipment needed"
+            value={values.equipment_requirements}
+            onChange={setField}
+            hasError={touched.has('equipment_requirements') && !values.equipment_requirements.trim()}
           />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <Eyebrow>Attendee registration</Eyebrow>
+          <Eyebrow>
+            Attendee registration <span style={{ color: color.accent }}>*</span>
+          </Eyebrow>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             <Chip
-              {...chipStyle(registrationNeeded)}
-              pressed={registrationNeeded}
-              onClick={() => setRegistrationNeeded((on) => !on)}
+              {...chipStyle(registrationNeeded === true)}
+              pressed={registrationNeeded === true}
+              onClick={() => setRegistrationNeeded(true)}
             >
               Registration needed
             </Chip>
+            <Chip
+              {...chipStyle(registrationNeeded === false)}
+              pressed={registrationNeeded === false}
+              onClick={() => setRegistrationNeeded(false)}
+            >
+              No registration needed
+            </Chip>
           </div>
+          {touched.size > 0 && registrationNeeded === null ? (
+            <span role="alert" style={{ fontSize: '12px', color: '#ff8a80' }}>
+              Say whether registration is needed
+            </span>
+          ) : null}
         </div>
 
         {/* Venue fit for the saved draft (SG2-47 suitability API) */}
@@ -604,7 +677,7 @@ export default function RequestForm({
               ? saveState.missing.length === 0
                 ? `Draft ${saveState.reference} saved — ready to submit.`
                 : `Draft ${saveState.reference} saved. Still needed to submit: ${saveState.missing
-                    .map((field) => FIELD_LABELS[field as RequiredField] ?? field)
+                    .map((field) => FIELD_LABELS[field as SubmissionField] ?? field)
                     .join(', ')}.`
               : touched.size > 0 && emptyFields.length > 0
                 ? `${emptyFields.length} required field${emptyFields.length === 1 ? '' : 's'} still empty.`

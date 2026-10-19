@@ -39,8 +39,12 @@ async function fillVenue(page: Page, name = venueValues.name, capacity = '100') 
 async function fillEvent(page: Page, name = 'Browser workshop') {
   for (const [label, value] of Object.entries({ 'Event name': name, Purpose: 'Team planning',
     Description: 'Review the release plan', Date: '2030-06-15T17:00',
-    'Expected attendance': '25', 'Venue requirements': 'Projector' })) {
+    'Expected attendance': '25', 'Venue requirements': 'Projector', 'Preferred room layout': 'Theatre' })) {
     await page.getByLabel(new RegExp(`^${label}`)).fill(value);
+  }
+  // SG2-105: "None" answers accessibility and equipment, and registration is a yes or no.
+  for (const answer of ['No accessibility needs', 'No equipment needed', 'No registration needed']) {
+    await page.getByRole('button', { name: answer, exact: true }).click();
   }
 }
 
@@ -450,7 +454,8 @@ test('SG2-28-P01 | [SG2-28:AC1] [SG2-30:AC1] [SG2-31:AC3] [SG2-87:AC4] [NORMAL] 
   expect(detail.status()).toBe(200);
   expect((await detail.json()).request).toMatchObject({ name: 'Browser workshop', purpose: 'Team planning',
     description: 'Review the release plan', proposed_date: '2030-06-15T09:00:00.000Z',
-    expected_attendance: 25, venue_requirements: 'Projector', status: 'unassigned' });
+    expected_attendance: 25, venue_requirements: 'Projector', preferred_layout: 'Theatre', accessibility_needs: 'None',
+    equipment_requirements: 'None', registration_needed: false, status: 'unassigned' });
 });
 
 test('SG2-28-B01 | [SG2-28:AC4] [SG2-29:AC1] [SG2-30:AC2] [BOUNDARY] [CONFLICT] an empty draft saves once but cannot be submitted', async ({ page }) => {
@@ -471,8 +476,8 @@ test('SG2-28-B01 | [SG2-28:AC4] [SG2-29:AC1] [SG2-30:AC2] [BOUNDARY] [CONFLICT] 
 
 test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then submitting preserves the latest field values', async ({ page }) => {
   await signIn(page);
-  // Clearing a value must start with something stored; clearing an already-null
-  // field would also pass if the edit never persisted at all.
+  // Changing a value must start with something else stored; otherwise the
+  // check would also pass if the edit never persisted at all.
   const headers = await authHeaders(page);
   const initial = await page.request.get('/api/event-requests/1', { headers });
   expect(initial.status()).toBe(200);
@@ -485,7 +490,7 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await expect(page.getByLabel(/^Event name/)).toHaveValue('Planning workshop');
   // The stored 02:00 UTC instant shows as 10:00 Singapore time in a date-time input.
   await expect(page.getByLabel(/^Date/)).toHaveValue('2030-06-15T10:00');
-  await expect(page.getByLabel('Accessibility needs (optional)', { exact: true })).toHaveValue('Step-free entrance');
+  await expect(page.getByLabel(/^Accessibility needs/)).toHaveValue('Step-free entrance');
   // No prototype requirement chips or canned suitability banner on a real draft.
   await expect(page.getByRole('button', { name: 'Hearing loop', exact: true })).toHaveCount(0);
   await expect(page.getByText(/expected attendance rules out/)).toHaveCount(0);
@@ -494,7 +499,8 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   const fit = page.getByRole('region', { name: 'Venues that do not fit this request', exact: true });
   await expect(fit.getByRole('heading', { name: 'Every venue fits this request', exact: true })).toBeVisible();
   await page.getByLabel(/^Event name/).fill('Revised workshop');
-  await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill('');
+  // SG2-105: accessibility may no longer be left blank, so the organiser answers "None".
+  await page.getByRole('button', { name: 'No accessibility needs', exact: true }).click();
   await page.getByRole('button', { name: 'Submit request', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Revised workshop has been submitted for review.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Revised workshop', exact: true })).toBeVisible();
@@ -503,7 +509,7 @@ test('SG2-29-P01 | [SG2-29:AC1] [SG2-29:AC2] [SG2-30:AC1] [NORMAL] editing then 
   await page.reload();
   const detail = await page.request.get('/api/event-requests/1', { headers: await authHeaders(page) });
   expect(detail.status()).toBe(200);
-  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: null,
+  expect((await detail.json()).request).toMatchObject({ name: 'Revised workshop', status: 'unassigned', accessibility_needs: 'None',
     proposed_date: '2030-06-15T02:00:00.000Z' });
 });
 
@@ -2477,6 +2483,87 @@ test('SG2-82-N01 | [SG2-82:AC1] [SG2-82:AC5] [CONFLICT] [FAILURE] the same venue
     .toEqual([409, 'This request has been approved. Release its booking instead if the event no longer needs the venue.']);
   expect((await page.request.post('/api/venue-booking-requests/9999/withdraw', { headers })).status()).toBe(404);
   await expect(hall.getByText('Approved', { exact: true })).toBeVisible();
+});
+
+test('SG2-105-P01 | [SG2-105:AC1] [SG2-105:AC2] [NORMAL] [BOUNDARY] an organiser must answer layout, accessibility, equipment and registration before submitting, and "None" is an answer', async ({ page }) => {
+  await signIn(page);
+  await nav(page, 'New request');
+  const submit = page.getByRole('button', { name: 'Submit request', exact: true });
+  // The six fields that used to be enough are no longer enough.
+  for (const [label, value] of Object.entries({ 'Event name': 'Layout workshop', Purpose: 'Team planning',
+    Description: 'Review the release plan', Date: '2030-06-15T17:00', 'Expected attendance': '25', 'Venue requirements': 'Projector' })) {
+    await page.getByLabel(new RegExp(`^${label}`)).fill(value);
+  }
+  await expect(submit).toBeDisabled();
+  await expect(page.getByText('4 required fields still empty.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Say whether registration is needed', { exact: true })).toBeVisible();
+  // The changed form fits a phone and a laptop (DoD v2.1 responsive check).
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await test.info().attach(`sg2-105-request-form-${width}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+  }
+  await page.getByLabel(/^Preferred room layout/).fill('Banquet rounds of ten');
+  await page.getByRole('button', { name: 'No accessibility needs', exact: true }).click();
+  await page.getByRole('button', { name: 'No equipment needed', exact: true }).click();
+  await expect(page.getByLabel(/^Accessibility needs/)).toHaveValue('None');
+  await expect(submit).toBeDisabled();
+  await page.getByRole('button', { name: 'No registration needed', exact: true }).click();
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(page.getByRole('status').filter({ hasText: 'Layout workshop has been submitted for review.' })).toBeVisible();
+  await expect(page.locator('dl > div').filter({ has: page.locator('dt').getByText('Preferred room layout', { exact: true }) })
+    .locator('dd')).toHaveText('Banquet rounds of ten');
+  const record = (await eventRecords(page)).find(row => row.name === 'Layout workshop')!;
+  const detail = await page.request.get(`/api/event-requests/${record.event_id}`, { headers: await authHeaders(page) });
+  expect((await detail.json()).request).toMatchObject({ status: 'unassigned', preferred_layout: 'Banquet rounds of ten',
+    accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false });
+  // The coordinator who reviews it sees the layout without chasing the organiser.
+  const lead = await page.request.post('/api/auth/login', { data: { email: 'lead@example.test', password: 'Regression123!' } });
+  const leadHeaders = { Authorization: `Bearer ${(await lead.json()).accessToken}` };
+  expect((await page.request.patch(`/api/event-requests/${record.event_id}/coordinator`,
+    { headers: leadHeaders, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(200);
+  const coordinator = await page.context().newPage();
+  try {
+    await signIn(coordinator, 'coordinator');
+    await coordinator.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Layout workshop/ }).click();
+    await expect(coordinator.locator('dl > div').filter({ has: coordinator.locator('dt').getByText('Preferred room layout', { exact: true }) })
+      .locator('dd')).toHaveText('Banquet rounds of ten');
+  } finally {
+    await coordinator.close();
+  }
+});
+
+test('SG2-105-F01 | [SG2-105:AC2] [SG2-105:AC3] [SG2-105:AC4] [FAILURE] [BOUNDARY] a draft missing the customer minimum saves, but submitting it is refused, lists every missing item and leaves it a draft', async ({ page }) => {
+  await signIn(page);
+  const headers = await authHeaders(page);
+  const original = { name: 'Minimum check', purpose: 'Team planning', description: 'Review the release plan',
+    proposed_date: '2030-06-15T09:00:00.000Z', expected_attendance: 25, venue_requirements: 'Projector' };
+  // AC4: incomplete drafts still save, and say what submission still needs.
+  const created = await page.request.post('/api/event-requests', { headers, data: { ...original, accessibility_needs: '   ' } });
+  expect(created.status()).toBe(201);
+  const body = await created.json();
+  expect(body.missingForSubmission).toEqual(['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
+  const id = body.request.event_id;
+  // AC3 + AC2: refused, every missing item listed (blank accessibility included), still a draft.
+  const refused = await page.request.patch(`/api/event-requests/${id}/submit`, { headers });
+  expect([refused.status(), await refused.json()]).toEqual([400, { error: 'Event request is missing required fields.',
+    missing: ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'] }]);
+  expect((await eventRecords(page)).find(row => row.event_id === id)?.status).toBe('draft');
+  // The draft keeps showing what is outstanding when the organiser reopens it.
+  await nav(page, 'My drafts');
+  await page.getByRole('region', { name: 'My draft requests', exact: true }).locator('div')
+    .filter({ has: page.getByRole('heading', { name: 'Minimum check', exact: true }) })
+    .filter({ has: page.getByRole('button', { name: 'Edit', exact: true }) }).last()
+    .getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel(/^Event name/)).toHaveValue('Minimum check');
+  await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toBeDisabled();
+  // Answering "None" and "No" is enough.
+  const completed = await page.request.patch(`/api/event-requests/${id}`, { headers, data: { ...original,
+    preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false } });
+  expect((await completed.json()).missingForSubmission).toEqual([]);
+  expect((await page.request.patch(`/api/event-requests/${id}/submit`, { headers })).status()).toBe(200);
+  expect((await eventRecords(page)).find(row => row.event_id === id)?.status).toBe('unassigned');
 });
 
 test('SG2-91-P01 | [SG2-91:AC2] [SG2-91:AC3] [NORMAL] the Safety Officer reviews each awaiting event with everything the check needs, including the crowd movement its coordinator recorded', async ({ page, request }) => {
