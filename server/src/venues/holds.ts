@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express';
 import { AccessError, type createAuthorization } from '../auth';
 import { createVenueHoldStore } from '../db/venueHolds';
-import { parseHoldId, validateVenueHold } from './holdFields';
+import { parseHoldId, validateHoldExpiry, validateVenueHold } from './holdFields';
 
 const FAILURES = {
   missing: { status: 404, error: 'Event, venue or tentative hold not found.' },
@@ -11,24 +11,29 @@ const FAILURES = {
   capacity: { status: 409, error: 'Approve a capacity exception for this booking request before converting the hold.' },
   suitability: { status: 409, error: 'Required venue facilities are missing. Choose a suitable venue.' }
 } as const;
+const EXPIRY_INVALID = 'Enter a new future expiry with a time zone, different from the current one.';
 
 export function createVenueHoldsRouter(access: ReturnType<typeof createAuthorization>, store = createVenueHoldStore, now: () => number = Date.now) {
   const router = access.protectedRouter();
-  const handle = (operation: 'list' | 'options' | 'notifications' | 'create' | 'release' | 'convert'): RequestHandler => async (req, res) => {
+  const handle = (operation: 'list' | 'options' | 'notifications' | 'create' | 'release' | 'convert' | 'expiry'): RequestHandler => async (req, res) => {
     res.set('Cache-Control', 'no-store');
     try {
-      const changing = operation === 'release' || operation === 'convert';
+      const changing = operation === 'release' || operation === 'convert' || operation === 'expiry';
       const id = changing ? parseHoldId(req.params.holdId) : null;
       const values = operation === 'create' ? validateVenueHold(req.body, now()) : null;
+      const expiry = operation === 'expiry' ? validateHoldExpiry(req.body, now()) : null;
       if ((changing && id === null) || (operation === 'create' && values === null)) {
         res.status(400).json({ error: 'Enter valid event and venue IDs, a start and end with time zones, and a mandatory future expiry.' }); return;
       }
+      if (operation === 'expiry' && expiry === null) { res.status(400).json({ error: EXPIRY_INVALID }); return; }
       const database = store(req.get('authorization')!.slice(7));
       if (operation === 'list') { res.json({ holds: await database.list() }); return; }
       if (operation === 'options') { res.json(await database.options()); return; }
       if (operation === 'notifications') { res.json({ notifications: await database.notifications() }); return; }
-      const result = operation === 'create' ? await database.create(values!) : await database.change(id!, operation);
+      const result = operation === 'create' ? await database.create(values!)
+        : operation === 'expiry' ? await database.changeExpiry(id!, expiry!) : await database.change(id!, operation);
       if (result.outcome === 'created' || result.outcome === 'updated') { res.status(operation === 'create' ? 201 : 200).json({ hold: result.hold }); return; }
+      if (operation === 'expiry' && result.outcome === 'invalid') { res.status(400).json({ error: EXPIRY_INVALID }); return; }
       const failure = FAILURES[result.outcome]; res.status(failure.status).json({ error: failure.error });
     } catch (error) {
       const failure = error instanceof AccessError ? error : new AccessError(503);
@@ -42,5 +47,6 @@ export function createVenueHoldsRouter(access: ReturnType<typeof createAuthoriza
   router.post('/', manage, handle('create'));
   router.post('/:holdId/release', manage, handle('release'));
   router.post('/:holdId/convert', manage, handle('convert'));
+  router.post('/:holdId/expiry', manage, handle('expiry'));
   return router;
 }

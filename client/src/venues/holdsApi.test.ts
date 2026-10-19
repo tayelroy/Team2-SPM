@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { createHold, fetchHolds, fetchHoldOptions, changeHold } from './holdsApi';
+import { createHold, fetchHolds, fetchHoldOptions, changeHold, changeHoldExpiry } from './holdsApi';
 
 afterEach(() => vi.unstubAllGlobals());
 const hold = { hold_id: 7, event_id: 41, event_name: 'Partner forum', venue_id: 1, venue_name: 'Atrium Hall',
@@ -82,3 +82,15 @@ test.each([null, {}, { events: [], venues: null }, { events: [null], venues: [] 
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(data)));
     expect((await fetchHoldOptions('token')).ok).toBe(false);
   });
+
+test('[NORMAL] [FAILURE] [SG2-106:AC3] the expiry adapter posts only the new time and passes refusals through', async () => {
+  const fetch = vi.fn(async () => Response.json({ hold }));
+  vi.stubGlobal('fetch', fetch);
+  expect(await changeHoldExpiry('token', 7, '2030-06-20T02:00:00.000Z')).toEqual({ ok: true, data: hold });
+  expect(fetch.mock.calls).toEqual([['/api/venue-holds/7/expiry', { method: 'POST',
+    headers: { Authorization: 'Bearer token', 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ expires_at: '2030-06-20T02:00:00.000Z' }) }]]);
+  fetch.mockResolvedValueOnce(Response.json({ error: 'This hold is no longer active. Place a new request.' }, { status: 409 }));
+  expect(await changeHoldExpiry('token', 7, '2030-06-20T02:00:00.000Z')).toEqual({ ok: false, error: 'This hold is no longer active. Place a new request.' });
+  fetch.mockResolvedValueOnce(Response.json({ hold: { ...hold, status: 'unknown' } }));
+  expect((await changeHoldExpiry('token', 7, '2030-06-20T02:00:00.000Z')).ok).toBe(false);
+});

@@ -8,18 +8,18 @@ export function createVenuesRouter(
   store = createVenueStore
 ) {
   const router = access.protectedRouter();
-  const handle = (operation: 'list' | 'create' | 'update'): RequestHandler => async (req, res) => {
+  const handle = (operation: 'list' | 'create' | 'update' | 'delete'): RequestHandler => async (req, res) => {
     try {
       let id: number | undefined;
-      if (operation === 'update') {
+      if (operation === 'update' || operation === 'delete') {
         if (!/^[1-9]\d*$/.test(req.params.venueId) || Number(req.params.venueId) > 2147483647) {
           res.status(400).json({ error: 'Invalid venue ID.' });
           return;
         }
         id = Number(req.params.venueId);
       }
-      const values = operation === 'list' ? null : validateVenue(req.body);
-      if (operation !== 'list' && !values) {
+      const values = operation === 'list' || operation === 'delete' ? null : validateVenue(req.body);
+      if ((operation === 'create' || operation === 'update') && !values) {
         res.status(400).json({ error: 'Complete every venue field, keep the name within 255 characters and enter a positive whole-number capacity.' });
         return;
       }
@@ -27,6 +27,14 @@ export function createVenuesRouter(
       const database = store(req.get('authorization')!.slice(7));
       if (operation === 'list') {
         res.json({ venues: await database.list() });
+        return;
+      }
+      if (operation === 'delete') {
+        // SG2-106 AC1: refuse while live work remains, and say what it is.
+        const result = await database.remove(id!);
+        if (result.outcome === 'deleted') res.json({ venue: result.venue });
+        else if (result.outcome === 'blocked') res.status(409).json({ error: 'This venue still has current or future bookings, holds or pending requests.', blockers: result.blockers });
+        else res.status(404).json({ error: 'Venue not found or already deleted.' });
         return;
       }
       const venue = await database.save(values!, id);
@@ -43,5 +51,6 @@ export function createVenuesRouter(
   router.get('/', access.requirePermission('venues.read'), handle('list'));
   router.post('/', access.requirePermission('venues.create'), handle('create'));
   router.put('/:venueId', access.requirePermission('venues.update'), handle('update'));
+  router.delete('/:venueId', access.requirePermission('venues.delete'), handle('delete'));
   return router;
 }

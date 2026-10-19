@@ -75,16 +75,19 @@ const eventDependencies = { getPrincipal: access.getPrincipal, getAdminClient: g
 const availability = access.protectedRouter();
 availability.get('/availability', access.requirePermission('venues.availability.view'), createAllVenuesAvailabilityHandler(undefined, getClient));
 availability.get('/:venueId/availability', access.requirePermission('venues.availability.view'), createAvailabilityHandler(undefined, getClient));
-const venues = createVenuesRouter(access, () => ({
+const venues = createVenuesRouter(access, token => ({
   async list() {
-    const result = await database.client.from('venues').select('*').order('name').order('venue_id');
+    const result = await database.client.from('venues').select('*').is('deleted_at', null).order('name').order('venue_id');
     return result.data as VenueRecord[];
   },
   async save(values, id) {
     const table = database.client.from('venues');
-    const query = id === undefined ? table.insert(values) : table.update(values).eq('venue_id', id);
+    const query = id === undefined ? table.insert(values) : table.update(values).eq('venue_id', id).is('deleted_at', null);
     const result = await query.select('*').maybeSingle();
     return result.data as VenueRecord | null;
+  },
+  async remove(id) {
+    return venueHolds.deleteVenue(id, (await database.principal(token)).userId);
   }
 }));
 const layouts = createVenueLayoutsRouter(access, () => ({

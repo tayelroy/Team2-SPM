@@ -134,7 +134,7 @@ export function createBookingRequestSuitabilityRouter(access: ReturnType<typeof 
       respond(404, { error: 'Booking request not found.' });
       return null;
     }
-    const [venue] = await database.venues(request.venue_id);
+    const [venue] = await database.venues(request.venue_id, true);
     const suitability = assessSuitability(event, venue);
     const exceptions = await database.exceptions(requestId);
     return { request, event, venue, suitability, exceptions, booking: bookingReadiness(suitability, exceptions) };

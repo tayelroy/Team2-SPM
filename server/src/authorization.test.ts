@@ -453,7 +453,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
     ],
     venue_staff: [
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
-      'venues.read', 'venues.create', 'venues.update', 'venues.layouts.read', 'venues.layouts.update',
+      'venues.read', 'venues.create', 'venues.update', 'venues.delete', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
       'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release',
       'venue_bookings.by_venue', 'venue_clashes.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'

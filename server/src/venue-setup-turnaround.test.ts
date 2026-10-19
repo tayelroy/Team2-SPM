@@ -18,7 +18,7 @@ function fakeClient(tables: Record<string, Result>, calls: Call[] = []): Supabas
     from(table: string) {
       const result = tables[table] ?? { data: [], error: null };
       const builder: Record<string, unknown> = { then: (resolve: (value: Result) => unknown) => Promise.resolve(result).then(resolve) };
-      for (const method of ['select', 'eq', 'in', 'lt', 'gt', 'order', 'maybeSingle']) {
+      for (const method of ['select', 'eq', 'is', 'in', 'lt', 'gt', 'order', 'maybeSingle']) {
         builder[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return builder; };
       }
       return builder;

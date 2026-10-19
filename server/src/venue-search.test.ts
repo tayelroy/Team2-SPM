@@ -28,7 +28,7 @@ function fakeClient(tables: Record<string, TableResult>, calls: QueryCall[] = []
         then: (resolve: (value: TableResult) => unknown, reject?: (reason: unknown) => unknown) =>
           Promise.resolve(result).then(resolve, reject)
       };
-      for (const method of ['select', 'lt', 'gt', 'order']) {
+      for (const method of ['select', 'is', 'lt', 'gt', 'order']) {
         builder[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return builder; };
       }
       return builder;
@@ -68,7 +68,7 @@ async function names(overrides: Partial<VenueSearchCriteria> = {}, extra: Record
 
 // --- searchVenues ------------------------------------------------------------
 
-test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returned in name order with its layouts', async () => {
+test('[NORMAL] [SG2-46:AC2] [SG2-106:AC2] SG2-46: with no criteria every free venue is returned in name order with its layouts', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({ venues: { data: [hall, terrace], error: null }, venue_layouts: {
     data: [{ venue_id: 3, layout: 'banquet', other_description: null }], error: null } }, calls);
@@ -86,6 +86,8 @@ test('[NORMAL] [SG2-46:AC2] SG2-46: with no criteria every free venue is returne
     ]);
   }
   assert.deepEqual(calls.find(call => call.table === 'venues' && call.method === 'order')?.args, ['name', { ascending: true }]);
+  // SG2-106 AC2: deleted venues are never offered.
+  assert.deepEqual(calls.find(call => call.table === 'venues' && call.method === 'is')?.args, ['deleted_at', null]);
 });
 
 test('[CONFLICT] [SG2-45:AC1] [SG2-46:AC2] [SG2-98:AC2] AC2: a blocked venue or one with a confirmed booking in the period is not returned', async () => {
