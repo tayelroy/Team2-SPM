@@ -212,18 +212,18 @@ create trigger safety_check_refresh after insert or update or delete on public.e
 create trigger safety_check_refresh after insert or update or delete on public.equipment_reservations
   for each row execute function public.safety_check_refresh_from_arrangement();
 
--- Unchanged from 202610120002_setup_turnaround_checks.sql except that an
--- event awaiting its safety check can still be held for another venue; the
--- hold's pending request returns it to Planning.
+-- Unchanged from 202610170007_venue_delete_hold_expiry.sql (SG2-106) except
+-- that an event awaiting its safety check can still be held for another
+-- venue; the hold's pending request returns it to Planning.
 create or replace function public.create_venue_hold(p_event_id integer,p_venue_id integer,p_starts_at timestamptz,p_ends_at timestamptz,p_expires_at timestamptz) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare e public.events; h public.venue_holds; r bigint; instant timestamptz; lead_seconds integer; gap interval;
+declare e public.events; h public.venue_holds; r bigint; instant timestamptz; lead_seconds integer; gap interval; removed timestamptz;
 begin
   if not exists(select 1 from public.account_roles where user_id = auth.uid() and role = 'venue_staff') then
     raise exception using errcode = '42501',message = 'Access denied';
   end if;
-  perform 1 from public.venues where venue_id = p_venue_id for update;
-  if not found then return jsonb_build_object('outcome','missing'); end if;
+  select deleted_at into removed from public.venues where venue_id = p_venue_id for update;
+  if not found or removed is not null then return jsonb_build_object('outcome','missing'); end if;
   select * into e from public.events where event_id = p_event_id for update;
   if not found then return jsonb_build_object('outcome','missing'); end if;
   instant := clock_timestamp();
