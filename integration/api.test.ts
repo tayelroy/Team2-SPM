@@ -284,11 +284,18 @@ test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation ev
   }
 
   // AC6 names only Confirmed and Preparation: an Awaiting Safety Check event still takes the edit.
-  assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
+  // SG2-91: an event only awaits its check while its venue is booked, so book
+  // one and let the trigger move the event there (a pending request would
+  // return it to Planning straight away).
+  assert.equal((await database.from('events').update({ status: 'planning' }).eq('event_id', id)).error, null);
   const venue = await database.from('venues').insert({ name: 'Integration Return Hall', capacity: 200 }).select('venue_id').single();
   assert.equal(venue.error, null);
-  assert.equal((await database.from('venue_booking_requests').insert({ event_id: id, venue_id: venue.data!.venue_id,
-    starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z', status: 'pending' })).error, null);
+  const period = { event_id: id, venue_id: venue.data!.venue_id, starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z' };
+  const booking = await database.from('venue_bookings').insert({ ...period, status: 'confirmed' }).select('booking_id').single();
+  assert.equal(booking.error, null);
+  assert.equal((await database.from('venue_booking_requests').insert({ ...period, status: 'approved',
+    venue_booking_id: booking.data!.booking_id })).error, null);
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
   const saved = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137, confirm_impact: true });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal((await stored(id)).status, 'planning');
