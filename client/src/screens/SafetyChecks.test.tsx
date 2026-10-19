@@ -128,4 +128,27 @@ describe('SafetyChecks (SG2-91)', () => {
     expect(await screen.findByRole('article', { name: 'Open Day' })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  test('[NORMAL] [SG2-91:AC2] a Safety desk card opens the list at its event', async () => {
+    const scrolled: string[] = [];
+    const scroll = vi.fn(function (this: Element) { scrolled.push(this.id); });
+    Element.prototype.scrollIntoView = scroll;
+    api(() => Response.json({ events: [RAW, { ...RAW, event_id: 8, name: 'Gala' }] }));
+    render(<SafetyChecks accessToken="tok" focusEventId={8} />);
+    await screen.findByRole('article', { name: 'Gala' });
+    expect(scrolled).toEqual(['safety-check-event-8']);
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+  });
+
+  test('[BOUNDARY] [SG2-91:AC2] the list opens at the top from the menu, or when the chosen event has since left it', async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    api(() => Response.json({ events: [RAW] }));
+    render(<SafetyChecks accessToken="tok" />);
+    await screen.findByRole('article', { name: 'Open Day' });
+    cleanup();
+    render(<SafetyChecks accessToken="tok" focusEventId={99} />);
+    await screen.findByRole('article', { name: 'Open Day' });
+    expect(scroll).not.toHaveBeenCalled();
+  });
 });

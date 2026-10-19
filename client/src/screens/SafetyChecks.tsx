@@ -31,7 +31,7 @@ function EventReview({ event }: { event: SafetyCheckEvent }) {
   const titleId = `safety-check-${event.eventId}`;
   return (
     <Card padding="24px 28px" style={{ gap: '20px' }}>
-      <article aria-labelledby={titleId} style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, overflowWrap: 'anywhere' }}>
+      <article id={`safety-check-event-${event.eventId}`} aria-labelledby={titleId} style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, overflowWrap: 'anywhere' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <Eyebrow>#{event.eventId}{event.awaitingSince ? ` · Awaiting since ${formatSgt(event.awaitingSince)}` : ''}</Eyebrow>
           <h3 id={titleId} style={{ margin: 0, fontSize: '22px', fontWeight: 500 }}>{title}</h3>
@@ -91,7 +91,7 @@ function EventReview({ event }: { event: SafetyCheckEvent }) {
  * An event leaves the list as soon as an arrangement falls through or is
  * added, so Refresh shows the list as it stands now.
  */
-export default function SafetyChecks({ accessToken }: { accessToken: string }) {
+export default function SafetyChecks({ accessToken, focusEventId }: { accessToken: string; focusEventId?: number }) {
   const [events, setEvents] = useState<SafetyCheckEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -111,6 +111,13 @@ export default function SafetyChecks({ accessToken }: { accessToken: string }) {
     });
     return () => { cancelled = true; };
   }, [accessToken, attempt]);
+
+  // SG2-91 AC2: a Safety desk card opens the list at its event, once loaded.
+  // An event that has left the list since leaves the page at the top.
+  useEffect(() => {
+    if (loading || focusEventId === undefined) return;
+    document.getElementById(`safety-check-event-${focusEventId}`)?.scrollIntoView({ block: 'start' });
+  }, [loading, focusEventId]);
 
   const refresh = <GhostButton onClick={() => setAttempt((n) => n + 1)} style={{ alignSelf: 'flex-start' }}>Refresh</GhostButton>;
 

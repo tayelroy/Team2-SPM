@@ -155,8 +155,12 @@ test('[CONFLICT] [SG2-86:AC2] a late queue count for the previous session cannot
 
 const awaitingEvent = (eventId: number) => ({ event_id: eventId, safety_check_revision: 1, name: `Awaiting ${eventId}`, venues: [], equipment: [] });
 
-test('[NORMAL] [SG2-86:AC2] [SG2-91:AC2] the Safety Officer desk counts the events awaiting a check and opens only the safety check list', async () => {
-  const fetch = vi.fn().mockResolvedValue(Response.json({ events: [awaitingEvent(41), awaitingEvent(42)] }));
+test('[NORMAL] [SG2-86:AC2] [SG2-91:AC2] the Safety Officer desk shows a card per awaiting event, each opening its review, and opens only the safety check list', async () => {
+  const fetch = vi.fn().mockResolvedValue(Response.json({ events: [
+    { ...awaitingEvent(41), name: 'Harbour Lecture', proposed_date: '2030-07-10T01:00:00.000Z', expected_attendance: 80,
+      awaiting_since: '2030-07-01T01:00:00.000Z', venues: [{ request_id: 1, venue_name: 'Regression Hall' }, { request_id: 2, venue_name: 'Annex' }] },
+    awaitingEvent(42),
+  ] }));
   vi.stubGlobal('fetch', fetch);
   const onNavigate = vi.fn();
   render(<Dashboard role="Safety Officer" accessToken="safety-token" onNavigate={onNavigate} />);
@@ -164,10 +168,32 @@ test('[NORMAL] [SG2-86:AC2] [SG2-91:AC2] the Safety Officer desk counts the even
   expect(await screen.findByText('2 events are awaiting a safety check.')).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledWith('/api/safety-checks', { method: 'GET', headers: { Authorization: 'Bearer safety-token' } });
   for (const name of prototypeEvents) expect(screen.queryByText(name)).not.toBeInTheDocument();
-  expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Open safety checks']);
+  const lecture = screen.getByRole('button', { name: /Harbour Lecture/ });
+  for (const text of ['Awaiting Safety Check', '#41', '10 Jul 2030 · 80 attendees', 'Regression Hall, Annex', 'Awaiting since 1 Jul 2030']) {
+    expect(within(lecture).getByText(text)).toBeInTheDocument();
+  }
+  expect(screen.getAllByRole('button').map((button) => button.textContent))
+    .toEqual([expect.stringContaining('Harbour Lecture'), expect.stringContaining('Awaiting 42'), 'Open safety checks']);
+  fireEvent.click(lecture);
+  expect(onNavigate).toHaveBeenLastCalledWith('safetyChecks', 41);
   fireEvent.click(screen.getByRole('button', { name: 'Open safety checks' }));
-  expect(onNavigate).toHaveBeenCalledTimes(1);
-  expect(onNavigate).toHaveBeenCalledWith('safetyChecks');
+  expect(onNavigate).toHaveBeenCalledTimes(2);
+  expect(onNavigate).toHaveBeenLastCalledWith('safetyChecks');
+});
+
+test('[BOUNDARY] [SG2-91:AC2] the Safety desk shows the four oldest waits and points to the rest; missing details read plainly', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ events: [
+    { ...awaitingEvent(41), name: '  ', venues: [{ request_id: 1, venue_name: '' }] },
+    ...[42, 43, 44, 45].map(awaitingEvent),
+  ] })));
+  render(<Dashboard role="Safety Officer" accessToken="safety-token" onNavigate={vi.fn()} />);
+  expect(await screen.findByText('5 events are awaiting a safety check.')).toBeInTheDocument();
+  const untitled = screen.getByRole('button', { name: /Untitled event/ });
+  for (const text of ['— · Attendance not recorded', 'Venue no longer listed']) expect(within(untitled).getByText(text)).toBeInTheDocument();
+  expect(within(untitled).queryByText(/Awaiting since/)).not.toBeInTheDocument();
+  expect(within(screen.getByRole('button', { name: /Awaiting 42/ })).getByText('No venue listed')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Awaiting 45/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'See all 5 safety checks' })).toBeInTheDocument();
 });
 
 test.each([

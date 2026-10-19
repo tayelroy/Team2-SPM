@@ -14,7 +14,7 @@ import {
 } from '../ui';
 import { fetchOwnEventRequests, type EventRequestSummary } from '../api/eventRequests';
 import { fetchAssignmentQueue } from '../api/assignmentQueue';
-import { fetchSafetyChecks } from '../api/safetyChecks';
+import { fetchSafetyChecks, type SafetyCheckEvent } from '../api/safetyChecks';
 import { badgeStyle, eventActionLabel, statusLabel } from '../mock/viewModel';
 import { formatProposedDate } from './EventsTable';
 import WorkQueue, { isQueueRole, type FindVenues } from './WorkQueue';
@@ -215,13 +215,16 @@ function LeadDashboard({ accessToken, onNavigate }: DashboardProps) {
   );
 }
 
+/** How many awaiting events the Safety desk shows before pointing to the list. */
+const SAFETY_DESK_CARDS = 4;
+
 /**
  * The Safety Officer's desk (SG2-86 AC2): a live count of the events awaiting
  * an operational safety check (SG2-91 AC2, `GET /api/safety-checks`) and the
  * way into the list.
  */
 function SafetyDashboard({ accessToken, onNavigate }: DashboardProps) {
-  const [waiting, setWaiting] = useState(0);
+  const [events, setEvents] = useState<SafetyCheckEvent[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'unauthorized' | 'unavailable'>('loading');
   useEffect(() => {
     if (!accessToken) {
@@ -232,7 +235,7 @@ function SafetyDashboard({ accessToken, onNavigate }: DashboardProps) {
     fetchSafetyChecks(accessToken).then((result) => {
       if (cancelled) return;
       if (result.ok) {
-        setWaiting(result.events.length);
+        setEvents(result.events);
         setState('ready');
       } else {
         setState(result.kind);
@@ -242,6 +245,8 @@ function SafetyDashboard({ accessToken, onNavigate }: DashboardProps) {
       cancelled = true;
     };
   }, [accessToken]);
+  const waiting = events.length;
+  const badge = badgeStyle('awaiting_safety_check');
   return (
     <Card padding="28px" style={{ gap: '16px' }}>
       <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500, color: color.platinum }}>Safety checks</h2>
@@ -258,8 +263,32 @@ function SafetyDashboard({ accessToken, onNavigate }: DashboardProps) {
             : 'The safety check list is temporarily unavailable. Open it to try again.'}
         </p>
       )}
+      {/* SG2-91 AC2: the oldest waits first, each opening its review in the list. */}
+      {events.slice(0, SAFETY_DESK_CARDS).map((event) => (
+        <button
+          key={event.eventId}
+          className="organisation-dashboard-event"
+          type="button"
+          onClick={() => onNavigate('safetyChecks', event.eventId)}
+          style={{
+            display: 'flex', flexDirection: 'column', gap: '10px', textAlign: 'left',
+            padding: '20px', background: surface.sunken, border: rule.faint,
+            borderRadius: radius.card, color: color.platinum, cursor: 'pointer',
+          }}
+        >
+          <span><Badge bg={badge.badgeBg} fg={badge.badgeFg}>{statusLabel('awaiting_safety_check')}</Badge> <span style={{ color: color.silver }}>#{event.eventId}</span></span>
+          <strong style={{ fontSize: '20px', overflowWrap: 'anywhere' }}>{event.name.trim() || 'Untitled event'}</strong>
+          <span style={{ color: color.silver }}>
+            {formatProposedDate(event.proposedDate)} · {event.expectedAttendance === null ? 'Attendance not recorded' : `${event.expectedAttendance} attendees`}
+          </span>
+          <span style={{ color: color.silver, overflowWrap: 'anywhere' }}>
+            {event.venues.length === 0 ? 'No venue listed' : event.venues.map((venue) => venue.name || 'Venue no longer listed').join(', ')}
+          </span>
+          {event.awaitingSince && <span style={{ color: color.mist }}>Awaiting since {formatProposedDate(event.awaitingSince)}</span>}
+        </button>
+      ))}
       <GhostButton onClick={() => onNavigate('safetyChecks')} style={{ alignSelf: 'flex-start' }}>
-        Open safety checks
+        {waiting > SAFETY_DESK_CARDS ? `See all ${waiting} safety checks` : 'Open safety checks'}
       </GhostButton>
     </Card>
   );
