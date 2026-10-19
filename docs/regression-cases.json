@@ -6522,6 +6522,40 @@
     ]
   },
   {
+    "id": "SMOKE-VENUE-DELETE-PAST-HOLD-01",
+    "title": "Delete a venue at a held period end without rewriting hold history",
+    "type": "NORMAL / BOUNDARY / CONFLICT",
+    "story": "SG2-106",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-106:AC1",
+      "SG2-106:AC2",
+      "SG2-106:AC5"
+    ],
+    "purpose": "Keep a venue protected during a held period, allow deletion when it ends even if expiry is later, and preserve history.",
+    "preconditions": "Production React build with real Express handlers on loopback and reset disposable in-memory providers; synthetic Venue Staff. Native SQL separately verifies database behavior.",
+    "data": "Quiet Room (venue 2), event 81; held period 1 Jun 2030 01:00Z–02:30Z; expiry 3 Jun 2030 02:00Z.",
+    "steps": [
+      "Place the hold through the API at fixture time 02:00Z; delete returns 409 with exactly its hold blocker.",
+      "Advance the fixture clock to exactly 02:30Z, before expiry.",
+      "At 390px sign in as Venue Staff, confirm delete in the catalogue and read the success state.",
+      "Compare the entire hold response with its original value; check hold options and reload the catalogue."
+    ],
+    "expected": "Before the period end deletion is blocked; at its end deletion succeeds. Quiet Room stays absent after reload and from new hold options, Regression Hall remains, the entire historical hold response including venue name/status/expiry is unchanged, and there is no horizontal overflow.",
+    "evidence": "e2e/smoke.spec.ts; supabase/tests/venue_delete_hold_expiry.sql",
+    "layer": "Playwright Chromium + fixture API; separate PostgreSQL contracts",
+    "status": "Pass",
+    "actual": "Red before the fixture fix; passed after it. Native PostgreSQL independently reproduced the baseline failure and passed with the forward migration.",
+    "execution_evidence": "19 Oct 2026; targeted Playwright journey 1/1; 50 migrations, all31 SQL suites and three real-session venue delete/expiry concurrency scenarios passed. Full CI evidence is recorded in the follow-up PR.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "Automated local validation",
+    "review": null
+  },
+  {
     "id": "SG2-104-P01",
     "title": "an account with two roles switches between them, and each role reaches only its own functions",
     "story": "SG2-104",
