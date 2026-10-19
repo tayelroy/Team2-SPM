@@ -15,9 +15,12 @@ export interface EventRequestDraftInput {
   proposed_date?: string;
   expected_attendance?: number;
   venue_requirements?: string;
+  /** SG2-105: the organiser's preferred room layout. */
+  preferred_layout?: string;
   accessibility_needs?: string;
   equipment_requirements?: string;
-  registration_needed?: boolean;
+  /** Null on a stored draft that has not answered yet (SG2-105). */
+  registration_needed?: boolean | null;
 }
 
 export interface EventRequestDraft extends EventRequestDraftInput {
@@ -112,6 +115,8 @@ export interface EventRequestDetail {
   proposedDate: string | null;
   expectedAttendance: number | null;
   venueRequirements: string | null;
+  /** SG2-105; null on requests submitted before it was asked for. */
+  preferredLayout?: string | null;
   accessibilityNeeds: string | null;
   equipmentRequirements: string | null;
   registrationNeeded: boolean;
@@ -199,6 +204,7 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
         ? Number(raw.expected_attendance)
         : null,
     venueRequirements: typeof raw.venue_requirements === 'string' ? raw.venue_requirements : null,
+    preferredLayout: typeof raw.preferred_layout === 'string' ? raw.preferred_layout : null,
     accessibilityNeeds: typeof raw.accessibility_needs === 'string' ? raw.accessibility_needs : null,
     equipmentRequirements:
       typeof raw.equipment_requirements === 'string' ? raw.equipment_requirements : null,

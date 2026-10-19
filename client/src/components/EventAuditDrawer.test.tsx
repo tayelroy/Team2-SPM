@@ -64,6 +64,10 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(formatSgtTimestamp(null)).toBe('Date not available');
     });
 
+    test('[NORMAL] [SG2-105:AC4] a saved preferred layout reads as "Preferred Room Layout" in the change history', () => {
+      expect(humanizeFieldName('preferred_layout')).toBe('Preferred Room Layout');
+    });
+
     test('[NORMAL] [SG2-40:AC2] humanizeFieldName translates snake_case fields into user-friendly labels', () => {
       expect(humanizeFieldName('name')).toBe('Event Name');
       expect(humanizeFieldName('purpose')).toBe('Purpose');

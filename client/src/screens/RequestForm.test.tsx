@@ -61,6 +61,11 @@ function fillAllFields() {
   fireEvent.change(screen.getByLabelText(/Description/i), {
     target: { value: 'A half-day forum with keynotes and a panel.' },
   });
+  // SG2-105: the rest of the customer's minimum.
+  fireEvent.change(screen.getByLabelText(/Preferred room layout/i), { target: { value: 'Theatre' } });
+  fireEvent.change(screen.getByLabelText(/Accessibility needs/i), { target: { value: 'Hearing loop' } });
+  fireEvent.change(screen.getByLabelText(/Equipment requirements/i), { target: { value: 'Lectern' } });
+  fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
 }
 
 function draftResponse(missing: string[] = [], eventId = 12) {
@@ -84,7 +89,8 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
   });
 
-  test.each(['Event name', 'Purpose', 'Date', 'Expected attendance', 'Venue requirements', 'Description'])(
+  test.each(['Event name', 'Purpose', 'Date', 'Expected attendance', 'Venue requirements', 'Description',
+    'Preferred room layout', 'Accessibility needs', 'Equipment requirements'])(
     '[BOUNDARY] [SG2-30:AC2] submit stays disabled when %s is the only blank required field', (label) => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     fillAllFields();
@@ -106,7 +112,8 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     const nameField = screen.getByLabelText(/Event name/i);
     fireEvent.change(nameField, { target: { value: 'x' } });
     fireEvent.change(nameField, { target: { value: '' } });
-    expect(screen.getByText('6 required fields still empty.')).toBeInTheDocument();
+    // Nine text answers plus whether registration is needed (SG2-105).
+    expect(screen.getByText('10 required fields still empty.')).toBeInTheDocument();
   });
 
   test('[FAILURE] [SG2-30:AC2] inline error appears for a touched field left blank', () => {
@@ -233,7 +240,7 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '120' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: '  Stage  ' } });
     fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'Two keynotes' } });
-    fireEvent.change(screen.getByLabelText('Equipment requirements'), { target: { value: 'Lectern' } });
+    fireEvent.change(screen.getByLabelText(/Equipment requirements/i), { target: { value: 'Lectern' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     expect(await screen.findByText('Draft 12 saved — ready to submit.')).toBeInTheDocument();
@@ -249,7 +256,9 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(body.equipment_requirements).toBe('Lectern');
     // Left blank, so never sent — the server stores null rather than ''.
     expect('accessibility_needs' in body).toBe(false);
-    expect(body.registration_needed).toBe(false);
+    expect('preferred_layout' in body).toBe(false);
+    // Not answered yet, so not sent: an untouched form must not say "No".
+    expect('registration_needed' in body).toBe(false);
   });
 
   test('[NORMAL] [SG2-28:AC1] toggles the registration chip into the payload', async () => {
@@ -267,12 +276,12 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     expect(sentDraftBody(fetchMock).registration_needed).toBe(true);
   });
 
-  test('[NORMAL] [SG2-28:AC2] records accessibility needs when provided', async () => {
+  test('[NORMAL] [SG2-105:AC1] records accessibility needs when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(draftResponse());
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
-    fireEvent.change(screen.getByLabelText('Accessibility needs (optional)'), {
+    fireEvent.change(screen.getByLabelText(/Accessibility needs/i), {
       target: { value: 'Hearing loop' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -400,10 +409,10 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(<RequestForm />);
     fillAllFields();
-    fireEvent.change(screen.getByLabelText('Accessibility needs (optional)'), { target: { value: 'Hearing loop' } });
+    fireEvent.change(screen.getByLabelText(/Accessibility needs/i), { target: { value: 'Hearing loop' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await screen.findByText(/Draft 42 saved/);
-    fireEvent.change(screen.getByLabelText('Accessibility needs (optional)'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Accessibility needs/i), { target: { value: '' } });
     fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -440,6 +449,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     proposed_date: '2026-11-04T01:00:00.000Z',
     expected_attendance: 120,
     venue_requirements: 'Stage',
+    preferred_layout: 'Theatre',
     accessibility_needs: 'Hearing loop',
     equipment_requirements: 'Lectern',
     registration_needed: true,
@@ -468,8 +478,9 @@ describe('Editing an existing draft (SG2-29)', () => {
     expect(screen.getByLabelText(/Date/i)).toHaveValue('2026-11-04T09:00');
     expect(screen.getByLabelText(/Expected attendance/i)).toHaveValue('120');
     expect(screen.getByLabelText(/Venue requirements/i)).toHaveValue('Stage');
-    expect(screen.getByLabelText('Accessibility needs (optional)')).toHaveValue('Hearing loop');
-    expect(screen.getByLabelText('Equipment requirements')).toHaveValue('Lectern');
+    expect(screen.getByLabelText(/Preferred room layout/i)).toHaveValue('Theatre');
+    expect(screen.getByLabelText(/Accessibility needs/i)).toHaveValue('Hearing loop');
+    expect(screen.getByLabelText(/Equipment requirements/i)).toHaveValue('Lectern');
     expect(screen.getByRole('button', { name: 'Registration needed' })).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -572,6 +583,10 @@ describe('stored draft values (SG2-30 walkthrough fixes)', () => {
     proposed_date: '2030-06-15T02:00:00.000Z',
     expected_attendance: 20,
     venue_requirements: 'A room with seating',
+    preferred_layout: 'Classroom',
+    accessibility_needs: 'None',
+    equipment_requirements: 'Projector',
+    registration_needed: false,
   };
 
   function renderStored(onSuccess = vi.fn()) {
@@ -774,6 +789,119 @@ describe('save then submit', () => {
 });
 
 // ─── AC2: Server error banners ───────────────────────────────────────────────
+
+describe('the customer minimum before submitting (SG2-105)', () => {
+  function fillOriginalSix() {
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum 2026' } });
+    fireEvent.change(screen.getByLabelText(/Purpose/i), { target: { value: 'Partner briefing' } });
+    fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T10:00' } });
+    fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
+    fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
+    fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'A half-day forum.' } });
+  }
+
+  test('[BOUNDARY] [SG2-105:AC1] the original six fields are no longer enough: layout, accessibility, equipment and registration must be answered too', () => {
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    const submit = screen.getByRole('button', { name: /Submit request/i });
+    fillOriginalSix();
+    expect(submit).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Preferred room layout/i), { target: { value: 'Banquet' } });
+    fireEvent.change(screen.getByLabelText(/Accessibility needs/i), { target: { value: 'Step-free entrance' } });
+    fireEvent.change(screen.getByLabelText(/Equipment requirements/i), { target: { value: 'Two microphones' } });
+    expect(submit).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Registration needed' }));
+    expect(submit).not.toBeDisabled();
+  });
+
+  test('[NORMAL] [SG2-105:AC2] "None" can be chosen for accessibility needs and equipment, and is what gets submitted', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+      url.endsWith('/submit') ? new Response(null, { status: 204 }) : draftResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const onSuccess = vi.fn();
+    render(<RequestForm onSaveDraft={undefined} onSuccess={onSuccess} />);
+    fillOriginalSix();
+    fireEvent.change(screen.getByLabelText(/Preferred room layout/i), { target: { value: '  Theatre  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+    expect(screen.getByLabelText(/Accessibility needs/i)).toHaveValue('None');
+    expect(screen.getByLabelText(/Equipment requirements/i)).toHaveValue('None');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit request' }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(sentDraftBody(fetchMock)).toMatchObject({
+      preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false,
+    });
+  });
+
+  test('[FAILURE] [SG2-105:AC2] clearing an accessibility or equipment answer flags it as required', () => {
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    for (const [label, message] of [[/Accessibility needs/i, 'Accessibility needs is required'],
+      [/Equipment requirements/i, 'Equipment requirements is required']] as const) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value: 'something' } });
+      fireEvent.change(screen.getByLabelText(label), { target: { value: '  ' } });
+      expect(screen.getByText(message)).toBeInTheDocument();
+    }
+  });
+
+  test('[NORMAL] [SG2-105:AC1] the two registration answers are exclusive and the latest choice is sent', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(draftResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
+    const yes = screen.getByRole('button', { name: 'Registration needed' });
+    const no = screen.getByRole('button', { name: 'No registration needed' });
+    expect(yes).toHaveAttribute('aria-pressed', 'false');
+    expect(no).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(yes);
+    fireEvent.click(no);
+    expect(yes).toHaveAttribute('aria-pressed', 'false');
+    expect(no).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText(/Draft 12 saved/);
+    expect(sentDraftBody(fetchMock).registration_needed).toBe(false);
+  });
+
+  test('[FAILURE] [SG2-105:AC1] an unanswered registration question is flagged once the form has been touched', () => {
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    expect(screen.queryByText('Say whether registration is needed')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum' } });
+    expect(screen.getByText('Say whether registration is needed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Registration needed' }));
+    expect(screen.queryByText('Say whether registration is needed')).not.toBeInTheDocument();
+  });
+
+  test('[FAILURE] [SG2-105:AC3] every missing item the server lists is named in plain words and flagged on the form', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
+      new Response(JSON.stringify({ missing: ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'] }),
+        { status: 400 })));
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
+    expect(await screen.findByText('Please complete the following required fields before submitting: '
+      + 'Preferred room layout, Accessibility needs, Equipment requirements, Whether registration is needed.')).toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-105:AC4] a draft can still be saved with the new fields blank, and they are listed as still needed', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      draftResponse(['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'], 9)));
+    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
+    fillOriginalSix();
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft 9 saved. Still needed to submit: '
+      + 'Preferred room layout, Accessibility needs, Equipment requirements, Whether registration is needed.')).toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-105:AC1] a reopened draft shows its stored registration answer, and none when it was never answered', () => {
+    const { unmount } = render(<RequestForm eventId="7" accessToken="t" initialValues={{ registration_needed: false }} />);
+    expect(screen.getByRole('button', { name: 'No registration needed' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Registration needed' })).toHaveAttribute('aria-pressed', 'false');
+    unmount();
+    // The API sends null for a question never answered.
+    render(<RequestForm eventId="7" accessToken="t" initialValues={{ registration_needed: null }} />);
+    expect(screen.getByRole('button', { name: 'No registration needed' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Registration needed' })).toHaveAttribute('aria-pressed', 'false');
+  });
+});
 
 describe('AC2 — server error banners', () => {
   test('[FAILURE] [SG2-30:AC2] shows a 400 banner listing the missing fields returned by the server', async () => {
