@@ -31,7 +31,7 @@ function EventReview({ event }: { event: SafetyCheckEvent }) {
   const titleId = `safety-check-${event.eventId}`;
   return (
     <Card padding="24px 28px" style={{ gap: '20px' }}>
-      <article id={`safety-check-event-${event.eventId}`} aria-labelledby={titleId} style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, overflowWrap: 'anywhere' }}>
+      <article aria-labelledby={titleId} style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, overflowWrap: 'anywhere' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <Eyebrow>#{event.eventId}{event.awaitingSince ? ` · Awaiting since ${formatSgt(event.awaitingSince)}` : ''}</Eyebrow>
           <h3 id={titleId} style={{ margin: 0, fontSize: '22px', fontWeight: 500 }}>{title}</h3>
@@ -96,6 +96,9 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  // SG2-91 AC2: a Safety desk card opens its event on its own; "Show all"
+  // returns to the whole list, which is what the menu and button open.
+  const [focus, setFocus] = useState(focusEventId);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,13 +114,6 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
     });
     return () => { cancelled = true; };
   }, [accessToken, attempt]);
-
-  // SG2-91 AC2: a Safety desk card opens the list at its event, once loaded.
-  // An event that has left the list since leaves the page at the top.
-  useEffect(() => {
-    if (loading || focusEventId === undefined) return;
-    document.getElementById(`safety-check-event-${focusEventId}`)?.scrollIntoView({ block: 'start' });
-  }, [loading, focusEventId]);
 
   const refresh = <GhostButton onClick={() => setAttempt((n) => n + 1)} style={{ alignSelf: 'flex-start' }}>Refresh</GhostButton>;
 
@@ -141,8 +137,27 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
       </Card>
     );
   }
+  const focused = events.find((event) => event.eventId === focus);
+  if (focused) {
+    return (
+      <section aria-label={`Safety check for ${focused.name.trim() || 'Untitled event'}`} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
+          <GhostButton onClick={() => setFocus(undefined)}>
+            Show all {events.length} {events.length === 1 ? 'safety check' : 'safety checks'}
+          </GhostButton>
+          {refresh}
+        </div>
+        <EventReview event={focused} />
+      </section>
+    );
+  }
   return (
     <section aria-label="Events awaiting a safety check" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {focus !== undefined && (
+        <p role="status" style={{ margin: 0, color: color.mist }}>
+          That event is no longer awaiting a safety check. These are the events that are.
+        </p>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
         <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 500, color: color.silver }}>
           {events.length} {events.length === 1 ? 'event' : 'events'} awaiting a safety check

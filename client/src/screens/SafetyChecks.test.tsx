@@ -129,26 +129,29 @@ describe('SafetyChecks (SG2-91)', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  test('[NORMAL] [SG2-91:AC2] a Safety desk card opens the list at its event', async () => {
-    const scrolled: string[] = [];
-    const scroll = vi.fn(function (this: Element) { scrolled.push(this.id); });
-    Element.prototype.scrollIntoView = scroll;
+  test('[NORMAL] [SG2-91:AC2] a Safety desk card opens its event on its own, and Show all returns to the whole list', async () => {
     api(() => Response.json({ events: [RAW, { ...RAW, event_id: 8, name: 'Gala' }] }));
     render(<SafetyChecks accessToken="tok" focusEventId={8} />);
-    await screen.findByRole('article', { name: 'Gala' });
-    expect(scrolled).toEqual(['safety-check-event-8']);
-    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    expect(await screen.findByRole('region', { name: 'Safety check for Gala' })).toBeInTheDocument();
+    expect(screen.getAllByRole('article').map((article) => article.getAttribute('aria-labelledby'))).toEqual(['safety-check-8']);
+    expect(screen.queryByRole('article', { name: 'Open Day' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 2 safety checks' }));
+    expect(screen.getByRole('heading', { level: 2, name: '2 events awaiting a safety check' })).toBeInTheDocument();
+    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  test('[BOUNDARY] [SG2-91:AC2] the list opens at the top from the menu, or when the chosen event has since left it', async () => {
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
+  test('[BOUNDARY] [SG2-91:AC2] a lone event offers to show its one safety check, and an untitled one is still named', async () => {
+    api(() => Response.json({ events: [{ ...RAW, name: ' ' }] }));
+    render(<SafetyChecks accessToken="tok" focusEventId={7} />);
+    expect(await screen.findByRole('region', { name: 'Safety check for Untitled event' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show all 1 safety check' })).toBeInTheDocument();
+  });
+
+  test('[CONFLICT] [SG2-91:AC1] an event that left the check since its card was shown says so and shows the whole list', async () => {
     api(() => Response.json({ events: [RAW] }));
-    render(<SafetyChecks accessToken="tok" />);
-    await screen.findByRole('article', { name: 'Open Day' });
-    cleanup();
     render(<SafetyChecks accessToken="tok" focusEventId={99} />);
-    await screen.findByRole('article', { name: 'Open Day' });
-    expect(scroll).not.toHaveBeenCalled();
+    expect(await screen.findByText(/That event is no longer awaiting a safety check\./)).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('article', { name: 'Open Day' })).toBeInTheDocument();
   });
 });
