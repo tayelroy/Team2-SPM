@@ -34,7 +34,7 @@ function isOption(value: unknown, id: string) {
   return record(value) && Number.isSafeInteger(value[id]) && Number(value[id]) > 0 && typeof value.name === 'string';
 }
 
-async function request<T>(token: string, path: string, decode: (body: any) => T | null, values?: HoldValues, mutate = false): Promise<HoldResult<T>> {
+async function request<T>(token: string, path: string, decode: (body: any) => T | null, values?: HoldValues | { expires_at: string }, mutate = false): Promise<HoldResult<T>> {
   if (!token) return { ok: false, error: 'Sign in again to manage venue holds.' };
   try {
     const response = await fetch(`/api/venue-holds${path}`, {
@@ -70,4 +70,9 @@ export function createHold(token: string, values: HoldValues): Promise<HoldResul
 }
 export function changeHold(token: string, id: number, action: 'convert' | 'release'): Promise<HoldResult<VenueHold>> {
   return request(token, `/${id}/${action}`, body => isHold(body?.hold) ? body.hold : null, undefined, true);
+}
+
+/** SG2-106 AC3: move an active hold's expiry to a new future time. */
+export function changeHoldExpiry(token: string, id: number, expiresAt: string): Promise<HoldResult<VenueHold>> {
+  return request(token, `/${id}/expiry`, body => isHold(body?.hold) ? body.hold : null, { expires_at: expiresAt }, true);
 }

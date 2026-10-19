@@ -15,6 +15,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 const placed = { notification_id: 1, event_id: 8, hold_id: 3, kind: 'placed' as const, message: 'Atrium is tentatively held for Tech Symposium.', created_at: '2026-10-05T02:00:00.000Z' };
 const warning = { ...placed, notification_id: 2, kind: 'warning' as const, message: 'Atrium hold expires in 24 hours.' };
 const expired = { ...placed, notification_id: 3, kind: 'expired' as const, message: 'Atrium hold has expired.' };
+const moved = { ...placed, notification_id: 4, kind: 'expiry_changed' as const, message: 'Tentative hold expiry changed on Atrium.' };
 
 test('[NORMAL] [SG2-55:AC4] the coordinator inbox visibly names the reserved equipment and event', async () => {
   vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [] });
@@ -338,4 +339,12 @@ test('[NORMAL] [SG2-84:AC6] a hold expiry stored as a UTC instant is shown in Si
   render(<HoldNotifications accessToken="coordinator-token" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
   expect(await screen.findByText('Tentative hold placed on Quiet Room; expiry 3 Jun 2030, 10:00 SGT.')).toBeVisible();
+});
+
+test('[NORMAL] [SG2-106:AC4] an expiry change notice is labelled for the coordinator with its new time', async () => {
+  vi.spyOn(api, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [{ ...moved, message: 'Tentative hold expiry changed on Atrium; expiry 2030-06-20T02:00:00Z.' }] });
+  render(<HoldNotifications accessToken="coordinator-token" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Notifications (loading)' }));
+  expect(await screen.findByText('Hold expiry changed')).toBeInTheDocument();
+  expect(screen.getByText(/Tentative hold expiry changed on Atrium; expiry 20 Jun 2030, 10:00/)).toBeInTheDocument();
 });
