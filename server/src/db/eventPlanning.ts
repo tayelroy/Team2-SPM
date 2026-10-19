@@ -16,6 +16,8 @@ export interface EventPlanningRecord {
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   planning_notes: string | null;
+  /** SG2-91 AC3. */
+  expected_crowd_movement: string | null;
   arrangements_recheck_needed: boolean;
   outstanding_arrangements: string[];
 }
@@ -31,6 +33,7 @@ export interface UpdatePlanningFieldsInput {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  expected_crowd_movement?: string | null;
   arrangements_recheck_needed?: boolean;
   outstanding_arrangements?: string[];
   status?: string;
@@ -48,13 +51,13 @@ const PLANNING_SELECT_COLUMNS =
   'event_id, status, coordinator_id, organiser_id, expected_attendance, proposed_date, ' +
   'venue_requirements, accessibility_needs, equipment_requirements, registration_needed, ' +
   'registration_capacity, registration_opens_at, registration_closes_at, planning_notes, ' +
-  'arrangements_recheck_needed, outstanding_arrangements, coordinator:users!coordinator_id(name)';
+  'expected_crowd_movement, arrangements_recheck_needed, outstanding_arrangements, coordinator:users!coordinator_id(name)';
 
 const PLANNING_UPDATE_COLUMNS =
   'event_id, status, coordinator_id, organiser_id, expected_attendance, proposed_date, ' +
   'venue_requirements, accessibility_needs, equipment_requirements, registration_needed, ' +
   'registration_capacity, registration_opens_at, registration_closes_at, planning_notes, ' +
-  'arrangements_recheck_needed, outstanding_arrangements';
+  'expected_crowd_movement, arrangements_recheck_needed, outstanding_arrangements';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {

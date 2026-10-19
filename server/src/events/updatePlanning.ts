@@ -38,6 +38,8 @@ export interface PlanningUpdateValues {
   registration_opens_at?: string | null;
   registration_closes_at?: string | null;
   planning_notes?: string | null;
+  /** SG2-91 AC3: how attendees arrive, move through and leave the venue. */
+  expected_crowd_movement?: string | null;
 }
 
 export type PlanningValidationResult =
@@ -80,7 +82,8 @@ const TEXT_FIELDS = [
   'venue_requirements',
   'equipment_requirements',
   'accessibility_needs',
-  'planning_notes'
+  'planning_notes',
+  'expected_crowd_movement'
 ] as const;
 
 export const AUDITED_PLANNING_FIELDS = [
@@ -93,7 +96,8 @@ export const AUDITED_PLANNING_FIELDS = [
   'registration_capacity',
   'registration_opens_at',
   'registration_closes_at',
-  'planning_notes'
+  'planning_notes',
+  'expected_crowd_movement'
 ] as const;
 
 /**

@@ -55,8 +55,9 @@ export function venueArrangement(requests: VenueBookingStatusRow[], affectedBook
 }
 
 /** Venues are requested once the event has been approved and before it is
- * confirmed (SG2-48 AC1). */
-const REQUESTABLE_EVENT_STATUSES = ['approved', 'planning'];
+ * confirmed (SG2-48 AC1). SG2-91: also while it awaits its safety check; the
+ * new pending request returns it to Planning (202610190001_safety_check_queue.sql). */
+const REQUESTABLE_EVENT_STATUSES = ['approved', 'planning', 'awaiting_safety_check'];
 /** SG2-81: a replacement for an unavailable venue is also requested once the
  * event has reached preparation or been confirmed. */
 const REPLACEMENT_EVENT_STATUSES = [...REQUESTABLE_EVENT_STATUSES, 'preparation', 'confirmed'];

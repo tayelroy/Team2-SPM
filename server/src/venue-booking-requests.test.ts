@@ -644,3 +644,11 @@ test('[FAILURE] [SG2-82:AC5] a refused or failing database withdrawal is reporte
   // Without a configured database the default store cannot sign in as the caller.
   assert.equal((await withdraw(app(store), 'coordinator')).status, 503);
 });
+
+test('[CONFLICT] [SG2-91:AC1] the coordinator can still request another venue while the event awaits its safety check', async () => {
+  const { store, created } = fakeStore({ events: [{ ...forum, status: 'awaiting_safety_check' }] });
+  const response = await post(app(store), 'coordinator', body());
+  assert.equal(response.status, 201);
+  assert.equal(response.body.request.status, 'pending');
+  assert.equal(created.length, 1);
+});

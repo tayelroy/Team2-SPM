@@ -162,6 +162,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],
   'equipment_requirements.request': ['event_coordinator'],
   'equipment_requirements.arrange': ['technical_support_staff'],
+  // SG2-91 AC2/AC4: only Safety Officers open the list of events awaiting an
+  // operational safety check; safety_check_queue() rechecks the stored role.
+  'safety_checks.read': ['safety_officer'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

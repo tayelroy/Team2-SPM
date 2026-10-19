@@ -46,6 +46,7 @@ const BASE_EVENT: EventPlanningRecord = {
   registration_opens_at: '2026-10-01T09:00:00.000Z',
   registration_closes_at: '2026-11-01T18:00:00.000Z',
   planning_notes: 'Initial planning notes',
+  expected_crowd_movement: null,
   arrangements_recheck_needed: false,
   outstanding_arrangements: []
 };
@@ -1654,5 +1655,54 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
       .set('Authorization', 'Bearer test-token');
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { reached: true });
+  });
+});
+
+describe('expected crowd movement for the safety check (SG2-91)', () => {
+  const AWAITING: FetchEventPlanningResult = { ok: true, event: { ...BASE_EVENT, status: 'awaiting_safety_check' } };
+
+  test('[NORMAL] [SG2-91:AC3] the coordinator records expected crowd movement, trimmed and in the event history, without leaving the safety check', async () => {
+    let saved: UpdatePlanningFieldsInput | undefined;
+    let history: InsertAuditLogInput[] | undefined;
+    const app = buildApp({ fetchResult: AWAITING, captureUpdateFields: fields => { saved = fields; },
+      captureAuditEntries: entries => { history = entries; } });
+    const response = await request(app).patch('/api/event-requests/10/planning')
+      .send({ expected_crowd_movement: '  Enter by the east doors, leave by the west doors  ' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(saved, { expected_crowd_movement: 'Enter by the east doors, leave by the west doors' });
+    assert.equal(response.body.event.status, 'awaiting_safety_check');
+    assert.deepEqual(history, [{ event_id: 10, actor_id: COORDINATOR_ID, field_name: 'expected_crowd_movement',
+      old_value: null, new_value: 'Enter by the east doors, leave by the west doors' }]);
+  });
+
+  test('[BOUNDARY] [SG2-91:AC3] expected crowd movement takes up to 5000 characters, and blank text clears it', () => {
+    assert.deepEqual(validatePlanningUpdateInput({ expected_crowd_movement: 'x'.repeat(5000) }),
+      { valid: true, values: { expected_crowd_movement: 'x'.repeat(5000) }, confirm_impact: false });
+    assert.deepEqual(validatePlanningUpdateInput({ expected_crowd_movement: 'x'.repeat(5001) }),
+      { valid: false, errors: ['expected_crowd_movement must be 5000 characters or fewer.'] });
+    assert.deepEqual(validatePlanningUpdateInput({ expected_crowd_movement: '   ' }),
+      { valid: true, values: { expected_crowd_movement: null }, confirm_impact: false });
+  });
+
+  test('[FAILURE] [SG2-91:AC3] expected crowd movement that is not text is refused and nothing is saved', async () => {
+    let updates = 0;
+    const app = buildApp({ fetchResult: AWAITING, captureUpdateFields: () => { updates++; } });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({ expected_crowd_movement: 42 });
+    assert.deepEqual([response.status, response.body],
+      [400, { error: 'Invalid planning details', details: ['expected_crowd_movement must be text.'] }]);
+    assert.equal(updates, 0);
+  });
+
+  test('[CONFLICT] [SG2-91:AC1] an edit that needs arrangements rechecked takes an event awaiting its safety check back to Planning', async () => {
+    let saved: UpdatePlanningFieldsInput | undefined;
+    let history: InsertAuditLogInput[] | undefined;
+    const app = buildApp({ fetchResult: AWAITING, captureUpdateFields: fields => { saved = fields; },
+      captureAuditEntries: entries => { history = entries; } });
+    const response = await request(app).patch('/api/event-requests/10/planning')
+      .send({ expected_attendance: 150, confirm_impact: true });
+    assert.equal(response.status, 200);
+    assert.equal(saved?.status, 'planning');
+    assert.deepEqual(history?.at(-1), { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'status',
+      old_value: 'awaiting_safety_check', new_value: 'planning' });
   });
 });
