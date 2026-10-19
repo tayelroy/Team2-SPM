@@ -18,13 +18,14 @@ insert into public.account_roles(user_id,role) values
  ('e6800000-0000-4000-8000-000000000006','event_coordinator');
 insert into public.venues(venue_id,name,capacity) values (96801,'Notice Hall',100),(96802,'Notice Annex',100);
 -- 96801 approved and 96802 rejected (unnamed event) notify organiser and coordinator;
--- 96803 is organised by its own coordinator; 96804 has no coordinator yet;
+-- 96803 is organised by a user who also works as a coordinator, but (SG2-104
+-- separation of duties) is coordinated by someone else; 96804 has no coordinator yet;
 -- 96805 is converted from a hold and 96806 is released from one; the
 -- unrelated organiser's 96807 is never decided.
 insert into public.events(event_id,organiser_id,coordinator_id,name,status,expected_attendance) values
  (96801,'e6800000-0000-4000-8000-000000000003','e6800000-0000-4000-8000-000000000002','Notice forum','approved',50),
  (96802,'e6800000-0000-4000-8000-000000000003','e6800000-0000-4000-8000-000000000002','','planning',50),
- (96803,'e6800000-0000-4000-8000-000000000006','e6800000-0000-4000-8000-000000000006','Self-run forum','approved',50),
+ (96803,'e6800000-0000-4000-8000-000000000006','e6800000-0000-4000-8000-000000000002','Self-run forum','approved',50),
  (96804,'e6800000-0000-4000-8000-000000000003',null,'Unassigned forum','approved',50),
  (96805,'e6800000-0000-4000-8000-000000000003','e6800000-0000-4000-8000-000000000002','Hold forum','planning',50),
  (96806,'e6800000-0000-4000-8000-000000000003','e6800000-0000-4000-8000-000000000002','Released forum','planning',50),
@@ -32,7 +33,7 @@ insert into public.events(event_id,organiser_id,coordinator_id,name,status,expec
 insert into public.venue_booking_requests(request_id,event_id,venue_id,starts_at,ends_at,layout,requested_by) values
  (96801,96801,96801,'2031-09-01T02:00Z','2031-09-01T06:00Z','theatre','e6800000-0000-4000-8000-000000000002'),
  (96802,96802,96801,'2031-09-02T02:00Z','2031-09-02T06:00Z','theatre','e6800000-0000-4000-8000-000000000002'),
- (96803,96803,96801,'2031-09-03T02:00Z','2031-09-03T06:00Z','theatre','e6800000-0000-4000-8000-000000000006'),
+ (96803,96803,96801,'2031-09-03T02:00Z','2031-09-03T06:00Z','theatre','e6800000-0000-4000-8000-000000000002'),
  (96804,96804,96801,'2031-09-04T02:00Z','2031-09-04T06:00Z','theatre','e6800000-0000-4000-8000-000000000003'),
  (96808,96804,96801,'2031-09-01T05:00Z','2031-09-01T08:00Z','theatre','e6800000-0000-4000-8000-000000000003'),
  (96809,96807,96801,'2031-09-09T02:00Z','2031-09-09T06:00Z','theatre','e6800000-0000-4000-8000-000000000005');
@@ -79,12 +80,13 @@ begin
  end if;
 end $$;
 
--- An organiser who coordinates their own event is told once; with no coordinator, only the organiser.
+-- An organiser can no longer coordinate their own event (SG2-104), so the
+-- organiser and the coordinator are each told once; with no coordinator, only the organiser.
 do $$
 begin
- if (select string_agg(recipient_id||'|'||kind||'|'||message, ' / ') from public.notifications where request_id=96803)
-   is distinct from 'e6800000-0000-4000-8000-000000000006|venue_request_approved|Notice Hall was approved for Self-run forum.' then
-  raise exception '[SG2-68:organising-coordinator-told-once] [SG2-68:AC1] [BOUNDARY] An organiser who is also the coordinator must get exactly one notice';
+ if (select string_agg(recipient_id||'|'||kind||'|'||message, ' / ' order by recipient_id) from public.notifications where request_id=96803)
+   is distinct from 'e6800000-0000-4000-8000-000000000002|venue_request_approved|Notice Hall was approved for Self-run forum. / e6800000-0000-4000-8000-000000000006|venue_request_approved|Notice Hall was approved for Self-run forum.' then
+  raise exception '[SG2-68:organising-coordinator-told-once] [SG2-68:AC1] [SG2-104:AC2] [BOUNDARY] An organiser who also works as a coordinator, and the event''s own coordinator, must each get exactly one notice';
  end if;
  if (select string_agg(recipient_id||'|'||kind||'|'||message, ' / ') from public.notifications where request_id=96804)
    is distinct from 'e6800000-0000-4000-8000-000000000003|venue_request_approved|Notice Hall was approved for Unassigned forum.' then
@@ -179,7 +181,7 @@ begin
  end if;
  perform set_config('request.jwt.claim.sub','e6800000-0000-4000-8000-000000000002',true);
  if (select string_agg(event_id||'|'||kind, ' / ' order by event_id) from public.notifications)
-   is distinct from '96801|venue_request_approved / 96802|venue_request_rejected' then
+   is distinct from '96801|venue_request_approved / 96802|venue_request_rejected / 96803|venue_request_approved' then
   raise exception '[SG2-68:coordinator-reads-own-notices] [SG2-68:AC3] [NORMAL] The coordinator must read exactly their own notices';
  end if;
  perform set_config('request.jwt.claim.sub','e6800000-0000-4000-8000-000000000004',true);
