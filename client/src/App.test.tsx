@@ -25,10 +25,9 @@ beforeAll(() => {
 
 // Mirrors the grants in server/src/auth/policy.ts that these screens use.
 const POLICY_PERMISSIONS: Partial<Record<Role, string[]>> = {
-  'Event Organiser': ['venue_booking.capacity_exception.approve'],
   'Venue Staff': ['venues.read', 'venues.create', 'venues.update', 'venue_booking.capacity_exception.approve'],
   'Event Coordinator': ['venues.read'],
-  'Technical Support Staff': ['equipment.read', 'equipment.create', 'equipment.update', 'venue_booking.capacity_exception.approve'],
+  'Technical Support Staff': ['equipment.read', 'equipment.create', 'equipment.update'],
   'Event Coordinator Lead': ['event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view',
     'event_request.history.view', 'profile.read', 'profile.update'],
   'Safety Officer': ['event_request.stage.view', 'event_request.history.view', 'equipment_requirements.read',
@@ -176,7 +175,6 @@ describe('every role can reach every screen in its navigation', () => {
       ['My events', 'Your events'], ['New request', 'Event request'],
       ['My drafts', 'My draft requests'],
       ['Event detail', 'Event detail'],
-      ['Capacity exceptions', 'Capacity exceptions'],
     ],
     'Event Coordinator': [
       ['Dashboard', 'Coordination desk'], ['Venues', 'Venue catalogue'], ['Find venues', 'Find venues'],
@@ -187,11 +185,11 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Venue desk'],
       ['Venue Availability', 'Venue availability'], ['Catalogue', 'Venue catalogue'],
       ['Venue holds', 'Venue holds'],
+      ['Capacity exceptions', 'Capacity exceptions'],
     ],
     'Technical Support Staff': [
       ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
-      ['Capacity exceptions', 'Capacity exceptions'],
     ],
     Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
     // SG2-86: only the screens these roles can use; neither holds
@@ -961,9 +959,9 @@ test('[NORMAL] [SG2-46:AC1] [SG2-53:AC1] [SG2-55:AC4] a coordinator opens equipm
 });
 
 test.each([
-  ['Event Organiser', true], ['Technical Support Staff', true], ['Venue Staff', false],
+  ['Venue Staff', true], ['Event Organiser', false], ['Technical Support Staff', false],
   ['Event Coordinator', false], ['Event Coordinator Lead', false], ['Safety Officer', false], ['Attendee', false],
-] as const)('[NORMAL] [SG2-47:AC3] [SG2-86:AC2] %s capacity-exception discovery navigation is offered: %s', async (role, offered) => {
+] as const)('[NORMAL] [SG2-47:AC3] [SG2-86:AC2] [SG2-66:AC5] %s capacity-exception discovery navigation is offered: %s', async (role, offered) => {
   // Even an unexpected grant cannot add this discovery screen to unrelated roles.
   await signInAs(role, [...(POLICY_PERMISSIONS[role] ?? []), 'venue_booking.capacity_exception.approve']);
   const entry = within(await loadedNav()).queryByRole('button', { name: 'Capacity exceptions' });
@@ -972,19 +970,19 @@ test.each([
   expect(vi.mocked(fetch).mock.calls.some(([url]) => url === '/api/venue-booking-requests/capacity-exceptions')).toBe(false);
 });
 
-test.each(['Event Organiser', 'Technical Support Staff'] as const)(
-  '[FAILURE] [SG2-47:AC3] [SG2-86:AC2] %s is not offered capacity approval without the actual server permission', async role => {
+test.each(['Venue Staff'] as const)(
+  '[FAILURE] [SG2-47:AC3] [SG2-86:AC2] [SG2-66:AC5] %s is not offered capacity approval without the actual server permission', async role => {
     await signInAs(role, ['profile.read']);
     expect(within(await loadedNav()).queryByRole('button', { name: 'Capacity exceptions' })).not.toBeInTheDocument();
   }
 );
 
-test.each(['Event Organiser', 'Technical Support Staff'] as const)(
-  '[NORMAL] [SG2-47:AC3] [SG2-47:AC5] %s reaches a pending capacity request from navigation and sees its real approval receipt without approving the booking', async role => {
+test.each(['Venue Staff'] as const)(
+  '[NORMAL] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] %s reaches a pending capacity request from navigation and sees its real approval receipt without approving the booking', async role => {
     mockLoginResponse(role);
     const base = globalThis.fetch;
     const request = { request_id: 18, event_id: 22, event_name: 'Capacity forum', venue_name: 'QA small room',
-      starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10 };
+      starts_at: '2030-11-23T03:00:00Z', ends_at: '2030-11-23T04:00:00Z', expected_attendance: 14, venue_capacity: 10, booked: false };
     const exception = { exception_id: 6, approver_name: 'Test approver', approver_role: role.toLowerCase().replace(/ /g, '_'),
       expected_attendance: 14, approved_at: '2030-11-01T03:00:00Z' };
     const api = vi.fn(async (url: string, init?: RequestInit) => {

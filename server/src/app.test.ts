@@ -42,8 +42,8 @@ test('[NORMAL] [SG2-20:AC3] application composition mounts injected service rout
 
 test('[NORMAL] [SG2-91:AC2] application composition mounts the Safety Officer\'s list at /api/safety-checks', async () => {
   const safetyChecks = Router().get('/', (_req, res) => res.json({ service: 'safetyChecks' }));
-  const args = Array.from({ length: 36 }, () => undefined) as unknown as Parameters<typeof createApp>;
-  args[35] = safetyChecks;
+  const args = Array.from({ length: 37 }, () => undefined) as unknown as Parameters<typeof createApp>;
+  args[36] = safetyChecks;
   const response = await request(createApp(...args)).get('/api/safety-checks');
   assert.deepEqual([response.status, response.body], [200, { service: 'safetyChecks' }]);
 });

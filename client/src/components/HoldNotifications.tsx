@@ -30,6 +30,8 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   clarification_requested: 'Question from your coordinator',
   event_approved: 'Event approved',
   event_rejected: 'Event not approved',
+  // SG2-66 AC7: the event moved back to Planning for its arrangements to be rechecked.
+  event_returned_to_planning: 'Back in Planning',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
@@ -44,6 +46,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   clarification_requested: color.silver,
   event_approved: color.accent,
   event_rejected: color.silver,
+  event_returned_to_planning: color.silver,
 };
 
 /** One line in the drawer, whichever inbox it came from. */

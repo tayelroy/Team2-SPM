@@ -9,6 +9,8 @@ import EquipmentRequirements from '../components/EquipmentRequirements';
 import type { RequirementsView } from '../api/equipmentRequirements';
 import EventArrangements from '../components/EventArrangements';
 import EventAuditDrawer from '../components/EventAuditDrawer';
+import ArrangementRechecks from '../components/ArrangementRechecks';
+import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
 import { BookingRequestConflicts } from '../venues/BookingConflicts';
@@ -185,7 +187,14 @@ function ConfirmPanel({ eventId, accessToken, onConfirmed }: {
 
 export type FindVenues = (prefill: VenueSearchPrefill) => void;
 
-function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalRole; item: WorkItem; accessToken?: string | null; onFindVenues?: FindVenues }) {
+function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
+  role: InternalRole;
+  item: WorkItem;
+  accessToken?: string | null;
+  onFindVenues?: FindVenues;
+  /** Re-reads this item, e.g. after an accepted change or a settled recheck (SG2-66). */
+  onReload: () => void;
+}) {
   const { status, error, setStatus } = useOpenedForReview(item, accessToken);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
@@ -270,6 +279,16 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
       {item.kind === 'event' && item.assigned_to_me
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
         <EventArrangements key={arrangementsRevision} eventId={item.event_id} accessToken={accessToken} confirmed={currentStatus === 'confirmed'} />
+      )}
+      {/* SG2-66 AC1–AC4: coordinators open events here, not on EventDetail, so
+          the change requests and the rechecks they leave live here too. Either
+          outcome moves the status and arrangements, so the item is re-read. */}
+      {item.kind === 'event' && item.assigned_to_me && accessToken
+        && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
+        <>
+          <ArrangementRechecks eventId={item.event_id} accessToken={accessToken} onSettled={onReload} />
+          <ChangeRequestsPanel eventId={item.event_id} accessToken={accessToken} onAccepted={onReload} />
+        </>
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread
@@ -384,12 +403,13 @@ function ItemDetail({ item, accessToken, onFindVenues, role }: { role: InternalR
   );
 }
 
-function QueueContent({ role, accessToken, selection, onSelect, onFindVenues }: {
+function QueueContent({ role, accessToken, selection, onSelect, onFindVenues, onReload }: {
   role: InternalRole;
   accessToken?: string | null;
   selection: WorkSelection | null;
   onSelect: (selection: WorkSelection) => void;
   onFindVenues?: FindVenues;
+  onReload: () => void;
 }) {
   const [result, setResult] = useState<QueueResult | null>(null);
   useEffect(() => {
@@ -402,7 +422,7 @@ function QueueContent({ role, accessToken, selection, onSelect, onFindVenues }: 
 
   if (!result) return <p role="status">Loading your work queue…</p>;
   if (!result.ok) return <p role="alert">{result.error}</p>;
-  if (selection) return <ItemDetail role={role} item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} />;
+  if (selection) return <ItemDetail role={role} item={result.items[0]} accessToken={accessToken} onFindVenues={onFindVenues} onReload={onReload} />;
 
   return <>
     <p className="work-queue-summary" role="status">{result.items.length} {result.items.length === 1 ? 'item' : 'items'} in your work queue</p>
@@ -437,7 +457,8 @@ export default function WorkQueue({ role, accessToken, onFindVenues }: { role: I
       <button type="button" className="organisation-button" onClick={() => setRevision(value => value + 1)}>Refresh</button>
     </div>
     <QueueContent key={`${selection?.kind}:${selection?.item_id}:${revision}`} role={role}
-      accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues} />
+      accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues}
+      onReload={() => setRevision(value => value + 1)} />
     {/* SG2-79: bookings that clash once setup and turnaround time apply. */}
     {!selection && (role === 'Venue Staff' || role === 'Event Coordinator')
       ? <BookingClashes key={revision} accessToken={accessToken} /> : null}

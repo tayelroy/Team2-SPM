@@ -725,6 +725,21 @@
       }
     },
     {
+      "id": "SG2-66",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-66",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-19",
+      "acceptanceCriteria": {
+        "AC1": "Given a change to information the customer regards as significant, when I open the request, then the affected venue bookings, equipment reservations and registrations are listed as requiring revalidation",
+        "AC2": "Given a change raising attendance above a booked venue's capacity, that booking is flagged for a new capacity check; any capacity exception for the revised attendance is decided by Venue Staff",
+        "AC3": "Given a change to the date or time, the venue bookings and equipment reservations are flagged for rechecking against the new period",
+        "AC4": "Given I accept a change with affected arrangements, those arrangements are marked outstanding and the event returns to Planning until they have been rechecked and settled. This applies to Confirmed events and events in Awaiting Safety Check or Preparation too: any safety approval is withdrawn and the event must pass every check again before it can be confirmed (SG2-94 AC3)",
+        "AC5": "Only Venue Staff can approve a capacity exception, for change requests and for new booking requests alike; an attempt by Technical Support Staff, the Event Organiser or any other role is refused on the server side (403), and Venue Staff's booking approval accepts only an exception recorded by Venue Staff. This replaces the wider approver list in SG2-47 AC3 and SG2-49 AC1 (see the decisions recorded on those stories)",
+        "AC6": "Once an event is Confirmed or in Preparation, its details cannot be edited directly: a direct planning edit is refused on the server side with a message pointing to a change request (SG2-64). Registration settings are the exception (SG2-63). This replaces the direct-edit rule in SG2-39 for those statuses",
+        "AC7": "The Event Organiser and the assigned Event Coordinator are notified when an event goes back to Planning, and the move is recorded in the event history"
+      }
+    },
+    {
       "id": "SG2-91",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-91",
       "originalPullRequests": [],

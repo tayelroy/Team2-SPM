@@ -29,6 +29,8 @@ export interface BookingRequestRow {
   starts_at: string;
   ends_at: string;
   status: string;
+  /** SG2-66 AC2: the booking an approved request holds, if any. */
+  venue_booking: { status: string } | null;
 }
 
 export interface CapacityExceptionRecord extends CapacityExceptionGrant {
@@ -46,7 +48,7 @@ export type NewCapacityException = Pick<CapacityExceptionRecord,
 
 /** Internal joined rows; the API projects only the fields needed to choose
  * an approval. Owner IDs, requirement text and grants never become list fields. */
-export interface PendingCapacityRequest extends BookingRequestRow {
+export interface CapacityCandidate extends BookingRequestRow {
   event: SuitabilityEventRow;
   venue: SuitabilityVenueRow;
   exceptions: CapacityExceptionGrant[];
@@ -61,15 +63,15 @@ export interface VenueSuitabilityStore {
   exceptions(requestId: number): Promise<CapacityExceptionRecord[]>;
   /** Null when the same approval was recorded concurrently by someone else. */
   recordException(values: NewCapacityException): Promise<CapacityExceptionRecord | null>;
-  /** Scope an organiser in the database, before any joined rows are returned. */
-  pendingCapacityRequests(organiserId?: string): Promise<PendingCapacityRequest[]>;
+  /** Pending requests and approved (booked) ones (SG2-66 AC2), every event. */
+  capacityCandidates(): Promise<CapacityCandidate[]>;
 }
 
 const EVENT_COLUMNS = 'event_id,name,organiser_id,coordinator_id,status,expected_attendance,venue_requirements,accessibility_needs';
 const VENUE_COLUMNS = 'venue_id,name,location,capacity,facilities,accessibility_features';
-const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status';
+const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,venue_booking:venue_bookings!venue_booking_requests_venue_booking_id_fkey(status)';
 const EXCEPTION_COLUMNS = 'exception_id,request_id,approved_by,approver_role,expected_attendance,venue_capacity,approved_at';
-const PENDING_CAPACITY_COLUMNS = `${REQUEST_COLUMNS},event:events!venue_booking_requests_event_id_fkey!inner(${EVENT_COLUMNS}),venue:venues!venue_booking_requests_venue_id_fkey!inner(${VENUE_COLUMNS}),exceptions:venue_capacity_exceptions!venue_capacity_exceptions_request_id_fkey(expected_attendance)`;
+const CANDIDATE_COLUMNS = `${REQUEST_COLUMNS},event:events!venue_booking_requests_event_id_fkey!inner(${EVENT_COLUMNS}),venue:venues!venue_booking_requests_venue_id_fkey!inner(${VENUE_COLUMNS}),exceptions:venue_capacity_exceptions!venue_capacity_exceptions_request_id_fkey(expected_attendance,approver_role)`;
 
 type Row = Omit<CapacityExceptionRecord, 'approver_name'>;
 
@@ -88,16 +90,15 @@ export function createVenueSuitabilityStore(admin: SupabaseClient): VenueSuitabi
     return rows.map(row => ({ ...row, approver_name: names.get(row.approved_by) ?? null }));
   }
   return {
-    async pendingCapacityRequests(organiserId) {
-      const rows: PendingCapacityRequest[] = [];
+    async capacityCandidates() {
+      const rows: CapacityCandidate[] = [];
       let more: boolean;
       do {
         const offset = rows.length;
-        let query = admin.from('venue_booking_requests').select(PENDING_CAPACITY_COLUMNS).eq('status', 'pending');
-        if (organiserId !== undefined) query = query.eq('event.organiser_id', organiserId);
-        const { data, error } = await query.order('request_id').range(offset, offset + 999);
+        const { data, error } = await admin.from('venue_booking_requests').select(CANDIDATE_COLUMNS)
+          .in('status', ['pending', 'approved']).order('request_id').range(offset, offset + 999);
         check(error || !data);
-        const page = data as unknown as PendingCapacityRequest[];
+        const page = data as unknown as CapacityCandidate[];
         rows.push(...page);
         more = page.length === 1000;
       } while (more);

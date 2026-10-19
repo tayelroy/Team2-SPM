@@ -193,4 +193,85 @@ begin
    raise exception '[SG2-106:expired-locked] [FAILURE] [SG2-106:AC3] an expired hold must stay expired'; end if;
 end;
 $$;
+
+-- Past reserved periods do not become current work just because the hold's
+-- expiry is later. Seed the state left by ordinary passage of time, without
+-- sleeps or changing clocks; ends_at = transaction start is the end boundary.
+reset role;
+insert into public.venues(venue_id,name,capacity) values
+ (98605,'Past Hold Hall',40),(98606,'Ended Hold Hall',40),
+ (98607,'Current Hold Hall',40),(98608,'Future Hold Hall',40);
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,expected_attendance) values
+ (98603,'d8600000-0000-4000-8000-000000000003','d8600000-0000-4000-8000-000000000002','Hold period event','planning',30);
+with periods(venue_id,starts_at,ends_at) as (values
+ (98605,now()-interval '2 hours',now()-interval '1 hour'),
+ (98606,now()-interval '1 hour',now()),
+ (98607,now()-interval '1 hour',now()+interval '1 hour'),
+ (98607,now()-interval '6 hours',now()-interval '5 hours'),
+ (98608,now()+interval '1 day',now()+interval '1 day 1 hour')
+), requests as (
+ insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at)
+ select 98603,venue_id,starts_at,ends_at from periods returning *
+)
+insert into public.venue_holds(event_id,venue_id,request_id,starts_at,ends_at,expires_at,created_by,created_at)
+select event_id,venue_id,request_id,starts_at,ends_at,now()+interval '5 days',
+ 'd8600000-0000-4000-8000-000000000001',now()-interval '2 days' from requests;
+insert into public.event_audit_logs(event_id,actor_id,field_name,old_value,new_value)
+select event_id,created_by,'venue_hold_status',null,'Tentative hold ' || hold_id || '; expires ' || expires_at
+ from public.venue_holds where event_id = 98603;
+select public.venue_hold_notice(h,'placed') from public.venue_holds h where event_id = 98603;
+do $$
+begin
+perform set_config('sg2106.past_records',jsonb_build_object(
+ 'holds',(select jsonb_agg(to_jsonb(h) order by hold_id) from public.venue_holds h where event_id = 98603),
+ 'requests',(select jsonb_agg(to_jsonb(r) order by request_id) from public.venue_booking_requests r where event_id = 98603),
+ 'notices',(select jsonb_agg(to_jsonb(n) order by notification_id) from public.venue_hold_notifications n where event_id = 98603),
+ 'audit',(select jsonb_agg(to_jsonb(a) order by log_id) from public.event_audit_logs a where event_id = 98603)
+)::text,true);
+end;
+$$;
+
+set local role authenticated;
+do $$
+declare result jsonb; venue integer; current_hold bigint;
+begin
+ result := public.delete_venue(98605);
+ if result->>'outcome' is distinct from 'deleted' then
+   raise exception '[SG2-106:past-hold-period-allowed] [NORMAL] [SG2-106:AC1] a finished hold period must not block deletion even when its expiry is still future: %',result; end if;
+ result := public.delete_venue(98606);
+ if result->>'outcome' is distinct from 'deleted' then
+   raise exception '[SG2-106:ended-hold-boundary] [BOUNDARY] [SG2-106:AC1] a hold ending at the transaction boundary must not block deletion: %',result; end if;
+ -- Current/future periods remain blockers. The current venue also has a past
+ -- hold; only its current hold belongs in the refusal, not the past one.
+ for venue in select unnest(array[98607,98608]) loop
+   select hold_id into current_hold from public.venue_holds
+     where venue_id = venue and ends_at > clock_timestamp();
+   result := public.delete_venue(venue);
+   if result->>'outcome' is distinct from 'blocked' or jsonb_array_length(result->'blockers') is distinct from 1
+     or result#>>'{blockers,0,kind}' is distinct from 'hold'
+     or (result#>>'{blockers,0,id}')::bigint is distinct from current_hold
+     or result#>>'{blockers,0,event_name}' is distinct from 'Hold period event'
+     or exists(select 1 from public.venues where venue_id = venue and deleted_at is not null) then
+     raise exception '[SG2-106:current-future-hold-period-refused] [FAILURE] [SG2-106:AC1] current or future hold periods must still be listed and keep venue % undeleted: %',venue,result; end if;
+ end loop;
+end;
+$$;
+reset role;
+do $$
+declare records jsonb;
+begin
+ select jsonb_build_object(
+   'holds',(select jsonb_agg(to_jsonb(h) order by hold_id) from public.venue_holds h where event_id = 98603),
+   'requests',(select jsonb_agg(to_jsonb(r) order by request_id) from public.venue_booking_requests r where event_id = 98603),
+   'notices',(select jsonb_agg(to_jsonb(n) order by notification_id) from public.venue_hold_notifications n where event_id = 98603),
+   'audit',(select jsonb_agg(to_jsonb(a) order by log_id) from public.event_audit_logs a where event_id = 98603)
+ ) into records;
+ if records is distinct from current_setting('sg2106.past_records')::jsonb
+   or exists(select 1 from public.venues where venue_id in (98605,98606)
+     and (deleted_at is null or deleted_by is distinct from 'd8600000-0000-4000-8000-000000000001'::uuid))
+   or (select array_agg(v.name::text order by v.venue_id) from public.venues v join public.venue_holds h using (venue_id)
+     where h.event_id = 98603 and v.venue_id in (98605,98606)) is distinct from array['Past Hold Hall','Ended Hold Hall'] then
+   raise exception '[SG2-106:past-hold-history-retained] [NORMAL] [SG2-106:AC2] [SG2-106:AC5] deletion must retain complete holds, requests, notices, event history and venue names, and record the deleting actor and time'; end if;
+end;
+$$;
 rollback;

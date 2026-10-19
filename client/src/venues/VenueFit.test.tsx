@@ -26,10 +26,10 @@ function api(routes: Record<string, () => Response | Promise<Response>>) {
   return fetch;
 }
 
-test('[NORMAL] [SG2-47:AC2] [SG2-47:AC3] [SG2-47:AC4] each kind of problem says what it means for booking', () => {
+test('[NORMAL] [SG2-47:AC2] [SG2-47:AC3] [SG2-47:AC4] [SG2-66:AC5] each kind of problem says what it means for booking', () => {
   expect(consequence({ suitable: true, issues: [] })).toBeNull();
   expect(consequence(seminar.suitability)).toMatch(/^Cannot be booked: no exception is permitted/);
-  expect(consequence(theatre.suitability)).toMatch(/^Can be booked only once .* approve a capacity exception/);
+  expect(consequence(theatre.suitability)).toBe('Can be booked only once Venue Staff approve a capacity exception.');
   expect(consequence({ suitable: false, issues: [{ kind: 'accessibility', message: 'Missing accessibility feature: ramp.' }] }))
     .toBe('Raise the missing accessibility features with the organiser before booking.');
 });
@@ -79,6 +79,13 @@ test('[NORMAL] [SG2-47:AC2] [SG2-47:AC3] a blocked request offers no exception, 
   expect(await screen.findByText(/^Cannot be booked: no exception is permitted/)).toBeInTheDocument();
   expect(screen.getByText(/approved by an unnamed account \(someone_else\)/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Approve capacity exception' })).not.toBeInTheDocument();
+});
+
+test('[CONFLICT] [SG2-66:AC5] an approval recorded by an organiser before SG2-66 is still shown but marked as no longer counting', async () => {
+  api({ '/31/suitability': () => Response.json({ venue: theatre, exceptions: [{ ...approval, approver_name: 'Olive', approver_role: 'event_organiser' }], booking: 'needs_capacity_exception' }) });
+  render(<BookingRequestFit accessToken="token" requestId={31} />);
+  expect(await screen.findByText(/approved by Olive \(Event Organiser\) on .* It no longer counts: only Venue Staff approve capacity exceptions\.$/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Approve capacity exception' })).toBeInTheDocument();
 });
 
 test('[FAILURE] [SG2-47:AC3] a fitting venue says so, and failures to load or approve are reported', async () => {

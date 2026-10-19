@@ -160,7 +160,7 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
     } else if (name === 'capacity-exceptions') {
       const requests = main.getByRole('region', { name: 'Capacity exception requests', exact: true });
       await expect(requests.getByRole('button', { name: /^Review exception for / })
-        .or(requests.getByText('No pending requests need a capacity exception you can approve.', { exact: true })).first()).toBeVisible();
+        .or(requests.getByText('No booking requests need a capacity exception right now.', { exact: true })).first()).toBeVisible();
     } else if (name === 'unassigned-queue') {
       await expect(main.getByRole('region', { name: 'Unassigned queue', exact: true }).getByRole('article')
         .or(main.getByRole('heading', { name: 'No requests awaiting a coordinator', exact: true })).first()).toBeVisible();

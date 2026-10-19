@@ -6,7 +6,7 @@ import type { EventNoticeKind } from './eventNotifications';
  * a venue booking was released (SG2-51), equipment was reserved (SG2-55),
  * the organiser's event was confirmed (SG2-58), or a step in the event's
  * request lifecycle happened (SG2-68, see eventNotifications.ts), or a booked
- * venue became unavailable (SG2-81). */
+ * venue became unavailable (SG2-81), or an event moved back to Planning (SG2-66). */
 export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;

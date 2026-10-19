@@ -15,6 +15,10 @@ vi.mock('../components/EventArrangements', () => ({ default: ({ eventId }: { eve
   <section aria-label="Arrangement readiness integration">Arrangements for event {eventId}</section>
 ) }));
 
+// SG2-66: stubbed for the same reason; covered in WorkQueue.changeImpact.test.tsx.
+vi.mock('../components/ArrangementRechecks', () => ({ default: () => null }));
+vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Leadership Forum',
   event_name: 'Leadership Forum', status: 'under_review', starts_at: '2030-06-15T02:00:00Z', ends_at: null,

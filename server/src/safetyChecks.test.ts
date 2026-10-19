@@ -41,8 +41,8 @@ test('[NORMAL] [SG2-91:AC2] [SG2-91:AC3] a Safety Officer opens the list of even
 
 test('[NORMAL] [SG2-91:AC2] production mounts the list and leaves public health accessible', async () => {
   const { router, access } = fixture();
-  const args = Array.from({ length: 36 }, () => undefined) as unknown as Parameters<typeof createApp>;
-  args[1] = access; args[35] = router;
+  const args = Array.from({ length: 37 }, () => undefined) as unknown as Parameters<typeof createApp>;
+  args[1] = access; args[36] = router;
   const app = createApp(...args);
   assert.equal((await request(app).get('/api/health')).status, 200);
   const response = await request(app).get('/api/safety-checks').set(auth);

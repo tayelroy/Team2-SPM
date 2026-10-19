@@ -338,12 +338,13 @@ entity venue_capacity_exceptions {
   --
   * request_id : bigint <<FK venue_booking_requests>> cascade
   * approved_by : uuid <<FK users>>
-  * approver_role : text  CHECK in (venue_staff,
-      technical_support_staff, event_organiser)
+  * approver_role : text  CHECK = venue_staff NOT VALID
+      (SG2-66 AC5; older rows by other roles kept, inert)
   * expected_attendance : integer  CHECK > 0
   venue_capacity : integer
   * approved_at : timestamptz = now()
   UNIQUE (request_id, expected_attendance)
+      WHERE approver_role = venue_staff
 }
 
 entity venue_holds <<Week 7>> {
