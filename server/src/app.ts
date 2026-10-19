@@ -43,6 +43,7 @@ import { createConfirmEventHandler } from './events/confirm';
 import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
+import { createSafetyChecksRouter } from './safetyChecks';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -106,7 +107,9 @@ export function createApp(
   confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
   eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal }),
   // SG2-66: appended last for the same reason.
-  changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal })
+  changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-91: appended last to keep every positional argument in place.
+  safetyChecksRouter = createSafetyChecksRouter(access)
 ) {
   const app = express();
 
@@ -150,6 +153,8 @@ export function createApp(
   app.use('/api/equipment-requests', equipmentRequirementsRouter);
   // SG2-87: the Event Coordinator Lead's queue of unassigned requests.
   app.use('/api/assignment-queue', assignmentQueueRouter);
+  // SG2-91: the Safety Officer's list of events awaiting a safety check.
+  app.use('/api/safety-checks', safetyChecksRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

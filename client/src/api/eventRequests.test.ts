@@ -1328,6 +1328,7 @@ describe('updateEventPlanning (SG2-39)', () => {
     registration_opens_at: '2026-10-01T00:00:00.000Z',
     registration_closes_at: '2026-11-10T23:59:59.000Z',
     planning_notes: 'All catering set',
+    expected_crowd_movement: null,
     arrangements_recheck_needed: true,
     outstanding_arrangements: ['venue_recheck'],
   };

@@ -223,6 +223,7 @@ describe('EventPlanningDrawer Component', () => {
     registration_opens_at: '2026-10-01T13:30:00.000Z',
     registration_closes_at: '2026-10-01T13:31:00.000Z',
     planning_notes: 'Keep the loading bay clear',
+    expected_crowd_movement: null,
   };
   const savedPlanning = {
     event_id: 17, status: 'planning', expected_attendance: 136,
@@ -606,6 +607,7 @@ describe('EventPlanningDrawer Component', () => {
         registration_opens_at: '2026-10-01T00:00:00.000Z',
         registration_closes_at: '2026-11-19T23:59:59.000Z',
         planning_notes: 'All confirmed',
+        expected_crowd_movement: null,
         arrangements_recheck_needed: false,
         outstanding_arrangements: [],
       },
@@ -734,6 +736,7 @@ describe('EventPlanningDrawer Component', () => {
           registration_opens_at: null,
           registration_closes_at: null,
           planning_notes: null,
+          expected_crowd_movement: null,
           arrangements_recheck_needed: true,
           outstanding_arrangements: ['venue_recheck', 'equipment_recheck'],
         },
@@ -880,6 +883,59 @@ describe('EventPlanningDrawer Component', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
     expect(await screen.findByTestId('server-error-notice')).toHaveTextContent(message);
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('expected crowd movement for the safety check (SG2-91)', () => {
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); sessionStorage.clear(); });
+  const saved = (crowd: string | null) => ({
+    ok: true as const,
+    event: { event_id: 17, status: 'awaiting_safety_check', expected_attendance: 100, proposed_date: null,
+      venue_requirements: null, equipment_requirements: null, accessibility_needs: null, registration_needed: false,
+      registration_capacity: null, registration_opens_at: null, registration_closes_at: null, planning_notes: null,
+      expected_crowd_movement: crowd, arrangements_recheck_needed: false, outstanding_arrangements: [] },
+    arrangements_recheck_needed: false, outstanding_arrangements: [],
+  });
+
+  test('[NORMAL] [SG2-91:AC3] the coordinator sees the recorded crowd movement and saves a change, trimmed', async () => {
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue(saved('Leave by the west exits'));
+    const onSuccess = vi.fn();
+    render(<EventPlanningDrawer eventId={17} accessToken="tok" onClose={vi.fn()} onSuccess={onSuccess}
+      initialValues={{ expected_crowd_movement: 'Enter by the east doors', status: 'awaiting_safety_check' }} />);
+    const field = screen.getByLabelText('Expected Crowd Movement');
+    expect(field).toHaveValue('Enter by the east doors');
+    fireEvent.change(field, { target: { value: '  Leave by the west exits  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith(17, expect.objectContaining({ expected_crowd_movement: 'Leave by the west exits' }), 'tok');
+  });
+
+  test('[BOUNDARY] [SG2-91:AC3] expected crowd movement takes up to 5000 characters', () => {
+    const base = { proposedDate: '', initialProposedDate: '', now: 0, expectedAttendance: '', registrationNeeded: false,
+      registrationCapacity: '', registrationOpensAt: '', registrationClosesAt: '', venueRequirements: '',
+      equipmentRequirements: '', accessibilityNeeds: '', planningNotes: '' };
+    expect(validatePlanningForm({ ...base, expectedCrowdMovement: 'a'.repeat(5000) })).toEqual([]);
+    expect(validatePlanningForm({ ...base, expectedCrowdMovement: 'a'.repeat(5001) }))
+      .toEqual(['Expected crowd movement must be 5000 characters or fewer.']);
+  });
+
+  test('[FAILURE] [SG2-91:AC3] crowd movement over the limit is refused before saving', () => {
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning');
+    render(<EventPlanningDrawer eventId={17} accessToken="tok" onClose={vi.fn()} initialValues={{ status: 'planning' }} />);
+    expect(screen.getByLabelText('Expected Crowd Movement')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('Expected Crowd Movement'), { target: { value: 'a'.repeat(5001) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    expect(screen.getByText('Expected crowd movement must be 5000 characters or fewer.')).toBeInTheDocument();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('[BOUNDARY] [SG2-91:AC3] clearing the crowd movement saves it as not recorded', async () => {
+    const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue(saved(null));
+    render(<EventPlanningDrawer eventId={17} accessToken="tok" onClose={vi.fn()}
+      initialValues={{ expected_crowd_movement: 'Enter by the east doors', status: 'planning' }} />);
+    fireEvent.change(screen.getByLabelText('Expected Crowd Movement'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(17, expect.objectContaining({ expected_crowd_movement: null }), 'tok'));
   });
 });
 

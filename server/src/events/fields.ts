@@ -239,7 +239,9 @@ export const STATUS_TRANSITIONS: Readonly<Record<EventStatus, readonly EventStat
   under_review: ['needs_clarification', 'rejected', 'approved'],
   needs_clarification: ['unassigned'],
   rejected: ['unassigned'],
-  approved: ['planning'],
+  // SG2-91 AC1: an Approved event whose venues and equipment are all in place
+  // goes straight to the safety check (venues are requested while Approved).
+  approved: ['planning', 'awaiting_safety_check'],
   planning: ['awaiting_safety_check', 'cancelled'],
   awaiting_safety_check: ['preparation', 'safety_rejected', 'planning', 'cancelled'],
   safety_rejected: ['cancelled'],
