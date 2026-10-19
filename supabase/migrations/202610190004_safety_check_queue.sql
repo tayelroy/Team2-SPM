@@ -5,7 +5,10 @@
 --      and whose required equipment is all reserved moves to Awaiting Safety
 --      Check. The move is made by triggers on every table those two rules
 --      read, so it happens whichever writer completes the last arrangement
---      (a venue decision, a hold conversion, a placement, a reservation). An
+--      (a venue decision, a hold conversion, a placement, a reservation, or
+--      settling the last outstanding recheck under SG2-66). Runs after
+--      SG2-66's 202610190003_event_change_impact.sql, whose functions it
+--      relies on. An
 --      event that is awaiting the check and loses one of those arrangements
 --      (a booking released, a request withdrawn or added, a venue made
 --      unavailable) moves back to Planning, so the list never shows an event
@@ -95,13 +98,14 @@ create trigger safety_check_track_event before insert or update on public.events
 
 -- AC1: the venue and equipment rules confirm_event() applies
 -- (202610170002_confirmation_rechecks_and_disruptions.sql), without the
--- registration rule. A persisted venue or equipment recheck (SG2-39) keeps
--- that arrangement outstanding, as it does for confirmation.
+-- registration rule. Any recheck still outstanding (SG2-39's planning edits,
+-- SG2-66's accepted changes) keeps the event out of the check: SG2-66 AC4
+-- keeps it in Planning until every recheck is settled, registration included.
 create function public.safety_check_arrangements_ready(p_event public.events)
 returns boolean language sql stable security definer set search_path = '' as $$
   select
     not (p_event.arrangements_recheck_needed is true
-      and coalesce(p_event.outstanding_arrangements, '[]'::jsonb) ?| array['venue_recheck', 'equipment_recheck'])
+      and jsonb_array_length(coalesce(p_event.outstanding_arrangements, '[]'::jsonb)) > 0)
     -- Venue: at least one request the event still needs, none pending or
     -- rejected, each approved one backed by a confirmed booking, and no
     -- confirmed booking a venue's unavailability affects (SG2-81).
@@ -211,6 +215,15 @@ create trigger safety_check_refresh after insert or update or delete on public.e
   for each row execute function public.safety_check_refresh_from_arrangement();
 create trigger safety_check_refresh after insert or update or delete on public.equipment_reservations
   for each row execute function public.safety_check_refresh_from_arrangement();
+-- SG2-66: settling the last outstanding recheck (settle_arrangement_recheck)
+-- changes only the event row, so the event is refreshed when its rechecks
+-- change too. The refresh itself writes only status and revision, so this
+-- does not fire again.
+create trigger safety_check_refresh after update of arrangements_recheck_needed, outstanding_arrangements
+  on public.events for each row
+  when (old.arrangements_recheck_needed is distinct from new.arrangements_recheck_needed
+    or old.outstanding_arrangements is distinct from new.outstanding_arrangements)
+  execute function public.safety_check_refresh_from_arrangement();
 
 -- Unchanged from 202610170007_venue_delete_hold_expiry.sql (SG2-106) except
 -- that an event awaiting its safety check can still be held for another

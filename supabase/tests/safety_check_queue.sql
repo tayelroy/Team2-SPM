@@ -319,6 +319,38 @@ begin
  end if;
 end $$;
 
+-- AC1 with SG2-66: any outstanding recheck, registration included, keeps a
+-- ready event in Planning; settling the last one moves it into the check, and
+-- accepting a change with affected arrangements takes it back out.
+-- SG2-66 calls these with the service role, so there is no caller.
+select set_config('request.jwt.claim.sub','',true);
+update public.events set arrangements_recheck_needed=true,outstanding_arrangements='["registration_recheck"]' where event_id=99112;
+select pg_temp.book(99112,99103,12);
+do $$
+declare result jsonb;
+begin
+ if (select status from public.events where event_id=99112) <> 'planning' then
+  raise exception '[SG2-91:any-recheck-not-ready] [SG2-91:AC1] [FAILURE] An outstanding registration recheck must keep the event in Planning until it is settled';
+ end if;
+ result := public.settle_arrangement_recheck(99112,'d9100000-0000-4000-8000-000000000002','registration_recheck');
+ if result->>'outcome' <> 'ok' or (select status from public.events where event_id=99112) <> 'awaiting_safety_check'
+   or (select actor_id::text||'|'||old_value||'|'||new_value from public.event_audit_logs
+     where event_id=99112 and field_name='status' order by log_id desc limit 1)
+   is distinct from 'd9100000-0000-4000-8000-000000000002|planning|awaiting_safety_check' then
+  raise exception '[SG2-91:settled-recheck-awaits] [SG2-91:AC1] [NORMAL] Settling the last recheck of a ready event must move it to Awaiting Safety Check: %',result;
+ end if;
+ perform set_config('sg2_91.revision',(select safety_check_revision from public.events where event_id=99112)::text,true);
+ result := public.apply_accepted_event_change(99112,'d9100000-0000-4000-8000-000000000002','awaiting_safety_check',
+  'CR-1','{"expected_attendance":150}','["venue_recheck"]');
+ if result->>'status' <> 'planning'
+   or (select awaiting_safety_check_since from public.events where event_id=99112) is not null
+   or (select safety_check_revision from public.events where event_id=99112) <= current_setting('sg2_91.revision')::bigint
+   or (select count(*) from public.event_audit_logs where event_id=99112 and field_name='status'
+     and old_value='awaiting_safety_check') <> 1 then
+  raise exception '[SG2-91:accepted-change-leaves-check] [SG2-91:AC1] [CONFLICT] An accepted change with affected arrangements must return an awaiting event to Planning once, clear its wait and change its revision: %',result;
+ end if;
+end $$;
+
 -- AC3: expected crowd movement takes up to 5000 characters.
 do $$
 begin
