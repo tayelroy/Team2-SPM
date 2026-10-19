@@ -26,7 +26,8 @@ begin
     end if;
     for column_name in select attname from pg_catalog.pg_attribute
         where attrelid = format('public.%I', relation_name)::regclass and attnum > 0 and not attisdropped loop
-      writable := relation_name = 'venues' and column_name <> 'venue_id';
+      -- SG2-106: deleted_at/deleted_by are set only by delete_venue().
+      writable := relation_name = 'venues' and column_name not in ('venue_id', 'deleted_at', 'deleted_by');
       if has_column_privilege('authenticated', format('public.%I', relation_name), column_name, 'INSERT') is distinct from writable
           or has_column_privilege('authenticated', format('public.%I', relation_name), column_name, 'UPDATE') is distinct from writable
           or has_column_privilege('authenticated', format('public.%I', relation_name), column_name, 'REFERENCES')

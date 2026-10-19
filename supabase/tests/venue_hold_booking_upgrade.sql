@@ -25,7 +25,8 @@ begin
     left join public.venue_bookings b on b.booking_id=h.booking_id
     join public.events e on e.event_id=h.event_id
     where (to_jsonb(r)-'venue_booking_id'-'status') is distinct from(f.request_before-'venue_booking_id'-'status')
-     or to_jsonb(h) is distinct from f.hold_before or to_jsonb(b) is distinct from f.booking_before
+     -- SG2-106 adds expiry_revision (default 0) after this fixture was taken.
+     or (to_jsonb(h)-'expiry_revision') is distinct from f.hold_before or to_jsonb(b) is distinct from f.booking_before
      or to_jsonb(e) is distinct from f.event_before) then
   raise exception '[SG2-51:legacy-hold-release-metadata-preserved] [SG2-51:AC3] [SG2-51:AC5] [BOUNDARY] Repair must retain original request metadata, all hold/booking history and event information';
  end if;
