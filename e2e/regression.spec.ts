@@ -2503,7 +2503,10 @@ test('SG2-91-P01 | [SG2-91:AC2] [SG2-91:AC3] [NORMAL] the Safety Officer reviews
   await expect(cards.nth(0)).toContainText('Regression Hall');
   await expect(cards.nth(1)).toContainText('Studio Talk');
   await cards.nth(1).click();
-  await expect(page.getByRole('article', { name: 'Studio Talk' })).toBeInViewport();
+  await expect(page.getByRole('region', { name: 'Safety check for Studio Talk' })).toBeVisible();
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Show all 2 safety checks', exact: true }).click();
+  await expect(page.getByRole('article')).toHaveCount(2);
   await page.getByRole('navigation').getByRole('button', { name: 'Dashboard', exact: true }).click();
   await page.getByRole('button', { name: 'Open safety checks', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Safety checks' })).toBeVisible();
