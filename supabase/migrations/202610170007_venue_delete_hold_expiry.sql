@@ -11,14 +11,19 @@ alter table public.venues add constraint venues_deleted_pair check ((deleted_at 
 create index venues_active_name_idx on public.venues(name, venue_id) where deleted_at is null;
 
 -- Deletion is only through delete_venue(), and a deleted venue is read-only.
+-- The delete columns may change only while delete_venue() runs: as a security
+-- definer it runs as its owner, and this trigger runs as the caller (security
+-- invoker), so current_user identifies it. A session setting is not used,
+-- because any session, the service role included, can set one.
 create function public.venues_guard_deleted() returns trigger
-language plpgsql security definer set search_path = '' as $$
+language plpgsql security invoker set search_path = '' as $$
 begin
   if old.deleted_at is not null then
     raise exception using errcode = '23514', message = 'This venue has been deleted.';
   end if;
   if (new.deleted_at is distinct from old.deleted_at or new.deleted_by is distinct from old.deleted_by)
-    and coalesce(current_setting('app.venue_delete', true), '') <> 'on' then
+    and current_user is distinct from (select pg_catalog.pg_get_userbyid(p.proowner) from pg_catalog.pg_proc p
+      where p.oid = 'public.delete_venue(integer)'::pg_catalog.regprocedure) then
     raise exception using errcode = '42501', message = 'Delete venues through the venue delete action.';
   end if;
   return new;
@@ -87,9 +92,7 @@ begin
   if jsonb_array_length(blockers) > 0 then
     return jsonb_build_object('outcome', 'blocked', 'blockers', blockers);
   end if;
-  perform set_config('app.venue_delete', 'on', true);
   update public.venues set deleted_at = instant, deleted_by = auth.uid() where venue_id = p_venue_id returning * into v;
-  perform set_config('app.venue_delete', '', true);
   return jsonb_build_object('outcome', 'deleted', 'venue', jsonb_build_object('venue_id', v.venue_id, 'name', v.name,
     'deleted_at', v.deleted_at, 'deleted_by', v.deleted_by));
 end;

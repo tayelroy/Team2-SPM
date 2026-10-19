@@ -82,15 +82,25 @@ begin
    raise exception '[SG2-106:deleted-read-only] [FAILURE] [SG2-106:AC2] a deleted venue was edited';
  exception when check_violation then null;
  end;
- begin
-   update public.venues set deleted_at = now(), deleted_by = 'd8600000-0000-4000-8000-000000000001' where venue_id = 98604;
-   raise exception '[SG2-106:direct-delete-refused] [FAILURE] [SG2-106:AC5] deleting outside delete_venue() must be refused';
- exception when insufficient_privilege then null;
- end;
  if (select v.name from public.venue_bookings b join public.venues v using (venue_id) where b.venue_id = 98603) is distinct from 'Old Studio' then
    raise exception '[SG2-106:history-name] [NORMAL] [SG2-106:AC2] past bookings must keep the deleted venue name'; end if;
 end;
 $$;
+
+-- AC5: the service role can write the delete columns, but even it cannot
+-- delete outside delete_venue(), including with a session flag set.
+set local role service_role;
+select set_config('app.venue_delete','on',true);
+do $$
+begin
+ begin
+   update public.venues set deleted_at = now(), deleted_by = 'd8600000-0000-4000-8000-000000000001' where venue_id = 98604;
+   raise exception '[SG2-106:direct-delete-refused] [FAILURE] [SG2-106:AC5] deleting outside delete_venue() must be refused, whatever session settings are set';
+ exception when insufficient_privilege then null;
+ end;
+end;
+$$;
+reset role;
 
 -- AC5: only Venue Staff can delete or change an expiry.
 set local role authenticated;
