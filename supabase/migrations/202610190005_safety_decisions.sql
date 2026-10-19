@@ -14,9 +14,9 @@
 -- their labels, the 2000-character reason) and the notice wording in
 -- server/src/db/eventNotifications.ts; they must change together.
 --
--- Which events are waiting for a check is SG2-91's (Lim Dao Jun); until it
--- ships the server lists them through a labelled stand-in. Nothing here moves
--- an event into Awaiting Safety Check.
+-- Which events are waiting for a check is SG2-91's (Lim Dao Jun,
+-- 202610190004_safety_check_queue.sql). Nothing here moves an event into
+-- Awaiting Safety Check; 202610190006 adds the reviewed revision.
 --
 -- SG2-94 must treat only an event's latest decision, when it is approve, as
 -- its safety approval: SG2-66's apply_accepted_event_change already returns

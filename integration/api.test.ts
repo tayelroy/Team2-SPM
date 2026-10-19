@@ -28,7 +28,9 @@ import { createGetEventArrangementsHandler } from '../server/src/events/getArran
 import { createBookingRequestSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
-import { createSafetyCheckHandlers } from '../server/src/events/safetyChecks';
+import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
+import { createSafetyChecksRouter } from '../server/src/safetyChecks';
+import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -43,18 +45,19 @@ const jwt = (role: string, sub?: string) => {
 };
 // Supabase's gateway uses /rest/v1; this isolated PostgREST serves the same
 // protocol at /. Rewrite only that loopback prefix, never any query or body.
+const loopbackFetch: typeof fetch = async (input, init) => {
+  const original = new Request(input, init);
+  const url = new URL(original.url);
+  assert.equal(url.origin, rest.origin);
+  assert.ok(url.pathname.startsWith('/rest/v1/'));
+  url.pathname = url.pathname.slice('/rest/v1'.length);
+  const response = await fetch(new Request(url, original));
+  if (!response.ok) console.error('Integration database response', url.pathname, await response.clone().text());
+  return response;
+};
 const database = createClient(rest.origin, jwt('service_role'), {
   auth: { persistSession: false, autoRefreshToken: false },
-  global: { fetch: async (input, init) => {
-    const original = new Request(input, init);
-    const url = new URL(original.url);
-    assert.equal(url.origin, rest.origin);
-    assert.ok(url.pathname.startsWith('/rest/v1/'));
-    url.pathname = url.pathname.slice('/rest/v1'.length);
-    const response = await fetch(new Request(url, original));
-    if (!response.ok) console.error('Integration database response', url.pathname, await response.clone().text());
-    return response;
-  } },
+  global: { fetch: loopbackFetch },
 });
 const ids = Object.fromEntries(['organiser', 'coordinator', 'lead', 'venue', 'support', 'other', 'safety'].map((name, index) =>
   [name, `ee000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`]));
@@ -285,11 +288,18 @@ test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation ev
   }
 
   // AC6 names only Confirmed and Preparation: an Awaiting Safety Check event still takes the edit.
-  assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
+  // SG2-91: an event only awaits its check while its venue is booked, so book
+  // one and let the trigger move the event there (a pending request would
+  // return it to Planning straight away).
+  assert.equal((await database.from('events').update({ status: 'planning' }).eq('event_id', id)).error, null);
   const venue = await database.from('venues').insert({ name: 'Integration Return Hall', capacity: 200 }).select('venue_id').single();
   assert.equal(venue.error, null);
-  assert.equal((await database.from('venue_booking_requests').insert({ event_id: id, venue_id: venue.data!.venue_id,
-    starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z', status: 'pending' })).error, null);
+  const period = { event_id: id, venue_id: venue.data!.venue_id, starts_at: '2090-06-15T02:00:00Z', ends_at: '2090-06-15T04:00:00Z' };
+  const booking = await database.from('venue_bookings').insert({ ...period, status: 'confirmed' }).select('booking_id').single();
+  assert.equal(booking.error, null);
+  assert.equal((await database.from('venue_booking_requests').insert({ ...period, status: 'approved',
+    venue_booking_id: booking.data!.booking_id })).error, null);
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
   const saved = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137, confirm_impact: true });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   assert.equal((await stored(id)).status, 'planning');
@@ -316,14 +326,16 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   const period = { event_id: id, starts_at: '2090-06-15T01:00:00Z', ends_at: '2090-06-15T05:00:00Z' };
   const booking = await database.from('venue_bookings').insert({ ...period, venue_id: venue.data!.venue_id, status: 'confirmed' }).select('*').single();
   assert.equal(booking.error, null);
-  const venueRequest = await database.from('venue_booking_requests').insert({ ...period, venue_id: venue.data!.venue_id, status: 'approved',
-    venue_booking_id: booking.data!.booking_id }).select('request_id').single();
-  assert.equal(venueRequest.error, null);
   const demand = await database.from('equipment_requests').insert({ ...period, equipment_id: equipment.data!.equipment_id, quantity: 2, status: 'approved',
     shortfall: 0, placement_venue_id: venue.data!.venue_id, placement_position: 'Lectern' }).select('request_id').single();
   assert.equal(demand.error, null);
   assert.equal((await database.from('equipment_reservations').insert({ ...period, equipment_id: equipment.data!.equipment_id, quantity_reserved: 2,
     request_id: demand.data!.request_id, reserved_at: '2089-10-01T00:00:00Z' })).error, null);
+  // SG2-91: approved last, so the event enters the safety check once and never
+  // bounces back to Planning (with notices) while the fixture is built.
+  const venueRequest = await database.from('venue_booking_requests').insert({ ...period, venue_id: venue.data!.venue_id, status: 'approved',
+    venue_booking_id: booking.data!.booking_id }).select('request_id').single();
+  assert.equal(venueRequest.error, null);
   assert.equal((await database.from('registrations').insert([
     { event_id: id, attendee_id: ids.other, status: 'registered' }, { event_id: id, attendee_id: ids.support, status: 'registered' },
     { event_id: id, attendee_id: ids.lead, status: 'cancelled' }
@@ -406,30 +418,47 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   assert.deepEqual([readiness.status, readiness.body.outstanding], [200, []]);
 });
 
-test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] [SG2-92:AC5] [SG2-92:AC6] native safety decisions move each event on, notify both people, keep who and why, and let the coordinator rework a rejection', async () => {
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] [SG2-92:AC5] [SG2-92:AC6] native safety decisions on SG2-91\'s list move each event on, refuse a stale review, notify both people, keep who and why, and let the coordinator rework a rejection', async () => {
   const [approved, rejected, changed] = [await planned(), await planned(), await planned()];
   for (const id of [approved, rejected, changed]) {
     assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
   }
   const safetyArgs = [...args] as Parameters<typeof createApp>;
-  safetyArgs[36] = createSafetyCheckHandlers(dependencies);
+  // SG2-91's list runs safety_check_queue() with the caller's own JWT, as in production.
+  safetyArgs[36] = createSafetyChecksRouter(access, token => createSafetyChecksStore(token, () =>
+    createClient(rest.origin, jwt('authenticated', ids[token]), { auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: loopbackFetch } })));
+  safetyArgs[37] = createSafetyDecisionHandlers(dependencies);
   const safety = request(createApp(...safetyArgs));
   const decide = (who: string, id: number, body: object) => safety.post(`/api/event-requests/${id}/safety-decision`).set(auth(who)).send(body);
+  // The revision each event shows on SG2-91's list, which the decision carries back.
+  const reviewed = async () => {
+    const list = await safety.get('/api/safety-checks').set(auth('safety'));
+    assert.equal(list.status, 200, JSON.stringify(list.body));
+    return new Map<number, number>(list.body.events.map((event: { event_id: number; safety_check_revision: number }) =>
+      [event.event_id, event.safety_check_revision]));
+  };
 
-  // AC1: only the Safety Officer reads the queue (stand-in for SG2-91) and decides.
+  // AC1: only the Safety Officer reads the list and decides.
   for (const who of ['coordinator', 'organiser', 'lead']) {
     assert.equal((await safety.get('/api/safety-checks').set(auth(who))).status, 403, who);
-    assert.equal((await decide(who, approved, { decision: 'approve' })).status, 403, who);
+    assert.equal((await decide(who, approved, { decision: 'approve', safety_check_revision: 0 })).status, 403, who);
   }
-  const queue = await safety.get('/api/safety-checks').set(auth('safety'));
-  assert.equal(queue.status, 200, JSON.stringify(queue.body));
-  assert.equal(queue.body.source, 'stand-in');
-  const queued = queue.body.events.filter((event: { event_id: number }) => [approved, rejected, changed].includes(event.event_id));
-  assert.deepEqual(queued.map((event: { coordinator_name: string }) => event.coordinator_name), Array(3).fill('Integration coordinator'));
+  let revisions = await reviewed();
+  assert.deepEqual([approved, rejected, changed].map(id => Number.isSafeInteger(revisions.get(id))), [true, true, true]);
 
   // AC2: a reason and, for Request Changes, the arrangements are required; nothing is written otherwise.
-  const invalid = await decide('safety', changed, { decision: 'request_changes', reason: ' ' });
+  const invalid = await decide('safety', changed, { decision: 'request_changes', reason: ' ', safety_check_revision: revisions.get(changed) });
   assert.deepEqual([invalid.status, invalid.body.details], [400, ['A reason is required to request changes.', 'Name at least one arrangement to change.']]);
+
+  // A reviewed detail changing after the list was read refuses the decision on what was seen, writing nothing.
+  assert.equal((await database.from('events').update({ expected_attendance: 450 }).eq('event_id', rejected)).error, null);
+  const stale = await decide('safety', rejected, { decision: 'reject', reason: 'Crowd flow blocks the east exit', safety_check_revision: revisions.get(rejected) });
+  assert.deepEqual([stale.status, stale.body], [409, { error: 'This event changed after you opened it. Refresh the safety checks and review it again.',
+    code: 'stale', revision: revisions.get(rejected)! + 1 }]);
+  assert.equal((await stored(rejected)).status, 'awaiting_safety_check');
+  assert.equal((await database.from('event_safety_decisions').select('decision_id').eq('event_id', rejected)).data!.length, 0);
+  revisions = await reviewed();
 
   // AC3/AC4/AC6: each decision moves its event on and is stored with who, when and why.
   const outcomes = [
@@ -438,13 +467,13 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-
     [changed, { decision: 'request_changes', reason: 'Widen the aisles', arrangements: ['equipment', 'venue'] }, 'planning']
   ] as const;
   for (const [id, body, status] of outcomes) {
-    const recorded = await decide('safety', id, body);
+    const recorded = await decide('safety', id, { ...body, safety_check_revision: revisions.get(id) });
     assert.equal(recorded.status, 201, JSON.stringify(recorded.body));
     assert.deepEqual([recorded.body.previous_status, recorded.body.status], ['awaiting_safety_check', status]);
     assert.equal(recorded.body.decision.decided_by_name, 'Integration safety officer');
     assert.equal((await stored(id)).status, status);
   }
-  const again = await decide('safety', approved, { decision: 'reject', reason: 'Second thoughts' });
+  const again = await decide('safety', approved, { decision: 'reject', reason: 'Second thoughts', safety_check_revision: revisions.get(approved) });
   assert.deepEqual([again.status, again.body], [409, { error: 'This event is no longer awaiting a safety check.', status: 'preparation' }]);
   const history = await safety.get(`/api/event-requests/${changed}/safety-decisions`).set(auth('organiser'));
   assert.equal(history.status, 200);

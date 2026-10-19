@@ -27,7 +27,10 @@ begin
     where (to_jsonb(r)-'venue_booking_id'-'status') is distinct from(f.request_before-'venue_booking_id'-'status')
      -- SG2-106 adds expiry_revision (default 0) after this fixture was taken.
      or (to_jsonb(h)-'expiry_revision') is distinct from f.hold_before or to_jsonb(b) is distinct from f.booking_before
-     or to_jsonb(e) is distinct from f.event_before) then
+     -- SG2-91 adds columns and may move a ready event into the safety check
+     -- after this repair; both are checked by the assertion below.
+     or (to_jsonb(e)-'status'-'expected_crowd_movement'-'awaiting_safety_check_since'-'safety_check_revision')
+       is distinct from (f.event_before-'status')) then
   raise exception '[SG2-51:legacy-hold-release-metadata-preserved] [SG2-51:AC3] [SG2-51:AC5] [BOUNDARY] Repair must retain original request metadata, all hold/booking history and event information';
  end if;
  if exists(select 1 from hold_link_upgrade_fixture.activity_before a
@@ -39,6 +42,18 @@ begin
  if exists(select 1 from public.venue_booking_requests r join hold_link_upgrade_fixture.after_first a using(request_id)
     where r.xmin::text is distinct from a.row_version) then
   raise exception '[SG2-84:hold-link-upgrade-idempotent] [SG2-84:AC5] [CONFLICT] Reapplying the actual migration must not rewrite already reconciled request rows';
+ end if;
+ -- SG2-91: the upgrade moves exactly the repaired events whose venues are now
+ -- all booked into the safety check, stamps the wait, and (checked above)
+ -- writes no history row for a move nobody made.
+ if (select count(*) from public.events where event_id between 988402 and 988416
+      and status = 'awaiting_safety_check') = 0
+    or exists(select 1 from public.events e where e.event_id between 988402 and 988416
+      and (e.status = 'awaiting_safety_check') is distinct from public.safety_check_arrangements_ready(e))
+    or exists(select 1 from public.events e where e.event_id between 988402 and 988416
+      and (e.status = 'awaiting_safety_check') is distinct from (e.awaiting_safety_check_since is not null
+        and e.safety_check_revision = 1)) then
+  raise exception '[SG2-91:upgrade-moves-ready-events] [SG2-91:AC1] [BOUNDARY] The upgrade must move exactly the ready legacy events into the safety check and stamp their wait';
  end if;
 end $$;
 rollback;

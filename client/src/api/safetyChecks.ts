@@ -1,11 +1,105 @@
 /**
- * SG2-92: the Safety Officer's operational safety check decision, the event's
- * decision history, and the coordinator's rework after a rejection.
- *
- * The list of events awaiting a check is a stand-in served by the server for
- * SG2-91 (the Safety Officer's queue) until that ships. The decision itself,
- * the history and the rework are real. Mirrors server/src/events/safetyDecisions.ts.
+ * SG2-91: the Safety Officer's list of events awaiting a safety check.
+ * SG2-92: the decision on each, the event's decision history, and the
+ * coordinator's rework after a rejection. Mirrors server/src/events/safetyDecisions.ts.
  */
+
+/** A venue an event awaiting its safety check is booked into (SG2-91 AC3). */
+export interface SafetyCheckVenue {
+  requestId: number;
+  name: string;
+  location: string | null;
+  capacity: number | null;
+  layout: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  accessibilityFeatures: string | null;
+  emergencyAccess: string | null;
+  knownRestrictions: string | null;
+}
+
+/** A piece of equipment and where it will be placed (SG2-91 AC3). */
+export interface SafetyCheckEquipment {
+  requestId: number;
+  name: string;
+  quantity: number;
+  placementVenue: string | null;
+  placementPosition: string | null;
+  arrangementNotes: string | null;
+}
+
+/** One event on the Safety Officer's list (SG2-91 AC2/AC3). */
+export interface SafetyCheckEvent {
+  eventId: number;
+  /** Sent back with SG2-92's decision so a review of since-changed details is refused. */
+  revision: number;
+  name: string;
+  organisation: string | null;
+  proposedDate: string | null;
+  awaitingSince: string | null;
+  expectedAttendance: number | null;
+  accessibilityNeeds: string | null;
+  expectedCrowdMovement: string | null;
+  venues: SafetyCheckVenue[];
+  equipment: SafetyCheckEquipment[];
+}
+
+export type FetchSafetyChecksResult =
+  | { ok: true; events: SafetyCheckEvent[] }
+  | { ok: false; kind: 'unauthorized' | 'unavailable' };
+
+type Raw = Record<string, unknown>;
+const text = (value: unknown) => (typeof value === 'string' ? value : null);
+const count = (value: unknown) => (typeof value === 'number' ? value : null);
+const list = (value: unknown): Raw[] => (Array.isArray(value) ? value as Raw[] : []);
+
+/** GET /api/safety-checks — Safety Officers only (SG2-91 AC4). */
+export async function fetchSafetyChecks(token: string): Promise<FetchSafetyChecksResult> {
+  let response: Response;
+  try {
+    response = await fetch('/api/safety-checks', { method: 'GET', headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    return { ok: false, kind: 'unavailable' };
+  }
+  if (response.status === 401 || response.status === 403) return { ok: false, kind: 'unauthorized' };
+  if (!response.ok) return { ok: false, kind: 'unavailable' };
+  const data = (await response.json().catch(() => ({}))) as Raw;
+  if (!Array.isArray(data.events)) return { ok: false, kind: 'unavailable' };
+  return {
+    ok: true,
+    events: (data.events as Raw[]).map((raw) => ({
+      eventId: Number(raw.event_id) || 0,
+      revision: Number(raw.safety_check_revision) || 0,
+      name: text(raw.name) ?? '',
+      organisation: text(raw.organisation),
+      proposedDate: text(raw.proposed_date),
+      awaitingSince: text(raw.awaiting_since),
+      expectedAttendance: count(raw.expected_attendance),
+      accessibilityNeeds: text(raw.accessibility_needs),
+      expectedCrowdMovement: text(raw.expected_crowd_movement),
+      venues: list(raw.venues).map((venue) => ({
+        requestId: Number(venue.request_id) || 0,
+        name: text(venue.venue_name) ?? '',
+        location: text(venue.location),
+        capacity: count(venue.capacity),
+        layout: text(venue.layout),
+        startsAt: text(venue.starts_at),
+        endsAt: text(venue.ends_at),
+        accessibilityFeatures: text(venue.accessibility_features),
+        emergencyAccess: text(venue.emergency_access),
+        knownRestrictions: text(venue.known_restrictions),
+      })),
+      equipment: list(raw.equipment).map((item) => ({
+        requestId: Number(item.request_id) || 0,
+        name: text(item.equipment_name) ?? '',
+        quantity: Number(item.quantity) || 0,
+        placementVenue: text(item.placement_venue_name),
+        placementPosition: text(item.placement_position),
+        arrangementNotes: text(item.arrangement_notes),
+      })),
+    })),
+  };
+}
 
 export const SAFETY_DECISIONS = ['approve', 'reject', 'request_changes'] as const;
 export type SafetyDecisionKind = typeof SAFETY_DECISIONS[number];
@@ -35,37 +129,6 @@ export const SAFETY_ARRANGEMENT_LABELS: Readonly<Record<SafetyArrangement, strin
 /** Matches the server's limit on a decision's reason, counted in characters. */
 export const MAX_SAFETY_REASON_LENGTH = 2000;
 
-export interface SafetyCheckVenue {
-  name: string;
-  capacity: number | null;
-  starts_at: string | null;
-  ends_at: string | null;
-}
-
-export interface SafetyCheckEquipment {
-  name: string;
-  quantity: number;
-  placement_position: string | null;
-}
-
-/** What the Safety Officer reviews for one event awaiting a check. */
-export interface SafetyCheckEvent {
-  event_id: number;
-  name: string | null;
-  proposed_date: string | null;
-  expected_attendance: number | null;
-  accessibility_needs: string | null;
-  coordinator_name: string | null;
-  venues: SafetyCheckVenue[];
-  equipment: SafetyCheckEquipment[];
-}
-
-export interface SafetyCheckQueue {
-  /** `stand-in` until SG2-91 replaces the queue source. */
-  source: string;
-  events: SafetyCheckEvent[];
-}
-
 export interface SafetyDecision {
   decision_id: number;
   event_id: number;
@@ -92,6 +155,7 @@ export interface SafetyDecisionDraft {
 export type SafetyCheckFailureKind =
   | 'validation'
   | 'conflict'
+  | 'stale'
   | 'unauthorized'
   | 'not_found'
   | 'unavailable'
@@ -106,7 +170,6 @@ export type SafetyCheckFailure = {
   status?: string;
 };
 
-export type FetchSafetyCheckQueueResult = { ok: true; queue: SafetyCheckQueue } | SafetyCheckFailure;
 export type RecordSafetyDecisionResult = { ok: true; recorded: RecordedSafetyDecision } | SafetyCheckFailure;
 export type FetchSafetyDecisionsResult = { ok: true; decisions: SafetyDecision[] } | SafetyCheckFailure;
 export type ReworkSafetyRejectedResult = { ok: true; status: string } | SafetyCheckFailure;
@@ -154,7 +217,9 @@ const isText = (value: unknown): value is string => typeof value === 'string';
 
 /** Maps a non-2xx reply onto the shared failure shape; the server's own words win. */
 function failure(status: number, body: Body, fallback: string): SafetyCheckFailure {
-  const kind = KIND_BY_STATUS[status] ?? 'error';
+  // A 409 whose code is `stale` means the event changed after it was opened,
+  // not that its check closed; the Safety Officer reviews it again.
+  const kind = status === 409 && body?.code === 'stale' ? 'stale' : KIND_BY_STATUS[status] ?? 'error';
   const result: SafetyCheckFailure = {
     ok: false,
     kind,
@@ -191,31 +256,21 @@ export function safetyArrangementList(arrangements: readonly SafetyArrangement[]
 }
 
 /**
- * The events awaiting a safety check, with what the Safety Officer needs to
- * review them. Maps to `GET /api/safety-checks` (a stand-in for SG2-91).
- */
-export async function fetchSafetyCheckQueue(token: string): Promise<FetchSafetyCheckQueueResult> {
-  const reply = await send('/api/safety-checks', 'GET', token);
-  if (!reply) return NETWORK_FAILURE;
-  const { response, body } = reply;
-  if (!response.ok) return failure(response.status, body, 'Could not load the safety checks');
-  if (!body || !Array.isArray(body.events)) return NETWORK_FAILURE;
-  return { ok: true, queue: body as unknown as SafetyCheckQueue };
-}
-
-/**
- * Records the Safety Officer's decision (AC1–AC6). The reason is trimmed and
- * left out when blank; arrangements are sent only with Request changes. Maps
- * to `POST /api/event-requests/:eventId/safety-decision`.
+ * Records the Safety Officer's decision (AC1–AC6) on the revision of the event
+ * they reviewed, as SG2-91's list showed it. The reason is trimmed and left out
+ * when blank; arrangements are sent only with Request changes. Maps to
+ * `POST /api/event-requests/:eventId/safety-decision`.
  */
 export async function recordSafetyDecision(
   eventId: number | string,
   draft: SafetyDecisionDraft,
+  revision: number,
   token: string,
 ): Promise<RecordSafetyDecisionResult> {
   const reason = draft.reason.trim();
   const reply = await send(`/api/event-requests/${eventId}/safety-decision`, 'POST', token, {
     decision: draft.decision,
+    safety_check_revision: revision,
     ...(reason ? { reason } : {}),
     ...(draft.decision === 'request_changes' ? { arrangements: draft.arrangements } : {}),
   });

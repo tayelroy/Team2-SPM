@@ -46,6 +46,8 @@ export type RecordSafetyDecisionResult =
     decided_at: string;
   }
   | { outcome: 'forbidden' | 'missing' | 'invalid' | 'unavailable' }
+  /** The event changed after the Safety Officer opened it (SG2-91's revision moved on). */
+  | { outcome: 'stale'; revision: number }
   | { outcome: 'closed'; status: string };
 
 /** What `public.rework_safety_rejected_event` did (SG2-92 AC4). */
@@ -118,7 +120,8 @@ export async function listSafetyDecisions(admin: SupabaseClient, eventId: number
  * Records a decision through `public.record_safety_decision` (service role):
  * the decision, the status move, its history and the notices are one
  * transaction under the event row lock. The function rechecks the actor is a
- * Safety Officer, the event is still awaiting a check and the input is valid.
+ * Safety Officer, the event is still awaiting a check at the revision the
+ * Safety Officer reviewed, and the input is valid.
  */
 export async function recordSafetyDecision(
   admin: SupabaseClient,
@@ -129,12 +132,14 @@ export async function recordSafetyDecision(
     p_actor_id: input.actorId,
     p_decision: input.decision,
     p_reason: input.reason,
-    p_arrangements: input.arrangements
+    p_arrangements: input.arrangements,
+    p_expected_revision: input.expectedRevision
   });
   if (error || typeof data !== 'object' || data === null) return { outcome: 'unavailable' };
   const row = data as Record<string, unknown>;
   if (row.outcome === 'forbidden' || row.outcome === 'missing' || row.outcome === 'invalid') return { outcome: row.outcome };
   if (row.outcome === 'closed' && typeof row.status === 'string') return { outcome: 'closed', status: row.status };
+  if (row.outcome === 'stale' && typeof row.revision === 'number') return { outcome: 'stale', revision: row.revision };
   if (row.outcome !== 'ok' || typeof row.decision_id !== 'number' || !isSafetyDecision(row.decision)
     || typeof row.previous_status !== 'string' || typeof row.status !== 'string' || typeof row.decided_at !== 'string') {
     return { outcome: 'unavailable' };

@@ -3047,10 +3047,9 @@
       "FAILURE"
     ],
     "mapped_acs": [
-      "SG2-86:AC2",
-      "SG2-92:AC1"
+      "SG2-86:AC2"
     ],
-    "purpose": "Guard the browser walkthrough bug where the Event Coordinator Lead and Safety Officer dashboards listed prototype events (E-205 'Product Launch — Tideline' with organiser copy), a click on one opened the Attendee event page, and the menu offered All events, which only says it is for Event Organisers. Each desk must show only real data for that role and the menu only the screens its server permissions allow. Since SG2-92 (19 Oct 2026) the Safety desk lists the real events awaiting a check (a stand-in for SG2-91's list) instead of the 'No safety checks yet' placeholder.",
+    "purpose": "Guard the browser walkthrough bug where the Event Coordinator Lead and Safety Officer dashboards listed prototype events (E-205 'Product Launch — Tideline' with organiser copy), a click on one opened the Attendee event page, and the menu offered All events, which only says it is for Event Organisers. Each desk must show only real data for that role and the menu only the screens its server permissions allow.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Fixture accounts safety@example.test (safety_officer) and lead@example.test (event_coordinator_lead).",
     "steps": [
       "Sign in as safety@example.test",
@@ -3062,25 +3061,16 @@
       "Prototype event name 'Product Launch — Tideline' (must not appear)"
     ],
     "expected": [
-      "Safety desk heading, a 'Safety checks' list with 'No events are awaiting a safety check.' in the reset fixture, a menu of exactly [Dashboard] and no prototype event",
+      "Safety desk heading, a live '0 events are awaiting a safety check.' count (SG2-91 replaced the earlier 'No safety checks yet' placeholder), a menu of exactly [Dashboard, Safety checks] and no prototype event",
       "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
       "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
     ],
     "evidence": "e2e/regression.spec.ts; client/src/App.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/mock/viewModel.test.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "PASS: ran in the 121/121 local Chromium run on 19 Oct 2026 against the production app build and reset loopback fixture. Hosted CI for this revision is pending.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-92-safety-decision working tree; npm run test:e2e; 121 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. No hosted Supabase validation.",
-    "execution_date": "19 Oct 2026",
-    "executed_by": "Claude (automated local verification)",
-    "previous_executions": [
-      {
-        "status": "Pass",
-        "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture (Safety desk was the 'No safety checks yet' placeholder).",
-        "execution_evidence": "10 Oct 2026; bugfix/SG2-86-new-role-dashboards on origin/main 88a431a; npm run test:regression locally in Chromium: 76/76 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
-        "execution_date": "10 Oct 2026"
-      }
-    ]
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+    "execution_evidence": "10 Oct 2026; bugfix/SG2-86-new-role-dashboards on origin/main 88a431a; npm run test:regression locally in Chromium: 76/76 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "10 Oct 2026"
   },
   {
     "id": "SG2-87-P01",
@@ -6752,28 +6742,114 @@
     "review": null
   },
   {
+    "id": "SG2-91-P01",
+    "title": "the Safety Officer reviews each awaiting event with everything the check needs, including the crowd movement its coordinator recorded",
+    "story": "SG2-91",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-91:AC2",
+      "SG2-91:AC3"
+    ],
+    "method_id": null,
+    "purpose": "Verify that a coordinator can record an event's expected crowd movement during planning without taking it out of the safety check, and that the Safety Officer's desk (a card per awaiting event, each opening that event's review on its own) and Safety checks list show exactly the events awaiting a check, oldest wait first, each with expected attendance, accessibility requirements, crowd movement, every booked venue's capacity, layout, emergency access and known restrictions, and every piece of equipment with where it will be placed, laid out without sideways scrolling on phone and laptop widths.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks: 911 Harbour Lecture and 913 Studio Talk await their check (since 1 and 2 Jul 2030); 912 Riverside Gala is still in Planning with a pending venue request. All three are coordinated by coordinator@example.test.",
+    "steps": [
+      "Sign in as coordinator@example.test; open Harbour Lecture from My assigned events; Edit Planning Information",
+      "Fill Expected Crowd Movement and Save Planning Details",
+      "Sign in as safety@example.test; read the desk count and its event cards",
+      "Click the Studio Talk card, then Show all 2 safety checks; return to the Dashboard and click Open safety checks",
+      "Read the Harbour Lecture and Studio Talk cards",
+      "Resize to 390px and 1440px"
+    ],
+    "data": [
+      "Harbour Lecture: 80 attendees, 'Wheelchair seating near the aisle'; Regression Hall (Level 1, capacity 100, theatre layout, 'Two exits onto the north concourse', 'No open flames'); 4 wireless microphones placed 'Either side of the stage' with 'Cable ramps across the aisle'",
+      "Crowd movement entered: 'Arrive through the north doors, leave by the south exits after the talk'",
+      "Studio Talk: 80 attendees in Quiet Room (capacity 20, no recorded operations), no equipment"
+    ],
+    "expected": [
+      "The planning drawer saves and closes; the desk says '2 events are awaiting a safety check.'",
+      "The desk shows a card for Harbour Lecture (with Regression Hall) then Studio Talk; clicking Studio Talk opens its safety check on its own, and Show all returns both events",
+      "The list heading reads '2 events awaiting a safety check'; the cards are Harbour Lecture then Studio Talk; Riverside Gala is not listed",
+      "Harbour Lecture shows 80, the accessibility need, the entered crowd movement, 'Regression Hall · Level 1', 100, Theatre, the step-free access, emergency access and restriction, '4 × Wireless microphones', 'Regression Hall — Either side of the stage' and the cable ramps note",
+      "Studio Talk shows '20 (below expected attendance of 80)', 'No equipment requested.' and 'Not recorded' for its emergency access and restrictions",
+      "Neither width scrolls sideways"
+    ],
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "executed_by": "Automated test runner",
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-91-safety-check-queue working tree; npx playwright test e2e/regression.spec.ts -g \"SG2-91\" (2 passed); local Playwright Chromium against the production client build. No hosted Supabase validation.",
+    "status": "Pass"
+  },
+  {
+    "id": "SG2-91-N01",
+    "title": "no role but the Safety Officer can open the safety check list, in the menu or through the API",
+    "story": "SG2-91",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-91:AC4"
+    ],
+    "method_id": null,
+    "purpose": "Verify that every other role is refused the safety check list by the real HTTP route, an unsigned request is refused as unauthenticated, and neither the coordinator nor the Event Coordinator Lead is offered Safety checks in the menu.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks so the list is not empty.",
+    "steps": [
+      "As organiser, coordinator, venue, support, attendee and lead: GET /api/safety-checks",
+      "Without a token: GET /api/safety-checks",
+      "Sign in as coordinator@example.test, then lead@example.test, and read the navigation once permissions load"
+    ],
+    "data": [
+      "The seeded awaiting events 911 and 913"
+    ],
+    "expected": [
+      "Each of the six roles receives 403 {error: 'Access denied'}",
+      "The unsigned request receives 401",
+      "Neither navigation offers Safety checks"
+    ],
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in a Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
+    "executed_by": "Automated test runner",
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-91-safety-check-queue working tree; npx playwright test e2e/regression.spec.ts -g \"SG2-91\" (2 passed); local Playwright Chromium against the production client build. No hosted Supabase validation.",
+    "status": "Pass"
+  },
+  {
     "id": "SG2-92-P01",
     "title": "The Safety Officer approves, rejects and requests changes, and each event moves on with the organiser and coordinator told",
     "type": "NORMAL",
     "story": "SG2-92",
-    "categories": ["NORMAL"],
-    "mapped_acs": ["SG2-92:AC1", "SG2-92:AC2", "SG2-92:AC3", "SG2-92:AC4", "SG2-92:AC5", "SG2-92:AC6"],
-    "purpose": "Browser journey for the Safety Officer's decision. The list of events awaiting a check is a stand-in for SG2-91 (not built yet); the decision, status moves, notices and history are real.",
-    "preconditions": "Production React build on the isolated loopback Express fixture; /__e2e/reset then /__e2e/safety-decisions seed 921 Harbour Gala, 922 Riverside Fair and 923 Bayfront Talk in awaiting_safety_check, each organised by organiser, assigned to coordinator, with Regression Hall (capacity 100) booked and 4 wireless microphones placed Stage left. No hosted Supabase.",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-92:AC1",
+      "SG2-92:AC2",
+      "SG2-92:AC3",
+      "SG2-92:AC4",
+      "SG2-92:AC5",
+      "SG2-92:AC6"
+    ],
+    "purpose": "Browser journey for the Safety Officer's decision on SG2-91's list of events awaiting a check: the decision, status moves, notices and history.",
+    "preconditions": "Production React build on the isolated loopback Express fixture; /__e2e/reset then /__e2e/safety-decisions seed 921 Harbour Gala, 922 Riverside Fair and 923 Bayfront Talk in awaiting_safety_check at safety_check_revision 1 (awaiting since 1, 2 and 3 Jul 2030), each organised by organiser, assigned to coordinator, with an approved and booked Regression Hall request and 4 wireless microphones placed Stage left. No hosted Supabase.",
     "steps": [
-      "Sign in as safety at 1440px; read the stand-in note and the three listed events.",
-      "Open Riverside Fair, choose Reject without a reason and record; read the refusal.",
+      "Sign in as safety at 1440px; read the desk count, then open Safety checks from the menu and read the listed events.",
+      "On Riverside Fair, read the venue, equipment and earlier decisions; choose Reject without a reason and record; read the refusal.",
       "Approve Harbour Gala; reject Riverside Fair with 'Crowd flow blocks the east fire exit'; request changes on Bayfront Talk naming Venue and Other with 'Widen the aisles'.",
       "Read the ledger, then sign in as organiser and open the notifications."
     ],
     "data": "Events 921/922/923; reason texts as above; arrangements venue and other.",
-    "expected": "The review shows the hall with its capacity and the microphones with placement and no earlier decisions; Reject without a reason is refused before anything is sent. Each recorded decision leaves the list with a confirmation. Statuses become preparation, safety_rejected and planning; three decisions are stored with the Safety Officer as decider; history has Approved / Rejected: <reason> / Changes requested (Venue, Other): <reason>; organiser and coordinator each get one exact notice per decision; the organiser sees three 'Safety check' notices.",
+    "expected": "The desk says 3 events are awaiting a safety check; the list shows Harbour Gala, Riverside Fair, Bayfront Talk in that order. Riverside Fair shows 'Regression Hall · Level 1', '4 × Wireless microphones' and no earlier decisions; Reject without a reason is refused before anything is sent. Each recorded decision re-reads the list without the event and confirms who was told; after the third the list says no events await a check. Statuses become preparation, safety_rejected and planning; three decisions are stored with the Safety Officer as decider; history has Approved / Rejected: <reason> / Changes requested (Venue, Other): <reason>; organiser and coordinator each get one exact notice per decision; the organiser sees three 'Safety check' notices.",
     "evidence": "e2e/safety-decisions.spec.ts; e2e/support/safety-decisions.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
-    "actual": "PASS: ran in the 121/121 local Chromium run on 19 Oct 2026; manual visual check of the review panel at 1440px and 390px (no horizontal overflow). Hosted CI for this revision is pending.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-92-safety-decision working tree; npm run test:e2e.",
-    "execution_date": "19 Oct 2026",
+    "actual": "PASS: ran in the 124/124 local Chromium run against the production app build and reset loopback fixture; manual visual check of the review, the decision form and the stale notice at 1440px and 390px (no horizontal overflow). Hosted CI for this revision is pending.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-92-safety-decision merge of origin/main (SG2-91); npm run test:e2e; 124 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   },
@@ -6782,10 +6858,15 @@
     "title": "The coordinator sees the rejection and its reason, and reworks the event back to Planning",
     "type": "NORMAL",
     "story": "SG2-92",
-    "categories": ["NORMAL"],
-    "mapped_acs": ["SG2-92:AC4", "SG2-92:AC6"],
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-92:AC4",
+      "SG2-92:AC6"
+    ],
     "purpose": "The assigned coordinator's side of a Safety Rejected event (AC4).",
-    "preconditions": "Same fixture as SG2-92-P01; Riverside Fair rejected through the API by the Safety Officer.",
+    "preconditions": "Same fixture as SG2-92-P01; Riverside Fair rejected through the API by the Safety Officer at safety_check_revision 1.",
     "steps": [
       "Sign in as coordinator at 390px and open Riverside Fair from My assigned events.",
       "Read the latest safety decision, then choose Rework arrangements."
@@ -6795,9 +6876,9 @@
     "evidence": "e2e/safety-decisions.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
-    "actual": "PASS: ran in the 121/121 local Chromium run on 19 Oct 2026. Hosted CI for this revision is pending.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-92-safety-decision working tree; npm run test:e2e.",
-    "execution_date": "19 Oct 2026",
+    "actual": "PASS: ran in the 124/124 local Chromium run against the production app build and reset loopback fixture; manual visual check of the review, the decision form and the stale notice at 1440px and 390px (no horizontal overflow). Hosted CI for this revision is pending.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-92-safety-decision merge of origin/main (SG2-91); npm run test:e2e; 124 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   },
@@ -6806,49 +6887,98 @@
     "title": "Only the Safety Officer decides, only once per check, and only with what each decision needs",
     "type": "FAILURE / CONFLICT",
     "story": "SG2-92",
-    "categories": ["FAILURE", "CONFLICT"],
-    "mapped_acs": ["SG2-92:AC1", "SG2-92:AC2", "SG2-92:AC4"],
+    "categories": [
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-92:AC1",
+      "SG2-92:AC2",
+      "SG2-92:AC4"
+    ],
     "purpose": "Role, validation and once-per-check refusals of the decision routes.",
     "preconditions": "Same fixture as SG2-92-P01.",
     "steps": [
-      "As coordinator and organiser, record a decision on 921.",
-      "As safety, request changes on 923 without arrangements; approve 921; then reject 921.",
-      "As coordinator, rework 921 and read the queue; as organiser, read 921's decisions."
+      "As coordinator and organiser, record a decision on 921 at revision 1.",
+      "As safety, request changes on 923 without arrangements or a revision; approve 921 at revision 1; then reject 921.",
+      "As coordinator, rework 921 and read the safety check list; as organiser, read 921's decisions."
     ],
     "data": "Events 921 and 923.",
-    "expected": "403 for coordinator and organiser; 400 naming the missing arrangement; 201 then 409 with status preparation; rework 409 'Only a Safety Rejected event can be reworked.'; queue 403 for the coordinator; the organiser reads one approve decision; only one decision stored and 922/923 still awaiting a check.",
+    "expected": "403 for coordinator and organiser; 400 naming the missing arrangement and the missing revision; 201 then 409 with status preparation; rework 409 'Only a Safety Rejected event can be reworked.'; safety check list 403 for the coordinator; the organiser reads one approve decision; only one decision stored and 922/923 still awaiting a check.",
     "evidence": "e2e/safety-decisions.spec.ts",
     "layer": "Playwright Chromium + isolated production app (API level)",
     "status": "Pass",
-    "actual": "PASS: ran in the 121/121 local Chromium run on 19 Oct 2026. Hosted CI for this revision is pending.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-92-safety-decision working tree; npm run test:e2e.",
-    "execution_date": "19 Oct 2026",
+    "actual": "PASS: ran in the 124/124 local Chromium run against the production app build and reset loopback fixture; manual visual check of the review, the decision form and the stale notice at 1440px and 390px (no horizontal overflow). Hosted CI for this revision is pending.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-92-safety-decision merge of origin/main (SG2-91); npm run test:e2e; 124 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   },
   {
+    "id": "SG2-92-N02",
+    "title": "A decision on details that changed after the review opened is refused, and the event is reviewed again as it now stands",
+    "type": "CONFLICT",
+    "story": "SG2-92",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-92:AC1"
+    ],
+    "purpose": "The decision carries the safety_check_revision SG2-91's list showed; a decision on a review the event has moved on from is refused and nothing is written.",
+    "preconditions": "Same fixture as SG2-92-P01.",
+    "steps": [
+      "Sign in as safety and open Safety checks; read Harbour Gala's expected attendance.",
+      "Through /__e2e/safety-decisions-change/921, raise its attendance to 450, moving its revision to 2.",
+      "Approve Harbour Gala from the open review; read the message, the re-read event and the ledger.",
+      "Approve it again; then, through the API, approve 922 with revision 0."
+    ],
+    "data": "Event 921 (attendance 80 → 450, revision 1 → 2); event 922 at revision 1.",
+    "expected": "The first approval shows 'This event changed after you opened it. Refresh the safety checks and review it again.', the list is re-read and Harbour Gala shows 450; 921 is still awaiting a check with no decision or notice stored. The second approval goes through and 921 moves to preparation. The API answers 409 {code: 'stale', revision: 1} for 922.",
+    "evidence": "e2e/safety-decisions.spec.ts; e2e/support/safety-decisions.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the 124/124 local Chromium run against the production app build and reset loopback fixture; manual visual check of the review, the decision form and the stale notice at 1440px and 390px (no horizontal overflow). Hosted CI for this revision is pending.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-92-safety-decision merge of origin/main (SG2-91); npm run test:e2e; 124 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
+  },
+  {
     "id": "SG2-92-INT01",
-    "title": "Native safety decisions move each event on, notify both people, keep who and why, and let the coordinator rework a rejection",
+    "title": "Native safety decisions on SG2-91's list move each event on, refuse a stale review, notify both people, keep who and why, and let the coordinator rework a rejection",
     "type": "NORMAL / CONFLICT / FAILURE",
     "story": "SG2-92",
-    "categories": ["NORMAL", "CONFLICT", "FAILURE"],
-    "mapped_acs": ["SG2-92:AC1", "SG2-92:AC2", "SG2-92:AC3", "SG2-92:AC4", "SG2-92:AC5", "SG2-92:AC6"],
-    "purpose": "Prove the real Express handlers, DB adapters, stand-in queue and both RPCs (record_safety_decision, rework_safety_rejected_event) end to end.",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-92:AC1",
+      "SG2-92:AC2",
+      "SG2-92:AC3",
+      "SG2-92:AC4",
+      "SG2-92:AC5",
+      "SG2-92:AC6"
+    ],
+    "purpose": "Prove the real Express handlers, DB adapters, SG2-91's safety_check_queue read with the caller's JWT, and both RPCs (record_safety_decision with its revision check, rework_safety_rejected_event) end to end.",
     "preconditions": "Disposable PostgreSQL with every migration and integration/seed.sql (now including a synthetic Safety Officer), PostgREST in front; synthetic loopback JWTs only.",
     "steps": [
       "Plan three events and set them awaiting_safety_check through the service client.",
-      "Refuse queue/decision for coordinator, organiser and Lead; read the queue as the Safety Officer.",
-      "Refuse an incomplete Request Changes; approve, reject and request changes; try a second decision.",
+      "Refuse the list and the decision for coordinator, organiser and Lead; read each event's safety_check_revision from the list as the Safety Officer.",
+      "Refuse an incomplete Request Changes; raise one event's attendance and refuse its decision on the revision read before; re-read the list.",
+      "Approve, reject and request changes on the revisions now shown; try a second decision.",
       "Read the history as the organiser and another coordinator; read audit rows and notices; rework as another coordinator, on the approved event, then on the rejected one."
     ],
     "data": "Reasons 'Crowd flow blocks the east exit' and 'Widen the aisles'; arrangements equipment, venue.",
-    "expected": "403s; queue labelled stand-in with the coordinator's name; 400 with both details; statuses preparation / safety_rejected / planning with the decider's name; 409 with status preparation; organiser reads the stored decision, another coordinator 404; audit 'Changes requested (Equipment and technical, Venue): Widen the aisles' then the status row; organiser and coordinator each get the exact rejection notice; rework 404, 409, then 200 to planning.",
-    "evidence": "integration/api.test.ts; integration/seed.sql; integration/cleanup.sql; supabase/migrations/202610190004_safety_decisions.sql",
+    "expected": "403s; the list carries a whole-number revision for each event; 400 with both details; the stale decision answers 409 {code: 'stale', revision: seen + 1} and stores no decision; statuses preparation / safety_rejected / planning with the decider's name; 409 with status preparation; organiser reads the stored decision, another coordinator 404; audit 'Changes requested (Equipment and technical, Venue): Widen the aisles' then the status row; organiser and coordinator each get the exact rejection notice; rework 404, 409, then 200 to planning.",
+    "evidence": "integration/api.test.ts; integration/seed.sql; integration/cleanup.sql; supabase/migrations/202610190005_safety_decisions.sql; supabase/migrations/202610190006_safety_decision_revision.sql",
     "layer": "Real local public API/PostgREST/PostgreSQL integration",
     "status": "Pass",
-    "actual": "PASS (local): 18/18 native integration tests on PostgreSQL 16 + PostgREST 16.4, and the cleanup script ran clean. CI uses PostgreSQL 17 + PostgREST 12.2.12; hosted CI for this revision is pending.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-92-safety-decision working tree; local equivalent of npm run test:integration without Docker.",
-    "execution_date": "19 Oct 2026",
+    "actual": "PASS: 18/18 with npm run test:integration (PostgreSQL 17 + PostgREST 12.2.12 in Docker, as CI), and 18/18 on local PostgreSQL 16 + PostgREST with cleanup. Hosted CI for this revision is pending.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-92-safety-decision merge of origin/main (SG2-91); npm run test:integration.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   },
@@ -6857,24 +6987,37 @@
     "title": "Database contracts for safety decisions and reworking a rejection",
     "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
     "story": "SG2-92",
-    "categories": ["NORMAL", "BOUNDARY", "CONFLICT", "FAILURE"],
-    "mapped_acs": ["SG2-92:AC1", "SG2-92:AC2", "SG2-92:AC3", "SG2-92:AC4", "SG2-92:AC5", "SG2-92:AC6"],
-    "purpose": "Rolled-back SQL suite for migration 202610190004.",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-92:AC1",
+      "SG2-92:AC2",
+      "SG2-92:AC3",
+      "SG2-92:AC4",
+      "SG2-92:AC5",
+      "SG2-92:AC6"
+    ],
+    "purpose": "Rolled-back SQL suite for migrations 202610190005 (safety decisions) and 202610190006 (the reviewed revision).",
     "preconditions": "Disposable PostgreSQL with the auth fixture and every migration; the suite runs in one rolled-back transaction (CI database job).",
     "steps": [
-      "Record each decision and check status, stored row, history and the two exact notices (blank name, missing coordinator, same person).",
+      "Record each decision on the revision the event stands at and check status, stored row, history and the two exact notices (blank name, missing coordinator, same person).",
       "Refuse invalid input (missing/blank/2001-character reason, unknown or duplicate arrangements) and accept 2000 characters.",
       "Refuse a closed check, a non-Safety-Officer actor and a missing event, writing nothing.",
+      "Raise a reviewed detail; refuse the decision on the earlier revision and one with no revision, writing nothing; accept it on the current revision; check the five-argument function is gone.",
       "Rework only from safety_rejected by the assigned coordinator; check grants, append-only table and constraints."
     ],
     "data": "Synthetic events, users and roles inside the rolled-back transaction.",
     "expected": "Every raise-exception assertion stays silent; anon and authenticated cannot read, write or call the functions; decisions cannot be updated or deleted.",
-    "evidence": "supabase/tests/safety_decisions.sql; supabase/migrations/202610190004_safety_decisions.sql",
+    "evidence": "supabase/tests/safety_decisions.sql; supabase/migrations/202610190005_safety_decisions.sql; supabase/migrations/202610190006_safety_decision_revision.sql",
     "layer": "Rolled-back SQL against disposable PostgreSQL",
     "status": "Pass",
-    "actual": "PASS (local): every migration, release_readiness.sql and every CI-listed suite passed on PostgreSQL 16. CI uses PostgreSQL 17; hosted CI for this revision is pending.",
-    "execution_evidence": "19 Oct 2026; feature/SG2-92-safety-decision working tree; local replay of the CI database job without Docker.",
-    "execution_date": "19 Oct 2026",
+    "actual": "PASS: CI's database-tests job replayed on postgres:17 in Docker (every migration, release_readiness.sql, every listed suite and concurrency script, including safety_check_queue.sql and test-safety-check-concurrency.mjs). Hosted CI for this revision is pending.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-92-safety-decision merge of origin/main (SG2-91); local replay of the CI database-tests job.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   }

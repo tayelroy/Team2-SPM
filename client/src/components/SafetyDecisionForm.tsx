@@ -14,9 +14,16 @@ import {
 
 export interface SafetyDecisionFormProps {
   eventId: number;
+  /** The event's safety_check_revision as SG2-91's list showed it. */
+  expectedRevision: number;
   accessToken: string;
   /** Called once the server has recorded the decision and moved the event on. */
   onRecorded: (recorded: RecordedSafetyDecision) => void;
+  /**
+   * Called with the server's words when the event changed after it was
+   * opened, so the list can be re-read and the event reviewed again.
+   */
+  onStale: (message: string) => void;
 }
 
 /**
@@ -24,8 +31,9 @@ export interface SafetyDecisionFormProps {
  * changes. Reject and Request changes need a reason; Request changes also
  * names the arrangements to change. The same rules are checked here before
  * sending and again by the server, whose refusal is shown as it words it.
+ * The decision is refused if the event changed since this review was opened.
  */
-export default function SafetyDecisionForm({ eventId, accessToken, onRecorded }: SafetyDecisionFormProps) {
+export default function SafetyDecisionForm({ eventId, expectedRevision, accessToken, onRecorded, onStale }: SafetyDecisionFormProps) {
   const id = useId();
   const [decision, setDecision] = useState<SafetyDecisionKind | null>(null);
   const [reason, setReason] = useState('');
@@ -55,10 +63,11 @@ export default function SafetyDecisionForm({ eventId, accessToken, onRecorded }:
     if (found.length > 0) return;
     inFlight.current = true;
     setBusy(true);
-    const result = await recordSafetyDecision(eventId, draft, accessToken);
+    const result = await recordSafetyDecision(eventId, draft, expectedRevision, accessToken);
     inFlight.current = false;
     setBusy(false);
     if (result.ok) onRecorded(result.recorded);
+    else if (result.kind === 'stale') onStale(result.message);
     else setProblems([result.message, ...(result.details ?? [])]);
   };
 

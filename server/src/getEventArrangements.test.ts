@@ -44,6 +44,7 @@ const MOCK_EVENT: EventPlanningRecord = {
   registration_opens_at: '2026-11-01T00:00:00.000Z',
   registration_closes_at: '2026-11-03T00:00:00.000Z',
   planning_notes: null,
+  expected_crowd_movement: null,
   arrangements_recheck_needed: false,
   outstanding_arrangements: []
 };

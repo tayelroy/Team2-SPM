@@ -33,7 +33,7 @@ const EVENT: ChangeImpactEventRecord = {
   expected_attendance: 120, proposed_date: START, venue_requirements: 'A stage', accessibility_needs: null,
   equipment_requirements: null, registration_needed: true, registration_capacity: 150,
   registration_opens_at: '2026-01-01T00:00:00.000Z', registration_closes_at: '2030-06-19T16:00:00.000Z',
-  planning_notes: null, arrangements_recheck_needed: false, outstanding_arrangements: []
+  planning_notes: null, expected_crowd_movement: null, arrangements_recheck_needed: false, outstanding_arrangements: []
 };
 const FACTS: ChangeImpactFacts = {
   venues: [{ kind: 'venue_booking', id: 5, venue_name: 'The Kelp Room', capacity: 150, starts_at: START, ends_at: END, exception_attendance: null }],

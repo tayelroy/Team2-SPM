@@ -384,24 +384,25 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 // SG2-97 gives the Lead its own dedicated test below, so this loop now covers
 // only the Safety Officer.
 for (const role of ['safety_officer'] as const) {
-  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-92:AC1] GET /api/auth/me for ${role} returns the profile grants plus the safety check queue and decision, the SG2-100 reads, venue safety details and read-only equipment placement`, async () => {
+  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, 200);
     // SG2-100 added the stage and history reads both Week 7 roles need,
-    // SG2-77 the venue safety details, SG2-53 equipment placement and SG2-92
-    // the safety check queue (a stand-in for SG2-91) and its decision.
+    // SG2-77 the venue safety details, and SG2-53 equipment placement; the queues
+    // they act on arrive with SG2-87/88/91/97; SG2-91 adds the safety check list
+    // and SG2-92 the decision on each event in it.
     assert.deepEqual(res.body, {
       userId,
       role,
       permissions: [
-        'safety_checks.view',
         'event_request.safety_decision.record',
         'event_request.safety_decisions.view',
         'event_request.stage.view',
         'event_request.history.view',
         'venues.operations.read',
         'equipment_requirements.read',
+        'safety_checks.read',
         'profile.read',
         'profile.update'
       ]
@@ -475,17 +476,17 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
   }
 });
 
-test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-92:AC1] the Safety Officer holds exactly the profile grants plus the safety check queue and decision, the SG2-100 reads, venue safety details and read-only equipment placement', () => {
+test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] the Safety Officer holds exactly the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision', () => {
   // Written as an independent literal, never computed from PERMISSIONS: this
   // file's snapshot went stale during SG2-86 for exactly that reason.
   const EXPECTED = [
-    'safety_checks.view',
     'event_request.safety_decision.record',
     'event_request.safety_decisions.view',
     'event_request.stage.view',
     'event_request.history.view',
     'venues.operations.read',
     'equipment_requirements.read',
+    'safety_checks.read',
     'profile.read',
     'profile.update'
   ];

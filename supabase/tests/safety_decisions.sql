@@ -1,5 +1,7 @@
 -- SG2-92 record_safety_decision / rework_safety_rejected_event contract and
 -- the event_safety_decisions table, with isolated fixture changes rolled back.
+-- Every decision carries the safety_check_revision SG2-91's list showed
+-- (202610190006); pg_temp.rev() reads the event as it stands.
 begin;
 insert into auth.users(id)
  select ('d9200000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid from generate_series(1,5) n;
@@ -18,7 +20,7 @@ insert into public.account_roles(user_id,role) values
 insert into public.events(event_id,organiser_id,coordinator_id,name,status,proposed_date,expected_attendance)
  select 99200+n,'d9200000-0000-4000-8000-000000000001','d9200000-0000-4000-8000-000000000002',
   'Safety event '||n,'awaiting_safety_check','2031-11-01T09:00Z',120
- from generate_series(1,12) n;
+ from generate_series(1,13) n;
 update public.events set name='Harbour Gala' where event_id=99201;
 -- 99205: no name, and its organiser also coordinates it (one notice only).
 update public.events set name='',coordinator_id='d9200000-0000-4000-8000-000000000001' where event_id=99205;
@@ -26,20 +28,22 @@ update public.events set name='',coordinator_id='d9200000-0000-4000-8000-0000000
 update public.events set coordinator_id=null where event_id=99206;
 update public.events set status='planning' where event_id=99207;
 update public.events set status='safety_rejected' where event_id=99210;
+create function pg_temp.rev(p_event_id integer) returns bigint language sql stable
+  as $$ select safety_check_revision from public.events where event_id = p_event_id $$;
 
 -- AC1/AC3/AC5/AC6: Approve moves the event on to Preparation.
 set local role service_role;
 do $$
 declare result jsonb;
 begin
- result := public.record_safety_decision(99201,'d9200000-0000-4000-8000-000000000004','approve',null,null);
+ result := public.record_safety_decision(99201,'d9200000-0000-4000-8000-000000000004','approve',null,null,pg_temp.rev(99201));
  if result->>'outcome' is distinct from 'ok' or result->>'decision' is distinct from 'approve'
    or result->>'previous_status' is distinct from 'awaiting_safety_check' or result->>'status' is distinct from 'preparation'
    or (result->>'decision_id')::bigint is distinct from (select decision_id from public.event_safety_decisions where event_id=99201)
    or (result->>'decided_at')::timestamptz is distinct from (select decided_at from public.event_safety_decisions where event_id=99201) then
   raise exception '[SG2-92:approve-result] [SG2-92:AC3] [NORMAL] Approving must report the decision and the move to Preparation: %', result;
  end if;
- result := public.record_safety_decision(99202,'d9200000-0000-4000-8000-000000000004','approve','  Keep the fire exits clear.  ','[]');
+ result := public.record_safety_decision(99202,'d9200000-0000-4000-8000-000000000004','approve','  Keep the fire exits clear.  ','[]',pg_temp.rev(99202));
  if result->>'status' is distinct from 'preparation' then
   raise exception '[SG2-92:approve-note-result] [SG2-92:AC3] [NORMAL] Approving with a note must move to Preparation: %', result;
  end if;
@@ -79,7 +83,7 @@ set local role service_role;
 do $$
 declare result jsonb;
 begin
- result := public.record_safety_decision(99203,'d9200000-0000-4000-8000-000000000004','reject','No crowd management plan',null);
+ result := public.record_safety_decision(99203,'d9200000-0000-4000-8000-000000000004','reject','No crowd management plan',null,pg_temp.rev(99203));
  if result->>'outcome' is distinct from 'ok' or result->>'decision' is distinct from 'reject'
    or result->>'status' is distinct from 'safety_rejected' then
   raise exception '[SG2-92:reject-result] [SG2-92:AC4] [NORMAL] Rejecting must leave the event Safety Rejected: %', result;
@@ -113,13 +117,13 @@ do $$
 declare result jsonb;
 begin
  result := public.record_safety_decision(99204,'d9200000-0000-4000-8000-000000000004','request_changes',
-  'Stage too close to the exit','["equipment","venue"]');
+  'Stage too close to the exit','["equipment","venue"]',pg_temp.rev(99204));
  if result->>'outcome' is distinct from 'ok' or result->>'decision' is distinct from 'request_changes'
    or result->>'status' is distinct from 'planning' then
   raise exception '[SG2-92:changes-result] [SG2-92:AC1] [NORMAL] Requesting changes must return the event to Planning: %', result;
  end if;
- perform public.record_safety_decision(99205,'d9200000-0000-4000-8000-000000000004','request_changes','Add a steward','["other"]');
- perform public.record_safety_decision(99206,'d9200000-0000-4000-8000-000000000004','reject','Unsafe rigging',null);
+ perform public.record_safety_decision(99205,'d9200000-0000-4000-8000-000000000004','request_changes','Add a steward','["other"]',pg_temp.rev(99205));
+ perform public.record_safety_decision(99206,'d9200000-0000-4000-8000-000000000004','reject','Unsafe rigging',null,pg_temp.rev(99206));
 end $$;
 reset role;
 do $$
@@ -174,12 +178,12 @@ begin
    ('escalate', 'Why', null, 'an unknown decision'),
    (null, 'Why', null, 'no decision')
  ) as cases(decision, reason, arrangements, label) loop
-  result := public.record_safety_decision(99208,'d9200000-0000-4000-8000-000000000004',bad.decision,bad.reason,bad.arrangements);
+  result := public.record_safety_decision(99208,'d9200000-0000-4000-8000-000000000004',bad.decision,bad.reason,bad.arrangements,pg_temp.rev(99208));
   if result is distinct from '{"outcome":"invalid"}'::jsonb then
    raise exception '[SG2-92:invalid-refused] [SG2-92:AC2] [FAILURE] % must be refused: %', bad.label, result;
   end if;
  end loop;
- result := public.record_safety_decision(99209,'d9200000-0000-4000-8000-000000000004','reject',repeat('r', 2000),'null');
+ result := public.record_safety_decision(99209,'d9200000-0000-4000-8000-000000000004','reject',repeat('r', 2000),'null',pg_temp.rev(99209));
  if result->>'status' is distinct from 'safety_rejected' then
   raise exception '[SG2-92:reason-2000] [SG2-92:AC2] [BOUNDARY] A 2000-character reason must be accepted: %', result;
  end if;
@@ -204,21 +208,21 @@ end $$;
 set local role service_role;
 do $$
 begin
- if public.record_safety_decision(99207,'d9200000-0000-4000-8000-000000000004','approve',null,null)
+ if public.record_safety_decision(99207,'d9200000-0000-4000-8000-000000000004','approve',null,null,pg_temp.rev(99207))
      is distinct from '{"outcome":"closed","status":"planning"}'::jsonb
-   or public.record_safety_decision(99201,'d9200000-0000-4000-8000-000000000004','reject','Again',null)
+   or public.record_safety_decision(99201,'d9200000-0000-4000-8000-000000000004','reject','Again',null,pg_temp.rev(99201))
      is distinct from '{"outcome":"closed","status":"preparation"}'::jsonb then
   raise exception '[SG2-92:closed] [SG2-92:AC1] [CONFLICT] An event not awaiting a check must be refused with its status';
  end if;
- if public.record_safety_decision(99211,'d9200000-0000-4000-8000-000000000002','approve',null,null)
+ if public.record_safety_decision(99211,'d9200000-0000-4000-8000-000000000002','approve',null,null,pg_temp.rev(99211))
      is distinct from '{"outcome":"forbidden"}'::jsonb
-   or public.record_safety_decision(99211,'d9200000-0000-4000-8000-000000000005','approve',null,null)
+   or public.record_safety_decision(99211,'d9200000-0000-4000-8000-000000000005','approve',null,null,pg_temp.rev(99211))
      is distinct from '{"outcome":"forbidden"}'::jsonb
-   or public.record_safety_decision(99211,null,'approve',null,null)
+   or public.record_safety_decision(99211,null,'approve',null,null,pg_temp.rev(99211))
      is distinct from '{"outcome":"forbidden"}'::jsonb then
   raise exception '[SG2-92:forbidden] [SG2-92:AC1] [FAILURE] Anyone but a Safety Officer must be refused';
  end if;
- if public.record_safety_decision(999999,'d9200000-0000-4000-8000-000000000004','approve',null,null)
+ if public.record_safety_decision(999999,'d9200000-0000-4000-8000-000000000004','approve',null,null,0)
      is distinct from '{"outcome":"missing"}'::jsonb then
   raise exception '[SG2-92:missing] [SG2-92:AC1] [FAILURE] A missing event must be reported missing';
  end if;
@@ -293,7 +297,7 @@ begin
    raise exception '[SG2-92:table-unwritable] [SG2-92:AC6] [FAILURE] % must not write safety decisions', client;
   exception when insufficient_privilege then null; end;
   begin
-   perform public.record_safety_decision(99212,'d9200000-0000-4000-8000-000000000004','approve',null,null);
+   perform public.record_safety_decision(99212,'d9200000-0000-4000-8000-000000000004','approve',null,null,0);
    raise exception '[SG2-92:record-server-only] [SG2-92:AC1] [FAILURE] % must not record a decision directly', client;
   exception when insufficient_privilege then null; end;
   begin
@@ -334,6 +338,46 @@ begin
      and pg_get_constraintdef(oid) like '%safety_decision%'
      and pg_get_constraintdef(oid) like '%event_returned_to_planning%') then
   raise exception '[SG2-92:notice-kind-allowed] [SG2-92:AC5] [NORMAL] The safety decision notice kind must be allowed alongside every earlier kind';
+ end if;
+end $$;
+
+-- SG2-92 with SG2-91: a decision on a review whose details have since changed
+-- is refused with the current revision and writes nothing; the same decision
+-- on the event as it now stands goes through.
+set local role service_role;
+do $$
+declare
+ seen bigint := pg_temp.rev(99213);
+ result jsonb;
+begin
+ update public.events set expected_attendance = 450 where event_id = 99213;
+ if pg_temp.rev(99213) is distinct from seen + 1 then
+  raise exception '[SG2-92:revision-moves] [SG2-92:AC1] [BOUNDARY] A reviewed detail changing must move the safety check revision on';
+ end if;
+ result := public.record_safety_decision(99213,'d9200000-0000-4000-8000-000000000004','approve',null,null,seen);
+ if result is distinct from jsonb_build_object('outcome','stale','revision',seen + 1) then
+  raise exception '[SG2-92:stale-refused] [SG2-92:AC1] [CONFLICT] A decision on a review the event has moved on from must be refused with the current revision: %', result;
+ end if;
+ result := public.record_safety_decision(99213,'d9200000-0000-4000-8000-000000000004','approve',null,null,null);
+ if result->>'outcome' is distinct from 'stale' then
+  raise exception '[SG2-92:stale-missing-revision] [SG2-92:AC1] [FAILURE] A decision without the reviewed revision must be refused: %', result;
+ end if;
+ if (select status::text from public.events where event_id=99213) is distinct from 'awaiting_safety_check'
+   or exists(select 1 from public.event_safety_decisions where event_id=99213)
+   or exists(select 1 from public.notifications where event_id=99213)
+   or exists(select 1 from public.event_audit_logs where event_id=99213 and field_name='safety_decision') then
+  raise exception '[SG2-92:stale-no-writes] [SG2-92:AC1] [CONFLICT] A refused stale decision must write nothing';
+ end if;
+ result := public.record_safety_decision(99213,'d9200000-0000-4000-8000-000000000004','approve',null,null,seen + 1);
+ if result->>'status' is distinct from 'preparation' then
+  raise exception '[SG2-92:current-revision-accepted] [SG2-92:AC3] [NORMAL] The same decision on the current revision must go through: %', result;
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if exists(select 1 from pg_proc where proname = 'record_safety_decision' and pronargs = 5) then
+  raise exception '[SG2-92:old-signature-gone] [SG2-92:AC1] [FAILURE] The decision without a revision must no longer be callable';
  end if;
 end $$;
 rollback;

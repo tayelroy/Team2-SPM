@@ -740,6 +740,18 @@
       }
     },
     {
+      "id": "SG2-91",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-91",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-19",
+      "acceptanceCriteria": {
+        "AC1": "When all of an event's venue bookings are approved and its required equipment is reserved, the event's status becomes Awaiting Safety Check",
+        "AC2": "The Safety Officer can see a list of events awaiting a check",
+        "AC3": "Each event shows the information needed for the review: expected attendance, venue capacity and layout, emergency access, accessibility requirements, equipment and where it will be placed, expected crowd movement, and known venue restrictions",
+        "AC4": "Only Safety Officers can open the safety check list"
+      }
+    },
+    {
       "id": "SG2-92",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-92",
       "originalPullRequests": [],

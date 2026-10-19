@@ -6,16 +6,30 @@ import {
   validateSafetyDecision
 } from './safetyDecisions';
 
+/** The safety_check_revision SG2-91's list showed with the event. */
+const R = { safety_check_revision: 3 };
+
 describe('validateSafetyDecision (SG2-92)', () => {
-  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC2] each of the three decisions is accepted with what it needs, trimmed', () => {
-    assert.deepEqual(validateSafetyDecision({ decision: 'approve' }),
-      { valid: true, value: { decision: 'approve', reason: null, arrangements: [] } });
-    assert.deepEqual(validateSafetyDecision({ decision: 'approve', reason: '  Keep the east exit clear  ', arrangements: [] }),
-      { valid: true, value: { decision: 'approve', reason: 'Keep the east exit clear', arrangements: [] } });
-    assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason: ' Fire exit blocked ' }),
-      { valid: true, value: { decision: 'reject', reason: 'Fire exit blocked', arrangements: [] } });
-    assert.deepEqual(validateSafetyDecision({ decision: 'request_changes', reason: 'Move the stage', arrangements: ['equipment', 'venue'] }),
-      { valid: true, value: { decision: 'request_changes', reason: 'Move the stage', arrangements: ['equipment', 'venue'] } });
+  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC2] each of the three decisions is accepted with what it needs, trimmed, on the reviewed revision', () => {
+    assert.deepEqual(validateSafetyDecision({ decision: 'approve', ...R }),
+      { valid: true, value: { decision: 'approve', reason: null, arrangements: [], expectedRevision: 3 } });
+    assert.deepEqual(validateSafetyDecision({ decision: 'approve', reason: '  Keep the east exit clear  ', arrangements: [], ...R }),
+      { valid: true, value: { decision: 'approve', reason: 'Keep the east exit clear', arrangements: [], expectedRevision: 3 } });
+    assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason: ' Fire exit blocked ', ...R }),
+      { valid: true, value: { decision: 'reject', reason: 'Fire exit blocked', arrangements: [], expectedRevision: 3 } });
+    assert.deepEqual(validateSafetyDecision({ decision: 'request_changes', reason: 'Move the stage', arrangements: ['equipment', 'venue'], ...R }),
+      { valid: true, value: { decision: 'request_changes', reason: 'Move the stage', arrangements: ['equipment', 'venue'], expectedRevision: 3 } });
+  });
+
+  test('[BOUNDARY] [SG2-92:AC1] the reviewed revision must be a whole number from 0 to the largest safe integer', () => {
+    for (const safety_check_revision of [0, Number.MAX_SAFE_INTEGER]) {
+      const accepted = validateSafetyDecision({ decision: 'approve', safety_check_revision });
+      assert.equal(accepted.valid && accepted.value.expectedRevision, safety_check_revision);
+    }
+    for (const safety_check_revision of [undefined, null, -1, 1.5, '3', Number.MAX_SAFE_INTEGER + 1, Number.NaN]) {
+      assert.deepEqual(validateSafetyDecision({ decision: 'approve', safety_check_revision }),
+        { valid: false, errors: ['safety_check_revision must be the whole-number revision shown with the event.'] }, String(safety_check_revision));
+    }
   });
 
   test('[FAILURE] [SG2-92:AC1] an unknown or missing decision, or a body that is not an object, is refused', () => {
@@ -26,27 +40,27 @@ describe('validateSafetyDecision (SG2-92)', () => {
 
   test('[FAILURE] [SG2-92:AC2] Reject and Request Changes without a reason, or with a blank one, are refused', () => {
     for (const reason of [undefined, null, '', '   ']) {
-      assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason }),
+      assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason, ...R }),
         { valid: false, errors: ['A reason is required to reject.'] });
-      assert.deepEqual(validateSafetyDecision({ decision: 'request_changes', reason, arrangements: ['venue'] }),
+      assert.deepEqual(validateSafetyDecision({ decision: 'request_changes', reason, arrangements: ['venue'], ...R }),
         { valid: false, errors: ['A reason is required to request changes.'] });
     }
   });
 
   test('[BOUNDARY] [SG2-92:AC2] a 2000-character reason is accepted and 2001 refused, counted in characters', () => {
     const emoji = '🔥'.repeat(2000);
-    const accepted = validateSafetyDecision({ decision: 'reject', reason: emoji });
+    const accepted = validateSafetyDecision({ decision: 'reject', reason: emoji, ...R });
     assert.equal(accepted.valid && accepted.value.reason, emoji);
-    assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason: 'x'.repeat(2001) }),
+    assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason: 'x'.repeat(2001), ...R }),
       { valid: false, errors: ['reason must be at most 2000 characters.'] });
   });
 
   test('[FAILURE] [SG2-92:AC2] a reason that is not text is refused without asking for one again', () => {
-    assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason: 42 }), { valid: false, errors: ['reason must be text.'] });
+    assert.deepEqual(validateSafetyDecision({ decision: 'reject', reason: 42, ...R }), { valid: false, errors: ['reason must be text.'] });
   });
 
   test('[FAILURE] [SG2-92:AC2] Request Changes must name at least one known arrangement, each once', () => {
-    const base = { decision: 'request_changes', reason: 'Move the stage' };
+    const base = { decision: 'request_changes', reason: 'Move the stage', ...R };
     for (const arrangements of [undefined, null, [], 'venue']) {
       assert.deepEqual(validateSafetyDecision({ ...base, arrangements }), { valid: false, errors: ['Name at least one arrangement to change.'] });
     }
@@ -58,14 +72,16 @@ describe('validateSafetyDecision (SG2-92)', () => {
 
   test('[CONFLICT] [SG2-92:AC2] Approve and Reject cannot name arrangements to change', () => {
     for (const decision of ['approve', 'reject']) {
-      assert.deepEqual(validateSafetyDecision({ decision, reason: 'Fine', arrangements: ['venue'] }),
+      assert.deepEqual(validateSafetyDecision({ decision, reason: 'Fine', arrangements: ['venue'], ...R }),
         { valid: false, errors: ['Arrangements are named only when requesting changes.'] });
     }
   });
 
   test('[NORMAL] [SG2-92:AC2] every problem with a request is reported together', () => {
-    assert.deepEqual(validateSafetyDecision({ decision: 'request_changes', reason: 3, arrangements: [] }),
-      { valid: false, errors: ['reason must be text.', 'Name at least one arrangement to change.'] });
+    assert.deepEqual(validateSafetyDecision({ decision: 'request_changes', reason: 3, arrangements: [] }), { valid: false, errors: [
+      'reason must be text.', 'Name at least one arrangement to change.',
+      'safety_check_revision must be the whole-number revision shown with the event.'
+    ] });
   });
 });
 

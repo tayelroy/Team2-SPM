@@ -398,7 +398,9 @@ do $$
 begin
  if exists(select 1 from public.events where event_id in (95890,95892) and status <> 'preparation')
    or exists(select 1 from public.event_audit_logs where event_id=95890)
-   or exists(select 1 from public.event_audit_logs where event_id=95892 and field_name='status')
+   -- SG2-91: building this fixture moves 95892 into the safety check and back
+   -- (both audited), so only a confirmation row would be a side effect.
+   or exists(select 1 from public.event_audit_logs where event_id=95892 and field_name='status' and new_value='confirmed')
    or exists(select 1 from public.notifications where event_id in (95890,95892) and kind='event_confirmed')
    or (select status from public.events where event_id=95891) <> 'confirmed' then
   raise exception '[SG2-58:unbooked-venue-no-side-effects] [SG2-58:AC2] [FAILURE] Refusing an unbooked venue must not confirm, audit or notify';

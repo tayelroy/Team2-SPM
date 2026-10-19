@@ -238,17 +238,10 @@ input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
   .request-form-card { grid-column: 1 / -1 !important; }
 }
 
-/* SG2-92: the Safety Officer's queue and decision, and the decision summary on an event. */
-.safety-queue { display: grid; gap: 20px; }
-.safety-layout { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 24px; align-items: start; }
-.safety-events, .safety-history, .safety-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.safety-list li { color: #edfffe; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
-.safety-event { width: 100%; display: grid; gap: 4px; text-align: left; }
-.safety-event span { color: #bbc7c6; font-size: 12px; }
-.safety-event[aria-pressed="true"] { border-color: rgba(203,255,252,.6); background: rgba(203,255,252,.08); }
-.safety-review, .safety-panel { display: grid; gap: 14px; padding: 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(1,29,28,.6); min-width: 0; }
-.safety-review h3, .safety-review h4, .safety-panel h3 { margin: 0; color: #edfffe; font-weight: 500; }
-.safety-review h4 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #bbc7c6; }
+/* SG2-92: the Safety Officer's decision on each review, and the decision summary on an event. */
+.safety-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.safety-panel { display: grid; gap: 14px; padding: 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(1,29,28,.6); min-width: 0; }
+.safety-panel h3 { margin: 0; color: #edfffe; font-weight: 500; }
 .safety-decision { display: grid; gap: 10px; }
 .safety-decision > :first-child { justify-self: start; }
 .safety-decision-facts { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px 24px; margin: 0; }
@@ -260,9 +253,7 @@ input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
 .safety-choice { display: inline-flex; align-items: center; gap: 8px; color: #edfffe; font-size: 14px; min-height: 32px; cursor: pointer; }
 .safety-label { color: #bbc7c6; font-size: 12px; }
 .safety-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.safety-recorded { margin: 0; color: #cbfffc; font-size: 14px; }
 @media (max-width: 760px) {
-  .safety-layout { grid-template-columns: minmax(0, 1fr); }
   .safety-decision-facts { grid-template-columns: minmax(0, 1fr); }
-  .safety-review, .safety-panel { padding: 16px; }
+  .safety-panel { padding: 16px; }
 }

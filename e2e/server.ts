@@ -63,8 +63,10 @@ import { seedEventNotifications } from './support/event-notifications';
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
 import { createMemoryChangeImpact, seedChangeImpact } from './support/change-impact';
-import { createSafetyCheckHandlers } from '../server/src/events/safetyChecks';
-import { createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
+import { createSafetyChecksRouter } from '../server/src/safetyChecks';
+import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
+import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
+import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -237,9 +239,12 @@ const app = createApp(
   // SG2-66: impact reads go through the in-memory client; acceptance and
   // settling mirror their SQL functions over the in-memory tables.
   createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) }),
-  // SG2-92: the stand-in queue and decision history read the in-memory client;
-  // recording and reworking mirror their SQL functions over the in-memory tables.
-  createSafetyCheckHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) })
+  // SG2-91: the Safety Officer's list mirrors safety_check_queue over the
+  // in-memory tables.
+  createSafetyChecksRouter(access, token => createMemorySafetyChecksStore(database, token)),
+  // SG2-92: the decision history reads the in-memory client; recording and
+  // reworking mirror their SQL functions over the in-memory tables.
+  createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -278,9 +283,15 @@ app.get('/__e2e/change-impact-ledger', (_req, res) => res.json({
   audit: database.tables.event_audit_logs.filter(row => row.event_id === 661),
   notifications: database.tables.notifications.filter(row => row.event_id === 661),
 }));
-// SG2-92: three events awaiting the Safety Officer's check (SG2-91 would put them there).
+// SG2-92: three events awaiting the Safety Officer's check.
 app.post('/__e2e/safety-decisions', (_req, res) => {
   seedSafetyDecisions(database);
+  res.status(204).end();
+});
+// SG2-92: a reviewed detail of one seeded event changes, as SG2-91's trigger
+// records by moving its safety_check_revision on.
+app.post('/__e2e/safety-decisions-change/:eventId', (req, res) => {
+  changeReviewedDetail(database, Number(req.params.eventId));
   res.status(204).end();
 });
 app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
@@ -301,6 +312,10 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
     bookings: database.tables.venue_bookings.filter(seeded),
   });
+});
+app.post('/__e2e/safety-checks', (_req, res) => {
+  seedSafetyChecks(database);
+  res.status(204).end();
 });
 app.post('/__e2e/event-notifications', (_req, res) => {
   seedEventNotifications(database);

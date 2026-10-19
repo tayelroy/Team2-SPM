@@ -153,7 +153,7 @@ The **Roles** column lists the roles granted the permission in `policy.ts`. Seve
   - rows 24 and 25 (stage, history)
   - rows 63 and 69 (equipment requirements and reservations, read-only)
   - profile and me
-  - The safety-check endpoints do not exist yet; see §11.
+  - the safety check list (SG2-91), and recording and reading each event's safety decisions (SG2-92); see §11.
 - **ECL (Week 7):**
   - rows 13 and 14 (assignable, assign/reassign)
   - row 26 (unassigned queue)
@@ -1099,7 +1099,7 @@ No endpoint at this snapshot delivers these planned stories. They are listed so 
 |---|---|---|
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
-| #6 | SG2-91, SG2-93, SG2-94 safety check | SG2-92 (19 Oct 2026) added `GET /api/safety-checks` (a stand-in for SG2-91's list), `POST /api/event-requests/:eventId/safety-decision`, `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; see [safety-checks.md](../safety-checks.md). Already in place before it: the statuses `awaiting_safety_check`, `safety_rejected` and `preparation` (SG2-100), the SO grants in §2, venue safety details (6.6), and SO read access to equipment placement (9.4). Nothing yet moves an event out of `planning` into `awaiting_safety_check` (SG2-91). |
+| #6 | SG2-93, SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; see [safety-checks.md](../safety-checks.md). Still planned: flagging Request Changes arrangements (SG2-93) and treating only the latest Approve as the safety approval (SG2-94). |
 
 ---
 

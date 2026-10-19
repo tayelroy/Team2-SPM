@@ -1904,17 +1904,16 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
 });
 
-test('SG2-86-P02 | [SG2-86:AC2] [SG2-92:AC1] [NORMAL] [FAILURE] the Week 7 desks show no prototype events and offer only their own screens', async ({ page }) => {
+test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prototype events and offer only their own screens', async ({ page }) => {
   const prototypeEvent = page.getByText('Product Launch — Tideline', { exact: true });
   const menu = page.getByRole('navigation').getByRole('button');
 
   await signIn(page, 'safety');
   await expect(page.getByRole('heading', { level: 1, name: 'Safety desk' })).toBeVisible();
-  // SG2-92: the desk lists the real events awaiting a check (none in the reset fixture).
-  await expect(page.getByRole('heading', { name: 'Safety checks', exact: true })).toBeVisible();
-  await expect(page.getByText('No events are awaiting a safety check.', { exact: true })).toBeVisible();
+  // SG2-91 replaced the placeholder with the live count of the safety check list.
+  await expect(page.getByText('0 events are awaiting a safety check.', { exact: true })).toBeVisible();
   await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
-  await expect(menu).toHaveText(['Dashboard']);
+  await expect(menu).toHaveText(['Dashboard', 'Safety checks']);
   await expect(prototypeEvent).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
@@ -2478,4 +2477,86 @@ test('SG2-82-N01 | [SG2-82:AC1] [SG2-82:AC5] [CONFLICT] [FAILURE] the same venue
     .toEqual([409, 'This request has been approved. Release its booking instead if the event no longer needs the venue.']);
   expect((await page.request.post('/api/venue-booking-requests/9999/withdraw', { headers })).status()).toBe(404);
   await expect(hall.getByText('Approved', { exact: true })).toBeVisible();
+});
+
+test('SG2-91-P01 | [SG2-91:AC2] [SG2-91:AC3] [NORMAL] the Safety Officer reviews each awaiting event with everything the check needs, including the crowd movement its coordinator recorded', async ({ page, request }) => {
+  expect((await request.post('/__e2e/safety-checks')).status()).toBe(204);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  // AC3: the coordinator records the expected crowd movement during planning;
+  // the event stays awaiting its check.
+  await signIn(page, 'coordinator');
+  await page.getByRole('region', { name: 'My assigned events' }).getByRole('button', { name: /Harbour Lecture/ }).click();
+  await page.getByRole('button', { name: 'Edit Planning Information', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: 'Event Planning Details' });
+  await drawer.getByLabel('Expected Crowd Movement').fill('Arrive through the north doors, leave by the south exits after the talk');
+  await drawer.getByRole('button', { name: 'Save Planning Details' }).click();
+  await expect(drawer).toHaveCount(0);
+
+  // AC2: the Safety Officer's desk counts the awaiting events and opens the list.
+  await switchAccount(page, 'safety');
+  await expect(page.getByText('2 events are awaiting a safety check.', { exact: true })).toBeVisible();
+  // Each awaiting event has a card on the desk, oldest wait first; a card opens the list.
+  const cards = page.getByRole('main').getByRole('button', { name: /Harbour Lecture|Studio Talk/ });
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0)).toContainText('Harbour Lecture');
+  await expect(cards.nth(0)).toContainText('Regression Hall');
+  await expect(cards.nth(1)).toContainText('Studio Talk');
+  await cards.nth(1).click();
+  await expect(page.getByRole('region', { name: 'Safety check for Studio Talk' })).toBeVisible();
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Show all 2 safety checks', exact: true }).click();
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await page.getByRole('navigation').getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await page.getByRole('button', { name: 'Open safety checks', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Safety checks' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: '2 events awaiting a safety check' })).toBeVisible();
+  const articles = page.getByRole('article');
+  await expect(articles).toHaveCount(2);
+  await expect(articles.nth(0)).toHaveAccessibleName('Harbour Lecture');
+  await expect(articles.nth(1)).toHaveAccessibleName('Studio Talk');
+  await expect(page.getByText('Riverside Gala')).toHaveCount(0);
+
+  // AC3: attendance, accessibility, crowd movement, venue capacity and layout,
+  // emergency access, restrictions, and equipment with its placement.
+  const lecture = page.getByRole('article', { name: 'Harbour Lecture' });
+  for (const value of ['80', 'Wheelchair seating near the aisle', 'Arrive through the north doors, leave by the south exits after the talk']) {
+    await expect(lecture.getByText(value, { exact: true })).toBeVisible();
+  }
+  const venues = lecture.getByRole('region', { name: 'Venues for Harbour Lecture' });
+  for (const value of ['Regression Hall · Level 1', '100', 'Theatre', 'Step-free access', 'Two exits onto the north concourse', 'No open flames']) {
+    await expect(venues.getByText(value, { exact: true })).toBeVisible();
+  }
+  const equipment = lecture.getByRole('region', { name: 'Equipment for Harbour Lecture' });
+  for (const value of ['4 × Wireless microphones', 'Regression Hall — Either side of the stage', 'Cable ramps across the aisle']) {
+    await expect(equipment.getByText(value, { exact: true })).toBeVisible();
+  }
+  const talk = page.getByRole('article', { name: 'Studio Talk' });
+  await expect(talk.getByText('20 (below expected attendance of 80)', { exact: true })).toBeVisible();
+  await expect(talk.getByText('No equipment requested.', { exact: true })).toBeVisible();
+  await expect(talk.getByRole('region', { name: 'Venues for Studio Talk' }).getByText('Not recorded', { exact: true })).toHaveCount(2);
+
+  // DoD v2.1: the list fits a phone and a laptop without sideways scrolling.
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(lecture).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+});
+
+test('SG2-91-N01 | [SG2-91:AC4] [FAILURE] no role but the Safety Officer can open the safety check list, in the menu or through the API', async ({ page, request }) => {
+  expect((await request.post('/__e2e/safety-checks')).status()).toBe(204);
+  for (const account of ['organiser', 'coordinator', 'venue', 'support', 'attendee', 'lead']) {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    const refused = await request.get('/api/safety-checks', { headers: { Authorization: `Bearer ${(await login.json()).accessToken}` } });
+    expect([account, refused.status(), await refused.json()]).toEqual([account, 403, { error: 'Access denied' }]);
+  }
+  expect((await request.get('/api/safety-checks')).status()).toBe(401);
+
+  for (const account of ['coordinator', 'lead']) {
+    await switchAccount(page, account);
+    await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByRole('navigation').getByRole('button', { name: 'Safety checks', exact: true })).toHaveCount(0);
+  }
 });

@@ -157,6 +157,7 @@ function registrationFixture(failSave = false) {
     venue_requirements: null, equipment_requirements: null, accessibility_needs: null,
     registration_needed: false, registration_capacity: null, registration_opens_at: null, registration_closes_at: null,
     planning_notes: 'Stored notes', arrangements_recheck_needed: false, outstanding_arrangements: [],
+    expected_crowd_movement: null,
   };
   let readinessReads = 0;
   const fetch = vi.fn(async (url: string, init?: RequestInit): Promise<Response> => {

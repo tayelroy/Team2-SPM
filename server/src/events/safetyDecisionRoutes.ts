@@ -13,19 +13,17 @@ import {
   type RecordSafetyDecisionResult,
   type ReworkSafetyRejectedEventResult
 } from '../db/safetyDecisions';
-import { standInSafetyCheckQueue, type SafetyCheckQueue } from '../safetyChecks/standInQueue';
 import { validateSafetyDecision } from './safetyDecisions';
 
 const UNAVAILABLE_MESSAGE = 'Safety checks are temporarily unavailable. Please try again later.';
 const NOT_FOUND_MESSAGE = 'Event not found.';
 const CLOSED_MESSAGE = 'This event is no longer awaiting a safety check.';
+const STALE_MESSAGE = 'This event changed after you opened it. Refresh the safety checks and review it again.';
 const NOT_REJECTED_MESSAGE = 'Only a Safety Rejected event can be reworked.';
 
-export interface SafetyCheckDependencies {
+export interface SafetyDecisionDependencies {
   getPrincipal: (req: Request) => Principal | undefined;
   getAdminClient?: () => SupabaseClient | null;
-  /** SG2-91 replaces the stand-in with its own queue. */
-  queue?: SafetyCheckQueue;
   fetchEvent?: (admin: SupabaseClient, eventId: number) => Promise<FetchSafetyDecisionEventResult>;
   listDecisions?: (admin: SupabaseClient, eventId: number) => Promise<ListSafetyDecisionsResult>;
   recordDecision?: (admin: SupabaseClient, input: RecordSafetyDecisionInput) => Promise<RecordSafetyDecisionResult>;
@@ -37,7 +35,7 @@ export interface SafetyCheckDependencies {
  * starts with. Returns null once a response has been sent. The route's
  * permission already limits the roles; per-row checks are the caller's.
  */
-function prelude(req: Request, res: Response, deps: Required<Pick<SafetyCheckDependencies, 'getPrincipal' | 'getAdminClient'>>) {
+function prelude(req: Request, res: Response, deps: Required<Pick<SafetyDecisionDependencies, 'getPrincipal' | 'getAdminClient'>>) {
   const principal = deps.getPrincipal(req);
   if (!principal) {
     // Defensive: these handlers are only mounted behind requireAuth.
@@ -46,7 +44,7 @@ function prelude(req: Request, res: Response, deps: Required<Pick<SafetyCheckDep
   }
   const raw = req.params.eventId;
   const eventId = Number(raw);
-  if (raw !== undefined && (!/^[1-9]\d*$/.test(raw) || eventId > 2147483647)) {
+  if (!/^[1-9]\d*$/.test(raw) || eventId > 2147483647) {
     res.status(400).json({ error: 'eventId must be a positive integer.' });
     return null;
   }
@@ -59,36 +57,25 @@ function prelude(req: Request, res: Response, deps: Required<Pick<SafetyCheckDep
 }
 
 /**
- * SG2-92 routes:
- * - GET  /api/safety-checks — events awaiting a check (stand-in for SG2-91);
+ * SG2-92 routes (the list of events awaiting a check is SG2-91's
+ * GET /api/safety-checks, which returns each event's safety_check_revision):
  * - POST /api/event-requests/:eventId/safety-decision — the Safety Officer's
- *   Approve / Reject / Request Changes (AC1–AC6, one database transaction);
+ *   Approve / Reject / Request Changes on the revision they reviewed
+ *   (AC1–AC6, one database transaction; a stale review is refused);
  * - GET  /api/event-requests/:eventId/safety-decisions — every decision, newest
  *   first, for the Safety Officer, the assigned coordinator or the organiser;
  * - POST /api/event-requests/:eventId/rework — the assigned coordinator takes a
  *   Safety Rejected event back to Planning (AC4).
  */
-export function createSafetyCheckHandlers({
+export function createSafetyDecisionHandlers({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  queue = standInSafetyCheckQueue,
   fetchEvent = fetchSafetyDecisionEvent,
   listDecisions = listSafetyDecisions,
   recordDecision = recordSafetyDecision,
   rework = reworkSafetyRejectedEvent
-}: SafetyCheckDependencies): { queue: RequestHandler; record: RequestHandler; decisions: RequestHandler; rework: RequestHandler } {
+}: SafetyDecisionDependencies): { record: RequestHandler; decisions: RequestHandler; rework: RequestHandler } {
   const deps = { getPrincipal, getAdminClient };
-
-  const listQueue: RequestHandler = async (req, res) => {
-    const loaded = prelude(req, res, deps);
-    if (!loaded) return;
-    const result = await queue.list(loaded.admin);
-    if (!result.ok) {
-      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
-      return;
-    }
-    res.status(200).json({ source: 'stand-in', events: result.events });
-  };
 
   const record: RequestHandler = async (req, res) => {
     const loaded = prelude(req, res, deps);
@@ -116,6 +103,9 @@ export function createSafetyCheckHandlers({
       }
       case 'closed':
         res.status(409).json({ error: CLOSED_MESSAGE, status: result.status });
+        return;
+      case 'stale':
+        res.status(409).json({ error: STALE_MESSAGE, code: 'stale', revision: result.revision });
         return;
       case 'missing':
         res.status(404).json({ error: NOT_FOUND_MESSAGE });
@@ -179,5 +169,5 @@ export function createSafetyCheckHandlers({
     }
   };
 
-  return { queue: listQueue, record, decisions, rework: reworkEvent };
+  return { record, decisions, rework: reworkEvent };
 }

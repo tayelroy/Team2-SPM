@@ -1,233 +1,89 @@
-import { afterEach, beforeEach, describe, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { AccessError, createAuthorization, ROLES, type Role } from './auth';
 import { createApp } from './app';
-import { createAuthorization, type Principal } from './auth';
-import { PERMISSIONS } from './auth/policy';
-import { dbConfig } from './db/config';
-import type {
-  RecordSafetyDecisionInput,
-  RecordSafetyDecisionResult,
-  ReworkSafetyRejectedEventResult,
-  SafetyDecisionRecord
-} from './db/safetyDecisions';
-import { createSafetyCheckHandlers, type SafetyCheckDependencies } from './events/safetyChecks';
-import type { SafetyCheckEvent } from './safetyChecks/standInQueue';
+import { createSafetyChecksRouter } from './safetyChecks';
+import type { SafetyCheckEvent, SafetyChecksStore } from './db/safetyChecks';
 
-const SAFETY = 'safety-1';
-const COORDINATOR = 'coordinator-1';
-const ORGANISER = 'organiser-1';
-const ADMIN = {} as SupabaseClient;
-const UNAVAILABLE = { error: 'Safety checks are temporarily unavailable. Please try again later.' };
+const events: SafetyCheckEvent[] = [{
+  event_id: 7, safety_check_revision: 3, name: 'Open Day', organisation: 'SMU', proposed_date: '2031-11-01T09:00:00Z',
+  awaiting_since: '2031-10-01T02:00:00Z', expected_attendance: 120, accessibility_needs: 'Wheelchair seating',
+  expected_crowd_movement: 'Enter east, leave west',
+  venues: [{ request_id: 11, venue_id: 4, venue_name: 'Hall', location: 'Level 1', capacity: 300, layout: 'theatre',
+    starts_at: '2031-11-01T09:00:00Z', ends_at: '2031-11-01T17:00:00Z', accessibility_features: 'Ramp',
+    emergency_access: 'Two exits', known_restrictions: 'No open flames' }],
+  equipment: [{ request_id: 21, equipment_name: 'Speakers', quantity: 2, placement_venue_name: 'Hall',
+    placement_position: 'Stage left', arrangement_notes: 'Cable ramps' }]
+}];
+const auth = { Authorization: 'Bearer officer-token' };
 
-const QUEUED: SafetyCheckEvent = {
-  event_id: 12, name: 'Harbour Gala', proposed_date: '2030-06-20T02:00:00.000Z', expected_attendance: 300,
-  accessibility_needs: 'Step-free access', coordinator_name: 'Casey Coordinator',
-  venues: [{ name: 'Harbour Hall', capacity: 400, starts_at: '2030-06-20T01:00:00.000Z', ends_at: '2030-06-20T06:00:00.000Z' }],
-  equipment: [{ name: 'Wireless microphone', quantity: 2, placement_position: 'Stage left' }]
-};
-const STORED: SafetyDecisionRecord = {
-  decision_id: 9, event_id: 12, decision: 'request_changes', reason: 'Move the stage', arrangements: ['venue'],
-  decided_by: SAFETY, decided_by_name: 'Sam Safety', decided_at: '2030-06-01T00:00:00.000Z'
-};
-
-const originalConfig = { ...dbConfig };
-
-describe('safety check routes behind the app (SG2-92)', () => {
-  beforeEach(() => {
-    dbConfig.supabaseUrl = undefined;
-    dbConfig.supabaseAnonKey = undefined;
-    dbConfig.supabaseServiceRoleKey = undefined;
-  });
-  afterEach(() => Object.assign(dbConfig, originalConfig));
-
-  const appAs = (role: Principal['role']) => createApp(undefined,
-    createAuthorization({ resolvePrincipal: async () => ({ userId: SAFETY, role }), permissions: PERMISSIONS }));
-  const routes: [Principal['role'][], 'get' | 'post', string][] = [
-    [['safety_officer'], 'get', '/api/safety-checks'],
-    [['safety_officer'], 'post', '/api/event-requests/12/safety-decision'],
-    [['safety_officer', 'event_coordinator', 'event_organiser'], 'get', '/api/event-requests/12/safety-decisions'],
-    [['event_coordinator'], 'post', '/api/event-requests/12/rework']
-  ];
-  const ROLES: Principal['role'][] = ['event_organiser', 'event_coordinator', 'venue_staff', 'technical_support_staff', 'attendee',
-    'event_coordinator_lead', 'safety_officer'];
-
-  test('[FAILURE] [SG2-92:AC1] a request without a session is refused with 401', async () => {
-    for (const [, method, path] of routes) {
-      assert.equal((await request(appAs('safety_officer'))[method](path)).status, 401, path);
-    }
-  });
-
-  test('[FAILURE] [SG2-92:AC1] [SG2-92:AC4] every role outside each route\'s grant is refused with 403 before the handler runs', async () => {
-    for (const [allowed, method, path] of routes) {
-      for (const role of ROLES.filter(role => !allowed.includes(role))) {
-        const res = await request(appAs(role))[method](path).set('Authorization', 'Bearer token').send({ decision: 'approve' });
-        assert.deepEqual([res.status, res.body], [403, { error: 'Access denied' }], `${role} ${path}`);
-      }
-    }
-  });
-
-  test('[BOUNDARY] [SG2-92:AC1] [SG2-92:AC4] [SG2-92:AC6] an allowed role reaches each handler, which reports the unconfigured database as 503', async () => {
-    for (const [allowed, method, path] of routes) {
-      const res = await request(appAs(allowed[0]))[method](path).set('Authorization', 'Bearer token').send({ decision: 'approve' });
-      assert.deepEqual([res.status, res.body], [503, UNAVAILABLE], path);
-    }
-  });
-});
-
-interface Harness { app: express.Express; recorded: RecordSafetyDecisionInput[]; reworked: [number, string][] }
-
-function harness(overrides: Partial<SafetyCheckDependencies> & { principal?: Principal | null } = {}): Harness {
-  const recorded: RecordSafetyDecisionInput[] = [];
-  const reworked: [number, string][] = [];
-  const principal = overrides.principal === undefined ? { userId: SAFETY, role: 'safety_officer' as const } : overrides.principal;
-  const handlers = createSafetyCheckHandlers({
-    getPrincipal: () => principal ?? undefined,
-    getAdminClient: () => ADMIN,
-    queue: { list: async () => ({ ok: true, events: [QUEUED] }) },
-    fetchEvent: async () => ({ ok: true, event: { event_id: 12, status: 'planning', organiser_id: ORGANISER, coordinator_id: COORDINATOR } }),
-    listDecisions: async () => ({ ok: true, decisions: [STORED] }),
-    recordDecision: async (_admin, input): Promise<RecordSafetyDecisionResult> => {
-      recorded.push(input);
-      return { outcome: 'ok', decision_id: 9, decision: input.decision, previous_status: 'awaiting_safety_check',
-        status: 'planning', decided_at: '2030-06-01T00:00:00.000Z' };
-    },
-    rework: async (_admin, eventId, actorId): Promise<ReworkSafetyRejectedEventResult> => {
-      reworked.push([eventId, actorId]);
-      return { outcome: 'ok', status: 'planning' };
-    },
-    ...overrides
-  });
-  const app = express();
-  app.use(express.json());
-  app.get('/safety-checks', handlers.queue);
-  app.post('/events/:eventId/safety-decision', handlers.record);
-  app.get('/events/:eventId/safety-decisions', handlers.decisions);
-  app.post('/events/:eventId/rework', handlers.rework);
-  return { app, recorded, reworked };
+function fixture(role: Role = 'safety_officer', list: () => Promise<SafetyCheckEvent[]> = async () => events) {
+  let reads = 0;
+  const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'officer-1', role }) });
+  const store = (token: string): SafetyChecksStore => {
+    assert.equal(token, 'officer-token');
+    return { list: async () => { reads++; return list(); } };
+  };
+  const router = createSafetyChecksRouter(access, store);
+  return { app: express().use('/api/safety-checks', router), router, access, reads: () => reads };
 }
 
-describe('GET /api/safety-checks (SG2-92; stand-in for SG2-91)', () => {
-  test('[NORMAL] [SG2-92:AC1] lists the events awaiting a check, labelled as the stand-in', async () => {
-    const res = await request(harness().app).get('/safety-checks');
-    assert.deepEqual([res.status, res.body], [200, { source: 'stand-in', events: [QUEUED] }]);
-  });
-
-  test('[FAILURE] [SG2-92:AC1] an unreadable queue is 503 without details', async () => {
-    const res = await request(harness({ queue: { list: async () => ({ ok: false }) } }).app).get('/safety-checks');
-    assert.deepEqual([res.status, res.body], [503, UNAVAILABLE]);
-  });
+test('[NORMAL] [SG2-91:AC2] [SG2-91:AC3] a Safety Officer opens the list of events awaiting a check with every review detail', async () => {
+  const { app, reads } = fixture();
+  const response = await request(app).get('/api/safety-checks').set(auth);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['cache-control'], 'no-store');
+  assert.deepEqual(response.body, { events });
+  assert.equal(reads(), 1);
 });
 
-describe('POST /api/event-requests/:eventId/safety-decision (SG2-92)', () => {
-  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC6] a valid decision is recorded as the signed-in Safety Officer and returned as stored', async () => {
-    const { app, recorded } = harness();
-    const res = await request(app).post('/events/12/safety-decision')
-      .send({ decision: 'request_changes', reason: ' Move the stage ', arrangements: ['venue'], decided_by: 'forged', event_id: 99 });
-    assert.equal(res.status, 201);
-    assert.deepEqual(res.body, { decision: STORED, previous_status: 'awaiting_safety_check', status: 'planning' });
-    assert.deepEqual(recorded, [{ decision: 'request_changes', reason: 'Move the stage', arrangements: ['venue'], eventId: 12, actorId: SAFETY }]);
-  });
-
-  test('[BOUNDARY] [SG2-92:AC6] when the history cannot be re-read the response is built from what was recorded', async () => {
-    for (const listDecisions of [async () => ({ ok: false as const }), async () => ({ ok: true as const, decisions: [] })]) {
-      const res = await request(harness({ listDecisions }).app).post('/events/12/safety-decision').send({ decision: 'approve' });
-      assert.equal(res.status, 201);
-      assert.deepEqual(res.body.decision, {
-        decision_id: 9, event_id: 12, decision: 'approve', reason: null, arrangements: [],
-        decided_by: SAFETY, decided_by_name: null, decided_at: '2030-06-01T00:00:00.000Z'
-      });
-    }
-  });
-
-  test('[FAILURE] [SG2-92:AC2] an invalid decision is refused with every problem before anything is written', async () => {
-    const { app, recorded } = harness();
-    const res = await request(app).post('/events/12/safety-decision').send({ decision: 'request_changes', reason: '' });
-    assert.deepEqual([res.status, res.body], [400, { error: 'Invalid safety decision',
-      details: ['A reason is required to request changes.', 'Name at least one arrangement to change.'] }]);
-    assert.deepEqual(recorded, []);
-  });
-
-  test('[BOUNDARY] [SG2-92:AC1] event ids must be positive whole numbers that fit the database', async () => {
-    for (const id of ['0', '-1', '1.5', 'abc', '2147483648']) {
-      const res = await request(harness().app).post(`/events/${id}/safety-decision`).send({ decision: 'approve' });
-      assert.deepEqual([res.status, res.body], [400, { error: 'eventId must be a positive integer.' }], id);
-    }
-  });
-
-  test('[CONFLICT] [SG2-92:AC1] each database refusal is answered with its own status', async () => {
-    const cases: [RecordSafetyDecisionResult, number, unknown][] = [
-      [{ outcome: 'closed', status: 'preparation' }, 409, { error: 'This event is no longer awaiting a safety check.', status: 'preparation' }],
-      [{ outcome: 'missing' }, 404, { error: 'Event not found.' }],
-      [{ outcome: 'forbidden' }, 403, { error: 'Access denied' }],
-      [{ outcome: 'invalid' }, 400, { error: 'Invalid safety decision', details: [] }],
-      [{ outcome: 'unavailable' }, 503, UNAVAILABLE]
-    ];
-    for (const [result, status, body] of cases) {
-      const res = await request(harness({ recordDecision: async () => result }).app).post('/events/12/safety-decision').send({ decision: 'approve' });
-      assert.deepEqual([res.status, res.body], [status, body], result.outcome);
-    }
-  });
-
-  test('[FAILURE] [SG2-92:AC1] without a principal or a database the decision is refused', async () => {
-    const anonymous = await request(harness({ principal: null }).app).post('/events/12/safety-decision').send({ decision: 'approve' });
-    assert.deepEqual([anonymous.status, anonymous.body], [401, { error: 'Authentication required' }]);
-    const down = await request(harness({ getAdminClient: () => null }).app).post('/events/12/safety-decision').send({ decision: 'approve' });
-    assert.deepEqual([down.status, down.body], [503, UNAVAILABLE]);
-  });
+test('[NORMAL] [SG2-91:AC2] production mounts the list and leaves public health accessible', async () => {
+  const { router, access } = fixture();
+  const args = Array.from({ length: 37 }, () => undefined) as unknown as Parameters<typeof createApp>;
+  args[1] = access; args[36] = router;
+  const app = createApp(...args);
+  assert.equal((await request(app).get('/api/health')).status, 200);
+  const response = await request(app).get('/api/safety-checks').set(auth);
+  assert.equal(response.status, 200); assert.deepEqual(response.body, { events });
 });
 
-describe('GET /api/event-requests/:eventId/safety-decisions (SG2-92 AC6)', () => {
-  test('[NORMAL] [SG2-92:AC6] the Safety Officer, the assigned coordinator and the organiser read every decision', async () => {
-    for (const principal of [
-      { userId: 'any-safety', role: 'safety_officer' as const },
-      { userId: COORDINATOR, role: 'event_coordinator' as const },
-      { userId: ORGANISER, role: 'event_organiser' as const }
-    ]) {
-      const res = await request(harness({ principal }).app).get('/events/12/safety-decisions');
-      assert.deepEqual([res.status, res.body], [200, { decisions: [STORED] }], principal.role);
-    }
-  });
-
-  test('[FAILURE] [SG2-92:AC6] another coordinator, another organiser or a missing event learn only that it was not found', async () => {
-    const notFound = [404, { error: 'Event not found.' }];
-    for (const principal of [{ userId: 'other', role: 'event_coordinator' as const }, { userId: 'other', role: 'event_organiser' as const }]) {
-      const res = await request(harness({ principal }).app).get('/events/12/safety-decisions');
-      assert.deepEqual([res.status, res.body], notFound, principal.role);
-    }
-    const missing = await request(harness({ fetchEvent: async () => ({ ok: false, reason: 'not_found' }) }).app).get('/events/12/safety-decisions');
-    assert.deepEqual([missing.status, missing.body], notFound);
-  });
-
-  test('[FAILURE] [SG2-92:AC6] a failed event or history read is 503', async () => {
-    const event = await request(harness({ fetchEvent: async () => ({ ok: false, reason: 'unavailable' }) }).app).get('/events/12/safety-decisions');
-    assert.deepEqual([event.status, event.body], [503, UNAVAILABLE]);
-    const history = await request(harness({ listDecisions: async () => ({ ok: false }) }).app).get('/events/12/safety-decisions');
-    assert.deepEqual([history.status, history.body], [503, UNAVAILABLE]);
-  });
+test('[BOUNDARY] [SG2-91:AC2] with nothing awaiting a check the list is empty rather than an error', async () => {
+  const { app } = fixture('safety_officer', async () => []);
+  const response = await request(app).get('/api/safety-checks').set(auth);
+  assert.deepEqual([response.status, response.body], [200, { events: [] }]);
 });
 
-describe('POST /api/event-requests/:eventId/rework (SG2-92 AC4)', () => {
-  const coordinator = { userId: COORDINATOR, role: 'event_coordinator' as const };
-
-  test('[NORMAL] [SG2-92:AC4] the assigned coordinator takes a Safety Rejected event back to Planning', async () => {
-    const { app, reworked } = harness({ principal: coordinator });
-    const res = await request(app).post('/events/12/rework');
-    assert.deepEqual([res.status, res.body], [200, { event_id: 12, status: 'planning' }]);
-    assert.deepEqual(reworked, [[12, COORDINATOR]]);
+for (const role of ROLES.filter(role => role !== 'safety_officer')) {
+  test(`[FAILURE] [SG2-91:AC4] ${role} cannot open the safety check list, even with a forged role header`, async () => {
+    const { app, reads } = fixture(role);
+    const response = await request(app).get('/api/safety-checks').set(auth).set('X-Role', 'safety_officer');
+    assert.deepEqual([response.status, response.body], [403, { error: 'Access denied' }]);
+    assert.equal(reads(), 0);
   });
+}
 
-  test('[CONFLICT] [SG2-92:AC4] an event that is not Safety Rejected, or not the caller\'s, is refused', async () => {
-    const cases: [ReworkSafetyRejectedEventResult, number, unknown][] = [
-      [{ outcome: 'closed', status: 'planning' }, 409, { error: 'Only a Safety Rejected event can be reworked.', status: 'planning' }],
-      [{ outcome: 'missing' }, 404, { error: 'Event not found.' }],
-      [{ outcome: 'unavailable' }, 503, UNAVAILABLE]
-    ];
-    for (const [result, status, body] of cases) {
-      const res = await request(harness({ principal: coordinator, rework: async () => result }).app).post('/events/12/rework');
-      assert.deepEqual([res.status, res.body], [status, body], result.outcome);
-    }
-  });
+test('[FAILURE] [SG2-91:AC4] unsigned or expired credentials cannot open the list', async () => {
+  const { app, reads } = fixture();
+  assert.equal((await request(app).get('/api/safety-checks')).status, 401);
+  const access = createAuthorization({ resolvePrincipal: async () => { throw new AccessError(401); } });
+  const expired = express().use('/api/safety-checks', createSafetyChecksRouter(access, () => assert.fail('Expired credentials must not reach storage')));
+  assert.equal((await request(expired).get('/api/safety-checks').set(auth)).status, 401);
+  assert.equal(reads(), 0);
+});
+
+test('[CONFLICT] [SG2-91:AC4] a Safety Officer whose stored role changed after sign-in is refused by the database check', async () => {
+  const { app } = fixture('safety_officer', async () => { throw new AccessError(403); });
+  const response = await request(app).get('/api/safety-checks').set(auth);
+  assert.deepEqual([response.status, response.body], [403, { error: 'Access denied' }]);
+});
+
+test('[FAILURE] [SG2-91:AC2] an unavailable database or unexpected failure answers 503 without detail', async () => {
+  for (const failure of [new AccessError(503), new Error('connection string leaked')]) {
+    const { app } = fixture('safety_officer', async () => { throw failure; });
+    const response = await request(app).get('/api/safety-checks').set(auth);
+    assert.deepEqual([response.status, response.body],
+      [503, { error: 'The safety check list is temporarily unavailable. Please try again.' }]);
+  }
 });

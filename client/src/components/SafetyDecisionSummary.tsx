@@ -40,6 +40,38 @@ export function SafetyDecisionDetails({ decision }: { decision: SafetyDecision }
   );
 }
 
+/**
+ * Every decision already recorded on an event awaiting its safety check,
+ * newest first (SG2-92 AC6), so the Safety Officer sees what was asked before.
+ */
+export function SafetyDecisionHistory({ eventId, accessToken }: { eventId: number; accessToken: string }) {
+  const [decisions, setDecisions] = useState<SafetyDecision[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSafetyDecisions(eventId, accessToken).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setDecisions(result.decisions);
+      else setError(result.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, accessToken]);
+
+  if (error) return <p role="alert" className="organisation-detail-hint">{error}</p>;
+  if (!decisions) return <p role="status" className="organisation-detail-hint">Loading earlier decisions…</p>;
+  if (decisions.length === 0) return <p className="organisation-detail-hint">No earlier safety decisions on this event.</p>;
+  return (
+    <ul className="safety-history" aria-label="Earlier safety decisions">
+      {decisions.map((decision) => (
+        <li key={decision.decision_id}><SafetyDecisionDetails decision={decision} /></li>
+      ))}
+    </ul>
+  );
+}
+
 export interface SafetyDecisionSummaryProps {
   eventId: number;
   accessToken: string;

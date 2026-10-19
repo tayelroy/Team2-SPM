@@ -368,6 +368,7 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
             registration_opens_at: currentDetails.registration_opens_at as string | null | undefined,
             registration_closes_at: currentDetails.registration_closes_at as string | null | undefined,
             planning_notes: currentDetails.planning_notes as string | null | undefined,
+            expected_crowd_movement: currentDetails.expected_crowd_movement as string | null | undefined,
             status: currentStatus,
           }}
           onSuccess={(updatedEvent) => {
@@ -385,6 +386,7 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
               registration_opens_at: updatedEvent.registration_opens_at,
               registration_closes_at: updatedEvent.registration_closes_at,
               planning_notes: updatedEvent.planning_notes,
+              expected_crowd_movement: updatedEvent.expected_crowd_movement,
             }));
           }}
         />

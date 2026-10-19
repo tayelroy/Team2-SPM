@@ -7,7 +7,6 @@ import {
   recordSafetyDecision,
   reworkSafetyRejectedEvent
 } from './safetyDecisions';
-import { standInSafetyCheckQueue } from '../safetyChecks/standInQueue';
 
 type Row = Record<string, unknown>;
 type Response = { data: unknown; error: unknown };
@@ -127,25 +126,28 @@ describe('listSafetyDecisions (SG2-92)', () => {
 });
 
 describe('recordSafetyDecision (SG2-92)', () => {
-  const input = { eventId: 7, actorId: 'safety-1', decision: 'request_changes' as const, reason: 'Move the stage', arrangements: ['venue' as const] };
+  const input = { eventId: 7, actorId: 'safety-1', decision: 'request_changes' as const, reason: 'Move the stage',
+    arrangements: ['venue' as const], expectedRevision: 4 };
 
-  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC6] one RPC carries the decision, its reason and arrangements, and the result comes back typed', async () => {
+  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC6] one RPC carries the decision, its reason, arrangements and reviewed revision, and the result comes back typed', async () => {
     const calls: unknown[] = [];
     const ok = { outcome: 'ok', decision_id: 9, decision: 'request_changes', previous_status: 'awaiting_safety_check', status: 'planning', decided_at: '2030-06-01T00:00:00Z' };
     assert.deepEqual(await recordSafetyDecision(rpcClient(ok, null, calls), input), ok);
-    assert.deepEqual(calls, [['record_safety_decision',
-      { p_event_id: 7, p_actor_id: 'safety-1', p_decision: 'request_changes', p_reason: 'Move the stage', p_arrangements: ['venue'] }]]);
+    assert.deepEqual(calls, [['record_safety_decision', { p_event_id: 7, p_actor_id: 'safety-1', p_decision: 'request_changes',
+      p_reason: 'Move the stage', p_arrangements: ['venue'], p_expected_revision: 4 }]]);
   });
 
-  test('[CONFLICT] [SG2-92:AC1] refusals from the database pass through, with the status for a closed check', async () => {
+  test('[CONFLICT] [SG2-92:AC1] refusals from the database pass through, with the status for a closed check and the current revision for a stale one', async () => {
     for (const outcome of ['forbidden', 'missing', 'invalid'] as const) {
       assert.deepEqual(await recordSafetyDecision(rpcClient({ outcome }), input), { outcome });
     }
     assert.deepEqual(await recordSafetyDecision(rpcClient({ outcome: 'closed', status: 'preparation' }), input), { outcome: 'closed', status: 'preparation' });
+    assert.deepEqual(await recordSafetyDecision(rpcClient({ outcome: 'stale', revision: 5 }), input), { outcome: 'stale', revision: 5 });
   });
 
   test('[FAILURE] [SG2-92:AC1] an error or an unexpected answer is reported unavailable', async () => {
     for (const [data, error] of [[null, { message: 'down' }], [null, null], ['ok', null], [{ outcome: 'closed' }, null],
+      [{ outcome: 'stale' }, null], [{ outcome: 'stale', revision: '5' }, null],
       [{ outcome: 'ok', decision_id: '9' }, null], [{ outcome: 'ok', decision_id: 9, decision: 'maybe' }, null],
       [{ outcome: 'ok', decision_id: 9, decision: 'approve', previous_status: 'a', status: 'b' }, null], [{ outcome: 'later' }, null]]) {
       assert.deepEqual(await recordSafetyDecision(rpcClient(data, error), input), { outcome: 'unavailable' }, JSON.stringify(data));
@@ -169,79 +171,6 @@ describe('reworkSafetyRejectedEvent (SG2-92)', () => {
   test('[FAILURE] [SG2-92:AC4] an error or an unexpected answer is reported unavailable', async () => {
     for (const [data, error] of [[null, { message: 'down' }], [7, null], [{ outcome: 'closed' }, null], [{ outcome: 'ok', status: 'preparation' }, null]]) {
       assert.deepEqual(await reworkSafetyRejectedEvent(rpcClient(data, error), 7, 'c'), { outcome: 'unavailable' }, JSON.stringify(data));
-    }
-  });
-});
-
-describe('stand-in safety check queue (SG2-92; stands in for SG2-91)', () => {
-  const events = [
-    { event_id: 7, name: 'Harbour Gala', proposed_date: '2030-06-20T02:00:00Z', expected_attendance: 300, accessibility_needs: 'Step-free access', coordinator_id: 'coord-1', status: 'awaiting_safety_check' },
-    { event_id: 8, name: null, proposed_date: null, expected_attendance: null, accessibility_needs: null, coordinator_id: null, status: 'awaiting_safety_check' }
-  ];
-  const tables = {
-    events: { data: events, error: null },
-    venue_bookings: { data: [
-      { event_id: 7, venue_id: 1, starts_at: '2030-06-20T01:00:00Z', ends_at: '2030-06-20T06:00:00Z', status: 'confirmed' },
-      { event_id: 7, venue_id: 2, starts_at: '2030-06-20T01:00:00Z', ends_at: '2030-06-20T06:00:00Z', status: 'held' },
-      { event_id: 7, venue_id: 9, starts_at: '2030-06-21T01:00:00Z', ends_at: '2030-06-21T06:00:00Z', status: 'confirmed' }
-    ], error: null },
-    equipment_requests: { data: [
-      { event_id: 7, equipment_id: 4, quantity: 2, status: 'approved', placement_position: 'Stage left' },
-      { event_id: 7, equipment_id: 5, quantity: 1, status: 'Cancelled', placement_position: null },
-      { event_id: 7, equipment_id: 6, quantity: 3, status: 'pending', placement_position: null }
-    ], error: null },
-    venues: { data: [{ venue_id: 1, name: 'Harbour Hall', capacity: 400 }], error: null },
-    equipment: { data: [{ equipment_id: 4, name: 'Wireless microphone' }], error: null },
-    users: { data: [{ user_id: 'coord-1', name: 'Casey Coordinator' }], error: null }
-  };
-
-  test('[NORMAL] [SG2-92:AC1] lists the events awaiting a check with their confirmed venues and live equipment', async () => {
-    const queries: string[] = [];
-    const result = await standInSafetyCheckQueue.list(fakeClient(tables, queries));
-    assert.deepEqual(result, {
-      ok: true,
-      events: [
-        {
-          event_id: 7, name: 'Harbour Gala', proposed_date: '2030-06-20T02:00:00Z', expected_attendance: 300,
-          accessibility_needs: 'Step-free access', coordinator_name: 'Casey Coordinator',
-          venues: [
-            { name: 'Harbour Hall', capacity: 400, starts_at: '2030-06-20T01:00:00Z', ends_at: '2030-06-20T06:00:00Z' },
-            { name: 'Unknown venue', capacity: null, starts_at: '2030-06-21T01:00:00Z', ends_at: '2030-06-21T06:00:00Z' }
-          ],
-          equipment: [
-            { name: 'Wireless microphone', quantity: 2, placement_position: 'Stage left' },
-            { name: 'Unknown equipment', quantity: 3, placement_position: null }
-          ]
-        },
-        { event_id: 8, name: null, proposed_date: null, expected_attendance: null, accessibility_needs: null, coordinator_name: null, venues: [], equipment: [] }
-      ]
-    });
-    assert.equal(queries[0], 'events event_id, name, proposed_date, expected_attendance, accessibility_needs, coordinator_id | status=awaiting_safety_check order proposed_date order event_id');
-  });
-
-  test('[BOUNDARY] [SG2-92:AC1] an empty queue reads nothing else', async () => {
-    const queries: string[] = [];
-    assert.deepEqual(await standInSafetyCheckQueue.list(fakeClient({}, queries)), { ok: true, events: [] });
-    assert.equal(queries.length, 1);
-  });
-
-  test('[BOUNDARY] [SG2-92:AC1] successful reads with no rows, and a coordinator without a name, still give a full queue entry', async () => {
-    assert.deepEqual(await standInSafetyCheckQueue.list(fakeClient({ events: { data: null, error: null } })), { ok: true, events: [] });
-    const result = await standInSafetyCheckQueue.list(fakeClient({
-      events: { data: [events[0]], error: null },
-      venue_bookings: { data: null, error: null },
-      equipment_requests: { data: null, error: null },
-      users: { data: [], error: null }
-    }));
-    assert.deepEqual(result, { ok: true, events: [{
-      event_id: 7, name: 'Harbour Gala', proposed_date: '2030-06-20T02:00:00Z', expected_attendance: 300,
-      accessibility_needs: 'Step-free access', coordinator_name: null, venues: [], equipment: []
-    }] });
-  });
-
-  test('[FAILURE] [SG2-92:AC1] any failed read makes the whole queue unavailable', async () => {
-    for (const table of ['events', 'venue_bookings', 'equipment_requests', 'venues', 'equipment', 'users']) {
-      assert.deepEqual(await standInSafetyCheckQueue.list(fakeClient({ ...tables, [table]: failed })), { ok: false }, table);
     }
   });
 });

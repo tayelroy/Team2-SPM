@@ -14,9 +14,10 @@ function nextId(rows: Row[], key: string) {
 }
 
 /** Loopback UI fixture mirroring public.record_safety_decision and
- * public.rework_safety_rejected_event over the in-memory tables. The SQL suite
- * (supabase/tests/safety_decisions.sql) proves the production functions, their
- * locking, validation, wording and grants. */
+ * public.rework_safety_rejected_event over the in-memory tables, with SG2-91's
+ * safety_check_track_event moving the revision on as the event leaves the
+ * check. The SQL suite (supabase/tests/safety_decisions.sql) proves the
+ * production functions, their locking, validation, wording and grants. */
 export function createMemorySafetyDecisions(database: MemoryDatabase) {
   const audit = (eventId: number, actorId: string, field: string, from: unknown, to: string) => {
     const logs = database.tables.event_audit_logs;
@@ -30,6 +31,8 @@ export function createMemorySafetyDecisions(database: MemoryDatabase) {
     const event = database.tables.events.find(row => row.event_id === input.eventId);
     if (!event) return { outcome: 'missing' };
     if (event.status !== 'awaiting_safety_check') return { outcome: 'closed', status: String(event.status) };
+    const revision = Number(event.safety_check_revision ?? 0);
+    if (revision !== input.expectedRevision) return { outcome: 'stale', revision };
     const previous = String(event.status);
     const status = SAFETY_DECISION_NEXT_STATUS[input.decision];
     const decisions = database.tables.event_safety_decisions;
@@ -37,7 +40,7 @@ export function createMemorySafetyDecisions(database: MemoryDatabase) {
     const decisionId = nextId(decisions, 'decision_id');
     decisions.push({ decision_id: decisionId, event_id: input.eventId, decision: input.decision, reason: input.reason,
       arrangements: [...input.arrangements], decided_by: input.actorId, decided_at: decidedAt });
-    event.status = status;
+    Object.assign(event, { status, awaiting_safety_check_since: null, safety_check_revision: revision + 1 });
     const named = safetyArrangementList(input.arrangements);
     audit(input.eventId, input.actorId, 'safety_decision', null,
       input.decision === 'approve' ? `Approved${input.reason ? `: ${input.reason}` : ''}`
@@ -71,14 +74,14 @@ export function createMemorySafetyDecisions(database: MemoryDatabase) {
 
 /**
  * SG2-92: three events awaiting the Safety Officer's check, organised by
- * `organiser` and assigned to `coordinator`, each with Regression Hall booked
- * and 4 wireless microphones requested: 921 Harbour Gala (to approve),
- * 922 Riverside Fair (to reject) and 923 Bayfront Talk (to request changes).
- * Nothing in SG2-92 moves an event into Awaiting Safety Check (SG2-91 does),
- * so the fixture places them there directly.
+ * `organiser` and assigned to `coordinator`, each with Regression Hall
+ * approved and booked and 4 wireless microphones placed, listed oldest wait
+ * first: 921 Harbour Gala (to approve), 922 Riverside Fair (to reject) and
+ * 923 Bayfront Talk (to request changes). The fixture places them in the
+ * check directly, at revision 1, rather than through SG2-91's triggers.
  */
 export function seedSafetyDecisions(database: MemoryDatabase) {
-  const { events, venue_bookings: bookings, equipment_requests: equipmentRequests } = database.tables;
+  const { events, venue_booking_requests: requests, venue_bookings: bookings, equipment_requests: equipmentRequests } = database.tables;
   const seeded: [number, string, string][] = [
     [921, 'Harbour Gala', '2030-07-10T02:00:00.000Z'],
     [922, 'Riverside Fair', '2030-07-11T02:00:00.000Z'],
@@ -87,11 +90,24 @@ export function seedSafetyDecisions(database: MemoryDatabase) {
   for (const [eventId, name, date] of seeded) {
     events.push({ ...events[0], event_id: eventId, name, status: 'awaiting_safety_check', coordinator_id: 'user-coordinator',
       organiser_id: 'user-organiser', proposed_date: date, expected_attendance: 80, accessibility_needs: 'Step-free access',
-      arrangements_recheck_needed: false, outstanding_arrangements: [], planning_notes: null });
+      arrangements_recheck_needed: false, outstanding_arrangements: [], planning_notes: null,
+      awaiting_safety_check_since: `2030-07-0${eventId - 920}T01:00:00.000Z`, safety_check_revision: 1 });
     // Each event's venue and equipment are booked for its own four hours.
     const end = new Date(Date.parse(date) + 4 * 60 * 60 * 1000).toISOString();
+    requests.push({ request_id: eventId, event_id: eventId, venue_id: 1, starts_at: date, ends_at: end, layout: 'theatre',
+      status: 'approved', venue_requirements: null, notes: null, requested_by: 'user-coordinator',
+      requested_at: '2030-06-01T00:00:00.000Z', decided_by: 'user-venue', decided_at: '2030-06-02T00:00:00.000Z',
+      decision_reason: null, venue_booking_id: eventId });
     bookings.push({ booking_id: eventId, venue_id: 1, event_id: eventId, starts_at: date, ends_at: end, status: 'confirmed' });
     equipmentRequests.push({ request_id: eventId, event_id: eventId, equipment_id: 1, quantity: 4, notes: null, starts_at: date,
       ends_at: end, status: 'approved', arrangement_notes: null, shortfall: 0, placement_venue_id: 1, placement_position: 'Stage left', version: 1 });
   }
+}
+
+/** SG2-92: the expected attendance of a seeded event awaiting its check rises
+ * to 450, and its safety_check_revision moves on as SG2-91's trigger would. */
+export function changeReviewedDetail(database: MemoryDatabase, eventId: number) {
+  const event = database.tables.events.find(row => row.event_id === eventId && row.status === 'awaiting_safety_check');
+  if (!event) return;
+  Object.assign(event, { expected_attendance: 450, safety_check_revision: Number(event.safety_check_revision ?? 0) + 1 });
 }

@@ -77,13 +77,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.change_request.view': ['event_coordinator'],
   'event_request.change_request.accept': ['event_coordinator'],
   'event_request.rechecks.settle': ['event_coordinator'],
-  // SG2-92: the Safety Officer sees the events awaiting a check (a stand-in
-  // for SG2-91's list) and records Approve / Reject / Request Changes. The
-  // decisions are read by the Safety Officer, the assigned coordinator and
-  // the organiser (per-row, 404 otherwise), and the assigned coordinator
-  // reworks a Safety Rejected event back to Planning (per-row, in the
-  // database function).
-  'safety_checks.view': ['safety_officer'],
+  // SG2-92: the Safety Officer records Approve / Reject / Request Changes on
+  // an event from SG2-91's list ('safety_checks.read'). The decisions are
+  // read by the Safety Officer, the assigned coordinator and the organiser
+  // (per-row, 404 otherwise), and the assigned coordinator reworks a Safety
+  // Rejected event back to Planning (per-row, in the database function).
   'event_request.safety_decision.record': ['safety_officer'],
   'event_request.safety_decisions.view': ['safety_officer', 'event_coordinator', 'event_organiser'],
   'event_request.safety_rework': ['event_coordinator'],
@@ -181,6 +179,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'equipment_requirements.read': ['event_coordinator', 'technical_support_staff', 'safety_officer'],
   'equipment_requirements.request': ['event_coordinator'],
   'equipment_requirements.arrange': ['technical_support_staff'],
+  // SG2-91 AC2/AC4: only Safety Officers open the list of events awaiting an
+  // operational safety check; safety_check_queue() rechecks the stored role.
+  'safety_checks.read': ['safety_officer'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

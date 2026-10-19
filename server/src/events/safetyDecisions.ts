@@ -1,8 +1,8 @@
 /**
  * SG2-92: the Safety Officer's operational safety check decision. This file
- * owns the vocabulary; the SQL in 202610190004_safety_decisions.sql mirrors
- * it (decisions, arrangements, labels, reason limit) and the two must change
- * together.
+ * owns the vocabulary; the SQL in 202610190005_safety_decisions.sql and
+ * 202610190006_safety_decision_revision.sql mirrors it (decisions,
+ * arrangements, labels, reason limit) and they must change together.
  */
 
 /** AC1: the three outcomes of a safety check. */
@@ -49,6 +49,11 @@ export interface SafetyDecisionInput {
   reason: string | null;
   /** Non-empty for Request Changes, empty otherwise. */
   arrangements: SafetyArrangement[];
+  /**
+   * The `safety_check_revision` SG2-91's list showed with the event. The
+   * decision is refused if the event has changed since (a stale review).
+   */
+  expectedRevision: number;
 }
 
 export type ValidateSafetyDecisionResult =
@@ -58,7 +63,8 @@ export type ValidateSafetyDecisionResult =
 /**
  * AC2: Reject and Request Changes need a reason; Request Changes also names
  * the arrangements to change. Approve may carry an optional note and never
- * arrangements. The database function repeats these checks.
+ * arrangements. Every decision carries the revision of the review it was made
+ * on. The database function repeats these checks.
  */
 export function validateSafetyDecision(body: unknown): ValidateSafetyDecisionResult {
   const input = (typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
@@ -100,7 +106,16 @@ export function validateSafetyDecision(body: unknown): ValidateSafetyDecisionRes
     errors.push('Arrangements are named only when requesting changes.');
   }
 
-  return errors.length > 0 ? { valid: false, errors } : { valid: true, value: { decision, reason, arrangements } };
+  // Bounded like events.safety_check_revision (0 to Number.MAX_SAFE_INTEGER).
+  const revision = input.safety_check_revision;
+  const expectedRevision = typeof revision === 'number' && Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+  if (expectedRevision === null) {
+    errors.push('safety_check_revision must be the whole-number revision shown with the event.');
+  }
+
+  return errors.length > 0 || expectedRevision === null
+    ? { valid: false, errors }
+    : { valid: true, value: { decision, reason, arrangements, expectedRevision } };
 }
 
 /** "Venue, Equipment and technical", in the order the decision named them. */

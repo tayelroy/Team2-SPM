@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
-  fetchSafetyCheckQueue,
+  fetchSafetyChecks,
   fetchSafetyDecisions,
   recordSafetyDecision,
   reworkSafetyRejectedEvent,
@@ -23,6 +23,72 @@ const decision = {
   decision_id: 9, event_id: 12, decision: 'request_changes', reason: 'Move the stage', arrangements: ['venue'],
   decided_by: 'safety-1', decided_by_name: 'Sam Safety', decided_at: '2030-06-01T00:00:00.000Z',
 };
+
+const RAW = {
+  event_id: 7, safety_check_revision: 3, name: 'Open Day', organisation: 'SMU', proposed_date: '2031-11-01T01:00:00.000Z',
+  awaiting_since: '2031-10-01T02:00:00.000Z', expected_attendance: 120, accessibility_needs: 'Wheelchair seating',
+  expected_crowd_movement: 'Enter east, leave west',
+  venues: [{ request_id: 11, venue_id: 4, venue_name: 'Hall', location: 'Level 1', capacity: 300, layout: 'theatre',
+    starts_at: '2031-11-01T01:00:00.000Z', ends_at: '2031-11-01T09:00:00.000Z', accessibility_features: 'Ramp',
+    emergency_access: 'Two exits', known_restrictions: 'No open flames' }],
+  equipment: [{ request_id: 21, equipment_name: 'Speakers', quantity: 2, placement_venue_name: 'Hall',
+    placement_position: 'Stage left', arrangement_notes: 'Cable ramps' }],
+};
+
+describe('fetchSafetyChecks (SG2-91)', () => {
+  test('[NORMAL] [SG2-91:AC2] [SG2-91:AC3] maps every review detail and sends the bearer token', async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ events: [RAW] }));
+    vi.stubGlobal('fetch', fetch);
+    expect(await fetchSafetyChecks('tok')).toEqual({
+      ok: true,
+      events: [{
+        eventId: 7, revision: 3, name: 'Open Day', organisation: 'SMU', proposedDate: '2031-11-01T01:00:00.000Z',
+        awaitingSince: '2031-10-01T02:00:00.000Z', expectedAttendance: 120, accessibilityNeeds: 'Wheelchair seating',
+        expectedCrowdMovement: 'Enter east, leave west',
+        venues: [{ requestId: 11, name: 'Hall', location: 'Level 1', capacity: 300, layout: 'theatre',
+          startsAt: '2031-11-01T01:00:00.000Z', endsAt: '2031-11-01T09:00:00.000Z', accessibilityFeatures: 'Ramp',
+          emergencyAccess: 'Two exits', knownRestrictions: 'No open flames' }],
+        equipment: [{ requestId: 21, name: 'Speakers', quantity: 2, placementVenue: 'Hall',
+          placementPosition: 'Stage left', arrangementNotes: 'Cable ramps' }],
+      }],
+    });
+    expect(fetch).toHaveBeenCalledWith('/api/safety-checks', { method: 'GET', headers: { Authorization: 'Bearer tok' } });
+  });
+
+  test('[BOUNDARY] [SG2-91:AC3] details never recorded come through as null or empty, not as invented values', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ events: [
+      { event_id: 'x', venues: [{}], equipment: [{}] },
+      { event_id: 8, venues: 'none', equipment: null },
+    ] })));
+    expect(await fetchSafetyChecks('tok')).toEqual({
+      ok: true,
+      events: [
+        { eventId: 0, revision: 0, name: '', organisation: null, proposedDate: null, awaitingSince: null, expectedAttendance: null,
+          accessibilityNeeds: null, expectedCrowdMovement: null,
+          venues: [{ requestId: 0, name: '', location: null, capacity: null, layout: null, startsAt: null, endsAt: null,
+            accessibilityFeatures: null, emergencyAccess: null, knownRestrictions: null }],
+          equipment: [{ requestId: 0, name: '', quantity: 0, placementVenue: null, placementPosition: null, arrangementNotes: null }] },
+        { eventId: 8, revision: 0, name: '', organisation: null, proposedDate: null, awaitingSince: null, expectedAttendance: null,
+          accessibilityNeeds: null, expectedCrowdMovement: null, venues: [], equipment: [] },
+      ],
+    });
+  });
+
+  test.each([401, 403])('[FAILURE] [SG2-91:AC4] a %i is reported as not allowed', async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })));
+    expect(await fetchSafetyChecks('tok')).toEqual({ ok: false, kind: 'unauthorized' });
+  });
+
+  test.each([
+    ['a server error', () => Promise.resolve(new Response(null, { status: 503 }))],
+    ['a network failure', () => Promise.reject(new TypeError('offline'))],
+    ['a body that is not JSON', () => Promise.resolve(new Response('not json', { status: 200 }))],
+    ['a body without a list', () => Promise.resolve(Response.json({ events: null }))],
+  ])('[FAILURE] [SG2-91:AC2] %s is reported as unavailable', async (_, reply) => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(reply));
+    expect(await fetchSafetyChecks('tok')).toEqual({ ok: false, kind: 'unavailable' });
+  });
+});
 
 describe('safetyDecisionProblems (SG2-92 AC2)', () => {
   test('[NORMAL] [SG2-92:AC2] a complete decision has no problems', () => {
@@ -48,76 +114,53 @@ describe('safetyDecisionProblems (SG2-92 AC2)', () => {
   });
 });
 
-describe('fetchSafetyCheckQueue (SG2-92; stand-in for SG2-91)', () => {
-  test('[NORMAL] [SG2-92:AC1] reads the queue with an authorised GET', async () => {
-    const queue = { source: 'stand-in', events: [] };
-    const fetch = respond(() => Response.json(queue));
-    expect(await fetchSafetyCheckQueue('safety-token')).toEqual({ ok: true, queue });
-    expect(fetch).toHaveBeenCalledWith('/api/safety-checks', { method: 'GET', headers: { Authorization: 'Bearer safety-token' } });
-  });
-
-  test('[FAILURE] [SG2-92:AC1] network failures and malformed bodies read as unavailable', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual(UNAVAILABLE);
-    respond(() => Response.json({ events: 'nope' }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual(UNAVAILABLE);
-    respond(() => new Response('not json', { status: 200 }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual(UNAVAILABLE);
-  });
-
-  test('[FAILURE] [SG2-92:AC1] refusals keep the server text, else fall back to plain wording per status', async () => {
-    respond(() => Response.json({ error: 'Access denied' }, { status: 403 }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual({ ok: false, kind: 'unauthorized', message: 'Access denied' });
-    respond(() => new Response(null, { status: 401 }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual({ ok: false, kind: 'unauthorized',
-      message: 'You do not have access to this. Sign in again if your session has expired.' });
-    respond(() => new Response(null, { status: 503 }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual(UNAVAILABLE);
-    respond(() => new Response(null, { status: 418 }));
-    expect(await fetchSafetyCheckQueue('t')).toEqual({ ok: false, kind: 'error', message: 'Could not load the safety checks (HTTP 418).' });
-  });
-});
-
 describe('recordSafetyDecision (SG2-92)', () => {
   const recorded = { decision, previous_status: 'awaiting_safety_check', status: 'planning' };
 
-  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC2] posts the decision with its trimmed reason and, for Request changes, the arrangements', async () => {
+  test('[NORMAL] [SG2-92:AC1] [SG2-92:AC2] posts the decision on the reviewed revision with its trimmed reason and, for Request changes, the arrangements', async () => {
     const fetch = respond(() => Response.json(recorded, { status: 201 }));
-    expect(await recordSafetyDecision(12, { decision: 'request_changes', reason: ' Move the stage ', arrangements: ['venue'] }, 'safety-token'))
+    expect(await recordSafetyDecision(12, { decision: 'request_changes', reason: ' Move the stage ', arrangements: ['venue'] }, 4, 'safety-token'))
       .toEqual({ ok: true, recorded });
     expect(fetch).toHaveBeenCalledWith('/api/event-requests/12/safety-decision', {
       method: 'POST',
       headers: { Authorization: 'Bearer safety-token', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision: 'request_changes', reason: 'Move the stage', arrangements: ['venue'] }),
+      body: JSON.stringify({ decision: 'request_changes', safety_check_revision: 4, reason: 'Move the stage', arrangements: ['venue'] }),
     });
   });
 
-  test('[BOUNDARY] [SG2-92:AC1] an Approve without a note sends neither a reason nor arrangements', async () => {
+  test('[BOUNDARY] [SG2-92:AC1] an Approve without a note sends only the decision and the reviewed revision', async () => {
     const fetch = respond(() => Response.json(recorded, { status: 201 }));
-    await recordSafetyDecision(12, { decision: 'approve', reason: '   ', arrangements: ['venue'] }, 't');
-    expect(fetch.mock.calls[0][1]?.body).toBe(JSON.stringify({ decision: 'approve' }));
+    await recordSafetyDecision(12, { decision: 'approve', reason: '   ', arrangements: ['venue'] }, 4, 't');
+    expect(fetch.mock.calls[0][1]?.body).toBe(JSON.stringify({ decision: 'approve', safety_check_revision: 4 }));
   });
 
   test('[CONFLICT] [SG2-92:AC1] a closed check reports the server message and the event status; validation details are kept', async () => {
     respond(() => Response.json({ error: 'This event is no longer awaiting a safety check.', status: 'preparation' }, { status: 409 }));
-    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 't')).toEqual({
+    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 4, 't')).toEqual({
       ok: false, kind: 'conflict', message: 'This event is no longer awaiting a safety check.', status: 'preparation',
     });
     respond(() => Response.json({ error: 'Invalid safety decision', details: ['A reason is required to reject.', 7] }, { status: 400 }));
-    expect(await recordSafetyDecision(12, { decision: 'reject', reason: 'x', arrangements: [] }, 't')).toEqual({
+    expect(await recordSafetyDecision(12, { decision: 'reject', reason: 'x', arrangements: [] }, 4, 't')).toEqual({
       ok: false, kind: 'validation', message: 'Invalid safety decision', details: ['A reason is required to reject.'],
     });
   });
 
+  test('[CONFLICT] [SG2-92:AC1] a decision on a review the event has moved on from reads as stale, apart from a closed check', async () => {
+    const message = 'This event changed after you opened it. Refresh the safety checks and review it again.';
+    respond(() => Response.json({ error: message, code: 'stale', revision: 5 }, { status: 409 }));
+    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 4, 't'))
+      .toEqual({ ok: false, kind: 'stale', message });
+  });
+
   test('[FAILURE] [SG2-92:AC1] network failures, a missing event and malformed replies are reported', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
-    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 't')).toEqual(UNAVAILABLE);
+    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 4, 't')).toEqual(UNAVAILABLE);
     respond(() => new Response(null, { status: 404 }));
-    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 't')).toEqual({
+    expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 4, 't')).toEqual({
       ok: false, kind: 'not_found', message: 'This event could not be found. Refresh and try again.' });
     for (const body of [{ status: 7, decision }, { status: 'planning' }, { status: 'planning', decision: null }]) {
       respond(() => Response.json(body, { status: 201 }));
-      expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 't')).toEqual(UNAVAILABLE);
+      expect(await recordSafetyDecision(12, { decision: 'approve', reason: '', arrangements: [] }, 4, 't')).toEqual(UNAVAILABLE);
     }
   });
 });
@@ -135,6 +178,20 @@ describe('fetchSafetyDecisions (SG2-92 AC6)', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
     expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
     respond(() => Response.json({ decisions: {} }));
+    expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
+  });
+
+  test('[FAILURE] [SG2-92:AC6] refusals keep the server text, else fall back to plain wording per status', async () => {
+    respond(() => Response.json({ error: 'Access denied' }, { status: 403 }));
+    expect(await fetchSafetyDecisions(12, 't')).toEqual({ ok: false, kind: 'unauthorized', message: 'Access denied' });
+    respond(() => new Response(null, { status: 401 }));
+    expect(await fetchSafetyDecisions(12, 't')).toEqual({ ok: false, kind: 'unauthorized',
+      message: 'You do not have access to this. Sign in again if your session has expired.' });
+    respond(() => new Response(null, { status: 503 }));
+    expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
+    respond(() => new Response(null, { status: 418 }));
+    expect(await fetchSafetyDecisions(12, 't')).toEqual({ ok: false, kind: 'error', message: 'Could not load the safety decisions (HTTP 418).' });
+    respond(() => new Response('not json', { status: 200 }));
     expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
   });
 });

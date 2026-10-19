@@ -5,22 +5,31 @@ that is Awaiting Safety Check and records one of three decisions: Approve, Rejec
 Request Changes. Each decision moves the event on, is recorded with who made it, when
 and why, and is sent to the event's organiser and assigned coordinator.
 
-## The list of events is a stand-in for SG2-91
+## Where the decision is made: SG2-91's list
 
-SG2-91 (Lim Dao Jun) owns the Safety Officer's list of events awaiting a check, the
-review details it shows, and the automatic move into Awaiting Safety Check once an
-event's venue bookings are approved and its equipment is reserved. None of that has
-shipped yet. Until it does, `GET /api/safety-checks` serves a labelled stand-in,
-`server/src/safetyChecks/standInQueue.ts`: the events already in
-`awaiting_safety_check` with the review details available today (date, attendance,
-accessibility needs, coordinator, confirmed venue bookings with capacity, and live
-equipment requests with their placement). The desk says the list is a stand-in.
+SG2-91 (Lim Dao Jun) owns the Safety Officer's list of events awaiting a check
+(`GET /api/safety-checks`, permission `safety_checks.read`), the review details it
+shows, and the automatic move into Awaiting Safety Check once an event's venue
+bookings are approved and its equipment is reserved. The Safety desk cards and the
+Safety checks screen (`client/src/screens/SafetyChecks.tsx`) are his. SG2-92 adds,
+on each event's review, its earlier decisions and the Approve / Reject / Request
+Changes form (`client/src/components/SafetyDecisionForm.tsx`). After a decision the
+list is read again, so the decided event leaves it.
 
 Nothing in SG2-92 moves an event into Awaiting Safety Check. The browser fixture
 (`e2e/support/safety-decisions.ts`) and the integration test put events there
-directly. SG2-91 replaces the stand-in by passing its own `SafetyCheckQueue`
-(`list(admin)`) to `createSafetyCheckHandlers` in `server/src/events/safetyChecks.ts`.
-No SG2-92 logic changes.
+directly.
+
+## Deciding on what was reviewed
+
+SG2-91's list returns each event's `safety_check_revision`, which moves on whenever
+the event enters or leaves the check or a reviewed detail changes. The decision
+carries back the revision the Safety Officer saw (`safety_check_revision` in the
+request body). If the event has changed since, the decision is refused with
+409 `{ error, code: 'stale', revision }` and nothing is written; the screen shows
+"This event changed after you opened it. Refresh the safety checks and review it
+again." and reads the list again, so the Safety Officer decides on the event as it
+now stands.
 
 ## Decisions
 
@@ -34,6 +43,8 @@ No SG2-92 logic changes.
 - Arrangements are named only with Request Changes, each once, in the order given.
 - A decision can only be recorded while the event is `awaiting_safety_check`; a second
   decision, or one on an event that moved on, is refused with its current status (409).
+- The revision must be the whole number the list showed (0 or more); a missing or
+  malformed one is refused (400), a different one is stale (409).
 - The server (`validateSafetyDecision`) and the database function apply the same rules.
 - **Reject (AC4).** The event is shown as Safety Rejected and cannot move on to
   Preparation. Its assigned coordinator reworks it back to Planning ("Rework
@@ -63,14 +74,15 @@ the organiser and the assigned coordinator see the latest decision on the event.
 
 | Route | Who | Result |
 | --- | --- | --- |
-| `GET /api/safety-checks` | Safety Officer | `{ source: 'stand-in', events }` |
-| `POST /api/event-requests/:eventId/safety-decision` | Safety Officer | 201 `{ decision, previous_status, status }`; 400 `Invalid safety decision` with `details`; 404; 409 `{ error, status }` |
+| `POST /api/event-requests/:eventId/safety-decision` | Safety Officer | body `{ decision, reason?, arrangements?, safety_check_revision }`; 201 `{ decision, previous_status, status }`; 400 `Invalid safety decision` with `details`; 404; 409 `{ error, status }` when the check is closed; 409 `{ error, code: 'stale', revision }` when the event changed |
 | `GET /api/event-requests/:eventId/safety-decisions` | Safety Officer; the assigned coordinator; the organiser who created it | `{ decisions }`, newest first; 404 for anyone else |
 | `POST /api/event-requests/:eventId/rework` | the assigned coordinator | 200 `{ event_id, status: 'planning' }`; 404; 409 unless Safety Rejected |
 
+The list itself is SG2-91's `GET /api/safety-checks`.
+
 ## Database
 
-Migration `supabase/migrations/202610190004_safety_decisions.sql` adds the
+Migration `supabase/migrations/202610190005_safety_decisions.sql` adds the
 `event_safety_decisions` table (RLS forced, service role only, no update or delete
 grant), the `safety_decision` notice kind, and two `security definer` functions
 executable only by the service role:
@@ -80,8 +92,14 @@ executable only by the service role:
   history and the notices in one transaction;
 - `rework_safety_rejected_event`, for the assigned coordinator only.
 
+Migration `supabase/migrations/202610190006_safety_decision_revision.sql` replaces
+`record_safety_decision` with a six-argument version whose last argument is the
+revision the Safety Officer reviewed; it answers `{ outcome: 'stale', revision }`,
+under the same row lock, when the event's `safety_check_revision` differs. The
+five-argument version no longer exists.
+
 `supabase/tests/safety_decisions.sql` covers each decision, validation boundaries,
-refusals, rework and the grants.
+refusals, the stale revision, rework and the grants.
 
 ## Follow-ups
 
