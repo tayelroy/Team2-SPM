@@ -2517,6 +2517,20 @@ test('SG2-105-P01 | [SG2-105:AC1] [SG2-105:AC2] [NORMAL] [BOUNDARY] an organiser
   const detail = await page.request.get(`/api/event-requests/${record.event_id}`, { headers: await authHeaders(page) });
   expect((await detail.json()).request).toMatchObject({ status: 'unassigned', preferred_layout: 'Banquet rounds of ten',
     accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false });
+  // The coordinator who reviews it sees the layout without chasing the organiser.
+  const lead = await page.request.post('/api/auth/login', { data: { email: 'lead@example.test', password: 'Regression123!' } });
+  const leadHeaders = { Authorization: `Bearer ${(await lead.json()).accessToken}` };
+  expect((await page.request.patch(`/api/event-requests/${record.event_id}/coordinator`,
+    { headers: leadHeaders, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(200);
+  const coordinator = await page.context().newPage();
+  try {
+    await signIn(coordinator, 'coordinator');
+    await coordinator.getByRole('region', { name: 'Awaiting review' }).getByRole('button', { name: /Layout workshop/ }).click();
+    await expect(coordinator.locator('dl > div').filter({ has: coordinator.locator('dt').getByText('Preferred room layout', { exact: true }) })
+      .locator('dd')).toHaveText('Banquet rounds of ten');
+  } finally {
+    await coordinator.close();
+  }
 });
 
 test('SG2-105-F01 | [SG2-105:AC2] [SG2-105:AC3] [SG2-105:AC4] [FAILURE] [BOUNDARY] a draft missing the customer minimum saves, but submitting it is refused, lists every missing item and leaves it a draft', async ({ page }) => {

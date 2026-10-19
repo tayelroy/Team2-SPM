@@ -184,6 +184,24 @@ test.each([
   expect(fetch).toHaveBeenCalledWith(`/api/work-queue/${kind}/7`, expect.anything());
 });
 
+test('[NORMAL] [SG2-105:AC1] the coordinator reviewing a request sees the preferred room layout the organiser gave', async () => {
+  const withLayout = { ...review, details: { ...review.details, venue_requirements: 'A stage', preferred_layout: 'Banquet rounds of ten' } };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [withLayout] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(screen.getByText('Preferred room layout').nextElementSibling).toHaveTextContent('Banquet rounds of ten');
+});
+
+test('[BOUNDARY] [SG2-105:AC5] a request submitted before the layout was asked for shows it as not provided', async () => {
+  const legacy = { ...review, details: { ...review.details, accessibility_needs: 'None', preferred_layout: null } };
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ items: [legacy] })));
+  render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: /Leadership Forum/ }));
+  await screen.findByRole('heading', { name: 'Leadership Forum' });
+  expect(screen.getByText('Preferred room layout').nextElementSibling).toHaveTextContent('Not provided');
+});
+
 test('[NORMAL] [SG2-48:AC2] Venue Staff see the layout, venue requirements and requester of a pending venue request', async () => {
   const request = { ...review, kind: 'venue', category: 'venue', item_id: 41, title: 'Atrium Hall', status: 'pending',
     ends_at: '2030-06-15T10:00:00Z', details: { venue_requirements: 'A stage', layout: 'theatre', requested_by: 'Casey Coordinator' } };
