@@ -91,7 +91,9 @@ const api = request(createApp(...args));
 const auth = (who: string) => ({ Authorization: `Bearer ${who}` });
 const values = { name: 'Integration workshop', purpose: 'Exercise actual storage', description: 'Synthetic test event',
   proposed_date: '2090-06-15T02:00:00.000Z', expected_attendance: 136,
-  venue_requirements: 'A room with seating', equipment_requirements: '1 projector', registration_needed: true };
+  venue_requirements: 'A room with seating', equipment_requirements: '1 projector', registration_needed: true,
+  // SG2-105: the rest of the customer's minimum for submission.
+  preferred_layout: 'Classroom', accessibility_needs: 'None' };
 async function draft(body = values) {
   const result = await api.post('/api/event-requests').set(auth('organiser')).send(body);
   assert.equal(result.status, 201, JSON.stringify(result.body));
@@ -680,7 +682,7 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
   assert.deepEqual(result.body.missingForSubmission, []);
   const history = await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'));
   assert.equal(history.status, 200, JSON.stringify(history.body));
-  assert.equal(history.body.history.length, 9);
+  assert.equal(history.body.history.length, 10);
   const names = history.body.history.map((row: { field_name: string }) => row.field_name).sort();
   assert.deepEqual(names, Object.keys(edited).sort());
   for (const row of history.body.history) {
@@ -694,12 +696,12 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
     else assert.equal(row.new_value, String(expected));
   }
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(edited)).status, 200);
-  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 9);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 10);
   assert.equal((await database.from('events').update({ status: 'needs_clarification' }).eq('event_id', id)).error, null);
   const cleared = { ...edited, description: null, registration_needed: false };
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(cleared)).status, 200);
   const changed = (await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history;
-  assert.equal(changed.length, 11);
+  assert.equal(changed.length, 12);
   assert.deepEqual(changed.filter((row: { old_value: unknown }) => row.old_value !== null).map((row: { field_name: string; new_value: string | null }) => [row.field_name, row.new_value]).sort(), [['description', null], ['registration_needed', 'false']]);
   assert.equal((await database.from('account_roles').update({ role: 'event_organiser' }).eq('user_id', ids.other)).error, null);
   assert.equal((await database.from('users').update({ organisation: 'Integration organisation' }).eq('user_id', ids.other)).error, null);
@@ -716,7 +718,7 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
   });
   assert.equal(direct.status, 403);
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('coordinator')).send(edited)).status, 403);
-  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 11);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 12);
 });
 
 test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-40:AC2] native concurrent draft saves serialize their old/new chain and submission closes the write path', async () => {

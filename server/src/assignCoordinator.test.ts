@@ -31,6 +31,7 @@ const SUBMITTED_REQUEST = {
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
+  preferred_layout: null,
   accessibility_needs: null,
   equipment_requirements: null,
   registration_needed: true,

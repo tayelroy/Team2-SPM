@@ -30,6 +30,8 @@ type InternalRole = keyof typeof GROUPS;
 const DETAIL_LABELS: Record<string, string> = {
   organisation: 'Client organisation', purpose: 'Purpose', description: 'Description',
   expected_attendance: 'Expected attendance', venue_requirements: 'Venue requirements',
+  // SG2-105: the organiser's preferred room layout.
+  preferred_layout: 'Preferred room layout',
   accessibility_needs: 'Accessibility needs', equipment_requirements: 'Equipment requirements',
   registration_needed: 'Registration needed', location: 'Location', capacity: 'Venue capacity',
   quantity: 'Quantity requested', notes: 'Request notes',

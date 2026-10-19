@@ -22,6 +22,8 @@ const FIELD_LABELS: Record<string, string> = {
   expected_attendance: 'Expected Attendance',
   proposed_date: 'Proposed Date',
   venue_requirements: 'Venue Requirements',
+  // SG2-105: the organiser's preferred room layout, saved with the draft.
+  preferred_layout: 'Preferred Room Layout',
   equipment_requirements: 'Equipment Requirements',
   accessibility_needs: 'Accessibility Needs',
   registration_needed: 'Registration Needed',

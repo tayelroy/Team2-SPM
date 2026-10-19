@@ -283,6 +283,8 @@ export default function EventDetail({
           value: detail.expectedAttendance !== null ? String(detail.expectedAttendance) : '—',
         },
         { label: 'Venue requirements', value: detail.venueRequirements || 'None specified' },
+        // SG2-105: requests submitted before the layout was asked for have none.
+        { label: 'Preferred room layout', value: detail.preferredLayout || 'Not specified' },
         { label: 'Coordinator', value: detail.coordinatorName || 'Unassigned' },
         ...(detail.coordinatorName
           ? [{ label: 'Coordinator contact', value: detail.coordinatorPhone || 'No phone number on file' }]

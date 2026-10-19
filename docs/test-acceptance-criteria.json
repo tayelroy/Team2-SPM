@@ -455,6 +455,19 @@
       }
     },
     {
+      "id": "SG2-105",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-105",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-19",
+      "acceptanceCriteria": {
+        "AC1": "Submission requires: event name, purpose, description, proposed date and time, expected attendance, venue requirements, preferred room layout, accessibility needs, equipment requirements, and whether registration is needed",
+        "AC2": "Accessibility needs and equipment requirements can be answered \"None\", but cannot be left blank",
+        "AC3": "Submitting with any of these missing is refused, every missing item is listed, and the request stays a draft (as SG2-30 AC2)",
+        "AC4": "Drafts can still be saved with these fields incomplete (SG2-28 AC4 and SG2-29 unchanged)",
+        "AC5": "Requests already submitted are not affected"
+      }
+    },
+    {
       "id": "SG2-50",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
       "originalPullRequests": [],

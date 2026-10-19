@@ -9,6 +9,7 @@
  * Completeness is a separate question, answered by SUBMISSION_REQUIRED_FIELDS
  * and missingForSubmission(). Those are the shared contract with SG2-30
  * (submit an event request), which enforces completeness at submission time.
+ * SG2-105 widened that list to the customer's full minimum.
  */
 
 /** Columns a client may supply. Anything else is ignored (no mass assignment). */
@@ -19,6 +20,8 @@ export const DRAFT_FIELDS = [
   'proposed_date',
   'expected_attendance',
   'venue_requirements',
+  // SG2-105: the room arrangement the organiser wants (theatre, banquet, ...).
+  'preferred_layout',
   'accessibility_needs',
   'equipment_requirements',
   'registration_needed'
@@ -30,8 +33,12 @@ export type DraftField = (typeof DRAFT_FIELDS)[number];
  * Fields that must be present before a request can be submitted for review.
  *
  * ⚠️ SHARED CONTRACT WITH SG2-30 — agree any change with that ticket's owner
- * rather than diverging. `accessibility_needs` is deliberately absent: SG2-28
- * states it is optional and may be left blank.
+ * rather than diverging. SG2-105 makes this the customer's minimum from
+ * clarification session 2, which replaces SG2-28 AC2: accessibility needs
+ * and equipment requirements may be answered "None" but not left blank, and
+ * `registration_needed` must be answered either way (false is an answer).
+ * Only submission checks this list, so requests already submitted are not
+ * affected and drafts still save incomplete.
  */
 export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'name',
@@ -39,7 +46,11 @@ export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'description',
   'proposed_date',
   'expected_attendance',
-  'venue_requirements'
+  'venue_requirements',
+  'preferred_layout',
+  'accessibility_needs',
+  'equipment_requirements',
+  'registration_needed'
 ];
 
 export interface DraftValues {
@@ -49,6 +60,7 @@ export interface DraftValues {
   proposed_date: string | null;
   expected_attendance: number | null;
   venue_requirements: string | null;
+  preferred_layout: string | null;
   accessibility_needs: string | null;
   equipment_requirements: string | null;
   registration_needed: boolean | null;
@@ -68,6 +80,7 @@ type TextField =
   | 'purpose'
   | 'description'
   | 'venue_requirements'
+  | 'preferred_layout'
   | 'accessibility_needs'
   | 'equipment_requirements';
 
@@ -76,6 +89,7 @@ const TEXT_FIELDS: TextField[] = [
   'purpose',
   'description',
   'venue_requirements',
+  'preferred_layout',
   'accessibility_needs',
   'equipment_requirements'
 ];

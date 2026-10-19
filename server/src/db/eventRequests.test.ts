@@ -273,6 +273,7 @@ const EMPTY_VALUES: DraftValues = {
   proposed_date: null,
   expected_attendance: null,
   venue_requirements: null,
+  preferred_layout: null,
   accessibility_needs: null,
   equipment_requirements: null,
   registration_needed: null
@@ -425,6 +426,33 @@ describe('insertEventRequestDraft', () => {
       if (!result.ok) assert.match(result.message, /not returned/);
     });
   }
+});
+
+describe('the preferred room layout is read back (SG2-105)', () => {
+  test('[NORMAL] [SG2-105:AC1] a created draft and a request detail both select the preferred layout from storage', async () => {
+    const selected: string[] = [];
+    const row = { event_id: 7, organiser_id: 'user-1', status: 'draft', preferred_layout: 'Theatre' };
+    const admin = {
+      from(table: string) {
+        assert.equal(table, 'events');
+        return {
+          insert: () => ({ select: async (columns: string) => { selected.push(columns); return { data: [row], error: null }; } }),
+          select: (columns: string) => {
+            selected.push(columns);
+            const chain = { eq: () => chain, then: (resolve: (value: Result) => unknown) => Promise.resolve({ data: [row], error: null }).then(resolve) };
+            return chain;
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const created = await insertEventRequestDraft(admin, { organiserId: 'user-1', organisation: null, values: EMPTY_VALUES });
+    const detail = await fetchOwnEventRequest(admin, 7, 'user-1');
+    assert.equal(created.ok && created.request.preferred_layout, 'Theatre');
+    assert.equal(detail.ok && detail.request.preferred_layout, 'Theatre');
+    assert.equal(selected.length, 2);
+    for (const columns of selected) assert.ok(columns.split(/,\s*/).includes('preferred_layout'), columns);
+  });
 });
 
 describe('fetchOwnEventRequest', () => {
