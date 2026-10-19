@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AccessError, type Role } from '../../server/src/auth/policy';
+import { currentActingRole, orderRoles, selectActingRole } from '../../server/src/auth/actingRole';
 import { DRAFT_FIELDS, validateDraftInput } from '../../server/src/events/fields';
 
 // Synthetic fixtures only. This adapter deliberately does not emulate Postgres
@@ -399,9 +400,13 @@ export class MemoryDatabase {
   async principal(token: string) {
     const userId = this.sessions.get(token);
     if (!userId) throw new AccessError(401);
-    const role = this.tables.account_roles.find(row => row.user_id === userId)?.role as Role | undefined;
-    if (!role) throw new AccessError(403);
-    return { userId, role };
+    // SG2-104: every role the account holds, and the one this request acts as
+    // (like public.acting_role(): the header's role if held, else the default).
+    const roles = orderRoles(this.tables.account_roles.filter(row => row.user_id === userId).map(row => row.role as Role));
+    if (roles.length === 0) throw new AccessError(403);
+    const acting = currentActingRole();
+    const role = acting && roles.includes(acting) ? acting : selectActingRole(roles, []);
+    return { userId, role, roles };
   }
 
   readonly client = {

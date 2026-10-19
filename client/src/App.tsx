@@ -109,9 +109,22 @@ export default function App() {
       () => settle(() => setLoadedAccess({ token, access: null })),
     );
     return () => controller.abort();
-    // Re-check only when the signed-in identity actually changes.
+    // Re-check when the signed-in identity or the role it acts as changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.accessToken]);
+  }, [session?.accessToken, session?.user.role]);
+
+  // SG2-104: switch the role the account acts as. Every screen starts again
+  // at that role's home, and the next requests carry the new role.
+  function handleSwitchRole(nextRole: Role) {
+    const next = { ...session!, user: { ...session!.user, role: nextRole } };
+    saveSession(next);
+    setSession(next);
+    setLoadedAccess(null);
+    setSelectedEventId(undefined);
+    setEditingRequest(null);
+    setVenuePrefill(null);
+    setScreen(landingScreenFor(nextRole));
+  }
 
   function handleSignIn(newSession: StoredSession) {
     saveSession(newSession);
@@ -162,6 +175,8 @@ export default function App() {
   // (same). The assertion documents that invariant rather than adding an
   // unreachable branch just to satisfy the type checker.
   const role = toRole(session!.user.role);
+  // SG2-104: every role the account holds (just its role for older sessions).
+  const roles = (session!.user.roles ?? [role]).filter(isRole);
   // `undefined` while this session's permissions are still loading.
   const access = loadedAccess?.token === session!.accessToken ? loadedAccess.access : undefined;
 
@@ -247,7 +262,7 @@ export default function App() {
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
-    profile: <Profile role={role} />,
+    profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
@@ -255,7 +270,8 @@ export default function App() {
   }[screen];
 
   return (
-    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} access={access} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
+    <AppShell key={`${session!.accessToken}:${role}`} accessToken={session!.accessToken} role={role} roles={roles} onSwitchRole={handleSwitchRole}
+      access={access} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event.
       setVenuePrefill(null);
       setScreen(nextScreen);

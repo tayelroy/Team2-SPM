@@ -6381,5 +6381,77 @@
       "SG2-77:upsert-invalid-refused",
       "SG2-77:upsert-failure-rolls-back-history"
     ]
+  },
+  {
+    "id": "SG2-104-P01",
+    "title": "an account with two roles switches between them, and each role reaches only its own functions",
+    "story": "SG2-104",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC1",
+      "SG2-104:AC2",
+      "SG2-104:AC3",
+      "SG2-104:AC5"
+    ],
+    "purpose": "Verify a two-role account starts as its less-privileged role, is refused the other role's functions until it switches, is refused a role it does not hold, and sees both roles on its profile.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Give the venue fixture account the Event Coordinator role too and sign in as it.",
+      "Check the Acting as switcher and the menu; list a venue's bookings through the API as each role and as a role not held.",
+      "Switch to Venue Staff; open My Profile."
+    ],
+    "data": "venue@example.test holding venue_staff and event_coordinator; venue 1.",
+    "expected": "Starts as Event Coordinator without the Catalogue; the venue-wide booking list is 403 as coordinator, 200 as Venue Staff and 403 for Technical Support Staff; switching shows the Catalogue; the profile lists Event Coordinator, Venue Staff.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the Chromium run with the other journeys.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "19 Oct 2026; feature/SG2-104-multi-role-accounts on main 67753f7; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-19",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-MULTI-ROLE-01",
+    "title": "Several roles per account, one acting role per call, separation of duties and history relationships",
+    "story": "SG2-104",
+    "mapped_acs": [
+      "SG2-104:AC1",
+      "SG2-104:AC2",
+      "SG2-104:AC3",
+      "SG2-104:AC4",
+      "SG2-104:AC6"
+    ],
+    "purpose": "Check account_roles, acting_role(), the role-reading functions, change_account_roles(), the organiser/coordinator check, the own-request refusal and the history read policy through actual records.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed multi-role accounts, events, a venue, bookings, requests, an equipment request and history.",
+      "Run the tagged assertions as each account with different X-Acting-Role headers, and as the service role.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/account_multi_roles.sql",
+    "expected": "Two and all seven roles are stored, never one twice; acting_role() follows a held header only and never guesses; release, holds, equipment and confirmation act as the acting role; an organiser is never their event's coordinator; Venue Staff cannot decide their own request; nobody changes their own roles or removes an account's last role; history is read only with a relationship, and a reassigned coordinator loses it.",
+    "evidence": "supabase/tests/account_multi_roles.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: an acting_role() that trusts the header, one that ignores it, the previous decide_venue_booking_request(), no organiser/coordinator check, no self-change check, no last-role check and the previous history policy each made the suite fail on the matching assertion.",
+    "execution_date": "19 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "19 Oct 2026; feature/SG2-104-multi-role-accounts on main 67753f7; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-19",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json",
+      "method_scope": {
+        "source": "supabase/tests/account_multi_roles.sql"
+      }
+    }
   }
 ]

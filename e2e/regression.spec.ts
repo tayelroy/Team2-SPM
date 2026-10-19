@@ -723,7 +723,7 @@ test('SG2-90-P01 | [SG2-90:AC1] [SG2-90:AC2] [SG2-90:AC3] [SG2-90:AC4] [NORMAL] 
   for (const eventId of notMine) expect({ eventId, ...await attempt(eventId) }).toEqual({ eventId, ...refused });
   // Refused attempts changed nothing: no history was written for any of them.
   for (const eventId of notMine) {
-    const history = await request.get(`/api/event-requests/${eventId}/history`, { headers: support });
+    const history = await request.get(`/api/event-requests/${eventId}/history`, { headers: lead });
     expect((await history.json()).history).toEqual([]);
   }
 
@@ -771,7 +771,8 @@ test('SG2-90-P02 | [SG2-90:AC1] [SG2-90:AC3] [BOUNDARY] rights follow the curren
   expect(await plan('Back again')).toBe(200);
 
   // Only the two real handovers are in the history, newest first.
-  const history = await request.get('/api/event-requests/81/history', { headers: support });
+  // SG2-104 AC6: history is read by the Lead, who relates to every submitted event.
+  const history = await request.get('/api/event-requests/81/history', { headers: lead });
   expect((await history.json()).history
     .filter((entry: Record<string, unknown>) => entry.field_name === 'coordinator_id')
     .map((entry: Record<string, unknown>) => [entry.old_value, entry.new_value])).toEqual([
@@ -1903,6 +1904,33 @@ test('SG2-86-P01 | [SG2-86:AC1/AC3/AC4] [NORMAL] a new Week 7 role signs in, see
   expect((await page.request.get('/api/work-queue', { headers: await authHeaders(page) })).status()).toBe(403);
 });
 
+test('SG2-104-P01 | [SG2-104:AC1] [SG2-104:AC2] [SG2-104:AC3] [SG2-104:AC5] [NORMAL] [FAILURE] an account with two roles switches between them, and each role reaches only its own functions', async ({ page, request }) => {
+  // The venue account also holds the Event Coordinator role.
+  expect((await request.post('/__e2e/multi-role')).status()).toBe(204);
+  await signIn(page, 'venue');
+  const acting = page.getByLabel('Acting as');
+  const catalogue = page.getByRole('navigation').getByRole('button', { name: 'Catalogue', exact: true });
+  // It starts as its less-privileged role, without the Venue Staff catalogue.
+  await expect(acting).toHaveValue('Event Coordinator');
+  await expect(catalogue).toHaveCount(0);
+
+  // AC2/AC5: the server allows only what the acting role allows.
+  const headers = await authHeaders(page);
+  const venueBookings = (role: string) => page.request.get('/api/venue-bookings?venue_id=1', { headers: { ...headers, 'X-Acting-Role': role } });
+  expect((await venueBookings('event_coordinator')).status()).toBe(403);
+  expect((await venueBookings('venue_staff')).status()).toBe(200);
+  expect((await venueBookings('technical_support_staff')).status()).toBe(403);
+
+  // AC1: switching to Venue Staff brings that role's functions.
+  await acting.selectOption('Venue Staff');
+  await expect(catalogue).toBeVisible();
+
+  // AC3: the profile lists both roles.
+  await page.getByRole('button', { name: 'Profile', exact: true }).click();
+  await page.getByRole('button', { name: 'My Profile', exact: true }).click();
+  await expect(page.getByText('Event Coordinator, Venue Staff', { exact: true })).toBeVisible();
+});
+
 test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prototype events and offer only their own screens', async ({ page }) => {
   const prototypeEvent = page.getByText('Product Launch — Tideline', { exact: true });
   const menu = page.getByRole('navigation').getByRole('button');
@@ -2062,7 +2090,9 @@ test('SG2-97-P01 | [SG2-97:AC1] [SG2-97:AC2] [SG2-97:AC3] [NORMAL] [FAILURE] ass
   expect((await request.patch('/api/event-requests/95/coordinator', { headers: support, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(403);
 
   // AC2: the assignment Technical Support made earlier is still in place, with its history.
-  const history = await request.get('/api/event-requests/95/history', { headers: support });
+  // SG2-104 AC6: history is read by the Lead, who relates to every submitted event.
+  const lead = await tokenFor('lead');
+  const history = await request.get('/api/event-requests/95/history', { headers: lead });
   expect((await history.json()).history.map((entry: Record<string, unknown>) =>
     [entry.actor_id, entry.field_name, entry.old_value, entry.new_value])).toEqual([
     ['user-support', 'coordinator_id', null, 'Regression coordinator']

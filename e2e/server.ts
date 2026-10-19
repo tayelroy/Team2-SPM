@@ -339,6 +339,11 @@ app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
   res.status(204).end();
 });
+// SG2-104: the venue account also holds the Event Coordinator role.
+app.post('/__e2e/multi-role', (_req, res) => {
+  database.tables.account_roles.push({ user_id: 'user-venue', role: 'event_coordinator' });
+  res.status(204).end();
+});
 app.post('/__e2e/venue-clash', (_req, res) => {
   database.seedVenueClash();
   res.status(204).end();

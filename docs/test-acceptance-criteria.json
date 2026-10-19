@@ -700,7 +700,9 @@
     {
       "id": "SG2-81",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-81",
-      "originalPullRequests": ["https://github.com/tayelroy/Team2-SPM/pull/92"],
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/92"
+      ],
       "sourceReadDate": "2026-10-15",
       "acceptanceCriteria": {
         "AC1": "Given a booking for an event I coordinate that is affected by venue unavailability, I am notified with the venue, the period and the reason",
@@ -709,6 +711,20 @@
         "AC4": "From the affected event, I can search for alternative venues using the event's existing requirements and raise a booking request for a replacement venue",
         "AC5": "Once the replacement booking is approved, the affected booking is released and the event no longer shows alternative arrangements as required",
         "AC6": "If the affected event is Confirmed or in Preparation, it moves back to Planning (SG2-66), and the Event Organiser is notified that the venue arrangement is being changed"
+      }
+    },
+    {
+      "id": "SG2-104",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-104",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-18",
+      "acceptanceCriteria": {
+        "AC1": "An account can hold more than one of the seven roles, and can reach the functions of every role it holds",
+        "AC2": "Every server-side check still applies per action and per event; for example, an Event Coordinator who is also an Event Organiser can still act as coordinator only on events assigned to them",
+        "AC3": "The user's profile shows every role the account holds",
+        "AC4": "Existing single-role accounts keep working unchanged",
+        "AC5": "Tests cover an account holding two roles, for both permitted and refused actions",
+        "AC6": "Reading an event's stage or change history requires a relationship to that event (its Organiser, its assigned Event Coordinator, a Lead, or a role that works on its venues, equipment or safety check); an Event Coordinator not assigned to the event is refused by ID, and a reassigned coordinator loses access immediately. Tests cover assigned, unrelated and reassigned coordinators"
       }
     }
   ]
