@@ -27,7 +27,7 @@ export type FetchChangeImpactFactsResult =
 const EVENT_COLUMNS = 'event_id, status, coordinator_id, organiser_id, name, purpose, description, '
   + 'expected_attendance, proposed_date, venue_requirements, accessibility_needs, equipment_requirements, '
   + 'registration_needed, registration_capacity, registration_opens_at, registration_closes_at, planning_notes, '
-  + 'arrangements_recheck_needed, outstanding_arrangements';
+  + 'expected_crowd_movement, arrangements_recheck_needed, outstanding_arrangements';
 
 /** Service-role read; the route checks the caller is the assigned coordinator. */
 export async function fetchChangeImpactEvent(
