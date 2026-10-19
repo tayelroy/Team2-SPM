@@ -38,7 +38,7 @@ export class MemoryDatabase {
     const draft = {
       name: 'Planning workshop', purpose: 'Team planning', description: 'A planning workshop.',
       proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 20,
-      venue_requirements: 'A room with seating', accessibility_needs: null,
+      venue_requirements: 'A room with seating', preferred_layout: 'Classroom', accessibility_needs: 'None',
       equipment_requirements: 'Projector', registration_needed: false,
       organisation: 'Regression Organisation', status: 'draft', coordinator_id: null
     };

@@ -6,7 +6,7 @@ test.use({ timezoneId: 'Asia/Singapore', trace: 'on', video: 'on' });
 
 type Draft = {
   name: string; purpose: string; description: string; proposed_date: string;
-  expected_attendance: number; venue_requirements: string; accessibility_needs: string | null;
+  expected_attendance: number; venue_requirements: string; preferred_layout: string; accessibility_needs: string | null;
   equipment_requirements: string; registration_needed: boolean;
 };
 type Entry = {
@@ -16,12 +16,12 @@ type Entry = {
 const initial: Draft = {
   name: 'Draft History Workshop', purpose: 'Plan the first workshop', description: 'Initial workshop description',
   proposed_date: '2030-07-01T02:00:00.000Z', expected_attendance: 12, venue_requirements: 'Projector',
-  accessibility_needs: 'Step-free entrance', equipment_requirements: 'Two microphones', registration_needed: false,
+  preferred_layout: 'Classroom', accessibility_needs: 'Step-free entrance', equipment_requirements: 'Two microphones', registration_needed: false,
 };
 const revised: Draft = {
   name: 'Revised Draft History Workshop', purpose: 'Plan the revised workshop', description: 'Revised workshop description',
   proposed_date: '2030-07-02T03:00:00.000Z', expected_attendance: 18, venue_requirements: 'Projector and stage',
-  accessibility_needs: null, equipment_requirements: 'Three microphones', registration_needed: true,
+  preferred_layout: 'Banquet rounds', accessibility_needs: null, equipment_requirements: 'Three microphones', registration_needed: true,
 };
 
 async function nav(page: Page, name: string) {
@@ -53,15 +53,15 @@ async function withAccount<T>(request: APIRequestContext, account: string, actio
 async function fill(page: Page, values: Draft) {
   for (const [label, value] of Object.entries({ 'Event name': values.name, Purpose: values.purpose,
     Description: values.description, 'Expected attendance': String(values.expected_attendance),
-    'Venue requirements': values.venue_requirements })) {
+    'Venue requirements': values.venue_requirements, 'Preferred room layout': values.preferred_layout })) {
     await page.getByLabel(new RegExp(`^${label}`)).fill(value);
   }
   const local = new Date(Date.parse(values.proposed_date) + 8 * 60 * 60 * 1000).toISOString().slice(0, 16);
   await page.getByLabel(/^Date/).fill(local);
-  await page.getByLabel('Accessibility needs (optional)', { exact: true }).fill(values.accessibility_needs ?? '');
-  await page.getByLabel('Equipment requirements', { exact: true }).fill(values.equipment_requirements);
-  const registration = page.getByRole('button', { name: 'Registration needed', exact: true });
-  if ((await registration.getAttribute('aria-pressed')) !== String(values.registration_needed)) await registration.click();
+  await page.getByLabel(/^Accessibility needs/).fill(values.accessibility_needs ?? '');
+  await page.getByLabel(/^Equipment requirements/).fill(values.equipment_requirements);
+  // SG2-105: registration is an explicit yes or no.
+  await page.getByRole('button', { name: values.registration_needed ? 'Registration needed' : 'No registration needed', exact: true }).click();
 }
 async function save(page: Page, id?: number) {
   const response = page.waitForResponse(result => result.request().method() === (id ? 'PATCH' : 'POST')
@@ -120,10 +120,10 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/reset')).status()).toBe(204);
 });
 
-test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [SG2-40:AC1] [SG2-40:AC2] revising all nine saved draft fields records the exact organiser old and new values and reopens them intact', async ({ page }, info) => {
+test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [SG2-40:AC1] [SG2-40:AC2] revising all ten saved draft fields records the exact organiser old and new values and reopens them intact', async ({ page }, info) => {
   const issues = watchConsole(page);
   let id = 0;
-  await test.step('Create a real draft, leave the form and reopen its stored nine fields', async () => {
+  await test.step('Create a real draft, leave the form and reopen its stored ten fields', async () => {
     await signIn(page);
     await page.setViewportSize({ width: 390, height: 900 });
     await nav(page, 'New request');
@@ -137,7 +137,7 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
     await expect(page.getByLabel(/^Expected attendance/)).toHaveValue('12');
     await expect(page.getByLabel(/^Description/)).toHaveValue(initial.description);
     await expect(page.getByLabel(/^Date/)).toHaveValue('2030-07-01T10:00');
-    await screenshot(page, info, 'draft-nine-fields-before-edit-390');
+    await screenshot(page, info, 'draft-ten-fields-before-edit-390');
   });
   let entries: Entry[] = [];
   await test.step('Change every supported field and verify one exact audit record per real change', async () => {
@@ -145,7 +145,7 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
     const saved = await save(page, id);
     expect(saved).toMatchObject({ ...revised, status: 'draft' });
     entries = await history(page, id);
-    expect(entries).toHaveLength(9);
+    expect(entries).toHaveLength(10);
     expect(new Set(entries.map(entry => entry.field_name))).toEqual(new Set(Object.keys(revised)));
     for (const entry of entries) {
       const key = entry.field_name as keyof Draft;
@@ -163,12 +163,13 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
     await editDraft(page, revised.name);
     await expect(page.getByLabel(/^Expected attendance/)).toHaveValue('18');
     await expect(page.getByLabel(/^Description/)).toHaveValue(revised.description);
-    await expect(page.getByLabel('Accessibility needs (optional)', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel(/^Accessibility needs/)).toHaveValue('');
+    await expect(page.getByLabel(/^Preferred room layout/)).toHaveValue('Banquet rounds');
     await expect(page.getByRole('button', { name: 'Registration needed', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
   await test.step('The actual change-history drawer renders actor, Singapore time and old/new values at both widths', async () => {
     const drawer = await openHistory(page, revised.name);
-    await expect(drawer.getByTestId(/^audit-entry-/)).toHaveCount(9);
+    await expect(drawer.getByTestId(/^audit-entry-/)).toHaveCount(10);
     for (const entry of entries) {
       const row = drawer.getByTestId(`audit-entry-${entry.log_id}`);
       await expect(row).toContainText('Regression organiser'); await expect(row).toContainText('Event Organiser');
@@ -184,7 +185,7 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
     }
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
-      await screenshot(page, info, `draft-nine-field-audit-${width}`, drawer);
+      await screenshot(page, info, `draft-ten-field-audit-${width}`, drawer);
     }
     expect(issues).toEqual([]);
   });
