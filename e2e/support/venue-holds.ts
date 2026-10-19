@@ -42,20 +42,24 @@ export class VenueHoldFixture {
       starts_at: String(hold.starts_at), ends_at: String(hold.ends_at), expires_at: String(hold.expires_at), created_at: String(hold.created_at) };
   }
 
-  private audit(hold: Row, actor: string | null, old: string | null, value: string) {
+  private audit(hold: Row, actor: string | null, old: string | null, value: string, field = 'venue_hold_status') {
     const logs = this.database.tables.event_audit_logs;
     logs.push({ log_id: nextId(logs, 'log_id'), event_id: hold.event_id, actor_id: actor,
-      field_name: 'venue_hold_status', old_value: old, new_value: value, created_at: new Date(this.now).toISOString() });
+      field_name: field, old_value: old, new_value: value, created_at: new Date(this.now).toISOString() });
   }
 
   private notify(hold: Row, kind: HoldNotification['kind']) {
     const event = this.database.tables.events.find(event => event.event_id === hold.event_id)!;
     const notices = this.database.tables.venue_hold_notifications;
-    if (!event.coordinator_id || notices.some(notice => notice.hold_id === hold.hold_id && notice.recipient_id === event.coordinator_id && notice.kind === kind)) return;
+    // SG2-106: each expiry change starts a new round of notices for the new time.
+    const round = Number(hold.expiry_revision ?? 0);
+    if (!event.coordinator_id || notices.some(notice => notice.hold_id === hold.hold_id && notice.recipient_id === event.coordinator_id
+      && notice.kind === kind && Number(notice.expiry_revision ?? 0) === round)) return;
     const venue = this.database.tables.venues.find(venue => venue.venue_id === hold.venue_id)!;
-    const prefix = { placed: 'Tentative hold placed on ', warning: 'Tentative hold expires soon on ', expired: 'Tentative hold expired on ' }[kind];
+    const prefix = { placed: 'Tentative hold placed on ', warning: 'Tentative hold expires soon on ', expired: 'Tentative hold expired on ',
+      expiry_changed: 'Tentative hold expiry changed on ' }[kind];
     notices.push({ notification_id: nextId(notices, 'notification_id'), recipient_id: event.coordinator_id, event_id: hold.event_id,
-      hold_id: hold.hold_id, kind, message: `${prefix}${venue.name}; expiry ${hold.expires_at}.`, created_at: new Date(this.now).toISOString() });
+      hold_id: hold.hold_id, kind, expiry_revision: round, message: `${prefix}${venue.name}; expiry ${hold.expires_at}.`, created_at: new Date(this.now).toISOString() });
   }
 
   private process() {
@@ -94,7 +98,7 @@ export class VenueHoldFixture {
     },
     options: async () => ({ events: this.database.tables.events.filter(event => ['approved', 'planning'].includes(String(event.status)) && event.coordinator_id)
       .map(event => ({ event_id: Number(event.event_id), name: String(event.name) })),
-    venues: this.database.tables.venues.map(venue => ({ venue_id: Number(venue.venue_id), name: String(venue.name) })) }),
+    venues: this.database.tables.venues.filter(venue => !venue.deleted_at).map(venue => ({ venue_id: Number(venue.venue_id), name: String(venue.name) })) }),
     notifications: async () => {
       const principal = await this.database.principal(token);
       this.process();
@@ -108,7 +112,7 @@ export class VenueHoldFixture {
       const { userId } = await this.database.principal(token);
       const event = this.database.tables.events.find(event => event.event_id === values.event_id);
       const venue = this.database.tables.venues.find(venue => venue.venue_id === values.venue_id);
-      if (!event || !venue) return { outcome: 'missing' };
+      if (!event || !venue || venue.deleted_at) return { outcome: 'missing' };
       if (!['approved', 'planning'].includes(String(event.status)) || !event.coordinator_id || Date.parse(values.ends_at) <= this.now || Date.parse(values.expires_at) <= this.now) return { outcome: 'invalid' };
       if (this.conflict(values)) return { outcome: 'conflict' };
       const requests = this.database.tables.venue_booking_requests;
@@ -156,5 +160,44 @@ export class VenueHoldFixture {
       this.audit(hold, userId, `Tentative hold ${hold.hold_id}`, `${action === 'convert' ? 'Converted' : 'Released'} hold ${hold.hold_id}`);
       return { outcome: 'updated', hold: this.record(hold) };
     },
+    changeExpiry: async (id, expiresAt): Promise<HoldMutationResult> => {
+      const { userId } = await this.database.principal(token);
+      this.process();
+      const hold = this.database.tables.venue_holds.find(hold => hold.hold_id === id);
+      if (!hold) return { outcome: 'missing' };
+      if (hold.status !== 'tentative') return { outcome: 'inactive' };
+      const next = Date.parse(expiresAt);
+      if (next <= this.now || next === Date.parse(String(hold.expires_at))) return { outcome: 'invalid' };
+      const previous = String(hold.expires_at);
+      hold.expires_at = new Date(next).toISOString(); hold.warning_sent_at = null;
+      hold.expiry_revision = Number(hold.expiry_revision ?? 0) + 1;
+      this.audit(hold, userId, `Hold ${hold.hold_id} expires ${previous}`, `Hold ${hold.hold_id} expires ${hold.expires_at}`, 'venue_hold_expiry');
+      this.notify(hold, 'expiry_changed');
+      this.process(); // Warns at once when the new time is already inside the lead.
+      return { outcome: 'updated', hold: this.record(hold) };
+    },
   });
+
+  /** SG2-106: the same live-work checks as delete_venue(), on the fixture clock. */
+  deleteVenue(venueId: number, userId: string) {
+    this.process();
+    const venue = this.database.tables.venues.find(venue => venue.venue_id === venueId);
+    if (!venue || venue.deleted_at) return { outcome: 'missing' as const };
+    const later = (row: Row) => Date.parse(String(row.ends_at)) > this.now;
+    const name = (row: Row) => (this.database.tables.events.find(event => event.event_id === row.event_id)?.name as string | undefined) ?? null;
+    const item = (kind: 'booking' | 'hold' | 'request', row: Row, key: string) => ({ kind, id: Number(row[key]),
+      event_id: row.event_id === null || row.event_id === undefined ? null : Number(row.event_id), event_name: name(row),
+      starts_at: String(row.starts_at), ends_at: String(row.ends_at) });
+    const holds = this.database.tables.venue_holds.filter(hold => hold.venue_id === venueId && hold.status === 'tentative');
+    const blockers = [
+      ...this.database.tables.venue_bookings.filter(row => row.venue_id === venueId && ['held', 'confirmed'].includes(String(row.status)) && later(row))
+        .map(row => item('booking', row, 'booking_id')),
+      ...holds.map(row => item('hold', row, 'hold_id')),
+      ...this.database.tables.venue_booking_requests.filter(row => row.venue_id === venueId && row.status === 'pending' && later(row)
+        && !holds.some(hold => hold.request_id === row.request_id)).map(row => item('request', row, 'request_id')),
+    ].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+    if (blockers.length) return { outcome: 'blocked' as const, blockers };
+    venue.deleted_at = new Date(this.now).toISOString(); venue.deleted_by = userId;
+    return { outcome: 'deleted' as const, venue: { venue_id: venueId, name: String(venue.name), deleted_at: String(venue.deleted_at), deleted_by: userId } };
+  }
 }
