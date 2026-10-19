@@ -7,22 +7,21 @@ import { createUpdateRoleHandler } from './auth/roles';
 import { createAuthorization } from './auth';
 import { createApp } from './app';
 
+// SG2-104: the role change goes through change_account_roles(). This fake
+// answers it the way the old single-row update did: a matched account is
+// changed, no match is missing, and a database error is passed on.
 function fakeAdmin(options: {
   update?: (payload: any) => Promise<{ data: any; error: { message: string } | null }>;
   captureTarget?: (column: string, userId: string) => void;
 }): SupabaseClient {
   return {
-    from(table: string) {
-      assert.equal(table, 'account_roles');
-      return {
-        update: (payload: any) => ({
-          eq: (column: string, userId: string) => {
-            options.captureTarget?.(column, userId);
-            return { select: async () =>
-              options.update ? options.update(payload) : { data: [{ user_id: 'target-1' }], error: null } };
-          }
-        })
-      };
+    rpc: async (name: string, args: any) => {
+      assert.equal(name, 'change_account_roles');
+      assert.equal(args.p_action, 'replace');
+      options.captureTarget?.('user_id', args.p_target_id);
+      const answer = options.update ? await options.update({ role: args.p_role }) : { data: [{ user_id: 'target-1' }], error: null };
+      if (answer.error) return { data: null, error: answer.error };
+      return { data: answer.data.length ? { outcome: 'changed', roles: [args.p_role] } : { outcome: 'missing' }, error: null };
     }
   } as unknown as SupabaseClient;
 }
@@ -54,7 +53,7 @@ describe('PATCH /api/users/:userId/role', () => {
     });
     const response = await request(app).patch('/api/users/target-1/role').send({ role: displayRole });
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { message: 'Role updated.' });
+    assert.deepEqual(response.body, { message: 'Role updated.', roles: [displayRole] });
     assert.deepEqual(updatePayload, { role: storedRole });
     assert.deepEqual(target, { column: 'user_id', userId: 'target-1' });
   });
@@ -158,5 +157,39 @@ describe('concurrent role changes for one account (SG2-86)', () => {
     assert.deepEqual([...payloads].sort((a: any, b: any) => a.role.localeCompare(b.role)), [
       { role: 'event_coordinator_lead' }, { role: 'safety_officer' }
     ]);
+  });
+});
+
+describe('separation of duties for role changes (SG2-104)', () => {
+  const caller = { userId: 'support-1', role: 'technical_support_staff' as const };
+  function appFor(rpcOutcome: unknown, calls: unknown[] = []) {
+    const app = express();
+    app.use(express.json());
+    const admin = { rpc: async (name: string, args: unknown) => { calls.push([name, args]); return { data: rpcOutcome, error: null }; } } as unknown as SupabaseClient;
+    app.patch('/api/users/:userId/role', createUpdateRoleHandler(() => admin, () => caller));
+    return app;
+  }
+
+  test('[FAILURE] [SG2-104:AC2] Technical Support cannot change the roles on their own account, and nothing is written', async () => {
+    const calls: unknown[] = [];
+    const response = await request(appFor({ outcome: 'changed', roles: ['venue_staff'] }, calls))
+      .patch('/api/users/support-1/role').send({ role: 'Venue Staff' });
+    assert.equal(response.status, 403);
+    assert.deepEqual(calls, []);
+  });
+
+  test('[NORMAL] [SG2-104:AC1] changing another account sends the verified caller as the actor', async () => {
+    const calls: unknown[] = [];
+    const response = await request(appFor({ outcome: 'changed', roles: ['venue_staff'] }, calls))
+      .patch('/api/users/target-1/role').send({ role: 'Venue Staff' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(calls, [['change_account_roles', { p_actor_id: 'support-1', p_target_id: 'target-1', p_action: 'replace', p_role: 'venue_staff' }]]);
+  });
+
+  test('[FAILURE] [SG2-104:AC2] database refusals are reported, never as success', async () => {
+    for (const [outcome, status] of [['self', 403], ['forbidden', 403], ['last_role', 409], ['invalid', 400]] as const) {
+      const response = await request(appFor({ outcome })).patch('/api/users/target-1/role').send({ role: 'Venue Staff' });
+      assert.equal(response.status, status, outcome);
+    }
   });
 });

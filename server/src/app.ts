@@ -49,7 +49,7 @@ export function createApp(
   eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal }),
   loginHandler: RequestHandler = createLoginHandler(),
   logoutHandler: RequestHandler = createLogoutHandler(),
-  updateRoleHandler: RequestHandler = createUpdateRoleHandler(),
+  updateRoleHandler: RequestHandler = createUpdateRoleHandler(undefined, access.getPrincipal),
   loginRateLimit: RequestHandler = createLoginRateLimiter(),
   eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal }),
   eventListHandler: RequestHandler = getEventRequestsHandler({ getPrincipal: access.getPrincipal }),
@@ -103,8 +103,7 @@ export function createApp(
   venueClashesRouter = createVenueClashesRouter(access),
   // SG2-58: appended last for the same reason.
   confirmEventHandler: RequestHandler = createConfirmEventHandler({ getPrincipal: access.getPrincipal }),
-  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal })
-) {
+  eventConfirmationHandler: RequestHandler = createGetEventConfirmationHandler({ getPrincipal: access.getPrincipal })) {
   const app = express();
 
   // Vercel puts one proxy hop in front of every request, setting

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { userScopedHeaders } from './user-client';
 import WebSocket from 'ws';
 import { dbConfig } from './config';
 import { AccessError } from '../auth/policy';
@@ -24,7 +25,7 @@ export function createVenueOperationStore(token: string): VenueOperationStore {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     realtime: { transport: WebSocket as any },
     global: {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: userScopedHeaders(token),
       fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(5000), redirect: 'error' })
     }
   });

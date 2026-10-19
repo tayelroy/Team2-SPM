@@ -1,6 +1,16 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import WebSocket from 'ws';
 import { dbConfig } from './config';
+import { actingRoleHeaders } from '../auth/actingRole';
+
+/**
+ * Headers for a client acting as the caller: their access token plus, inside a
+ * request, the role it acts as (SG2-104), which public.acting_role() checks
+ * against the caller's own account_roles rows.
+ */
+export function userScopedHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}`, ...actingRoleHeaders() };
+}
 
 /**
  * A per-request Supabase client that acts as the caller: their access token is
@@ -26,7 +36,7 @@ export function createUserScopedClient(token: string): SupabaseClient | null {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     realtime: { transport: WebSocket as any },
     global: {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: userScopedHeaders(token),
       fetch: (input, init) => fetch(input, {
         ...init,
         signal: AbortSignal.timeout(5000),

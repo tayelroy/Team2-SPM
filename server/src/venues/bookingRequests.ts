@@ -96,6 +96,7 @@ function refusal(result: Exclude<DecisionResult, { outcome: 'updated' }>, venue:
     case 'hold': return [409, HOLD_MESSAGE(result.hold_id)];
     case 'closed': return [409, 'This request can no longer be approved: the event is not approved or the requested period has passed.'];
     case 'capacity': return [409, CAPACITY_MESSAGE];
+    case 'own_request': return [403, 'You raised this request yourself, so another Venue Staff member must decide it.'];
     case 'missing': return [404, 'Booking request not found.'];
     default: return [400, 'Choose approve or reject, and give a reason for rejecting.'];
   }

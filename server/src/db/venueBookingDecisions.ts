@@ -10,7 +10,9 @@ export type DecisionResult =
   | { outcome: 'conflict'; kind: 'booking' | 'block' | 'hold'; starts_at: string; ends_at: string; label: string }
   | { outcome: 'decided'; status: string }
   | { outcome: 'hold'; hold_id: number }
-  | { outcome: 'missing' | 'invalid' | 'closed' | 'capacity' };
+  | { outcome: 'missing' | 'invalid' | 'closed' | 'capacity' }
+  // SG2-104 separation of duties: the decider raised this request themselves.
+  | { outcome: 'own_request' };
 
 export interface VenueBookingDecisionStore {
   decide(requestId: number, decision: Decision, reason: string | null): Promise<DecisionResult>;

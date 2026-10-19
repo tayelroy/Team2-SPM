@@ -12,6 +12,7 @@ import {
 import { getAccountRoles, type GetAccountRolesResult } from '../db/accountRoles';
 import { INTERNAL_ONLY_AUDIT_FIELDS, isInternalRole, type Principal } from '../auth/policy';
 import { toDisplayRole } from '../auth/roleFormat';
+import { hasEventRelationship } from './eventRelationship';
 
 const UNAVAILABLE_MESSAGE = 'Event history service is temporarily unavailable. Please try again later.';
 
@@ -28,6 +29,7 @@ export interface GetEventHistoryDependencies {
     eventId: number
   ) => Promise<FetchEventAuditLogsResult>;
   fetchActorRoles?: (client: SupabaseClient, userIds: string[]) => Promise<GetAccountRolesResult>;
+  checkRelationship?: typeof hasEventRelationship;
 }
 
 /**
@@ -43,7 +45,8 @@ export function createGetEventHistoryHandler({
   getAdminClient = getSupabaseAdminClient,
   fetchEventRequest = fetchEventRequestById,
   fetchAuditLogs = fetchEventAuditLogs,
-  fetchActorRoles = getAccountRoles
+  fetchActorRoles = getAccountRoles,
+  checkRelationship = hasEventRelationship
 }: GetEventHistoryDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -82,8 +85,13 @@ export function createGetEventHistoryHandler({
 
     const event = eventResult.request;
 
-    // RBAC & Ownership: Organisers can only view history of their own events
-    if (principal.role === 'event_organiser' && event.organiser_id !== principal.userId) {
+    // SG2-104 AC6: the acting role needs a relationship to this event.
+    const relationship = await checkRelationship(admin, principal.role, principal.userId, event);
+    if (!relationship.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+    if (!relationship.related) {
       res.status(403).json({ error: 'You are not authorized to view the change history of this event.' });
       return;
     }
@@ -102,7 +110,7 @@ export function createGetEventHistoryHandler({
     );
 
     const actorIds = [...new Set(visible.flatMap((log) => (log.actor_id === null ? [] : [log.actor_id])))];
-    let roles = new Map<string, string>();
+    let roles = new Map<string, string[]>();
     if (actorIds.length > 0) {
       const rolesResult = await fetchActorRoles(admin, actorIds);
       if (!rolesResult.ok) {
@@ -113,13 +121,14 @@ export function createGetEventHistoryHandler({
     }
 
     const history = visible.map((log) => {
-      const role = log.actor_id === null ? undefined : roles.get(log.actor_id);
+      // SG2-104: an actor may hold several roles; name them all.
+      const held = log.actor_id === null ? undefined : roles.get(log.actor_id);
       return {
         log_id: log.log_id,
         event_id: log.event_id,
         actor_id: log.actor_id,
         actor_name: log.actor_name ?? 'Unknown',
-        actor_role: role === undefined ? null : toDisplayRole(role),
+        actor_role: held === undefined ? null : held.map(toDisplayRole).join(', '),
         field_name: log.field_name,
         old_value: log.old_value,
         new_value: log.new_value,
