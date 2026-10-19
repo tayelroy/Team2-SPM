@@ -2496,6 +2496,15 @@ test('SG2-91-P01 | [SG2-91:AC2] [SG2-91:AC3] [NORMAL] the Safety Officer reviews
   // AC2: the Safety Officer's desk counts the awaiting events and opens the list.
   await switchAccount(page, 'safety');
   await expect(page.getByText('2 events are awaiting a safety check.', { exact: true })).toBeVisible();
+  // Each awaiting event has a card on the desk, oldest wait first; a card opens the list.
+  const cards = page.getByRole('main').getByRole('button', { name: /Harbour Lecture|Studio Talk/ });
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0)).toContainText('Harbour Lecture');
+  await expect(cards.nth(0)).toContainText('Regression Hall');
+  await expect(cards.nth(1)).toContainText('Studio Talk');
+  await cards.nth(1).click();
+  await expect(page.getByRole('article', { name: 'Studio Talk' })).toBeInViewport();
+  await page.getByRole('navigation').getByRole('button', { name: 'Dashboard', exact: true }).click();
   await page.getByRole('button', { name: 'Open safety checks', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Safety checks' })).toBeVisible();
   await expect(page.getByRole('heading', { level: 2, name: '2 events awaiting a safety check' })).toBeVisible();

@@ -6753,12 +6753,13 @@
       "SG2-91:AC3"
     ],
     "method_id": null,
-    "purpose": "Verify that a coordinator can record an event's expected crowd movement during planning without taking it out of the safety check, and that the Safety Officer's desk and Safety checks list show exactly the events awaiting a check, oldest wait first, each with expected attendance, accessibility requirements, crowd movement, every booked venue's capacity, layout, emergency access and known restrictions, and every piece of equipment with where it will be placed, laid out without sideways scrolling on phone and laptop widths.",
+    "purpose": "Verify that a coordinator can record an event's expected crowd movement during planning without taking it out of the safety check, and that the Safety Officer's desk (a card per awaiting event, each opening its review) and Safety checks list show exactly the events awaiting a check, oldest wait first, each with expected attendance, accessibility requirements, crowd movement, every booked venue's capacity, layout, emergency access and known restrictions, and every piece of equipment with where it will be placed, laid out without sideways scrolling on phone and laptop widths.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/safety-checks: 911 Harbour Lecture and 913 Studio Talk await their check (since 1 and 2 Jul 2030); 912 Riverside Gala is still in Planning with a pending venue request. All three are coordinated by coordinator@example.test.",
     "steps": [
       "Sign in as coordinator@example.test; open Harbour Lecture from My assigned events; Edit Planning Information",
       "Fill Expected Crowd Movement and Save Planning Details",
-      "Sign in as safety@example.test; read the desk count; Open safety checks",
+      "Sign in as safety@example.test; read the desk count and its event cards",
+      "Click the Studio Talk card; return to the Dashboard and click Open safety checks",
       "Read the Harbour Lecture and Studio Talk cards",
       "Resize to 390px and 1440px"
     ],
@@ -6769,6 +6770,7 @@
     ],
     "expected": [
       "The planning drawer saves and closes; the desk says '2 events are awaiting a safety check.'",
+      "The desk shows a card for Harbour Lecture (with Regression Hall) then Studio Talk; clicking Studio Talk opens the list scrolled to its card",
       "The list heading reads '2 events awaiting a safety check'; the cards are Harbour Lecture then Studio Talk; Riverside Gala is not listed",
       "Harbour Lecture shows 80, the accessibility need, the entered crowd movement, 'Regression Hall · Level 1', 100, Theatre, the step-free access, emergency access and restriction, '4 × Wireless microphones', 'Regression Hall — Either side of the stage' and the cable ramps note",
       "Studio Talk shows '20 (below expected attendance of 80)', 'No equipment requested.' and 'Not recorded' for its emergency access and restrictions",
