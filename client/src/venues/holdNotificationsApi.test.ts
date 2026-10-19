@@ -8,8 +8,8 @@ const notification: HoldNotification = {
   message: 'A tentative hold was placed on Atrium.', created_at: '2026-10-05T02:00:00.000Z',
 };
 
-test('[NORMAL] [SG2-84:AC6] [SG2-85:AC4] loads recipient notifications with bearer authentication and retains only public fields', async () => {
-  const notifications = ['placed', 'warning', 'expired'].map((kind, index) => ({
+test('[NORMAL] [SG2-84:AC6] [SG2-85:AC4] [SG2-106:AC4] loads recipient notifications with bearer authentication and retains only public fields', async () => {
+  const notifications = ['placed', 'warning', 'expired', 'expiry_changed'].map((kind, index) => ({
     ...notification, notification_id: index + 1, kind, secret: 'not retained',
   }));
   const fetchMock = vi.fn().mockResolvedValue(Response.json({ notifications, secret: 'not retained' }));

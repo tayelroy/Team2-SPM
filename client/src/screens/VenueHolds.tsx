@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Role } from '../mock/types';
-import { changeHold, createHold, fetchHolds, fetchHoldOptions, type HoldOptions, type VenueHold } from '../venues/holdsApi';
+import { changeHold, changeHoldExpiry, createHold, fetchHolds, fetchHoldOptions, type HoldOptions, type VenueHold } from '../venues/holdsApi';
 import { sgtToMs } from '../venues/searchApi';
 
 const EMPTY = { event: '', venue: '', start: '', end: '', expiry: '' };
@@ -20,6 +20,8 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
   const [message, setMessage] = useState('');
   const [form, setForm] = useState(EMPTY);
   const [pending, setPending] = useState(false);
+  // SG2-106: the hold whose expiry is being changed, with the typed SGT value.
+  const [expiry, setExpiry] = useState<{ holdId: number; value: string } | null>(null);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -79,6 +81,21 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
       : 'Hold released. The period is available for other requests.');
   }
 
+  async function moveExpiry(event: FormEvent, hold: VenueHold) {
+    event.preventDefault();
+    if (busy.current || !expiry) return;
+    setError(''); setMessage('');
+    const next = expiry.value ? sgtToMs(expiry.value) : NaN;
+    if (!Number.isFinite(next) || next <= Date.now()) { setError('Enter a new expiry in the future.'); return; }
+    busy.current = true; setPending(true);
+    const result = await changeHoldExpiry(accessToken, hold.hold_id, new Date(next).toISOString());
+    busy.current = false; setPending(false);
+    if (!result.ok) { setError(result.error); return; }
+    setHolds(previous => previous!.map(row => row.hold_id === hold.hold_id ? result.data : row));
+    setExpiry(null);
+    setMessage('Expiry changed. The Event Coordinator has been notified of the new time.');
+  }
+
   if (!allowed) return <p role="alert">Venue holds are available to Venue Staff and Event Coordinators.</p>;
   return <div className="venue-holds">
     <div className="work-queue-heading"><h2>Tentative venue holds</h2>
@@ -120,7 +137,19 @@ export default function VenueHolds({ role, accessToken }: { role: Role; accessTo
               <div className="venue-hold-actions">
                 <button type="button" className="organisation-button organisation-button-primary" disabled={pending} onClick={() => change(hold, 'convert')}>Approve booking</button>
                 <button type="button" className="organisation-button" disabled={pending} onClick={() => change(hold, 'release')}>Release hold</button>
+                {expiry?.holdId !== hold.hold_id && <button type="button" className="organisation-button" disabled={pending}
+                  onClick={() => { setError(''); setMessage(''); setExpiry({ holdId: hold.hold_id, value: '' }); }}>Change expiry</button>}
               </div>
+              {expiry?.holdId === hold.hold_id && <form aria-label={`Change expiry for hold #${hold.hold_id}`} onSubmit={event => moveExpiry(event, hold)}>
+                <div className="venue-hold-fields">
+                  <label>New expiry (Singapore time)<input required type="datetime-local" value={expiry.value}
+                    onChange={event => setExpiry({ holdId: hold.hold_id, value: event.target.value })} /></label>
+                </div>
+                <div className="venue-hold-actions">
+                  <button type="submit" className="organisation-button organisation-button-primary" disabled={pending}>{pending ? 'Saving…' : 'Save expiry'}</button>
+                  <button type="button" className="organisation-button" disabled={pending} onClick={() => setExpiry(null)}>Cancel</button>
+                </div>
+              </form>}
             </>}
           </article>;
         })}

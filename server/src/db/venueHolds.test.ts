@@ -28,3 +28,11 @@ test('[FAILURE] [SG2-84:AC1] RPC failures are translated without disclosing data
   assert.throws(() => createVenueHoldStore('token', () => null), failure => failure instanceof AccessError && failure.status === 503);
   assert.throws(() => createVenueHoldStore('token'), failure => failure instanceof AccessError && failure.status === 503);
 });
+test('[NORMAL] [SG2-106:AC3] expiry changes call the locked RPC with the hold and new time under the caller token', async () => {
+  const calls: unknown[] = [];
+  const client = { rpc: async (name: string, args?: unknown) => { calls.push([name, args]); return { data: { outcome: 'invalid' }, error: null, status: 200 }; } } as unknown as SupabaseClient;
+  assert.deepEqual(await createVenueHoldStore('user-token', () => client).changeExpiry(4, '2030-01-06T00:00:00.000Z'), { outcome: 'invalid' });
+  assert.deepEqual(calls, [['change_venue_hold_expiry', { p_hold_id: 4, p_expires_at: '2030-01-06T00:00:00.000Z' }]]);
+  const denied = { rpc: async () => ({ status: 403, error: { code: '42501' }, data: null }) } as unknown as SupabaseClient;
+  await assert.rejects(createVenueHoldStore('token', () => denied).changeExpiry(4, 'x'), failure => failure instanceof AccessError && failure.status === 403);
+});

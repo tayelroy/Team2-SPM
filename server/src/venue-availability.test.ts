@@ -43,7 +43,7 @@ function fakeClient(tables: Record<string, TableResult>, calls: QueryCall[] = []
         then: (resolve: (value: TableResult) => unknown, reject?: (reason: unknown) => unknown) =>
           Promise.resolve(result).then(resolve, reject)
       };
-      for (const method of ['select', 'eq', 'lt', 'gt', 'order']) {
+      for (const method of ['select', 'eq', 'is', 'lt', 'gt', 'order']) {
         builder[method] = (...args: unknown[]) => {
           calls.push({ table, method, args });
           return builder;
@@ -264,7 +264,7 @@ test('[BOUNDARY] [SG2-44:AC1] accepts exactly 366 days and rejects one milliseco
 
 // --- getAllVenuesAvailability --------------------------------------------------
 
-test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries every venue over the chosen range and groups sorted entries by venue', async () => {
+test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] [SG2-106:AC2] queries every venue over the chosen range and groups sorted entries by venue', async () => {
   const calls: QueryCall[] = [];
   const client = fakeClient({
     venues: {
@@ -292,6 +292,8 @@ test('[NORMAL] [SG2-44:AC1] [SG2-44:AC2] queries every venue over the chosen ran
 
   const result = await getAllVenuesAvailability(FROM, TO, client);
 
+  // SG2-106 AC2: deleted venues are left out of availability.
+  assert.deepEqual(calls.filter(call => call.table === 'venues' && call.method === 'is').map(call => call.args), [['deleted_at', null]]);
   assert.deepEqual(calls.filter(call => call.table === 'venues' && call.method === 'order'), [
     { table: 'venues', method: 'order', args: ['name', { ascending: true }] }
   ]);

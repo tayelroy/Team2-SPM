@@ -15,6 +15,7 @@ export interface VenueHoldStore {
   notifications(): Promise<HoldNotification[]>;
   create(values: VenueHoldValues): Promise<HoldMutationResult>;
   change(id: number, action: 'release' | 'convert'): Promise<HoldMutationResult>;
+  changeExpiry(id: number, expiresAt: string): Promise<HoldMutationResult>;
 }
 /** Every mutation is one database transaction under the venue lock, with the caller's token. */
 export function createVenueHoldStore(token: string, makeClient = createUserScopedClient): VenueHoldStore {
@@ -31,6 +32,7 @@ export function createVenueHoldStore(token: string, makeClient = createUserScope
     notifications: () => rpc('list_venue_hold_notifications'),
     create: values => rpc('create_venue_hold', { p_event_id: values.event_id, p_venue_id: values.venue_id,
       p_starts_at: values.starts_at, p_ends_at: values.ends_at, p_expires_at: values.expires_at }),
-    change: (id, action) => rpc('change_venue_hold', { p_hold_id: id, p_action: action })
+    change: (id, action) => rpc('change_venue_hold', { p_hold_id: id, p_action: action }),
+    changeExpiry: (id, expiresAt) => rpc('change_venue_hold_expiry', { p_hold_id: id, p_expires_at: expiresAt })
   };
 }

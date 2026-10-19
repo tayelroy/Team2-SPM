@@ -2,7 +2,7 @@ import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import { createApp } from '../app';
-import { createAuthorization, type Role } from '../auth';
+import { AccessError, createAuthorization, type Role } from '../auth';
 import type { VenueRecord } from '../venues/fields';
 import { dbConfig } from './config';
 import { createVenueStore } from './venues';
@@ -116,3 +116,30 @@ for (const config of [{ supabaseUrl: undefined }, { supabaseAnonKey: undefined }
     assert.throws(() => createVenueStore('token'), { status: 503 });
   });
 }
+
+test('[NORMAL] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC5] reads and edits skip deleted venues, and delete goes through one RPC under the caller token', async () => {
+  const seen: string[] = [];
+  const replies: [number, unknown][] = [[200, { outcome: 'blocked', blockers: [] }], [403, { code: '42501', message: 'Access denied' }],
+    [400, { code: '42501', message: 'Access denied' }], [500, { code: 'XX000', message: 'SECRET' }], [200, null], [401, { message: 'jwt' }]];
+  mock.method(globalThis, 'fetch', async (...[input, init]: Parameters<typeof fetch>) => {
+    const url = new URL(String(input));
+    assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer staff-token');
+    if (url.pathname === '/rest/v1/venues') {
+      seen.push(`${init!.method} ${url.searchParams.get('deleted_at')}`);
+      return init!.method === 'GET' ? Response.json([]) : new Response(null, { status: 204 });
+    }
+    assert.equal(url.pathname, '/rest/v1/rpc/delete_venue');
+    assert.equal(init!.method, 'POST');
+    assert.deepEqual(JSON.parse(init!.body as string), { p_venue_id: 4 });
+    const [status, body] = replies.shift()!;
+    return new Response(body === null ? 'null' : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  });
+  const store = createVenueStore('staff-token');
+  await store.list();
+  assert.equal(await store.save(values, 4), null);
+  assert.deepEqual(seen, ['GET is.null', 'PATCH is.null']);
+  assert.deepEqual(await store.remove(4), { outcome: 'blocked', blockers: [] });
+  for (const status of [403, 403, 503, 503, 401]) {
+    await assert.rejects(store.remove(4), failure => failure instanceof AccessError && failure.status === status && !/SECRET/.test(failure.message));
+  }
+});

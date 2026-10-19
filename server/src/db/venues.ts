@@ -3,13 +3,17 @@ import { userScopedHeaders } from './user-client';
 import WebSocket from 'ws';
 import { dbConfig } from './config';
 import { AccessError } from '../auth/policy';
-import type { VenueRecord, VenueValues } from '../venues/fields';
+import type { VenueBlocker, VenueRecord, VenueValues } from '../venues/fields';
 
 const COLUMNS = 'venue_id,name,location,capacity,facilities,accessibility_features,operating_information';
 export interface VenueStore {
   list(): Promise<VenueRecord[]>;
   save(values: VenueValues, id?: number): Promise<VenueRecord | null>;
+  remove(id: number): Promise<VenueDeleteResult>;
 }
+export type VenueDeleteResult = { outcome: 'deleted'; venue: { venue_id: number; name: string; deleted_at: string; deleted_by: string } }
+  | { outcome: 'blocked'; blockers: VenueBlocker[] }
+  | { outcome: 'missing' };
 
 /** Use the existing table and caller token. Routes enforce permissions;
  * database RLS adds protection only when separately configured by the team. */
@@ -29,16 +33,22 @@ export function createVenueStore(token: string): VenueStore {
   }
   return {
     async list() {
-      const { data, error, status } = await client.from('venues').select(COLUMNS).order('name').order('venue_id');
+      const { data, error, status } = await client.from('venues').select(COLUMNS).is('deleted_at', null).order('name').order('venue_id');
       check(error, status);
       return data as VenueRecord[];
     },
     async save(values, id) {
       const table = client.from('venues');
-      const query = id === undefined ? table.insert(values) : table.update(values).eq('venue_id', id);
+      const query = id === undefined ? table.insert(values) : table.update(values).eq('venue_id', id).is('deleted_at', null);
       const { data, error, status } = await query.select(COLUMNS).maybeSingle();
       check(error, status);
       return data as VenueRecord | null;
+    },
+    // SG2-106: one database call checks for live work and deletes under the venue lock.
+    async remove(id) {
+      const { data, error, status } = await client.rpc('delete_venue', { p_venue_id: id });
+      check(error || data === null, error?.code === '42501' ? 403 : status);
+      return data as VenueDeleteResult;
     }
   };
 }

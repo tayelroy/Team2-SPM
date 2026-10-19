@@ -15,6 +15,7 @@ begin
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
     ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at'),
     ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
+    ('venues', 'venue_id,name,deleted_at,deleted_by'),
     ('venue_booking_requests', 'request_id,event_id,venue_id,status,venue_booking_id,replaces_booking_id'),
     ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details')
   ), column_checks as (
@@ -69,7 +70,9 @@ begin
     ('public.withdraw_venue_booking_request(bigint)'),
     ('public.release_venue_booking(bigint,text)'),
     ('public.list_venue_unavailability(integer,timestamptz)'),
-    ('public.release_replaced_booking(bigint,text)'), ('public.venue_disruption_notify()')
+    ('public.release_replaced_booking(bigint,text)'), ('public.venue_disruption_notify()'),
+    -- SG2-106: venue delete and hold expiry change.
+    ('public.delete_venue(integer)'), ('public.change_venue_hold_expiry(bigint,timestamptz)')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions

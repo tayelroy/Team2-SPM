@@ -6,8 +6,11 @@ import VenueForm, { inputStyle } from '../venues/VenueForm';
 import VenueBlocks from '../venues/VenueBlocks';
 import VenueBookings from '../venues/VenueBookings';
 import { VenueLayoutError, describeLayouts, fetchVenueLayouts, saveVenueLayouts, type VenueLayout, type VenueLayoutValues } from '../venues/layoutsApi';
-import { VenueError, venueRequest, type Venue, type VenueValues } from '../venues/api';
+import { VenueDeleteBlocked, VenueError, deleteVenue, venueRequest, type Venue, type VenueBlocker, type VenueValues } from '../venues/api';
 import { NO_OPERATIONS, VenueOperationsError, describeTimes, fetchVenueOperations, saveVenueOperations, type VenueOperationValues, type VenueOperations } from '../venues/operationsApi';
+
+const KIND = { booking: 'Booking', hold: 'Tentative hold', request: 'Pending request' } as const;
+const when = new Intl.DateTimeFormat('en-SG', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Singapore', hour12: false });
 
 /** Use the signed-in token and server permissions to load and maintain records. */
 export default function Venues({ accessToken = null }: { accessToken?: string | null }) {
@@ -30,6 +33,9 @@ function VenueCatalogue({ token }: { token: string | null }) {
   const [operationsByVenue, setOperationsByVenue] = useState<Record<number, VenueOperations | null>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState('');
+  // SG2-106: the venue awaiting delete confirmation, and what stopped a delete.
+  const [removing, setRemoving] = useState<{ venue: Venue; blockers?: VenueBlocker[]; error?: string } | undefined>(undefined);
+  const [deleting, setDeleting] = useState(false);
   const pending = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -117,6 +123,29 @@ function VenueCatalogue({ token }: { token: string | null }) {
     }
   }
 
+  // Confirm is disabled while deleting, so one delete runs at a time.
+  async function remove(venue: Venue) {
+    const controller = new AbortController();
+    pending.current = controller;
+    setDeleting(true);
+    try {
+      await deleteVenue(token!, controller.signal, venue.venue_id);
+      if (controller.signal.aborted) return;
+      setVenues(current => current.filter(item => item.venue_id !== venue.venue_id));
+      setRemoving(undefined);
+      setSaved(`${venue.name} deleted. It no longer appears in search, availability or new bookings.`);
+    } catch (failure) {
+      if (controller.signal.aborted) return;
+      if (failure instanceof VenueDeleteBlocked) setRemoving({ venue, blockers: failure.blockers });
+      else if (failure instanceof VenueError && [401, 403].includes(failure.status)) {
+        setAccess(null); setVenues([]); setRemoving(undefined); setError(failure.message);
+      } else setRemoving({ venue, error: failure instanceof VenueError ? failure.message : 'Unable to delete the venue. Please try again.' });
+    } finally {
+      pending.current = null;
+      if (!controller.signal.aborted) setDeleting(false);
+    }
+  }
+
   if (!token) return <Notice><Eyebrow>Sign in required</Eyebrow><span>Sign in with your account to view venue records.</span></Notice>;
   if (loading) return <p role="status">Loading venue catalogue…</p>;
   if (!access) return <Notice><p role="alert">{error}</p><GhostButton onClick={() => setAttempt(n => n + 1)}>Retry</GhostButton></Notice>;
@@ -178,7 +207,26 @@ function VenueCatalogue({ token }: { token: string | null }) {
             {can(access, 'venues.update') ? <GhostButton onClick={() => { setSaved(''); setEditing(venue); }}>Edit {venue.name}</GhostButton> : null}
             {can(access, 'venues.blocks.manage') ? <GhostButton onClick={() => { setSaved(''); setBlocking(venue); }}>Block {venue.name}</GhostButton> : null}
             {can(access, 'venue_bookings.by_venue') ? <GhostButton onClick={() => { setSaved(''); setBookings(venue); }}>Bookings for {venue.name}</GhostButton> : null}
+            {can(access, 'venues.delete') && removing?.venue.venue_id !== venue.venue_id
+              ? <GhostButton onClick={() => { setSaved(''); setRemoving({ venue }); }}>Delete {venue.name}</GhostButton> : null}
           </div>
+          {removing?.venue.venue_id === venue.venue_id ? <RecessedCard padding="18px 20px" style={{ gap: '12px' }}>
+            <div role="group" aria-label={`Delete ${venue.name}`} style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowWrap: 'anywhere' }}>
+              {removing.blockers ? <>
+                <p role="alert" style={{ margin: 0 }}>{venue.name} cannot be deleted while it has current or future work. Clear these first:</p>
+                <ul style={{ margin: 0, paddingLeft: '20px', display: 'grid', gap: '6px' }}>
+                  {removing.blockers.map(item => <li key={`${item.kind}-${item.id}`}>
+                    {KIND[item.kind]} #{item.id} · {item.event_name ?? 'No event'} · {when.format(new Date(item.starts_at))} – {when.format(new Date(item.ends_at))} (SGT)
+                  </li>)}
+                </ul>
+              </> : <p style={{ margin: 0 }}>Delete {venue.name}? It will be removed from search, availability and new bookings. Past bookings and history keep its name.</p>}
+              {removing.error ? <p role="alert" style={{ margin: 0 }}>{removing.error}</p> : null}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                {removing.blockers ? null : <GradientButton disabled={deleting} onClick={() => void remove(venue)}>{deleting ? 'Deleting…' : 'Confirm delete'}</GradientButton>}
+                <GhostButton disabled={deleting} onClick={() => setRemoving(undefined)}>{removing.blockers ? 'Close' : 'Cancel'}</GhostButton>
+              </div>
+            </div>
+          </RecessedCard> : null}
         </Card>)}
       </div>
     </section>

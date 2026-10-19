@@ -104,6 +104,7 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'venues.read': ['venue_staff', 'event_coordinator'],
   'venues.create': ['venue_staff'],
   'venues.update': ['venue_staff'],
+  'venues.delete': ['venue_staff'],
   // SG2-43: layouts a venue supports are shown wherever venue details are
   // shown, but only Venue Staff record them.
   'venues.layouts.read': ['venue_staff', 'event_coordinator'],
