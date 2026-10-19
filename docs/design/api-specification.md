@@ -245,7 +245,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **DraftRecord:**
   - identity and status: `event_id, organiser_id, organisation, status`
   - details: `name, purpose, description, proposed_date, expected_attendance`
-  - requirements: `venue_requirements, accessibility_needs, equipment_requirements, registration_needed`
+  - requirements: `venue_requirements, preferred_layout, accessibility_needs, equipment_requirements, registration_needed`
 - **DetailRecord:** DraftRecord plus:
   - assignment: `coordinator_id, coordinator_name`
   - decision and completion: `decided_at, decision_reason, completed_by, completed_at`
@@ -256,7 +256,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Permission:** `event_request.create` (EO).
 - **Body:** every field is optional and nullable.
   - `name`: at most 255 characters
-  - `purpose`, `description`, `venue_requirements`, `accessibility_needs`, `equipment_requirements`: each at most 5000 characters
+  - `purpose`, `description`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements`: each at most 5000 characters
   - `proposed_date`: ISO date-time
   - `expected_attendance`: integer from 1 to 2147483647
   - `registration_needed`: boolean
@@ -289,14 +289,14 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 ### 4.4 PATCH /api/event-requests/:eventId
 - **Source:** `events/updateDraft.ts` (`createUpdateEventDraftHandler`), `db/eventRequests.ts` (`updateEventRequestDraft`), migration `202610170003_event_draft_change_history.sql` (`update_event_request_draft`).
 - **Permission:** `event_request.update` (EO).
-- **Body:** the same nine fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
+- **Body:** the same ten fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
 - **200:** `{ request: DraftRecord, missingForSubmission }`. The DraftRecord shape is unchanged; this endpoint does not submit a request.
 - **Errors:**
   - 400 `{ error: "Invalid event request details", details[] }` for HTTP validation; a private RPC validation refusal returns the same error without details.
   - 404 `No event request found for this account.` for a missing event, wrong creator or changed organisation membership.
   - 409 `Only a draft or returned event request can be edited.` if the status is no longer editable, including a change after the initial lookup.
   - 503 generic service error if storage or audit insertion fails; private database errors are not exposed.
-- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the nine fields. The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
+- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the ten fields (`preferred_layout` added by migration `202610200001_event_preferred_layout.sql`, SG2-105). The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
 - **History:** the same transaction inserts one `event_audit_logs` row per actual changed field with verified actor, old/new values and a common save time. An audit failure rolls back the draft update. Unchanged saves, including equivalent timestamp offsets, add no history. Null remains null; numeric and boolean values are stored as text; dates use canonical UTC timestamp text. History reads still apply the existing owner/internal-field visibility rules.
 - **Internal result:** JSON object `{ outcome: "updated", request }` or `{ outcome: "not_found"|"not_editable"|"invalid" }`; the adapter maps these to the public response above. A successful earlier precheck cannot override a later locked refusal.
 - **Limits:** only the existing draft/clarification edit path is repaired. This adds no rejected-request rework policy and does not reconstruct edits made before the migration.
@@ -324,6 +324,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `Only a draft or rejected event request can be submitted.`
   - 503
 - **Rule:** only the creating EO; status must be `draft`, `rejected` or `needs_clarification`.
+- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked.
 - **Side effects:**
   - an `event_audit_logs` status row
   - `notifications` of kind `event_submitted`: to every ECL when the status is `unassigned`, otherwise to the coordinator
