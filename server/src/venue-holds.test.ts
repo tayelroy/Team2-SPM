@@ -18,7 +18,8 @@ const auth = { Authorization: 'Bearer caller-token' };
 function database(overrides: Partial<VenueHoldStore> = {}): VenueHoldStore {
   return { list: async () => [hold], options: async () => ({ events: [{ event_id: 2, name: 'Event' }], venues: [{ venue_id: 3, name: 'Hall' }] }),
     notifications: async () => [notification], create: async () => ({ outcome: 'created', hold }),
-    change: async () => ({ outcome: 'updated', hold: { ...hold, status: 'released' } }), ...overrides };
+    change: async () => ({ outcome: 'updated', hold: { ...hold, status: 'released' } }),
+    changeExpiry: async () => ({ outcome: 'updated', hold }), ...overrides };
 }
 function app(role: Role = 'venue_staff', store = (_token: string) => database()) {
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'user', role }) });

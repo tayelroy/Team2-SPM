@@ -201,7 +201,7 @@ export async function getAllVenuesAvailability(
   if (!client) return { outcome: 'unavailable' };
 
   const [venues, bookings, unavailability, affected, operations] = await Promise.all([
-    client.from('venues').select('venue_id, name').order('name', { ascending: true }),
+    client.from('venues').select('venue_id, name').is('deleted_at', null).order('name', { ascending: true }),
     client
       .from('venue_booking_occupancy')
       .select('venue_id, starts_at, ends_at, status, event_id')

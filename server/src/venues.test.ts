@@ -26,7 +26,8 @@ function fixture(role: Role = 'venue_staff', override?: VenueStore) {
       const index = rows.findIndex(row => row.venue_id === id);
       if (index < 0) rows.push(venue); else rows[index] = venue;
       return venue;
-    }
+    },
+    remove: async () => ({ outcome: 'missing' })
   };
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'user-1', role }) });
   const app = express();
@@ -107,14 +108,14 @@ test('[BOUNDARY] [SG2-42:AC1] invalid IDs never write; an in-range missing ID re
 });
 
 test('[FAILURE] [SG2-42:AC1] missing update and insert without returned row do not report success', async () => {
-  const { app } = fixture('venue_staff', { list: async () => [], save: async () => null });
+  const { app } = fixture('venue_staff', { list: async () => [], save: async () => null, remove: async () => ({ outcome: 'missing' }) });
   assert.equal((await request(app).put('/api/venues/8').set('Authorization', 'Bearer valid-token').send(values)).status, 404);
   assert.equal((await request(app).post('/api/venues').set('Authorization', 'Bearer valid-token').send(values)).status, 503);
 });
 
 for (const error of [new AccessError(401), new AccessError(403), new Error('SECRET')]) {
   test(`[FAILURE] [SG2-42:AC1] database failures fail closed: ${error.message}`, async () => {
-    const { app } = fixture('venue_staff', { list: async () => { throw error; }, save: async () => { throw error; } });
+    const { app } = fixture('venue_staff', { list: async () => { throw error; }, save: async () => { throw error; }, remove: async () => { throw error; } });
     for (const method of ['get', 'post', 'put'] as const) {
       const res = await request(app)[method](`/api/venues${method === 'put' ? '/1' : ''}`)
         .set('Authorization', 'Bearer valid-token').send(values);

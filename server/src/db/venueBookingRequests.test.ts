@@ -16,7 +16,7 @@ function fakeAdmin(tables: Record<string, Result[]>, calls: Call[] = []): Supaba
       const builder: Record<string, unknown> = {
         then: (resolve: (value: Result) => unknown) => Promise.resolve(result).then(resolve)
       };
-      for (const method of ['select', 'eq', 'in', 'not', 'lt', 'gt', 'order', 'range', 'maybeSingle', 'insert']) {
+      for (const method of ['select', 'eq', 'is', 'in', 'not', 'lt', 'gt', 'order', 'range', 'maybeSingle', 'insert']) {
         builder[method] = (...args: unknown[]) => { calls.push({ table, method, args }); return builder; };
       }
       return builder;

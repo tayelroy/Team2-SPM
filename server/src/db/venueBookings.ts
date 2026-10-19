@@ -91,7 +91,7 @@ export function createVenueBookingStore(admin: SupabaseClient): VenueBookingStor
   return {
     event: eventId => suitability.event(eventId),
     async venueExists(venueId) {
-      return (await suitability.venues(venueId)).length > 0;
+      return (await suitability.venues(venueId, true)).length > 0;
     },
     async forEvent(eventId) {
       const { data, error } = await admin.from('venue_bookings').select(COLUMNS)
