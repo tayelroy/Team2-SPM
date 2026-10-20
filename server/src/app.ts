@@ -45,6 +45,7 @@ import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
 import { createSafetyChecksRouter } from './safetyChecks';
 import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
+import { createRegistrationHandlers } from './events/registrationRoutes';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -112,7 +113,9 @@ export function createApp(
   // SG2-91: appended last to keep every positional argument in place.
   safetyChecksRouter = createSafetyChecksRouter(access),
   // SG2-92: appended last for the same reason.
-  safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal })
+  safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-63: appended last for the same reason.
+  registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -287,6 +290,23 @@ export function createApp(
     '/:eventId/rework',
     access.requirePermission('event_request.safety_rework'),
     safetyDecisionHandlers.rework
+  );
+  // SG2-63 AC1-AC10: the registration picture, and the creating organiser's
+  // registration settings (capacity, opening and closing times, close now).
+  eventRequests.get(
+    '/:eventId/registrations',
+    access.requirePermission('event_request.registrations.view'),
+    registrationHandlers.overview
+  );
+  eventRequests.patch(
+    '/:eventId/registration-settings',
+    access.requirePermission('event_request.registration_settings.update'),
+    registrationHandlers.update
+  );
+  eventRequests.post(
+    '/:eventId/registration-settings/close',
+    access.requirePermission('event_request.registration_settings.update'),
+    registrationHandlers.close
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

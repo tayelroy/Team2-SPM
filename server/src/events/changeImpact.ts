@@ -37,7 +37,9 @@ export const CHANGEABLE_FIELDS = [...SIGNIFICANT_CHANGE_FIELDS, 'name', 'purpose
 export const RECHECK_KEYS = ['venue_recheck', 'equipment_recheck', 'registration_recheck'] as const;
 
 /** Registration settings stay editable on Confirmed and Preparation events
- * (SG2-63, SG2-66 AC6). */
+ * (SG2-66 AC6), and are never part of a change request. Capacity and times
+ * are the organiser's own setting (SG2-63 AC5); the coordinator can only say
+ * whether registration is needed. */
 export const REGISTRATION_SETTINGS = [
   'registration_needed',
   'registration_capacity',
