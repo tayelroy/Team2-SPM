@@ -1,9 +1,9 @@
 -- SG2-104: the functions that read the caller's role act as the request's
--- acting role (202610180001), and decide_venue_booking_request() refuses a
--- request the deciding Venue Staff member raised themselves.
+-- acting role (202610180001), and decide_venue_booking_request() also refuses
+-- a request the deciding Venue Staff member raised themselves.
 --
 -- Each body below is the LATEST definition, copied verbatim; only its role
--- lookup (or, for the venue decision, the own-request check) changed. This
+-- lookup changed (and, for the venue decision, the own-request check added). This
 -- migration is deliberately the last one: if a later migration redefines one
 -- of these functions, it must keep the acting-role line (and the own-request
 -- check), or this story's behaviour is lost.
@@ -691,7 +691,8 @@ declare
   instant timestamptz;
   gap interval;
 begin
-  if not exists (select 1 from public.account_roles where user_id = auth.uid() and role = 'venue_staff') then
+  -- SG2-104: decides only while acting as Venue Staff, not merely holding it.
+  if public.lock_acting_role() is distinct from 'venue_staff' then
     raise exception using errcode = '42501', message = 'Access denied';
   end if;
   if p_decision is null or p_decision not in ('approve', 'reject')

@@ -29,6 +29,13 @@ async function anyRow(admin: SupabaseClient, tables: string[], eventId: number):
  * private.event_relationship_exists() (202610180004); the two change together.
  * The coordinator check reads the event's current coordinator, so a
  * reassigned coordinator loses access immediately.
+ *
+ * Venue Staff and Technical Support are each one shared team: no account is
+ * assigned to particular venues or equipment, and any Venue Staff member may
+ * decide any venue's request (decide_venue_booking_request()). So they relate
+ * to every event that has a venue (or equipment) request or booking, the same
+ * events their queues show; scoping per venue would need a staff assignment
+ * the system does not have.
  */
 export async function hasEventRelationship(
   admin: SupabaseClient,

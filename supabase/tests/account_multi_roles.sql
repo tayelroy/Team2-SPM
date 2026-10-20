@@ -281,9 +281,28 @@ begin
   end if;
 end $$;
 
--- (b) Venue Staff never decide a venue request they raised themselves.
+-- Deciding needs Venue Staff as the acting role, not just a held one.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'd1040000-0000-4000-8000-000000000003', true);
+do $$
+declare
+  header text;
+  refused integer := 0;
+begin
+  foreach header in array array['{"x-acting-role":"event_coordinator"}', '{}'] loop
+    perform set_config('request.headers', header, true);
+    begin
+      perform public.decide_venue_booking_request(104202, 'reject', 'Hall closed');
+    exception when insufficient_privilege then
+      refused := refused + 1;
+    end;
+  end loop;
+  if refused <> 2 then
+    raise exception '[SG2-104:decide-needs-acting-venue-staff] [SG2-104:AC2] [FAILURE] Holding Venue Staff while acting as another role, or with no acting role, must not decide a venue request; % of 2 refused', refused;
+  end if;
+end $$;
+
+-- (b) Venue Staff never decide a venue request they raised themselves.
 select set_config('request.headers', '{"x-acting-role":"venue_staff"}', true);
 do $$
 declare
