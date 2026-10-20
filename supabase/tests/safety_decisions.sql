@@ -22,8 +22,9 @@ insert into public.events(event_id,organiser_id,coordinator_id,name,status,propo
   'Safety event '||n,'awaiting_safety_check','2031-11-01T09:00Z',120
  from generate_series(1,13) n;
 update public.events set name='Harbour Gala' where event_id=99201;
--- 99205: no name, and its organiser also coordinates it (one notice only).
-update public.events set name='',coordinator_id='d9200000-0000-4000-8000-000000000001' where event_id=99205;
+-- 99205: no name and no coordinator, so its organiser gets one notice. (SG2-104
+-- rule (a) means an organiser can no longer coordinate their own event.)
+update public.events set name='',coordinator_id=null where event_id=99205;
 -- 99206: nobody coordinates it, so only the organiser is told.
 update public.events set coordinator_id=null where event_id=99206;
 update public.events set status='planning' where event_id=99207;

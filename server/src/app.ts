@@ -53,7 +53,7 @@ export function createApp(
   eventDraftHandler: RequestHandler = createEventDraftHandler({ getPrincipal: access.getPrincipal }),
   loginHandler: RequestHandler = createLoginHandler(),
   logoutHandler: RequestHandler = createLogoutHandler(),
-  updateRoleHandler: RequestHandler = createUpdateRoleHandler(),
+  updateRoleHandler: RequestHandler = createUpdateRoleHandler(undefined, access.getPrincipal),
   loginRateLimit: RequestHandler = createLoginRateLimiter(),
   eventSubmitHandler: RequestHandler = submitEventRequestHandler({ getPrincipal: access.getPrincipal }),
   eventListHandler: RequestHandler = getEventRequestsHandler({ getPrincipal: access.getPrincipal }),

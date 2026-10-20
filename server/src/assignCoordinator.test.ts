@@ -13,7 +13,7 @@ import type {
   AssignStatusTransition,
   FetchEventRequestResult
 } from './db/eventRequests';
-import type { GetAccountRoleResult } from './db/accountRoles';
+import type { GetHeldRolesResult } from './db/accountRoles';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 import type { EventNotice, NotifyEventResult } from './db/eventNotifications';
 
@@ -44,7 +44,7 @@ interface HarnessOptions {
   principal?: Principal | undefined;
   admin?: SupabaseClient | null;
   fetchResult?: FetchEventRequestResult;
-  roleResult?: GetAccountRoleResult;
+  roleResult?: GetHeldRolesResult;
   assignResult?: AssignCoordinatorResult;
   /** Result of the compensating write that undoes an unrecorded assignment. */
   rollbackResult?: AssignCoordinatorResult;
@@ -76,7 +76,7 @@ function buildApp(options: HarnessOptions = {}) {
       },
       lookupRole: async (_admin, userId) => {
         options.captureRole?.(userId);
-        return options.roleResult ?? { ok: true, role: 'event_coordinator' };
+        return options.roleResult ?? { ok: true, roles: ['event_coordinator'] };
       },
       assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent, statusTransition) => {
         options.writes?.push([eventId, coordinatorId, expectedCurrent]);
@@ -215,7 +215,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator (SG2-33/SG2-34)', () =>
   });
 
   test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] returns 400 when the target account is not an Event Coordinator', async () => {
-    const response = await request(buildApp({ roleResult: { ok: true, role: 'venue_staff' } }))
+    const response = await request(buildApp({ roleResult: { ok: true, roles: ['venue_staff'] } }))
       .patch('/api/event-requests/7/coordinator')
       .send({ coordinatorId: 'coord-1' });
     assert.equal(response.status, 400);
@@ -486,7 +486,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
       getPrincipal: () => STAFF,
       getAdminClient: () => ({}) as SupabaseClient,
       fetchRequest: async () => ({ ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: storedCoordinator } }),
-      lookupRole: async () => ({ ok: true, role: 'event_coordinator' }),
+      lookupRole: async () => ({ ok: true, roles: ['event_coordinator'] }),
       assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent) => {
         writes.push([eventId, coordinatorId, expectedCurrent]);
         assert.equal(expectedCurrent, storedCoordinator);
@@ -680,4 +680,13 @@ describe('PATCH /api/event-requests/:eventId/coordinator authorisation wiring', 
     assert.equal(response.status, 200);
     assert.equal(response.body.reached, true);
   });
+});
+
+test("[FAILURE] [SG2-104:AC2] the Lead cannot make an event's own organiser its coordinator, and nothing is written", async () => {
+  const writes: unknown[] = [];
+  const audits: unknown[] = [];
+  const response = await request(buildApp({ writes, audits } as never))
+    .patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'user-1' });
+  assert.equal(response.status, 400);
+  assert.deepEqual([writes, audits], [[], []]);
 });

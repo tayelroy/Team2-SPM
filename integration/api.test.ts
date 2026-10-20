@@ -8,7 +8,7 @@ import request from 'supertest';
 import { createClient } from '@supabase/supabase-js';
 import { createApp } from '../server/src/app';
 import { createAuthorization, AccessError, type Role } from '../server/src/auth';
-import { getAccountRole } from '../server/src/db/accountRoles';
+import { getHeldRoles } from '../server/src/db/accountRoles';
 import { dbConfig } from '../server/src/db/config';
 import { createEventDraftHandler } from '../server/src/events/createDraft';
 import { createUpdateEventDraftHandler } from '../server/src/events/updateDraft';
@@ -64,9 +64,9 @@ const ids = Object.fromEntries(['organiser', 'coordinator', 'lead', 'venue', 'su
 const access = createAuthorization({ resolvePrincipal: async token => {
   const userId = ids[token];
   if (!userId) throw new AccessError(401);
-  const role = await getAccountRole(database, userId);
+  const role = await getHeldRoles(database, userId);
   if (!role.ok) throw new AccessError(403);
-  return { userId, role: role.role as Role };
+  return { userId, roles: role.roles as Role[] };
 } });
 let available = true;
 const dependencies = { getPrincipal: access.getPrincipal, getAdminClient: () => available ? database : null };
@@ -753,9 +753,9 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-77:AC5] [SG2-77:AC6] [SG2-86:AC2] Safet
   const operationAccess = createAuthorization({ resolvePrincipal: async token => {
     const userId = token === tokens.safety ? safetyId : token === tokens.venue ? ids.venue : undefined;
     if (!userId) throw new AccessError(401);
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const operationApi = request(createApp(undefined, operationAccess));
   const venueIds: number[] = [];
@@ -836,9 +836,9 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-77:AC6] actual Staff upserts
     const name = (Object.keys(tokens) as (keyof typeof tokens)[]).find(name => tokens[name] === token);
     if (!name) throw new AccessError(401);
     const userId = userIds[name];
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const operationApi = request(createApp(undefined, operationAccess));
   let venueId: number | undefined;
@@ -937,9 +937,9 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC3] [S
   const callerAccess = createAuthorization({ resolvePrincipal: async token => {
     const userId = token === tokens.venue ? ids.venue : token === tokens.coordinator ? ids.coordinator : undefined;
     if (!userId) throw new AccessError(401);
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const callerApi = request(createApp(undefined, callerAccess));
   const as = (who: keyof typeof tokens) => ({ Authorization: `Bearer ${tokens[who]}` });

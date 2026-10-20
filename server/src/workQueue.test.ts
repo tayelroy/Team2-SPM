@@ -22,7 +22,7 @@ function fixture(role: Role = 'event_coordinator', fetchItems: typeof fetchWorkQ
 
 test('[NORMAL] [SG2-41:AC4] list and detail forward verified identity and exact selection; app mounts the queue and prevents caching', async () => {
   const { router, access } = fixture('event_coordinator', async (_admin, principal, selection) => {
-    assert.deepEqual(principal, { userId: 'verified-user', role: 'event_coordinator' });
+    assert.deepEqual(principal, { userId: 'verified-user', role: 'event_coordinator', roles: ['event_coordinator'] });
     assert.deepEqual(selection, { kind: 'event', item_id: 42 });
     return [item];
   });

@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAccountRole, updateAccountRole, deleteAccountRole, getAccountRole, getAccountRoles, listCoordinators } from './accountRoles';
+import { createAccountRole, changeAccountRoles, deleteAccountRole, getHeldRoles, getAccountRoles, listCoordinators } from './accountRoles';
 
 function fakeAdmin(options: {
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
@@ -34,8 +34,10 @@ function fakeAdmin(options: {
             eq: (column: string, value: unknown) => {
               assert.equal(column, 'user_id');
               return {
-                maybeSingle: async () =>
-                  options.select ? options.select(value) : { data: { role: 'event_coordinator' }, error: null }
+                order: async (orderBy: string) => {
+                  assert.equal(orderBy, 'role');
+                  return options.select ? options.select(value) : { data: [{ role: 'event_coordinator' }], error: null };
+                }
               };
             }
           };
@@ -68,41 +70,28 @@ describe('createAccountRole', () => {
   });
 });
 
-describe('updateAccountRole', () => {
-  test('[NORMAL] [SG2-24:AC2] updates the role for an existing user', async () => {
-    let updatePayload: any;
-    let filter: unknown;
-    const admin = fakeAdmin({
-      captureFilter: (column, userId) => { filter = { column, userId }; },
-      update: async (payload) => {
-        updatePayload = payload;
-        return { data: [{ user_id: 'target-1' }], error: null };
-      }
-    });
+describe('changeAccountRoles', () => {
+  function rpcAdmin(answer: { data: unknown; error: { code?: string; message: string } | null }, calls: unknown[] = []): SupabaseClient {
+    return { rpc: async (name: string, args: unknown) => { calls.push([name, args]); return answer; } } as unknown as SupabaseClient;
+  }
 
-    const result = await updateAccountRole(admin, 'target-1', 'venue_staff');
-
-    assert.deepEqual(result, { ok: true });
-    assert.deepEqual(updatePayload, { role: 'venue_staff' });
-    assert.deepEqual(filter, { column: 'user_id', userId: 'target-1' });
+  test('[NORMAL] [SG2-104:AC1] replaces the target\'s roles through the database function with the verified actor', async () => {
+    const calls: unknown[] = [];
+    const result = await changeAccountRoles(rpcAdmin({ data: { outcome: 'changed', roles: ['venue_staff'] }, error: null }, calls),
+      'support-1', 'target-1', 'replace', 'venue_staff');
+    assert.deepEqual(result, { outcome: 'changed', roles: ['venue_staff'] });
+    assert.deepEqual(calls, [['change_account_roles', { p_actor_id: 'support-1', p_target_id: 'target-1', p_action: 'replace', p_role: 'venue_staff' }]]);
   });
 
-  test('[FAILURE] [SG2-24:AC2] reports user_not_found when no row matches the target user id', async () => {
-    const admin = fakeAdmin({ update: async () => ({ data: [], error: null }) });
-    const result = await updateAccountRole(admin, 'does-not-exist', 'venue_staff');
-    assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
-  });
-
-  test('[FAILURE] [SG2-24:AC2] surfaces a database error from the update itself', async () => {
-    const admin = fakeAdmin({ update: async () => ({ data: null, error: { message: 'connection reset' } }) });
-    const result = await updateAccountRole(admin, 'target-1', 'venue_staff');
-    assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
-  });
-
-  test('[BOUNDARY] [SG2-24:AC2] a malformed account id (not a UUID) is reported as not found, not as an outage', async () => {
-    const admin = fakeAdmin({ update: async () => ({ data: null, error: { code: '22P02', message: 'invalid input syntax for type uuid: "not-a-uuid"' } }) });
-    const result = await updateAccountRole(admin, 'not-a-uuid', 'venue_staff');
-    assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
+  test('[FAILURE] [SG2-104:AC2] passes on the database refusals and reports anything else as an error', async () => {
+    for (const outcome of ['self', 'forbidden', 'missing', 'last_role', 'invalid'] as const) {
+      assert.deepEqual(await changeAccountRoles(rpcAdmin({ data: { outcome }, error: null }), 'a', 'b', 'replace', 'attendee'), { outcome });
+    }
+    for (const data of [{ outcome: 'changed', roles: 'attendee' }, { outcome: 'surprise' }, null]) {
+      assert.deepEqual(await changeAccountRoles(rpcAdmin({ data, error: null }), 'a', 'b', 'replace', 'attendee'), { outcome: 'error' });
+    }
+    assert.deepEqual(await changeAccountRoles(rpcAdmin({ data: null, error: { message: 'down' } }), 'a', 'b', 'replace', 'attendee'), { outcome: 'error' });
+    assert.deepEqual(await changeAccountRoles(rpcAdmin({ data: null, error: { code: '22P02', message: 'bad uuid' } }), 'a', 'x', 'replace', 'attendee'), { outcome: 'missing' });
   });
 });
 
@@ -126,32 +115,20 @@ describe('deleteAccountRole', () => {
   }
 });
 
-describe('getAccountRole', () => {
-  test('[NORMAL] [SG2-24:AC3] returns the role for an existing account', async () => {
+describe('getHeldRoles', () => {
+  test('[NORMAL] [SG2-104:AC1] returns every role an account holds', async () => {
     let askedFor: unknown;
-    const admin = fakeAdmin({
-      select: async (userId) => {
-        askedFor = userId;
-        return { data: { role: 'event_coordinator' }, error: null };
-      }
-    });
-
-    const result = await getAccountRole(admin, 'coord-1');
-
-    assert.deepEqual(result, { ok: true, role: 'event_coordinator' });
+    const admin = fakeAdmin({ select: async (userId) => { askedFor = userId; return { data: [{ role: 'event_coordinator' }, { role: 'event_organiser' }], error: null }; } });
+    assert.deepEqual(await getHeldRoles(admin, 'coord-1'), { ok: true, roles: ['event_coordinator', 'event_organiser'] });
     assert.equal(askedFor, 'coord-1');
   });
 
-  test('[FAILURE] [SG2-24:AC3] reports user_not_found when no row matches', async () => {
-    const admin = fakeAdmin({ select: async () => ({ data: null, error: null }) });
-    const result = await getAccountRole(admin, 'ghost');
-    assert.deepEqual(result, { ok: false, reason: 'user_not_found' });
-  });
-
-  test('[FAILURE] [SG2-24:AC3] surfaces a database error', async () => {
-    const admin = fakeAdmin({ select: async () => ({ data: null, error: { message: 'connection reset' } }) });
-    const result = await getAccountRole(admin, 'coord-1');
-    assert.deepEqual(result, { ok: false, reason: 'error', error: 'connection reset' });
+  test('[FAILURE] [SG2-104:AC2] no rows or a malformed id is user_not_found; other errors are surfaced', async () => {
+    assert.deepEqual(await getHeldRoles(fakeAdmin({ select: async () => ({ data: [], error: null }) }), 'ghost'), { ok: false, reason: 'user_not_found' });
+    assert.deepEqual(await getHeldRoles(fakeAdmin({ select: async () => ({ data: null, error: null }) }), 'ghost'), { ok: false, reason: 'user_not_found' });
+    assert.deepEqual(await getHeldRoles(fakeAdmin({ select: async () => ({ data: null, error: { code: '22P02', message: 'bad' } as any }) }), 'x'), { ok: false, reason: 'user_not_found' });
+    assert.deepEqual(await getHeldRoles(fakeAdmin({ select: async () => ({ data: null, error: { message: 'connection reset' } }) }), 'c'),
+      { ok: false, reason: 'error', error: 'connection reset' });
   });
 });
 
@@ -176,11 +153,13 @@ describe('getAccountRoles', () => {
     const asked: unknown[] = [];
     const result = await getAccountRoles(rolesAdmin({ data: [
       { user_id: 'coord-1', role: 'event_coordinator' },
-      { user_id: 'lead-1', role: 'event_coordinator_lead' }
+      { user_id: 'lead-1', role: 'event_coordinator_lead' },
+      { user_id: 'coord-1', role: 'event_organiser' }
     ], error: null }, asked), ['coord-1', 'lead-1', 'gone-1']);
     assert.equal(result.ok, true);
     if (result.ok) {
-      assert.deepEqual([...result.roles], [['coord-1', 'event_coordinator'], ['lead-1', 'event_coordinator_lead']]);
+      // SG2-104: an account may hold several roles; all of them are kept.
+      assert.deepEqual([...result.roles], [['coord-1', ['event_coordinator', 'event_organiser']], ['lead-1', ['event_coordinator_lead']]]);
       assert.equal(result.roles.has('gone-1'), false);
     }
     assert.deepEqual(asked, [['user_id, role', 'user_id', ['coord-1', 'lead-1', 'gone-1']]]);

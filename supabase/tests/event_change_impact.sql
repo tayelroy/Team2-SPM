@@ -27,9 +27,10 @@ update public.events set status='confirmed',confirmed_by='d6600000-0000-4000-800
  confirmed_at='2031-10-01T00:00Z' where event_id in (96604,96606);
 update public.events set status='awaiting_safety_check' where event_id=96607;
 update public.events set status='preparation' where event_id=96608;
--- 96605: no name, and its organiser also coordinates it (one notice only).
-update public.events set name='',status='confirmed',coordinator_id='d6600000-0000-4000-8000-000000000001',
- confirmed_by='d6600000-0000-4000-8000-000000000001',confirmed_at='2031-10-01T00:00Z' where event_id=96605;
+-- 96605: no name, coordinated by the other coordinator. (SG2-104: an event's
+-- organiser can no longer be its coordinator, so each gets their own notice.)
+update public.events set name='',status='confirmed',coordinator_id='d6600000-0000-4000-8000-000000000003',
+ confirmed_by='d6600000-0000-4000-8000-000000000003',confirmed_at='2031-10-01T00:00Z' where event_id=96605;
 update public.events set arrangements_recheck_needed=true,outstanding_arrangements='["venue_recheck","equipment_recheck"]'
  where event_id=96610;
 
@@ -126,19 +127,21 @@ begin
  end if;
 end $$;
 
--- Untitled events, and one notice when organiser and coordinator are the same person.
+-- Untitled events: the organiser and the coordinator are each told once.
 set local role service_role;
 do $$ begin
- perform public.apply_accepted_event_change(96605,'d6600000-0000-4000-8000-000000000001','confirmed',
+ perform public.apply_accepted_event_change(96605,'d6600000-0000-4000-8000-000000000003','confirmed',
   'change request y','{"expected_attendance":300}','["venue_recheck"]');
 end $$;
 reset role;
 do $$
 begin
- if (select count(*) from public.notifications where event_id=96605) <> 1
-   or (select message from public.notifications where event_id=96605)
-     is distinct from 'Untitled event has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.' then
-  raise exception '[SG2-66:untitled-single-notice] [SG2-66:AC7] [BOUNDARY] A blank name reads Untitled event and one person gets one notice';
+ if (select count(*) from public.notifications where event_id=96605) <> 2
+   or (select message from public.notifications where event_id=96605 and recipient_id='d6600000-0000-4000-8000-000000000001')
+     is distinct from 'Untitled event has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.'
+   or (select message from public.notifications where event_id=96605 and recipient_id='d6600000-0000-4000-8000-000000000003')
+     is distinct from 'Untitled event is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.' then
+  raise exception '[SG2-66:untitled-single-notice] [SG2-66:AC7] [SG2-104:AC2] [BOUNDARY] A blank name reads Untitled event, and the organiser and coordinator each get exactly one notice';
  end if;
 end $$;
 

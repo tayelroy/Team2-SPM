@@ -58,7 +58,7 @@ class AccountRole {
   userId : uuid
   role : AccountRoleName
   --
-  updateAccountRole()
+  changeAccountRoles()
 }
 
 class Role {

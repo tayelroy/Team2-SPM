@@ -1,9 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type AccountRoleWriteResult = { ok: true } | { ok: false; error: string };
-export type AccountRoleUpdateResult =
-  | { ok: true }
-  | { ok: false; reason: 'user_not_found' | 'error'; error?: string };
 
 /**
  * public.account_roles is the authoritative role store (SG2-25): RLS-secured,
@@ -23,56 +20,76 @@ export async function createAccountRole(
   return { ok: true };
 }
 
-export async function updateAccountRole(
-  admin: SupabaseClient,
-  userId: string,
-  role: string
-): Promise<AccountRoleUpdateResult> {
-  const { data, error } = await admin.from('account_roles').update({ role }).eq('user_id', userId).select('user_id');
+export type RoleChangeAction = 'add' | 'remove' | 'replace';
 
+export type RoleChangeResult =
+  | { outcome: 'changed' | 'unchanged'; roles: string[] }
+  | { outcome: 'self' | 'forbidden' | 'missing' | 'last_role' | 'invalid' | 'error' };
+
+const ROLE_CHANGE_REFUSALS = new Set(['self', 'forbidden', 'missing', 'last_role', 'invalid']);
+
+/**
+ * SG2-104: adds a role, removes a role, or replaces every role with one, in
+ * the database's change_account_roles() (service role only), which locks
+ * both accounts, refuses self-changes and a last-role removal, and requires
+ * the actor to hold technical_support_staff.
+ */
+export async function changeAccountRoles(
+  admin: SupabaseClient,
+  actorId: string,
+  targetId: string,
+  action: RoleChangeAction,
+  role: string
+): Promise<RoleChangeResult> {
+  const { data, error } = await admin.rpc('change_account_roles', {
+    p_actor_id: actorId, p_target_id: targetId, p_action: action, p_role: role
+  });
   // 22P02 (invalid_text_representation): the id is not a UUID, so no account can match it.
+  if (error?.code === '22P02') return { outcome: 'missing' };
+  if (error || !data || typeof data !== 'object') return { outcome: 'error' };
+  const result = data as { outcome?: unknown; roles?: unknown };
+  if (result.outcome === 'changed' || result.outcome === 'unchanged') {
+    if (!Array.isArray(result.roles) || !result.roles.every(item => typeof item === 'string')) return { outcome: 'error' };
+    return { outcome: result.outcome, roles: result.roles };
+  }
+  if (typeof result.outcome === 'string' && ROLE_CHANGE_REFUSALS.has(result.outcome)) {
+    return { outcome: result.outcome as 'self' | 'forbidden' | 'missing' | 'last_role' | 'invalid' };
+  }
+  return { outcome: 'error' };
+}
+
+export type GetHeldRolesResult =
+  | { ok: true; roles: string[] }
+  | { ok: false; reason: 'user_not_found' | 'error'; error?: string };
+
+/**
+ * Reads every role an account holds from the authoritative store (SG2-104),
+ * e.g. to confirm a coordinator-assignment target holds `event_coordinator`
+ * (SG2-33/SG2-34) rather than trusting the caller's claim.
+ */
+export async function getHeldRoles(admin: SupabaseClient, userId: string): Promise<GetHeldRolesResult> {
+  const { data, error } = await admin.from('account_roles').select('role').eq('user_id', userId).order('role');
   if (error?.code === '22P02') {
     return { ok: false, reason: 'user_not_found' };
   }
   if (error) {
     return { ok: false, reason: 'error', error: error.message };
   }
-  if (!data || data.length === 0) {
+  const roles = ((data as { role: string }[] | null) ?? []).map(row => row.role);
+  if (roles.length === 0) {
     return { ok: false, reason: 'user_not_found' };
   }
-  return { ok: true };
-}
-
-export type GetAccountRoleResult =
-  | { ok: true; role: string }
-  | { ok: false; reason: 'user_not_found' | 'error'; error?: string };
-
-/**
- * Reads a single account's role from the authoritative store (SG2-33/SG2-34)
- * — used to confirm a coordinator-assignment target actually holds the
- * `event_coordinator` role before the write, rather than trusting the
- * caller's claim.
- */
-export async function getAccountRole(admin: SupabaseClient, userId: string): Promise<GetAccountRoleResult> {
-  const { data, error } = await admin.from('account_roles').select('role').eq('user_id', userId).maybeSingle();
-
-  if (error) {
-    return { ok: false, reason: 'error', error: error.message };
-  }
-  if (!data) {
-    return { ok: false, reason: 'user_not_found' };
-  }
-  return { ok: true, role: (data as { role: string }).role };
+  return { ok: true, roles };
 }
 
 export type GetAccountRolesResult =
-  | { ok: true; roles: Map<string, string> }
+  | { ok: true; roles: Map<string, string[]> }
   | { ok: false; error: string };
 
 /**
  * Reads several accounts' roles at once (SG2-40), keyed by user id — the
- * history drawer names each actor's role. An account without a role row is
- * simply absent from the result.
+ * history drawer names each actor's roles (SG2-104: an account may hold
+ * several). An account without a role row is simply absent from the result.
  */
 export async function getAccountRoles(admin: SupabaseClient, userIds: string[]): Promise<GetAccountRolesResult> {
   const { data, error } = await admin.from('account_roles').select('user_id, role').in('user_id', userIds);
@@ -80,8 +97,11 @@ export async function getAccountRoles(admin: SupabaseClient, userIds: string[]):
   if (error) {
     return { ok: false, error: error.message };
   }
-  const rows = (data as { user_id: string; role: string }[] | null) ?? [];
-  return { ok: true, roles: new Map(rows.map(row => [row.user_id, row.role])) };
+  const roles = new Map<string, string[]>();
+  for (const row of (data as { user_id: string; role: string }[] | null) ?? []) {
+    roles.set(row.user_id, [...(roles.get(row.user_id) ?? []), row.role]);
+  }
+  return { ok: true, roles };
 }
 
 /** Best-effort cleanup for registration rollback; failures are not surfaced. */

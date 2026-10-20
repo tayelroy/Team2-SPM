@@ -1027,3 +1027,16 @@ test.each(['Venue Staff'] as const)(
     ]);
   }
 );
+
+test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that role's home and remembers it", async () => {
+  await signInAs('Event Coordinator');
+  cleanup();
+  const stored = JSON.parse(sessionStorage.getItem('connectsphere.session')!);
+  sessionStorage.setItem('connectsphere.session', JSON.stringify({ ...stored, user: { ...stored.user, roles: ['Event Coordinator', 'Venue Staff'] } }));
+  mockLoginResponse('Event Coordinator');
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Coordination desk' })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Acting as' }), { target: { value: 'Venue Staff' } });
+  expect(await screen.findByRole('heading', { level: 1, name: 'Venue desk' })).toBeInTheDocument();
+  expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!).user.role).toBe('Venue Staff');
+});
