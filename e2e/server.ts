@@ -67,6 +67,8 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
 import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
+import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
+import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -244,7 +246,10 @@ const app = createApp(
   createSafetyChecksRouter(access, token => createMemorySafetyChecksStore(database, token)),
   // SG2-92: the decision history reads the in-memory client; recording and
   // reworking mirror their SQL functions over the in-memory tables.
-  createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) })
+  createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) }),
+  // SG2-63: the registration picture and settings mirror their SQL functions
+  // over the in-memory tables.
+  createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -301,6 +306,16 @@ app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
     audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
   });
 });
+// SG2-63: a confirmed event with open registration, two registered and one withdrawn.
+app.post('/__e2e/registrations', (_req, res) => {
+  seedRegistrations(database);
+  res.status(204).end();
+});
+app.get('/__e2e/registrations-ledger', (_req, res) => res.json({
+  event: database.tables.events.find(row => row.event_id === 631),
+  audit: database.tables.event_audit_logs.filter(row => row.event_id === 631),
+  notifications: database.tables.notifications.filter(row => row.event_id === 631),
+}));
 app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
   prepareConvertedForum(database);
   res.status(204).end();
