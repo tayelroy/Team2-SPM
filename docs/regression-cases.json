@@ -7109,8 +7109,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
-    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
     "id": "SG2-69-P01",
     "title": "Unread badge, ordered merged inbox and safe event opening",
     "type": "NORMAL",
@@ -7141,8 +7141,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
-    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
     "id": "SG2-69-B01",
     "title": "All-page unread total and clearing both inbox sources at phone width",
     "type": "BOUNDARY",
@@ -7172,8 +7172,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
-    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
     "id": "SG2-69-P02",
     "title": "Default daily reminder setting and saved thirty-day boundary",
     "type": "NORMAL / BOUNDARY",
@@ -7203,8 +7203,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
-    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
     "id": "SG2-69-N01",
     "title": "Recipient and coordinator-setting isolation",
     "type": "CONFLICT",
@@ -7234,8 +7234,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
-    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
     "id": "SG2-69-F01",
     "title": "Failed read retains unread state and supports retry",
     "type": "FAILURE",
@@ -7339,8 +7339,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "19/19 native API integration tests pass, including caller-scoped inbox paging/read/clear/target/preferences and scheduler recipient/cadence contracts.",
-    "execution_evidence": "20 Oct 2026; exact CI database sequence replay, then npm run test:integration; 19/19 pass through real Express and production Supabase adapter with disposable PostgreSQL17/PostgREST12.2.12. /tmp/sg69-ci-sequence-api.log. SQL rollback advances identity sequences; each new API fixture uses its returned venue ID and cleans up independently.",
+    "actual": "20/20 native API integration methods pass, including caller-scoped inbox paging/read/clear/target/preferences, scheduler recipient/cadence and current organiser organisation revocation/restoration.",
+    "execution_evidence": "20 Oct 2026; npm run test:integration; /tmp/sg69-followup-integration.log. Real Express and production caller-JWT Supabase adapter use disposable PostgreSQL17/PostgREST12.2.12 with all57 migrations. Startup waits for the final TCP listener to avoid the image bootstrap-server shutdown race. Dedicated fixture IDs and cleanup remain independent of identity sequence state.",
     "id": "SG2-69-API01",
     "title": "JWT-scoped inbox across Express, PostgREST and PostgreSQL",
     "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
@@ -7369,6 +7369,104 @@
     "data": "Dedicated SG2-69 venue and assigned event created by this case; synthetic users from integration/seed.sql; event and venue removed in finally. No fixed global venue ID.",
     "expected": "Production HTTP and JWT/RPC contracts agree with database state; cleanup succeeds and no hosted URL or secrets are used.",
     "evidence": "integration/api.test.ts; server/src/notifications/index.ts; server/src/db/notificationInbox.ts",
+    "layer": "Native API + PostgREST + PostgreSQL"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SMOKE-INBOX-01",
+    "title": "Notification inbox fast smoke gate on a phone",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC3",
+      "SG2-69:AC4"
+    ],
+    "purpose": "Protect the dedicated smoke CI job with the built notification-to-assigned-work and clear-all flow.",
+    "preconditions": "Built production React app and real Express on loopback with isolated, resettable providers; no hosted data.",
+    "steps": [
+      "Seed the inbox and sign in coordinator at390px; assert2 unread notices.",
+      "Open the reminder, verify badge1 and event691, follow View event details into the assigned Event request article and its Edit Planning Information action.",
+      "Clear all; assert badge0, three read notices, disabled clear action and unchanged other-recipient read_at. Reload and reopen; retain read state and exclude the private notice.",
+      "Assert no horizontal overflow or browser errors and attach assigned-work and cleared-inbox screenshots."
+    ],
+    "data": "Coordinator synthetic account; event691, eventnotice1 and holdnotice1, private notice90.",
+    "expected": "Badge2 to1 to0, real assigned work opens, clearing persists across reload and affects only the signed-in recipient; mobile layout fits.",
+    "actual": "Passed in the separate smoke gate (8/8) and complete browser suite (133/133).",
+    "execution_evidence": "20 Oct2026; npm run test:smoke and npm run test:e2e; /tmp/sg69-followup-smoke.log and /tmp/sg69-followup-browser.log. Passing smoke screenshots, video and trace are retained by the smoke job.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Dedicated Playwright smoke + fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-R01",
+    "title": "Loaded history reconciles a second session read on focus",
+    "type": "NORMAL / CONFLICT",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3"
+    ],
+    "purpose": "Prevent unread staleness, history truncation, duplication or reordering when refreshing pages already loaded by the user.",
+    "preconditions": "Built app and real routes on loopback; large synthetic inbox and two authenticated coordinator sessions.",
+    "steps": [
+      "Seed54 own rows with53 unread; open inbox and load older rows. Save the exact54-message order.",
+      "Sign into a second same-user session through the real login route and mark older eventnotice3 read; assert API unread52.",
+      "Focus the first browser. Assert badge52, Read:Earlier notice3, all54 rows in the original exact order,52 unread and2 read, no duplicate messages or extra next-page button.",
+      "Verify private-recipient notice is absent and unrelated holdnotice1 remains unread."
+    ],
+    "data": "54 own source/ID rows, eventnotice3 on the second page; second authenticated session uses production read endpoint.",
+    "expected": "Cross-session read state refreshes atomically across the loaded page depth while every older row and its ordering remain intact.",
+    "actual": "Passed within133/133 full browser regressions; no retries/skips.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-followup-browser.log.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright regression + real fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-API02",
+    "title": "Organiser target access follows current organisation",
+    "type": "NORMAL / CONFLICT",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Verify real API-to-SQL recipient and current-organisation checks with an unchanged caller JWT.",
+    "preconditions": "Disposable PostgreSQL17/PostgREST12.2.12; committed migrations and synthetic authfixture; production router and caller-JWT adapter.",
+    "steps": [
+      "Create an approved event and two recipient notices with returned IDs. Fetch organiser-owned target; assert exactly four permitted fields and exact event/name/status/date instant.",
+      "Attempt to fetch and mark the coordinator notice as organiser; expect404.",
+      "Change the organiser current organisation in real PostgreSQL. With the same JWT, target becomes404; own historical notice can still be marked read with a finite timestamp and repeated response unchanged.",
+      "Read stored receipts; own timestamp matches exactly and other recipient stays unread. Restore organisation; target returns the identical minimal summary.",
+      "Finally restore user/config/fetch and delete the dedicated event/notice fixtures."
+    ],
+    "data": "Synthetic organiser and coordinator UUIDs; dedicated event and notices, no global fixed event/venue IDs.",
+    "expected": "Current organisation revokes/restores event-summary access independently of historical notice ownership; no cross-recipient writes and no extra fields.",
+    "actual": "20/20 native integration methods pass, including this case.",
+    "execution_evidence": "20 Oct2026; npm run test:integration; /tmp/sg69-followup-integration.log. Production Express/Supabase adapter and real PostgREST/SQL, no hosted URL.",
+    "evidence": "integration/api.test.ts",
     "layer": "Native API + PostgREST + PostgreSQL"
   }
 ]

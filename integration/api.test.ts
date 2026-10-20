@@ -596,6 +596,80 @@ test('[NORMAL] [SG2-41:AC2] [SG2-41:AC3] native venue and equipment request proj
   }
 });
 
+test('[NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC7] an organiser notification target follows current organisation while historical read receipts remain owned and idempotent', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const organiser = await database.from('users').select('organisation').eq('user_id', ids.organiser).single();
+  assert.equal(organiser.error, null);
+  const originalOrganisation = organiser.data!.organisation;
+  const tokens = Object.fromEntries(['organiser', 'coordinator'].map(who => [who, jwt('authenticated', ids[who])]));
+  const callerAccess = createAuthorization({ resolvePrincipal: async token => {
+    const who = Object.entries(tokens).find(([, value]) => value === token)?.[0];
+    if (!who) throw new AccessError(401);
+    const role = await getAccountRole(database, ids[who]);
+    if (!role.ok) throw new AccessError(403);
+    return { userId: ids[who], role: role.role as Role };
+  } });
+  const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
+  const as = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
+  const eventId = await planned();
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    const inserted = await database.from('notifications').insert([
+      { recipient_id: ids.organiser, event_id: eventId, request_id: null, kind: 'event_approved', message: 'Organisation-scoped organiser approval.', read_at: null },
+      { recipient_id: ids.coordinator, event_id: eventId, request_id: null, kind: 'coordinator_assigned', message: 'Separate coordinator receipt.', read_at: null },
+    ]).select('notification_id,recipient_id');
+    assert.equal(inserted.error, null);
+    const ownId = inserted.data!.find(row => row.recipient_id === ids.organiser)!.notification_id;
+    const otherId = inserted.data!.find(row => row.recipient_id === ids.coordinator)!.notification_id;
+    Object.assign(dbConfig, { supabaseUrl: 'https://notifications-integration.supabase.test', supabaseAnonKey: jwt('anon') });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://notifications-integration.supabase.test') {
+        assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`), 'Every inbox RPC carries its caller JWT.');
+        url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const target = () => callerApi.get(`/api/notifications/event/${ownId}/event`).set(as('organiser'));
+    const initial = await target();
+    assert.equal(initial.status, 200, JSON.stringify(initial.body));
+    assert.deepEqual(Object.keys(initial.body.event).sort(), ['event_id', 'name', 'proposed_date', 'status']);
+    const { proposed_date: proposedDate, ...summary } = initial.body.event;
+    assert.deepEqual(summary, { event_id: eventId, name: values.name, status: 'approved' });
+    assert.equal(Date.parse(proposedDate), Date.parse(values.proposed_date), 'The minimal target retains the event date instant across PostgreSQL timestamp formatting.');
+    assert.equal((await callerApi.get(`/api/notifications/event/${otherId}/event`).set(as('organiser'))).status, 404);
+    assert.equal((await callerApi.post(`/api/notifications/event/${otherId}/read`).set(as('organiser'))).status, 404);
+
+    assert.equal((await database.from('users').update({ organisation: 'A different integration organisation' }).eq('user_id', ids.organiser)).error, null);
+    assert.equal((await target()).status, 404, 'Current organisation is checked again even when the JWT and historical notice are unchanged.');
+    const read = await callerApi.post(`/api/notifications/event/${ownId}/read`).set(as('organiser'));
+    assert.equal(read.status, 200, JSON.stringify(read.body));
+    assert.equal(read.body.notification.notification_id, ownId);
+    assert.equal(read.body.notification.source, 'event');
+    assert.ok(Number.isFinite(Date.parse(read.body.notification.read_at)), 'An owned historical notice still receives its read receipt.');
+    const repeated = await callerApi.post(`/api/notifications/event/${ownId}/read`).set(as('organiser'));
+    assert.equal(repeated.status, 200, JSON.stringify(repeated.body));
+    assert.deepEqual(repeated.body, read.body, 'Repeated opening preserves the first read timestamp and unread count.');
+    const receipts = await database.from('notifications').select('notification_id,read_at').in('notification_id', [ownId, otherId]);
+    assert.equal(receipts.error, null);
+    assert.equal(receipts.data!.find(row => row.notification_id === ownId)!.read_at, read.body.notification.read_at);
+    assert.equal(receipts.data!.find(row => row.notification_id === otherId)!.read_at, null, 'Denied cross-recipient reads never mark the coordinator notice.');
+
+    assert.equal((await database.from('users').update({ organisation: originalOrganisation }).eq('user_id', ids.organiser)).error, null);
+    const restored = await target();
+    assert.equal(restored.status, 200, JSON.stringify(restored.body));
+    assert.deepEqual(restored.body, initial.body, 'Restoring the current organisation restores only the permitted minimal event summary.');
+  } finally {
+    transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
+    const restored = await database.from('users').update({ organisation: originalOrganisation }).eq('user_id', ids.organiser);
+    const removed = await database.from('events').delete().eq('event_id', eventId);
+    assert.equal(restored.error, null);
+    assert.equal(removed.error, null);
+  }
+});
+
 test('[NORMAL] [FAILURE] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] native capacity discovery and approval are Venue Staff only, resolve real joins and record approval without deciding the booking', async () => {
   const ownEvent = await planned();
   const otherEvent = await planned();

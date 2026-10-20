@@ -123,3 +123,37 @@ test('SG2-69-F01 | [FAILURE] [SG2-69:AC1] [SG2-69:AC3] an unavailable read mutat
   await expect(page.getByRole('heading', { name: 'Reminder Forum', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Notifications (1)', exact: true })).toBeVisible();
 });
+
+test('SG2-69-R01 | [NORMAL] [CONFLICT] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] a focus refresh reconciles another session read without losing or duplicating loaded history', async ({ page, request }) => {
+  expect((await request.post('/__e2e/notification-inbox', { data: { large: true } })).status()).toBe(204);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Notifications (53)', exact: true }).click();
+  const drawer = inbox(page);
+  await drawer.getByRole('button', { name: 'Load older notifications', exact: true }).click();
+  const rows = drawer.getByRole('button', { name: /^(Unread|Read):/ });
+  await expect(rows).toHaveCount(54);
+  const orderedMessages = () => rows.evaluateAll(elements => elements.map(element => element.getAttribute('aria-label')!.replace(/^(Unread|Read): /, '')));
+  const originalOrder = await orderedMessages();
+  await expect(drawer.getByRole('button', { name: 'Unread: Earlier notice 3', exact: true })).toBeVisible();
+  // A second authenticated session uses the same real read route, rather than
+  // modifying the first page's component state or database fixture directly.
+  const login = await request.post('/api/auth/login', { data: { email: 'coordinator@example.test', password: 'Regression123!' } });
+  expect(login.status()).toBe(200);
+  const headers = { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  const marked = await request.post('/api/notifications/event/3/read', { headers });
+  expect(marked.status()).toBe(200);
+  expect((await marked.json()).unread_count).toBe(52);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.getByRole('button', { name: 'Notifications (52)', exact: true })).toBeVisible();
+  await expect(drawer.getByRole('button', { name: 'Read: Earlier notice 3', exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(54);
+  expect(await orderedMessages()).toEqual(originalOrder);
+  expect(new Set(await orderedMessages()).size).toBe(54);
+  await expect(drawer.getByRole('button', { name: /^Unread:/ })).toHaveCount(52);
+  await expect(drawer.getByRole('button', { name: /^Read:/ })).toHaveCount(2);
+  await expect(drawer.getByRole('button', { name: 'Load older notifications', exact: true })).toHaveCount(0);
+  await expect(drawer.getByText('Private other organisation notice.', { exact: true })).toHaveCount(0);
+  const stored = await ledger(page);
+  expect(stored.notifications.find((row: { notification_id: number }) => row.notification_id === 3).read_at).toEqual(expect.any(String));
+  expect(stored.holds[0].read_at).toBeNull();
+});

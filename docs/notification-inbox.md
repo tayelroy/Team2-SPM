@@ -107,6 +107,14 @@ Validation is split across public seams:
 - `e2e/notification-inbox.spec.ts` drives the built app and real handlers with
   isolated storage at 1440px and 390px. Its reminder notice is seeded; scheduler
   correctness is proved by the native tests, not that browser fixture.
+- `e2e/smoke.spec.ts` includes `SMOKE-INBOX-01` in the separate smoke CI job:
+  open an unread notice, reach assigned event work, clear both notice sources,
+  and retain read state after reload at phone width.
+- `SG2-69-R01` refreshes two loaded inbox pages after a second authenticated
+  session reads an older notice. Exact history order and all 54 rows remain.
+- Native API case `SG2-69-API02` changes the organiser's current organisation in
+  disposable PostgreSQL and proves target access is revoked and restored while
+  historical read receipts remain owned and idempotent.
 
 The method inventory and regression register hold execution evidence. Independent
 teammate review remains required before merge; automated checks are not peer sign-off.
