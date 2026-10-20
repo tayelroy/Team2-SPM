@@ -42,10 +42,10 @@ where name = 'Demo · Atrium Hall';
 -- requests. Uses the first seeded organiser and coordinator accounts; skipped
 -- if either is missing.
 insert into public.events (organiser_id, coordinator_id, organisation, name, purpose, proposed_date,
-  expected_attendance, venue_requirements, accessibility_needs, status)
+  expected_attendance, venue_requirements, accessibility_needs, status, category)
 select organiser.user_id, coordinator.user_id, u.organisation, 'Demo · Suitability Forum',
   'Try venue suitability warnings', '2026-11-12T01:00:00+00', 150,
-  'A stage, a projector and a PA system', 'Step-free entry and a hearing loop', 'approved'
+  'A stage, a projector and a PA system', 'Step-free entry and a hearing loop', 'approved', 'conference'
 from (select user_id from public.account_roles where role = 'event_organiser' order by user_id limit 1) organiser
 cross join (select user_id from public.account_roles where role = 'event_coordinator' order by user_id limit 1) coordinator
 join public.users u on u.user_id = organiser.user_id;

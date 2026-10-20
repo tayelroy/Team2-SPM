@@ -244,6 +244,8 @@ end $$;
 do $$
 declare state public.event_status; result jsonb;
 begin
+ -- SG2-70: the loop passes through draft to submitted, which needs a category.
+ update public.events set category='conference' where event_id=95873;
  foreach state in array (select array_agg(s) from unnest(enum_range(null::public.event_status)) s where s <> 'preparation') loop
   update public.events set status=state,
    decision_reason=case when state='rejected' then 'Not suitable' end,

@@ -76,7 +76,8 @@ begin
    raise exception '[SG2-40:draft-blank-membership] [BOUNDARY] [SG2-26:AC2] Unicode blank membership must not authorize a save';
  end if;
  update public.users set organisation='Draft audit A' where user_id=actor;
- update public.events set status='submitted' where event_id=94091;
+ -- SG2-70: a request needs a category before it can leave draft.
+ update public.events set status='submitted', category='other' where event_id=94091;
  if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' <> 'not_editable'
      or (select count(*) from public.event_audit_logs where event_id=94091) <> before_count then
    raise exception '[SG2-40:draft-stale-status] [CONFLICT] [SG2-30:AC3] [SG2-40:AC2] A status change before the locked write must refuse the stale edit without history';

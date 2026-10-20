@@ -8,7 +8,7 @@ declare
   failures text[];
 begin
   with required_columns(relation, columns) as (values
-    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,registration_capacity,registration_opens_at,registration_closes_at,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
+    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
     ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
