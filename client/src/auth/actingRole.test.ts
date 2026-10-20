@@ -23,6 +23,14 @@ test('[FAILURE] [SG2-104:AC2] no acting role is sent to another site, without a 
   expect(withActingRole('/api/x', { headers: { Authorization: 'Bearer tok-1' } })).toEqual({ headers: { Authorization: 'Bearer tok-1' } });
 });
 
+test('[BOUNDARY] [SG2-104:AC4] a single-role session sends no acting role, so a role changed by an administrator applies on the next call', () => {
+  for (const roles of [['Event Organiser'], undefined]) {
+    saveSession({ accessToken: 'tok-1', user: { userId: 'u1', email: 'a@b.c', role: 'Event Organiser', roles } });
+    const init = withActingRole('/api/auth/me', { headers: { Authorization: 'Bearer tok-1' } });
+    expect(new Headers(init?.headers).has('X-Acting-Role')).toBe(false);
+  }
+});
+
 test('[NORMAL] [SG2-104:AC1] the installed hook adds the header to every fetch', async () => {
   signedIn('Event Coordinator');
   const original = vi.fn().mockResolvedValue(new Response('{}'));

@@ -244,7 +244,7 @@ begin
     raise exception '[SG2-104:requirements-as-coordinator] [SG2-104:AC1] [NORMAL] Acting as the assigned coordinator must request equipment: %', result;
   end if;
   result := public.confirm_event(104004);
-  if result ->> 'outcome' not in ('ok', 'outstanding') then
+  if result ->> 'outcome' is distinct from 'outstanding' or result -> 'outstanding' <> '["venue"]'::jsonb then
     raise exception '[SG2-104:confirm-as-coordinator] [SG2-104:AC1] [NORMAL] Acting as the assigned coordinator must reach the confirmation check: %', result;
   end if;
 end $$;

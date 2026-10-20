@@ -12,13 +12,13 @@ import { createApp } from './app';
 // changed, no match is missing, and a database error is passed on.
 function fakeAdmin(options: {
   update?: (payload: any) => Promise<{ data: any; error: { message: string } | null }>;
-  captureTarget?: (column: string, userId: string) => void;
+  captureTarget?: (userId: string) => void;
 }): SupabaseClient {
   return {
     rpc: async (name: string, args: any) => {
       assert.equal(name, 'change_account_roles');
       assert.equal(args.p_action, 'replace');
-      options.captureTarget?.('user_id', args.p_target_id);
+      options.captureTarget?.(args.p_target_id);
       const answer = options.update ? await options.update({ role: args.p_role }) : { data: [{ user_id: 'target-1' }], error: null };
       if (answer.error) return { data: null, error: answer.error };
       return { data: answer.data.length ? { outcome: 'changed', roles: [args.p_role] } : { outcome: 'missing' }, error: null };
@@ -45,7 +45,7 @@ describe('PATCH /api/users/:userId/role', () => {
     let updatePayload: any;
     let target: unknown;
     const app = buildApp({
-      captureTarget: (column, userId) => { target = { column, userId }; },
+      captureTarget: (userId) => { target = userId; },
       update: async (payload) => {
         updatePayload = payload;
         return { data: [{ user_id: 'target-1' }], error: null };
@@ -55,7 +55,7 @@ describe('PATCH /api/users/:userId/role', () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, { message: 'Role updated.', roles: [displayRole] });
     assert.deepEqual(updatePayload, { role: storedRole });
-    assert.deepEqual(target, { column: 'user_id', userId: 'target-1' });
+    assert.equal(target, 'target-1');
   });
 
   test('[FAILURE] [SG2-24:AC1] requires a target role in the body', async () => {
