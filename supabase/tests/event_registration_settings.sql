@@ -123,7 +123,11 @@ begin
         and old_value = '150' and new_value = '151') then
     raise exception '[SG2-63:settings-history-old] [NORMAL] [SG2-63:AC9] A change keeps the value it replaced';
   end if;
-  if exists(select 1 from public.notifications where event_id = 96301) then
+  -- 96308 is in Planning but inside its window: registration is not open to attendees yet.
+  result := public.update_registration_settings(96308, owner, '{"registration_capacity": 12}', false);
+  if result ->> 'outcome' is distinct from 'ok'
+      or exists(select 1 from public.notifications where event_id in (96301, 96308))
+      or (select registration_announced from public.events where event_id = 96308) is not null then
     raise exception '[SG2-63:planning-no-notice] [BOUNDARY] [SG2-63:AC10] Settings on an unconfirmed event announce nothing';
   end if;
 
@@ -170,6 +174,11 @@ begin
       raise exception '[SG2-63:settings-invalid] [FAILURE] [SG2-63:AC5] % must be refused', invalid;
     end if;
   end loop;
+  -- Open since yesterday, so only the rule that a new closing time is in the future refuses this.
+  if public.update_registration_settings(96302, owner, jsonb_build_object('registration_closes_at',
+      to_jsonb(now() - interval '1 minute')), false) ->> 'outcome' is distinct from 'invalid' then
+    raise exception '[SG2-63:closes-in-past] [BOUNDARY] [SG2-63:AC6] A new closing time already past is refused; closing now is its own action';
+  end if;
   if public.update_registration_settings(96302, owner, '{"registration_capacity": 3}', true) ->> 'outcome' is distinct from 'invalid' then
     raise exception '[SG2-63:close-now-alone] [FAILURE] [SG2-63:AC6] Closing now carries no other change';
   end if;

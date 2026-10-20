@@ -99,6 +99,9 @@ describe('validateRegistrationSchedule (SG2-63)', () => {
     assert.deepEqual(validateRegistrationSchedule(STORED, {
       registration_opens_at: '2030-06-20T01:00:00.000Z', registration_closes_at: '2030-06-21T01:00:00.000Z'
     }, NOW), ['Registration must open before the event starts.', 'Registration must close before the event starts.']);
+    // Closing exactly as the event starts is refused; a millisecond before is not.
+    assert.deepEqual(validateRegistrationSchedule(STORED, { registration_closes_at: '2030-06-20T01:00:00.000Z' }, NOW),
+      ['Registration must close before the event starts.']);
     assert.deepEqual(validateRegistrationSchedule(STORED, { registration_closes_at: '2030-06-20T00:59:59.999Z' }, NOW), []);
   });
 
