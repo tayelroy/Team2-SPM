@@ -23,6 +23,8 @@ export type Screen =
   | 'dashboard'
   | 'events'
   | 'detail'
+  | 'notificationEvent'
+  | 'notificationWork'
   | 'form'
   | 'venues'
   | 'calendar'

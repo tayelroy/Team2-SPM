@@ -457,8 +457,10 @@ function QueueContent({ role, accessToken, selection, onSelect, onFindVenues, on
 
 /** The parent keys this view by signed-in identity so neither a selection nor
  * an in-flight result can carry over to another account. */
-export default function WorkQueue({ role, accessToken, onFindVenues }: { role: InternalRole; accessToken?: string | null; onFindVenues?: FindVenues }) {
-  const [selection, setSelection] = useState<WorkSelection | null>(null);
+export default function WorkQueue({ role, accessToken, onFindVenues, initialSelection }: {
+  role: InternalRole; accessToken?: string | null; onFindVenues?: FindVenues; initialSelection?: WorkSelection;
+}) {
+  const [selection, setSelection] = useState<WorkSelection | null>(initialSelection ?? null);
   const [revision, setRevision] = useState(0);
   return <div className="work-queue">
     <div className="work-queue-heading">

@@ -12,7 +12,7 @@ export interface NotificationRecord {
   event_id: number | null;
   request_id: number | null;
   kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
-    | 'venue_unavailable' | 'event_confirmed' | EventNoticeKind;
+    | 'venue_unavailable' | 'event_confirmed' | 'outstanding_arrangements' | EventNoticeKind;
   message: string;
   created_at: string;
 }

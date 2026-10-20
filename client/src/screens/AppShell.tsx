@@ -7,6 +7,7 @@ import type { Access } from '../auth/access';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
+import type { NotificationSource } from '../api/notificationInboxApi';
 
 /** Slide-over notification panel. */
 function NotificationDrawer({ onClose, notifications }: { onClose: () => void; notifications: Notification[] }) {
@@ -138,10 +139,9 @@ const menuStyle: CSSProperties = {
 
 /**
  * Chrome shared by every signed-in screen: the sticky header with role-scoped
- * navigation, the page heading block, and the notification drawer. The role
- * is a real, server-assigned attribute of the signed-in account — displayed
- * here, not switchable (only Technical Support Staff can change a role, and
- * only for someone else's account; see SG2-24).
+ * navigation, the page heading block, and the notification drawer. Accounts
+ * holding several server-assigned roles can choose which one to act as;
+ * assigning roles remains a Technical Support Staff action (SG2-24).
  */
 export default function AppShell({
   role,
@@ -150,6 +150,7 @@ export default function AppShell({
   onSignOut,
   accessToken,
   access,
+  onOpenNotification,
   roles = [role],
   onSwitchRole,
   children,
@@ -164,6 +165,7 @@ export default function AppShell({
   accessToken?: string;
   /** The account's server permissions; `undefined` while still loading. */
   access?: Access | null;
+  onOpenNotification?: (source: NotificationSource, id: number) => void;
   children: ReactNode;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -260,8 +262,8 @@ export default function AppShell({
             {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released.
                 SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
                 neither has hold notices. */}
-            {accessToken && (internalRole || role === 'Event Organiser' || role === 'Event Coordinator Lead')
-              ? <HoldNotifications key={accessToken} accessToken={accessToken} holds={internalRole} /> : <button
+            {accessToken
+              ? <HoldNotifications key={`${accessToken}:${role}`} accessToken={accessToken} coordinator={role === 'Event Coordinator'} onOpenNotification={onOpenNotification} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
               aria-label={`Notifications (${notifications.length})`}

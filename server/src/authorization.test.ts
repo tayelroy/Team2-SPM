@@ -180,7 +180,7 @@ test('[NORMAL] [SG2-24:AC1] [SG2-25:AC2] production adapter verifies Auth then r
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
   // SG2-27: every role, including attendee, holds the profile grants.
-  assert.deepEqual(res.body, { userId, role: 'attendee', roles: ['attendee'], permissions: ['profile.read', 'profile.update'] });
+  assert.deepEqual(res.body, { userId, role: 'attendee', roles: ['attendee'], permissions: ['notifications.inbox', 'profile.read', 'profile.update'] });
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
@@ -401,6 +401,7 @@ for (const role of ['safety_officer'] as const) {
         'event_request.stage.view',
         'event_request.history.view',
         'venues.operations.read',
+        'notifications.inbox',
         'equipment_requirements.read',
         'safety_checks.read',
         'profile.read',
@@ -419,7 +420,7 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] GET /api/au
     userId, role: 'event_coordinator_lead', roles: ['event_coordinator_lead'],
     permissions: [
       'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view', 'event_request.history.view',
-      'notifications.read', 'profile.read', 'profile.update'
+      'notifications.read', 'notifications.inbox', 'profile.read', 'profile.update'
     ]
   });
   assert.equal(fetchMock.mock.callCount(), 2);
@@ -443,7 +444,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
       'event_request.update', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
       'event_request.confirmation.view', 'event_request.safety_decisions.view',
-      'venues.suitability.view', 'notifications.read', 'profile.read', 'profile.update'
+      'venues.suitability.view', 'notifications.read', 'notifications.inbox', 'profile.read', 'profile.update'
     ],
     event_coordinator: [
       'work_queue.read', 'venues.availability.view', 'event_request.review', 'event_request.planning.update',
@@ -453,23 +454,23 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'event_request.change_request.view', 'event_request.change_request.accept', 'event_request.rechecks.settle',
       'event_request.safety_decisions.view', 'event_request.safety_rework',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
-      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.withdraw', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venue_clashes.view', 'venues.holds.read',
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.withdraw', 'notifications.read', 'notifications.inbox', 'notifications.reminders.manage', 'venue_bookings.view', 'venue_bookings.release', 'venue_clashes.view', 'venues.holds.read',
       'equipment_requirements.read', 'equipment_requirements.request', 'profile.read', 'profile.update'
     ],
     venue_staff: [
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.create', 'venues.update', 'venues.delete', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
-      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release',
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'notifications.inbox', 'venue_bookings.view', 'venue_bookings.release',
       'venue_bookings.by_venue', 'venue_clashes.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
       'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
-      'notifications.read', 'venues.holds.read',
+      'notifications.read', 'notifications.inbox', 'venues.holds.read',
       'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
     ],
-    attendee: ['profile.read', 'profile.update']
+    attendee: ['notifications.inbox', 'profile.read', 'profile.update']
   };
   for (const [role, expected] of Object.entries(EXPECTED)) {
     assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);
@@ -486,6 +487,7 @@ test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1
     'event_request.history.view',
     'venues.operations.read',
     'equipment_requirements.read',
+    'notifications.inbox',
     'safety_checks.read',
     'profile.read',
     'profile.update'
@@ -501,7 +503,7 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] the Event C
     'event_request.queue.view',
     'event_request.stage.view',
     'event_request.history.view',
-    'notifications.read',
+    'notifications.read', 'notifications.inbox',
     'profile.read',
     'profile.update'
   ];
