@@ -238,7 +238,7 @@ allows for the caller's acting role, so a coordinator finds only the events
 assigned to them, the Lead every submitted event, and so on. Drafts are never
 returned. The database checks the acting role itself, so an account that also
 holds an organiser role cannot search while acting as the organiser. Migration
-`202610200003_event_search.sql`; tests `supabase/tests/event_search.sql` and
+`202610200005_event_search.sql`; tests `supabase/tests/event_search.sql` and
 browser journeys `SG2-70-N01` and `SG2-70-N03`.
 
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,

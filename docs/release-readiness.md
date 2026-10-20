@@ -58,7 +58,7 @@ Some stories ship a data script beside their migration. It is not a migration
 and CI never runs it; run it by hand, once, after its migration, on the project
 it names.
 
-- **SG2-70 event categories:** after `202610200003_event_search.sql`, run
+- **SG2-70 event categories:** after `202610200005_event_search.sql`, run
   [`supabase/backfill_event_categories_live.sql`](../supabase/backfill_event_categories_live.sql)
   on the live project. The migration has already given every existing event a
   category inferred from its name; the script replaces those with hand-picked
