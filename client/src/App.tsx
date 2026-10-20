@@ -15,6 +15,9 @@ import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
 import EquipmentDesk from './screens/EquipmentDesk';
 import EventDetail from './screens/EventDetail';
+import NotificationEvent from './screens/NotificationEvent';
+import WorkQueue from './screens/WorkQueue';
+import type { NotificationSource } from './api/notificationInboxApi';
 import EventsTable from './screens/EventsTable';
 import Landing from './screens/Landing';
 import Login from './screens/Login';
@@ -69,6 +72,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
   const [logoutState, setLogoutState] = useState<'pending' | 'failed' | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>(undefined);
+  const [notificationTarget, setNotificationTarget] = useState<{ source: NotificationSource; id: number } | null>(null);
   // The draft "My drafts" → Edit currently has open, if any (SG2-29).
   const [editingRequest, setEditingRequest] = useState<EventRequestDraft | null>(null);
   // The approved event venue search was opened from, if any (SG2-46).
@@ -169,6 +173,13 @@ export default function App() {
   const access = loadedAccess?.token === session!.accessToken ? loadedAccess.access : undefined;
 
   const body = {
+    notificationWork: <WorkQueue key={`${session!.accessToken}:${selectedEventId}`} role="Event Coordinator"
+      accessToken={session!.accessToken} initialSelection={{ kind: 'event', item_id: selectedEventId! }}
+      onFindVenues={prefill => { setVenuePrefill(prefill); setScreen('search'); }} />,
+    notificationEvent: notificationTarget && <NotificationEvent accessToken={session!.accessToken}
+      source={notificationTarget.source} notificationId={notificationTarget.id}
+      onViewEvent={role === 'Event Organiser' || role === 'Event Coordinator'
+        ? id => { setSelectedEventId(id); setScreen(role === 'Event Coordinator' ? 'notificationWork' : 'detail'); } : undefined} />,
     dashboard: (
       <Dashboard
         role={role}
@@ -260,7 +271,8 @@ export default function App() {
   }[screen];
 
   return (
-    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} access={access} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
+    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} access={access} screen={screen} onSignOut={handleSignOut}
+      onOpenNotification={(source, id) => { setNotificationTarget({ source, id }); setScreen('notificationEvent'); }} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event,
       // and the safety check list at the top (SG2-91).
       setVenuePrefill(null);

@@ -7,7 +7,7 @@ import { formatSgt } from './searchApi';
 import Dashboard from '../screens/Dashboard';
 import HoldNotifications from '../components/HoldNotifications';
 import * as notices from '../api/notificationsApi';
-import * as holds from './holdNotificationsApi';
+import * as inbox from '../api/notificationInboxApi';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -100,9 +100,8 @@ test.each([['Venue Staff', true], ['Event Coordinator', true], ['Technical Suppo
   });
 
 test('[NORMAL] [SG2-79:AC4] the coordinator\'s notifications show a flagged clash', async () => {
-  vi.spyOn(holds, 'loadHoldNotifications').mockResolvedValue({ ok: true, notifications: [] });
-  vi.spyOn(notices, 'loadNotifications').mockResolvedValue({ ok: true, notifications: [{ notification_id: 5, event_id: 7, request_id: null,
-    kind: 'venue_booking_clash', message: 'Clash Hall: Morning Summit now clashes with another event.', created_at: '2030-01-01T00:00:00.000Z' }] });
+  vi.spyOn(inbox, 'loadNotificationInbox').mockResolvedValue({ ok: true, value: { notifications: [{ source: 'event', notification_id: 5, event_id: 7, read_at: null,
+    kind: 'venue_booking_clash', message: 'Clash Hall: Morning Summit now clashes with another event.', created_at: '2030-01-01T00:00:00.000Z' }], unread_count: 1, next_cursor: null } });
   render(<HoldNotifications accessToken="token" />);
   (await screen.findByRole('button', { name: 'Notifications (1)' })).click();
   expect(await screen.findByText('Booking clash flagged')).toBeVisible();

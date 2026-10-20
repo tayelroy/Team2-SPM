@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import Dashboard from './Dashboard';
+import WorkQueue from './WorkQueue';
 import type { WorkItem } from '../api/workQueue';
 import EquipmentRequirements from '../components/EquipmentRequirements';
 
@@ -869,4 +870,23 @@ test('[FAILURE] [SG2-58:AC1] confirmation is never offered on someone else\'s ev
     expect(screen.queryByRole('button', { name: 'Confirm event' })).not.toBeInTheDocument();
     cleanup();
   }
+});
+
+test('[NORMAL] [SG2-69:AC3] a notification focuses its assigned coordinator event through the existing work queue detail endpoint', async () => {
+  const item = { ...review, assigned_to_me: true };
+  const fetch = vi.fn(async (url: string) => Response.json(url === '/api/work-queue/event/12' ? { items: [item] } : { items: [] }));
+  vi.stubGlobal('fetch', fetch);
+  render(<WorkQueue role="Event Coordinator" accessToken="token" initialSelection={{ kind: 'event', item_id: 12 }} />);
+  expect(await screen.findByRole('heading', { name: 'Leadership Forum' })).toBeVisible();
+  expect(screen.getByRole('region', { name: 'Decide this request' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Edit Planning Information' })).toBeVisible();
+  expect(fetch).toHaveBeenCalledWith('/api/work-queue/event/12', { headers: { Authorization: 'Bearer token' }, cache: 'no-store' });
+  expect(fetch).not.toHaveBeenCalledWith('/api/event-requests/12', expect.anything());
+});
+
+test('[FAILURE] [SG2-69:AC3] a reassigned notification target cannot show coordinator work detail after the queue rejects it', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+  render(<WorkQueue role="Event Coordinator" accessToken="token" initialSelection={{ kind: 'event', item_id: 12 }} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('This item is no longer in your work queue.');
+  expect(screen.queryByRole('article')).not.toBeInTheDocument();
 });

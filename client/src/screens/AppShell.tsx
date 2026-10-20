@@ -7,6 +7,7 @@ import type { Access } from '../auth/access';
 import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
+import type { NotificationSource } from '../api/notificationInboxApi';
 
 /** Slide-over notification panel. */
 function NotificationDrawer({ onClose, notifications }: { onClose: () => void; notifications: Notification[] }) {
@@ -150,6 +151,7 @@ export default function AppShell({
   onSignOut,
   accessToken,
   access,
+  onOpenNotification,
   children,
 }: {
   role: Role;
@@ -159,6 +161,7 @@ export default function AppShell({
   accessToken?: string;
   /** The account's server permissions; `undefined` while still loading. */
   access?: Access | null;
+  onOpenNotification?: (source: NotificationSource, id: number) => void;
   children: ReactNode;
 }) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -255,8 +258,8 @@ export default function AppShell({
             {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released.
                 SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
                 neither has hold notices. */}
-            {accessToken && (internalRole || role === 'Event Organiser' || role === 'Event Coordinator Lead')
-              ? <HoldNotifications key={accessToken} accessToken={accessToken} holds={internalRole} /> : <button
+            {accessToken
+              ? <HoldNotifications key={accessToken} accessToken={accessToken} coordinator={role === 'Event Coordinator'} onOpenNotification={onOpenNotification} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
               aria-label={`Notifications (${notifications.length})`}

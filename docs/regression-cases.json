@@ -7102,5 +7102,273 @@
     "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
+    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "id": "SG2-69-P01",
+    "title": "Unread badge, ordered merged inbox and safe event opening",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3"
+    ],
+    "purpose": "Prove read state changes only the chosen source/ID and survives a reload.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Seed two unread notices (event:1 and hold:1) and one read notice, plus another recipient notice.",
+      "Sign in as coordinator at 1440px. Open Notifications (2); assert exact newest-first source identities and read/unread counts.",
+      "Open the outstanding-arrangements notice. Assert event691 summary and badge1; use View event details and assert the real assigned WorkQueue article and Edit Planning Information action, with no session-expired error. Inspect only event:1 gained a timestamp and hold:1 is still unread.",
+      "Reload and reopen; assert unread1, original read timestamp unchanged, no other-organisation notice, no page/console errors or horizontal overflow."
+    ],
+    "data": "Reminder Forum event691; event notice1, read eventnotice2, holdnotice1; another recipient eventnotice90.",
+    "expected": "Exact three-row order; event691 summary then authorised coordinator workflow; badge2→1; only own event:1 changed; reload retains state.",
+    "evidence": "e2e/notification-inbox.spec.ts; docs/notification-inbox.md",
+    "layer": "Playwright browser + fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
+    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "id": "SG2-69-B01",
+    "title": "All-page unread total and clearing both inbox sources at phone width",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC4"
+    ],
+    "purpose": "Verify counts and clear-all cover unloaded rows and tied-time pagination.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Seed54 own rows with53 unread, including51 earlier tied-time rows, plus another person’s unread row.",
+      "Sign in at390px. Badge53 exceeds first50. Load older; assert earliest row3 appears and53 unread rows are visible.",
+      "Mark all read, inspect54 own read timestamps and unchanged other recipient state, reload and retain badge0; verify no horizontal overflow."
+    ],
+    "data": "54 ownrows, 53 unread, tiedtime earlierIDs3–53 and repeated sourceID1.",
+    "expected": "Badge53→0 and54 ownrows read; other person unread; no lost/duplicate cursor pages or overflow.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
+    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "id": "SG2-69-P02",
+    "title": "Default daily reminder setting and saved thirty-day boundary",
+    "type": "NORMAL / BOUNDARY",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC5",
+      "SG2-69:AC6"
+    ],
+    "purpose": "Prove preference save and reload use the real HTTP route.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Open coordinator inbox; assert default1 day.",
+      "Set30, save and assert success plus exact persisted current-user preference.",
+      "Reload; reopen and assert30 remains."
+    ],
+    "data": "Coordinator user-coordinator, frequency1 default and30 maximum.",
+    "expected": "One exact current-user setting30; reload displays30. This browser case seeds a reminder; it does not prove scheduler delivery.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
+    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "id": "SG2-69-N01",
+    "title": "Recipient and coordinator-setting isolation",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Prove another account cannot read or mutate a coordinator notice/settings.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "As other organiser, POST event:1/read and GET event:1/event; expect404.",
+      "PUT coordinator frequency as organiser; expect403. Mark all only own notices.",
+      "Inspect coordinator event/hold unread state unchanged and no settings created; sign in attendee and verify an empty real inbox with no reminder preference editor."
+    ],
+    "data": "Other organiser own notice90; coordinatornotice1 and holdnotice1; attendee account.",
+    "expected": "404/403 without cross-account writes; attendee empty inbox and no preference control.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "131/131 complete browser regressions pass on the finished build, including all5 SG2-69 journeys and actual coordinator WorkQueue navigation. Production React and real Express use isolated identity/storage at1440px/390px.",
+    "execution_evidence": "20 Oct 2026; npm run ci (1661server/1701client, 100%per-file coverage) and npm run test:e2e (131/131,13report-gate checks and requiredSG2-26 cases pass); /tmp/sg69-verified-ci.log and /tmp/sg69-verified-browser.log. In-app browser verified read/open/mark-all/preferences and coordinator workflow, no console errors or overflow at1440px/390px; screenshots /tmp/sg69-desktop-inbox.png, /tmp/sg69-mobile-inbox.png, /tmp/sg69-mobile-event-work.png. Hosted deployment remains unverified.",
+    "id": "SG2-69-F01",
+    "title": "Failed read retains unread state and supports retry",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC3"
+    ],
+    "purpose": "Verify failure feedback does not pretend a notice was handled.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Intercept only event:1/read with503 in the isolated browser.",
+      "Open reminder row; assert visible alert, drawer and badge2 unchanged, stored read_at null.",
+      "Remove failure; retry. Assert event691 opens and badge1."
+    ],
+    "data": "One controlled HTTP503 for the read mutation, then real route success.",
+    "expected": "No optimistic unread loss on503; successful retry marks read and opens correct event.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "All 57 migrations and 36 non-upgrade SQL suites pass in disposable PostgreSQL17, including the 67 SG2-69 assertion contracts; 22 release-readiness checks pass.",
+    "execution_evidence": "20 Oct 2026; native Docker postgres:17; supabase/tests/notification_inbox_reminders.sql; /tmp/sg69-all-sql.log and /tmp/sg69-sql-tests.log. Actual hosted pg_cron registration remains a deployment prerequisite.",
+    "id": "SG2-69-DB01",
+    "title": "Native read-state, cursor, recipient and scheduled reminder contracts",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC5",
+      "SG2-69:AC6",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Check SQL authorization, exact unread state and scheduler cadence with real database rows.",
+    "preconditions": "Disposable PostgreSQL17 with all committed migrations. Hosted database untouched.",
+    "steps": [
+      "Replay authfixture and all migrations; execute notification_inbox_reminders.sql in a rolled-back transaction.",
+      "Assert source collisions, cursor ties, older-page count, mark-one idempotence and mark-all snapshot semantics.",
+      "Assert current recipient/event relationships, role checks, preference1..30 boundaries, private receipts and denied direct scheduler execution.",
+      "Assert outstanding venue/equipment/registration and recheck readiness, default/configured cadence, new assignment, fully ready/terminal/past suppression and no unrelated recipients."
+    ],
+    "data": "Synthetic users/roles/events/notices/arrangements in disposable PostgreSQL17.",
+    "expected": "Every tagged SQL assertion passes; no application user can edit another recipient or invoke private delivery helpers.",
+    "evidence": "supabase/tests/notification_inbox_reminders.sql; supabase/migrations/202610200002_notifications_inbox_reminders.sql",
+    "layer": "Native PostgreSQL contracts"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "All 8 native multi-session races pass, including competing sweeps, cancellation, reassignment, completed arrangements, revoked role, clear-all arrival snapshot, idempotent concurrent read and notice/cadence rollback.",
+    "execution_evidence": "20 Oct 2026; .github/scripts/test-notification-reminders-concurrency.mjs; disposable PostgreSQL17, /tmp/sg69-concurrency.log; fixture cleanup complete.",
+    "id": "SG2-69-CONC01",
+    "title": "Reminder, lifecycle and read-receipt races",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC5",
+      "SG2-69:AC6",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Verify competing real SQL transactions preserve recipients and delivery/read receipts.",
+    "preconditions": "Disposable PostgreSQL17 with committed migrations; synthetic fixtures only.",
+    "steps": [
+      "Run test-notification-reminders-concurrency.mjs with a disposable POSTGRES_CONTAINER.",
+      "Observe lock waits while sweeps compete and while cancellation/reassignment/readiness/role changes hold locks.",
+      "Check a new notice arriving after mark-all snapshot stays unread, concurrent read keeps its first timestamp, and a delivery failure rolls back notice and receipt together."
+    ],
+    "data": "Eight isolated multi-session PostgreSQL races; synthetic IDs and rollback/cleanup.",
+    "expected": "At most one eligible delivery; none to stale/unrelated roles or terminal/ready events; atomic receipts; new arrivals remain unread.",
+    "evidence": ".github/scripts/test-notification-reminders-concurrency.mjs",
+    "layer": "Native PostgreSQL concurrency"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "19/19 native API integration tests pass, including caller-scoped inbox paging/read/clear/target/preferences and scheduler recipient/cadence contracts.",
+    "execution_evidence": "20 Oct 2026; npm run test:integration via /tmp/sg69-run-api.mjs; real Express and production Supabase adapter, disposable PostgreSQL17/PostgREST12.2.12; /tmp/sg69-native-api.log.",
+    "id": "SG2-69-API01",
+    "title": "JWT-scoped inbox across Express, PostgREST and PostgreSQL",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC5",
+      "SG2-69:AC6",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Check that the production adapter reaches the actual guarded SQL RPCs.",
+    "preconditions": "All migrations applied in disposable Docker containers, controlled authfixture, production Express/Supabase adapter.",
+    "steps": [
+      "Run npm run test:integration against disposable PostgreSQL17 and PostgREST12.2.12.",
+      "Exercise new notification routes with caller JWTs, exact read/count/target/preferences responses and denied unrelated access.",
+      "Check scheduler-generated reminder contents/cadence and resulting unread receipt behavior through the production API seam."
+    ],
+    "data": "Integration synthetic users/events from integration/seed.sql plus test-local transactional fixtures.",
+    "expected": "Production HTTP and JWT/RPC contracts agree with database state; cleanup succeeds and no hosted URL or secrets are used.",
+    "evidence": "integration/api.test.ts; server/src/notifications/index.ts; server/src/db/notificationInbox.ts",
+    "layer": "Native API + PostgREST + PostgreSQL"
   }
 ]

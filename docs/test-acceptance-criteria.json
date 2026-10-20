@@ -726,7 +726,9 @@
     {
       "id": "SG2-81",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-81",
-      "originalPullRequests": ["https://github.com/tayelroy/Team2-SPM/pull/92"],
+      "originalPullRequests": [
+        "https://github.com/tayelroy/Team2-SPM/pull/92"
+      ],
       "sourceReadDate": "2026-10-15",
       "acceptanceCriteria": {
         "AC1": "Given a booking for an event I coordinate that is affected by venue unavailability, I am notified with the venue, the period and the reason",
@@ -776,6 +778,21 @@
         "AC4": "On Reject, the event is shown as Safety Rejected, cannot move on to Preparation, and goes back to Planning so the coordinator can rework the arrangements and resubmit them for a new check (the status flow allows safety_rejected → planning)",
         "AC5": "The assigned Event Coordinator and the Event Organiser are notified of the decision and its reason",
         "AC6": "Each decision is recorded with who made it, when, and the reason"
+      }
+    },
+    {
+      "id": "SG2-69",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-69",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Unread notifications are countable at a glance from anywhere in the system",
+        "AC2": "The notification list shows newest first, and distinguishes read from unread",
+        "AC3": "Opening a notification takes me to the event it concerns and marks it read",
+        "AC4": "Can clear the unread state for everything at once",
+        "AC5": "As an Event Coordinator, I receive reminders for each upcoming event I coordinate that still has outstanding arrangements (SG2-57), listing what is outstanding",
+        "AC6": "I can set how often these reminders come (daily by default); they stop once every arrangement is ready, or the event is cancelled or completed",
+        "AC7": "Users unrelated to the event receive no reminders"
       }
     }
   ]

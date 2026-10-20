@@ -197,6 +197,8 @@ export const HEAD: Record<
 
 /** Screens whose heading is fixed. The dashboard's comes from HEAD instead. */
 export const PAGE_TITLE: Record<ContentScreen, string> = {
+  notificationEvent: 'Notification event',
+  notificationWork: 'Event work queue',
   events: 'All events',
   detail: 'Event detail',
   form: 'Event request',
@@ -217,6 +219,8 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
+  notificationEvent: 'The event linked to your notification and its current status.',
+  notificationWork: 'Work through the arrangements for the event you coordinate.',
   events:
     'Every event you have access to, with its current status in plain language.',
   detail: 'Full request, activity trail, and the actions available to you.',

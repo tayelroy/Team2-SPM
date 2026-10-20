@@ -59,6 +59,7 @@ export class MemoryDatabase {
       venue_holds: [],
       venue_hold_notifications: [],
       notifications: [],
+      notification_reminder_preferences: [],
       equipment_requests: [],
       equipment_reservations: [],
       // SG2-66: attendee registrations, counted when a change is assessed.
