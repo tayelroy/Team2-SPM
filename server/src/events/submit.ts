@@ -116,12 +116,6 @@ export function submitEventRequestHandler({
     }
 
     const submitted = await submitRequest(admin, eventId);
-    if (!submitted.ok && submitted.reason === 'missing_category') {
-      // SG2-70 [CONFLICT]: a draft save cleared the category after the check
-      // above; the database refused the move, so the request is still a draft.
-      res.status(400).json({ error: 'Event request is missing required fields.', missing: ['category'] });
-      return;
-    }
     if (!submitted.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;

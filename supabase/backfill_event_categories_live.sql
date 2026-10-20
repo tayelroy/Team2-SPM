@@ -5,8 +5,10 @@
 -- category inferred from its name (mostly Other for these test events).
 --
 -- Each row is matched on both its id and its name as read on 2026-10-20, so it
--- cannot touch any other event; anything renamed since is left as it is.
--- Safe to re-run.
+-- cannot touch any other event; anything renamed since is left as it is. It
+-- only sets a category, so re-running it changes nothing more. It does not
+-- write event_audit_logs: it is a one-off data correction, not an organiser's
+-- edit. See docs/release-readiness.md.
 begin;
 
 with picked(event_id, name, category) as (values
@@ -36,13 +38,5 @@ update public.events e
   from picked
   where e.event_id = picked.event_id and e.name = picked.name
     and e.category is distinct from picked.category;
-
--- Nothing is left uncategorised.
-do $$
-begin
-  if exists (select 1 from public.events where category is null) then
-    raise exception 'An event is still uncategorised';
-  end if;
-end $$;
 
 commit;

@@ -4,24 +4,23 @@
 --      the client organisation (case-insensitive, LIKE wildcards escaped).
 -- AC2  It filters by date (an inclusive range of Singapore calendar days on
 --      proposed_date), state, venue (one the event is booked, held or
---      requested at), category and assigned coordinator. Category is new:
---      events.category, from the fixed list below, chosen by the organiser on
---      the request form. It joins the customer minimum (SG2-30 / SG2-105), so
---      this story also changes what a request needs before it is submitted.
+--      requested at), category and assigned coordinator, or events with no
+--      coordinator ('unassigned'). Category is new: events.category, from the
+--      fixed list below, which the organiser may choose on the request form.
+--      It is optional: a request can be submitted without one.
 -- AC3  Only internal roles may call search_events() or event_search_options():
---      the acting role (SG2-104) is checked here as well as by the route permission
---      ('events.search' in server/src/auth/policy.ts, mirrored from
---      INTERNAL_ROLES). Drafts are never returned: they belong to their
---      organiser until submitted.
+--      the acting role (SG2-104) is checked here as well as by the route
+--      permission ('events.search' in server/src/auth/policy.ts, mirrored from
+--      INTERNAL_ROLES). Results are the events that acting role may see, by
+--      SG2-104's private.event_relationship_exists(): a coordinator their
+--      assigned events, Venue Staff events with a venue request or booking,
+--      Technical Support events with equipment requests or reservations, the
+--      Safety Officer events from Awaiting Safety Check on, and the Lead every
+--      submitted event. Drafts are never returned.
 -- AC4  The result echoes the filters it applied, so an empty list can be shown
 --      with the filters in force.
 --
--- Existing events are given a category below so none is left uncategorised.
--- events_category_required_on_submit is the database backstop for "required
--- on submit": a request cannot leave draft, needs-clarification or rejected
--- without a category, whichever writer moves it, and it re-reads the row a
--- racing draft save just wrote. Rows written directly in another status are
--- not checked, so fixtures and earlier migrations are unaffected.
+-- Existing events are given a category inferred from their name below.
 begin;
 
 alter table public.events
@@ -29,38 +28,30 @@ alter table public.events
   add constraint events_category_known check (category is null or category in
     ('conference', 'workshop', 'seminar', 'training', 'networking', 'social', 'other'));
 comment on column public.events.category is
-  'Kind of event (SG2-70 AC2), chosen by the organiser; required before a request is submitted.';
+  'Kind of event (SG2-70 AC2), optionally chosen by the organiser.';
 
--- Existing events: inferred from the name, otherwise Other. Live demo events
--- are then given hand-picked categories by
--- supabase/backfill_event_categories_live.sql (run by hand, not a migration).
-update public.events set category = case
-    when name ~* '(forum|summit|conference|symposium|convention|expo)' then 'conference'
-    when name ~* '(gala|party|dinner|reception|celebration|festival)' then 'social'
-    when name ~* '(workshop|hackathon|masterclass)' then 'workshop'
-    when name ~* '(seminar|lecture|talk|webinar|briefing)' then 'seminar'
-    when name ~* '(training|course|bootcamp|onboarding)' then 'training'
-    when name ~* '(networking|mixer|meetup|meet-up)' then 'networking'
+-- The category an existing event is given from its name, otherwise Other.
+-- A function so the rule is tested (event_search.sql) and the upgrade replay
+-- can check what existing events received.
+create function private.event_category_from_name(p_name text)
+returns text language sql immutable set search_path = '' as $$
+  select case
+    when p_name ~* '(forum|summit|conference|symposium|convention|expo)' then 'conference'
+    when p_name ~* '(gala|party|dinner|reception|celebration|festival)' then 'social'
+    when p_name ~* '(workshop|hackathon|masterclass)' then 'workshop'
+    when p_name ~* '(seminar|lecture|talk|webinar|briefing)' then 'seminar'
+    when p_name ~* '(training|course|bootcamp|onboarding)' then 'training'
+    when p_name ~* '(networking|mixer|meetup|meet-up)' then 'networking'
     else 'other'
-  end
-  where category is null;
-
-create function public.events_require_category_on_submit()
-returns trigger language plpgsql set search_path = '' as $$
-begin
-  if old.status in ('draft', 'needs_clarification', 'rejected')
-      and new.status in ('unassigned', 'submitted')
-      and new.category is null then
-    raise exception using errcode = '23514',
-      message = 'An event request needs a category before it is submitted',
-      constraint = 'events_category_required_on_submit';
-  end if;
-  return new;
-end;
+  end;
 $$;
-revoke all on function public.events_require_category_on_submit() from public, anon, authenticated;
-create trigger events_category_required_on_submit before update of status on public.events
-  for each row execute function public.events_require_category_on_submit();
+revoke all on function private.event_category_from_name(text) from public, anon, authenticated;
+
+-- Existing events. Live demo events are then given hand-picked categories by
+-- supabase/backfill_event_categories_live.sql (run by hand, not a migration;
+-- see docs/release-readiness.md).
+update public.events set category = private.event_category_from_name(name)
+  where category is null;
 
 -- Copied verbatim from its latest definition, SG2-104's
 -- 202610200002_acting_role_functions.sql (which keeps SG2-105's fields and
@@ -214,7 +205,8 @@ revoke all on function public.event_search_venue_ids(integer) from public, anon,
 -- AC1-AC4. Every filter is optional; a null leaves that filter out. At most
 -- 100 events are returned, soonest first, and `truncated` says whether more
 -- matched, so the screen can ask for a narrower search. The coordinator is
--- compared as text, so an id that is no coordinator's simply matches nothing.
+-- compared as text, so an id that is no coordinator's simply matches nothing;
+-- 'unassigned' matches events with no coordinator.
 create function public.search_events(
   p_query text default null,
   p_date_from date default null,
@@ -228,6 +220,7 @@ declare
   pattern text;
   matches jsonb;
   page_size constant integer := 100;
+  caller_role text := public.acting_role();
 begin
   if auth.uid() is null or not public.event_search_caller_is_internal() then
     raise exception using errcode = '42501', message = 'Access denied';
@@ -259,13 +252,17 @@ begin
     from public.events e
     left join public.users coordinator on coordinator.user_id = e.coordinator_id
     where e.status <> 'draft'
+      -- AC3: only the events the acting role may see (SG2-104).
+      and private.event_relationship_exists(e.event_id, caller_role)
       and (pattern is null or e.name ilike pattern or e.organisation ilike pattern)
       and (p_date_from is null or (e.proposed_date at time zone 'Asia/Singapore')::date >= p_date_from)
       and (p_date_to is null or (e.proposed_date at time zone 'Asia/Singapore')::date <= p_date_to)
       and (p_status is null or e.status::text = p_status)
       and (p_venue_id is null or p_venue_id in (select public.event_search_venue_ids(e.event_id)))
       and (p_category is null or e.category = p_category)
-      and (p_coordinator_id is null or e.coordinator_id::text = p_coordinator_id)
+      and (p_coordinator_id is null
+        or (p_coordinator_id = 'unassigned' and e.coordinator_id is null)
+        or e.coordinator_id::text = p_coordinator_id)
     order by e.proposed_date nulls last, e.event_id
     limit page_size + 1
   ) matched;
@@ -283,7 +280,9 @@ revoke all on function public.search_events(text, date, date, text, integer, tex
 grant execute on function public.search_events(text, date, date, text, integer, text, text) to authenticated;
 
 -- AC2: what the venue and coordinator filters can be set to. Deleted venues
--- are left out; every account currently holding the coordinator role is in.
+-- are left out. Coordinators are every account holding the coordinator role,
+-- plus anyone still assigned to a submitted event after losing it, so such an
+-- event can still be filtered for.
 create function public.event_search_options()
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 begin
@@ -295,8 +294,8 @@ begin
       order by v.name, v.venue_id) from public.venues v where v.deleted_at is null), '[]'::jsonb),
     'coordinators', coalesce((select jsonb_agg(jsonb_build_object('user_id', u.user_id, 'name', u.name)
       order by u.name, u.user_id) from public.users u
-      join public.account_roles ar on ar.user_id = u.user_id
-      where ar.role = 'event_coordinator'), '[]'::jsonb));
+      where exists (select 1 from public.account_roles ar where ar.user_id = u.user_id and ar.role = 'event_coordinator')
+        or exists (select 1 from public.events e where e.coordinator_id = u.user_id and e.status <> 'draft')), '[]'::jsonb));
 end;
 $$;
 revoke all on function public.event_search_options() from public, anon, authenticated;

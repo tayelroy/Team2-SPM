@@ -52,6 +52,21 @@ acceptance tests or the Definition of Done.
    Auth identities, profiles or account-role assignments. Memory E2E fixtures
    are not hosted accounts. Record the tested roles without recording passwords.
 
+### One-off data scripts
+
+Some stories ship a data script beside their migration. It is not a migration
+and CI never runs it; run it by hand, once, after its migration, on the project
+it names.
+
+- **SG2-70 event categories:** after `202610200003_event_search.sql`, run
+  [`supabase/backfill_event_categories_live.sql`](../supabase/backfill_event_categories_live.sql)
+  on the live project. The migration has already given every existing event a
+  category inferred from its name; the script replaces those with hand-picked
+  categories for the 20 demo events listed in it, each matched by both id and
+  name, so it cannot touch any other event. Re-running it changes nothing more.
+  It does not write `event_audit_logs`: it is a data correction, not an
+  organiser's edit. Record the number of rows it updated in the release evidence.
+
 ## What the structural gate checks
 
 - Event detail, submission and planning columns, including the completion and

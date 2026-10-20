@@ -1,11 +1,11 @@
 -- SG2-70: internal users find an event by name or client organisation and
--- narrow it by date, state, venue, category and coordinator; only internal
--- roles may search, drafts are never found, and the filters applied are
--- echoed for the empty state. Category is required before submission.
--- Isolated fixture changes are rolled back.
+-- narrow it by date, state, venue, category and coordinator; each acting role
+-- finds only the events it may see (SG2-104's relationship rule), drafts are
+-- never found, and the filters applied are echoed for the empty state.
+-- Category is optional. Isolated fixture changes are rolled back.
 begin;
 insert into auth.users(id)
- select ('d7000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid from generate_series(1,10) n;
+ select ('d7000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid from generate_series(1,11) n;
 insert into public.users(user_id,name,role_id,organisation) values
  ('d7000000-0000-4000-8000-000000000001','Search organiser',1,'Harbour Foundation'),
  ('d7000000-0000-4000-8000-000000000002','Search coordinator Alice',2,null),
@@ -16,7 +16,8 @@ insert into public.users(user_id,name,role_id,organisation) values
  ('d7000000-0000-4000-8000-000000000007','Search safety officer',7,null),
  ('d7000000-0000-4000-8000-000000000008','Search roleless',5,null),
  ('d7000000-0000-4000-8000-000000000009','Search coordinator Bob',2,null),
- ('d7000000-0000-4000-8000-000000000010','Search moved coordinator',2,null);
+ ('d7000000-0000-4000-8000-000000000010','Search moved coordinator',2,null),
+ ('d7000000-0000-4000-8000-000000000011','Search lapsed coordinator',1,null);
 insert into public.account_roles(user_id,role) values
  ('d7000000-0000-4000-8000-000000000001','event_organiser'),
  ('d7000000-0000-4000-8000-000000000002','event_coordinator'),
@@ -26,19 +27,24 @@ insert into public.account_roles(user_id,role) values
  ('d7000000-0000-4000-8000-000000000006','event_coordinator_lead'),
  ('d7000000-0000-4000-8000-000000000007','safety_officer'),
  ('d7000000-0000-4000-8000-000000000009','event_coordinator'),
- ('d7000000-0000-4000-8000-000000000010','event_coordinator');
+ ('d7000000-0000-4000-8000-000000000010','event_coordinator'),
+ -- Coordinated 99706, then lost the coordinator role.
+ ('d7000000-0000-4000-8000-000000000011','event_organiser');
 insert into public.venues(venue_id,name,location,capacity) values
  (99701,'Search Atrium','Level 1',300),
  (99702,'Search Annex','Level 2',40),
  (99703,'Search Retired Room','Level 3',20);
 update public.venues set deleted_at=now(),deleted_by='d7000000-0000-4000-8000-000000000003' where venue_id=99703;
+insert into public.equipment(equipment_id,name,quantity_total) values (99701,'Search speakers',10);
 
--- 99701 Harbour Gala (social, Alice, booked at Atrium, 1 Nov SG)
--- 99702 Coastal Leaders Summit (conference, Bob, requested at Annex, 2 Nov SG
---       because 16:30Z is 00:30 the next day in Singapore)
--- 99703 Quiet workshop (workshop, unassigned, released booking at Atrium)
--- 99704 Secret draft (draft, Harbour in its name, never found)
--- 99705 100% Club (other, literal percent sign in the name)
+-- 99701 Harbour Gala (social, Planning, Alice, booked at Atrium, 1 Nov SG)
+-- 99702 Coastal Leaders Summit (conference, Approved, Bob, requested at Annex,
+--       2 Nov SG because 16:30Z is 00:30 the next day in Singapore)
+-- 99703 Quiet workshop (workshop, Awaiting Assignment, no coordinator, a
+--       released booking at Atrium and an equipment request)
+-- 99704 Harbour secret draft (draft, Harbour in its name, never found)
+-- 99705 100% Club (other, Confirmed, Alice, literal percent sign in the name)
+-- 99706 Lapsed Forum (no category, Submitted, coordinated by the lapsed coordinator)
 insert into public.events(event_id,organiser_id,coordinator_id,organisation,name,status,category,proposed_date) values
  (99701,'d7000000-0000-4000-8000-000000000001','d7000000-0000-4000-8000-000000000002','Harbour Foundation',
   'Harbour Gala','planning','social','2031-11-01T02:00Z'),
@@ -49,13 +55,17 @@ insert into public.events(event_id,organiser_id,coordinator_id,organisation,name
  (99704,'d7000000-0000-4000-8000-000000000001',null,'Harbour Foundation',
   'Harbour secret draft','draft','social','2031-11-01T02:00Z'),
  (99705,'d7000000-0000-4000-8000-000000000001','d7000000-0000-4000-8000-000000000002','Quiet Trust',
-  '100% Club','confirmed','other','2031-12-01T02:00Z');
+  '100% Club','confirmed','other','2031-12-01T02:00Z'),
+ (99706,'d7000000-0000-4000-8000-000000000001','d7000000-0000-4000-8000-000000000011','Lapsed Partners',
+  'Lapsed Forum','submitted',null,'2031-11-10T02:00Z');
 insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status) values
  (99701,99701,'2031-11-01T01:00Z','2031-11-01T09:00Z','confirmed');
 insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status,cancelled_at,cancellation_reason) values
  (99701,99703,'2031-11-05T01:00Z','2031-11-05T09:00Z','cancelled','2031-10-01T00:00Z','No longer needed');
 insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status) values
  (99702,99702,'2031-11-01T16:00Z','2031-11-01T23:00Z','pending');
+insert into public.equipment_requests(event_id,equipment_id,quantity,starts_at,ends_at) values
+ (99703,99701,2,'2031-11-05T01:00Z','2031-11-05T09:00Z');
 
 -- Ids of the events a search returns, in order, as a comma list.
 create function pg_temp.ids(result jsonb) returns text language sql as $$
@@ -63,10 +73,62 @@ create function pg_temp.ids(result jsonb) returns text language sql as $$
   where (e->>'event_id')::integer between 99700 and 99799;
 $$;
 grant execute on function pg_temp.ids(jsonb) to authenticated;
+-- What one account finds with no filters, acting as its only role.
+create function pg_temp.sees(p_user uuid) returns text language plpgsql as $$
+begin
+ perform set_config('request.jwt.claim.sub', p_user::text, true);
+ perform set_config('request.headers', '', true);
+ return pg_temp.ids(public.search_events());
+end $$;
+grant execute on function pg_temp.sees(uuid) to authenticated;
 
--- AC1-AC4 as an Event Coordinator.
+-- AC3: each role finds exactly the events it may see.
 set local role authenticated;
-select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000002',true);
+do $$
+begin
+ if pg_temp.sees('d7000000-0000-4000-8000-000000000006') <> '99701,99702,99703,99706,99705' then
+  raise exception '[SG2-70:lead-sees-submitted] [SG2-70:AC3] [NORMAL] The Lead must find every submitted event, soonest first, and no draft: %',
+   pg_temp.sees('d7000000-0000-4000-8000-000000000006');
+ end if;
+ if pg_temp.sees('d7000000-0000-4000-8000-000000000002') <> '99701,99705' then
+  raise exception '[SG2-70:coordinator-sees-assigned] [SG2-70:AC3] [NORMAL] A coordinator must find only the events assigned to them';
+ end if;
+ if pg_temp.sees('d7000000-0000-4000-8000-000000000003') <> '99701,99702,99703' then
+  raise exception '[SG2-70:venue-staff-sees-venue-work] [SG2-70:AC3] [NORMAL] Venue Staff must find only events with a venue request or booking';
+ end if;
+ if pg_temp.sees('d7000000-0000-4000-8000-000000000004') <> '99703' then
+  raise exception '[SG2-70:support-sees-equipment-work] [SG2-70:AC3] [NORMAL] Technical Support must find only events with equipment requests or reservations';
+ end if;
+ if pg_temp.sees('d7000000-0000-4000-8000-000000000007') <> '99705' then
+  raise exception '[SG2-70:safety-sees-checked] [SG2-70:AC3] [NORMAL] The Safety Officer must find only events from Awaiting Safety Check on';
+ end if;
+ perform set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000009',true);
+ if pg_temp.ids(public.search_events(p_query => 'Harbour')) <> '' then
+  raise exception '[SG2-70:unrelated-event-hidden] [SG2-70:AC3] [FAILURE] A coordinator must not find another coordinator''s event by its name';
+ end if;
+ if pg_temp.ids(public.search_events(p_coordinator_id => 'd7000000-0000-4000-8000-000000000002')) <> '' then
+  raise exception '[SG2-70:unrelated-by-filter-hidden] [SG2-70:AC3] [FAILURE] Filtering by another coordinator must not reveal their events';
+ end if;
+end $$;
+reset role;
+
+-- AC3 conflict: reassigning an event moves it from one coordinator's results
+-- to the other's at once.
+update public.events set coordinator_id='d7000000-0000-4000-8000-000000000002' where event_id=99702;
+set local role authenticated;
+do $$
+begin
+ if pg_temp.sees('d7000000-0000-4000-8000-000000000009') <> ''
+   or pg_temp.sees('d7000000-0000-4000-8000-000000000002') <> '99701,99702,99705' then
+  raise exception '[SG2-70:reassigned-moves-results] [SG2-70:AC3] [CONFLICT] A reassigned event must leave the old coordinator''s results and join the new one''s';
+ end if;
+end $$;
+reset role;
+update public.events set coordinator_id='d7000000-0000-4000-8000-000000000009' where event_id=99702;
+
+-- AC1, AC2 and AC4 as the Lead, who sees every submitted event.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000006',true);
 do $$
 declare result jsonb;
 begin
@@ -83,8 +145,8 @@ begin
  if pg_temp.ids(public.search_events(p_query => '_')) <> '' then
   raise exception '[SG2-70:underscore-escaped] [SG2-70:AC1] [BOUNDARY] An underscore must match itself, not any single character';
  end if;
- if pg_temp.ids(public.search_events(p_query => '   ')) <> '99701,99702,99703,99705' then
-  raise exception '[SG2-70:blank-query-all] [SG2-70:AC1] [BOUNDARY] A blank search must apply no text filter and order by date: %', pg_temp.ids(public.search_events(p_query => '   '));
+ if pg_temp.ids(public.search_events(p_query => '   ')) <> '99701,99702,99703,99706,99705' then
+  raise exception '[SG2-70:blank-query-all] [SG2-70:AC1] [BOUNDARY] A blank search must apply no text filter and order by date';
  end if;
 
  if pg_temp.ids(public.search_events(p_date_from => '2031-11-01', p_date_to => '2031-11-01')) <> '99701' then
@@ -106,10 +168,16 @@ begin
   raise exception '[SG2-70:filter-venue-requested] [SG2-70:AC2] [NORMAL] The venue filter must find an event with a pending request for the venue';
  end if;
  if pg_temp.ids(public.search_events(p_category => 'conference')) <> '99702' then
-  raise exception '[SG2-70:filter-category] [SG2-70:AC2] [NORMAL] The category filter must keep only that category';
+  raise exception '[SG2-70:filter-category] [SG2-70:AC2] [NORMAL] The category filter must keep only that category, and not an uncategorised event';
  end if;
  if pg_temp.ids(public.search_events(p_coordinator_id => 'd7000000-0000-4000-8000-000000000002')) <> '99701,99705' then
   raise exception '[SG2-70:filter-coordinator] [SG2-70:AC2] [NORMAL] The coordinator filter must keep only events assigned to them';
+ end if;
+ if pg_temp.ids(public.search_events(p_coordinator_id => 'unassigned')) <> '99703' then
+  raise exception '[SG2-70:filter-unassigned] [SG2-70:AC2] [NORMAL] The Unassigned filter must keep only events with no coordinator';
+ end if;
+ if pg_temp.ids(public.search_events(p_coordinator_id => 'd7000000-0000-4000-8000-000000000011')) <> '99706' then
+  raise exception '[SG2-70:filter-lapsed-coordinator] [SG2-70:AC2] [BOUNDARY] An event still assigned to someone who lost the coordinator role must be found by them';
  end if;
  if pg_temp.ids(public.search_events(p_coordinator_id => 'not-a-coordinator')) <> '' then
   raise exception '[SG2-70:unknown-coordinator-empty] [SG2-70:AC2] [BOUNDARY] An id that is no coordinator''s must match no event rather than fail';
@@ -151,8 +219,9 @@ begin
   raise exception '[SG2-70:options-venues] [SG2-70:AC2] [NORMAL] The venue filter must offer every venue still listed and no deleted one';
  end if;
  if (select string_agg(c->>'name', ',' order by c->>'name') from jsonb_array_elements(result->'coordinators') c
-     where c->>'name' like 'Search %') <> 'Search coordinator Alice,Search coordinator Bob,Search moved coordinator' then
-  raise exception '[SG2-70:options-coordinators] [SG2-70:AC2] [NORMAL] The coordinator filter must offer every Event Coordinator and no other role';
+     where c->>'name' like 'Search %')
+     <> 'Search coordinator Alice,Search coordinator Bob,Search lapsed coordinator,Search moved coordinator' then
+  raise exception '[SG2-70:options-coordinators] [SG2-70:AC2] [NORMAL] The coordinator filter must offer every Event Coordinator and anyone still assigned to an event, and no other account';
  end if;
 end $$;
 reset role;
@@ -162,7 +231,7 @@ insert into public.events(event_id,organiser_id,organisation,name,status,categor
  select 99800+n,'d7000000-0000-4000-8000-000000000001','Bulk Org','Bulk event '||n,'submitted','seminar',
   '2032-01-01T02:00Z'::timestamptz+n*interval '1 hour' from generate_series(1,101) n;
 set local role authenticated;
-select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000006',true);
 do $$
 declare result jsonb;
 begin
@@ -175,7 +244,7 @@ end $$;
 reset role;
 delete from public.events where event_id = 99801;
 set local role authenticated;
-select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000002',true);
+select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000006',true);
 do $$
 declare result jsonb;
 begin
@@ -223,7 +292,8 @@ reset role;
 
 -- AC3 with SG2-104: an account holding an organiser and a coordinator role
 -- searches only while acting as the coordinator, never as the organiser, with
--- no acting role chosen, or as a role it does not hold.
+-- no acting role chosen, or as a role it does not hold. As coordinator it
+-- finds only events assigned to it, not the ones it organises.
 insert into public.account_roles(user_id,role) values
  ('d7000000-0000-4000-8000-000000000001','event_coordinator');
 set local role authenticated;
@@ -232,6 +302,9 @@ declare dual constant uuid := 'd7000000-0000-4000-8000-000000000001';
 begin
  if not pg_temp.can_search(dual, 'event_coordinator') then
   raise exception '[SG2-70:acting-internal-searches] [SG2-70:AC3] [NORMAL] An account acting as its coordinator role must be able to search';
+ end if;
+ if pg_temp.ids(public.search_events()) <> '' then
+  raise exception '[SG2-70:acting-coordinator-scoped] [SG2-70:AC3] [CONFLICT] Acting as coordinator must not reveal the events the account organises';
  end if;
  if pg_temp.can_search(dual, 'event_organiser') then
   raise exception '[SG2-70:acting-organiser-refused] [SG2-70:AC3] [CONFLICT] The same account acting as its organiser role must be refused';
@@ -258,7 +331,7 @@ begin
 end $$;
 reset role;
 
--- AC3: the helpers and the table itself stay closed to clients.
+-- AC3: the helpers stay closed to clients.
 set local role authenticated;
 select set_config('request.jwt.claim.sub','d7000000-0000-4000-8000-000000000002',true);
 do $$
@@ -284,7 +357,7 @@ exception when insufficient_privilege then null;
 end $$;
 reset role;
 
--- AC2: category values and the submit backstop.
+-- AC2: the category list, and how existing events were given one.
 do $$
 begin
  begin
@@ -295,40 +368,37 @@ begin
  if (select category from public.events where event_id=99701) <> 'social' then
   raise exception '[SG2-70:category-unchanged] [SG2-70:AC2] [FAILURE] A refused category must leave the event unchanged';
  end if;
+ if (private.event_category_from_name('Partner Forum'), private.event_category_from_name('Charity Gala'),
+     private.event_category_from_name('Design workshop'), private.event_category_from_name('Guest lecture'),
+     private.event_category_from_name('Staff onboarding'), private.event_category_from_name('Founders mixer'))
+     is distinct from ('conference', 'social', 'workshop', 'seminar', 'training', 'networking') then
+  raise exception '[SG2-70:infer-from-name] [SG2-70:AC2] [NORMAL] An existing event''s name must give its category';
+ end if;
+ if (private.event_category_from_name('ANNUAL SUMMIT GALA'), private.event_category_from_name('sprint2'))
+     is distinct from ('conference', 'other') then
+  raise exception '[SG2-70:infer-first-match-or-other] [SG2-70:AC2] [BOUNDARY] Matching must ignore case, take the first rule that matches, and fall back to Other';
+ end if;
+ if private.event_category_from_name(null) is distinct from 'other' then
+  raise exception '[SG2-70:infer-unnamed-other] [SG2-70:AC2] [FAILURE] An event with no name must still be given Other';
+ end if;
 end $$;
-
-insert into public.events(event_id,organiser_id,organisation,name,status) values
- (99710,'d7000000-0000-4000-8000-000000000001','Harbour Foundation','No category yet','draft'),
- (99711,'d7000000-0000-4000-8000-000000000001','Harbour Foundation','Asked a question','needs_clarification'),
- (99713,'d7000000-0000-4000-8000-000000000001','Harbour Foundation','Legacy planning','planning');
-insert into public.events(event_id,organiser_id,organisation,name,status,decision_reason) values
- (99712,'d7000000-0000-4000-8000-000000000001','Harbour Foundation','Rejected before','rejected','Date clashes');
+set local role authenticated;
 do $$
-declare target integer;
 begin
- foreach target in array array[99710, 99711, 99712] loop
-  begin
-   update public.events set status='unassigned' where event_id=target;
-   raise exception '[SG2-70:submit-needs-category] [SG2-70:AC2] [FAILURE] Event % must not be submitted without a category', target;
-  exception when check_violation then null;
-  end;
- end loop;
- begin
-  update public.events set status='submitted', coordinator_id='d7000000-0000-4000-8000-000000000002' where event_id=99711;
-  raise exception '[SG2-70:resubmit-needs-category] [SG2-70:AC2] [FAILURE] A held request must not go back to its coordinator without a category';
- exception when check_violation then null;
- end;
- if (select status from public.events where event_id=99710) <> 'draft' then
-  raise exception '[SG2-70:refused-stays-draft] [SG2-70:AC2] [FAILURE] A refused submission must leave the request a draft';
- end if;
- update public.events set status='awaiting_safety_check' where event_id=99713;
- if (select status from public.events where event_id=99713) <> 'awaiting_safety_check' then
-  raise exception '[SG2-70:other-moves-unchecked] [SG2-70:AC2] [BOUNDARY] Moves other than submission must not need a category';
- end if;
- update public.events set category='seminar' where event_id=99710;
- update public.events set status='unassigned' where event_id=99710;
- if (select status from public.events where event_id=99710) <> 'unassigned' then
-  raise exception '[SG2-70:submit-with-category] [SG2-70:AC2] [NORMAL] A request with a category must submit';
+ perform private.event_category_from_name('Forum');
+ raise exception '[SG2-70:infer-helper-closed] [SG2-70:AC2] [FAILURE] Clients must not call the category inference helper';
+exception when insufficient_privilege then null;
+end $$;
+reset role;
+
+-- AC2: the category is optional, so a request without one is submitted.
+insert into public.events(event_id,organiser_id,organisation,name,status) values
+ (99710,'d7000000-0000-4000-8000-000000000001','Harbour Foundation','No category yet','draft');
+update public.events set status='unassigned' where event_id=99710;
+do $$
+begin
+ if (select (status, category) from public.events where event_id=99710) is distinct from ('unassigned'::public.event_status, null::text) then
+  raise exception '[SG2-70:submit-without-category] [SG2-70:AC2] [BOUNDARY] A request without a category must still be submitted';
  end if;
 end $$;
 
@@ -359,19 +429,11 @@ begin
  if result->>'outcome' <> 'invalid' then
   raise exception '[SG2-70:draft-refuses-non-text] [SG2-70:AC2] [FAILURE] A non-text category must be refused';
  end if;
- -- A draft may still clear its category; only submission needs one.
  result := public.update_event_request_draft(99720,'d7000000-0000-4000-8000-000000000001',
    '{"name":"Draft to categorise"}');
  if result->>'outcome' <> 'updated' or (select category from public.events where event_id=99720) is not null then
-  raise exception '[SG2-70:draft-may-omit] [SG2-70:AC2] [BOUNDARY] A draft must still save without a category';
+  raise exception '[SG2-70:draft-may-clear] [SG2-70:AC2] [BOUNDARY] A draft save without a category must clear it';
  end if;
- -- CONFLICT: the save above cleared the category the organiser had picked;
- -- a submission racing it reads the row the save wrote and is refused.
- begin
-  update public.events set status='unassigned' where event_id=99720 and status='draft';
-  raise exception '[SG2-70:race-save-then-submit] [SG2-70:AC2] [CONFLICT] A submission after a save that cleared the category must be refused';
- exception when check_violation then null;
- end;
 end $$;
 
 rollback;

@@ -225,8 +225,6 @@ reset role;
 do $$
 declare state public.event_status; result jsonb;
 begin
- -- SG2-70: the loop moves the event from draft to submitted, which needs a category.
- update public.events set category='workshop' where event_id=95507;
  foreach state in array array['draft','submitted','under_review','cancelled']::public.event_status[] loop
   update public.events set status=state where event_id=95507;
   result := public.manage_equipment_reservations('reserve',95507,95507,1,'2031-10-04T09:00Z','2031-10-04T17:00Z');
