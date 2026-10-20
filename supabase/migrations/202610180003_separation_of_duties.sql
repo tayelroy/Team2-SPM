@@ -8,7 +8,7 @@
 --     stops the migration loudly rather than hide any row that breaks it.
 -- (b) Venue Staff never approve or reject a venue booking request they raised
 --     themselves: decide_venue_booking_request() gains that check in
---     202610200001_acting_role_functions.sql, which builds on its latest body.
+--     202610200002_acting_role_functions.sql, which builds on its latest body.
 begin;
 
 do $$

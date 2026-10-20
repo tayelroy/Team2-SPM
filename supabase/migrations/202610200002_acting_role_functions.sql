@@ -23,7 +23,7 @@
 --   manage_equipment_requirements() from 202610190004_safety_check_queue.sql
 --   manage_equipment_reservations() from 202610140001_equipment_reservations.sql
 --   confirm_event() from 202610170002_confirmation_rechecks_and_disruptions.sql
---   update_event_request_draft() from 202610170003_event_draft_change_history.sql
+--   update_event_request_draft() from 202610200001_event_preferred_layout.sql
 --   safety_check_queue() from 202610190004_safety_check_queue.sql
 --   decide_venue_booking_request() from 202610190002_venue_staff_capacity_exceptions.sql
 begin;
@@ -518,7 +518,7 @@ declare
   updated_values jsonb;
   saved_at timestamptz;
   fields constant text[] := array['name', 'purpose', 'description', 'proposed_date',
-    'expected_attendance', 'venue_requirements', 'accessibility_needs',
+    'expected_attendance', 'venue_requirements', 'preferred_layout', 'accessibility_needs',
     'equipment_requirements', 'registration_needed'];
 begin
   -- Keep membership/role stable until the transaction finishes, then lock the
@@ -584,6 +584,7 @@ begin
     description = values_row.description, proposed_date = values_row.proposed_date,
     expected_attendance = values_row.expected_attendance,
     venue_requirements = values_row.venue_requirements,
+    preferred_layout = values_row.preferred_layout,
     accessibility_needs = values_row.accessibility_needs,
     equipment_requirements = values_row.equipment_requirements,
     registration_needed = values_row.registration_needed
