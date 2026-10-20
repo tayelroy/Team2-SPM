@@ -1,10 +1,12 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  EVENT_CATEGORIES,
   EVENT_STATUSES,
   STATUS_TRANSITIONS,
   SUBMISSION_REQUIRED_FIELDS,
   canTransition,
+  isEventCategory,
   missingForSubmission,
   validateDraftInput,
   type DraftValues,
@@ -101,7 +103,7 @@ describe('the customer minimum for submission (SG2-105)', () => {
     name: 'Partner Forum', purpose: 'Client relationship building', description: 'Quarterly forum.',
     proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 120, venue_requirements: 'Stage',
     preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None',
-    registration_needed: false
+    registration_needed: false, category: 'conference'
   };
 
   test('[NORMAL] [SG2-105:AC1] submission requires every field the customer listed, layout included', () => {
@@ -143,10 +145,36 @@ describe('the customer minimum for submission (SG2-105)', () => {
   });
 });
 
+describe('the event category (SG2-70)', () => {
+  test('[NORMAL] [SG2-70:AC2] a draft keeps any of the seven categories', () => {
+    assert.deepEqual([...EVENT_CATEGORIES], ['conference', 'workshop', 'seminar', 'training', 'networking', 'social', 'other']);
+    for (const category of EVENT_CATEGORIES) {
+      assert.deepEqual(validateDraftInput({ category }), { valid: true, values: { ...emptyDraft(), category } });
+      assert.equal(isEventCategory(category), true);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-70:AC2] a blank or missing category saves as none and does not hold up submission', () => {
+    for (const body of [{}, { category: '' }, { category: null }]) {
+      const result = validateDraftInput(body);
+      assert.deepEqual(result, { valid: true, values: emptyDraft() });
+      assert.equal(missingForSubmission(result.valid ? result.values : {}).includes('category'), false);
+    }
+  });
+
+  test('[FAILURE] [SG2-70:AC2] a category outside the list, in another case or not text is refused by name', () => {
+    const message = 'category must be one of: conference, workshop, seminar, training, networking, social, other.';
+    for (const category of ['party', 'Conference', ' social', 3, true]) {
+      assert.deepEqual(validateDraftInput({ category }), { valid: false, errors: [message] });
+      assert.equal(isEventCategory(category), false);
+    }
+  });
+});
+
 function emptyDraft(): DraftValues {
   return {
     name: null, purpose: null, description: null, proposed_date: null, expected_attendance: null,
     venue_requirements: null, preferred_layout: null, accessibility_needs: null, equipment_requirements: null,
-    registration_needed: null
+    registration_needed: null, category: null
   };
 }

@@ -45,6 +45,7 @@ import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
 import { createSafetyChecksRouter } from './safetyChecks';
 import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
+import { createEventSearchRouter } from './eventSearch';
 import { createRegistrationHandlers } from './events/registrationRoutes';
 
 export function createApp(
@@ -114,6 +115,8 @@ export function createApp(
   safetyChecksRouter = createSafetyChecksRouter(access),
   // SG2-92: appended last for the same reason.
   safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-70: appended last for the same reason.
+  eventSearchRouter = createEventSearchRouter(access),
   // SG2-63: appended last for the same reason.
   registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal })
 ) {
@@ -161,6 +164,8 @@ export function createApp(
   app.use('/api/assignment-queue', assignmentQueueRouter);
   // SG2-91: the Safety Officer's list of events awaiting a safety check.
   app.use('/api/safety-checks', safetyChecksRouter);
+  // SG2-70: internal users find an event across the system.
+  app.use('/api/event-search', eventSearchRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

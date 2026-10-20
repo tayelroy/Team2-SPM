@@ -39,7 +39,9 @@ export type Screen =
   | 'assign'
   | 'queue'
   | 'safetyChecks'
-  | 'search';
+  | 'search'
+  // SG2-70: find an event across the system.
+  | 'findEvent';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;

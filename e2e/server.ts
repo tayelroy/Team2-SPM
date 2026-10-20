@@ -68,6 +68,8 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
 import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
+import { createEventSearchRouter } from '../server/src/eventSearch';
+import { createMemoryEventSearchStore, seedEventSearch } from './support/event-search';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
 
@@ -248,6 +250,8 @@ const app = createApp(
   // SG2-92: the decision history reads the in-memory client; recording and
   // reworking mirror their SQL functions over the in-memory tables.
   createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) }),
+  // SG2-70: event search mirrors search_events over the in-memory tables.
+  createEventSearchRouter(access, token => createMemoryEventSearchStore(database, token)),
   // SG2-63: the registration picture and settings mirror their SQL functions
   // over the in-memory tables.
   createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) })
@@ -328,6 +332,11 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
     bookings: database.tables.venue_bookings.filter(seeded),
   });
+});
+// SG2-70: events across organisations to search for, plus a draft that is never found.
+app.post('/__e2e/event-search', (_req, res) => {
+  seedEventSearch(database);
+  res.status(204).end();
 });
 app.post('/__e2e/safety-checks', (_req, res) => {
   seedSafetyChecks(database);

@@ -113,6 +113,8 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['search', 'Find venues'],
     ['calendar', 'Venue Availability'],
     ['holds', 'Venue holds'],
+    // SG2-70 AC3: every internal role finds an event across the system.
+    ['findEvent', 'Find an event', 'events.search'],
   ],
   'Venue Staff': [
     ['dashboard', 'Dashboard'],
@@ -121,11 +123,13 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['holds', 'Venue holds'],
     // SG2-66 AC5: only Venue Staff approve capacity exceptions.
     ['capacityExceptions', 'Capacity exceptions', 'venue_booking.capacity_exception.approve'],
+    ['findEvent', 'Find an event', 'events.search'],
   ],
   'Technical Support Staff': [
     ['dashboard', 'Dashboard'],
     ['calendar', 'Venue Availability'],
     ['equipment', 'Equipment'],
+    ['findEvent', 'Find an event', 'events.search'],
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
@@ -141,11 +145,13 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     // SG2-87: the queue of submitted requests no coordinator holds yet.
     ['queue', 'Unassigned queue', 'event_request.queue.view'],
     ['assign', 'Assign coordinators', 'event_request.assign_coordinator'],
+    ['findEvent', 'Find an event', 'events.search'],
   ],
   // SG2-91 AC2/AC4: the list of events awaiting a safety check.
   'Safety Officer': [
     ['dashboard', 'Dashboard'],
     ['safetyChecks', 'Safety checks', 'safety_checks.read'],
+    ['findEvent', 'Find an event', 'events.search'],
   ],
 };
 
@@ -216,6 +222,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   queue: 'Unassigned queue',
   safetyChecks: 'Safety checks',
   search: 'Find venues',
+  findEvent: 'Find an event',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -246,6 +253,8 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Give each submitted request a named coordinator, or hand it to someone else when plans change.',
   search:
     'Venues that meet every criterion and are free for the whole period. Blocked or confirmed-booked venues are left out.',
+  findEvent:
+    'Search the submitted events you work on by name or client organisation, and narrow by date, state, venue, category or coordinator.',
 };
 
 /** Headline figures on the Attendee's prototype dashboard. */

@@ -48,6 +48,14 @@ test('[NORMAL] [SG2-91:AC2] application composition mounts the Safety Officer\'s
   assert.deepEqual([response.status, response.body], [200, { service: 'safetyChecks' }]);
 });
 
+test('[NORMAL] [SG2-70:AC1] application composition mounts event search at /api/event-search', async () => {
+  const eventSearch = Router().get('/', (_req, res) => res.json({ service: 'eventSearch' }));
+  const args = Array.from({ length: 39 }, () => undefined) as unknown as Parameters<typeof createApp>;
+  args[38] = eventSearch;
+  const response = await request(createApp(...args)).get('/api/event-search');
+  assert.deepEqual([response.status, response.body], [200, { service: 'eventSearch' }]);
+});
+
 describe('Public database readiness', () => {
   for (const route of ['/health/db', '/api/health/db']) {
     for (const status of ['connected', 'unconfigured', 'error'] as const) {

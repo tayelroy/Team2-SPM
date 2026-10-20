@@ -32,6 +32,7 @@ const SUBMITTED_REQUEST = {
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: null,
+  category: null,
   accessibility_needs: null,
   equipment_requirements: null,
   registration_needed: true,

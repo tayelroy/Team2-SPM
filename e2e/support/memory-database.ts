@@ -41,6 +41,8 @@ export class MemoryDatabase {
       proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 20,
       venue_requirements: 'A room with seating', preferred_layout: 'Classroom', accessibility_needs: 'None',
       equipment_requirements: 'Projector', registration_needed: false,
+      // SG2-70: every seeded event has a category, as every live one does.
+      category: 'workshop',
       organisation: 'Regression Organisation', status: 'draft', coordinator_id: null
     };
     const venue = {

@@ -159,7 +159,8 @@ test('SMOKE-ASSIGN-01 | [NORMAL] [BOUNDARY] [SG2-28:AC1] [SG2-30:AC2] [SG2-87:AC
       await page.getByLabel(new RegExp(`^${label}`)).fill(value);
     }
     // SG2-105: "None" answers accessibility and equipment, and registration is a yes or no.
-    for (const answer of ['No accessibility needs', 'No equipment needed', 'No registration needed']) {
+    // SG2-70: and the event has a category.
+    for (const answer of ['No accessibility needs', 'No equipment needed', 'No registration needed', 'Workshop']) {
       await page.getByRole('button', { name: answer, exact: true }).click();
     }
     await page.getByRole('button', { name: 'Submit request', exact: true }).click();

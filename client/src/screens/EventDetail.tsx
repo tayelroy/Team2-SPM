@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  categoryLabel,
   completeEvent,
   fetchOwnEventDetail,
   getEventStage,
@@ -286,6 +287,8 @@ export default function EventDetail({
         { label: 'Venue requirements', value: detail.venueRequirements || 'None specified' },
         // SG2-105: requests submitted before the layout was asked for have none.
         { label: 'Preferred room layout', value: detail.preferredLayout || 'Not specified' },
+        // SG2-70: the kind of event, which internal users can filter by.
+        { label: 'Category', value: categoryLabel(detail.category) },
         { label: 'Coordinator', value: detail.coordinatorName || 'Unassigned' },
         ...(detail.coordinatorName
           ? [{ label: 'Coordinator contact', value: detail.coordinatorPhone || 'No phone number on file' }]

@@ -826,6 +826,18 @@
         "AC5": "Tests cover an account holding two roles, for both permitted and refused actions",
         "AC6": "Reading an event's stage or change history requires a relationship to that event (its Organiser, its assigned Event Coordinator, a Lead, or a role that works on its venues, equipment or safety check); an Event Coordinator not assigned to the event is refused by ID, and a reassigned coordinator loses access immediately. Tests cover assigned, unrelated and reassigned coordinators"
       }
+    },
+    {
+      "id": "SG2-70",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-70",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Can search by event name and client organisation",
+        "AC2": "Can filter by date, state, venue, category and assigned coordinator",
+        "AC3": "Results include only events I am permitted to see",
+        "AC4": "When nothing matches, this is stated along with the filters in force"
+      }
     }
   ]
 }
