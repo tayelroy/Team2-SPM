@@ -9,29 +9,47 @@ const singaporeDay = (iso: unknown) => typeof iso === 'string'
 
 /** Loopback UI fixture mirroring public.search_events and
  * public.event_search_options. The SQL suite (supabase/tests/event_search.sql)
- * proves the production read, its stored-role check and its filters. */
+ * proves the production read, its acting-role check, the per-role scoping
+ * (SG2-104's event_relationship_exists) and its filters. */
 export function createMemoryEventSearchStore(database: MemoryDatabase, token: string): EventSearchStore {
   const { tables } = database;
   async function requireInternal() {
     const principal = await database.principal(token);
     if (!(INTERNAL_ROLES as readonly string[]).includes(principal.role)) throw new AccessError(403);
+    return principal;
   }
+  const SAFETY_STAGES = ['awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed', 'completed'];
+  // Mirrors private.event_relationship_exists (SG2-104) for the internal roles.
+  const related = (role: string, userId: string, event: Row) => {
+    const id = event.event_id;
+    switch (role) {
+      case 'event_coordinator': return event.coordinator_id === userId;
+      case 'event_coordinator_lead': return true;
+      case 'venue_staff': return tables.venue_booking_requests.some(row => row.event_id === id)
+        || tables.venue_bookings.some(row => row.event_id === id);
+      case 'technical_support_staff': return tables.equipment_requests.some(row => row.event_id === id)
+        || tables.equipment_reservations.some(row => row.event_id === id);
+      default: return SAFETY_STAGES.includes(String(event.status));
+    }
+  };
   const venueIds = (eventId: unknown) => new Set([
     ...tables.venue_bookings.filter(row => row.event_id === eventId && ['held', 'confirmed'].includes(String(row.status))),
     ...tables.venue_booking_requests.filter(row => row.event_id === eventId && ['pending', 'approved'].includes(String(row.status)))
   ].map(row => row.venue_id));
   return {
     async search(filters) {
-      await requireInternal();
+      const { role, userId } = await requireInternal();
       const query = filters.query?.toLowerCase();
       const matched = tables.events.filter((event: Row) => event.status !== 'draft'
+        && related(role, userId, event)
         && (!query || String(event.name ?? '').toLowerCase().includes(query) || String(event.organisation ?? '').toLowerCase().includes(query))
         && (!filters.date_from || (singaporeDay(event.proposed_date) ?? '') >= filters.date_from)
         && (!filters.date_to || (singaporeDay(event.proposed_date) ?? '9999') <= filters.date_to)
         && (!filters.status || event.status === filters.status)
         && (filters.venue_id === null || venueIds(event.event_id).has(filters.venue_id))
         && (!filters.category || event.category === filters.category)
-        && (!filters.coordinator_id || event.coordinator_id === filters.coordinator_id))
+        && (!filters.coordinator_id || (filters.coordinator_id === 'unassigned'
+          ? !event.coordinator_id : event.coordinator_id === filters.coordinator_id)))
         .sort((a, b) => String(a.proposed_date ?? '~').localeCompare(String(b.proposed_date ?? '~')) || Number(a.event_id) - Number(b.event_id));
       const events = matched.slice(0, 100).map((event): EventSearchResult => ({
         event_id: Number(event.event_id), name: text(event.name) ?? '', organisation: text(event.organisation),
@@ -44,7 +62,9 @@ export function createMemoryEventSearchStore(database: MemoryDatabase, token: st
     },
     async options() {
       await requireInternal();
-      const coordinators = new Set(tables.account_roles.filter(row => row.role === 'event_coordinator').map(row => row.user_id));
+      const coordinators = new Set([
+        ...tables.account_roles.filter(row => row.role === 'event_coordinator').map(row => row.user_id),
+        ...tables.events.filter(row => row.status !== 'draft' && row.coordinator_id).map(row => row.coordinator_id)]);
       return {
         venues: tables.venues.filter(venue => !venue.deleted_at)
           .map(venue => ({ venue_id: Number(venue.venue_id), name: String(venue.name) }))
@@ -58,14 +78,19 @@ export function createMemoryEventSearchStore(database: MemoryDatabase, token: st
 }
 
 /**
- * SG2-70 events across two organisations:
- * - 701 Harbour Gala: social, Planning, `coordinator`, booked at Regression Hall, 1 Nov 2030.
- * - 702 Coastal Leaders Summit: conference, Approved, `coordinator`, requested at Quiet Room, 2 Nov 2030.
- * - 703 Quiet Trust Workshop: workshop, Awaiting Assignment, no coordinator, 5 Nov 2030.
+ * SG2-70 events across organisations, and who may find each (SG2-104):
+ * - 701 Harbour Gala: social, Planning, `coordinator`, booked at Regression Hall, 1 Nov 2030
+ *   (Lead, coordinator, Venue Staff).
+ * - 702 Coastal Leaders Summit: conference, Approved, `coordinator`, requested at Quiet Room, 2 Nov 2030
+ *   (Lead, coordinator, Venue Staff).
+ * - 703 Quiet Trust Workshop: workshop, Awaiting Assignment, no coordinator, equipment requested, 5 Nov 2030
+ *   (Lead, Technical Support).
+ * - 705 Bayfront Safety Briefing: seminar, Awaiting Safety Check, `coordinator`, 20 Nov 2030
+ *   (Lead, coordinator, Safety Officer).
  * - 704 Harbour secret draft: a draft with "Harbour" in its name, never found.
  */
 export function seedEventSearch(database: MemoryDatabase) {
-  const { events, venue_bookings: bookings, venue_booking_requests: requests } = database.tables;
+  const { events, venue_bookings: bookings, venue_booking_requests: requests, equipment_requests: equipment } = database.tables;
   const base = { ...events[0], organiser_id: 'user-organiser' };
   events.push(
     { ...base, event_id: 701, name: 'Harbour Gala', organisation: 'Harbour Foundation', category: 'social',
@@ -75,8 +100,13 @@ export function seedEventSearch(database: MemoryDatabase) {
     { ...base, event_id: 703, name: 'Quiet Trust Workshop', organisation: 'Quiet Trust', category: 'workshop',
       status: 'unassigned', coordinator_id: null, proposed_date: '2030-11-05T02:00:00.000Z' },
     { ...base, event_id: 704, name: 'Harbour secret draft', organisation: 'Harbour Foundation', category: 'social',
-      status: 'draft', coordinator_id: null, proposed_date: '2030-11-01T02:00:00.000Z' }
+      status: 'draft', coordinator_id: null, proposed_date: '2030-11-01T02:00:00.000Z' },
+    { ...base, event_id: 705, name: 'Bayfront Safety Briefing', organisation: 'Bayfront Council', category: 'seminar',
+      status: 'awaiting_safety_check', coordinator_id: 'user-coordinator', proposed_date: '2030-11-20T02:00:00.000Z' }
   );
+  equipment.push({ request_id: 703, event_id: 703, equipment_id: 1, quantity: 2, notes: null, status: 'pending',
+    starts_at: '2030-11-05T01:00:00.000Z', ends_at: '2030-11-05T09:00:00.000Z', arrangement_notes: null, shortfall: 0,
+    placement_venue_id: null, placement_position: null, version: 1 });
   bookings.push({ booking_id: 701, venue_id: 1, event_id: 701, starts_at: '2030-11-01T01:00:00.000Z',
     ends_at: '2030-11-01T09:00:00.000Z', status: 'confirmed' });
   requests.push({ request_id: 702, event_id: 702, venue_id: 2, starts_at: '2030-11-02T01:00:00.000Z',

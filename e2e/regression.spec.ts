@@ -2527,8 +2527,7 @@ test('SG2-105-P01 | [SG2-105:AC1] [SG2-105:AC2] [NORMAL] [BOUNDARY] an organiser
     await page.getByLabel(new RegExp(`^${label}`)).fill(value);
   }
   await expect(submit).toBeDisabled();
-  // Layout, accessibility, equipment, registration and (SG2-70) the category.
-  await expect(page.getByText('5 required fields still empty.', { exact: true })).toBeVisible();
+  await expect(page.getByText('4 required fields still empty.', { exact: true })).toBeVisible();
   await expect(page.getByText('Say whether registration is needed', { exact: true })).toBeVisible();
   // The changed form fits a phone and a laptop (DoD v2.1 responsive check).
   for (const width of [390, 1440]) {
@@ -2542,9 +2541,6 @@ test('SG2-105-P01 | [SG2-105:AC1] [SG2-105:AC2] [NORMAL] [BOUNDARY] an organiser
   await expect(page.getByLabel(/^Accessibility needs/)).toHaveValue('None');
   await expect(submit).toBeDisabled();
   await page.getByRole('button', { name: 'No registration needed', exact: true }).click();
-  // SG2-70: the category is required as well.
-  await expect(submit).toBeDisabled();
-  await page.getByRole('button', { name: 'Seminar', exact: true }).click();
   await expect(submit).toBeEnabled();
   await submit.click();
   await expect(page.getByRole('status').filter({ hasText: 'Layout workshop has been submitted for review.' })).toBeVisible();
@@ -2579,13 +2575,12 @@ test('SG2-105-F01 | [SG2-105:AC2] [SG2-105:AC3] [SG2-105:AC4] [FAILURE] [BOUNDAR
   const created = await page.request.post('/api/event-requests', { headers, data: { ...original, accessibility_needs: '   ' } });
   expect(created.status()).toBe(201);
   const body = await created.json();
-  // SG2-70 adds the category to what submission still needs.
-  expect(body.missingForSubmission).toEqual(['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category']);
+  expect(body.missingForSubmission).toEqual(['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
   const id = body.request.event_id;
   // AC3 + AC2: refused, every missing item listed (blank accessibility included), still a draft.
   const refused = await page.request.patch(`/api/event-requests/${id}/submit`, { headers });
   expect([refused.status(), await refused.json()]).toEqual([400, { error: 'Event request is missing required fields.',
-    missing: ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category'] }]);
+    missing: ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'] }]);
   expect((await eventRecords(page)).find(row => row.event_id === id)?.status).toBe('draft');
   // The draft keeps showing what is outstanding when the organiser reopens it.
   await nav(page, 'My drafts');
@@ -2597,8 +2592,7 @@ test('SG2-105-F01 | [SG2-105:AC2] [SG2-105:AC3] [SG2-105:AC4] [FAILURE] [BOUNDAR
   await expect(page.getByRole('button', { name: 'Submit request', exact: true })).toBeDisabled();
   // Answering "None" and "No" is enough.
   const completed = await page.request.patch(`/api/event-requests/${id}`, { headers, data: { ...original,
-    preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false,
-    category: 'workshop' } });
+    preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None', registration_needed: false } });
   expect((await completed.json()).missingForSubmission).toEqual([]);
   expect((await page.request.patch(`/api/event-requests/${id}/submit`, { headers })).status()).toBe(200);
   expect((await eventRecords(page)).find(row => row.event_id === id)?.status).toBe('unassigned');
@@ -2698,16 +2692,16 @@ function searchResult(page: Page, name: string) {
   return page.getByRole('region', { name: 'Search results' }).getByRole('article', { name });
 }
 
-test('SG2-70-P01 | [SG2-70:AC1] [SG2-70:AC2] [NORMAL] a coordinator finds an event by name or client organisation and narrows the list by date, state, venue, category and coordinator', async ({ page, request }) => {
+test('SG2-70-P01 | [SG2-70:AC1] [SG2-70:AC2] [NORMAL] the Lead finds an event by name or client organisation and narrows the list by date, state, venue, category and coordinator', async ({ page, request }) => {
   expect((await request.post('/__e2e/event-search')).status()).toBe(204);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await signIn(page, 'coordinator');
+  await signIn(page, 'lead');
   await openFindEvent(page);
 
   // Every submitted event is listed soonest first, with what identifies it.
   const results = page.getByRole('region', { name: 'Search results' });
-  await expect(results.getByRole('heading', { level: 2 })).toHaveText('3 events found');
-  await expect(results.getByRole('article')).toHaveText([/Harbour Gala/, /Coastal Leaders Summit/, /Quiet Trust Workshop/]);
+  await expect(results.getByRole('heading', { level: 2 })).toHaveText('4 events found');
+  await expect(results.getByRole('article')).toHaveText([/Harbour Gala/, /Coastal Leaders Summit/, /Quiet Trust Workshop/, /Bayfront Safety Briefing/]);
   const gala = searchResult(page, 'Harbour Gala');
   for (const text of ['Harbour Foundation', 'Social', 'Regression Hall', 'Regression coordinator', 'Arrangements']) {
     await expect(gala.getByText(text, { exact: true })).toBeVisible();
@@ -2728,7 +2722,8 @@ test('SG2-70-P01 | [SG2-70:AC1] [SG2-70:AC2] [NORMAL] a coordinator finds an eve
     ['Category', 'Workshop', [/Quiet Trust Workshop/]],
     ['Venue', 'Quiet Room', [/Coastal Leaders Summit/]],
     ['State', 'Approved', [/Coastal Leaders Summit/]],
-    ['Assigned coordinator', 'Regression coordinator', [/Harbour Gala/, /Coastal Leaders Summit/]],
+    ['Assigned coordinator', 'Regression coordinator', [/Harbour Gala/, /Coastal Leaders Summit/, /Bayfront Safety Briefing/]],
+    ['Assigned coordinator', 'Unassigned', [/Quiet Trust Workshop/]],
   ] as const) {
     await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
     await page.getByLabel(label, { exact: true }).selectOption({ label: value });
@@ -2744,12 +2739,9 @@ test('SG2-70-P01 | [SG2-70:AC1] [SG2-70:AC2] [NORMAL] a coordinator finds an eve
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(results.getByRole('article')).toHaveText([/Coastal Leaders Summit/]);
 
-  // The other internal roles search the same list.
-  await switchAccount(page, 'safety');
-  await openFindEvent(page);
-  await expect(page.getByRole('region', { name: 'Search results' }).getByRole('article')).toHaveCount(3);
-
   // DoD v2.1: the screen fits a phone and a laptop.
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await expect(results.getByRole('article')).toHaveCount(4);
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -2757,7 +2749,7 @@ test('SG2-70-P01 | [SG2-70:AC1] [SG2-70:AC2] [NORMAL] a coordinator finds an eve
   }
 });
 
-test('SG2-70-P02 | [SG2-70:AC2] [NORMAL] an organiser must choose a category to submit, and a coordinator then finds the request by it', async ({ page }) => {
+test('SG2-70-P02 | [SG2-70:AC2] [NORMAL] an organiser may choose a category when submitting, and the Lead then finds the request by it', async ({ page }) => {
   await signIn(page, 'organiser');
   await nav(page, 'New request');
   for (const [label, value] of Object.entries({ 'Event name': 'Category Networking Night', Purpose: 'Meet partners',
@@ -2768,9 +2760,10 @@ test('SG2-70-P02 | [SG2-70:AC2] [NORMAL] an organiser must choose a category to 
   for (const answer of ['No accessibility needs', 'No equipment needed', 'No registration needed']) {
     await page.getByRole('button', { name: answer, exact: true }).click();
   }
+  // The category is optional: the request could already be submitted.
   const submit = page.getByRole('button', { name: 'Submit request', exact: true });
-  await expect(page.getByText('Choose a category', { exact: true })).toBeVisible();
-  await expect(submit).toBeDisabled();
+  await expect(page.getByRole('group', { name: /Category/ })).toContainText('Category (optional)');
+  await expect(submit).toBeEnabled();
   await page.getByRole('button', { name: 'Networking', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Networking', exact: true })).toHaveAttribute('aria-pressed', 'true');
   for (const width of [390, 1440]) {
@@ -2783,7 +2776,7 @@ test('SG2-70-P02 | [SG2-70:AC2] [NORMAL] an organiser must choose a category to 
   await expect(page.locator('dl > div').filter({ has: page.locator('dt').getByText('Category', { exact: true }) })
     .locator('dd')).toHaveText('Networking');
 
-  await switchAccount(page, 'coordinator');
+  await switchAccount(page, 'lead');
   await openFindEvent(page);
   await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Networking' });
   await page.getByRole('button', { name: 'Search', exact: true }).click();
@@ -2809,8 +2802,8 @@ test('SG2-70-N01 | [SG2-70:AC3] [FAILURE] only internal users can search, and a 
   await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('navigation').getByRole('button', { name: 'Find an event', exact: true })).toHaveCount(0);
 
-  // A coordinator searching the draft's exact name finds nothing: drafts are never found.
-  await switchAccount(page, 'coordinator');
+  // The Lead, who sees every submitted event, still never finds the draft.
+  await switchAccount(page, 'lead');
   await openFindEvent(page);
   await page.getByLabel('Event name or client organisation').fill('Harbour secret draft');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
@@ -2840,11 +2833,32 @@ test('SG2-70-N02 | [SG2-70:AC4] [BOUNDARY] when nothing matches, the screen says
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await test.info().attach('sg2-70-no-match-390', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
-  // One filter fewer and the event is there; clearing them all lists everything again.
+  // One filter fewer and the event is there; clearing them all lists Venue Staff's events again.
   await page.getByLabel('Category', { exact: true }).selectOption({ label: 'Any category' });
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Search results' }).getByRole('article')).toHaveText([/Harbour Gala/]);
   await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();
-  await expect(page.getByRole('region', { name: 'Search results' }).getByRole('article')).toHaveCount(3);
+  await expect(page.getByRole('region', { name: 'Search results' }).getByRole('article')).toHaveCount(2);
   await expect(page.getByLabel('Event name or client organisation')).toHaveValue('');
+});
+
+test('SG2-70-N03 | [SG2-70:AC3] [FAILURE] each internal role finds only the events it works on, in the screen and through the API', async ({ page, request }) => {
+  expect((await request.post('/__e2e/event-search')).status()).toBe(204);
+  const seen: Record<string, string[]> = {
+    coordinator: ['Harbour Gala', 'Coastal Leaders Summit', 'Bayfront Safety Briefing'],
+    venue: ['Harbour Gala', 'Coastal Leaders Summit'],
+    support: ['Quiet Trust Workshop'],
+    safety: ['Bayfront Safety Briefing'],
+  };
+  for (const [account, names] of Object.entries(seen)) {
+    await switchAccount(page, account);
+    await openFindEvent(page);
+    await expect(page.getByRole('region', { name: 'Search results' }).getByRole('article'))
+      .toHaveText(names.map(name => new RegExp(name)));
+  }
+  // Searching another role's event by name finds nothing, even through the API.
+  const login = await request.post('/api/auth/login', { data: { email: 'support@example.test', password } });
+  const auth = { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  const hidden = await request.get('/api/event-search?q=Harbour', { headers: auth });
+  expect([hidden.status(), (await hidden.json()).events]).toEqual([200, []]);
 });
