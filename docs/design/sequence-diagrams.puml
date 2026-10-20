@@ -189,7 +189,7 @@ LEAD -> WEB : pick coordinator for event
 WEB -> API : PATCH /api/event-requests/:eventId/coordinator\n{coordinatorId} [event_request.assign_coordinator]
 API -> DB : fetchEventRequestById
 API -> API : status in COORDINATOR_ASSIGNABLE_STATUSES? else 409
-API -> DB : getAccountRole(coordinatorId) = event_coordinator? else 400
+API -> DB : getHeldRoles(coordinatorId) includes event_coordinator? else 400
 API -> DB : assignEventCoordinator: update events\nset coordinator_id [, status unassigned -> submitted]\nwhere status = from and coordinator_id = expected
 alt zero rows (changed meanwhile)
   API --> WEB : 409
