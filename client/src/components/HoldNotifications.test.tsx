@@ -330,3 +330,28 @@ test.each(['unmount', 'mutation'] as const)('[CONFLICT] [SG2-69:AC2] %s stops a 
   await act(async () => pending(value([placed], 1, cursor)));
   expect(api.loadNotificationInbox).toHaveBeenCalledTimes(4);
 });
+
+
+test('[CONFLICT] [SG2-69:AC1] [SG2-69:AC6] [SG2-104:AC1] changing acting role with the same token discards pending inbox and coordinator preferences', async () => {
+  let inbox!: (result: InboxOutcome<InboxPage>) => void;
+  let preferences!: (result: InboxOutcome<ReminderPreferences>) => void;
+  vi.mocked(api.loadNotificationInbox).mockResolvedValueOnce(value([placed]))
+    .mockImplementationOnce(() => new Promise(resolve => { inbox = resolve; })).mockResolvedValue(value());
+  vi.mocked(api.loadReminderPreferences).mockImplementationOnce(() => new Promise(resolve => { preferences = resolve; }));
+  const view = render(<AppShell role="Event Coordinator" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="token">Desk</AppShell>);
+  await open();
+  expect(screen.getByText(placed.message)).toBeVisible();
+  expect(screen.getByRole('spinbutton', { name: 'Reminder frequency (days)' })).toBeDisabled();
+
+  view.rerender(<AppShell role="Venue Staff" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="token">Desk</AppShell>);
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  await act(async () => {
+    inbox(value([placed], 42));
+    preferences({ ok: true, value: { frequency_days: 7 } });
+  });
+  await open(0);
+  expect(screen.queryByText(placed.message)).not.toBeInTheDocument();
+  expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+  expect(api.loadReminderPreferences).toHaveBeenCalledTimes(1);
+  expect(api.loadNotificationInbox).toHaveBeenCalledTimes(4);
+});

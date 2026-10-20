@@ -1,4 +1,6 @@
 import { AccessError } from '../../server/src/auth/policy';
+import { currentActingRole } from '../../server/src/auth/actingRole';
+import { hasEventRelationship } from '../../server/src/events/eventRelationship';
 import type { MemoryDatabase } from './memory-database';
 import type { NotificationInboxStore, InboxCursor, InboxNotification, NotificationSource } from '../../server/src/db/notificationInbox';
 
@@ -7,7 +9,11 @@ import type { NotificationInboxStore, InboxCursor, InboxNotification, Notificati
 export function createMemoryNotificationInbox(database: MemoryDatabase) {
   return (token: string): NotificationInboxStore => {
     const user = () => database.sessions.get(token)!;
-    const role = () => database.tables.account_roles.find(row => row.user_id === user())?.role;
+    const role = () => {
+      const selected = currentActingRole();
+      if (!selected || !database.tables.account_roles.some(row => row.user_id === user() && row.role === selected)) throw new AccessError(403);
+      return selected;
+    };
     const table = (source: NotificationSource) => database.tables[source === 'event' ? 'notifications' : 'venue_hold_notifications'];
     const own = (source: NotificationSource, id: number) => table(source).find(row => row.recipient_id === user() && row.notification_id === id);
     const compare = (a: InboxCursor, b: InboxCursor) => Date.parse(b.created_at) - Date.parse(a.created_at)
@@ -47,10 +53,18 @@ export function createMemoryNotificationInbox(database: MemoryDatabase) {
         const row = own(source, id);
         const event = row && database.tables.events.find(event => event.event_id === row.event_id);
         if (!event) return null;
+        const selectedRole = role();
         const viewer = database.tables.users.find(row => row.user_id === user());
-        if (role() === 'event_coordinator' && event.coordinator_id !== user()) return null;
-        if (role() === 'event_organiser' && (event.organiser_id !== user() || !viewer?.organisation || event.organisation !== viewer.organisation)) return null;
-        if (role() === 'attendee' && !database.tables.registrations.some(row => row.event_id === event.event_id && row.user_id === user())) return null;
+        if (selectedRole === 'attendee') {
+          if (!database.tables.registrations.some(row => row.event_id === event.event_id && row.user_id === user())) return null;
+        } else {
+          const relationship = await hasEventRelationship(database.client, selectedRole, user(), {
+            event_id: Number(event.event_id), organiser_id: String(event.organiser_id),
+            coordinator_id: event.coordinator_id == null ? null : String(event.coordinator_id), status: String(event.status),
+          });
+          if (!relationship.ok || !relationship.related) return null;
+          if (selectedRole === 'event_organiser' && (!String(viewer?.organisation ?? '').trim() || event.organisation !== viewer?.organisation)) return null;
+        }
         return { event_id: Number(event.event_id), name: String(event.name), status: String(event.status), proposed_date: event.proposed_date == null ? null : String(event.proposed_date) };
       },
       async preferences() { return { frequency_days: Number(preference()?.frequency_days ?? 1) }; },
@@ -65,7 +79,8 @@ export function createMemoryNotificationInbox(database: MemoryDatabase) {
 }
 
 /** Repeated numeric IDs in different sources are intentional. */
-export function seedNotificationInbox(database: MemoryDatabase, large = false) {
+export function seedNotificationInbox(database: MemoryDatabase, large = false, multiRole = false) {
+  if (multiRole) database.tables.account_roles.push({ user_id: 'user-coordinator', role: 'attendee' });
   database.tables.events.push({ ...database.tables.events[0], event_id: 691, name: 'Reminder Forum',
     coordinator_id: 'user-coordinator', status: 'planning', proposed_date: '2030-06-20T02:00:00.000Z' });
   const base = { recipient_id: 'user-coordinator', event_id: 691, request_id: null, read_at: null };

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
 import { createAuthorization, AccessError, ROLES, type Role } from './auth';
+import { currentActingRole } from './auth/actingRole';
 import { dbConfig } from './db';
 import type { NotificationInboxStore } from './db/notificationInbox';
 import { createNotificationsRouter } from './notifications';
@@ -130,4 +131,27 @@ test('[FAILURE] [SG2-69:AC1] [SG2-69:AC4] upstream exceptions and missing config
     assert.equal(response.headers['cache-control'], 'no-store');
   }
   assert.equal((await request(app()).get('/api/notifications/inbox').set(auth())).status, 503);
+});
+
+test('[NORMAL] [CONFLICT] [SG2-69:AC6] [SG2-104:AC2] held coordinator permissions apply only while acting as coordinator and disappear on revocation', async () => {
+  let held: readonly Role[] = ['event_coordinator', 'attendee'];
+  const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'multi-role-person', roles: held }) });
+  const calls: unknown[] = [];
+  const api = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(access, async () => [], token => {
+    calls.push([token, currentActingRole()]);
+    return store();
+  })));
+  const headers = { Authorization: 'Bearer verified-token' };
+  assert.equal((await api.get('/api/notifications/inbox').set(headers)).status, 200);
+  assert.deepEqual(calls, [['verified-token', 'attendee']]);
+  assert.equal((await api.get('/api/notifications/reminder-preferences').set(headers)).status, 403);
+  assert.equal((await api.put('/api/notifications/reminder-preferences').set(headers).set('X-Acting-Role', 'attendee').send({ frequency_days: 3 })).status, 403);
+  assert.equal((await api.put('/api/notifications/reminder-preferences').set(headers).set('X-Acting-Role', 'venue_staff').send({ frequency_days: 3 })).status, 403);
+  assert.equal(calls.length, 1, 'Other acting roles cannot reach the coordinator preference store.');
+  const saved = await api.put('/api/notifications/reminder-preferences').set(headers).set('X-Acting-Role', 'event_coordinator').send({ frequency_days: 3 });
+  assert.deepEqual([saved.status, saved.body], [200, { frequency_days: 3 }]);
+  assert.deepEqual(calls[1], ['verified-token', 'event_coordinator']);
+  held = ['attendee'];
+  assert.equal((await api.get('/api/notifications/reminder-preferences').set(headers).set('X-Acting-Role', 'event_coordinator')).status, 403);
+  assert.equal(calls.length, 2, 'Role revocation is checked again before accessing storage.');
 });

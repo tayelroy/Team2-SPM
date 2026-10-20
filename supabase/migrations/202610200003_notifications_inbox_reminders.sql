@@ -1,6 +1,9 @@
 -- SG2-69: one recipient-owned inbox and Free pg_cron arrangement reminders.
 -- Historical event/hold notices start unread. Read receipts never modify their
 -- recipient, event, message or creation time. Existing delivery jobs are retained.
+-- Follows SG2-104: inbox ownership spans roles, while event summaries and
+-- preferences use the caller's validated acting role. This unreleased migration
+-- uses version 202610200003 so SG2-104's 202610200002 runs first.
 begin;
 
 alter table public.notifications add column read_at timestamptz;
@@ -139,14 +142,19 @@ begin
   if target is null then return null; end if;
   select * into e from public.events where event_id=target;
   if not found then return null; end if;
-  select role into caller_role from public.account_roles where user_id=caller;
-  if caller_role='event_coordinator' and e.coordinator_id is distinct from caller then return null; end if;
+  caller_role:=public.acting_role();
+  if caller_role is null then return null; end if;
   if caller_role='event_organiser' and (e.organiser_id is distinct from caller or not exists(
       select 1 from public.users u where u.user_id=caller and u.organisation=e.organisation
         and btrim(u.organisation,U&'\0009\000A\000B\000C\000D\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF')<>'')) then
     return null;
   end if;
   if caller_role='attendee' and not exists(select 1 from public.registrations r where r.event_id=target and r.attendee_id=caller) then return null; end if;
+  -- A past recipient keeps their message/read receipt, but opening its current
+  -- event summary requires the selected role's relationship now (SG2-104).
+  -- Registered attendees have this minimal summary even though the broader
+  -- stage/history relationship helper deliberately excludes attendees.
+  if caller_role<>'attendee' and not private.event_relationship_exists(target,caller_role) then return null; end if;
   return jsonb_build_object('event_id',e.event_id,'name',coalesce(nullif(e.name,''),'Untitled event'),
     'status',e.status::text,'proposed_date',e.proposed_date);
 end $$;
@@ -154,7 +162,7 @@ create function public.notification_reminder_preferences() returns jsonb
 language plpgsql stable security definer set search_path='' as $$
 declare caller uuid:=public.notification_inbox_caller(); days integer;
 begin
-  if not exists(select 1 from public.account_roles where user_id=caller and role='event_coordinator') then
+  if public.acting_role() is distinct from 'event_coordinator' then
     raise exception using errcode='42501',message='Access denied';
   end if;
   select frequency_days into days from public.notification_reminder_settings where user_id=caller;
@@ -164,7 +172,7 @@ create function public.set_notification_reminder_preferences(p_frequency_days in
 language plpgsql volatile security definer set search_path='' as $$
 declare caller uuid:=public.notification_inbox_caller(); caller_role text;
 begin
-  select role into caller_role from public.account_roles where user_id=caller for share;
+  caller_role:=public.lock_acting_role();
   if caller_role is distinct from 'event_coordinator' then raise exception using errcode='42501',message='Access denied'; end if;
   if p_frequency_days is null or p_frequency_days not between 1 and 30 then
     raise exception using errcode='22023',message='Frequency must be 1 to 30 whole days';
@@ -200,7 +208,7 @@ begin
 end $$;
 create function public.send_outstanding_arrangement_reminders() returns integer
 language plpgsql volatile security definer set search_path='' as $$
-declare e public.events; caller_role text; outstanding text[]; days integer; last_sent timestamptz; instant timestamptz; sent integer:=0; labels text;
+declare e public.events; outstanding text[]; days integer; last_sent timestamptz; instant timestamptz; sent integer:=0; labels text;
 begin
   -- At most one sweep owns the receipts. A concurrent cron/manual sweep exits
   -- promptly; aborted transactions roll back notices and receipts together.
@@ -209,8 +217,10 @@ begin
       and status not in ('cancelled','completed','rejected') order by event_id for update loop
     -- A reassignment/cancellation which committed while the row lock was being
     -- acquired is rechecked by READ COMMITTED's locking SELECT.
-    select role into caller_role from public.account_roles where user_id=e.coordinator_id for share;
-    if caller_role is distinct from 'event_coordinator' then continue; end if;
+    -- A scheduled sweep has no selected web role. Check and lock the exact
+    -- held coordinator role; a second held role must never mask it.
+    perform 1 from public.account_roles where user_id=e.coordinator_id and role='event_coordinator' for share;
+    if not found then continue; end if;
     if e.proposed_date<=clock_timestamp() then continue; end if;
     outstanding:=public.notification_outstanding_arrangements(e);
     if cardinality(outstanding)=0 then continue; end if;

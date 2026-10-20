@@ -1,5 +1,6 @@
 -- SG2-69 public RPC behavior against native PostgreSQL; no hosted mutations.
 begin;
+select set_config('request.headers','{}',true);
 insert into auth.users(id) select ('e6900000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid from generate_series(1,9)n;
 insert into public.users(user_id,name,role_id,organisation) select ('e6900000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'Inbox fixture '||n,
   case n when 1 then 2 when 2 then 2 when 3 then 1 when 4 then 3 when 5 then 4 when 6 then 5 when 7 then 6 when 8 then 7 else 5 end,'SG69 Org' from generate_series(1,9)n;
@@ -111,8 +112,10 @@ do $$ declare n integer; result jsonb; begin
    result:=public.notification_inbox();
    if result->>'unread_count' is distinct from '1' or jsonb_array_length(result->'notifications') is distinct from 1 then
      raise exception '[SG2-69:all-role-inboxes] [SG2-69:AC1] [NORMAL] Role % must receive exactly its own inbox: %',n,result; end if;
-   if n in (3,4,5,7,8) and public.notification_event('event',97000+n)->>'event_id' is distinct from '96901' then
-     raise exception '[SG2-69:current-recipient-event-targets] [SG2-69:AC3] [NORMAL] Current organiser and internal recipients must open only their notice event'; end if;
+   if n in (3,4,7) and public.notification_event('event',97000+n)->>'event_id' is distinct from '96901' then
+     raise exception '[SG2-69:current-recipient-event-targets] [SG2-69:AC3] [NORMAL] Current organiser and related internal recipients must open only their notice event'; end if;
+   if n in (2,5,8) and public.notification_event('event',97000+n) is not null then
+     raise exception '[SG2-69:unrelated-internal-event-targets] [SG2-69:AC3] [SG2-104:AC6] [FAILURE] A recipient role without a current event relationship cannot open its summary'; end if;
    if n>2 then
      begin perform public.notification_reminder_preferences(); raise exception '[SG2-69:non-coordinator-preference-read-denied] [SG2-69:AC6] [FAILURE] Only coordinators may read reminder preferences'; exception when insufficient_privilege then null; end;
      begin perform public.set_notification_reminder_preferences(2); raise exception '[SG2-69:non-coordinator-preference-write-denied] [SG2-69:AC6] [FAILURE] Only coordinators may write reminder preferences'; exception when insufficient_privilege then null; end;
@@ -128,6 +131,37 @@ do $$ declare n integer; result jsonb; begin
  raise notice '[SG2-69:missing-identity-role] [SG2-69:AC1] [FAILURE] Missing subject or stored role is denied';
 end $$;
 reset role;
+-- Inbox receipts belong to the person across held roles; the selected role
+-- still gates event summaries and coordinator-only reminder settings.
+insert into public.account_roles(user_id,role) values('e6900000-0000-4000-8000-000000000001','attendee');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000001',true);
+select set_config('request.headers','{"x-acting-role":"attendee"}',true);
+do $$ declare result jsonb; begin
+ result:=public.notification_inbox();
+ if jsonb_array_length(result->'notifications') is distinct from 50 or result->>'unread_count' is distinct from '0' then
+   raise exception '[SG2-69:multi-role-inbox-ownership] [SG2-69:AC1] [SG2-104:AC1] [NORMAL] Switching role preserves the same recipient inbox and read receipts'; end if;
+ perform public.read_notification('hold',96955);
+ perform public.read_all_notifications();
+ if public.notification_event('event',96955) is not null then
+   raise exception '[SG2-69:acting-role-event-summary] [SG2-69:AC3] [SG2-104:AC6] [FAILURE] A held coordinator role cannot grant an acting attendee access to an unregistered event'; end if;
+ begin perform public.notification_reminder_preferences(); raise exception '[SG2-69:acting-role-preference-read] [SG2-69:AC6] [SG2-104:AC2] [FAILURE] A held coordinator role cannot grant an acting attendee reminder preferences'; exception when insufficient_privilege then null; end;
+ begin perform public.set_notification_reminder_preferences(2); raise exception '[SG2-69:acting-role-preference-write] [SG2-69:AC6] [SG2-104:AC2] [FAILURE] An acting attendee cannot edit coordinator preferences'; exception when insufficient_privilege then null; end;
+ perform set_config('request.headers','{"x-acting-role":"event_coordinator"}',true);
+ if public.notification_event('hold',96955)->>'event_id' is distinct from '96901' then
+   raise exception '[SG2-69:multi-role-coordinator-target] [SG2-69:AC3] [SG2-104:AC6] [NORMAL] The selected held coordinator role can open its assigned event'; end if;
+ perform public.set_notification_reminder_preferences(1);
+ if public.notification_reminder_preferences()->>'frequency_days' is distinct from '1' then
+   raise exception '[SG2-69:multi-role-coordinator-preferences] [SG2-69:AC6] [SG2-104:AC2] [NORMAL] A selected held coordinator role can edit its reminder preferences'; end if;
+ foreach result in array array['{}'::jsonb,'{"x-acting-role":"venue_staff"}'::jsonb] loop
+   perform set_config('request.headers',result::text,true);
+   if public.notification_event('event',96955) is not null then
+     raise exception '[SG2-69:unresolved-acting-role-summary] [SG2-69:AC3] [SG2-104:AC2] [FAILURE] Missing or unheld acting roles cannot resolve event summaries'; end if;
+   begin perform public.set_notification_reminder_preferences(2); raise exception '[SG2-69:unresolved-acting-role-preferences] [SG2-69:AC6] [SG2-104:AC2] [FAILURE] Missing or unheld acting roles cannot edit preferences'; exception when insufficient_privilege then null; end;
+ end loop;
+end $$;
+select set_config('request.headers','{}',true);
+reset role;
 insert into public.registrations(event_id,attendee_id,status) values(96901,'e6900000-0000-4000-8000-000000000006','confirmed');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000006',true);
@@ -137,8 +171,10 @@ update public.users set organisation='Another org' where user_id='e6900000-0000-
 update public.events set coordinator_id='e6900000-0000-4000-8000-000000000002' where event_id=96901;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000001',true);
+select set_config('request.headers','{"x-acting-role":"event_coordinator"}',true);
 do $$ begin if public.notification_event('hold',96955) is not null then raise exception '[SG2-69:reassigned-target] [SG2-69:AC3] [CONFLICT] Former coordinator cannot open old event'; end if; end $$;
 select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000003',true);
+select set_config('request.headers','{}',true);
 do $$ begin if public.notification_event('event',97003) is not null then raise exception '[SG2-69:organisation-change-target] [SG2-69:AC3] [FAILURE] Former organisation membership cannot open event'; end if; end $$;
 reset role;
 update public.users set organisation='SG69 Org' where user_id='e6900000-0000-4000-8000-000000000003';
@@ -234,6 +270,32 @@ do $$ declare stage text; sent integer; begin
  if sent is distinct from 1 or not exists(select 1 from public.notifications where kind='outstanding_arrangements' and event_id=96901 and recipient_id='e6900000-0000-4000-8000-000000000002') then
    raise exception '[SG2-69:reassignment-new-recipient] [SG2-69:AC7] [CONFLICT] Reassigned event must notify only its current coordinator without old cadence suppressing first reminder'; end if;
 end $$;
+-- The summary uses the same current internal relationships as stage/history:
+-- an equipment request creates the support relationship, and reaching the
+-- safety stage creates the safety relationship.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000005',true);
+do $$ begin
+ if public.notification_event('event',97005)->>'event_id' is distinct from '96901' then
+   raise exception '[SG2-69:related-support-summary] [SG2-69:AC3] [SG2-104:AC6] [NORMAL] Support staff with a current equipment relationship can open its own notice summary'; end if;
+end $$;
+reset role;
+update public.events set status='awaiting_safety_check' where event_id=96901;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000008',true);
+do $$ begin
+ if public.notification_event('event',97008)->>'event_id' is distinct from '96901' then
+   raise exception '[SG2-69:related-safety-summary] [SG2-69:AC3] [SG2-104:AC6] [NORMAL] Safety stage creates the current safety officer relationship'; end if;
+end $$;
+reset role;
+update public.events set status='planning' where event_id=96901;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000008',true);
+do $$ begin
+ if public.notification_event('event',97008) is not null then
+   raise exception '[SG2-69:revoked-safety-summary] [SG2-69:AC3] [SG2-104:AC6] [CONFLICT] Returning to planning removes the safety relationship while preserving the notice'; end if;
+end $$;
+reset role;
 set local role anon;
 do $$ begin
  begin perform public.notification_inbox(); raise exception '[SG2-69:anonymous-inbox-denied] [SG2-69:AC1] [FAILURE] Anonymous caller cannot read an inbox'; exception when insufficient_privilege then null; end;

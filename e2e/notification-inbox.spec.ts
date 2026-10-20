@@ -157,3 +157,43 @@ test('SG2-69-R01 | [NORMAL] [CONFLICT] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] a 
   expect(stored.notifications.find((row: { notification_id: number }) => row.notification_id === 3).read_at).toEqual(expect.any(String));
   expect(stored.holds[0].read_at).toBeNull();
 });
+
+test('SG2-69-R02 | [NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-104:AC2] switching roles keeps owned notices and receipts while event targets and reminder settings follow the acting role', async ({ page, request }) => {
+  expect((await request.post('/__e2e/notification-inbox', { data: { multiRole: true } })).status()).toBe(204);
+  await signIn(page);
+  const acting = page.getByRole('combobox', { name: 'Acting as', exact: true });
+  await expect(acting).toHaveValue('Attendee');
+  await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+  await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveCount(0);
+  await expect(inbox(page).getByRole('button', { name: /^Unread:/ })).toHaveCount(2);
+  await inbox(page).getByRole('button', { name: 'Close notifications', exact: true }).click();
+
+  const login = await request.post('/api/auth/login', { data: { email: 'coordinator@example.test', password: 'Regression123!' } });
+  expect(login.status()).toBe(200);
+  const headers = { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  expect((await request.get('/api/notifications/event/1/event', { headers })).status()).toBe(404);
+  expect((await request.put('/api/notifications/reminder-preferences', { headers, data: { frequency_days: 4 } })).status()).toBe(403);
+
+  await acting.selectOption('Event Coordinator');
+  await expect(acting).toHaveValue('Event Coordinator');
+  await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+  await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveValue('1');
+  await inbox(page).getByLabel('Reminder frequency (days)', { exact: true }).fill('4');
+  await inbox(page).getByRole('button', { name: 'Save reminder frequency', exact: true }).click();
+  await expect(inbox(page).getByRole('status')).toContainText('saved');
+  await inbox(page).getByRole('button', { name: 'Unread: Reminder Forum still needs: Venue booking, Equipment.', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Reminder Forum', exact: true })).toBeVisible();
+  const receipt = (await ledger(page)).notifications.find((row: { notification_id: number }) => row.notification_id === 1).read_at;
+  expect(receipt).toEqual(expect.any(String));
+
+  await acting.selectOption('Attendee');
+  await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+  await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveCount(0);
+  await expect(inbox(page).getByRole('button', { name: 'Read: Reminder Forum still needs: Venue booking, Equipment.', exact: true })).toBeVisible();
+  expect((await request.get('/api/notifications/event/1/event', { headers: { ...headers, 'X-Acting-Role': 'attendee' } })).status()).toBe(404);
+  expect((await request.get('/api/notifications/event/1/event', { headers: { ...headers, 'X-Acting-Role': 'event_coordinator' } })).status()).toBe(200);
+  const stored = await ledger(page);
+  expect(stored.preferences).toEqual([{ user_id: 'user-coordinator', frequency_days: 4 }]);
+  expect(stored.notifications.find((row: { notification_id: number }) => row.notification_id === 1).read_at).toBe(receipt);
+  expect(stored.holds[0].read_at).toBeNull();
+});

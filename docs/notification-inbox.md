@@ -25,16 +25,18 @@ writes keep the row and count unchanged so the user can retry.
 tables, including unloaded pages. It preserves notice contents and existing
 read timestamps. Rows arriving after the statement snapshot remain unread.
 All responses are `no-store`; the bell refreshes on mount, window focus,
-opening the drawer and every 30 seconds. Changing session discards the previous
-recipient's data and pending responses. Mutation replies supersede earlier
-polls.
+opening the drawer and every 30 seconds. Changing session or selected acting
+role discards the previous view and pending responses. The unread count and
+read receipts belong to the recipient across their held roles. Mutation replies
+supersede earlier polls.
 
 The event summary exposes only ID, name, status and proposed date, through
 `GET /api/notifications/:source/:id/event`. The client cannot choose an arbitrary
 event ID. SQL requires ownership of the notice and current access: coordinators
 must still be assigned, organisers must own the request in their current
 nonblank organisation, and attendees must be registered for the event. Internal
-staff can open the limited summary associated with their own notice. Missing,
+staff also need the current event relationship required by SG2-104 while acting
+as that role. Holding a second role does not bypass the selected role's checks. Missing,
 deleted or no-longer-accessible targets return the same unavailable response.
 Coordinators can continue with “View event details” into the existing assigned-event work queue, including arrangement and planning controls. Organisers continue to their existing request detail. Other roles retain the limited summary. This does not grant access to the private full event-request APIs.
 
@@ -64,7 +66,9 @@ earlier notices remain as history.
 
 The coordinator's drawer contains “Reminder frequency (days)”. The default is
 daily; whole-day intervals from 1 to 30 are supported. GET/PUT
-`/api/notifications/reminder-preferences` operates only on the caller's settings.
+`/api/notifications/reminder-preferences` operates only on the caller's settings
+while they are acting as an Event Coordinator. A role switch hides those controls;
+revocation is checked again before a settings write.
 The interval is measured from the most recent reminder **per event and
 recipient**. The hourly sweep sends once the interval is due, so delivery can
 be up to an hour after the due instant. A new assignment is not suppressed by
@@ -73,17 +77,24 @@ the next hourly sweep immediately eligible. Marking a reminder read does not
 change its delivery cadence.
 
 The sweep locks each event before reading arrangements and assignment, locks
-the recipient's role while sending, and commits the notice and cadence receipt
+the recipient's held coordinator role while sending, and commits the notice and cadence receipt
 in one transaction. A transaction-level advisory lock prevents overlapping
 sweeps from duplicating delivery. Preferences and receipts have forced RLS;
 authenticated clients use guarded RPCs, and cannot invoke the scheduler or
 write delivery receipts. All inbox RPCs use the caller's JWT. Legacy notification
-routes and the `venue-hold-deadlines` job remain available.
+routes and the `venue-hold-deadlines` job remain available. A coordinator holding
+several roles still receives reminders without keeping a coordinator browser
+session open; the scheduler checks their current held roles directly.
 
 ## Rollout and checks
 
-Apply `supabase/migrations/202610200002_notifications_inbox_reminders.sql` after
-all earlier migrations and before deploying this API/client. It adds columns,
+Apply `supabase/migrations/202610200003_notifications_inbox_reminders.sql` after
+all earlier migrations, including SG2-104's `202610200002_acting_role_functions.sql`,
+and before deploying this API/client. The unreleased notification migration was
+renumbered from `202610200002` to avoid a duplicate Supabase version when merging
+SG2-104. The inventory/build gate rejects new duplicate migration versions;
+the exact historical `202609220001` pair remains unchanged.
+It adds columns,
 indexes, private reminder tables, guarded RPCs and the named hourly job, and
 reloads the PostgREST schema. It does not rewrite existing messages or delete
 business rows. Historical notices becoming unread is intentional.

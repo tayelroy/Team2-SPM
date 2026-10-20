@@ -8,7 +8,7 @@ import request from 'supertest';
 import { createClient } from '@supabase/supabase-js';
 import { createApp } from '../server/src/app';
 import { createAuthorization, AccessError, type Role } from '../server/src/auth';
-import { getAccountRole } from '../server/src/db/accountRoles';
+import { getHeldRoles } from '../server/src/db/accountRoles';
 import { dbConfig } from '../server/src/db/config';
 import { createEventDraftHandler } from '../server/src/events/createDraft';
 import { createUpdateEventDraftHandler } from '../server/src/events/updateDraft';
@@ -65,9 +65,9 @@ const ids = Object.fromEntries(['organiser', 'coordinator', 'lead', 'venue', 'su
 const access = createAuthorization({ resolvePrincipal: async token => {
   const userId = ids[token];
   if (!userId) throw new AccessError(401);
-  const role = await getAccountRole(database, userId);
+  const role = await getHeldRoles(database, userId);
   if (!role.ok) throw new AccessError(403);
-  return { userId, role: role.role as Role };
+  return { userId, roles: role.roles as Role[] };
 } });
 let available = true;
 const dependencies = { getPrincipal: access.getPrincipal, getAdminClient: () => available ? database : null };
@@ -606,9 +606,9 @@ test('[NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC7] an organiser notification ta
   const callerAccess = createAuthorization({ resolvePrincipal: async token => {
     const who = Object.entries(tokens).find(([, value]) => value === token)?.[0];
     if (!who) throw new AccessError(401);
-    const role = await getAccountRole(database, ids[who]);
+    const role = await getHeldRoles(database, ids[who]);
     if (!role.ok) throw new AccessError(403);
-    return { userId: ids[who], role: role.role as Role };
+    return { userId: ids[who], roles: role.roles as Role[] };
   } });
   const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
   const as = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
@@ -628,6 +628,7 @@ test('[NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC7] an organiser notification ta
       const url = new URL(original.url);
       if (url.origin === 'https://notifications-integration.supabase.test') {
         assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`), 'Every inbox RPC carries its caller JWT.');
+        assert.ok(original.headers.has('x-acting-role'), 'Every inbox RPC carries the validated acting role.');
         url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
       } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
       return originalFetch(new Request(url, original));
@@ -826,9 +827,9 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-77:AC5] [SG2-77:AC6] [SG2-86:AC2] Safet
   const operationAccess = createAuthorization({ resolvePrincipal: async token => {
     const userId = token === tokens.safety ? safetyId : token === tokens.venue ? ids.venue : undefined;
     if (!userId) throw new AccessError(401);
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const operationApi = request(createApp(undefined, operationAccess));
   const venueIds: number[] = [];
@@ -909,9 +910,9 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-77:AC6] actual Staff upserts
     const name = (Object.keys(tokens) as (keyof typeof tokens)[]).find(name => tokens[name] === token);
     if (!name) throw new AccessError(401);
     const userId = userIds[name];
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const operationApi = request(createApp(undefined, operationAccess));
   let venueId: number | undefined;
@@ -1010,9 +1011,9 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC3] [S
   const callerAccess = createAuthorization({ resolvePrincipal: async token => {
     const userId = token === tokens.venue ? ids.venue : token === tokens.coordinator ? ids.coordinator : undefined;
     if (!userId) throw new AccessError(401);
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const callerApi = request(createApp(undefined, callerAccess));
   const as = (who: keyof typeof tokens) => ({ Authorization: `Bearer ${tokens[who]}` });
@@ -1109,9 +1110,9 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
   const callerAccess = createAuthorization({ resolvePrincipal: async token => {
     const who = Object.entries(tokens).find(([, value]) => value === token)?.[0];
     if (!who) throw new AccessError(401);
-    const role = await getAccountRole(database, ids[who]);
+    const role = await getHeldRoles(database, ids[who]);
     if (!role.ok) throw new AccessError(403);
-    return { userId: ids[who], role: role.role as Role };
+    return { userId: ids[who], roles: role.roles as Role[] };
   } });
   // The unmodified production factory builds a fresh user-scoped DB adapter.
   const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
@@ -1133,6 +1134,7 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
       const url = new URL(original.url);
       if (url.origin === 'https://notifications-integration.supabase.test') {
         assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`), 'Every inbox RPC carries its caller JWT.');
+        assert.ok(original.headers.has('x-acting-role'), 'Every inbox RPC carries the validated acting role.');
         url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
       } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
       return originalFetch(new Request(url, original));
@@ -1208,5 +1210,77 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
     transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
     assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
     if (venueId !== undefined) assert.equal((await database.from('venues').delete().eq('venue_id', venueId)).error, null);
+  }
+});
+
+test('[NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-69:AC7] [SG2-104:AC2] native notification targets and cadence follow the acting role while historical ownership survives a role switch or revocation', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const eventId = await planned();
+  const token = jwt('authenticated', ids.coordinator);
+  const anonKey = jwt('anon');
+  const callerAccess = createAuthorization({ resolvePrincipal: async presented => {
+    if (presented !== token) throw new AccessError(401);
+    const held = await getHeldRoles(database, ids.coordinator);
+    if (!held.ok) throw new AccessError(403);
+    return { userId: ids.coordinator, roles: held.roles as Role[] };
+  } });
+  const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
+  const as = (role?: Role) => ({ Authorization: `Bearer ${token}`, ...(role ? { 'X-Acting-Role': role } : {}) });
+  const rpcRoles: { path: string; role: string | null }[] = [];
+  let transport: ReturnType<typeof mock.method> | undefined;
+  let coordinatorRevoked = false;
+  try {
+    const inserted = await database.from('notifications').insert({ recipient_id: ids.coordinator, event_id: eventId,
+      request_id: null, kind: 'coordinator_assigned', message: 'One identity with separate acting roles.', read_at: null })
+      .select('notification_id').single();
+    assert.equal(inserted.error, null);
+    const noticeId = inserted.data!.notification_id;
+    assert.equal((await database.from('account_roles').insert({ user_id: ids.coordinator, role: 'attendee' })).error, null);
+    Object.assign(dbConfig, { supabaseUrl: 'https://multi-role-notifications-integration.supabase.test', supabaseAnonKey: anonKey });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://multi-role-notifications-integration.supabase.test') {
+        assert.equal(original.headers.get('authorization'), `Bearer ${token}`, 'Notification RPCs keep the authenticated user JWT.');
+        assert.equal(original.headers.get('apikey'), anonKey);
+        rpcRoles.push({ path: url.pathname, role: original.headers.get('x-acting-role') });
+        url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const target = (role?: Role) => callerApi.get(`/api/notifications/event/${noticeId}/event`).set(as(role));
+    assert.equal((await callerApi.get('/api/notifications/inbox').set(as())).status, 200);
+    assert.equal((await target()).status, 404, 'The least-privileged attendee default cannot borrow its held coordinator relationship.');
+    assert.equal((await target('event_coordinator')).status, 200);
+    assert.deepEqual(rpcRoles.filter(call => call.path.endsWith('/notification_event')).map(call => call.role), ['attendee', 'event_coordinator']);
+    assert.equal((await callerApi.get('/api/notifications/reminder-preferences').set(as())).status, 403);
+    assert.equal((await callerApi.get('/api/notifications/reminder-preferences').set(as('event_coordinator'))).status, 200);
+    const callsBeforeDenied = rpcRoles.length;
+    assert.equal((await callerApi.put('/api/notifications/reminder-preferences').set(as('attendee')).send({ frequency_days: 3 })).status, 403);
+    assert.equal((await target('venue_staff')).status, 403, 'An unheld acting role is refused before storage.');
+    assert.equal(rpcRoles.length, callsBeforeDenied);
+    const directDenied = await originalFetch(new URL('/rpc/set_notification_reminder_preferences', rest), { method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'X-Acting-Role': 'attendee', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_frequency_days: 3 }) });
+    assert.equal(directDenied.status, 403, 'SQL also refuses cadence writes under a held role other than coordinator.');
+    const firstRead = await callerApi.post(`/api/notifications/event/${noticeId}/read`).set(as('attendee'));
+    assert.equal(firstRead.status, 200);
+    assert.ok(Number.isFinite(Date.parse(firstRead.body.notification.read_at)));
+    assert.equal((await database.from('account_roles').delete().eq('user_id', ids.coordinator).eq('role', 'event_coordinator')).error, null);
+    coordinatorRevoked = true;
+    const callsBeforeRevoked = rpcRoles.length;
+    assert.equal((await target('event_coordinator')).status, 403, 'A revoked acting role is checked again on the next request.');
+    assert.equal(rpcRoles.length, callsBeforeRevoked);
+    assert.equal((await target()).status, 404);
+    const repeated = await callerApi.post(`/api/notifications/event/${noticeId}/read`).set(as());
+    assert.equal(repeated.status, 200, 'Recipient ownership still permits reading a historical notice.');
+    assert.deepEqual(repeated.body, firstRead.body, 'A role change does not alter the original receipt or duplicate it.');
+    assert.ok(rpcRoles.every(call => call.role === 'attendee' || call.role === 'event_coordinator'));
+  } finally {
+    transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
+    if (coordinatorRevoked) assert.equal((await database.from('account_roles').insert({ user_id: ids.coordinator, role: 'event_coordinator' })).error, null);
+    assert.equal((await database.from('account_roles').delete().eq('user_id', ids.coordinator).eq('role', 'attendee')).error, null);
+    assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
   }
 });

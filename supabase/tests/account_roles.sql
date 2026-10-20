@@ -127,10 +127,14 @@ insert into auth.users (id) values
 set local role service_role;
 insert into public.users (user_id, name, organisation, role_id) values
   ('70000000-0000-4000-8000-000000000007', 'Organiser Seven', 'Acme Corp', 1);
+-- SG2-104 AC6: a Safety Officer reads the history of an event at its safety
+-- check (97001), not one still in planning (97002).
 insert into public.events (event_id, organiser_id, organisation, name, status) values
-  (97001, '70000000-0000-4000-8000-000000000007', 'Acme Corp', 'Week 7 Event', 'planning');
+  (97001, '70000000-0000-4000-8000-000000000007', 'Acme Corp', 'Week 7 Event', 'awaiting_safety_check'),
+  (97002, '70000000-0000-4000-8000-000000000007', 'Acme Corp', 'Planning Event', 'planning');
 insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value) values
-  (97001, '70000000-0000-4000-8000-000000000007', 'name', 'Draft', 'Week 7 Event');
+  (97001, '70000000-0000-4000-8000-000000000007', 'name', 'Draft', 'Week 7 Event'),
+  (97002, '70000000-0000-4000-8000-000000000007', 'name', 'Draft', 'Planning Event');
 
 do $$
 begin
@@ -168,7 +172,10 @@ begin
   exception when insufficient_privilege then null;
   end;
   if not exists (select 1 from public.event_audit_logs where event_id = 97001) then
-    raise exception '[SG2-86:safety-officer-audit-read] [SG2-86:AC3] [NORMAL] Safety Officer could not read audit logs for an event they do not organise';
+    raise exception '[SG2-86:safety-officer-audit-read] [SG2-86:AC3] [SG2-104:AC6] [NORMAL] Safety Officer could not read audit logs for an event at its safety check';
+  end if;
+  if exists (select 1 from public.event_audit_logs where event_id = 97002) then
+    raise exception '[SG2-104:safety-officer-planning-history-hidden] [SG2-104:AC6] [BOUNDARY] Safety Officer read the history of an event not yet at its safety check';
   end if;
 end $$;
 
@@ -194,9 +201,11 @@ begin
     raise exception '[SG2-24:required-role] [SG2-24:AC1] [BOUNDARY] Null role accepted';
   exception when not_null_violation then null;
   end;
+  -- SG2-104 supersedes SG2-24 AC1's single role: a second, different role is
+  -- now allowed (account_multi_roles.sql); the same role twice still is not.
   begin
     insert into public.account_roles values ('10000000-0000-4000-8000-000000000001', 'attendee');
-    raise exception '[SG2-24:single-role-per-account] [SG2-24:AC1] [CONFLICT] Multiple roles accepted for one account';
+    raise exception '[SG2-104:same-role-twice-refused] [SG2-104:AC1] [BOUNDARY] The same role was stored twice for one account';
   exception when unique_violation then null;
   end;
   begin

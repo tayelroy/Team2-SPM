@@ -140,7 +140,7 @@ test('[NORMAL] [SG2-24:AC3] [SG2-25:AC2] pages receive exactly the same permissi
   const { app } = fixture();
   const res = await request(app).get('/api/auth/me').set('Authorization', 'Bearer token');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { userId, role: 'event_organiser', permissions: ['fixture.edit'] });
+  assert.deepEqual(res.body, { userId, role: 'event_organiser', roles: ['event_organiser'], permissions: ['fixture.edit'] });
   assert.equal(res.headers['cache-control'], 'no-store');
 });
 
@@ -180,7 +180,7 @@ test('[NORMAL] [SG2-24:AC1] [SG2-25:AC2] production adapter verifies Auth then r
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
   // SG2-27: every role, including attendee, holds the profile grants.
-  assert.deepEqual(res.body, { userId, role: 'attendee', permissions: ['notifications.inbox', 'profile.read', 'profile.update'] });
+  assert.deepEqual(res.body, { userId, role: 'attendee', roles: ['attendee'], permissions: ['notifications.inbox', 'profile.read', 'profile.update'] });
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
@@ -394,7 +394,7 @@ for (const role of ['safety_officer'] as const) {
     // and SG2-92 the decision on each event in it.
     assert.deepEqual(res.body, {
       userId,
-      role,
+      role, roles: [role],
       permissions: [
         'event_request.safety_decision.record',
         'event_request.safety_decisions.view',
@@ -417,7 +417,7 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] GET /api/au
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, {
-    userId, role: 'event_coordinator_lead',
+    userId, role: 'event_coordinator_lead', roles: ['event_coordinator_lead'],
     permissions: [
       'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view', 'event_request.history.view',
       'notifications.read', 'notifications.inbox', 'profile.read', 'profile.update'

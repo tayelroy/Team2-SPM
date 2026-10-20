@@ -8,6 +8,7 @@ import { createAuthorization } from '../auth';
 import { INTERNAL_ONLY_AUDIT_FIELDS, PERMISSIONS, type Principal, type Role } from '../auth/policy';
 import { dbConfig } from '../db/config';
 import { createGetEventHistoryHandler } from './getHistory';
+import { hasEventRelationship } from './eventRelationship';
 import type { EventAuditLogRecord, FetchEventAuditLogsResult } from '../db/auditLogs';
 import type { FetchEventRequestResult, EventRequestRecord } from '../db/eventRequests';
 import type { GetAccountRolesResult } from '../db/accountRoles';
@@ -95,6 +96,7 @@ const SAMPLE_HISTORY = [
 ];
 
 interface HarnessOptions {
+  checkRelationship?: typeof hasEventRelationship;
   principal?: Principal | undefined;
   admin?: SupabaseClient | null;
   eventResult?: FetchEventRequestResult;
@@ -114,7 +116,11 @@ function buildApp(options: HarnessOptions = {}) {
     return { ok: true, logs: SAMPLE_LOGS };
   });
   const fetchActorRoles = mock.fn(async (_admin: SupabaseClient, _userIds: string[]): Promise<GetAccountRolesResult> =>
-    options.rolesResult ?? { ok: true, roles: new Map([[COORDINATOR_ID, 'event_coordinator']]) });
+    options.rolesResult ?? { ok: true, roles: new Map([[COORDINATOR_ID, ['event_coordinator']]]) });
+  // SG2-104 AC6: venue and support staff in these fixtures work on the event;
+  // every other role follows the real relationship rule.
+  const checkRelationship: typeof hasEventRelationship = options.checkRelationship ?? (async (admin, role, userId, event) =>
+    role === 'venue_staff' || role === 'technical_support_staff' ? { ok: true, related: true } : hasEventRelationship(admin, role, userId, event));
   app.get(
     '/api/event-requests/:eventId/history',
     createGetEventHistoryHandler({
@@ -122,7 +128,8 @@ function buildApp(options: HarnessOptions = {}) {
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
       fetchEventRequest,
       fetchAuditLogs,
-      fetchActorRoles
+      fetchActorRoles,
+      checkRelationship
     })
   );
   return { app, fetchEventRequest, fetchAuditLogs, fetchActorRoles };
@@ -233,7 +240,9 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
       for (const role of internalRoles) {
         const { app } = buildApp({
           principal: { userId: 'internal-user', role },
-          historyResult: { ok: true, logs: [NOTES_LOG, ...SAMPLE_LOGS] }
+          historyResult: { ok: true, logs: [NOTES_LOG, ...SAMPLE_LOGS] },
+          // Each works on this event (SG2-104 AC6); this test is about which fields they see.
+          checkRelationship: async () => ({ ok: true, related: true })
         });
         const res = await request(app).get('/api/event-requests/101/history');
         assert.equal(res.status, 200, role);
@@ -400,9 +409,9 @@ describe('GET /api/event-requests/:eventId/history Handler Logic (SG2-40)', () =
         principal: ORGANISER,
         historyResult: { ok: true, logs: MIXED_LOGS },
         rolesResult: { ok: true, roles: new Map([
-          [COORDINATOR_ID, 'event_coordinator'],
-          [LEAD_ID, 'event_coordinator_lead'],
-          [ORGANISER_ID, 'event_organiser']
+          [COORDINATOR_ID, ['event_coordinator']],
+          [LEAD_ID, ['event_coordinator_lead']],
+          [ORGANISER_ID, ['event_organiser']]
         ]) }
       });
       const res = await request(app).get('/api/event-requests/101/history');
@@ -568,4 +577,15 @@ describe('GET /api/event-requests/:eventId/history Integration & Authorisation W
     assert.equal(res.headers['cache-control'], 'no-store');
     assert.equal(historyHandler.mock.callCount(), 1);
   });
+});
+
+test('[FAILURE] [SG2-104:AC6] a relationship lookup that fails answers 503 without reading history', async () => {
+  const { app, fetchAuditLogs } = buildApp({ checkRelationship: async () => ({ ok: false }) });
+  assert.equal((await request(app).get('/api/event-requests/101/history')).status, 503);
+  assert.equal(fetchAuditLogs.mock.callCount(), 0);
+});
+
+test('[FAILURE] [SG2-104:AC6] a coordinator not assigned to the event is refused its history by ID', async () => {
+  const { app } = buildApp({ principal: { userId: 'other-coordinator', role: 'event_coordinator' } });
+  assert.equal((await request(app).get('/api/event-requests/101/history')).status, 403);
 });

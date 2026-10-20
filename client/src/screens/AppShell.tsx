@@ -139,10 +139,9 @@ const menuStyle: CSSProperties = {
 
 /**
  * Chrome shared by every signed-in screen: the sticky header with role-scoped
- * navigation, the page heading block, and the notification drawer. The role
- * is a real, server-assigned attribute of the signed-in account — displayed
- * here, not switchable (only Technical Support Staff can change a role, and
- * only for someone else's account; see SG2-24).
+ * navigation, the page heading block, and the notification drawer. Accounts
+ * holding several server-assigned roles can choose which one to act as;
+ * assigning roles remains a Technical Support Staff action (SG2-24).
  */
 export default function AppShell({
   role,
@@ -152,9 +151,14 @@ export default function AppShell({
   accessToken,
   access,
   onOpenNotification,
+  roles = [role],
+  onSwitchRole,
   children,
 }: {
   role: Role;
+  /** Every role the account holds (SG2-104); a switcher shows when there are several. */
+  roles?: readonly Role[];
+  onSwitchRole?: (role: Role) => void;
   screen: Exclude<Screen, 'landing' | 'login'>;
   onNavigate: (screen: Screen) => void;
   onSignOut: () => void;
@@ -259,7 +263,7 @@ export default function AppShell({
                 SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
                 neither has hold notices. */}
             {accessToken
-              ? <HoldNotifications key={accessToken} accessToken={accessToken} coordinator={role === 'Event Coordinator'} onOpenNotification={onOpenNotification} /> : <button
+              ? <HoldNotifications key={`${accessToken}:${role}`} accessToken={accessToken} coordinator={role === 'Event Coordinator'} onOpenNotification={onOpenNotification} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
               aria-label={`Notifications (${notifications.length})`}
@@ -294,6 +298,17 @@ export default function AppShell({
                 {notifications.length}
               </span>
             </button>}
+
+            {roles.length > 1 && onSwitchRole && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: color.mist, fontSize: '12px' }}>
+                Acting as
+                <select aria-label="Acting as" value={role} onChange={event => onSwitchRole(event.target.value as Role)}
+                  style={{ background: color.kelp, border: rule.control, borderRadius: radius.sm, color: color.mist,
+                    fontSize: '12px', letterSpacing: '0.06em', padding: '8px 10px' }}>
+                  {roles.map(held => <option key={held} value={held}>{held}</option>)}
+                </select>
+              </label>
+            )}
 
             <div
               ref={profileRef}

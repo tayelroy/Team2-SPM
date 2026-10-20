@@ -2036,7 +2036,7 @@
     "steps": [
       "request.post('/__e2e/coordinator-access')",
       "As coordinator@example.test, attempt review, decision, planning update, clarification and venue request on events 82-87 (another coordinator's and unassigned, in each state)",
-      "As support@example.test, read the history of events 82-87",
+      "As lead@example.test, read the history of events 82-87",
       "As coordinator@example.test, review event 88, decide event 89, update planning on event 81 and request a venue for event 81",
       "As lead@example.test, reassign events 81, 90 and 91 to the second coordinator, then repeat every coordinator action on each"
     ],
@@ -2054,10 +2054,10 @@
     "evidence": "e2e/regression.spec.ts:688",
     "layer": "Playwright fixture API",
     "status": "Pass",
-    "actual": "SG2-90-P01 passed in the 43-journey Chromium run (42 passed, 1 failed). The one failure, SG2-85-P02 (tentative-hold notices), fails identically on a clean origin/main at 5531afa, so it predates this story; npm run test:e2e therefore exits 1 until that is fixed.",
-    "execution_date": "5 Oct 2026",
+    "actual": "Passed in the full Chromium run on the SG2-104 branch, with the history now read as the Event Coordinator Lead (SG2-104 AC6: Technical Support relate only to events with equipment).",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Marcus Chua",
-    "execution_evidence": "5 Oct 2026; feature/SG2-90-restrict-coordinators-to-assigned working tree on main at 5531afa; npm run test:e2e with Supabase variables blanked; SG2-90-P01 green, SG2-85-P02 red on both this branch and main; test-only Chromium; no hosted Supabase."
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase."
   },
   {
     "id": "SG2-90-P02",
@@ -2079,7 +2079,7 @@
       "As coordinator@example.test, update planning on event 81",
       "Reassign event 81 to the second coordinator; repeat the planning update",
       "Reassign event 81 back; repeat the planning update",
-      "As support@example.test, read the history of event 81"
+      "As lead@example.test, read the history of event 81"
     ],
     "data": [
       "Event 81 'Own Forum' (approved), coordinator Regression coordinator",
@@ -2094,10 +2094,10 @@
     "evidence": "e2e/regression.spec.ts:738",
     "layer": "Playwright fixture API",
     "status": "Pass",
-    "actual": "Passed alongside SG2-90-P01 in the Chromium run; removing the same-coordinator no-op in assignCoordinator.ts makes it fail.",
-    "execution_date": "5 Oct 2026",
+    "actual": "Passed in the full Chromium run on the SG2-104 branch, with the history now read as the Event Coordinator Lead (SG2-104 AC6: Technical Support relate only to events with equipment).",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Marcus Chua",
-    "execution_evidence": "npx playwright test -g SG2-90 on feature/SG2-90-restrict-coordinators-to-assigned working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase."
   },
   {
     "id": "SG2-37-P01",
@@ -3269,7 +3269,7 @@
     "steps": [
       "request.post('/__e2e/legacy-assignment')",
       "As support@example.test: GET /api/event-requests/assignable and PATCH /api/event-requests/95/coordinator",
-      "As support@example.test: GET /api/event-requests/95/history",
+      "As lead@example.test: GET /api/event-requests/95/history",
       "As organiser@example.test: GET /api/event-requests/95",
       "Sign in as lead@example.test; at 390px and 1440px open Assign coordinators"
     ],
@@ -3286,10 +3286,10 @@
     "evidence": "e2e/regression.spec.ts:1935",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
-    "execution_date": "6 Oct 2026",
+    "actual": "Passed in the full Chromium run on the SG2-104 branch, with the history now read as the Event Coordinator Lead (SG2-104 AC6: Technical Support relate only to events with equipment).",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Marcus Chua",
-    "execution_evidence": "npx playwright test on feature/SG2-97-move-assignment-to-lead working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase."
   },
   {
     "id": "SG2-97-P02",
@@ -7109,8 +7109,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
-    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "id": "SG2-69-P01",
     "title": "Unread badge, ordered merged inbox and safe event opening",
     "type": "NORMAL",
@@ -7133,7 +7133,17 @@
     "data": "Reminder Forum event691; event notice1, read eventnotice2, holdnotice1; another recipient eventnotice90.",
     "expected": "Exact three-row order; event691 summary then authorised coordinator workflow; badge2→1; only own event:1 changed; reload retains state.",
     "evidence": "e2e/notification-inbox.spec.ts; docs/notification-inbox.md",
-    "layer": "Playwright browser + fixture API"
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7141,8 +7151,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
-    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "id": "SG2-69-B01",
     "title": "All-page unread total and clearing both inbox sources at phone width",
     "type": "BOUNDARY",
@@ -7164,7 +7174,17 @@
     "data": "54 ownrows, 53 unread, tiedtime earlierIDs3–53 and repeated sourceID1.",
     "expected": "Badge53→0 and54 ownrows read; other person unread; no lost/duplicate cursor pages or overflow.",
     "evidence": "e2e/notification-inbox.spec.ts",
-    "layer": "Playwright browser + fixture API"
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7172,8 +7192,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
-    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "id": "SG2-69-P02",
     "title": "Default daily reminder setting and saved thirty-day boundary",
     "type": "NORMAL / BOUNDARY",
@@ -7195,7 +7215,17 @@
     "data": "Coordinator user-coordinator, frequency1 default and30 maximum.",
     "expected": "One exact current-user setting30; reload displays30. This browser case seeds a reminder; it does not prove scheduler delivery.",
     "evidence": "e2e/notification-inbox.spec.ts",
-    "layer": "Playwright browser + fixture API"
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7203,8 +7233,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
-    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "id": "SG2-69-N01",
     "title": "Recipient and coordinator-setting isolation",
     "type": "CONFLICT",
@@ -7226,7 +7256,17 @@
     "data": "Other organiser own notice90; coordinatornotice1 and holdnotice1; attendee account.",
     "expected": "404/403 without cross-account writes; attendee empty inbox and no preference control.",
     "evidence": "e2e/notification-inbox.spec.ts",
-    "layer": "Playwright browser + fixture API"
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7234,8 +7274,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
-    "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "id": "SG2-69-F01",
     "title": "Failed read retains unread state and supports retry",
     "type": "FAILURE",
@@ -7256,7 +7296,17 @@
     "data": "One controlled HTTP503 for the read mutation, then real route success.",
     "expected": "No optimistic unread loss on503; successful retry marks read and opens correct event.",
     "evidence": "e2e/notification-inbox.spec.ts",
-    "layer": "Playwright browser + fixture API"
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7264,8 +7314,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "All 57 migrations and 36 non-upgrade SQL suites pass in disposable PostgreSQL17, including the 67 SG2-69 assertion contracts; 22 release-readiness checks pass.",
-    "execution_evidence": "20 Oct 2026; native Docker postgres:17; supabase/tests/notification_inbox_reminders.sql; /tmp/sg69-all-sql.log and /tmp/sg69-sql-tests.log. Actual hosted pg_cron registration remains a deployment prerequisite.",
+    "actual": "All61 migrations replay; all37 CI SQL policy suites,79 SG2-69 assertion contracts and23 release-readiness tests pass after integrating SG2-104 acting roles.",
+    "execution_evidence": "20 Oct2026; exact CI database-policy and legacy-upgrade scripts, disposable PostgreSQL17; /tmp/sg69-merge-native.log. The unique SG69 migration202610200003 follows SG104 acting-role functions202610200002; role-scoped summaries/preferences and held-role scheduler eligibility are exercised. Hosted migration and actual pg_cron checks remain pending.",
     "id": "SG2-69-DB01",
     "title": "Native read-state, cursor, recipient and scheduled reminder contracts",
     "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
@@ -7294,8 +7344,18 @@
     ],
     "data": "Synthetic users/roles/events/notices/arrangements in disposable PostgreSQL17.",
     "expected": "Every tagged SQL assertion passes; no application user can edit another recipient or invoke private delivery helpers.",
-    "evidence": "supabase/tests/notification_inbox_reminders.sql; supabase/migrations/202610200002_notifications_inbox_reminders.sql",
-    "layer": "Native PostgreSQL contracts"
+    "evidence": "supabase/tests/notification_inbox_reminders.sql; supabase/migrations/202610200003_notifications_inbox_reminders.sql",
+    "layer": "Native PostgreSQL contracts",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "All 57 migrations and 36 non-upgrade SQL suites pass in disposable PostgreSQL17, including the 67 SG2-69 assertion contracts; 22 release-readiness checks pass.",
+        "execution_evidence": "20 Oct 2026; native Docker postgres:17; supabase/tests/notification_inbox_reminders.sql; /tmp/sg69-all-sql.log and /tmp/sg69-sql-tests.log. Actual hosted pg_cron registration remains a deployment prerequisite.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7303,8 +7363,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "All 8 native multi-session races pass, including competing sweeps, cancellation, reassignment, completed arrangements, revoked role, clear-all arrival snapshot, idempotent concurrent read and notice/cadence rollback.",
-    "execution_evidence": "20 Oct 2026; .github/scripts/test-notification-reminders-concurrency.mjs; disposable PostgreSQL17, /tmp/sg69-concurrency.log; fixture cleanup complete.",
+    "actual": "All9 notification concurrency scenarios pass, including same-recipient multi-role scheduler eligibility and coordinator-role revocation while a preference save waits on its role lock.",
+    "execution_evidence": "20 Oct2026; exact CI database sequence plus .github/scripts/test-notification-reminders-concurrency.mjs; /tmp/sg69-merge-native.log; disposable PostgreSQL17 containers removed.",
     "id": "SG2-69-CONC01",
     "title": "Reminder, lifecycle and read-receipt races",
     "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
@@ -7326,12 +7386,23 @@
     "steps": [
       "Run test-notification-reminders-concurrency.mjs with a disposable POSTGRES_CONTAINER.",
       "Observe lock waits while sweeps compete and while cancellation/reassignment/readiness/role changes hold locks.",
-      "Check a new notice arriving after mark-all snapshot stays unread, concurrent read keeps its first timestamp, and a delivery failure rolls back notice and receipt together."
+      "Check a new notice arriving after mark-all snapshot stays unread, concurrent read keeps its first timestamp, and a delivery failure rolls back notice and receipt together.",
+      "Revoke only the selected coordinator role during a waiting preference update while another held role remains; require42501 and no preference write."
     ],
     "data": "Eight isolated multi-session PostgreSQL races; synthetic IDs and rollback/cleanup.",
     "expected": "At most one eligible delivery; none to stale/unrelated roles or terminal/ready events; atomic receipts; new arrivals remain unread.",
     "evidence": ".github/scripts/test-notification-reminders-concurrency.mjs",
-    "layer": "Native PostgreSQL concurrency"
+    "layer": "Native PostgreSQL concurrency",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "All 8 native multi-session races pass, including competing sweeps, cancellation, reassignment, completed arrangements, revoked role, clear-all arrival snapshot, idempotent concurrent read and notice/cadence rollback.",
+        "execution_evidence": "20 Oct 2026; .github/scripts/test-notification-reminders-concurrency.mjs; disposable PostgreSQL17, /tmp/sg69-concurrency.log; fixture cleanup complete.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7339,8 +7410,8 @@
     "executed_by": "Automated verification",
     "review": null,
     "status": "Pass",
-    "actual": "20/20 native API integration methods pass, including caller-scoped inbox paging/read/clear/target/preferences, scheduler recipient/cadence and current organiser organisation revocation/restoration.",
-    "execution_evidence": "20 Oct 2026; npm run test:integration; /tmp/sg69-followup-integration.log. Real Express and production caller-JWT Supabase adapter use disposable PostgreSQL17/PostgREST12.2.12 with all57 migrations. Startup waits for the final TCP listener to avoid the image bootstrap-server shutdown race. Dedicated fixture IDs and cleanup remain independent of identity sequence state.",
+    "actual": "21/21 native API integration methods pass, including current acting-role headers, multi-role ownership, target restrictions and role revocation.",
+    "execution_evidence": "20 Oct2026; exact full CI policy/concurrency and legacy-upgrade sequence followed by npm run test:integration; /tmp/sg69-merge-native.log. Production caller-JWT adapter forwards validated X-Acting-Role to real PostgreSQL/PostgREST.",
     "id": "SG2-69-API01",
     "title": "JWT-scoped inbox across Express, PostgREST and PostgreSQL",
     "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
@@ -7369,7 +7440,17 @@
     "data": "Dedicated SG2-69 venue and assigned event created by this case; synthetic users from integration/seed.sql; event and venue removed in finally. No fixed global venue ID.",
     "expected": "Production HTTP and JWT/RPC contracts agree with database state; cleanup succeeds and no hosted URL or secrets are used.",
     "evidence": "integration/api.test.ts; server/src/notifications/index.ts; server/src/db/notificationInbox.ts",
-    "layer": "Native API + PostgREST + PostgreSQL"
+    "layer": "Native API + PostgREST + PostgreSQL",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "20/20 native API integration methods pass, including caller-scoped inbox paging/read/clear/target/preferences, scheduler recipient/cadence and current organiser organisation revocation/restoration.",
+        "execution_evidence": "20 Oct 2026; npm run test:integration; /tmp/sg69-followup-integration.log. Real Express and production caller-JWT Supabase adapter use disposable PostgreSQL17/PostgREST12.2.12 with all57 migrations. Startup waits for the final TCP listener to avoid the image bootstrap-server shutdown race. Dedicated fixture IDs and cleanup remain independent of identity sequence state.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7398,10 +7479,20 @@
     ],
     "data": "Coordinator synthetic account; event691, eventnotice1 and holdnotice1, private notice90.",
     "expected": "Badge2 to1 to0, real assigned work opens, clearing persists across reload and affects only the signed-in recipient; mobile layout fits.",
-    "actual": "Passed in the separate smoke gate (8/8) and complete browser suite (133/133).",
-    "execution_evidence": "20 Oct2026; npm run test:smoke and npm run test:e2e; /tmp/sg69-followup-smoke.log and /tmp/sg69-followup-browser.log. Passing smoke screenshots, video and trace are retained by the smoke job.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "evidence": "e2e/smoke.spec.ts",
-    "layer": "Dedicated Playwright smoke + fixture API"
+    "layer": "Dedicated Playwright smoke + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "Passed in the separate smoke gate (8/8) and complete browser suite (133/133).",
+        "execution_evidence": "20 Oct2026; npm run test:smoke and npm run test:e2e; /tmp/sg69-followup-smoke.log and /tmp/sg69-followup-browser.log. Passing smoke screenshots, video and trace are retained by the smoke job.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7431,10 +7522,20 @@
     ],
     "data": "54 own source/ID rows, eventnotice3 on the second page; second authenticated session uses production read endpoint.",
     "expected": "Cross-session read state refreshes atomically across the loaded page depth while every older row and its ordering remain intact.",
-    "actual": "Passed within133/133 full browser regressions; no retries/skips.",
-    "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-followup-browser.log.",
+    "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
     "evidence": "e2e/notification-inbox.spec.ts",
-    "layer": "Playwright regression + real fixture API"
+    "layer": "Playwright regression + real fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "Passed within133/133 full browser regressions; no retries/skips.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-followup-browser.log.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
   },
   {
     "story": "SG2-69",
@@ -7464,9 +7565,158 @@
     ],
     "data": "Synthetic organiser and coordinator UUIDs; dedicated event and notices, no global fixed event/venue IDs.",
     "expected": "Current organisation revokes/restores event-summary access independently of historical notice ownership; no cross-recipient writes and no extra fields.",
-    "actual": "20/20 native integration methods pass, including this case.",
-    "execution_evidence": "20 Oct2026; npm run test:integration; /tmp/sg69-followup-integration.log. Production Express/Supabase adapter and real PostgREST/SQL, no hosted URL.",
+    "actual": "21/21 native API integration methods pass, including current acting-role headers, multi-role ownership, target restrictions and role revocation.",
+    "execution_evidence": "20 Oct2026; exact full CI policy/concurrency and legacy-upgrade sequence followed by npm run test:integration; /tmp/sg69-merge-native.log. Production caller-JWT adapter forwards validated X-Acting-Role to real PostgreSQL/PostgREST.",
     "evidence": "integration/api.test.ts",
+    "layer": "Native API + PostgREST + PostgreSQL",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "20/20 native integration methods pass, including this case.",
+        "execution_evidence": "20 Oct2026; npm run test:integration; /tmp/sg69-followup-integration.log. Production Express/Supabase adapter and real PostgREST/SQL, no hosted URL.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      }
+    ]
+  },
+  {
+    "id": "SG2-104-P01",
+    "title": "an account with two roles switches between them, and each role reaches only its own functions",
+    "story": "SG2-104",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC1",
+      "SG2-104:AC2",
+      "SG2-104:AC3",
+      "SG2-104:AC5"
+    ],
+    "purpose": "Verify a two-role account starts as its less-privileged role, is refused the other role's functions until it switches, is refused a role it does not hold, and sees both roles on its profile.",
+    "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
+    "steps": [
+      "Give the venue fixture account the Event Coordinator role too and sign in as it.",
+      "Check the Acting as switcher and the menu; list a venue's bookings through the API as each role and as a role not held.",
+      "Switch to Venue Staff; open My Profile."
+    ],
+    "data": "venue@example.test holding venue_staff and event_coordinator; venue 1.",
+    "expected": "Starts as Event Coordinator without the Catalogue; the venue-wide booking list is 403 as coordinator, 200 as Venue Staff and 403 for Technical Support Staff; switching shows the Catalogue; the profile lists Event Coordinator, Venue Staff.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in the full Chromium run with the other journeys.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-19",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "DB-MULTI-ROLE-01",
+    "title": "Several roles per account, one acting role per call, separation of duties and history relationships",
+    "story": "SG2-104",
+    "mapped_acs": [
+      "SG2-104:AC1",
+      "SG2-104:AC2",
+      "SG2-104:AC3",
+      "SG2-104:AC4",
+      "SG2-104:AC6"
+    ],
+    "purpose": "Check account_roles, acting_role(), the role-reading functions, change_account_roles(), the organiser/coordinator check, the own-request refusal and the history read policy through actual records.",
+    "preconditions": "Disposable PostgreSQL 17, auth fixture and all migrations; synthetic transaction-local data.",
+    "steps": [
+      "Seed multi-role accounts, events, a venue, bookings, requests, an equipment request and history.",
+      "Run the tagged assertions as each account with different X-Acting-Role headers, and as the service role.",
+      "Roll back the suite transaction."
+    ],
+    "data": "Synthetic IDs and values defined in supabase/tests/account_multi_roles.sql",
+    "expected": "Two and all seven roles are stored, never one twice; acting_role() follows a held header only and never guesses; release, holds, equipment and confirmation act as the acting role; an organiser is never their event's coordinator; Venue Staff cannot decide their own request; nobody changes their own roles or removes an account's last role; history is read only with a relationship, and a reassigned coordinator loses it.",
+    "evidence": "supabase/tests/account_multi_roles.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Suite passed. Mutation checks: an acting_role() that trusts the header, one that ignores it, the previous decide_venue_booking_request(), a decide check on a held rather than acting Venue Staff role, no organiser/coordinator check, no self-change check, no last-role check, the previous history policy and the relationship check back in public each made the suite fail on the matching assertion.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase.",
+    "review": {
+      "date": "2026-10-19",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json",
+      "method_scope": {
+        "source": "supabase/tests/account_multi_roles.sql"
+      }
+    }
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-R02",
+    "title": "Role switching preserves owned notices while selecting current event and cadence permissions",
+    "type": "NORMAL / CONFLICT",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC6",
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prevent notification data or coordinator controls surviving the wrong acting-role view.",
+    "preconditions": "Built React/real Express loopback fixture with a coordinator+attendee account and a current assigned event; no hosted data.",
+    "steps": [
+      "Seed multiRole:true inbox. Sign in at least-privileged Attendee; assert2 unread and no reminder preference editor. Default-role event target404 and cadence PUT403.",
+      "Select Event Coordinator in the actual header switcher. Open inbox, assert daily default, save4, open reminder and assert event691 plus its read receipt.",
+      "Switch back to Attendee. Assert badge1 and the historical Read reminder, absent coordinator preference editor, exact saved4 and unchanged receipt/hold unread state.",
+      "Verify explicit attendee target404 while explicit coordinator target200."
+    ],
+    "data": "One synthetic recipient holds attendee+event_coordinator; event691, own event/hold source-ID1.",
+    "expected": "No permission union: selected role controls target/settings, while recipient-owned notices and read receipts persist across role switches.",
+    "actual": "Passed within135/135 browser regressions.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-merge-browser.log. In-app desktop/mobile inspection also verifies real work navigation and role-switch cleanup.",
+    "evidence": "e2e/notification-inbox.spec.ts; client/src/App.tsx; client/src/screens/AppShell.tsx",
+    "layer": "Playwright browser + real fixture API"
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-API03",
+    "title": "Caller JWT and validated acting role reach native notification RPCs",
+    "type": "NORMAL / CONFLICT",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC6",
+      "SG2-69:AC7",
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prove gateway and real SQL agree on multi-role target access, cadence and historical ownership.",
+    "preconditions": "Exact CI SQL suites applied in disposable PostgreSQL17/PostgREST12.2.12; synthetic dual-role coordinator and production router/adapter.",
+    "steps": [
+      "Create assigned event/owned notice with returned IDs and add attendee role. Default attendee inbox200 and target404; explicit coordinator target200. Capture exact attendee/coordinator X-Acting-Role headers alongside unchanged JWT/apikey.",
+      "Default/explicit attendee cadence writes403; unheld venue target403. Denied calls do not reach the RPC transport. Direct PostgreSQL RPC cadence call under attendee also403.",
+      "Mark owned history read as attendee. Revoke coordinator role in actual account_roles while retaining attendee; explicit coordinator target403 before storage, default target404, and repeated owned read returns the original timestamp/count.",
+      "Restore roles/config/fetch and remove the dedicated event in finally."
+    ],
+    "data": "One caller JWT, held coordinator+attendee then attendee only; returned notice/event IDs; captured role-specific PostgREST headers.",
+    "expected": "No role union or stale revoked-role access; real SQL denies attendee cadence and event target; owned read receipt remains idempotent.",
+    "actual": "21/21 native API integration tests pass, including this case.",
+    "execution_evidence": "20 Oct2026; exact CI policy/concurrency and upgrade steps then npm run test:integration; /tmp/sg69-merge-native.log.",
+    "evidence": "integration/api.test.ts; supabase/migrations/202610200003_notifications_inbox_reminders.sql",
     "layer": "Native API + PostgREST + PostgreSQL"
   }
 ]

@@ -207,3 +207,11 @@ test('[SG2-69:release-empty-function-search-path] [SG2-69:AC7] [FAILURE] deploym
   assertReadinessRejects('ALTER FUNCTION public.read_notification(text,bigint) SET search_path=public;',
     'notification RPC security definer empty search_path public.read_notification(text,bigint)');
 });
+
+test('[SG2-69:release-acting-role-dependencies] [SG2-69:AC7] [SG2-104:AC2] [FAILURE] deployment refuses missing acting-role or private relationship dependencies', () => {
+  for (const [signature, replacement] of [
+    ['public.acting_role()', 'readiness_missing_acting_role'],
+    ['public.lock_acting_role()', 'readiness_missing_lock_acting_role'],
+    ['private.event_relationship_exists(integer,text)', 'readiness_missing_event_relationship'],
+  ]) assertReadinessRejects(`ALTER FUNCTION ${signature} RENAME TO ${replacement};`, `RPC ${signature}`);
+});

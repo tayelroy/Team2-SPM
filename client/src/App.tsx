@@ -80,9 +80,9 @@ export default function App() {
   // SG2-91: the awaiting event a Safety desk card opened, if any.
   const [safetyFocus, setSafetyFocus] = useState<number | undefined>(undefined);
   // The server's permissions for the signed-in account (SG2-86 AC2), tagged
-  // with the token they were loaded for so a previous session's never leak
-  // into the next one's navigation.
-  const [loadedAccess, setLoadedAccess] = useState<{ token: string; access: Access | null } | null>(null);
+  // with their session and acting role so previous permissions never leak
+  // into another role's navigation.
+  const [loadedAccess, setLoadedAccess] = useState<{ token: string; role: string; access: Access | null } | null>(null);
   // SG2-30 AC1: the request just submitted, confirmed on its detail page.
   // Cleared as soon as the user leaves that page.
   const [submittedName, setSubmittedName] = useState<string | null>(null);
@@ -98,6 +98,7 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     const token = session.accessToken;
+    const actingRole = session.user.role;
     const controller = new AbortController();
     const settle = (apply: () => void) => {
       if (!controller.signal.aborted) apply();
@@ -105,7 +106,7 @@ export default function App() {
     loadAccess(token, controller.signal).then(
       (access) => settle(() => {
         if (access) {
-          setLoadedAccess({ token, access });
+          setLoadedAccess({ token, role: actingRole, access });
           return;
         }
         clearSession();
@@ -113,12 +114,28 @@ export default function App() {
         setScreen('landing');
       }),
       // Unknown permissions gate like none: ungated items stay, gated ones wait.
-      () => settle(() => setLoadedAccess({ token, access: null })),
+      () => settle(() => setLoadedAccess({ token, role: actingRole, access: null })),
     );
     return () => controller.abort();
-    // Re-check only when the signed-in identity actually changes.
+    // Re-check when the signed-in identity or the role it acts as changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.accessToken]);
+  }, [session?.accessToken, session?.user.role]);
+
+  // SG2-104: switch the role the account acts as. Every screen starts again
+  // at that role's home, and the next requests carry the new role.
+  function handleSwitchRole(nextRole: Role) {
+    const next = { ...session!, user: { ...session!.user, role: nextRole } };
+    saveSession(next);
+    setSession(next);
+    setLoadedAccess(null);
+    setSelectedEventId(undefined);
+    setNotificationTarget(null);
+    setSafetyFocus(undefined);
+    setSubmittedName(null);
+    setEditingRequest(null);
+    setVenuePrefill(null);
+    setScreen(landingScreenFor(nextRole));
+  }
 
   function handleSignIn(newSession: StoredSession) {
     saveSession(newSession);
@@ -169,8 +186,11 @@ export default function App() {
   // (same). The assertion documents that invariant rather than adding an
   // unreachable branch just to satisfy the type checker.
   const role = toRole(session!.user.role);
+  // SG2-104: every role the account holds (just its role for older sessions).
+  const roles = (session!.user.roles ?? [role]).filter(isRole);
   // `undefined` while this session's permissions are still loading.
-  const access = loadedAccess?.token === session!.accessToken ? loadedAccess.access : undefined;
+  const access = loadedAccess?.token === session!.accessToken && loadedAccess.role === session!.user.role
+    ? loadedAccess.access : undefined;
 
   const body = {
     notificationWork: <WorkQueue key={`${session!.accessToken}:${selectedEventId}`} role="Event Coordinator"
@@ -262,7 +282,7 @@ export default function App() {
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
     attendee: <AttendeeEvent />,
     change: <ChangeRequest />,
-    profile: <Profile role={role} />,
+    profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
     safetyChecks: <SafetyChecks key={session!.accessToken} accessToken={session!.accessToken} focusEventId={safetyFocus} />,
@@ -271,7 +291,8 @@ export default function App() {
   }[screen];
 
   return (
-    <AppShell key={session!.accessToken} accessToken={session!.accessToken} role={role} access={access} screen={screen} onSignOut={handleSignOut}
+    <AppShell key={`${session!.accessToken}:${role}`} accessToken={session!.accessToken} role={role} roles={roles} onSwitchRole={handleSwitchRole}
+      access={access} screen={screen} onSignOut={handleSignOut}
       onOpenNotification={(source, id) => { setNotificationTarget({ source, id }); setScreen('notificationEvent'); }} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event,
       // and the safety check list at the top (SG2-91).

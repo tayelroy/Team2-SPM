@@ -323,7 +323,7 @@ app.post('/__e2e/event-notifications', (_req, res) => {
   res.status(204).end();
 });
 app.post('/__e2e/notification-inbox', (req, res) => {
-  seedNotificationInbox(database, req.body?.large === true);
+  seedNotificationInbox(database, req.body?.large === true, req.body?.multiRole === true);
   res.status(204).end();
 });
 app.get('/__e2e/notification-inbox-ledger', (_req, res) => res.json({
@@ -400,6 +400,11 @@ app.post('/__e2e/venue-multiple', (_req, res) => {
 });
 app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
+  res.status(204).end();
+});
+// SG2-104: the venue account also holds the Event Coordinator role.
+app.post('/__e2e/multi-role', (_req, res) => {
+  database.tables.account_roles.push({ user_id: 'user-venue', role: 'event_coordinator' });
   res.status(204).end();
 });
 app.post('/__e2e/venue-clash', (_req, res) => {

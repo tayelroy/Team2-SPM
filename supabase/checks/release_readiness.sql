@@ -61,6 +61,9 @@ begin
         and e.enumlabel = r.name) as passed
     from required_statuses r
   ), required_functions(signature) as (values
+    -- SG2-69 must deploy after SG2-104's validated acting-role dependencies.
+    ('public.acting_role()'), ('public.lock_acting_role()'),
+    ('private.event_relationship_exists(integer,text)'),
     ('public.venue_exists_for_operations_read(integer)'),
     ('public.update_event_request_draft(integer,uuid,jsonb)'),
     ('public.confirm_event(integer)'),

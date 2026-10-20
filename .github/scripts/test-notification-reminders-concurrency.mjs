@@ -58,7 +58,9 @@ const organiser = 'e6900000-0000-4000-8000-000000000083';
 const people = `'${coordinator}','${other}','${organiser}'`;
 const event = 96980;
 const scheduler = session => session.query('SELECT public.send_outstanding_arrangement_reminders();');
-const login = session => session.query(`BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','${coordinator}',true);`);
+const login = session => session.query(`BEGIN; SET LOCAL ROLE authenticated;
+  SELECT set_config('request.jwt.claim.sub','${coordinator}',true);
+  SELECT set_config('request.headers','{"x-acting-role":"event_coordinator"}',true);`);
 async function waitsFor(root, promise, waitingPid, owningPid) {
   let settled = false; promise.then(() => { settled = true; }, () => { settled = true; });
   const limit = Date.now() + 10000;
@@ -78,7 +80,7 @@ try {
     INSERT INTO public.users(user_id,name,role_id,organisation) VALUES
       ('${coordinator}','Reminder race coordinator',2,'Reminder Org'),('${other}','Reminder race new coordinator',2,'Reminder Org'),
       ('${organiser}','Reminder race organiser',1,'Reminder Org');
-    INSERT INTO public.account_roles(user_id,role) VALUES('${coordinator}','event_coordinator'),('${other}','event_coordinator'),('${organiser}','event_organiser');
+    INSERT INTO public.account_roles(user_id,role) VALUES('${coordinator}','attendee'),('${coordinator}','event_coordinator'),('${other}','event_coordinator'),('${organiser}','event_organiser');
     INSERT INTO public.venues(venue_id,name,capacity) VALUES(${event},'Reminder race hall',100);
     INSERT INTO public.events(event_id,organiser_id,coordinator_id,organisation,name,status,proposed_date,registration_needed)
       VALUES(${event},'${organiser}','${coordinator}','Reminder Org','Reminder race event','planning',clock_timestamp()+interval '100 days',false);
@@ -97,7 +99,7 @@ try {
   await second.query('COMMIT;'); await first.query('COMMIT;');
   assert.equal(await count(), '1');
   assert.equal(await root.query(`SELECT count(*) FROM public.notification_reminder_receipts WHERE event_id=${event};`), '1');
-  console.log('PASS [SG2-69:simultaneous-sweeps] [SG2-69:AC6] [CONFLICT] Simultaneous scheduler sessions publish one reminder and one cadence receipt.');
+  console.log('PASS [SG2-69:simultaneous-sweeps] [SG2-69:AC6] [SG2-104:AC1] [CONFLICT] Simultaneous scheduler sessions publish one reminder and receipt for a multi-role coordinator without a web acting role.');
 
   await reset();
   await root.query(`BEGIN; UPDATE public.events SET status='cancelled' WHERE event_id=${event};`);
@@ -129,14 +131,28 @@ try {
   console.log('PASS [SG2-69:arrangement-completion-during-sweep] [SG2-69:AC5] [CONFLICT] Readiness committed during the event lock wait stops the due reminder.');
 
   await root.query(`UPDATE public.venue_booking_requests SET status='pending',venue_booking_id=null WHERE request_id=${event};
-    BEGIN; UPDATE public.account_roles SET role='attendee' WHERE user_id='${coordinator}';`);
+    BEGIN; DELETE FROM public.account_roles WHERE user_id='${coordinator}' AND role='event_coordinator';`);
   await first.query('BEGIN;'); const roleRevoked = scheduler(first);
   await waitsFor(root, roleRevoked, firstPid, rootPid); await root.query('COMMIT;');
   assert.equal(await roleRevoked, '0'); await first.query('COMMIT;');
   assert.equal(await count(), '0');
   console.log('PASS [SG2-69:role-revocation-during-sweep] [SG2-69:AC7] [FAILURE] A role revocation committed while the scheduler waits prevents delivery to the former coordinator.');
 
-  await root.query(`UPDATE public.account_roles SET role='event_coordinator' WHERE user_id='${coordinator}';
+  await root.query(`INSERT INTO public.account_roles(user_id,role) VALUES('${coordinator}','event_coordinator');
+    BEGIN; DELETE FROM public.account_roles WHERE user_id='${coordinator}' AND role='event_coordinator';`);
+  await login(first);
+  const preferenceAfterRevocation = first.query(`DO $$ BEGIN
+    BEGIN
+      PERFORM public.set_notification_reminder_preferences(30);
+      RAISE EXCEPTION 'Removed coordinator role must not authorize a preference write';
+    EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  END $$;`);
+  await waitsFor(root, preferenceAfterRevocation, firstPid, rootPid); await root.query('COMMIT;');
+  assert.equal(await preferenceAfterRevocation, ''); await first.query('COMMIT;');
+  assert.equal(await root.query(`SELECT count(*) FROM public.notification_reminder_settings WHERE user_id='${coordinator}';`), '0');
+  console.log('PASS [SG2-69:preference-role-revocation] [SG2-69:AC6] [SG2-104:AC4] [CONFLICT] Revoking the selected coordinator role during its lock wait prevents preference changes while the attendee role remains.');
+
+  await root.query(`INSERT INTO public.account_roles(user_id,role) VALUES('${coordinator}','event_coordinator');
     INSERT INTO public.notifications(notification_id,recipient_id,event_id,kind,message)
       VALUES(9698001,'${coordinator}',${event},'event_submitted','Existing unread notice');
     BEGIN; SELECT 1 FROM public.notifications WHERE notification_id=9698001 FOR UPDATE;`);

@@ -1,7 +1,10 @@
 export interface StoredUser {
   userId: string;
   email: string;
+  /** The role the account is acting as (SG2-104), in display form. */
   role: string;
+  /** Every role the account holds, in display form (SG2-104 AC1). */
+  roles?: string[];
 }
 
 // No refreshToken: the server never sends one (see auth/login.ts) — nothing
