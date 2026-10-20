@@ -63,13 +63,20 @@ saved for each date when the edit changes it and the stored value otherwise:
 - A newly chosen proposed date must be in the future (`proposed_date must be in
   the future.`). An unchanged date is not re-judged against the clock, because
   the drawer resends every field.
-- Registration must close after it opens, and both its opening and closing
-  times must be before the event starts. Moving the event before a stored
-  registration close is refused the same way.
+- The organiser's registration opening and closing times (SG2-63) must still
+  be before the event starts, so moving the event to or before a stored
+  registration time is refused.
 
-**Arrangement rechecks.** A later date, a higher expected attendance or a higher
-registration capacity can invalidate arrangements, but only arrangements that
-exist. The handler reads them through SG2-57's readiness data
+**Registration settings (SG2-63 AC8).** Registration capacity and its opening
+and closing times belong to the Event Organiser
+([Registrations](registrations.md)). The drawer shows them read-only, marked
+"Set by the event organiser", and the planning route refuses a body carrying
+any of them with 403 `{ error: 'Registration capacity and opening and closing
+times are set by the Event Organiser.', fields }` before anything is read or
+written. The coordinator still says whether registration is needed.
+
+**Arrangement rechecks.** A later date or a higher expected attendance can
+invalidate arrangements, but only arrangements that exist. The handler reads them through SG2-57's readiness data
 (`fetchEventArrangementFacts` and `computeArrangementReadiness`, see
 [Event arrangement readiness](event-arrangements.md)):
 
@@ -77,7 +84,6 @@ exist. The handler reads them through SG2-57's readiness data
 | --- | --- | --- |
 | Proposed date moved, or expected attendance increased | `venue_recheck` | a live venue booking request (pending, placed by a hold, or approved) |
 | Proposed date moved, or expected attendance increased | `equipment_recheck` | a live equipment request or an equipment reservation, including a legacy reservation without a linked request |
-| Registration capacity increased | `registration_recheck` | registration needed |
 
 If anything is flagged and the request lacks `confirm_impact: true`, the server
 answers 409 with `affected_arrangements` and `impact_notes`, and the drawer
@@ -93,13 +99,13 @@ saved (503).
 `confirmed` or in `preparation`, its details change only through a change
 request (SG2-64). The handler compares the body with the stored record
 (`computePlanningDiffs`, so values the drawer re-sends unchanged are not
-edits) and refuses, before anything is written, any change outside the
-registration settings (`registration_needed`, `registration_capacity`,
-`registration_opens_at`, `registration_closes_at`, SG2-63) and
-`planning_notes`: 409 `{ error, code: 'change_request_required', fields }`,
-where `error` is `This event is <Confirmed|in Preparation>, so its details can
-no longer be edited directly. Ask for the change through a change request
-instead; only registration settings can still be edited here.` Planning notes
+edits) and refuses, before anything is written, any change other than
+`registration_needed` and `planning_notes`: 409 `{ error, code:
+'change_request_required', fields }`, where `error` is `This event is
+<Confirmed|in Preparation>, so its details can no longer be edited directly.
+Ask for the change through a change request instead; only whether registration
+is needed and planning notes can still be edited here.` Registration capacity
+and times stay the organiser's to change at any stage (SG2-63). Planning notes
 stay editable because they are the coordinator's internal log, not event
 details. The drawer shows a notice saying so, disables the date, attendance
 and requirement fields, leaves them out of the save, and shows the server's
@@ -107,9 +113,10 @@ message if a refusal still comes back. `awaiting_safety_check` events keep the
 full SG2-39 edit (AC6 names only Confirmed and Preparation).
 
 **Back to Planning (SG2-66 AC7).** When a confirmed recheck moves an
-`awaiting_safety_check`, `preparation` or `confirmed` event to `planning`
-(for example a registration capacity rise on a confirmed event), the save also
-clears `confirmed_by`/`confirmed_at`, records the status change in the history
+`awaiting_safety_check` event to `planning` (a Confirmed or Preparation event
+cannot reach a recheck on this route: its date and attendance are locked and
+its registration capacity is the organiser's), the save records the status
+change in the history
 and tells the organiser and the assigned coordinator with an
 `event_returned_to_planning` notice (see [Notifications](notifications.md)).
 If the notices cannot be stored the request answers 503 while the saved edit
