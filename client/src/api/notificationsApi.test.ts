@@ -75,6 +75,21 @@ test('[NORMAL] [SG2-66:AC7] a back-to-Planning notice survives response validati
   expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [returned] });
 });
 
+test('[NORMAL] [SG2-92:AC5] a safety check decision notice survives response validation with its reason', async () => {
+  const decided = { notification_id: 71, event_id: 7, request_id: null, kind: 'safety_decision',
+    message: 'Partner Forum did not pass its operational safety check: Fire exits blocked. The coordinator will rework the arrangements for a new check.',
+    created_at: '2026-10-19T03:00:00.000Z' };
+  respond(() => Response.json({ notifications: [decided] }));
+  expect(await loadNotifications('organiser-token')).toEqual({ ok: true, notifications: [decided] });
+});
+
+test('[FAILURE] [SG2-92:AC5] a near-miss safety decision kind is refused rather than shown unlabelled', async () => {
+  for (const kind of ['safety_decisions', 'Safety_decision', 'safety_decision ']) {
+    respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));
+    expect(await loadNotifications('token')).toEqual({ ok: false, message: 'Could not load notifications. Please try again.' });
+  }
+});
+
 test('[FAILURE] [SG2-68:AC2] a near-miss or inherited kind name is refused rather than shown unlabelled', async () => {
   for (const kind of ['event_submitted ', 'Event_approved', 'event_cancelled', 'venue_unavailable ', 'Venue_unavailable', 'toString', 7]) {
     respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));

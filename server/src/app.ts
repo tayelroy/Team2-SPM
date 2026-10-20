@@ -44,6 +44,7 @@ import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
 import { createSafetyChecksRouter } from './safetyChecks';
+import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -109,7 +110,9 @@ export function createApp(
   // SG2-66: appended last for the same reason.
   changeRequestHandlers = createChangeRequestHandlers({ getPrincipal: access.getPrincipal }),
   // SG2-91: appended last to keep every positional argument in place.
-  safetyChecksRouter = createSafetyChecksRouter(access)
+  safetyChecksRouter = createSafetyChecksRouter(access),
+  // SG2-92: appended last for the same reason.
+  safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -266,6 +269,25 @@ export function createApp(
     access.requirePermission('event_request.rechecks.settle'),
     changeRequestHandlers.settle
   );
+  // SG2-92 AC1-AC6: the Safety Officer records a safety check decision; the
+  // decisions are read by the Safety Officer, the assigned coordinator and the
+  // organiser (per-row), and the assigned coordinator reworks a Safety
+  // Rejected event back to Planning.
+  eventRequests.post(
+    '/:eventId/safety-decision',
+    access.requirePermission('event_request.safety_decision.record'),
+    safetyDecisionHandlers.record
+  );
+  eventRequests.get(
+    '/:eventId/safety-decisions',
+    access.requirePermission('event_request.safety_decisions.view'),
+    safetyDecisionHandlers.decisions
+  );
+  eventRequests.post(
+    '/:eventId/rework',
+    access.requirePermission('event_request.safety_rework'),
+    safetyDecisionHandlers.rework
+  );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(
     '/:eventId/history',
@@ -288,7 +310,6 @@ export function createApp(
     assignCoordinatorHandler
   );
   app.use('/api/event-requests', eventRequests);
-
   app.use('/api/venues', routers.venues);
   app.use('/api/venues', routers.layouts);
   app.use('/api/venues', routers.operations);

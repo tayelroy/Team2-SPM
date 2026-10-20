@@ -15,6 +15,7 @@ import EquipmentRequirements from '../components/EquipmentRequirements';
 import ConfirmedArrangements from '../components/ConfirmedArrangements';
 import RecheckSettleActions from '../components/RecheckSettleActions';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
+import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -414,6 +415,19 @@ export default function EventDetail({
               eventId={detail.eventId}
               accessToken={accessToken}
               onAccepted={() => setReloadKey((value) => value + 1)}
+            />
+          )}
+          {/* SG2-92 AC4–AC6: the latest safety decision for the creating
+              organiser and the assigned coordinator, who can rework a Safety
+              Rejected event back to Planning. */}
+          {((isOrganiser && detail.canManage) || isAssignedCoordinator) && accessToken
+            && ['planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(detail.status.toLowerCase()) && (
+            <SafetyDecisionSummary
+              eventId={detail.eventId}
+              accessToken={accessToken}
+              status={detail.status.toLowerCase()}
+              canRework={isAssignedCoordinator}
+              onReworked={() => setReloadKey((value) => value + 1)}
             />
           )}
           <footer className="organisation-detail-footer">

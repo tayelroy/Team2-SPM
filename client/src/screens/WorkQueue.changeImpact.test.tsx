@@ -26,6 +26,8 @@ vi.mock('../components/ArrangementRechecks', () => ({
 vi.mock('../components/EquipmentRequirements', () => ({ default: () => null }));
 vi.mock('../components/EventArrangements', () => ({ default: () => null }));
 vi.mock('../venues/BookingClashes', () => ({ BookingClashes: () => null }));
+// SG2-92: its own suites cover it; stubbed so its fetch stays out of this one.
+vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
 
 afterEach(() => {
   cleanup();

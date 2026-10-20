@@ -64,6 +64,8 @@ export class MemoryDatabase {
       equipment_reservations: [],
       // SG2-66: attendee registrations, counted when a change is assessed.
       registrations: [],
+      // SG2-92: the Safety Officer's decisions, append-only.
+      event_safety_decisions: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
         quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [
