@@ -60,6 +60,7 @@ import { createConfirmEventHandler } from '../server/src/events/confirm';
 import { createGetEventConfirmationHandler } from '../server/src/events/getConfirmation';
 import { createMemoryConfirm, prepareConvertedForum, seedEventConfirmation } from './support/event-confirmation';
 import { seedEventNotifications } from './support/event-notifications';
+import { createMemoryNotificationInbox, seedNotificationInbox } from './support/notification-inbox';
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
 import { createMemoryChangeImpact, seedChangeImpact } from './support/change-impact';
@@ -199,7 +200,7 @@ const app = createApp(
     // SG2-50: what a pending request overlaps, against the in-memory client.
     conflicts: createVenueConflictsRouter(access, { getAdminClient: getClient }),
     // SG2-49: decision notices, against the in-memory client.
-    notifications: createNotificationsRouter(access, memoryNotifications(database)) },
+    notifications: createNotificationsRouter(access, memoryNotifications(database), createMemoryNotificationInbox(database)) },
   createWorkQueueRouter(access, { getAdminClient: getClient }),
   // SG2-100: the stage tracker's own regression journey (SG2-100-P01) reads
   // this endpoint directly, so it now runs against the in-memory client too.
@@ -336,6 +337,19 @@ app.post('/__e2e/event-notifications', (_req, res) => {
   seedEventNotifications(database);
   res.status(204).end();
 });
+app.post('/__e2e/notification-inbox', (req, res) => {
+  const unreadCount = req.body?.unreadCount;
+  if (unreadCount !== undefined && (!Number.isInteger(unreadCount) || unreadCount < 2 || unreadCount > 1000)) {
+    res.status(400).json({ error: 'Unread fixture count must be a whole number from 2 through 1000.' });
+    return;
+  }
+  seedNotificationInbox(database, req.body?.large === true, req.body?.multiRole === true, unreadCount);
+  res.status(204).end();
+});
+app.get('/__e2e/notification-inbox-ledger', (_req, res) => res.json({
+  notifications: database.tables.notifications, holds: database.tables.venue_hold_notifications,
+  preferences: database.tables.notification_reminder_preferences,
+}));
 // SG2-68: every stored notice with its recipient, which the bell never shows.
 app.get('/__e2e/event-notifications-ledger', (_req, res) => res.json({
   notifications: database.tables.notifications, events: database.tables.events.filter(row => [681, 682, 683].includes(Number(row.event_id))),
@@ -406,6 +420,11 @@ app.post('/__e2e/venue-multiple', (_req, res) => {
 });
 app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
+  res.status(204).end();
+});
+// SG2-104: the venue account also holds the Event Coordinator role.
+app.post('/__e2e/multi-role', (_req, res) => {
+  database.tables.account_roles.push({ user_id: 'user-venue', role: 'event_coordinator' });
   res.status(204).end();
 });
 app.post('/__e2e/venue-clash', (_req, res) => {

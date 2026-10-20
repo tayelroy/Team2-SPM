@@ -1,7 +1,8 @@
 import type { Request, RequestHandler, Response } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { createAuthorization } from '../auth';
-import type { Principal } from '../auth/policy';
+import { heldRoles, type Principal } from '../auth/policy';
+import { toDisplayRole } from '../auth/roleFormat';
 import { getSupabaseAdminClient } from '../db';
 import { fetchProfile, updateProfile, type ProfileRecord, type ProfileResult } from '../db/profile';
 import { isInternalRole, validateProfileUpdate, type ProfileUpdateValues } from './fields';
@@ -14,6 +15,15 @@ function toResponse(profile: ProfileRecord, role: Principal['role']) {
   if (isInternalRole(role)) return profile;
   const { department: _department, ...visible } = profile;
   return visible;
+}
+
+/**
+ * SG2-104: the department is a fact about the person, so it is shown and
+ * editable when any role the account holds is internal, whichever role it
+ * is acting as.
+ */
+function profileRole(principal: Principal): Principal['role'] {
+  return heldRoles(principal).find(role => isInternalRole(role)) ?? principal.role;
 }
 
 export interface ProfileRouterDependencies {
@@ -49,7 +59,8 @@ export function createProfileRouter(
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
-    res.json({ profile: toResponse(result.profile, principal.role) });
+    // SG2-104 AC3: every role the account holds, in display form.
+    res.json({ profile: toResponse(result.profile, profileRole(principal)), roles: heldRoles(principal).map(toDisplayRole) });
   };
 
   const getHandler: RequestHandler = async (req: Request, res) => {
@@ -73,7 +84,7 @@ export function createProfileRouter(
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
-    const validated = validateProfileUpdate(req.body ?? {}, principal.role);
+    const validated = validateProfileUpdate(req.body ?? {}, profileRole(principal));
     if (!validated.valid) {
       res.status(400).json({ error: 'Invalid profile details', details: validated.errors });
       return;

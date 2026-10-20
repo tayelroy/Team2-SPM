@@ -59,6 +59,19 @@ interface HarnessOptions {
   fetchResult?: FetchEventPlanningResult;
 }
 
+/** SG2-104 AC6: an admin client answering the relationship lookups from fixed rows. */
+function relationshipAdmin(rows: Record<string, unknown[]>, failing = false): SupabaseClient {
+  return {
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          limit: async () => (failing ? { data: null, error: { message: 'down' } } : { data: rows[table] ?? [], error: null })
+        })
+      })
+    })
+  } as unknown as SupabaseClient;
+}
+
 function buildApp(options: HarnessOptions = {}) {
   const app = express();
   app.use(express.json());
@@ -106,12 +119,41 @@ describe('GET /api/event-requests/:eventId/stage (SG2-38)', () => {
     assert.equal(res.body.stage, 'Arrangements');
   });
 
-  test('[NORMAL] [SG2-38:AC1] returns 200 for venue staff', async () => {
-    const app = buildApp({ principal: VENUE_STAFF });
+  test('[NORMAL] [SG2-38:AC1] [SG2-104:AC6] returns 200 for venue staff working on the event\'s venue', async () => {
+    const app = buildApp({ principal: VENUE_STAFF, admin: relationshipAdmin({ venue_booking_requests: [{ event_id: 101 }] }) });
     const res = await request(app).get('/api/event-requests/101/stage');
 
     assert.equal(res.status, 200);
     assert.equal(res.body.stage, 'Arrangements');
+  });
+
+  test('[BOUNDARY] [SG2-104:AC6] venue staff with no venue request or booking on the event are refused', async () => {
+    const res = await request(buildApp({ principal: VENUE_STAFF, admin: relationshipAdmin({}) })).get('/api/event-requests/101/stage');
+    assert.equal(res.status, 403);
+  });
+
+  test('[FAILURE] [SG2-104:AC6] a coordinator not assigned to the event is refused by ID', async () => {
+    const other: Principal = { userId: '60000000-0000-4000-8000-000000000006', role: 'event_coordinator' };
+    const res = await request(buildApp({ principal: other })).get('/api/event-requests/101/stage');
+    assert.equal(res.status, 403);
+  });
+
+  test('[CONFLICT] [SG2-104:AC6] a reassigned coordinator loses access on the very next request', async () => {
+    let event = MOCK_EVENT;
+    const app = express();
+    app.get('/api/event-requests/:eventId/stage', createGetEventStageHandler({
+      getPrincipal: () => COORDINATOR,
+      getAdminClient: () => ({} as SupabaseClient),
+      fetchPlanningRecord: async () => ({ ok: true, event })
+    }));
+    assert.equal((await request(app).get('/api/event-requests/101/stage')).status, 200);
+    event = { ...MOCK_EVENT, coordinator_id: '60000000-0000-4000-8000-000000000006' };
+    assert.equal((await request(app).get('/api/event-requests/101/stage')).status, 403);
+  });
+
+  test('[FAILURE] [SG2-104:AC6] a relationship lookup that fails answers 503', async () => {
+    const res = await request(buildApp({ principal: VENUE_STAFF, admin: relationshipAdmin({}, true) })).get('/api/event-requests/101/stage');
+    assert.equal(res.status, 503);
   });
 
   test('[FAILURE] [SG2-25:AC1] [SG2-38:AC1] returns 403 Forbidden for attendee', async () => {

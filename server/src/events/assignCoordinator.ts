@@ -9,7 +9,7 @@ import {
   type AssignCoordinatorResult,
   type AssignStatusTransition
 } from '../db/eventRequests';
-import { getAccountRole, type GetAccountRoleResult } from '../db/accountRoles';
+import { getHeldRoles, type GetHeldRolesResult } from '../db/accountRoles';
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import type { Principal } from '../auth/policy';
@@ -23,7 +23,7 @@ export interface AssignCoordinatorDependencies {
   getPrincipal: (req: Request) => Principal | undefined;
   getAdminClient?: () => SupabaseClient | null;
   fetchRequest?: (admin: SupabaseClient, eventId: number) => Promise<FetchEventRequestResult>;
-  lookupRole?: (admin: SupabaseClient, userId: string) => Promise<GetAccountRoleResult>;
+  lookupRole?: (admin: SupabaseClient, userId: string) => Promise<GetHeldRolesResult>;
   assignCoordinator?: (
     admin: SupabaseClient,
     eventId: number,
@@ -70,7 +70,7 @@ export function createAssignCoordinatorHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchRequest = fetchEventRequestById,
-  lookupRole = getAccountRole,
+  lookupRole = getHeldRoles,
   assignCoordinator = assignEventCoordinator,
   writeHistory = insertAuditLogs,
   notify = notifyEvent
@@ -126,8 +126,17 @@ export function createAssignCoordinatorHandler({
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
-    if (target.role !== 'event_coordinator') {
+    // SG2-104: the account may hold several roles; one must be event_coordinator.
+    if (!target.roles.includes('event_coordinator')) {
       res.status(400).json({ error: 'coordinatorId must belong to an Event Coordinator account.' });
+      return;
+    }
+    // SG2-104 separation of duties: an event's own organiser never coordinates
+    // it, so nobody reviews, decides or confirms their own request. Nothing is
+    // written, recorded or sent. The database refuses it too
+    // (events_coordinator_not_organiser).
+    if (coordinatorId === current.organiser_id) {
+      res.status(400).json({ error: "An event's organiser cannot be its coordinator." });
       return;
     }
 

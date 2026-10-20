@@ -121,3 +121,10 @@ test('[NORMAL] [CONFLICT] [SG2-81:AC1] [SG2-81:AC6] a venue unavailable warning 
   respond(() => Response.json({ notifications: [unavailableVenue, rejected] }));
   expect(await loadNotifications('coordinator-token')).toEqual({ ok: true, notifications: [unavailableVenue, rejected] });
 });
+
+test('[NORMAL] [SG2-69:AC5] legacy notice readers also accept outstanding arrangement reminders', async () => {
+  const reminder = { notification_id: 90, event_id: 20, request_id: null, kind: 'outstanding_arrangements',
+    message: 'Forum still needs: Venue booking, Equipment.', created_at: '2026-10-20T03:00:00Z' };
+  respond(() => Response.json({ notifications: [reminder] }));
+  expect(await loadNotifications('token')).toEqual({ ok: true, notifications: [reminder] });
+});

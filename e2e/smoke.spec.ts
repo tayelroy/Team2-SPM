@@ -38,6 +38,42 @@ test.beforeEach(async ({ request, baseURL }) => {
   expect((await request.post('/__e2e/reset')).status()).toBe(204);
 });
 
+test('SMOKE-INBOX-01 | [NORMAL] [SG2-69:AC1] [SG2-69:AC3] [SG2-69:AC4] a phone user opens an unread event, reaches assigned work and clears the remaining notices durably', async ({ page, request }, testInfo) => {
+  expect((await request.post('/__e2e/notification-inbox')).status()).toBe(204);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page, 'coordinator');
+  await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications', exact: true });
+  await expect(drawer.getByRole('button', { name: /^Unread:/ })).toHaveCount(2);
+  await drawer.getByRole('button', { name: 'Unread: Reminder Forum still needs: Venue booking, Equipment.', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Reminder Forum', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Notifications (1)', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'View event details', exact: true }).click();
+  const event = page.getByRole('article', { name: 'Event request', exact: true });
+  await expect(event.getByRole('heading', { name: 'Reminder Forum', exact: true })).toBeVisible();
+  await expect(event.getByRole('button', { name: 'Edit Planning Information', exact: true })).toBeVisible();
+  expect(await noOverflow(page)).toBe(true);
+  await attachScreenshot(page, testInfo, 'notification-assigned-work-mobile', false);
+  await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
+  await drawer.getByRole('button', { name: 'Mark all as read', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Notifications (0)', exact: true })).toBeVisible();
+  await expect(drawer.getByRole('button', { name: /^Read:/ })).toHaveCount(3);
+  await expect(drawer.getByRole('button', { name: 'Mark all as read', exact: true })).toBeDisabled();
+  const stored = await (await request.get('/__e2e/notification-inbox-ledger')).json();
+  expect(stored.notifications.find((row: { notification_id: number }) => row.notification_id === 90).read_at).toBeNull();
+  expect(stored.holds[0].read_at).toEqual(expect.any(String));
+  await page.reload();
+  await page.getByRole('button', { name: 'Notifications (0)', exact: true }).click();
+  await expect(drawer.getByRole('button', { name: /^Read:/ })).toHaveCount(3);
+  await expect(drawer.getByText('Private other organisation notice.', { exact: true })).toHaveCount(0);
+  expect(await noOverflow(page)).toBe(true);
+  expect(errors).toEqual([]);
+  await attachScreenshot(page, testInfo, 'notification-cleared-mobile', false);
+});
+
 test('SMOKE-ROLES-01 | [NORMAL] [FAILURE] [SG2-23:AC1] [SG2-41:AC4] each role opens its desk and logout revokes access', async ({ page, request }, testInfo) => {
   expect((await request.post('/__e2e/work-queue')).status()).toBe(204);
   const errors: string[] = [];

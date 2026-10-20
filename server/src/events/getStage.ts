@@ -7,6 +7,7 @@ import {
 } from '../db/eventPlanning';
 import { computeEventStage } from './stageCalculator';
 import type { Principal } from '../auth/policy';
+import { hasEventRelationship } from './eventRelationship';
 
 const UNAVAILABLE_MESSAGE = 'Event stage service is temporarily unavailable. Please try again later.';
 
@@ -18,6 +19,7 @@ export interface GetEventStageDependencies {
     client: SupabaseClient,
     eventId: number
   ) => Promise<FetchEventPlanningResult>;
+  checkRelationship?: typeof hasEventRelationship;
 }
 
 /**
@@ -27,7 +29,8 @@ export interface GetEventStageDependencies {
 export function createGetEventStageHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
-  fetchPlanningRecord = fetchEventPlanningRecord
+  fetchPlanningRecord = fetchEventPlanningRecord,
+  checkRelationship = hasEventRelationship
 }: GetEventStageDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -69,7 +72,13 @@ export function createGetEventStageHandler({
       return;
     }
 
-    if (principal.role === 'event_organiser' && event.organiser_id !== principal.userId) {
+    // SG2-104 AC6: the acting role needs a relationship to this event.
+    const relationship = await checkRelationship(admin, principal.role, principal.userId, event);
+    if (!relationship.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+    if (!relationship.related) {
       res.status(403).json({ error: 'You are not authorized to view the stage of this event.' });
       return;
     }

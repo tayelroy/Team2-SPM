@@ -37,9 +37,9 @@ alter table public.events
   add column registration_announced text
     constraint events_registration_announced_known check (registration_announced in ('open', 'closed'));
 
--- Adds the two kinds to whatever list is already allowed, rather than
--- restating it, so a kind another open story adds (e.g. SG2-69's
--- outstanding_arrangements) survives whichever order the migrations land in.
+-- Adds the two kinds to whatever list is already allowed (SG2-69's
+-- 202610200003 left the latest, with outstanding_arrangements) rather than
+-- restating it, so no earlier or concurrently added kind is lost.
 do $$
 declare
   kinds text[];

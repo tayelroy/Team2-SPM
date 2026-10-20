@@ -6,6 +6,7 @@
 do $readiness$
 declare
   failures text[];
+  reminder_job_ready boolean;
 begin
   with required_columns(relation, columns) as (values
     ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
@@ -14,7 +15,10 @@ begin
     ('account_roles', 'user_id,role'),
     ('registrations', 'registration_id,event_id,attendee_id,status,registered_at'),
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
-    ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at'),
+    ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at,read_at'),
+    ('venue_hold_notifications', 'notification_id,recipient_id,event_id,kind,message,created_at,read_at'),
+    ('notification_reminder_settings', 'user_id,frequency_days'),
+    ('notification_reminder_receipts', 'event_id,recipient_id,last_sent_at'),
     ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
     ('venues', 'venue_id,name,deleted_at,deleted_by'),
     ('venue_booking_requests', 'request_id,event_id,venue_id,status,venue_booking_id,replaces_booking_id'),
@@ -44,7 +48,7 @@ begin
     ('venue_holds'), ('venue_hold_settings'), ('venue_hold_notifications'),
     ('venue_booking_disruptions'), ('venue_booking_clashes'), ('venue_booking_occupancy'),
     ('equipment'), ('equipment_requests'), ('equipment_reservations'),
-    ('event_clarifications'), ('notifications')
+    ('event_clarifications'), ('notifications'), ('notification_reminder_settings'), ('notification_reminder_receipts')
   ), relation_checks as (
     select 'relation public.' || name as name, to_regclass('public.' || name) is not null as passed
     from required_relations
@@ -58,6 +62,9 @@ begin
         and e.enumlabel = r.name) as passed
     from required_statuses r
   ), required_functions(signature) as (values
+    -- SG2-69 must deploy after SG2-104's validated acting-role dependencies.
+    ('public.acting_role()'), ('public.lock_acting_role()'),
+    ('private.event_relationship_exists(integer,text)'),
     ('public.venue_exists_for_operations_read(integer)'),
     ('public.update_event_request_draft(integer,uuid,jsonb)'),
     ('public.confirm_event(integer)'),
@@ -74,6 +81,11 @@ begin
     ('public.release_replaced_booking(bigint,text)'), ('public.venue_disruption_notify()'),
     -- SG2-106: venue delete and hold expiry change.
     ('public.delete_venue(integer)'), ('public.change_venue_hold_expiry(bigint,timestamptz)'),
+    ('public.notification_inbox(integer,timestamptz,text,bigint)'), ('public.read_notification(text,bigint)'),
+    ('public.read_all_notifications()'), ('public.notification_event(text,bigint)'),
+    ('public.notification_reminder_preferences()'), ('public.set_notification_reminder_preferences(integer)'),
+    ('private.notification_reminder_due(timestamptz,timestamptz,integer)'),
+    ('public.send_outstanding_arrangement_reminders()'),
     ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
     ('public.event_registration_overview(integer)'), ('public.process_registration_windows()')
   ), function_checks as (
@@ -89,6 +101,48 @@ begin
       coalesce(has_function_privilege((select oid from pg_roles where rolname = r.name),
         to_regprocedure('public.venue_exists_for_operations_read(integer)'), 'EXECUTE') = r.expected, false) as passed
     from (values ('authenticated', true), ('anon', false), ('service_role', false)) r(name, expected)
+  ), inbox_rpc_contracts(signature, authenticated_execute, service_execute) as (values
+    ('public.notification_inbox(integer,timestamptz,text,bigint)',true,false),
+    ('public.read_notification(text,bigint)',true,false), ('public.read_all_notifications()',true,false),
+    ('public.notification_event(text,bigint)',true,false), ('public.notification_reminder_preferences()',true,false),
+    ('public.set_notification_reminder_preferences(integer)',true,false),
+    ('public.send_outstanding_arrangement_reminders()',false,true),
+    ('public.notification_inbox_caller()',false,false), ('public.notification_unread_count(uuid)',false,false),
+    ('public.notification_outstanding_arrangements(public.events)',false,false)
+  ), inbox_rpc_grants as (
+    select 'notification RPC EXECUTE ' || f.signature || ' ' || role.name as name,
+      coalesce(has_function_privilege((select oid from pg_roles where rolname=role.name),to_regprocedure(f.signature),'EXECUTE')=
+        case role.name when 'authenticated' then f.authenticated_execute when 'service_role' then f.service_execute else false end,false) as passed
+    from inbox_rpc_contracts f cross join (values('anon'),('authenticated'),('service_role')) role(name)
+  ), reminder_cadence_helper as (
+    select 'notification cadence helper private immutable invoker empty search_path' as name,
+      coalesce(p.provolatile='i' and not p.prosecdef and p.proconfig @> array['search_path=""']::text[],false) as passed
+    from (values(1)) singleton(n) left join pg_proc p
+      on p.oid=to_regprocedure('private.notification_reminder_due(timestamptz,timestamptz,integer)')
+  ), reminder_cadence_grants as (
+    select 'notification cadence helper EXECUTE '||role.name||' = false' as name,
+      coalesce(not has_function_privilege((select oid from pg_roles where rolname=role.name),
+        to_regprocedure('private.notification_reminder_due(timestamptz,timestamptz,integer)'),'EXECUTE'),false) as passed
+    from (values('anon'),('authenticated'),('service_role')) role(name)
+  ), inbox_function_security as (
+    select 'notification RPC security definer empty search_path ' || signature as name,
+      coalesce(p.prosecdef and p.proconfig @> array['search_path=""']::text[],false) as passed
+    from inbox_rpc_contracts f left join pg_proc p on p.oid=to_regprocedure(f.signature)
+  ), inbox_column_types(relation,column_name,type_name) as (values
+    ('notifications','read_at','timestamptz'), ('venue_hold_notifications','read_at','timestamptz'),
+    ('notification_reminder_settings','frequency_days','integer'), ('notification_reminder_receipts','last_sent_at','timestamptz')
+  ), inbox_type_checks as (
+    select 'notification type public.' || r.relation || '.' || r.column_name as name,
+      exists(select 1 from pg_attribute a where a.attrelid=to_regclass('public.'||r.relation)
+        and a.attname=r.column_name and not a.attisdropped and a.atttypid=to_regtype(r.type_name)) as passed
+    from inbox_column_types r
+  ), inbox_private_relations(relation) as (values('notification_reminder_settings'),('notification_reminder_receipts')),
+  inbox_table_checks as (
+    select 'notification private RLS and grants public.' || relation as name,
+      coalesce(c.relrowsecurity and c.relforcerowsecurity
+        and not has_table_privilege((select oid from pg_roles where rolname='anon'),c.oid,'SELECT,INSERT,UPDATE,DELETE')
+        and not has_table_privilege((select oid from pg_roles where rolname='authenticated'),c.oid,'SELECT,INSERT,UPDATE,DELETE'),false) as passed
+    from inbox_private_relations r left join pg_class c on c.oid=to_regclass('public.'||r.relation)
   ), confirmation_definition as (
     select pg_get_functiondef(to_regprocedure('public.confirm_event(integer)')) as definition
   ), required_rechecks(name) as (values
@@ -143,7 +197,8 @@ begin
     ('venue_request_approved'), ('venue_request_rejected'), ('venue_booking_released'),
     ('equipment_reserved'), ('venue_booking_clash'), ('event_confirmed'),
     ('event_submitted'), ('coordinator_assigned'), ('clarification_requested'),
-    ('event_approved'), ('event_rejected'), ('venue_unavailable'),
+    ('event_approved'), ('event_rejected'), ('venue_unavailable'), ('event_returned_to_planning'),
+    ('safety_decision'), ('outstanding_arrangements'),
     ('registration_opened'), ('registration_closed')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
@@ -168,6 +223,9 @@ begin
     union all select * from function_checks union all select * from foreign_key_checks
     union all select * from draft_rpc_grants
     union all select * from operations_rpc_grants
+    union all select * from inbox_rpc_grants union all select * from inbox_function_security
+    union all select * from reminder_cadence_helper union all select * from reminder_cadence_grants
+    union all select * from inbox_type_checks union all select * from inbox_table_checks
     union all select * from recheck_function_checks
     union all select * from disruption_function_check
     union all select * from grant_checks union all select * from view_checks
@@ -178,6 +236,18 @@ begin
 
   if failures is not null then
     raise exception 'Release schema readiness failed: %', array_to_string(failures, '; ');
+  end if;
+
+  if exists(select 1 from pg_available_extensions where name='pg_cron') then
+    if to_regclass('cron.job') is null then
+      raise exception 'Release schema readiness failed: SG2-69 hourly reminder cron job missing';
+    end if;
+    execute $cron$ select exists(select 1 from cron.job where jobname='sg2-69-arrangement-reminders'
+      and schedule='0 * * * *' and active and command='select public.send_outstanding_arrangement_reminders();') $cron$
+      into reminder_job_ready;
+    if not coalesce(reminder_job_ready,false) then
+      raise exception 'Release schema readiness failed: SG2-69 hourly reminder cron job missing or inactive';
+    end if;
   end if;
 
   -- Only the fixed, non-personal catalogue is read; never inspect demo identities.

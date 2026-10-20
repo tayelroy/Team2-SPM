@@ -41,7 +41,7 @@ describe('loginAccount', () => {
     assert.deepEqual(result, {
       outcome: 'success',
       accessToken: 'access-1',
-      user: { userId: 'user-1', email: 'ada@example.com', role: 'Venue Staff' }
+      user: { userId: 'user-1', email: 'ada@example.com', role: 'Venue Staff', roles: ['Venue Staff'] }
     });
   });
 
@@ -127,7 +127,7 @@ describe('loginAccount', () => {
     assert.deepEqual(result, {
       outcome: 'success',
       accessToken: 'access-1',
-      user: { userId: 'user-1', email: 'ada@example.com', role: 'Attendee' }
+      user: { userId: 'user-1', email: 'ada@example.com', role: 'Attendee', roles: ['Attendee'] }
     });
   });
 });
@@ -180,11 +180,11 @@ describe('POST /api/auth/login', () => {
     const app = buildApp(async () => ({
       outcome: 'success',
       accessToken: 'a',
-      user: { userId: '1', email: 'x', role: 'Attendee' }
+      user: { userId: '1', email: 'x', role: 'Attendee', roles: ['Attendee'] }
     }));
     const response = await request(app).post('/api/auth/login').send({ email: 'a@b.com', password: 'x' });
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { accessToken: 'a', user: { userId: '1', email: 'x', role: 'Attendee' } });
+    assert.deepEqual(response.body, { accessToken: 'a', user: { userId: '1', email: 'x', role: 'Attendee', roles: ['Attendee'] } });
   });
 
   test('[FAILURE] [SG2-23:AC2] returns 401 for invalid credentials', async () => {

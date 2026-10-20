@@ -65,7 +65,7 @@ function ControlledField({
  * field appears, matching the "internal users additionally see their
  * department" acceptance criterion.
  */
-export default function Profile({ role }: { role: Role }) {
+export default function Profile({ role, roles = [role] }: { role: Role; roles?: readonly Role[] }) {
   const baseId = useId();
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [loadMessage, setLoadMessage] = useState('');
@@ -135,7 +135,10 @@ export default function Profile({ role }: { role: Role }) {
 
   return (
     <Card style={{ gap: '24px', maxWidth: '560px' }}>
-      <Fact label="Role" value={role} />
+      {/* SG2-104 AC3: every role the account holds, and the one it acts as. */}
+      {roles.length > 1
+        ? <><Fact label="Roles" value={roles.join(', ')} /><Fact label="Acting as" value={role} /></>
+        : <Fact label="Role" value={role} />}
       <Fact label="Organisation" value={profile?.organisation ?? '—'} />
 
       <ControlledField id={`${baseId}-name`} label="Name" value={name} onChange={(e) => setName(e.target.value)} />

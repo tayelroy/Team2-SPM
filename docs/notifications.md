@@ -1,4 +1,4 @@
-# Notifications (SG2-68)
+# Notifications (SG2-68 / SG2-69)
 
 People are told when something affects an event they take part in. Every
 notice is a row in `public.notifications` and appears in the bell in the app
@@ -14,12 +14,12 @@ Coordinator Lead (see [authorization](authorization.md)). Rows are limited to
 the caller twice: the handler filters on `recipient_id`, and the
 `notifications` RLS policy lets a recipient read only their own rows. Nobody
 else's notice can be read, so a person with no part in an event never sees one
-about it (AC3). The Safety Officer receives no notices yet and has no grant.
+about it (AC3). This legacy route retains its existing role grants.
 
-The Event Organiser's and the Lead's bells show these notices only; the
-internal roles' bells also show tentative-hold notices (SG2-84/85,
-`venue_hold_notifications`), which are a separate table and are not covered
-here.
+Since SG2-69, the header uses the recipient-scoped unified inbox described
+in [notification-inbox.md](notification-inbox.md). All seven authenticated roles have a real inbox. Event and tentative-hold
+notices remain in separate tables; their read state, pagination and unread
+total are presented together.
 
 ## Every kind
 

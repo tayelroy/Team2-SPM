@@ -392,7 +392,9 @@ test('[CONFLICT] [SG2-49:AC1] a period already booked, blocked or held at the mo
     [{ outcome: 'closed' }, 409, { error: 'This request can no longer be approved: the event is not approved or the requested period has passed.' }],
     [{ outcome: 'capacity' }, 409, { error: 'Approve a capacity exception for this request before approving the booking.' }],
     [{ outcome: 'missing' }, 404, { error: 'Booking request not found.' }],
-    [{ outcome: 'invalid' }, 400, { error: 'Choose approve or reject, and give a reason for rejecting.' }]
+    [{ outcome: 'invalid' }, 400, { error: 'Choose approve or reject, and give a reason for rejecting.' }],
+    // SG2-104 separation of duties: the decider raised the request themselves.
+    [{ outcome: 'own_request' }, 403, { error: 'You raised this request yourself, so another Venue Staff member must decide it.' }]
   ];
   for (const [result, status, expected] of cases) {
     const { composed } = decisionApp({}, result);

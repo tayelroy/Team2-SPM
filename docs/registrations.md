@@ -72,7 +72,7 @@ registration is not open to attendees until then.
 
 ## Where it lives
 
-- Migration `supabase/migrations/202610200003_event_registration_settings.sql`:
+- Migration `supabase/migrations/202610200004_event_registration_settings.sql`:
   `update_registration_settings`, `event_registration_overview`,
   `announce_registration_window`, `process_registration_windows`, the two
   notice kinds, `registrations.registered_at` and `events.registration_announced`.

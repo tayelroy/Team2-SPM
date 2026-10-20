@@ -1,7 +1,7 @@
 /**
  * SG2-63: the Event Organiser's registration settings and the registration
  * picture built from them. The SQL in
- * 202610200003_event_registration_settings.sql repeats these rules; they
+ * 202610200004_event_registration_settings.sql repeats these rules; they
  * must change together.
  */
 

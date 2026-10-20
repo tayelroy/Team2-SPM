@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -27,6 +27,35 @@ test('[NORMAL] [SG2-22:AC3] the CLI writes and verifies a current method ledger'
   assert.equal(ledger.methods.length, 1);
   assert.deepEqual(ledger.methods[0].references, [{ story: 'SG2-22', criterion: 'AC3' }]);
   assert.deepEqual(ledger.methods[0].categories, ['NORMAL']);
+});
+
+test('[CONFLICT] [SG2-22:AC3] duplicate Supabase migration versions block the deployment inventory gate until renumbered', t => {
+  const { root, run } = fixture(t);
+  const directory = join(root, 'supabase/migrations');
+  mkdirSync(directory);
+  writeFileSync(join(directory, '202610200002_acting_role_functions.sql'), 'SELECT 1;');
+  writeFileSync(join(directory, '202610200002_notifications_inbox_reminders.sql'), 'SELECT 2;');
+  const rejected = run('--write');
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /Duplicate migration version 202610200002: 202610200002_acting_role_functions.sql, 202610200002_notifications_inbox_reminders.sql/);
+  renameSync(join(directory, '202610200002_notifications_inbox_reminders.sql'), join(directory, '202610200003_notifications_inbox_reminders.sql'));
+  assert.equal(run('--write').status, 0);
+  assert.equal(run().status, 0);
+});
+
+test('[BOUNDARY] [CONFLICT] [SG2-22:AC3] the exact historical migration pair remains accepted while another collision is refused', t => {
+  const { root, run } = fixture(t);
+  const directory = join(root, 'supabase/migrations');
+  mkdirSync(directory);
+  for (const name of ['202609220001_internal_work_queue.sql', '202609220001_venue_layouts.sql']) {
+    writeFileSync(join(directory, name), 'SELECT 1;');
+  }
+  assert.equal(run('--write').status, 0);
+  assert.equal(run().status, 0);
+  writeFileSync(join(directory, '202609220001_unreleased.sql'), 'SELECT 3;');
+  const rejected = run('--write');
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /Duplicate migration version 202609220001:/);
 });
 
 test('[NORMAL] [SG2-22:AC3] database integration declarations enter the same auditable ledger', t => {

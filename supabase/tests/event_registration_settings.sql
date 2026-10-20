@@ -27,7 +27,9 @@ insert into public.account_roles(user_id, role) values
  ('e6300000-0000-4000-8000-000000000007', 'attendee');
 -- 96301 planning, 96302 confirmed and open, 96303 cancelled, 96304 no
 -- registration, 96305 already started, 96306 confirmed and not yet open,
--- 96307 confirmed and past its closing time, 96308 planning inside its window.
+-- 96307 confirmed and past its closing time with no coordinator (only the
+-- organiser is told; SG2-104 forbids organising and coordinating the same
+-- event), 96308 planning inside its window.
 insert into public.events(event_id, organiser_id, coordinator_id, organisation, status, name, proposed_date,
   registration_needed, registration_capacity, registration_opens_at, registration_closes_at) values
  (96301, 'e6300000-0000-4000-8000-000000000001', 'e6300000-0000-4000-8000-000000000004', 'Reg org', 'planning',
@@ -42,7 +44,7 @@ insert into public.events(event_id, organiser_id, coordinator_id, organisation, 
   'Started forum', now() - interval '1 hour', true, 10, now() - interval '3 days', now() - interval '2 hours'),
  (96306, 'e6300000-0000-4000-8000-000000000001', 'e6300000-0000-4000-8000-000000000004', 'Reg org', 'confirmed',
   '', now() + interval '30 days', true, 10, now() + interval '2 days', now() + interval '9 days'),
- (96307, 'e6300000-0000-4000-8000-000000000001', 'e6300000-0000-4000-8000-000000000001', 'Reg org', 'confirmed',
+ (96307, 'e6300000-0000-4000-8000-000000000001', null, 'Reg org', 'confirmed',
   'Closed forum', now() + interval '30 days', true, 10, now() - interval '5 days', now() - interval '1 day'),
  (96308, 'e6300000-0000-4000-8000-000000000001', 'e6300000-0000-4000-8000-000000000004', 'Reg org', 'planning',
   'Unconfirmed forum', now() + interval '30 days', true, 10, now() - interval '1 day', now() + interval '9 days');

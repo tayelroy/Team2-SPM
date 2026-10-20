@@ -189,6 +189,53 @@ a reassignment matches no row instead of overwriting the new assignment. Any
 new coordinator action must carry the same per-row check; the SG2-90 regression
 case in `docs/regression-cases.json` exercises every existing one.
 
+### Several roles on one account (SG2-104)
+
+An account can hold more than one of the seven roles (`account_roles` is keyed
+by `(user_id, role)`), but every request runs as exactly **one** of them, its
+*acting role*:
+
+- The client sends `X-Acting-Role: <role code>` on every signed-in API call
+  (`client/src/auth/actingRole.ts`), and the header's "Acting as" switcher,
+  shown only to accounts with several roles, changes it.
+- `requireAuth` reads every role the account holds and picks the acting role
+  (`server/src/auth/actingRole.ts`): a role not held is refused with 403
+  `role_not_held`, a malformed value or a repeated header with 400. With no
+  header, a single-role account acts as its role and a multi-role account as
+  its least-privileged one. `principal.role` is the acting role, so
+  permissions and every per-event check apply to that role only;
+  `principal.roles` lists every role held, and `/api/auth/me` and login
+  return them.
+- The server forwards the header to PostgREST, where `public.acting_role()`
+  checks it against the caller's own rows. The functions that read the
+  caller's role use it, so the database also acts as one role at a time.
+  Row level security still allows any role the account holds.
+- Separation of duties: an event's organiser is never its coordinator
+  (`assignCoordinator.ts` and the `events_coordinator_not_organiser` check);
+  Venue Staff never decide a venue request they raised themselves
+  (`decide_venue_booking_request()` answers `own_request`, 403); nobody
+  changes their own roles (`PATCH /api/users/:userId/role` and
+  `change_account_roles()`).
+- Extra roles are granted in SQL, e.g. `insert into public.account_roles
+  (user_id, role) values ('<user id>', 'event_coordinator');`. The profile
+  lists every role held.
+
+Reading an event's stage or change history needs a relationship to that event
+(AC6, `server/src/events/eventRelationship.ts`, mirrored by
+`private.event_relationship_exists()` and the `event_audit_logs` read policy;
+the function sits in the unexposed `private` schema so clients cannot call it
+through `/rpc`):
+its organiser, its current coordinator (so a reassigned coordinator loses
+access at once), the Lead for any submitted event, Venue Staff when it has a
+venue request or booking, Technical Support when it has an equipment request
+or reservation, and the Safety Officer from its safety check on.
+
+Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
+`change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
+`202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.
+Tests: `supabase/tests/account_multi_roles.sql`, `server/src/multiRoles.test.ts`,
+`client/src/screens/RoleSwitcher.test.tsx`, browser journey `SG2-104-P01`.
+
 ## Protect a backend route
 
 Import the shared `authorization` instance. `protectedRouter()` applies

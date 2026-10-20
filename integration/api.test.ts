@@ -8,7 +8,7 @@ import request from 'supertest';
 import { createClient } from '@supabase/supabase-js';
 import { createApp } from '../server/src/app';
 import { createAuthorization, AccessError, type Role } from '../server/src/auth';
-import { getAccountRole } from '../server/src/db/accountRoles';
+import { getHeldRoles } from '../server/src/db/accountRoles';
 import { dbConfig } from '../server/src/db/config';
 import { createEventDraftHandler } from '../server/src/events/createDraft';
 import { createUpdateEventDraftHandler } from '../server/src/events/updateDraft';
@@ -31,6 +31,7 @@ import { createMockChangeRequestSource } from '../server/src/changeRequests/mock
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
 import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
+import { createNotificationsRouter } from '../server/src/notifications';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
@@ -65,9 +66,9 @@ const ids = Object.fromEntries(['organiser', 'coordinator', 'lead', 'venue', 'su
 const access = createAuthorization({ resolvePrincipal: async token => {
   const userId = ids[token];
   if (!userId) throw new AccessError(401);
-  const role = await getAccountRole(database, userId);
+  const role = await getHeldRoles(database, userId);
   if (!role.ok) throw new AccessError(403);
-  return { userId, role: role.role as Role };
+  return { userId, roles: role.roles as Role[] };
 } });
 let available = true;
 const dependencies = { getPrincipal: access.getPrincipal, getAdminClient: () => available ? database : null };
@@ -657,6 +658,81 @@ test('[NORMAL] [SG2-41:AC2] [SG2-41:AC3] native venue and equipment request proj
   }
 });
 
+test('[CONFLICT] [SG2-69:AC3] [SG2-69:AC7] an organiser notification target follows current organisation while historical read receipts remain owned and idempotent', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const organiser = await database.from('users').select('organisation').eq('user_id', ids.organiser).single();
+  assert.equal(organiser.error, null);
+  const originalOrganisation = organiser.data!.organisation;
+  const tokens = Object.fromEntries(['organiser', 'coordinator'].map(who => [who, jwt('authenticated', ids[who])]));
+  const callerAccess = createAuthorization({ resolvePrincipal: async token => {
+    const who = Object.entries(tokens).find(([, value]) => value === token)?.[0];
+    if (!who) throw new AccessError(401);
+    const role = await getHeldRoles(database, ids[who]);
+    if (!role.ok) throw new AccessError(403);
+    return { userId: ids[who], roles: role.roles as Role[] };
+  } });
+  const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
+  const as = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
+  const eventId = await planned();
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    const inserted = await database.from('notifications').insert([
+      { recipient_id: ids.organiser, event_id: eventId, request_id: null, kind: 'event_approved', message: 'Organisation-scoped organiser approval.', read_at: null },
+      { recipient_id: ids.coordinator, event_id: eventId, request_id: null, kind: 'coordinator_assigned', message: 'Separate coordinator receipt.', read_at: null },
+    ]).select('notification_id,recipient_id');
+    assert.equal(inserted.error, null);
+    const ownId = inserted.data!.find(row => row.recipient_id === ids.organiser)!.notification_id;
+    const otherId = inserted.data!.find(row => row.recipient_id === ids.coordinator)!.notification_id;
+    Object.assign(dbConfig, { supabaseUrl: 'https://notifications-integration.supabase.test', supabaseAnonKey: jwt('anon') });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://notifications-integration.supabase.test') {
+        assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`), 'Every inbox RPC carries its caller JWT.');
+        assert.ok(original.headers.has('x-acting-role'), 'Every inbox RPC carries the validated acting role.');
+        url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const target = () => callerApi.get(`/api/notifications/event/${ownId}/event`).set(as('organiser'));
+    const initial = await target();
+    assert.equal(initial.status, 200, JSON.stringify(initial.body));
+    assert.deepEqual(Object.keys(initial.body.event).sort(), ['event_id', 'name', 'proposed_date', 'status']);
+    const { proposed_date: proposedDate, ...summary } = initial.body.event;
+    assert.deepEqual(summary, { event_id: eventId, name: values.name, status: 'approved' });
+    assert.equal(Date.parse(proposedDate), Date.parse(values.proposed_date), 'The minimal target retains the event date instant across PostgreSQL timestamp formatting.');
+    assert.equal((await callerApi.get(`/api/notifications/event/${otherId}/event`).set(as('organiser'))).status, 404);
+    assert.equal((await callerApi.post(`/api/notifications/event/${otherId}/read`).set(as('organiser'))).status, 404);
+
+    assert.equal((await database.from('users').update({ organisation: 'A different integration organisation' }).eq('user_id', ids.organiser)).error, null);
+    assert.equal((await target()).status, 404, 'Current organisation is checked again even when the JWT and historical notice are unchanged.');
+    const read = await callerApi.post(`/api/notifications/event/${ownId}/read`).set(as('organiser'));
+    assert.equal(read.status, 200, JSON.stringify(read.body));
+    assert.equal(read.body.notification.notification_id, ownId);
+    assert.equal(read.body.notification.source, 'event');
+    assert.ok(Number.isFinite(Date.parse(read.body.notification.read_at)), 'An owned historical notice still receives its read receipt.');
+    const repeated = await callerApi.post(`/api/notifications/event/${ownId}/read`).set(as('organiser'));
+    assert.equal(repeated.status, 200, JSON.stringify(repeated.body));
+    assert.deepEqual(repeated.body, read.body, 'Repeated opening preserves the first read timestamp and unread count.');
+    const receipts = await database.from('notifications').select('notification_id,read_at').in('notification_id', [ownId, otherId]);
+    assert.equal(receipts.error, null);
+    assert.equal(receipts.data!.find(row => row.notification_id === ownId)!.read_at, read.body.notification.read_at);
+    assert.equal(receipts.data!.find(row => row.notification_id === otherId)!.read_at, null, 'Denied cross-recipient reads never mark the coordinator notice.');
+
+    assert.equal((await database.from('users').update({ organisation: originalOrganisation }).eq('user_id', ids.organiser)).error, null);
+    const restored = await target();
+    assert.equal(restored.status, 200, JSON.stringify(restored.body));
+    assert.deepEqual(restored.body, initial.body, 'Restoring the current organisation restores only the permitted minimal event summary.');
+  } finally {
+    transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
+    const restored = await database.from('users').update({ organisation: originalOrganisation }).eq('user_id', ids.organiser);
+    const removed = await database.from('events').delete().eq('event_id', eventId);
+    assert.equal(restored.error, null);
+    assert.equal(removed.error, null);
+  }
+});
+
 test('[NORMAL] [FAILURE] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] native capacity discovery and approval are Venue Staff only, resolve real joins and record approval without deciding the booking', async () => {
   const ownEvent = await planned();
   const otherEvent = await planned();
@@ -813,9 +889,9 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-77:AC5] [SG2-77:AC6] [SG2-86:AC2] Safet
   const operationAccess = createAuthorization({ resolvePrincipal: async token => {
     const userId = token === tokens.safety ? safetyId : token === tokens.venue ? ids.venue : undefined;
     if (!userId) throw new AccessError(401);
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const operationApi = request(createApp(undefined, operationAccess));
   const venueIds: number[] = [];
@@ -896,9 +972,9 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-77:AC6] actual Staff upserts
     const name = (Object.keys(tokens) as (keyof typeof tokens)[]).find(name => tokens[name] === token);
     if (!name) throw new AccessError(401);
     const userId = userIds[name];
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const operationApi = request(createApp(undefined, operationAccess));
   let venueId: number | undefined;
@@ -997,9 +1073,9 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC3] [S
   const callerAccess = createAuthorization({ resolvePrincipal: async token => {
     const userId = token === tokens.venue ? ids.venue : token === tokens.coordinator ? ids.coordinator : undefined;
     if (!userId) throw new AccessError(401);
-    const role = await getAccountRole(database, userId);
+    const role = await getHeldRoles(database, userId);
     if (!role.ok) throw new AccessError(403);
-    return { userId, role: role.role as Role };
+    return { userId, roles: role.roles as Role[] };
   } });
   const callerApi = request(createApp(undefined, callerAccess));
   const as = (who: keyof typeof tokens) => ({ Authorization: `Bearer ${tokens[who]}` });
@@ -1086,5 +1162,187 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC3] [S
       assert.equal((await database.from('venue_booking_requests').delete().in('venue_id', venueIds)).error, null);
       assert.equal((await database.from('venues').delete().in('venue_id', venueIds)).error, null);
     }
+  }
+});
+
+test('[NORMAL] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] [SG2-69:AC4] [SG2-69:AC5] [SG2-69:AC6] [SG2-69:AC7] native inbox pages both notice sources, counts all unread rows, marks only owned identities and delivers coordinator-only reminders', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const tokens = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, jwt('authenticated', id)]));
+  const callerAccess = createAuthorization({ resolvePrincipal: async token => {
+    const who = Object.entries(tokens).find(([, value]) => value === token)?.[0];
+    if (!who) throw new AccessError(401);
+    const role = await getHeldRoles(database, ids[who]);
+    if (!role.ok) throw new AccessError(403);
+    return { userId: ids[who], roles: role.roles as Role[] };
+  } });
+  // The unmodified production factory builds a fresh user-scoped DB adapter.
+  const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
+  const holdingApi = request(createApp(undefined, callerAccess));
+  const as = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
+  const eventId = await planned();
+  let venueId: number | undefined;
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    // SQL suites share this disposable DB in CI. Their rolled-back inserts
+    // still advance identity sequences, so no global venue ID is a fixture.
+    const venue = await database.from('venues').insert({ name: 'Integration SG2-69 inbox venue', capacity: 200 })
+      .select('venue_id').single();
+    assert.equal(venue.error, null);
+    venueId = venue.data!.venue_id;
+    Object.assign(dbConfig, { supabaseUrl: 'https://notifications-integration.supabase.test', supabaseAnonKey: jwt('anon') });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://notifications-integration.supabase.test') {
+        assert.ok(Object.values(tokens).some(token => original.headers.get('authorization') === `Bearer ${token}`), 'Every inbox RPC carries its caller JWT.');
+        assert.ok(original.headers.has('x-acting-role'), 'Every inbox RPC carries the validated acting role.');
+        url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const held = await holdingApi.post('/api/venue-holds').set(as('venue')).send({ event_id: eventId, venue_id: venueId,
+      starts_at: '2099-07-03T02:00:00Z', ends_at: '2099-07-03T04:00:00Z', expires_at: '2098-06-20T02:00:00Z' });
+    assert.equal(held.status, 201, JSON.stringify(held.body));
+    const cleared = await callerApi.post('/api/notifications/read-all').set(as('coordinator'));
+    assert.deepEqual([cleared.status, cleared.body], [200, { unread_count: 0 }]);
+    const sameInstant = '2099-01-01T00:00:00.123456Z';
+    const inserted = await database.from('notifications').insert(Array.from({ length: 53 }, (_, i) => ({
+      recipient_id: ids.coordinator, event_id: eventId, request_id: null, kind: 'coordinator_assigned',
+      message: `Integration SG2-69 page ${i}`, created_at: sameInstant
+    }))).select('notification_id');
+    assert.equal(inserted.error, null);
+    const heldNotice = await database.from('venue_hold_notifications').insert({ recipient_id: ids.coordinator,
+      event_id: eventId, hold_id: held.body.hold.hold_id, kind: 'warning', message: 'Integration hold reminder', created_at: sameInstant }).select('notification_id').single();
+    assert.equal(heldNotice.error, null);
+    const first = await callerApi.get('/api/notifications/inbox').set(as('coordinator'));
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    assert.equal(first.headers['cache-control'], 'no-store');
+    assert.equal(first.body.unread_count, 54, 'Unread count includes notices beyond page 50.');
+    assert.equal(first.body.notifications.length, 50);
+    assert.deepEqual([first.body.notifications[0].source, first.body.notifications[0].notification_id], ['hold', heldNotice.data!.notification_id]);
+    const next = first.body.next_cursor;
+    assert.ok(next);
+    const second = await callerApi.get('/api/notifications/inbox').query({ before_created_at: next.created_at, before_source: next.source, before_id: next.notification_id }).set(as('coordinator'));
+    assert.equal(second.status, 200, JSON.stringify(second.body));
+    assert.equal(second.body.unread_count, 54);
+    const combined = [...first.body.notifications, ...second.body.notifications].slice(0, 54);
+    assert.equal(new Set(combined.map(n => `${n.source}:${n.notification_id}`)).size, 54, 'Microsecond cursor does not repeat a row.');
+    assert.deepEqual(combined.filter(n => n.source === 'event').map(n => n.notification_id), inserted.data!.map(n => n.notification_id).sort((a, b) => b - a));
+    assert.ok(combined.every(n => n.read_at === null));
+    const selectedId = inserted.data![0].notification_id;
+    const opened = await callerApi.post(`/api/notifications/event/${selectedId}/read`).set(as('coordinator'));
+    assert.equal(opened.status, 200, JSON.stringify(opened.body));
+    assert.equal(opened.body.unread_count, 53);
+    assert.ok(Number.isFinite(Date.parse(opened.body.notification.read_at)));
+    const repeated = await callerApi.post(`/api/notifications/event/${selectedId}/read`).set(as('coordinator'));
+    assert.deepEqual(repeated.body, opened.body, 'Opening twice preserves the original read time and count.');
+    const target = await callerApi.get(`/api/notifications/event/${selectedId}/event`).set(as('coordinator'));
+    assert.equal(target.status, 200, JSON.stringify(target.body));
+    assert.deepEqual(Object.keys(target.body.event).sort(), ['event_id', 'name', 'proposed_date', 'status']);
+    assert.equal(target.body.event.event_id, eventId);
+    for (const who of ['other', 'organiser', 'support', 'safety']) {
+      assert.equal((await callerApi.post(`/api/notifications/event/${selectedId}/read`).set(as(who))).status, 404);
+      assert.equal((await callerApi.get(`/api/notifications/event/${selectedId}/event`).set(as(who))).status, 404);
+    }
+    assert.deepEqual((await callerApi.get('/api/notifications/reminder-preferences').set(as('coordinator'))).body, { frequency_days: 1 });
+    assert.deepEqual((await callerApi.put('/api/notifications/reminder-preferences').set(as('coordinator')).send({ frequency_days: 2 })).body, { frequency_days: 2 });
+    assert.deepEqual((await callerApi.get('/api/notifications/reminder-preferences').set(as('coordinator'))).body, { frequency_days: 2 });
+    assert.equal((await callerApi.put('/api/notifications/reminder-preferences').set(as('support')).send({ frequency_days: 2 })).status, 403);
+    const directScheduler = await originalFetch(new URL('/rpc/send_outstanding_arrangement_reminders', rest), { method: 'POST', headers: {
+      Authorization: `Bearer ${tokens.coordinator}`, 'Content-Type': 'application/json' }, body: '{}' });
+    assert.ok([401, 403].includes(directScheduler.status), `Coordinator scheduler status ${directScheduler.status}`);
+    const sent = await database.rpc('send_outstanding_arrangement_reminders');
+    assert.equal(sent.error, null);
+    const reminders = await database.from('notifications').select('recipient_id,message').eq('event_id', eventId).eq('kind', 'outstanding_arrangements');
+    assert.equal(reminders.error, null);
+    assert.equal(reminders.data!.length, 1);
+    assert.equal(reminders.data![0].recipient_id, ids.coordinator);
+    assert.match(reminders.data![0].message, /venue/i);
+    assert.match(reminders.data![0].message, /registration/i);
+    assert.equal((await database.rpc('send_outstanding_arrangement_reminders')).error, null);
+    const duplicate = await database.from('notifications').select('notification_id').eq('event_id', eventId).eq('kind', 'outstanding_arrangements');
+    assert.equal(duplicate.data!.length, 1, 'An immediate second sweep cannot duplicate the reminder.');
+    assert.deepEqual((await callerApi.post('/api/notifications/read-all').set(as('coordinator'))).body, { unread_count: 0 });
+    assert.equal((await callerApi.get('/api/notifications/inbox').set(as('coordinator'))).body.unread_count, 0);
+    assert.equal((await database.from('events').update({ coordinator_id: ids.other }).eq('event_id', eventId)).error, null);
+    assert.equal((await callerApi.get(`/api/notifications/event/${selectedId}/event`).set(as('coordinator'))).status, 404, 'Reassignment revokes the old coordinator event target.');
+    assert.equal((await callerApi.post(`/api/notifications/event/${selectedId}/read`).set(as('coordinator'))).status, 200, 'Historical owned notices remain readable.');
+  } finally {
+    transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
+    assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
+    if (venueId !== undefined) assert.equal((await database.from('venues').delete().eq('venue_id', venueId)).error, null);
+  }
+});
+
+test('[CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-69:AC7] [SG2-104:AC2] native notification targets and cadence follow the acting role while historical ownership survives a role switch or revocation', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const eventId = await planned();
+  const token = jwt('authenticated', ids.coordinator);
+  const anonKey = jwt('anon');
+  const callerAccess = createAuthorization({ resolvePrincipal: async presented => {
+    if (presented !== token) throw new AccessError(401);
+    const held = await getHeldRoles(database, ids.coordinator);
+    if (!held.ok) throw new AccessError(403);
+    return { userId: ids.coordinator, roles: held.roles as Role[] };
+  } });
+  const callerApi = request(express().use(express.json()).use('/api/notifications', createNotificationsRouter(callerAccess)));
+  const as = (role?: Role) => ({ Authorization: `Bearer ${token}`, ...(role ? { 'X-Acting-Role': role } : {}) });
+  const rpcRoles: { path: string; role: string | null }[] = [];
+  let transport: ReturnType<typeof mock.method> | undefined;
+  let coordinatorRevoked = false;
+  try {
+    const inserted = await database.from('notifications').insert({ recipient_id: ids.coordinator, event_id: eventId,
+      request_id: null, kind: 'coordinator_assigned', message: 'One identity with separate acting roles.', read_at: null })
+      .select('notification_id').single();
+    assert.equal(inserted.error, null);
+    const noticeId = inserted.data!.notification_id;
+    assert.equal((await database.from('account_roles').insert({ user_id: ids.coordinator, role: 'attendee' })).error, null);
+    Object.assign(dbConfig, { supabaseUrl: 'https://multi-role-notifications-integration.supabase.test', supabaseAnonKey: anonKey });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.origin === 'https://multi-role-notifications-integration.supabase.test') {
+        assert.equal(original.headers.get('authorization'), `Bearer ${token}`, 'Notification RPCs keep the authenticated user JWT.');
+        assert.equal(original.headers.get('apikey'), anonKey);
+        rpcRoles.push({ path: url.pathname, role: original.headers.get('x-acting-role') });
+        url.pathname = url.pathname.slice('/rest/v1'.length); url.protocol = rest.protocol; url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const target = (role?: Role) => callerApi.get(`/api/notifications/event/${noticeId}/event`).set(as(role));
+    assert.equal((await callerApi.get('/api/notifications/inbox').set(as())).status, 200);
+    assert.equal((await target()).status, 404, 'The least-privileged attendee default cannot borrow its held coordinator relationship.');
+    assert.equal((await target('event_coordinator')).status, 200);
+    assert.deepEqual(rpcRoles.filter(call => call.path.endsWith('/notification_event')).map(call => call.role), ['attendee', 'event_coordinator']);
+    assert.equal((await callerApi.get('/api/notifications/reminder-preferences').set(as())).status, 403);
+    assert.equal((await callerApi.get('/api/notifications/reminder-preferences').set(as('event_coordinator'))).status, 200);
+    const callsBeforeDenied = rpcRoles.length;
+    assert.equal((await callerApi.put('/api/notifications/reminder-preferences').set(as('attendee')).send({ frequency_days: 3 })).status, 403);
+    assert.equal((await target('venue_staff')).status, 403, 'An unheld acting role is refused before storage.');
+    assert.equal(rpcRoles.length, callsBeforeDenied);
+    const directDenied = await originalFetch(new URL('/rpc/set_notification_reminder_preferences', rest), { method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'X-Acting-Role': 'attendee', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_frequency_days: 3 }) });
+    assert.equal(directDenied.status, 403, 'SQL also refuses cadence writes under a held role other than coordinator.');
+    const firstRead = await callerApi.post(`/api/notifications/event/${noticeId}/read`).set(as('attendee'));
+    assert.equal(firstRead.status, 200);
+    assert.ok(Number.isFinite(Date.parse(firstRead.body.notification.read_at)));
+    assert.equal((await database.from('account_roles').delete().eq('user_id', ids.coordinator).eq('role', 'event_coordinator')).error, null);
+    coordinatorRevoked = true;
+    const callsBeforeRevoked = rpcRoles.length;
+    assert.equal((await target('event_coordinator')).status, 403, 'A revoked acting role is checked again on the next request.');
+    assert.equal(rpcRoles.length, callsBeforeRevoked);
+    assert.equal((await target()).status, 404);
+    const repeated = await callerApi.post(`/api/notifications/event/${noticeId}/read`).set(as());
+    assert.equal(repeated.status, 200, 'Recipient ownership still permits reading a historical notice.');
+    assert.deepEqual(repeated.body, firstRead.body, 'A role change does not alter the original receipt or duplicate it.');
+    assert.ok(rpcRoles.every(call => call.role === 'attendee' || call.role === 'event_coordinator'));
+  } finally {
+    transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
+    if (coordinatorRevoked) assert.equal((await database.from('account_roles').insert({ user_id: ids.coordinator, role: 'event_coordinator' })).error, null);
+    assert.equal((await database.from('account_roles').delete().eq('user_id', ids.coordinator).eq('role', 'attendee')).error, null);
+    assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
   }
 });

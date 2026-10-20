@@ -111,7 +111,10 @@ begin
   end if;
 end $$;
 
--- 2. Internal staff can read all audit logs:
+-- 2. Internal staff read the history of events they work on (SG2-104 AC6
+-- replaced SG2-40's every-event read): the coordinator sees their own event's
+-- history; venue and support staff with no venue or equipment work on either
+-- event see none. account_multi_roles.sql covers staff who do work on one.
 set local role authenticated;
 
 -- Coordinator
@@ -119,8 +122,9 @@ select set_config('request.jwt.claim.sub', 'c0000000-0000-4000-8000-000000000001
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-000000000001","role":"authenticated"}', true);
 do $$
 begin
-  if (select count(*) from public.event_audit_logs) <> 2 then
-    raise exception '[SG2-40:coordinator-history-read] [SG2-40:AC1] [NORMAL] Event coordinator should see all audit logs';
+  if (select count(*) from public.event_audit_logs) <> 1
+      or not exists (select 1 from public.event_audit_logs where event_id = 93901) then
+    raise exception '[SG2-40:coordinator-history-read] [SG2-40:AC1] [SG2-104:AC6] [NORMAL] Event coordinator should see the history of their assigned event, and only that';
   end if;
   -- Cannot write directly
   begin
@@ -136,8 +140,8 @@ select set_config('request.jwt.claim.sub', 'c0000000-0000-4000-8000-000000000005
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-000000000005","role":"authenticated"}', true);
 do $$
 begin
-  if (select count(*) from public.event_audit_logs) <> 2 then
-    raise exception '[SG2-40:venue-staff-history-read] [SG2-40:AC1] [NORMAL] Venue staff should see all audit logs';
+  if exists (select 1 from public.event_audit_logs) then
+    raise exception '[SG2-40:venue-staff-history-read] [SG2-40:AC1] [SG2-104:AC6] [BOUNDARY] Venue staff with no venue request on an event must not see its history';
   end if;
 end $$;
 
@@ -146,8 +150,8 @@ select set_config('request.jwt.claim.sub', 'c0000000-0000-4000-8000-000000000006
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-4000-8000-000000000006","role":"authenticated"}', true);
 do $$
 begin
-  if (select count(*) from public.event_audit_logs) <> 2 then
-    raise exception '[SG2-40:technical-support-history-read] [SG2-40:AC1] [NORMAL] Technical support staff should see all audit logs';
+  if exists (select 1 from public.event_audit_logs) then
+    raise exception '[SG2-40:technical-support-history-read] [SG2-40:AC1] [SG2-104:AC6] [BOUNDARY] Technical support staff with no equipment request on an event must not see its history';
   end if;
 end $$;
 

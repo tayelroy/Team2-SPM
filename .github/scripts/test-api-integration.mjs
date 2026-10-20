@@ -24,7 +24,9 @@ try {
     docker('run', '--detach', '--name', database, '--env', 'POSTGRES_PASSWORD=ci-only-password', 'postgres:17');
     resources.push(database);
     for (let attempt = 0; ; attempt++) {
-      const ready = spawnSync('docker', ['exec', database, 'pg_isready', '-U', 'postgres'], { encoding: 'utf8' });
+      // The image briefly exposes a socket-only bootstrap server. Wait for the
+      // final TCP listener so schema replay cannot race its shutdown.
+      const ready = spawnSync('docker', ['exec', database, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'], { encoding: 'utf8' });
       if (ready.status === 0) break;
       assert.ok(attempt < 60, 'Disposable PostgreSQL did not become ready.');
       await new Promise(resolve => setTimeout(resolve, 250));

@@ -426,7 +426,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 
 
 ### 4.13a SG2-63 registration picture and settings
-- **Source:** `events/registrationRoutes.ts`, `events/registrationSettings.ts`, `db/registrations.ts`; migration `202610200003_event_registration_settings.sql`. See [Registrations](../registrations.md).
+- **Source:** `events/registrationRoutes.ts`, `events/registrationSettings.ts`, `db/registrations.ts`; migration `202610200004_event_registration_settings.sql`. See [Registrations](../registrations.md).
 - **GET /api/event-requests/:eventId/registrations** — permission `event_request.registrations.view` (EO, EC). An organiser of the event's organisation or its assigned coordinator; anyone else gets 404.
   - **200:** `{ event_id, name, status, registration_needed, registration_capacity, registration_opens_at, registration_closes_at, window, registered_count, places_remaining, contact_details_visible, attendees[], venues[], capacity_warnings[], can_edit }`. `window` is SG2-58's `not_required | not_confirmed | not_yet_open | open | closed`. Each attendee has `registration_id, name, organisation, registered_at`, plus `email` and `phone` only when `contact_details_visible` (the creating organiser and the assigned coordinator).
 - **PATCH /api/event-requests/:eventId/registration-settings** — permission `event_request.registration_settings.update` (EO); the creating organiser only (403 otherwise).
