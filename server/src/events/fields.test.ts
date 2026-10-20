@@ -1,7 +1,5 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   EVENT_CATEGORIES,
   EVENT_STATUSES,
@@ -108,8 +106,8 @@ describe('the customer minimum for submission (SG2-105)', () => {
     registration_needed: false, category: 'conference'
   };
 
-  test('[NORMAL] [SG2-105:AC1] [SG2-70:AC2] submission requires every field the customer listed, layout included, and the category', () => {
-    assert.deepEqual([...SUBMISSION_REQUIRED_FIELDS], [...CUSTOMER_MINIMUM, 'category']);
+  test('[NORMAL] [SG2-105:AC1] submission requires every field the customer listed, layout included', () => {
+    assert.deepEqual([...SUBMISSION_REQUIRED_FIELDS], CUSTOMER_MINIMUM);
     assert.deepEqual(missingForSubmission(COMPLETE), []);
   });
 
@@ -156,11 +154,11 @@ describe('the event category (SG2-70)', () => {
     }
   });
 
-  test('[BOUNDARY] [SG2-70:AC2] a blank or missing category saves the draft but is still missing for submission', () => {
+  test('[BOUNDARY] [SG2-70:AC2] a blank or missing category saves as none and does not hold up submission', () => {
     for (const body of [{}, { category: '' }, { category: null }]) {
       const result = validateDraftInput(body);
       assert.deepEqual(result, { valid: true, values: emptyDraft() });
-      assert.ok(missingForSubmission(result.valid ? result.values : {}).includes('category'));
+      assert.equal(missingForSubmission(result.valid ? result.values : {}).includes('category'), false);
     }
   });
 
@@ -170,13 +168,6 @@ describe('the event category (SG2-70)', () => {
       assert.deepEqual(validateDraftInput({ category }), { valid: false, errors: [message] });
       assert.equal(isEventCategory(category), false);
     }
-  });
-
-  test('[CONFLICT] [SG2-70:AC2] the list matches the database check, so the API never accepts a category the database refuses', () => {
-    const migration = readFileSync(join(__dirname, '../../../supabase/migrations/202610200003_event_search.sql'), 'utf8');
-    const check = /events_category_known check \(category is null or category in\s*\(([^)]*)\)/.exec(migration);
-    assert.ok(check, 'the events_category_known check is defined');
-    assert.deepEqual(check[1].split(',').map(value => value.trim().replace(/'/g, '')), [...EVENT_CATEGORIES]);
   });
 });
 

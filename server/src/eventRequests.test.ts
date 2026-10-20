@@ -18,11 +18,10 @@ import type { CreateDraftResult, OrganiserLookupResult } from './db/eventRequest
 import type { Principal } from './auth/policy';
 
 // README's submission requirements are the oracle, independent of the validator.
-// SG2-105 adds the rest of the customer's minimum (clarification session 2),
-// and SG2-70 the event's category.
+// SG2-105 adds the rest of the customer's minimum (clarification session 2).
 const REQUIRED_FOR_SUBMISSION = [
   'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
-  'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category'
+  'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
 ];
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
@@ -424,7 +423,7 @@ describe('missingForSubmission', () => {
     assert.deepEqual(missingForSubmission({
       name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session',
       proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
-    }), ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category']);
+    }), ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
   });
 });
 

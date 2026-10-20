@@ -2,8 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
-import { AccessError, createAuthorization, ROLES, type Role } from './auth';
-import { INTERNAL_ROLES } from './auth/policy';
+import { AccessError, createAuthorization, type Role } from './auth';
 import { createApp } from './app';
 import { createEventSearchRouter, parseSearchFilters } from './eventSearch';
 import type { EventSearchFilters, EventSearchOptions, EventSearchPage, EventSearchStore } from './db/eventSearch';
@@ -126,14 +125,18 @@ test('[FAILURE] [SG2-70:AC3] Draft is not a state a search can ask for, since dr
   assert.equal(searched.length, 0);
 });
 
-for (const role of INTERNAL_ROLES) {
+// Independent literal lists (docs/testing.md), not the production INTERNAL_ROLES.
+const SEARCHING_ROLES: Role[] = ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'];
+const REFUSED_ROLES: Role[] = ['event_organiser', 'attendee'];
+
+for (const role of SEARCHING_ROLES) {
   test(`[NORMAL] [SG2-70:AC3] ${role} may search across the system`, async () => {
     const { app } = fixture(role);
     assert.equal((await request(app).get('/api/event-search').set(auth)).status, 200);
   });
 }
 
-for (const role of ROLES.filter(role => !INTERNAL_ROLES.includes(role))) {
+for (const role of REFUSED_ROLES) {
   test(`[FAILURE] [SG2-70:AC3] ${role} cannot search or read the filter options, even with a forged role header`, async () => {
     const { app, searched, optionReads } = fixture(role);
     for (const path of ['/api/event-search', '/api/event-search/options']) {
@@ -153,7 +156,10 @@ test('[FAILURE] [SG2-70:AC3] unsigned or expired credentials cannot search', asy
   assert.equal(searched.length, 0);
 });
 
-test('[CONFLICT] [SG2-70:AC3] an account whose stored role changed after sign-in is refused by the database check', async () => {
+// The database's acting-role check itself is proven by event_search.sql
+// (role-change-refused, acting-organiser-refused); this covers the route's
+// handling of that refusal.
+test('[CONFLICT] [SG2-70:AC3] when the store refuses an account whose role changed after sign-in, the route answers 403', async () => {
   const refused = async () => { throw new AccessError(403); };
   const { app } = fixture('event_coordinator', { search: refused, options: refused });
   for (const path of ['/api/event-search', '/api/event-search/options']) {
@@ -180,4 +186,9 @@ test('[BOUNDARY] [SG2-70:AC2] the parser accepts a leap day and the largest venu
   assert.deepEqual(parseSearchFilters({ from: '2031-02-29' }), { ok: false, error: 'from must be a date (YYYY-MM-DD).' });
   assert.deepEqual(parseSearchFilters({ coordinator: 'A'.repeat(64) }),
     { ok: true, filters: { ...NO_FILTERS, coordinator_id: 'a'.repeat(64) } });
+});
+
+test('[NORMAL] [SG2-70:AC2] the Unassigned coordinator filter is passed on as unassigned', () => {
+  assert.deepEqual(parseSearchFilters({ coordinator: 'Unassigned' }),
+    { ok: true, filters: { ...NO_FILTERS, coordinator_id: 'unassigned' } });
 });

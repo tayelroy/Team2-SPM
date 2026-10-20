@@ -9,8 +9,8 @@
  * Completeness is a separate question, answered by SUBMISSION_REQUIRED_FIELDS
  * and missingForSubmission(). Those are the shared contract with SG2-30
  * (submit an event request), which enforces completeness at submission time.
- * SG2-105 widened that list to the customer's full minimum, and SG2-70 adds
- * the event's category.
+ * SG2-105 widened that list to the customer's full minimum. SG2-70's
+ * category is a draft field but not required for submission.
  */
 
 /**
@@ -63,8 +63,8 @@ export type DraftField = (typeof DRAFT_FIELDS)[number];
  * and equipment requirements may be answered "None" but not left blank, and
  * `registration_needed` must be answered either way (false is an answer).
  * Only submission checks this list, so requests already submitted are not
- * affected and drafts still save incomplete. SG2-70 adds `category`, also
- * enforced at submission by the events_category_required_on_submit trigger.
+ * affected and drafts still save incomplete. SG2-70's `category` is optional
+ * and deliberately absent.
  */
 export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'name',
@@ -76,8 +76,7 @@ export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'preferred_layout',
   'accessibility_needs',
   'equipment_requirements',
-  'registration_needed',
-  'category'
+  'registration_needed'
 ];
 
 export interface DraftValues {

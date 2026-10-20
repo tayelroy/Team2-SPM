@@ -326,7 +326,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `Only a draft or rejected event request can be submitted.`
   - 503
 - **Rule:** only the creating EO; status must be `draft`, `rejected` or `needs_clarification`.
-- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. SG2-70 adds `category`, also enforced by the `events_category_required_on_submit` trigger: if a draft save clears it after the check, the write is refused and the response is the same 400 with `missing: ["category"]`. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked; existing events were given a category by the migration.
+- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked. SG2-70's `category` is optional and not part of this list.
 - **Side effects:**
   - an `event_audit_logs` status row
   - `notifications` of kind `event_submitted`: to every ECL when the status is `unassigned`, otherwise to the coordinator
@@ -1080,14 +1080,14 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 
 ### 9A.1 GET /api/event-search
 - **Source:** `eventSearch/index.ts` (`createEventSearchRouter`), `db/eventSearch.ts`, migration `202610200003_event_search.sql` (`search_events`).
-- **Permission:** `events.search` (EC, VS, TSS, Lead, Safety Officer). `search_events` runs with the caller's JWT and rechecks the stored role, so a role changed after sign-in is refused (403).
-- **Query (all optional; blank leaves the filter out):** `q` (name or client organisation, case-insensitive, at most 255 characters), `from` and `to` (YYYY-MM-DD, inclusive, Singapore calendar days on `proposed_date`), `status` (any event status except `draft`), `venue` (venue id; an event booked, held or requested there), `category` (one of the list in 4.1), `coordinator` (account id). A repeated or malformed value is 400 naming it.
+- **Permission:** `events.search` (EC, VS, TSS, Lead, Safety Officer). `search_events` runs with the caller's JWT and acting role (SG2-104) and rechecks that role, so a role changed after sign-in, or an account acting as a non-internal role, is refused (403). Results are only the events that acting role may see (`private.event_relationship_exists()`; see docs/authorization.md).
+- **Query (all optional; blank leaves the filter out):** `q` (name or client organisation, case-insensitive, at most 255 characters), `from` and `to` (YYYY-MM-DD, inclusive, Singapore calendar days on `proposed_date`), `status` (any event status except `draft`), `venue` (venue id; an event booked, held or requested there), `category` (one of the list in 4.1), `coordinator` (account id, or `unassigned` for events with no coordinator). A repeated or malformed value is 400 naming it.
 - **200:** `{ events: [{ event_id, name, organisation, category, status, proposed_date, coordinator_id, coordinator_name, venues[] }], truncated, filters }`. At most 100 events, soonest first; `truncated` is true when more matched. Drafts are never returned. `filters` echoes what was applied (`query, date_from, date_to, status, venue_id, category, coordinator_id`) for the empty state.
 - **Errors:** 400 for a malformed filter, 401/403 for an unsigned or non-internal caller, 503 otherwise without database detail.
 
 ### 9A.2 GET /api/event-search/options
 - **Permission:** as 9A.1 (`event_search_options`).
-- **200:** `{ venues: [{ venue_id, name }], coordinators: [{ user_id, name }] }`: venues not deleted, and every Event Coordinator account.
+- **200:** `{ venues: [{ venue_id, name }], coordinators: [{ user_id, name }] }`: venues not deleted, and every Event Coordinator account plus anyone still assigned to a submitted event after losing that role.
 
 ## 10. Health
 

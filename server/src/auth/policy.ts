@@ -196,9 +196,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-91 AC2/AC4: only Safety Officers open the list of events awaiting an
   // operational safety check; safety_check_queue() rechecks the stored role.
   'safety_checks.read': ['safety_officer'],
-  // SG2-70 AC3: every internal role finds an event across the system (drafts
-  // excepted); search_events() rechecks the stored role, mirroring
-  // INTERNAL_ROLES below, and the two must change together.
+  // SG2-70 AC3: every internal role can search; search_events() rechecks the
+  // acting role (mirroring INTERNAL_ROLES below; the two must change together)
+  // and returns only the events that role may see (SG2-104 relationship).
   'events.search': [
     'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
   ],

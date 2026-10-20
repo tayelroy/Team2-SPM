@@ -230,6 +230,17 @@ access at once), the Lead for any submitted event, Venue Staff when it has a
 venue request or booking, Technical Support when it has an equipment request
 or reservation, and the Safety Officer from its safety check on.
 
+**Find an event (SG2-70).** `events.search` is granted to every internal role
+(Event Coordinator, Event Coordinator Lead, Venue Staff, Technical Support
+Staff, Safety Officer). Its results use the same relationship rule:
+`search_events()` returns only the events that `private.event_relationship_exists()`
+allows for the caller's acting role, so a coordinator finds only the events
+assigned to them, the Lead every submitted event, and so on. Drafts are never
+returned. The database checks the acting role itself, so an account that also
+holds an organiser role cannot search while acting as the organiser. Migration
+`202610200003_event_search.sql`; tests `supabase/tests/event_search.sql` and
+browser journeys `SG2-70-N01` and `SG2-70-N03`.
+
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
 `change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
 `202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.

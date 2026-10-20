@@ -250,7 +250,7 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   search:
     'Venues that meet every criterion and are free for the whole period. Blocked or confirmed-booked venues are left out.',
   findEvent:
-    'Search every submitted event by name or client organisation, and narrow by date, state, venue, category or coordinator.',
+    'Search the submitted events you work on by name or client organisation, and narrow by date, state, venue, category or coordinator.',
 };
 
 /** Headline figures on the Attendee's prototype dashboard. */

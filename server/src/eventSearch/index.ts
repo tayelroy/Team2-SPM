@@ -62,11 +62,12 @@ function send(res: Response, error: unknown) {
 
 /**
  * GET /api/event-search — internal users find an event by name or client
- * organisation and narrow it by date, state, venue, category and coordinator
- * (SG2-70 AC1/AC2). Only drafts are left out (AC3), and the response echoes
- * the filters in force for the empty state (AC4).
+ * organisation and narrow it by date, state, venue, category and coordinator,
+ * or 'unassigned' (SG2-70 AC1/AC2). The database returns only the events the
+ * acting role may see, never a draft (AC3), and the response echoes the
+ * filters in force for the empty state (AC4).
  * GET /api/event-search/options — the venues and coordinators to choose from.
- * Both need 'events.search' here and an internal stored role in the database.
+ * Both need 'events.search' here and an internal acting role in the database.
  */
 export function createEventSearchRouter(access = authorization, store = createEventSearchStore) {
   const router = access.protectedRouter();

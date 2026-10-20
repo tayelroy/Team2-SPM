@@ -55,15 +55,7 @@ export type FetchEventRequestsResult =
 
 export type SubmitEventRequestResult =
   | { ok: true; request: EventRequestRecord }
-  // SG2-70: a draft save cleared the category between the handler's check and
-  // this write, and events_category_required_on_submit refused the move.
-  | { ok: false; reason: 'missing_category' }
   | { ok: false; reason: 'unavailable'; message: string };
-
-/** SG2-70: the submit backstop's refusal, as PostgREST reports it. */
-function isMissingCategory(error: { code?: string; message?: string }): boolean {
-  return error.code === '23514' && (error.message ?? '').includes('needs a category');
-}
 
 export type DeleteDraftResult =
   | { ok: true }
@@ -463,7 +455,6 @@ export async function submitEventRequest(
     .select(RETURNED_COLUMNS);
 
   if (unheld.error) {
-    if (isMissingCategory(unheld.error)) return { ok: false, reason: 'missing_category' };
     return { ok: false, reason: 'unavailable', message: unheld.error.message };
   }
   if (unheld.data && unheld.data.length > 0) {
@@ -479,7 +470,6 @@ export async function submitEventRequest(
     .select(RETURNED_COLUMNS);
 
   if (held.error) {
-    if (isMissingCategory(held.error)) return { ok: false, reason: 'missing_category' };
     return { ok: false, reason: 'unavailable', message: held.error.message };
   }
   if (!held.data || held.data.length === 0) {

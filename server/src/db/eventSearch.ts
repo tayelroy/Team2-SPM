@@ -83,8 +83,9 @@ function failure(error: { code?: string }, status: number): AccessError {
 
 /**
  * Reads through `public.search_events` and `public.event_search_options` with
- * the caller's JWT, so the stored role is checked by the database as well as
- * by the route (SG2-70 AC3): an account whose role has since changed is refused.
+ * the caller's JWT and acting role (SG2-104), so the database checks the
+ * acting role as well as the route does and returns only the events that role
+ * may see (SG2-70 AC3); an account whose role has since changed is refused.
  */
 export function createEventSearchStore(token: string, makeClient = createUserScopedClient): EventSearchStore {
   const client = makeClient(token);

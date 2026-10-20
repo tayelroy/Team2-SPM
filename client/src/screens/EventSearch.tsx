@@ -47,7 +47,8 @@ export function describeFilters(filters: AppliedFilters, options: EventSearchOpt
     parts.push(`Venue: ${venue?.name ?? `#${filters.venueId}`}`);
   }
   if (filters.category) parts.push(`Category: ${categoryLabel(filters.category)}`);
-  if (filters.coordinatorId) {
+  if (filters.coordinatorId === 'unassigned') parts.push('Coordinator: Unassigned');
+  else if (filters.coordinatorId) {
     const coordinator = options?.coordinators.find((option) => option.userId === filters.coordinatorId);
     parts.push(`Coordinator: ${coordinator?.name ?? 'Unknown coordinator'}`);
   }
@@ -57,9 +58,9 @@ export function describeFilters(filters: AppliedFilters, options: EventSearchOpt
 /**
  * SG2-70: an internal user finds an event by what they remember about it —
  * its name or client organisation (AC1), narrowed by date, state, venue,
- * category and assigned coordinator (AC2). The server returns only events the
- * caller may see, never a draft (AC3), and when nothing matches the screen
- * says so with the filters that were in force (AC4).
+ * category and assigned coordinator, or none (AC2). The server returns only the
+ * events the caller's acting role may see, never a draft (AC3), and when
+ * nothing matches the screen says so with the filters that were in force (AC4).
  */
 export default function EventSearch({ accessToken }: { accessToken: string }) {
   const [values, setValues] = useState<EventSearchQuery>(EMPTY_SEARCH);
@@ -84,7 +85,7 @@ export default function EventSearch({ accessToken }: { accessToken: string }) {
     } else setOutcome({ kind: 'error', message: 'Event search is temporarily unavailable. Please try again.', retry: true });
   }
 
-  // Opening the screen lists every event the caller may see, soonest first.
+  // Opening the screen lists the events the caller may see, soonest first.
   useEffect(() => {
     void run(EMPTY_SEARCH);
     let cancelled = false;
@@ -154,6 +155,7 @@ export default function EventSearch({ accessToken }: { accessToken: string }) {
               <label htmlFor="event-search-coordinator" style={label}>Assigned coordinator</label>
               <select id="event-search-coordinator" value={values.coordinator} style={inputStyle} onChange={set('coordinator')} disabled={!options}>
                 <option value="">Any coordinator</option>
+                <option value="unassigned">Unassigned</option>
                 {options?.coordinators.map((coordinator) => <option key={coordinator.userId} value={coordinator.userId}>{coordinator.name}</option>)}
               </select>
             </div>
@@ -190,7 +192,7 @@ export default function EventSearch({ accessToken }: { accessToken: string }) {
               <div><GhostButton onClick={clear}>Clear filters</GhostButton></div>
             </>
           ) : (
-            <p style={{ margin: 0, color: color.silver }}>There are no submitted events yet. Drafts are not shown until they are submitted.</p>
+            <p style={{ margin: 0, color: color.silver }}>There are no submitted events for your role yet. Drafts are not shown until they are submitted.</p>
           )}
         </Card>
       ) : null}

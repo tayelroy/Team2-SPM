@@ -334,17 +334,17 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(response.status, 200);
   });
 
-  test('[FAILURE] [SG2-70:AC2] a draft without a category is refused, names the category and stays a draft', async () => {
+  test('[BOUNDARY] [SG2-70:AC2] a draft without a category is still submitted, since the category is optional', async () => {
     let writes = 0;
     const app = buildApp({
       captureSubmit: () => { writes++; },
-      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, category: null } }
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, category: null } },
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, category: null, status: 'unassigned' } }
     });
     const response = await request(app).patch('/api/event-requests/7/submit');
-    assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: 'Event request is missing required fields.', missing: ['category'] });
-    assert.equal(writes, 0);
-    assert.deepEqual([app.history, app.notices], [[], []]);
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.category, null);
+    assert.equal(writes, 1);
   });
 
   test('[NORMAL] [SG2-70:AC2] a draft with a category is submitted with it', async () => {
@@ -355,15 +355,6 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     const response = await request(app).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 200);
     assert.equal(response.body.request.category, 'workshop');
-  });
-
-  test('[CONFLICT] [SG2-70:AC2] a category cleared by a draft save racing the submission is refused by the database and reported as missing', async () => {
-    const app = buildApp({ submitResult: { ok: false, reason: 'missing_category' } });
-    const response = await request(app).patch('/api/event-requests/7/submit');
-    assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: 'Event request is missing required fields.', missing: ['category'] });
-    // Nothing moved, so there is no status change to record or announce.
-    assert.deepEqual([app.history, app.notices], [[], []]);
   });
 
   test('[FAILURE] [SG2-30:AC1] [SG2-40:AC1] returns 503 without leaking the database error when the update fails, recording nothing', async () => {

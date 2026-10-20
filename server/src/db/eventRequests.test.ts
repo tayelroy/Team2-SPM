@@ -784,29 +784,6 @@ describe('submitEventRequest', () => {
     assert.equal(calls.length, 1);
   });
 
-  // SG2-70: the database refuses a submission whose category a racing draft
-  // save cleared (events_category_required_on_submit), on either path.
-  const missingCategory = { code: '23514', message: 'An event request needs a category before it is submitted' };
-
-  test('[CONFLICT] [SG2-70:AC2] reports a missing category when the database refuses the unheld submission', async () => {
-    let calls: SubmitCall[] = [];
-    const result = await submitEventRequest(fakeSubmitEventClient([{ data: null, error: missingCategory }], (c) => (calls = c)), 7);
-    assert.deepEqual(result, { ok: false, reason: 'missing_category' });
-    assert.equal(calls.length, 1);
-  });
-
-  test('[CONFLICT] [SG2-70:AC2] reports a missing category when the database refuses the held resubmission', async () => {
-    const result = await submitEventRequest(fakeSubmitEventClient([{ data: [], error: null }, { data: null, error: missingCategory }]), 7);
-    assert.deepEqual(result, { ok: false, reason: 'missing_category' });
-  });
-
-  test('[FAILURE] [SG2-70:AC2] another check violation is still reported as unavailable, not as a missing category', async () => {
-    for (const error of [{ code: '23514', message: 'events_rejection_requires_reason' }, { code: '23514' }]) {
-      const result = await submitEventRequest(fakeSubmitEventClient([{ data: null, error: error as { message: string } }]), 7);
-      assert.equal(result.ok === false && result.reason, 'unavailable');
-    }
-  });
-
   test('[FAILURE] [SG2-30:AC1] reports unavailable when the held update errors', async () => {
     const result = await submitEventRequest(
       fakeSubmitEventClient([

@@ -84,7 +84,7 @@ describe('EventSearch (SG2-70)', () => {
     expect(options('State')[0]).toBe('Any state');
     expect(options('Category')).toEqual(['Any category', 'Conference', 'Workshop', 'Seminar', 'Training', 'Networking', 'Social', 'Other']);
     expect(options('Venue')).toEqual(['Any venue', 'Atrium Hall', 'Quiet Room']);
-    expect(options('Assigned coordinator')).toEqual(['Any coordinator', 'Alice Tan']);
+    expect(options('Assigned coordinator')).toEqual(['Any coordinator', 'Unassigned', 'Alice Tan']);
   });
 
   test('[NORMAL] [SG2-70:AC4] when nothing matches, the screen says so and lists every filter the server applied', async () => {
@@ -112,7 +112,7 @@ describe('EventSearch (SG2-70)', () => {
   test('[BOUNDARY] [SG2-70:AC4] with no filters and no events, the screen explains that drafts are not shown', async () => {
     serve(() => Response.json(page([])));
     render(<EventSearch accessToken="token" />);
-    expect(await screen.findByText('There are no submitted events yet. Drafts are not shown until they are submitted.')).toBeInTheDocument();
+    expect(await screen.findByText('There are no submitted events for your role yet. Drafts are not shown until they are submitted.')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Filters in force' })).not.toBeInTheDocument();
   });
 
@@ -195,6 +195,10 @@ describe('describeFilters (SG2-70 AC4)', () => {
     expect(describeFilters({ ...none, dateFrom: '2030-11-01' }, null)).toEqual(['Date from 1 Nov 2030']);
     expect(describeFilters({ ...none, dateTo: '2030-11-30' }, null)).toEqual(['Date until 30 Nov 2030']);
     expect(describeFilters(none, null)).toEqual([]);
+  });
+
+  test('[NORMAL] [SG2-70:AC4] the Unassigned coordinator filter reads as Unassigned', () => {
+    expect(describeFilters({ ...none, coordinatorId: 'unassigned' }, null)).toEqual(['Coordinator: Unassigned']);
   });
 
   test('[FAILURE] [SG2-70:AC4] a venue or coordinator the options do not name is still shown, not hidden', () => {

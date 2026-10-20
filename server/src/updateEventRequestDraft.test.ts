@@ -135,7 +135,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, [
       'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
-      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category'
+      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
     ]);
   });
 
@@ -181,7 +181,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, name: null });
     assert.deepEqual(response.body.missingForSubmission, [
       'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
-      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category'
+      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
     ]);
   });
 

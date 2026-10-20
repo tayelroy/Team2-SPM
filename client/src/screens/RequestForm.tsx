@@ -23,8 +23,7 @@ import {
  * Mandatory text fields that must all be non-empty before the request can be
  * submitted (AC2). Together with `registration_needed` they mirror
  * `SUBMISSION_REQUIRED_FIELDS` on the server (`server/src/events/fields.ts`),
- * which SG2-105 widened to the customer's minimum. SG2-70 adds `category`,
- * chosen from a fixed list rather than typed.
+ * which SG2-105 widened to the customer's minimum.
  */
 const REQUIRED_FIELDS = [
   'name',
@@ -39,8 +38,8 @@ const REQUIRED_FIELDS = [
 ] as const;
 
 type RequiredField = (typeof REQUIRED_FIELDS)[number];
-/** Every answer submission needs: the text fields plus the registration question and category. */
-type SubmissionField = RequiredField | 'registration_needed' | 'category';
+/** Every answer submission needs: the text fields plus the registration question. */
+type SubmissionField = RequiredField | 'registration_needed';
 
 /** Human-readable labels for inline validation errors and outstanding-field summaries. */
 const FIELD_LABELS: Record<SubmissionField, string> = {
@@ -54,7 +53,6 @@ const FIELD_LABELS: Record<SubmissionField, string> = {
   accessibility_needs: 'Accessibility needs',
   equipment_requirements: 'Equipment requirements',
   registration_needed: 'Whether registration is needed',
-  category: 'Category',
 };
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
@@ -226,7 +224,7 @@ function NoneableTextField({
  * blank is not), and an explicit yes or no on registration.
  *
  * SG2-70 adds the event's category, picked from a fixed list, so internal
- * users can filter by it. It is required before submission like the rest.
+ * users can filter by it. It is optional.
  *
  * The date is a `datetime-local` input in Singapore time. The form keeps the
  * stored ISO instant and converts only for display, so an untouched date is
@@ -288,7 +286,7 @@ export default function RequestForm({
   const [registrationNeeded, setRegistrationNeeded] = useState<boolean | null>(
     initialValues?.registration_needed ?? null,
   );
-  // SG2-70: null until chosen, like registration.
+  // SG2-70: optional; null until chosen.
   const [category, setCategory] = useState<EventCategory | null>(initialValues?.category ?? null);
   const [touched, setTouched] = useState<Set<SubmissionField>>(new Set());
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
@@ -303,7 +301,6 @@ export default function RequestForm({
 
   const emptyFields: SubmissionField[] = REQUIRED_FIELDS.filter((k) => !values[k].trim());
   if (registrationNeeded === null) emptyFields.push('registration_needed');
-  if (category === null) emptyFields.push('category');
   const effectiveEventId = eventId ?? (createdEventId !== null ? String(createdEventId) : undefined);
 
   // When no real required-field data exists yet (fresh form), the submit
@@ -641,7 +638,7 @@ export default function RequestForm({
         {/* SG2-70: what kind of event this is */}
         <div role="group" aria-labelledby="rf-category-label" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <span id="rf-category-label" style={labelToken}>
-            Category <span style={{ color: color.accent }}>*</span>
+            Category <span style={{ color: color.silver, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {EVENT_CATEGORIES.map((option) => (
@@ -649,17 +646,13 @@ export default function RequestForm({
                 key={option.value}
                 {...chipStyle(category === option.value)}
                 pressed={category === option.value}
-                onClick={() => setCategory(option.value)}
+                // Optional, so choosing the selected category again clears it.
+                onClick={() => setCategory(category === option.value ? null : option.value)}
               >
                 {option.label}
               </Chip>
             ))}
           </div>
-          {touched.size > 0 && category === null ? (
-            <span role="alert" style={{ fontSize: '12px', color: '#ff8a80' }}>
-              Choose a category
-            </span>
-          ) : null}
         </div>
 
         {/* Venue fit for the saved draft (SG2-47 suitability API) */}
