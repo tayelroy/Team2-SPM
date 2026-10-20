@@ -141,4 +141,27 @@ describe('event notice text (SG2-68 AC2)', () => {
     ]);
     assert.equal((calls[0].rows as unknown[]).length, 1);
   });
+
+  test('[NORMAL] [SG2-92:AC5] each safety decision notice names the event, the decision and its reason, as the database writes it', () => {
+    assert.equal(eventNoticeMessages.safetyApproved('Partner Forum', null),
+      'Partner Forum passed its operational safety check and has moved to Preparation.');
+    assert.equal(eventNoticeMessages.safetyApproved('Partner Forum', 'Keep the east exit clear'),
+      'Partner Forum passed its operational safety check and has moved to Preparation. Note: Keep the east exit clear');
+    assert.equal(eventNoticeMessages.safetyRejected('Partner Forum', 'Crowd flow blocks the fire exit'),
+      'Partner Forum did not pass its operational safety check: Crowd flow blocks the fire exit. The coordinator will rework the arrangements for a new check.');
+    assert.equal(eventNoticeMessages.safetyChangesRequested('Partner Forum', 'Venue, Equipment and technical', 'Move the stage'),
+      'Partner Forum needs changes before it can pass its operational safety check (Venue, Equipment and technical): Move the stage. It has moved back to Planning.');
+  });
+
+  test('[BOUNDARY] [SG2-92:AC5] a 2000-character reason keeps every safety notice within the stored limit', () => {
+    const reason = 'r'.repeat(2000);
+    for (const message of [
+      eventNoticeMessages.safetyApproved('E', reason),
+      eventNoticeMessages.safetyRejected('E', reason),
+      eventNoticeMessages.safetyChangesRequested('E', 'Other', reason)
+    ]) {
+      assert.equal(Array.from(message).length, 2000);
+      assert.ok(message.startsWith('E '));
+    }
+  });
 });

@@ -167,13 +167,17 @@ export function computeEventStage(event: EventStageInput): EventStageResult {
       break;
 
     case 'safety_rejected':
-      // SG2-100: a stop, not a recoverable waiting-on — the event cannot move
-      // on to Preparation (SG2-92 AC4). SG2-93's Request Changes decision is
-      // the separate, recoverable path and does carry a waiting-on.
+      // SG2-92 AC4: the event cannot move on to Preparation; the assigned
+      // coordinator reworks it back to Planning and resubmits it for a new
+      // check, so the waiting-on is theirs.
       stage = 'Safety Rejected';
       stageKey = 'safety_rejected';
-      description = 'The operational safety check was not passed; the event cannot proceed to Preparation.';
-      waitingOn = null;
+      description = 'The operational safety check was not passed; the event cannot proceed to Preparation until its arrangements are reworked and checked again.';
+      waitingOn = {
+        persona: coordinatorPersona,
+        action: 'Rework the arrangements and resubmit them for a new safety check',
+        user_id: event.coordinator_id ?? null
+      };
       activeStepIndex = 4;
       break;
 

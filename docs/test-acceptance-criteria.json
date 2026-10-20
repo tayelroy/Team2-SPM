@@ -763,6 +763,20 @@
         "AC3": "Each event shows the information needed for the review: expected attendance, venue capacity and layout, emergency access, accessibility requirements, equipment and where it will be placed, expected crowd movement, and known venue restrictions",
         "AC4": "Only Safety Officers can open the safety check list"
       }
+    },
+    {
+      "id": "SG2-92",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-92",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-19",
+      "acceptanceCriteria": {
+        "AC1": "For an event awaiting a check, I can record one of three decisions: Approve, Reject, or Request Changes",
+        "AC2": "Reject and Request Changes require me to give a reason, and Request Changes also requires me to name the arrangements to change (venue, equipment/technical, or other)",
+        "AC3": "On Approve, the event can move on to Preparation",
+        "AC4": "On Reject, the event is shown as Safety Rejected, cannot move on to Preparation, and goes back to Planning so the coordinator can rework the arrangements and resubmit them for a new check (the status flow allows safety_rejected → planning)",
+        "AC5": "The assigned Event Coordinator and the Event Organiser are notified of the decision and its reason",
+        "AC6": "Each decision is recorded with who made it, when, and the reason"
+      }
     }
   ]
 }

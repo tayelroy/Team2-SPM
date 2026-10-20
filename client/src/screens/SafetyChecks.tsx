@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { fetchSafetyChecks, type SafetyCheckEvent, type SafetyCheckVenue } from '../api/safetyChecks';
+import {
+  fetchSafetyChecks,
+  SAFETY_DECISION_OUTCOMES,
+  type RecordedSafetyDecision,
+  type SafetyCheckEvent,
+  type SafetyCheckVenue,
+} from '../api/safetyChecks';
+import SafetyDecisionForm from '../components/SafetyDecisionForm';
+import { SafetyDecisionHistory } from '../components/SafetyDecisionSummary';
 import { LAYOUT_LABELS, type Layout } from '../venues/layoutsApi';
 import { formatSgt } from '../venues/searchApi';
 import { color } from '../theme';
@@ -26,7 +34,14 @@ function period(venue: SafetyCheckVenue) {
   return venue.startsAt && venue.endsAt ? `${formatSgt(venue.startsAt)} – ${formatSgt(venue.endsAt)}` : NOT_RECORDED;
 }
 
-function EventReview({ event }: { event: SafetyCheckEvent }) {
+interface EventReviewProps {
+  event: SafetyCheckEvent;
+  accessToken: string;
+  onRecorded: (event: SafetyCheckEvent, recorded: RecordedSafetyDecision) => void;
+  onStale: (message: string) => void;
+}
+
+function EventReview({ event, accessToken, onRecorded, onStale }: EventReviewProps) {
   const title = event.name.trim() || 'Untitled event';
   const titleId = `safety-check-${event.eventId}`;
   return (
@@ -80,6 +95,19 @@ function EventReview({ event }: { event: SafetyCheckEvent }) {
             </RecessedCard>
           ))}
         </section>
+
+        {/* SG2-92: the decision on what is shown above, at the revision it was read. */}
+        <section aria-label={`Safety decision for ${title}`} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 500, color: color.silver }}>Earlier decisions</h4>
+          <SafetyDecisionHistory eventId={event.eventId} accessToken={accessToken} />
+          <SafetyDecisionForm
+            eventId={event.eventId}
+            expectedRevision={event.revision}
+            accessToken={accessToken}
+            onRecorded={(recorded) => onRecorded(event, recorded)}
+            onStale={onStale}
+          />
+        </section>
       </article>
     </Card>
   );
@@ -87,9 +115,10 @@ function EventReview({ event }: { event: SafetyCheckEvent }) {
 
 /**
  * The Safety Officer's list of events awaiting an operational safety check
- * (SG2-91 AC2), oldest wait first, each with what the review needs (AC3).
- * An event leaves the list as soon as an arrangement falls through or is
- * added, so Refresh shows the list as it stands now.
+ * (SG2-91 AC2), oldest wait first, each with what the review needs (AC3)
+ * and the SG2-92 decision on it. An event leaves the list as soon as an
+ * arrangement falls through or is added, or a decision is recorded, so
+ * Refresh shows the list as it stands now.
  */
 export default function SafetyChecks({ accessToken, focusEventId }: { accessToken: string; focusEventId?: number }) {
   const [events, setEvents] = useState<SafetyCheckEvent[]>([]);
@@ -99,6 +128,8 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
   // SG2-91 AC2: a Safety desk card opens its event on its own; "Show all"
   // returns to the whole list, which is what the menu and button open.
   const [focus, setFocus] = useState(focusEventId);
+  // SG2-92: what the last decision did, or why it was refused as stale.
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -115,20 +146,38 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
     return () => { cancelled = true; };
   }, [accessToken, attempt]);
 
-  const refresh = <GhostButton onClick={() => setAttempt((n) => n + 1)} style={{ alignSelf: 'flex-start' }}>Refresh</GhostButton>;
+  const reload = () => setAttempt((n) => n + 1);
+  const refresh = <GhostButton onClick={() => { setNotice(''); reload(); }} style={{ alignSelf: 'flex-start' }}>Refresh</GhostButton>;
+  const flash = notice ? <p role="status" style={{ margin: 0, color: color.mist }}>{notice}</p> : null;
+  // A recorded event has moved on, so the list is re-read without it; a stale
+  // one is re-read so the Safety Officer reviews what it says now.
+  const onRecorded = (event: SafetyCheckEvent, recorded: RecordedSafetyDecision) => {
+    setFocus(undefined);
+    setNotice(`${SAFETY_DECISION_OUTCOMES[recorded.decision.decision]} for ${event.name.trim() || 'Untitled event'}. `
+      + 'The organiser and the coordinator have been notified.');
+    reload();
+  };
+  const onStale = (message: string) => {
+    setNotice(message);
+    reload();
+  };
+  const review = (event: SafetyCheckEvent) => (
+    <EventReview key={event.eventId} event={event} accessToken={accessToken} onRecorded={onRecorded} onStale={onStale} />
+  );
 
   if (loading) return <p role="status">Loading events awaiting a safety check…</p>;
   if (error) {
     return (
       <Notice>
         <p role="alert">{error}</p>
-        <GhostButton onClick={() => setAttempt((n) => n + 1)}>Retry</GhostButton>
+        <GhostButton onClick={reload}>Retry</GhostButton>
       </Notice>
     );
   }
   if (events.length === 0) {
     return (
       <Card style={{ gap: '12px' }}>
+        {flash}
         <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 500 }}>No events awaiting a safety check</h2>
         <p style={{ margin: 0, color: color.silver }}>
           An event appears here once all of its venue bookings are approved and its equipment is reserved.
@@ -147,12 +196,14 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
           </GhostButton>
           {refresh}
         </div>
-        <EventReview event={focused} />
+        {flash}
+        {review(focused)}
       </section>
     );
   }
   return (
     <section aria-label="Events awaiting a safety check" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {flash}
       {focus !== undefined && (
         <p role="status" style={{ margin: 0, color: color.mist }}>
           That event is no longer awaiting a safety check. These are the events that are.
@@ -164,7 +215,7 @@ export default function SafetyChecks({ accessToken, focusEventId }: { accessToke
         </h2>
         {refresh}
       </div>
-      {events.map((event) => <EventReview key={event.eventId} event={event} />)}
+      {events.map(review)}
     </section>
   );
 }

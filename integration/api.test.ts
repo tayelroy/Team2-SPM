@@ -28,6 +28,9 @@ import { createGetEventArrangementsHandler } from '../server/src/events/getArran
 import { createBookingRequestSuitabilityRouter } from '../server/src/venues/suitabilityRoutes';
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
+import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
+import { createSafetyChecksRouter } from '../server/src/safetyChecks';
+import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -42,20 +45,21 @@ const jwt = (role: string, sub?: string) => {
 };
 // Supabase's gateway uses /rest/v1; this isolated PostgREST serves the same
 // protocol at /. Rewrite only that loopback prefix, never any query or body.
+const loopbackFetch: typeof fetch = async (input, init) => {
+  const original = new Request(input, init);
+  const url = new URL(original.url);
+  assert.equal(url.origin, rest.origin);
+  assert.ok(url.pathname.startsWith('/rest/v1/'));
+  url.pathname = url.pathname.slice('/rest/v1'.length);
+  const response = await fetch(new Request(url, original));
+  if (!response.ok) console.error('Integration database response', url.pathname, await response.clone().text());
+  return response;
+};
 const database = createClient(rest.origin, jwt('service_role'), {
   auth: { persistSession: false, autoRefreshToken: false },
-  global: { fetch: async (input, init) => {
-    const original = new Request(input, init);
-    const url = new URL(original.url);
-    assert.equal(url.origin, rest.origin);
-    assert.ok(url.pathname.startsWith('/rest/v1/'));
-    url.pathname = url.pathname.slice('/rest/v1'.length);
-    const response = await fetch(new Request(url, original));
-    if (!response.ok) console.error('Integration database response', url.pathname, await response.clone().text());
-    return response;
-  } },
+  global: { fetch: loopbackFetch },
 });
-const ids = Object.fromEntries(['organiser', 'coordinator', 'lead', 'venue', 'support', 'other'].map((name, index) =>
+const ids = Object.fromEntries(['organiser', 'coordinator', 'lead', 'venue', 'support', 'other', 'safety'].map((name, index) =>
   [name, `ee000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`]));
 const access = createAuthorization({ resolvePrincipal: async token => {
   const userId = ids[token];
@@ -414,6 +418,88 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   assert.deepEqual(settled.data!.map(entry => entry.new_value), ['venue_recheck settled', 'equipment_recheck settled', 'registration_recheck settled']);
   const readiness = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.deepEqual([readiness.status, readiness.body.outstanding], [200, []]);
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] [SG2-92:AC5] [SG2-92:AC6] native safety decisions on SG2-91\'s list move each event on, refuse a stale review, notify both people, keep who and why, and let the coordinator rework a rejection', async () => {
+  const [approved, rejected, changed] = [await planned(), await planned(), await planned()];
+  for (const id of [approved, rejected, changed]) {
+    assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
+  }
+  const safetyArgs = [...args] as Parameters<typeof createApp>;
+  // SG2-91's list runs safety_check_queue() with the caller's own JWT, as in production.
+  safetyArgs[36] = createSafetyChecksRouter(access, token => createSafetyChecksStore(token, () =>
+    createClient(rest.origin, jwt('authenticated', ids[token]), { auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: loopbackFetch } })));
+  safetyArgs[37] = createSafetyDecisionHandlers(dependencies);
+  const safety = request(createApp(...safetyArgs));
+  const decide = (who: string, id: number, body: object) => safety.post(`/api/event-requests/${id}/safety-decision`).set(auth(who)).send(body);
+  // The revision each event shows on SG2-91's list, which the decision carries back.
+  const reviewed = async () => {
+    const list = await safety.get('/api/safety-checks').set(auth('safety'));
+    assert.equal(list.status, 200, JSON.stringify(list.body));
+    return new Map<number, number>(list.body.events.map((event: { event_id: number; safety_check_revision: number }) =>
+      [event.event_id, event.safety_check_revision]));
+  };
+
+  // AC1: only the Safety Officer reads the list and decides.
+  for (const who of ['coordinator', 'organiser', 'lead']) {
+    assert.equal((await safety.get('/api/safety-checks').set(auth(who))).status, 403, who);
+    assert.equal((await decide(who, approved, { decision: 'approve', safety_check_revision: 0 })).status, 403, who);
+  }
+  let revisions = await reviewed();
+  assert.deepEqual([approved, rejected, changed].map(id => Number.isSafeInteger(revisions.get(id))), [true, true, true]);
+
+  // AC2: a reason and, for Request Changes, the arrangements are required; nothing is written otherwise.
+  const invalid = await decide('safety', changed, { decision: 'request_changes', reason: ' ', safety_check_revision: revisions.get(changed) });
+  assert.deepEqual([invalid.status, invalid.body.details], [400, ['A reason is required to request changes.', 'Name at least one arrangement to change.']]);
+
+  // A reviewed detail changing after the list was read refuses the decision on what was seen, writing nothing.
+  assert.equal((await database.from('events').update({ expected_attendance: 450 }).eq('event_id', rejected)).error, null);
+  const stale = await decide('safety', rejected, { decision: 'reject', reason: 'Crowd flow blocks the east exit', safety_check_revision: revisions.get(rejected) });
+  assert.deepEqual([stale.status, stale.body], [409, { error: 'This event changed after you opened it. Refresh the safety checks and review it again.',
+    code: 'stale', revision: revisions.get(rejected)! + 1 }]);
+  assert.equal((await stored(rejected)).status, 'awaiting_safety_check');
+  assert.equal((await database.from('event_safety_decisions').select('decision_id').eq('event_id', rejected)).data!.length, 0);
+  revisions = await reviewed();
+
+  // AC3/AC4/AC6: each decision moves its event on and is stored with who, when and why.
+  const outcomes = [
+    [approved, { decision: 'approve' }, 'preparation'],
+    [rejected, { decision: 'reject', reason: 'Crowd flow blocks the east exit' }, 'safety_rejected'],
+    [changed, { decision: 'request_changes', reason: 'Widen the aisles', arrangements: ['equipment', 'venue'] }, 'planning']
+  ] as const;
+  for (const [id, body, status] of outcomes) {
+    const recorded = await decide('safety', id, { ...body, safety_check_revision: revisions.get(id) });
+    assert.equal(recorded.status, 201, JSON.stringify(recorded.body));
+    assert.deepEqual([recorded.body.previous_status, recorded.body.status], ['awaiting_safety_check', status]);
+    assert.equal(recorded.body.decision.decided_by_name, 'Integration safety officer');
+    assert.equal((await stored(id)).status, status);
+  }
+  const again = await decide('safety', approved, { decision: 'reject', reason: 'Second thoughts', safety_check_revision: revisions.get(approved) });
+  assert.deepEqual([again.status, again.body], [409, { error: 'This event is no longer awaiting a safety check.', status: 'preparation' }]);
+  const history = await safety.get(`/api/event-requests/${changed}/safety-decisions`).set(auth('organiser'));
+  assert.equal(history.status, 200);
+  assert.deepEqual(history.body.decisions.map((row: { decision: string; reason: string; arrangements: string[]; decided_by: string }) =>
+    [row.decision, row.reason, row.arrangements, row.decided_by]), [['request_changes', 'Widen the aisles', ['equipment', 'venue'], ids.safety]]);
+  assert.equal((await safety.get(`/api/event-requests/${changed}/safety-decisions`).set(auth('other'))).status, 404);
+  const audit = await database.from('event_audit_logs').select('field_name,old_value,new_value').eq('event_id', changed)
+    .in('field_name', ['safety_decision', 'status']).order('log_id');
+  assert.deepEqual(audit.data!.slice(-2), [
+    { field_name: 'safety_decision', old_value: null, new_value: 'Changes requested (Equipment and technical, Venue): Widen the aisles' },
+    { field_name: 'status', old_value: 'awaiting_safety_check', new_value: 'planning' }
+  ]);
+
+  // AC5: the organiser and the coordinator each get the decision and its reason.
+  const notices = await database.from('notifications').select('recipient_id,message').eq('event_id', rejected).eq('kind', 'safety_decision');
+  const message = 'Integration workshop did not pass its operational safety check: Crowd flow blocks the east exit. The coordinator will rework the arrangements for a new check.';
+  assert.deepEqual(notices.data!.map(row => [row.recipient_id, row.message]).sort(), [[ids.organiser, message], [ids.coordinator, message]].sort());
+
+  // AC4: only the assigned coordinator reworks, and only a Safety Rejected event.
+  assert.equal((await safety.post(`/api/event-requests/${rejected}/rework`).set(auth('other'))).status, 404);
+  assert.equal((await safety.post(`/api/event-requests/${approved}/rework`).set(auth('coordinator'))).status, 409);
+  const reworked = await safety.post(`/api/event-requests/${rejected}/rework`).set(auth('coordinator'));
+  assert.deepEqual([reworked.status, reworked.body], [200, { event_id: rejected, status: 'planning' }]);
+  assert.equal((await stored(rejected)).status, 'planning');
 });
 
 test('[NORMAL] [SG2-28:AC1] [SG2-30:AC1] [SG2-87:AC5] [SG2-39:AC1] organiser submission, Lead assignment and planning preserve actual stored values', async () => {

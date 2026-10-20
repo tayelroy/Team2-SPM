@@ -45,9 +45,15 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
     assert.equal(canTransition('confirmed', 'planning'), true);
   });
 
-  test('[BOUNDARY] [SG2-81:AC6] Planning is reachable only from approved (the normal way in), the safety check, Preparation and Confirmed, never from the earlier stages or the terminal ones', () => {
+  test('[BOUNDARY] [SG2-81:AC6] [SG2-92:AC4] Planning is reachable only from approved (the normal way in), the safety check and its rejection, Preparation and Confirmed, never from the earlier stages or the terminal ones', () => {
     const back = EVENT_STATUSES.filter(from => canTransition(from, 'planning'));
-    assert.deepEqual([...back].sort(), ['approved', 'awaiting_safety_check', 'confirmed', 'preparation']);
+    assert.deepEqual([...back].sort(), ['approved', 'awaiting_safety_check', 'confirmed', 'preparation', 'safety_rejected']);
+  });
+
+  test('[CONFLICT] [SG2-92:AC4] a Safety Rejected event can go back to Planning but never straight to Preparation or Confirmed', () => {
+    assert.equal(canTransition('safety_rejected', 'planning'), true);
+    assert.equal(canTransition('safety_rejected', 'preparation'), false);
+    assert.equal(canTransition('safety_rejected', 'confirmed'), false);
   });
 
   test('[FAILURE] [SG2-81:AC6] a completed or cancelled event still cannot go back to Planning', () => {

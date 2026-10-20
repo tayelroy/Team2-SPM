@@ -178,6 +178,7 @@ jobs:
           node .github/scripts/test-equipment-reservations-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_confirmation.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_change_impact.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/safety_decisions.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_notifications.sql
           node .github/scripts/test-event-confirmation-concurrency.mjs
           node .github/scripts/test-equipment-requirements-concurrency.mjs

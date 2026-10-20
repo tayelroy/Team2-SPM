@@ -16,13 +16,18 @@ const RAW = {
     placement_position: 'Stage left', arrangement_notes: 'Cable ramps' }],
 };
 
-/** A fresh Response per call: React StrictMode runs effects twice. */
+/**
+ * A fresh Response per call: React StrictMode runs effects twice. Returns the
+ * list reads only; each review's SG2-92 decision history reads as empty.
+ */
 function api(...replies: (() => Response)[]) {
-  const fetch = vi.fn();
-  for (const reply of replies) fetch.mockImplementationOnce(() => Promise.resolve(reply()));
-  fetch.mockImplementation(() => Promise.resolve(replies.at(-1)!()));
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
+  const list = vi.fn();
+  for (const reply of replies) list.mockImplementationOnce(() => Promise.resolve(reply()));
+  list.mockImplementation(() => Promise.resolve(replies.at(-1)!()));
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (url.endsWith('/safety-decisions')
+    ? Promise.resolve(Response.json({ decisions: [] }))
+    : list(url, init))));
+  return list;
 }
 
 describe('SafetyChecks (SG2-91)', () => {
@@ -138,7 +143,7 @@ describe('SafetyChecks (SG2-91)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show all 2 safety checks' }));
     expect(screen.getByRole('heading', { level: 2, name: '2 events awaiting a safety check' })).toBeInTheDocument();
     expect(screen.getAllByRole('article')).toHaveLength(2);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText(/no longer awaiting a safety check/)).not.toBeInTheDocument();
   });
 
   test('[BOUNDARY] [SG2-91:AC2] a lone event offers to show its one safety check, and an untitled one is still named', async () => {

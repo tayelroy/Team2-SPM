@@ -91,7 +91,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[4].status, 'current');
   });
 
-  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] safety_rejected status has no waiting_on and stays at the safety_check step', () => {
+  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] [SG2-92:AC4] safety_rejected status waits on the coordinator to rework it and stays at the safety_check step', () => {
     const result = computeEventStage({
       event_id: 22,
       status: 'safety_rejected',
@@ -101,9 +101,22 @@ describe('computeEventStage (SG2-38)', () => {
 
     assert.equal(result.stage, 'Safety Rejected');
     assert.equal(result.stage_key, 'safety_rejected');
-    assert.equal(result.waiting_on, null);
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Event Coordinator (Sarah Tan)',
+      action: 'Rework the arrangements and resubmit them for a new safety check',
+      user_id: 'coord-456'
+    });
     assert.equal(result.stepper_steps[4].key, 'safety_check');
     assert.equal(result.stepper_steps[4].status, 'current');
+  });
+
+  test('[BOUNDARY] [SG2-92:AC4] a Safety Rejected event without a coordinator still waits on the Event Coordinator role', () => {
+    const result = computeEventStage({ event_id: 24, status: 'safety_rejected', coordinator_id: null, coordinator_name: null });
+    assert.deepEqual(result.waiting_on, {
+      persona: 'Event Coordinator',
+      action: 'Rework the arrangements and resubmit them for a new safety check',
+      user_id: null
+    });
   });
 
   test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] preparation status waits on the named coordinator at the preparation step', () => {

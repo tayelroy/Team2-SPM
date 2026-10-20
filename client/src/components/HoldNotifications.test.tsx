@@ -246,6 +246,16 @@ test('[NORMAL] [SG2-66:AC7] a back-to-Planning notice is labelled and shows its 
   expect(screen.getByText(message)).toBeVisible();
 });
 
+test('[NORMAL] [SG2-92:AC5] a safety check decision notice is labelled and shows its reason', async () => {
+  const message = 'Partner Forum needs changes before it can pass its operational safety check (Venue, Other): Widen the aisles. It has moved back to Planning.';
+  vi.mocked(notices.loadNotifications).mockResolvedValue({ ok: true, notifications: [{
+    notification_id: 71, event_id: 7, request_id: null, kind: 'safety_decision', message, created_at: '2026-10-19T03:00:00.000Z' }] });
+  render(<HoldNotifications accessToken="organiser-token" holds={false} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (1)' }));
+  expect(screen.getByText('Safety check')).toBeVisible();
+  expect(screen.getByText(message)).toBeVisible();
+});
+
 test('[BOUNDARY] [SG2-68:AC3] the Safety Officer, who receives no notices yet, keeps the empty placeholder and makes no notice request', () => {
   render(<AppShell role="Safety Officer" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="safety-token">Dashboard</AppShell>);
   expect(screen.getByRole('button', { name: 'Notifications (0)' })).toBeInTheDocument();
