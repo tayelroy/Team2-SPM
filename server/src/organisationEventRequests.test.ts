@@ -185,7 +185,8 @@ describe('SG2-26 organisation membership on writes', () => {
   const completeEvent = {
     ...EVENTS[0], purpose: 'Planning', description: 'Annual meeting',
     proposed_date: '2026-11-15T09:00:00.000Z', expected_attendance: 10,
-    venue_requirements: 'Meeting room'
+    venue_requirements: 'Meeting room', preferred_layout: 'Boardroom', accessibility_needs: 'None',
+    equipment_requirements: 'None', registration_needed: false
   } as unknown as EventRequestRecord;
 
   function mutationApp(db: ReturnType<typeof database>) {

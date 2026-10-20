@@ -103,7 +103,7 @@ export type DecideEventRequestResult =
 /** Columns returned for a created draft. */
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
-  'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
+  'proposed_date, expected_attendance, venue_requirements, preferred_layout, accessibility_needs, ' +
   'equipment_requirements, registration_needed';
 
 /** Columns returned for list summary views (SG2-31). */
@@ -113,7 +113,7 @@ const SUMMARY_COLUMNS =
 /** Columns returned for an event request detail lookup (SG2-31). */
 const DETAIL_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
-  'proposed_date, expected_attendance, venue_requirements, accessibility_needs, ' +
+  'proposed_date, expected_attendance, venue_requirements, preferred_layout, accessibility_needs, ' +
   'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
   // SG2-37: the organiser sees the outcome and, for a rejection, why.
   'decided_at, decision_reason, ' +

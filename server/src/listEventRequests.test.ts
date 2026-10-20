@@ -40,6 +40,7 @@ const SAMPLE_DETAIL: EventRequestRecord = {
   proposed_date: '2026-11-15T09:00:00.000Z',
   expected_attendance: 50,
   venue_requirements: 'Auditorium with AV',
+  preferred_layout: null,
   accessibility_needs: 'Step-free access',
   equipment_requirements: 'Projector',
   registration_needed: true,

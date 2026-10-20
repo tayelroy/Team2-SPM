@@ -18,8 +18,10 @@ import type { CreateDraftResult, OrganiserLookupResult } from './db/eventRequest
 import type { Principal } from './auth/policy';
 
 // README's submission requirements are the oracle, independent of the validator.
+// SG2-105 adds the rest of the customer's minimum (clarification session 2).
 const REQUIRED_FOR_SUBMISSION = [
-  'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements'
+  'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
+  'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
 ];
 
 const ORGANISER: Principal = { userId: 'user-1', role: 'event_organiser' };
@@ -31,6 +33,7 @@ const COMPLETE_BODY = {
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
+  preferred_layout: 'Theatre',
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'Lectern, 2 radio mics',
   registration_needed: true
@@ -110,14 +113,14 @@ describe('POST /api/event-requests (SG2-28)', () => {
     assert.deepEqual(response.body.missingForSubmission, REQUIRED_FOR_SUBMISSION);
   });
 
-  test('[NORMAL] [SG2-28:AC2] a draft omitting only accessibility needs is submission-ready', async () => {
-    const { accessibility_needs, ...withoutAccessibility } = COMPLETE_BODY;
-    const response = await request(buildApp())
-      .post('/api/event-requests')
-      .send(withoutAccessibility);
+  test('[NORMAL] [SG2-105:AC4] a draft leaving out the layout, accessibility and equipment answers is still saved and names them as outstanding', async () => {
+    const { preferred_layout, accessibility_needs, equipment_requirements, ...partial } = COMPLETE_BODY;
+    const response = await request(buildApp()).post('/api/event-requests').send(partial);
 
     assert.equal(response.status, 201);
-    assert.deepEqual(response.body.missingForSubmission, []);
+    assert.equal(response.body.request.status, 'draft');
+    assert.deepEqual(response.body.missingForSubmission,
+      ['preferred_layout', 'accessibility_needs', 'equipment_requirements']);
   });
 
   test('[FAILURE] [SG2-28:AC3] [SG2-25:AC2] ownership fields in the body are ignored, not trusted', async () => {
@@ -405,16 +408,20 @@ describe('missingForSubmission', () => {
       // description is deliberately omitted to exercise undefined.
       proposed_date: '2026-11-04T09:00:00.000Z',
       expected_attendance: 10,
-      venue_requirements: 'Stage'
+      venue_requirements: 'Stage',
+      preferred_layout: 'Theatre',
+      accessibility_needs: 'None',
+      equipment_requirements: 'None',
+      registration_needed: false
     });
     assert.deepEqual(missing, ['name', 'purpose', 'description']);
   });
 
-  test('[NORMAL] [SG2-28:AC2] [SG2-30:AC2] optional accessibility, equipment and registration fields do not block submission', () => {
+  test('[FAILURE] [SG2-105:AC1] accessibility, equipment, layout and registration now block submission when unanswered (replaces SG2-28 AC2)', () => {
     assert.deepEqual(missingForSubmission({
       name: 'Partner Forum', purpose: 'Planning', description: 'Annual planning session',
       proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 10, venue_requirements: 'Stage'
-    }), []);
+    }), ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
   });
 });
 

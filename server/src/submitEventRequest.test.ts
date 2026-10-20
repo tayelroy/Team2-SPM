@@ -26,8 +26,9 @@ const COMPLETE_DRAFT = {
   proposed_date: '2026-11-04T09:00:00.000Z',
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
+  preferred_layout: 'Theatre',
   accessibility_needs: 'Hearing loop',
-  equipment_requirements: null,
+  equipment_requirements: 'None',
   registration_needed: true
 };
 
@@ -224,24 +225,24 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('[BOUNDARY] [SG2-36:AC2] a returned request missing only optional details can still be resubmitted', async () => {
-    let submitted: number | undefined;
-    const response = await request(
-      buildApp({
-        fetchResult: {
-          ok: true,
-          request: {
-            ...COMPLETE_DRAFT, status: 'needs_clarification',
-            accessibility_needs: null, equipment_requirements: null
-          }
-        },
-        captureSubmit: (eventId) => (submitted = eventId)
-      })
-    ).patch('/api/event-requests/7/submit');
+  test('[FAILURE] [SG2-105:AC3] [SG2-36:AC2] a returned request whose accessibility and equipment answers were cleared cannot be resubmitted', async () => {
+    let writes = 0;
+    const app = buildApp({
+      captureSubmit: () => { writes++; },
+      fetchResult: {
+        ok: true,
+        request: {
+          ...COMPLETE_DRAFT, status: 'needs_clarification',
+          accessibility_needs: null, equipment_requirements: null
+        }
+      }
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
 
-    assert.equal(response.status, 200);
-    assert.equal(response.body.request.status, 'submitted');
-    assert.equal(submitted, 7);
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body.missing, ['accessibility_needs', 'equipment_requirements']);
+    assert.equal(writes, 0);
+    assert.deepEqual(app.history, []);
   });
 
   test('[FAILURE] [SG2-30:AC2] returns 400 and lists outstanding fields for an incomplete draft', async () => {
@@ -278,9 +279,56 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.equal(writes, 0);
   });
 
-  test('[NORMAL] [SG2-28:AC2] [SG2-30:AC1] a draft omitting only accessibility needs is submission-ready', async () => {
+  test('[NORMAL] [SG2-105:AC2] [SG2-30:AC1] accessibility needs and equipment requirements answered "None" can be submitted', async () => {
+    let submitted: number | undefined;
     const response = await request(
-      buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, accessibility_needs: null } } })
+      buildApp({
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, accessibility_needs: 'None', equipment_requirements: 'None' } },
+        captureSubmit: (eventId) => (submitted = eventId)
+      })
+    ).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 200);
+    assert.equal(submitted, 7);
+  });
+
+  test('[FAILURE] [SG2-105:AC2] [SG2-105:AC3] blank accessibility needs is refused and listed (replaces SG2-28 AC2)', async () => {
+    let writes = 0;
+    const response = await request(
+      buildApp({
+        captureSubmit: () => { writes++; },
+        fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, accessibility_needs: null } }
+      })
+    ).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'Event request is missing required fields.', missing: ['accessibility_needs'] });
+    assert.equal(writes, 0);
+  });
+
+  test('[FAILURE] [SG2-105:AC3] a draft missing every field the customer added lists each one and stays a draft', async () => {
+    let writes = 0;
+    const app = buildApp({
+      captureSubmit: () => { writes++; },
+      fetchResult: {
+        ok: true,
+        request: {
+          ...COMPLETE_DRAFT, preferred_layout: null, accessibility_needs: null,
+          equipment_requirements: null, registration_needed: null
+        }
+      }
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body.missing,
+      ['preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed']);
+    // No status write, history row or notice: the request is still the draft it was.
+    assert.equal(writes, 0);
+    assert.deepEqual(app.history, []);
+    assert.deepEqual(app.notices, []);
+  });
+
+  test('[BOUNDARY] [SG2-105:AC1] a request saying registration is not needed has answered the question and can be submitted', async () => {
+    const response = await request(
+      buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, registration_needed: false } } })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 200);
   });

@@ -30,6 +30,17 @@ test('[BOUNDARY] [SG2-46:AC3] AC3: an event without accessibility needs leaves a
   }
 });
 
+test('[BOUNDARY] [SG2-105:AC2] an organiser who answered "None" for accessibility is treated as having no accessibility needs', () => {
+  for (const accessibility_needs of ['None', ' none ', 'NONE']) {
+    const prefill = prefillFromEvent({ ...event, details: { ...event.details, accessibility_needs } });
+    expect(prefill.accessibilityNeeds).toBeNull();
+    expect(prefill.values.accessibility).toBe('');
+  }
+  // Only the bare answer counts: a real need that mentions the word is kept.
+  expect(prefillFromEvent({ ...event, details: { ...event.details, accessibility_needs: 'None beyond a ramp' } }).accessibilityNeeds)
+    .toBe('None beyond a ramp');
+});
+
 test('[BOUNDARY] [SG2-46:AC1] missing date or attendance are left for the coordinator to enter', () => {
   const prefill = prefillFromEvent({ ...event, starts_at: null, details: {} });
   expect(prefill.values).toEqual(EMPTY_SEARCH);

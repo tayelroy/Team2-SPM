@@ -39,7 +39,7 @@ export class MemoryDatabase {
     const draft = {
       name: 'Planning workshop', purpose: 'Team planning', description: 'A planning workshop.',
       proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 20,
-      venue_requirements: 'A room with seating', accessibility_needs: null,
+      venue_requirements: 'A room with seating', preferred_layout: 'Classroom', accessibility_needs: 'None',
       equipment_requirements: 'Projector', registration_needed: false,
       organisation: 'Regression Organisation', status: 'draft', coordinator_id: null
     };
@@ -386,7 +386,7 @@ export class MemoryDatabase {
       kind: 'event', item_id: event.event_id, event_id: event.event_id, title: event.name || 'Untitled event', event_name: event.name || 'Untitled event',
       status: event.status, starts_at: event.proposed_date, ends_at: this.eventEndsAt(event.event_id), audience: 'event_coordinator', assigned_to: event.coordinator_id,
       category: REVIEW_STATUSES.includes(String(event.status)) ? 'review' : 'assigned',
-      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'registration_capacity', 'registration_opens_at', 'registration_closes_at', 'planning_notes', 'expected_crowd_movement'].map(key => [key, event[key]])),
+      details: Object.fromEntries(['organisation', 'purpose', 'description', 'expected_attendance', 'venue_requirements', 'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'registration_capacity', 'registration_opens_at', 'registration_closes_at', 'planning_notes', 'expected_crowd_movement'].map(key => [key, event[key]])),
     } as Row));
     for (const [table, kind, resourceTable, resourceKey, audience] of [
       ['venue_booking_requests', 'venue', 'venues', 'venue_id', 'venue_staff'],

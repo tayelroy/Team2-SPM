@@ -28,8 +28,9 @@ begin
      -- SG2-106 adds expiry_revision (default 0) after this fixture was taken.
      or (to_jsonb(h)-'expiry_revision') is distinct from f.hold_before or to_jsonb(b) is distinct from f.booking_before
      -- SG2-91 adds columns and may move a ready event into the safety check
-     -- after this repair; both are checked by the assertion below.
-     or (to_jsonb(e)-'status'-'expected_crowd_movement'-'awaiting_safety_check_since'-'safety_check_revision')
+     -- after this repair; both are checked by the assertion below. SG2-105
+     -- adds preferred_layout, which an event from before it never has.
+     or (to_jsonb(e)-'status'-'expected_crowd_movement'-'awaiting_safety_check_since'-'safety_check_revision'-'preferred_layout')
        is distinct from (f.event_before-'status')) then
   raise exception '[SG2-51:legacy-hold-release-metadata-preserved] [SG2-51:AC3] [SG2-51:AC5] [BOUNDARY] Repair must retain original request metadata, all hold/booking history and event information';
  end if;

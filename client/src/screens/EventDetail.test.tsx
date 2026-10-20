@@ -1491,3 +1491,35 @@ describe('confirmed arrangements (SG2-58)', () => {
     expect(screen.queryByRole('region', { name: 'Confirmed arrangements integration' })).not.toBeInTheDocument();
   });
 });
+
+describe('preferred room layout on the request (SG2-105)', () => {
+  function detail(overrides: Partial<eventRequestsApi.EventRequestDetail>): eventRequestsApi.EventRequestDetail {
+    return {
+      eventId: 105, organiserId: 'org-1', organisation: 'Acme Corp', status: 'submitted', name: 'Layout Forum',
+      purpose: 'Partner briefing', description: '', proposedDate: null, expectedAttendance: 40,
+      venueRequirements: 'Projector', accessibilityNeeds: 'None', equipmentRequirements: 'None', registrationNeeded: false,
+      coordinatorId: 'coord-1', coordinatorName: 'Assigned coordinator', canManage: false, waitingOnMe: false,
+      decisionReason: null, decidedAt: null, completedBy: null, completedAt: null, endsAt: null, ...overrides,
+    };
+  }
+
+  function layoutRow() {
+    return screen.getByText('Preferred room layout').closest('div')!;
+  }
+
+  test('[NORMAL] [SG2-105:AC1] the coordinator reviewing a request sees the layout the organiser asked for', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: detail({ preferredLayout: 'Banquet rounds of ten' }) });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+    render(<EventDetail role="Event Coordinator" currentUserId="coord-1" selectedEventId={105} accessToken="token" onNavigate={vi.fn()} />);
+    expect(await screen.findByRole('heading', { name: 'Layout Forum' })).toBeInTheDocument();
+    expect(within(layoutRow()).getByText('Banquet rounds of ten')).toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-105:AC5] a request submitted before the layout was asked for still opens, showing none was given', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: detail({ preferredLayout: null }) });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+    render(<EventDetail role="Event Coordinator" currentUserId="coord-1" selectedEventId={105} accessToken="token" onNavigate={vi.fn()} />);
+    expect(await screen.findByRole('heading', { name: 'Layout Forum' })).toBeInTheDocument();
+    expect(within(layoutRow()).getByText('Not specified')).toBeInTheDocument();
+  });
+});

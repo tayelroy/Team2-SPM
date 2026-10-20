@@ -436,19 +436,19 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Event Organiser, open My events and select Planning workshop.",
-      "Open New request, fill the required event fields and submit.",
+      "Open New request, fill the required event fields (including preferred room layout, \"None\" for accessibility needs and equipment requirements, and no registration, per SG2-105) and submit.",
       "Immediately check the confirmation naming Browser workshop as submitted for review, then its details, submitted status, purpose and description; check the selection prompt and edit action are absent.",
       "Check submitted status through the fixture API.",
       "Reload, open My drafts and verify the new event is listed; read its API detail and check all saved fields."
     ],
-    "data": "Browser workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 Singapore time (stored 2030-06-15T09:00:00.000Z); attendance 25; Projector",
-    "expected": "The immediate detail view confirms 'Browser workshop has been submitted for review.' and shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance and venue requirements in fixture storage.",
+    "data": "Browser workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 Singapore time (stored 2030-06-15T09:00:00.000Z); attendance 25; Projector; layout Theatre; accessibility needs None; equipment None; registration not needed",
+    "expected": "The immediate detail view confirms 'Browser workshop has been submitted for review.' and shows the newly submitted Browser workshop, its submitted status, purpose and description, with no stale selection, selection prompt or edit action. The request is listed after reload; API detail retains name, purpose, description, proposed date, attendance, venue requirements, preferred layout, accessibility and equipment answers and the registration answer in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
-    "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
-    "execution_date": "10 Oct 2026",
+    "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture, with the SG2-105 fields filled in.",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "19 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -460,6 +460,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+        "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+        "execution_date": "10 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
@@ -484,7 +490,7 @@
       "SG2-87:AC4"
     ],
     "method_id": "TC-6cea16b8d437",
-    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4. Since the SG2-30 draft-form fix the date is a Singapore-time date-time input and the detail view opens with a submission confirmation; it is Not Executed until re-run."
+    "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4. Since the SG2-30 draft-form fix the date is a Singapore-time date-time input and the detail view opens with a submission confirmation; it is Not Executed until re-run. Updated by SG2-105: the form now also needs the preferred layout, accessibility, equipment and registration answers."
   },
   {
     "id": "SG2-28-B01",
@@ -541,22 +547,22 @@
     "title": "editing then submitting preserves the latest field values",
     "type": "Positive",
     "story": "SG2-29; SG2-30",
-    "purpose": "Detect stale submitted values and failure to clear a previously stored optional field.",
+    "purpose": "Detect stale submitted values and failure to replace a previously stored field value.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Set event 1 accessibility needs to Step-free entrance through the creator API session; verify that value appears before clearing it.",
+      "Set event 1 accessibility needs to Step-free entrance through the creator API session; verify that value appears before changing it.",
       "Open the seeded Planning workshop draft; verify its stored 02:00 UTC date shows as 15 Jun 2030 10:00 Singapore time, no requirement chips or canned suitability banner are shown, and Check venue fit reports real venue fit for the saved draft.",
-      "Rename it Revised workshop and clear Accessibility needs, leaving the date untouched.",
+      "Rename it Revised workshop and answer \"None\" for accessibility needs, leaving the date untouched.",
       "Submit; verify the detail page confirms Revised workshop was submitted for review and My drafts is empty; reload and fetch event detail."
     ],
-    "data": "Seeded complete event 1 (2030-06-15T02:00:00.000Z) with Step-free entrance; change name to Revised workshop and clear accessibility needs.",
-    "expected": "The date input shows 2030-06-15T10:00; no prototype chips or banner; Check venue fit shows 'Every venue fits this request' for the 20-person draft; after submit the detail page shows 'Revised workshop has been submitted for review.'; latest name is stored; event 1 is unassigned with null accessibility_needs and an unchanged proposed_date of 2030-06-15T02:00:00.000Z in fixture storage.",
+    "data": "Seeded complete event 1 (2030-06-15T02:00:00.000Z) with Step-free entrance; change name to Revised workshop and answer None for accessibility needs.",
+    "expected": "The date input shows 2030-06-15T10:00; no prototype chips or banner; Check venue fit shows 'Every venue fits this request' for the 20-person draft; after submit the detail page shows 'Revised workshop has been submitted for review.'; latest name is stored; event 1 is unassigned with accessibility_needs None and an unchanged proposed_date of 2030-06-15T02:00:00.000Z in fixture storage.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
-    "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
-    "execution_date": "10 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "execution_date": "19 Oct 2026",
     "review": {
       "date": "2026-10-01",
       "by": "LIM JUN WEI",
@@ -568,6 +574,12 @@
       }
     },
     "previous_executions": [
+      {
+        "status": "Pass",
+        "actual": "Passed in the full local Chromium regression run against the production app build and reset loopback fixture.",
+        "execution_evidence": "10 Oct 2026; bugfix/SG2-30-draft-form-and-submit-confirmation on origin/main 88a431a; npm run test:regression locally in Chromium: 75/75 journeys passed including this one, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+        "execution_date": "10 Oct 2026"
+      },
       {
         "status": "Pass",
         "actual": "Passed in the 28-journey Chromium run against the production app build and reset loopback fixture; assertions checked the specified visible and persisted results.",
@@ -591,7 +603,77 @@
       "SG2-30:AC1"
     ],
     "method_id": "TC-747b61ba6f0a",
-    "notes": "Extended by the SG2-30 draft-form fix (date input, removed prototype chips and banner, venue fit, submission confirmation); it is Not Executed until re-run."
+    "notes": "Extended by the SG2-30 draft-form fix (date input, removed prototype chips and banner, venue fit, submission confirmation); it is Not Executed until re-run. Changed by SG2-105 (replaces SG2-28 AC2): accessibility may no longer be blank at submission, so the edit answers \"None\" instead of clearing it."
+  },
+  {
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "executed_by": "MARCUS CHUA",
+    "review": null,
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "story": "SG2-105",
+    "id": "SG2-105-P01",
+    "title": "an organiser must answer layout, accessibility, equipment and registration before submitting, and \"None\" is an answer",
+    "type": "NORMAL / BOUNDARY",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-105:AC1",
+      "SG2-105:AC2"
+    ],
+    "method_id": "TC-0749579d7165",
+    "purpose": "Catch a request form that lets a request through without the customer's minimum, or that refuses \"None\" as an answer.",
+    "steps": [
+      "Sign in as Event Organiser and open New request.",
+      "Fill only the six fields that used to be enough; check Submit is disabled, 4 required fields are counted and the registration question is flagged.",
+      "At 390px and 1440px, check the form has no horizontal overflow and attach screenshots.",
+      "Fill the preferred layout, choose No accessibility needs and No equipment needed; check Submit is still disabled until No registration needed is chosen.",
+      "Submit; check the confirmation, the Preferred room layout row on the detail page and the stored API detail.",
+      "Assign the request to the coordinator as the Event Coordinator Lead; in a second tab, sign in as the coordinator, open it from Awaiting review and read the Preferred room layout row."
+    ],
+    "data": "Layout workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 SGT; attendance 25; Projector; layout Banquet rounds of ten; None; None; no registration; assigned to Regression coordinator by the Lead",
+    "expected": "Submit stays disabled until all ten answers are given; no overflow at 390px or 1440px; after submit the detail shows Banquet rounds of ten and the API stores status unassigned, preferred_layout Banquet rounds of ten, accessibility_needs None, equipment_requirements None, registration_needed false. The assigned coordinator's review panel shows Preferred room layout: Banquet rounds of ten.",
+    "actual": "PASS: ran in the full local Chromium run on 19 Oct 2026 against the production build and loopback fixture."
+  },
+  {
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "executed_by": "MARCUS CHUA",
+    "review": null,
+    "execution_date": "19 Oct 2026",
+    "execution_evidence": "19 Oct 2026; feature/SG2-105-require-customer-minimum-fields at c2653a4 (origin/main 3dad058 merged in); npm run test:e2e locally in Chromium: 122/122 journeys passed, regression gate passed; npm run ci green at 100% coverage. No hosted Supabase validation.",
+    "story": "SG2-105",
+    "id": "SG2-105-F01",
+    "title": "a draft missing the customer minimum saves, but submitting it is refused, lists every missing item and leaves it a draft",
+    "type": "FAILURE / BOUNDARY",
+    "categories": [
+      "FAILURE",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-105:AC2",
+      "SG2-105:AC3",
+      "SG2-105:AC4"
+    ],
+    "method_id": "TC-175d06bb7c8a",
+    "purpose": "Catch a submission check that misses a new field, accepts blank accessibility, or moves an incomplete request out of draft.",
+    "steps": [
+      "As Event Organiser, create a draft through the API with the six original fields and blank accessibility needs.",
+      "Check the save succeeds (201) and lists preferred_layout, accessibility_needs, equipment_requirements and registration_needed as still needed.",
+      "Submit it; check 400 with all four listed and the request still draft.",
+      "Reopen it from My drafts; check Submit is disabled.",
+      "Save None, None, Theatre and no registration; submit; check it becomes unassigned."
+    ],
+    "data": "Minimum check; Team planning; Review the release plan; 2030-06-15T09:00:00.000Z; 25; Projector; accessibility '   '",
+    "expected": "Draft saves with four outstanding fields; submission refused with error 'Event request is missing required fields.' and the four fields; status stays draft; after answering, submission succeeds and status is unassigned.",
+    "actual": "PASS: ran in the full local Chromium run on 19 Oct 2026 against the production build and loopback fixture."
   },
   {
     "id": "SG2-32-P01",

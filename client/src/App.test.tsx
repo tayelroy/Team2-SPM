@@ -711,6 +711,11 @@ describe('the request form', () => {
     fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
+    // SG2-105: the rest of the customer's minimum.
+    fireEvent.change(screen.getByLabelText(/Preferred room layout/i), { target: { value: 'Theatre' } });
+    fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
@@ -745,6 +750,11 @@ describe('the request form', () => {
     fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
+    // SG2-105: the rest of the customer's minimum.
+    fireEvent.change(screen.getByLabelText(/Preferred room layout/i), { target: { value: 'Theatre' } });
+    fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
@@ -796,6 +806,11 @@ describe('editing a draft (SG2-29)', () => {
     fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: '2026-10-12T08:00' } });
     fireEvent.change(screen.getByLabelText(/Expected attendance/i), { target: { value: '180' } });
     fireEvent.change(screen.getByLabelText(/Venue requirements/i), { target: { value: 'Stage + loop' } });
+    // SG2-105: the rest of the customer's minimum.
+    fireEvent.change(screen.getByLabelText(/Preferred room layout/i), { target: { value: 'Theatre' } });
+    fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });

@@ -118,8 +118,13 @@ test('SMOKE-ASSIGN-01 | [NORMAL] [BOUNDARY] [SG2-28:AC1] [SG2-30:AC2] [SG2-87:AC
     await signIn(page, 'organiser');
     await page.getByRole('navigation').getByRole('button', { name: 'New request', exact: true }).click();
     for (const [label, value] of Object.entries({ 'Event name': 'Smoke workshop', Purpose: 'Release check',
-      Description: 'Synthetic smoke event', Date: '2030-06-15T10:00', 'Expected attendance': '1', 'Venue requirements': 'One seat' })) {
+      Description: 'Synthetic smoke event', Date: '2030-06-15T10:00', 'Expected attendance': '1', 'Venue requirements': 'One seat',
+      'Preferred room layout': 'Boardroom' })) {
       await page.getByLabel(new RegExp(`^${label}`)).fill(value);
+    }
+    // SG2-105: "None" answers accessibility and equipment, and registration is a yes or no.
+    for (const answer of ['No accessibility needs', 'No equipment needed', 'No registration needed']) {
+      await page.getByRole('button', { name: answer, exact: true }).click();
     }
     await page.getByRole('button', { name: 'Submit request', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Smoke workshop', exact: true })).toBeVisible();
