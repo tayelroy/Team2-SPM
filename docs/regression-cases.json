@@ -7389,7 +7389,7 @@
       "Check a new notice arriving after mark-all snapshot stays unread, concurrent read keeps its first timestamp, and a delivery failure rolls back notice and receipt together.",
       "Revoke only the selected coordinator role during a waiting preference update while another held role remains; require42501 and no preference write."
     ],
-    "data": "Eight isolated multi-session PostgreSQL races; synthetic IDs and rollback/cleanup.",
+    "data": "Nine isolated multi-session PostgreSQL races; synthetic IDs and rollback/cleanup.",
     "expected": "At most one eligible delivery; none to stale/unrelated roles or terminal/ready events; atomic receipts; new arrivals remain unread.",
     "evidence": ".github/scripts/test-notification-reminders-concurrency.mjs",
     "layer": "Native PostgreSQL concurrency",

@@ -150,7 +150,7 @@ try {
   await waitsFor(root, preferenceAfterRevocation, firstPid, rootPid); await root.query('COMMIT;');
   assert.equal(await preferenceAfterRevocation, ''); await first.query('COMMIT;');
   assert.equal(await root.query(`SELECT count(*) FROM public.notification_reminder_settings WHERE user_id='${coordinator}';`), '0');
-  console.log('PASS [SG2-69:preference-role-revocation] [SG2-69:AC6] [SG2-104:AC4] [CONFLICT] Revoking the selected coordinator role during its lock wait prevents preference changes while the attendee role remains.');
+  console.log('PASS [SG2-69:preference-role-revocation] [SG2-69:AC6] [SG2-104:AC2] [CONFLICT] Revoking the selected coordinator role during its lock wait prevents preference changes while the attendee role remains.');
 
   await root.query(`INSERT INTO public.account_roles(user_id,role) VALUES('${coordinator}','event_coordinator');
     INSERT INTO public.notifications(notification_id,recipient_id,event_id,kind,message)
