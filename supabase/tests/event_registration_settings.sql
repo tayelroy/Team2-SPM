@@ -137,6 +137,15 @@ begin
     raise exception '[SG2-63:capacity-above-venue] [BOUNDARY] [SG2-63:AC5] [SG2-63:AC7] A confirmed event takes a capacity above its venues';
   end if;
 
+  -- Nobody already registered loses their place: 96302 holds two.
+  if public.update_registration_settings(96302, owner, '{"registration_capacity": 1}', false)
+      is distinct from '{"outcome": "below_registered", "registered": 2}'::jsonb
+      or (select registration_capacity from public.events where event_id = 96302) <> 500
+      or public.update_registration_settings(96302, owner, '{"registration_capacity": 2}', false) ->> 'outcome' is distinct from 'ok'
+      or public.update_registration_settings(96302, owner, '{"registration_capacity": 500}', false) ->> 'outcome' is distinct from 'ok' then
+    raise exception '[SG2-63:capacity-not-below-registered] [BOUNDARY] [SG2-63:AC5] Capacity can come down to the registered count but not below it';
+  end if;
+
   -- AC3, AC5, AC8: only the creating organiser.
   foreach invalid in array array[to_jsonb(colleague), to_jsonb(outsider), to_jsonb(coordinator)] loop
     result := public.update_registration_settings(96301, (invalid #>> '{}')::uuid, '{"registration_capacity": 9}', false);

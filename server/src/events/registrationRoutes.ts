@@ -13,6 +13,7 @@ import {
 } from '../db/registrations';
 import {
   SETTLED_STATUSES,
+  belowRegisteredMessage,
   capacityWarnings,
   placesRemaining,
   validateRegistrationSchedule,
@@ -171,6 +172,9 @@ export function createRegistrationHandlers({
       case 'not_open':
         res.status(409).json({ error: NOT_OPEN_MESSAGE });
         return;
+      case 'below_registered':
+        res.status(409).json({ error: belowRegisteredMessage(result.registered), registered: result.registered });
+        return;
       case 'invalid':
         // The server's checks and the database function apply the same rules.
         res.status(400).json({ error: 'Invalid registration settings', details: [] });
@@ -201,6 +205,9 @@ export function createRegistrationHandlers({
       return;
     }
     const schedule = validateRegistrationSchedule(loaded.overview.event, validated.values, now());
+    const registered = loaded.overview.attendees.length;
+    const capacity = validated.values.registration_capacity;
+    if (typeof capacity === 'number' && capacity < registered) schedule.push(belowRegisteredMessage(registered));
     if (schedule.length > 0) {
       res.status(400).json({ error: 'Invalid registration settings', details: schedule });
       return;

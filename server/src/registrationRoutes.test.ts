@@ -272,6 +272,16 @@ describe('PATCH and close of the registration settings (SG2-63)', () => {
     assert.deepEqual(writes, []);
   });
 
+  test('[BOUNDARY] [SG2-63:AC5] capacity comes down to the registered count but not below it', async () => {
+    const { app, writes } = harness(as(OWNER));
+    const below = await request(app).patch('/events/12/registration-settings').send({ registration_capacity: 1 });
+    assert.deepEqual([below.status, below.body], [400, { error: 'Invalid registration settings',
+      details: ['2 people are already registered, so the capacity cannot be lower than 2.'] }]);
+    assert.equal(writes.length, 0);
+    assert.equal((await request(app).patch('/events/12/registration-settings').send({ registration_capacity: 2 })).status, 200);
+    assert.deepEqual(writes.map(write => write.values), [{ registration_capacity: 2 }]);
+  });
+
   test('[CONFLICT] [SG2-63:AC5] [SG2-63:AC6] each database refusal is answered with its own status', async () => {
     const cases: [UpdateRegistrationSettingsResult, number, unknown][] = [
       [{ outcome: 'missing' }, 404, NOT_FOUND],
@@ -280,6 +290,9 @@ describe('PATCH and close of the registration settings (SG2-63)', () => {
       [{ outcome: 'not_needed' }, 409, { error: 'This event does not take registrations.' }],
       [{ outcome: 'started' }, 409, { error: 'The event has started, so its registration settings can no longer change.' }],
       [{ outcome: 'not_open' }, 409, { error: 'Registration is not open, so it cannot be closed early.' }],
+      // A registration arriving between the server's check and the write.
+      [{ outcome: 'below_registered', registered: 3 }, 409,
+        { error: '3 people are already registered, so the capacity cannot be lower than 3.', registered: 3 }],
       [{ outcome: 'invalid' }, 400, { error: 'Invalid registration settings', details: [] }],
       [{ outcome: 'unavailable' }, 503, UNAVAILABLE]
     ];

@@ -158,11 +158,14 @@ function changesOf(view: RegistrationView, draft: Draft): RegistrationSettingsIn
   return changes;
 }
 
-function problemsOf(draft: Draft): string[] {
+function problemsOf(draft: Draft, registered: number): string[] {
   const problems: string[] = [];
   const capacity = draft.capacity.trim();
   if (capacity !== '' && !(/^\d+$/.test(capacity) && Number(capacity) >= 1 && Number(capacity) <= MAX_CAPACITY)) {
     problems.push('Capacity must be a whole number of at least 1.');
+  } else if (capacity !== '' && Number(capacity) < registered) {
+    // Nobody already registered loses their place (capacity is at least 1, so two or more here).
+    problems.push(`${registered} people are already registered, so the capacity cannot be lower than ${registered}.`);
   }
   if (draft.opens && draft.closes && sgtToIso(draft.closes) <= sgtToIso(draft.opens)) {
     problems.push('Registration must close after it opens.');
@@ -200,7 +203,7 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setNotice('');
-    const found = problemsOf(draft);
+    const found = problemsOf(draft, view.registered_count);
     setProblems(found);
     if (found.length > 0 || !changed) return;
     setBusy(true);

@@ -141,6 +141,15 @@ export function capacityWarnings(capacity: number | null, venues: readonly Booke
     .map(venue => `A capacity of ${capacity} is more than ${venue.name} holds (${venue.capacity}).`);
 }
 
+/**
+ * Capacity never drops below the registrations already held: no story says
+ * who would lose their place (SG2-61 AC4 only raises it). Capacity is at
+ * least 1, so this only arises with two or more registered.
+ */
+export function belowRegisteredMessage(registered: number): string {
+  return `${registered} people are already registered, so the capacity cannot be lower than ${registered}.`;
+}
+
 /** AC1: places left, never below zero; null when no capacity is set. */
 export function placesRemaining(capacity: number | null, registered: number): number | null {
   return capacity === null ? null : Math.max(capacity - registered, 0);

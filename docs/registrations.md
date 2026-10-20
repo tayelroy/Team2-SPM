@@ -46,6 +46,11 @@ Cancelled or Rejected, including once it is Confirmed.
 - **Reopen or extend:** save a later closing time. A new closing time must be in
   the future.
 - Registration closes after it opens, and both times are before the event starts.
+- Capacity can come down to the number already registered, but not below it:
+  `2 people are already registered, so the capacity cannot be lower than 2.` No
+  story says who would lose their place (SG2-61 AC4 only speaks of raising it), so
+  this is refused rather than warned. The form, the server and the database
+  function (under the event row lock) all check it. This reading is flagged to the PO.
 - Only what changed is sent. Each changed setting adds one history row with the
   organiser's name and the time (SG2-40's history shows it).
 - The coordinator's planning drawer shows the settings read-only. The planning

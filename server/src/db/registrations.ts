@@ -40,7 +40,9 @@ export type FetchRegistrationOverviewResult =
 export type UpdateRegistrationSettingsResult =
   | { outcome: 'ok' }
   | { outcome: 'missing' | 'not_needed' | 'started' | 'not_open' | 'invalid' | 'unavailable' }
-  | { outcome: 'closed'; status: string };
+  | { outcome: 'closed'; status: string }
+  /** A registration arrived between the server's check and the write. */
+  | { outcome: 'below_registered'; registered: number };
 
 export interface UpdateRegistrationSettingsInput {
   eventId: number;
@@ -131,6 +133,8 @@ export async function updateRegistrationSettings(
       return { outcome: row.outcome };
     case 'closed':
       return typeof row.status === 'string' ? { outcome: 'closed', status: row.status } : { outcome: 'unavailable' };
+    case 'below_registered':
+      return typeof row.registered === 'number' ? { outcome: 'below_registered', registered: row.registered } : { outcome: 'unavailable' };
     default:
       return { outcome: 'unavailable' };
   }

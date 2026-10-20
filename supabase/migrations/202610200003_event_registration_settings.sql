@@ -9,7 +9,8 @@
 -- event set or change its registration capacity and opening and closing
 -- times at any time before the event starts, including once it is confirmed,
 -- close registration early (p_close_now), and reopen or extend it by setting a
--- later closing time. The assigned coordinator can no longer change them
+-- later closing time. Capacity never drops below the registrations already
+-- held: no story says who would lose their place (SG2-61 AC4 only raises it). The assigned coordinator can no longer change them
 -- (AC8, replacing SG2-39 AC4); the planning route refuses the fields.
 -- AC9: each changed setting is written to the event history (SG2-40).
 -- AC10: when registration opens or closes on a confirmed event, on schedule
@@ -204,6 +205,12 @@ begin
     exception when invalid_datetime_format or datetime_field_overflow then
       return jsonb_build_object('outcome', 'invalid');
     end;
+    -- Nobody already registered loses their place (counted under the event lock).
+    if capacity is not null and capacity < (select count(*) from public.registrations r
+        where r.event_id = p_event_id and lower(coalesce(r.status, '')) <> 'cancelled') then
+      return jsonb_build_object('outcome', 'below_registered', 'registered', (select count(*) from public.registrations r
+        where r.event_id = p_event_id and lower(coalesce(r.status, '')) <> 'cancelled'));
+    end if;
     -- A new closing time is in the future: closing now is p_close_now.
     if (opens is not null and closes is not null and closes <= opens)
         or (p_values ? 'registration_closes_at' and closes is not null and closes <= instant)

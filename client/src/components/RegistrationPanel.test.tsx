@@ -159,13 +159,17 @@ describe('RegistrationPanel settings (SG2-63)', () => {
     expect(form.getByLabelText('Opens (Singapore time)')).toHaveValue('');
   });
 
-  test('[FAILURE] [SG2-63:AC5] a capacity that is not a whole number of at least 1, or a closing time before opening, is refused before sending', async () => {
+  test('[FAILURE] [SG2-63:AC5] a capacity that is not a whole number of at least 1 or is below those registered, or a closing time before opening, is refused before sending', async () => {
     const { fetch, form } = await open({ ...OWNER_VIEW, registration_opens_at: null, registration_closes_at: null });
     for (const capacity of ['0', '2.5', '2147483648']) {
       fireEvent.change(form.getByLabelText('Capacity'), { target: { value: capacity } });
       fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
       expect(form.getByRole('alert')).toHaveTextContent('Capacity must be a whole number of at least 1.');
     }
+    // Two are registered: one place is not enough, two is.
+    fireEvent.change(form.getByLabelText('Capacity'), { target: { value: '1' } });
+    fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
+    expect(form.getByRole('alert')).toHaveTextContent('2 people are already registered, so the capacity cannot be lower than 2.');
     fireEvent.change(form.getByLabelText('Capacity'), { target: { value: '4' } });
     fireEvent.change(form.getByLabelText('Opens (Singapore time)'), { target: { value: '2030-06-10T09:00' } });
     fireEvent.change(form.getByLabelText('Closes (Singapore time)'), { target: { value: '2030-06-10T09:00' } });

@@ -146,6 +146,11 @@ test('SG2-63-N01 | [FAILURE] [CONFLICT] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC6] [
   expect((await page.request.get('/api/event-requests/631/registrations', { headers: outsider })).status()).toBe(404);
   expect((await page.request.get('/api/event-requests/631/registrations', { headers: attendee })).status()).toBe(403);
 
+  // Nobody already registered loses their place.
+  const below = await settings(organiser, { registration_capacity: 1 });
+  expect([below.status(), (await below.json()).details])
+    .toEqual([400, ['2 people are already registered, so the capacity cannot be lower than 2.']]);
+
   // AC5: a closing time after the event starts, or already past, is refused.
   const late = await settings(organiser, { registration_closes_at: '2030-07-20T02:00:00.000Z' });
   expect([late.status(), (await late.json()).details]).toEqual([400, ['Registration must close before the event starts.']]);

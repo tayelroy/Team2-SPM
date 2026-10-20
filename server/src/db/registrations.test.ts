@@ -70,10 +70,13 @@ describe('updateRegistrationSettings (SG2-63)', () => {
     }
     assert.deepEqual(await updateRegistrationSettings(rpcClient({ outcome: 'closed', status: 'cancelled' }),
       { eventId: 12, actorId: 'organiser-1', values: {}, closeNow: true }), { outcome: 'closed', status: 'cancelled' });
+    assert.deepEqual(await updateRegistrationSettings(rpcClient({ outcome: 'below_registered', registered: 3 }),
+      { eventId: 12, actorId: 'organiser-1', values: { registration_capacity: 2 }, closeNow: false }), { outcome: 'below_registered', registered: 3 });
   });
 
   test('[FAILURE] [SG2-63:AC5] an error or an unexpected answer is reported unavailable', async () => {
-    for (const [data, error] of [[null, failed], [null, null], ['ok', null], [{ outcome: 'closed' }, null], [{ outcome: 'done' }, null]]) {
+    for (const [data, error] of [[null, failed], [null, null], ['ok', null], [{ outcome: 'closed' }, null],
+      [{ outcome: 'below_registered' }, null], [{ outcome: 'done' }, null]]) {
       assert.deepEqual(await updateRegistrationSettings(rpcClient(data, error),
         { eventId: 12, actorId: 'organiser-1', values: { registration_capacity: 2 }, closeNow: false }),
       { outcome: 'unavailable' }, JSON.stringify(data));

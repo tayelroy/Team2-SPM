@@ -700,7 +700,7 @@
     "review": null,
     "status": "Pass",
     "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
-    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1681 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1683 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
     "execution_date": "20 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
@@ -735,7 +735,7 @@
     "review": null,
     "status": "Pass",
     "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
-    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1681 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1683 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
     "execution_date": "20 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
@@ -770,19 +770,20 @@
     "review": null,
     "status": "Pass",
     "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
-    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1681 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1683 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
     "execution_date": "20 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
       "As coordinator, PATCH /planning with registration_capacity and PATCH /registration-settings.",
       "As colleague, PATCH /registration-settings.",
       "As organiser2 and attendee, GET /registrations.",
+      "As organiser, set capacity 1 with two registered.",
       "As organiser, set a closing time at the event start, then one in the past.",
       "As organiser, close registration twice.",
       "Read the ledger."
     ],
     "data": "Event 631 as seeded for SG2-63-P01.",
-    "expected": "Planning route 403 with the 'set by the Event Organiser' message and fields [registration_capacity]; coordinator 403 on the settings route; colleague 403 'Only the organiser who created this event can change its registration settings.'; organiser2 404, attendee 403; 400 'Registration must close before the event starts.'; 400 naming close-after-open and the future rule; first close 200, second 409 'Registration is not open, so it cannot be closed early.'. Capacity stays 80 and the only history row is the closing time.",
+    "expected": "Planning route 403 with the 'set by the Event Organiser' message and fields [registration_capacity]; coordinator 403 on the settings route; colleague 403 'Only the organiser who created this event can change its registration settings.'; organiser2 404, attendee 403; capacity 1 refused 400 '2 people are already registered, so the capacity cannot be lower than 2.'; 400 'Registration must close before the event starts.'; 400 naming close-after-open and the future rule; first close 200, second 409 'Registration is not open, so it cannot be closed early.'. Capacity stays 80 and the only history row is the closing time.",
     "evidence": "e2e/registrations.spec.ts",
     "layer": "Playwright Chromium + isolated production app (API level)"
   },
@@ -855,13 +856,13 @@
       "Run supabase/tests/event_registration_settings.sql."
     ],
     "data": "Events 96301–96308 covering planning, confirmed open, cancelled, no registration, started, not yet open, past closing and unconfirmed-in-window.",
-    "expected": "Every assertion passes; no notice for unconfirmed events; each opening or closing is announced once.",
+    "expected": "Every assertion passes, including capacity coming down to the registered count but not below it; no notice for unconfirmed events; each opening or closing is announced once.",
     "evidence": "supabase/tests/event_registration_settings.sql",
     "layer": "PostgreSQL",
     "review": null,
     "status": "Pass",
     "actual": "PASS: ran locally as described in execution_evidence.",
-    "execution_evidence": "20 Oct 2026; same branch; CI's database job replayed locally on fresh postgres:17 (every migration, release_readiness.sql and its tests, every listed SQL suite and concurrency script, and the upgrade replay): passed. 15 SQL mutations of the migration each failed this suite.",
+    "execution_evidence": "20 Oct 2026; same branch; CI's database job replayed locally on fresh postgres:17 (every migration, release_readiness.sql and its tests, every listed SQL suite and concurrency script, and the upgrade replay): passed. 17 SQL mutations of the migration each failed this suite.",
     "execution_date": "20 Oct 2026",
     "executed_by": "Automated local run"
   },

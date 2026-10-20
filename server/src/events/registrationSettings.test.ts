@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  belowRegisteredMessage,
   capacityWarnings,
   isRegistrationSettingField,
   placesRemaining,
@@ -130,6 +131,10 @@ describe('capacity warnings and places remaining (SG2-63)', () => {
   test('[BOUNDARY] [SG2-63:AC7] no capacity or no booked venue gives no warning', () => {
     assert.deepEqual(capacityWarnings(null, VENUES), []);
     assert.deepEqual(capacityWarnings(500, []), []);
+  });
+
+  test('[NORMAL] [SG2-63:AC5] a capacity below the registered count is explained with the count', () => {
+    assert.equal(belowRegisteredMessage(2), '2 people are already registered, so the capacity cannot be lower than 2.');
   });
 
   test('[BOUNDARY] [SG2-63:AC1] places remaining never drop below zero and are unknown without a capacity', () => {

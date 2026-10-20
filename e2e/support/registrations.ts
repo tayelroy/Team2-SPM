@@ -91,6 +91,9 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
       next.registration_closes_at = new Date(now).toISOString();
     } else {
       Object.assign(next, input.values);
+      const registered = database.tables.registrations.filter(row => row.event_id === input.eventId
+        && String(row.status ?? '').toLowerCase() !== 'cancelled').length;
+      if (next.registration_capacity !== null && next.registration_capacity < registered) return { outcome: 'below_registered', registered };
     }
     const logs = database.tables.event_audit_logs;
     for (const field of ['registration_capacity', 'registration_opens_at', 'registration_closes_at'] as const) {
