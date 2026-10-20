@@ -630,14 +630,14 @@
     "purpose": "Catch a request form that lets a request through without the customer's minimum, or that refuses \"None\" as an answer.",
     "steps": [
       "Sign in as Event Organiser and open New request.",
-      "Fill only the six fields that used to be enough; check Submit is disabled, 4 required fields are counted and the registration question is flagged.",
+      "Fill only the six fields that used to be enough; check Submit is disabled, 5 required fields are counted (layout, accessibility, equipment, registration and, since SG2-70, the category) and the registration question is flagged.",
       "At 390px and 1440px, check the form has no horizontal overflow and attach screenshots.",
-      "Fill the preferred layout, choose No accessibility needs and No equipment needed; check Submit is still disabled until No registration needed is chosen.",
+      "Fill the preferred layout, choose No accessibility needs and No equipment needed; check Submit is still disabled after No registration needed is chosen, until the Seminar category (SG2-70) is chosen too.",
       "Submit; check the confirmation, the Preferred room layout row on the detail page and the stored API detail.",
       "Assign the request to the coordinator as the Event Coordinator Lead; in a second tab, sign in as the coordinator, open it from Awaiting review and read the Preferred room layout row."
     ],
-    "data": "Layout workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 SGT; attendance 25; Projector; layout Banquet rounds of ten; None; None; no registration; assigned to Regression coordinator by the Lead",
-    "expected": "Submit stays disabled until all ten answers are given; no overflow at 390px or 1440px; after submit the detail shows Banquet rounds of ten and the API stores status unassigned, preferred_layout Banquet rounds of ten, accessibility_needs None, equipment_requirements None, registration_needed false. The assigned coordinator's review panel shows Preferred room layout: Banquet rounds of ten.",
+    "data": "Layout workshop; Team planning; Review the release plan; 15 Jun 2030 17:00 SGT; attendance 25; Projector; layout Banquet rounds of ten; None; None; no registration; category Seminar (SG2-70); assigned to Regression coordinator by the Lead",
+    "expected": "Submit stays disabled until all ten answers and the SG2-70 category are given; no overflow at 390px or 1440px; after submit the detail shows Banquet rounds of ten and the API stores status unassigned, preferred_layout Banquet rounds of ten, accessibility_needs None, equipment_requirements None, registration_needed false. The assigned coordinator's review panel shows Preferred room layout: Banquet rounds of ten.",
     "actual": "PASS: ran in the full local Chromium run on 19 Oct 2026 against the production build and loopback fixture."
   },
   {
@@ -666,13 +666,13 @@
     "purpose": "Catch a submission check that misses a new field, accepts blank accessibility, or moves an incomplete request out of draft.",
     "steps": [
       "As Event Organiser, create a draft through the API with the six original fields and blank accessibility needs.",
-      "Check the save succeeds (201) and lists preferred_layout, accessibility_needs, equipment_requirements and registration_needed as still needed.",
-      "Submit it; check 400 with all four listed and the request still draft.",
+      "Check the save succeeds (201) and lists preferred_layout, accessibility_needs, equipment_requirements, registration_needed and (SG2-70) category as still needed.",
+      "Submit it; check 400 with all five listed and the request still draft.",
       "Reopen it from My drafts; check Submit is disabled.",
-      "Save None, None, Theatre and no registration; submit; check it becomes unassigned."
+      "Save None, None, Theatre, no registration and the Workshop category; submit; check it becomes unassigned."
     ],
     "data": "Minimum check; Team planning; Review the release plan; 2030-06-15T09:00:00.000Z; 25; Projector; accessibility '   '",
-    "expected": "Draft saves with four outstanding fields; submission refused with error 'Event request is missing required fields.' and the four fields; status stays draft; after answering, submission succeeds and status is unassigned.",
+    "expected": "Draft saves with five outstanding fields; submission refused with error 'Event request is missing required fields.' and the five fields; status stays draft; after answering, submission succeeds and status is unassigned.",
     "actual": "PASS: ran in the full local Chromium run on 19 Oct 2026 against the production build and loopback fixture."
   },
   {
@@ -7102,5 +7102,154 @@
     "execution_date": "20 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
+  },
+  {
+    "id": "SG2-70-P01",
+    "title": "a coordinator finds an event by name or client organisation and narrows the list by date, state, venue, category and coordinator",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-70:AC1",
+      "SG2-70:AC2"
+    ],
+    "story": "SG2-70",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Seeded via /__e2e/event-search: 701 Harbour Gala (Harbour Foundation, Social, Planning, coordinator@example.test, booked at Regression Hall, 1 Nov 2030), 702 Coastal Leaders Summit (Coastal Partners, Conference, Approved, coordinator@example.test, pending request for Quiet Room, 2 Nov 2030), 703 Quiet Trust Workshop (Quiet Trust, Workshop, Awaiting Assignment, no coordinator, 5 Nov 2030) and 704 Harbour secret draft (a draft).",
+    "executed_by": "Automated test runner",
+    "review": null,
+    "purpose": "Catch a search that misses an event by its name or client organisation, ignores one of the five filters, or does not fit a phone or laptop screen.",
+    "steps": [
+      "Sign in as coordinator@example.test and open Find an event; read the list and the Harbour Gala card.",
+      "Search \"harbour\", then \"COASTAL PARTNERS\".",
+      "Clear and filter by each of Category Workshop, Venue Quiet Room, State Approved and Assigned coordinator Regression coordinator.",
+      "Clear; set From 2 Nov 2030 and To 5 Nov 2030; then add Category Conference.",
+      "Sign in as safety@example.test and open Find an event.",
+      "Resize to 390px and 1440px."
+    ],
+    "data": "Search text \"harbour\" and \"COASTAL PARTNERS\"; filters as listed; dates 2030-11-02 to 2030-11-05",
+    "expected": [
+      "3 events found: Harbour Gala, Coastal Leaders Summit, Quiet Trust Workshop (soonest first; the draft is not listed); Harbour Gala shows Harbour Foundation, Social, Regression Hall, Regression coordinator and Arrangements",
+      "\"harbour\" finds only Harbour Gala; \"COASTAL PARTNERS\" finds only Coastal Leaders Summit",
+      "Workshop finds Quiet Trust Workshop; Quiet Room and Approved find Coastal Leaders Summit; Regression coordinator finds Harbour Gala and Coastal Leaders Summit",
+      "The date range finds Coastal Leaders Summit and Quiet Trust Workshop; adding Conference leaves Coastal Leaders Summit",
+      "The Safety Officer sees the same 3 events",
+      "Neither width scrolls sideways"
+    ],
+    "status": "Pass",
+    "execution_date": "20 Oct 2026",
+    "execution_evidence": "20 Oct 2026; feature/SG2-70-find-event working tree; npx playwright test -g \"SG2-70\" locally in Chromium against the production client build and loopback fixture. No hosted Supabase validation.",
+    "actual": "PASS: ran in local Chromium on 20 Oct 2026 against the production build and loopback fixture; assertions checked the visible and stored results above."
+  },
+  {
+    "id": "SG2-70-P02",
+    "title": "an organiser must choose a category to submit, and a coordinator then finds the request by it",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-70:AC2"
+    ],
+    "story": "SG2-70",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "executed_by": "Automated test runner",
+    "review": null,
+    "purpose": "Catch a request that can be submitted without a category, a category that is not stored, or a category filter that misses a newly submitted request.",
+    "steps": [
+      "Sign in as organiser@example.test and open New request; fill every field and answer None, None and No registration needed.",
+      "Check \"Choose a category\" is shown and Submit request is disabled; choose Networking.",
+      "Resize to 390px and 1440px.",
+      "Submit; read the Category row on the event detail.",
+      "Sign in as coordinator@example.test, open Find an event and filter by Category Networking."
+    ],
+    "data": "Category Networking Night; Meet partners; An evening of introductions; 3 Dec 2030 18:00 SGT; 40; Standing room; Cocktail; None; None; no registration; Networking",
+    "expected": [
+      "Submit request stays disabled until a category is chosen; Networking shows as pressed",
+      "Neither width scrolls sideways",
+      "The request is submitted and its detail shows Category: Networking",
+      "The coordinator finds only Category Networking Night, shown as Awaiting Assignment"
+    ],
+    "status": "Pass",
+    "execution_date": "20 Oct 2026",
+    "execution_evidence": "20 Oct 2026; feature/SG2-70-find-event working tree; npx playwright test -g \"SG2-70\" locally in Chromium against the production client build and loopback fixture. No hosted Supabase validation.",
+    "actual": "PASS: ran in local Chromium on 20 Oct 2026 against the production build and loopback fixture; assertions checked the visible and stored results above."
+  },
+  {
+    "id": "SG2-70-N01",
+    "title": "only internal users can search, and a draft is never found even by its exact name",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-70:AC3"
+    ],
+    "story": "SG2-70",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Seeded via /__e2e/event-search: 701 Harbour Gala (Harbour Foundation, Social, Planning, coordinator@example.test, booked at Regression Hall, 1 Nov 2030), 702 Coastal Leaders Summit (Coastal Partners, Conference, Approved, coordinator@example.test, pending request for Quiet Room, 2 Nov 2030), 703 Quiet Trust Workshop (Quiet Trust, Workshop, Awaiting Assignment, no coordinator, 5 Nov 2030) and 704 Harbour secret draft (a draft).",
+    "executed_by": "Automated test runner",
+    "review": null,
+    "purpose": "Catch an organiser or attendee reaching event search through the menu or the API, or a draft leaking into another user's results.",
+    "steps": [
+      "As organiser@example.test and attendee@example.test, call GET /api/event-search?q=Harbour and GET /api/event-search/options; call GET /api/event-search with no credentials.",
+      "Sign in as organiser@example.test and read the navigation.",
+      "Sign in as coordinator@example.test, open Find an event and search \"Harbour secret draft\".",
+      "Read the State options; call GET /api/event-search?status=draft."
+    ],
+    "data": "Draft 704 Harbour secret draft",
+    "expected": [
+      "Each API call answers 403 Access denied; without credentials 401",
+      "The organiser has no Find an event item",
+      "No events match; the draft is not shown",
+      "Draft is not a State option, and the API answers 400 Unknown event state."
+    ],
+    "status": "Pass",
+    "execution_date": "20 Oct 2026",
+    "execution_evidence": "20 Oct 2026; feature/SG2-70-find-event working tree; npx playwright test -g \"SG2-70\" locally in Chromium against the production client build and loopback fixture. No hosted Supabase validation.",
+    "actual": "PASS: ran in local Chromium on 20 Oct 2026 against the production build and loopback fixture; assertions checked the visible and stored results above."
+  },
+  {
+    "id": "SG2-70-N02",
+    "title": "when nothing matches, the screen says so with every filter in force and can clear them",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-70:AC4"
+    ],
+    "story": "SG2-70",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase. Seeded via /__e2e/event-search: 701 Harbour Gala (Harbour Foundation, Social, Planning, coordinator@example.test, booked at Regression Hall, 1 Nov 2030), 702 Coastal Leaders Summit (Coastal Partners, Conference, Approved, coordinator@example.test, pending request for Quiet Room, 2 Nov 2030), 703 Quiet Trust Workshop (Quiet Trust, Workshop, Awaiting Assignment, no coordinator, 5 Nov 2030) and 704 Harbour secret draft (a draft).",
+    "executed_by": "Automated test runner",
+    "review": null,
+    "purpose": "Catch an empty search that shows a blank page, or one that hides which filters ruled every event out.",
+    "steps": [
+      "At 390px, sign in as venue@example.test and open Find an event.",
+      "Search \"Harbour\" from 1 Nov 2030 to 1 Nov 2030, Category Conference, Venue Regression Hall.",
+      "Set Category back to Any category and search.",
+      "Click Clear filters."
+    ],
+    "data": "Harbour; 2030-11-01 to 2030-11-01; Conference; Regression Hall",
+    "expected": [
+      "No events match, listing: Name or organisation contains “Harbour”, Date 1 Nov 2030 – 1 Nov 2030, Venue: Regression Hall, Category: Conference; no sideways scroll at 390px",
+      "Harbour Gala is found",
+      "All 3 events are listed again and the search text is empty"
+    ],
+    "status": "Pass",
+    "execution_date": "20 Oct 2026",
+    "execution_evidence": "20 Oct 2026; feature/SG2-70-find-event working tree; npx playwright test -g \"SG2-70\" locally in Chromium against the production client build and loopback fixture. No hosted Supabase validation.",
+    "actual": "PASS: ran in local Chromium on 20 Oct 2026 against the production build and loopback fixture; assertions checked the visible and stored results above."
   }
 ]
