@@ -1920,14 +1920,15 @@ test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prot
   // SG2-91 replaced the placeholder with the live count of the safety check list.
   await expect(page.getByText('0 events are awaiting a safety check.', { exact: true })).toBeVisible();
   await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
-  await expect(menu).toHaveText(['Dashboard', 'Safety checks']);
+  // SG2-70: every internal role can find an event.
+  await expect(menu).toHaveText(['Dashboard', 'Safety checks', 'Find an event']);
   await expect(prototypeEvent).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Profile', exact: true }).click();
   await page.getByRole('button', { name: 'Logout', exact: true }).click();
   await signIn(page, 'lead');
   await expect(page.getByRole('heading', { level: 1, name: 'Coordination lead desk' })).toBeVisible();
-  await expect(menu).toHaveText(['Dashboard', 'Unassigned queue', 'Assign coordinators']);
+  await expect(menu).toHaveText(['Dashboard', 'Unassigned queue', 'Assign coordinators', 'Find an event']);
   await expect(page.getByText(/^\d+ requests? (is|are) awaiting a coordinator\.$/)).toBeVisible();
   await expect(prototypeEvent).toHaveCount(0);
   await page.getByRole('button', { name: 'Open unassigned queue', exact: true }).click();
