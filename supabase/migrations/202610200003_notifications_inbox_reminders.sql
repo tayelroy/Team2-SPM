@@ -206,6 +206,17 @@ begin
     then outstanding:=outstanding||'registration'::text; end if;
   return outstanding;
 end $$;
+-- The hourly scheduler compares UTC hour buckets, not elapsed wall-clock
+-- seconds. A run delayed by a few seconds remains due in the next scheduled
+-- hour after N whole days; it does not drift into the following hour. UTC also
+-- keeps a day at 24 hourly buckets across session time zones and DST changes.
+-- This pure helper makes the exact scheduler boundaries reproducible in tests.
+create function private.notification_reminder_due(p_last_sent timestamptz,p_instant timestamptz,p_frequency_days integer) returns boolean
+language sql immutable set search_path='' as $$
+  select p_last_sent is null or date_trunc('hour',p_instant at time zone 'UTC') >=
+    date_trunc('hour',p_last_sent at time zone 'UTC')+make_interval(days=>p_frequency_days);
+$$;
+revoke all on function private.notification_reminder_due(timestamptz,timestamptz,integer) from public,anon,authenticated,service_role;
 create function public.send_outstanding_arrangement_reminders() returns integer
 language plpgsql volatile security definer set search_path='' as $$
 declare e public.events; outstanding text[]; days integer; last_sent timestamptz; instant timestamptz; sent integer:=0; labels text;
@@ -228,7 +239,7 @@ begin
     days:=coalesce(days,1);
     select last_sent_at into last_sent from public.notification_reminder_receipts where event_id=e.event_id and recipient_id=e.coordinator_id;
     instant:=clock_timestamp();
-    if last_sent is not null and instant<last_sent+make_interval(days=>days) then continue; end if;
+    if not private.notification_reminder_due(last_sent,instant,days) then continue; end if;
     select string_agg(case key when 'venue' then 'Venue booking' when 'equipment' then 'Equipment' else 'Registration' end,', ' order by position)
       into labels from unnest(outstanding) with ordinality keys(key,position);
     insert into public.notifications(recipient_id,event_id,kind,message) values(e.coordinator_id,e.event_id,'outstanding_arrangements',

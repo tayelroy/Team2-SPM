@@ -74,7 +74,39 @@ test('SG2-69-B01 | [BOUNDARY] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC4] unread tota
   await expect(page.getByRole('button', { name: 'Notifications (0)', exact: true })).toBeVisible();
 });
 
-test('SG2-69-P02 | [NORMAL] [BOUNDARY] [SG2-69:AC5] [SG2-69:AC6] a coordinator saves the daily default and thirty-day reminder frequency and sees it after reload', async ({ page, request }) => {
+test('SG2-69-B02 | [BOUNDARY] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC4] a thousand unread notices keep a compact badge and exact accessible and inbox totals without phone overflow', async ({ page, request }) => {
+  expect((await request.post('/__e2e/notification-inbox', { data: { unreadCount: 1000 } })).status()).toBe(204);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  const trigger = page.getByRole('button', { name: 'Notifications (1000)', exact: true });
+  await expect(trigger).toBeVisible();
+  const badge = trigger.getByText('99+', { exact: true });
+  await expect(badge).toBeVisible();
+  const badgeBounds = (await badge.boundingBox())!;
+  expect(badgeBounds.width).toBeLessThanOrEqual(32);
+  expect(badgeBounds.x).toBeGreaterThanOrEqual(0);
+  expect(badgeBounds.x + badgeBounds.width).toBeLessThanOrEqual(390);
+  expect(await noOverflow(page)).toBe(true);
+  await trigger.click();
+  const drawer = inbox(page);
+  await expect(drawer.getByText('1000 unread', { exact: true })).toBeVisible();
+  await expect(drawer.getByRole('button', { name: /^(Unread|Read):/ })).toHaveCount(50);
+  await expect(drawer.getByRole('button', { name: 'Load older notifications', exact: true })).toBeVisible();
+  expect(await noOverflow(page)).toBe(true);
+  await drawer.getByRole('button', { name: 'Mark all as read', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Notifications (0)', exact: true })).toBeVisible();
+  await expect(drawer.getByText('0 unread', { exact: true })).toBeVisible();
+  const stored = await ledger(page);
+  const own = [...stored.notifications, ...stored.holds].filter(row => row.recipient_id === 'user-coordinator');
+  expect(own).toHaveLength(1001);
+  expect(own.every(row => typeof row.read_at === 'string')).toBe(true);
+  expect(stored.notifications.find((row: { notification_id: number }) => row.notification_id === 2).read_at).toBe('2030-06-01T01:05:00.000Z');
+  expect(stored.notifications.find((row: { notification_id: number }) => row.notification_id === 90).read_at).toBeNull();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Notifications (0)', exact: true })).toBeVisible();
+});
+
+test('SG2-69-P02 | [BOUNDARY] [SG2-69:AC5] [SG2-69:AC6] a coordinator saves the daily default and thirty-day reminder frequency and sees it after reload', async ({ page, request }) => {
   expect((await request.post('/__e2e/notification-inbox')).status()).toBe(204);
   await signIn(page);
   await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
@@ -124,7 +156,7 @@ test('SG2-69-F01 | [FAILURE] [SG2-69:AC1] [SG2-69:AC3] an unavailable read mutat
   await expect(page.getByRole('button', { name: 'Notifications (1)', exact: true })).toBeVisible();
 });
 
-test('SG2-69-R01 | [NORMAL] [CONFLICT] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] a focus refresh reconciles another session read without losing or duplicating loaded history', async ({ page, request }) => {
+test('SG2-69-R01 | [CONFLICT] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] a focus refresh reconciles another session read without losing or duplicating loaded history', async ({ page, request }) => {
   expect((await request.post('/__e2e/notification-inbox', { data: { large: true } })).status()).toBe(204);
   await signIn(page);
   await page.getByRole('button', { name: 'Notifications (53)', exact: true }).click();
@@ -158,7 +190,7 @@ test('SG2-69-R01 | [NORMAL] [CONFLICT] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] a 
   expect(stored.holds[0].read_at).toBeNull();
 });
 
-test('SG2-69-R02 | [NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-104:AC2] switching roles keeps owned notices and receipts while event targets and reminder settings follow the acting role', async ({ page, request }) => {
+test('SG2-69-R02 | [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-104:AC2] switching roles keeps owned notices and receipts while event targets and reminder settings follow the acting role', async ({ page, request }) => {
   expect((await request.post('/__e2e/notification-inbox', { data: { multiRole: true } })).status()).toBe(204);
   await signIn(page);
   const acting = page.getByRole('combobox', { name: 'Acting as', exact: true });

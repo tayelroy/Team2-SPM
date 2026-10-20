@@ -181,6 +181,29 @@ update public.users set organisation='SG69 Org' where user_id='e6900000-0000-400
 update public.events set coordinator_id='e6900000-0000-4000-8000-000000000001' where event_id=96901;
 insert into public.equipment_requests(request_id,event_id,equipment_id,quantity) values(96901,96901,96901,2);
 -- Scheduler public seam: first send lists all unmet SG2-57 arrangements exactly once.
+-- Fixed instants exercise the production cadence helper without relying on the
+-- test runner's position within an hour. Last delivery was two seconds into a
+-- UTC hour; the next hourly cron can run one second earlier without drifting.
+set local timezone='America/New_York';
+do $$ begin
+ if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-10T04:00:02Z',1) is distinct from true then
+   raise exception '[SG2-69:daily-exact-interval] [SG2-69:AC6] [BOUNDARY] Daily cadence must be due at exactly twenty-four hours'; end if;
+ if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-10T04:00:01Z',1) is distinct from true then
+   raise exception '[SG2-69:daily-hour-aligned] [SG2-69:AC6] [BOUNDARY] Daily cadence one second before twenty-four hours must remain due in the same UTC scheduled hour'; end if;
+ if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-10T03:00:02Z',1) is distinct from false then
+   raise exception '[SG2-69:daily-hour-early] [SG2-69:AC6] [BOUNDARY] Daily cadence one full hour early must remain not due'; end if;
+ if private.notification_reminder_due('2030-03-10T04:00:01Z','2030-03-10T04:59:59Z',1) is distinct from false then
+   raise exception '[SG2-69:daily-bucket-no-repeat] [SG2-69:AC6] [CONFLICT] Daily delivery must not repeat later in its sent UTC hour'; end if;
+ if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-12T04:00:02Z',3) is distinct from true then
+   raise exception '[SG2-69:custom-exact-interval] [SG2-69:AC6] [BOUNDARY] Three-day cadence must be due at exactly seventy-two hours across daylight saving time'; end if;
+ if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-12T04:00:01Z',3) is distinct from true then
+   raise exception '[SG2-69:custom-hour-aligned] [SG2-69:AC6] [BOUNDARY] Three-day cadence one second before seventy-two hours must remain due in the same UTC scheduled hour'; end if;
+ if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-12T03:00:02Z',3) is distinct from false then
+   raise exception '[SG2-69:custom-hour-early] [SG2-69:AC6] [BOUNDARY] Three-day cadence one full hour early must remain not due'; end if;
+ if private.notification_reminder_due('2030-03-12T04:00:01Z','2030-03-12T04:59:59Z',3) is distinct from false then
+   raise exception '[SG2-69:custom-bucket-no-repeat] [SG2-69:AC6] [CONFLICT] Three-day delivery must not repeat later in its sent UTC hour'; end if;
+end $$;
+set local timezone='UTC';
 do $$ declare sent integer; begin
  sent:=public.send_outstanding_arrangement_reminders();
  if sent is distinct from 1 or (select message from public.notifications where event_id=96901 and kind='outstanding_arrangements') is distinct from 'Upcoming event Upcoming forum still needs: Venue booking, Equipment, Registration.'

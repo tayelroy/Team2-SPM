@@ -133,7 +133,7 @@ test('[FAILURE] [SG2-69:AC1] [SG2-69:AC4] upstream exceptions and missing config
   assert.equal((await request(app()).get('/api/notifications/inbox').set(auth())).status, 503);
 });
 
-test('[NORMAL] [CONFLICT] [SG2-69:AC6] [SG2-104:AC2] held coordinator permissions apply only while acting as coordinator and disappear on revocation', async () => {
+test('[CONFLICT] [SG2-69:AC6] [SG2-104:AC2] held coordinator permissions apply only while acting as coordinator and disappear on revocation', async () => {
   let held: readonly Role[] = ['event_coordinator', 'attendee'];
   const access = createAuthorization({ resolvePrincipal: async () => ({ userId: 'multi-role-person', roles: held }) });
   const calls: unknown[] = [];

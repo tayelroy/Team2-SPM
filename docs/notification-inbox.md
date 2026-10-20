@@ -10,7 +10,8 @@ Source: [SG2-69](https://smu-spm-group.atlassian.net/browse/SG2-69), read 20 Oct
 The header bell uses `GET /api/notifications/inbox` for every signed-in role,
 on every authenticated screen. It shows the number of unread notices across
 **all** recipient-owned event and hold rows. The first page contains at most
-50 rows. “Load older notifications” follows a timestamp, source and ID cursor;
+50 rows. The badge displays `99+` above 99 unread notices; its accessible name
+and the open inbox retain the exact total. “Load older notifications” follows a timestamp, source and ID cursor;
 ties and repeated numeric IDs across the two tables are unambiguous. Rows are
 ordered by creation time, source and ID, descending.
 
@@ -69,9 +70,14 @@ daily; whole-day intervals from 1 to 30 are supported. GET/PUT
 `/api/notifications/reminder-preferences` operates only on the caller's settings
 while they are acting as an Event Coordinator. A role switch hides those controls;
 revocation is checked again before a settings write.
-The interval is measured from the most recent reminder **per event and
-recipient**. The hourly sweep sends once the interval is due, so delivery can
-be up to an hour after the due instant. A new assignment is not suppressed by
+The interval is measured in UTC hour buckets from the most recent reminder
+**per event and recipient**. A daily reminder sent at 10:00:02 is eligible in
+the next day's 10:00 hour, even if that sweep reaches it at 10:00:01. This avoids
+accumulating an extra hour of delay from small variations in sweep timing.
+The exact send timestamp remains recorded, and a second sweep in the same
+hour cannot send another reminder. An hourly sweep can send less than one
+hour before the exact elapsed-day anniversary; it does not use a day boundary
+in the database session's local timezone. A new assignment is not suppressed by
 the previous coordinator's reminder receipt. Shortening an interval can make
 the next hourly sweep immediately eligible. Marking a reminder read does not
 change its delivery cadence.
@@ -85,6 +91,14 @@ write delivery receipts. All inbox RPCs use the caller's JWT. Legacy notificatio
 routes and the `venue-hold-deadlines` job remain available. A coordinator holding
 several roles still receives reminders without keeping a coordinator browser
 session open; the scheduler checks their current held roles directly.
+
+Event and role locks are held until the sweep transaction commits or rolls
+back. Coordinator edits to those rows can therefore wait for the remaining
+sweep, and the sweep can wait for an edit already in progress. The current
+school-project scale keeps one ordered atomic sweep. Skipping locked events
+would defer their reminders until a later hourly run; batching would require
+a different transaction and retry contract. Neither behavior is introduced
+by this cadence correction.
 
 ## Rollout and checks
 

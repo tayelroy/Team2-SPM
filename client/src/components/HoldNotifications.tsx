@@ -216,7 +216,7 @@ function HoldNotificationsSession({ accessToken, coordinator, onOpenNotification
       style={{ position: 'relative', background: surface.iconButton, border: 'none', borderRadius: radius.sm,
         width: '32px', height: '32px', color: color.platinum, fontSize: '13px', cursor: 'pointer' }}>
       ●<span aria-hidden="true" style={{ position: 'absolute', top: '-6px', right: '-6px', minWidth: '18px', height: '18px', borderRadius: '9px',
-        background: color.accent, color: color.abyss, fontSize: '10px', lineHeight: '18px' }}>{page === null ? '…' : page.unread_count}</span>
+        padding: '0 4px', boxSizing: 'border-box', background: color.accent, color: color.abyss, fontSize: '10px', lineHeight: '18px' }}>{page === null ? '…' : page.unread_count > 99 ? '99+' : page.unread_count}</span>
     </button>
     {open ? createPortal(<>
       <button type="button" aria-label="Close notifications overlay" tabIndex={-1} onClick={close}

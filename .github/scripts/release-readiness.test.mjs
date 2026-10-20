@@ -215,3 +215,22 @@ test('[SG2-69:release-acting-role-dependencies] [SG2-69:AC7] [SG2-104:AC2] [FAIL
     ['private.event_relationship_exists(integer,text)', 'readiness_missing_event_relationship'],
   ]) assertReadinessRejects(`ALTER FUNCTION ${signature} RENAME TO ${replacement};`, `RPC ${signature}`);
 });
+
+test('[SG2-69:release-cadence-helper] [SG2-69:AC6] [FAILURE] deployment refuses a missing deterministic UTC cadence helper', () => {
+  const signature = 'private.notification_reminder_due(timestamptz,timestamptz,integer)';
+  assertReadinessRejects(`ALTER FUNCTION ${signature} RENAME TO readiness_missing_notification_cadence;`, `RPC ${signature}`);
+});
+
+test('[SG2-69:release-cadence-helper-grants] [SG2-69:AC7] [FAILURE] deployment refuses direct role access to the private cadence helper', () => {
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assertReadinessRejects(`GRANT EXECUTE ON FUNCTION private.notification_reminder_due(timestamptz,timestamptz,integer) TO ${role};`,
+      `notification cadence helper EXECUTE ${role} = false`);
+  }
+});
+
+test('[SG2-69:release-cadence-helper-security] [SG2-69:AC7] [FAILURE] deployment requires immutable invoker cadence with a fixed empty search path', () => {
+  for (const change of ['VOLATILE', 'SECURITY DEFINER', 'SET search_path=public']) {
+    assertReadinessRejects(`ALTER FUNCTION private.notification_reminder_due(timestamptz,timestamptz,integer) ${change};`,
+      'notification cadence helper private immutable invoker empty search_path');
+  }
+});

@@ -34,6 +34,16 @@ test('[NORMAL] [SG2-69:AC1] [SG2-69:AC2] badge counts all unread and rows visibl
   expect(api.loadReminderPreferences).not.toHaveBeenCalled();
 });
 
+test.each([99, 100, 1000])('[BOUNDARY] [SG2-69:AC1] [SG2-69:AC2] badge stays compact while its accessible name and inbox retain the exact total at %s unread', async count => {
+  vi.mocked(api.loadNotificationInbox).mockResolvedValue(value([placed], count));
+  render(<HoldNotifications accessToken="token" />);
+  const trigger = await screen.findByRole('button', { name: `Notifications (${count})` });
+  expect(within(trigger).getByText(count === 99 ? '99' : '99+', { exact: true })).toBeVisible();
+  fireEvent.click(trigger);
+  expect(within(screen.getByRole('complementary', { name: 'Notifications' })).getByText(`${count} unread`, { exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: `Unread: ${placed.message}` })).toBeVisible();
+});
+
 async function expectLabelledNotification(kind: string, label: string) {
   vi.mocked(api.loadNotificationInbox).mockResolvedValue(value([{ ...notice(kind, 'Forum: venue or equipment needs attention.'),
     source: ['placed', 'warning', 'expired', 'expiry_changed'].includes(kind) ? 'hold' : 'event' }]));
@@ -274,7 +284,7 @@ test('[BOUNDARY] [SG2-69:AC1] tokenless attendee prototype retains empty preview
   fireEvent.click(screen.getByRole('button', { name: 'Close notifications' })); expect(screen.queryByText('No notifications available.')).not.toBeInTheDocument();
 });
 
-test.each(['Event Coordinator', 'Event Organiser'] as const)('[NORMAL] [CONFLICT] [SG2-81:AC1] [SG2-81:AC6] %s keeps a disruption warning alongside its original approval', async role => {
+test.each(['Event Coordinator', 'Event Organiser'] as const)('[CONFLICT] [SG2-81:AC1] [SG2-81:AC6] %s keeps a disruption warning alongside its original approval', async role => {
   vi.mocked(api.loadNotificationInbox).mockResolvedValue(value([
     { ...notice('venue_unavailable', 'QA room is unavailable: maintenance. Find a replacement venue.'), notification_id: 12 },
     notice('venue_request_approved', 'Original booking approved.')

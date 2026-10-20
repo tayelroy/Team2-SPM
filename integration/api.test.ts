@@ -596,7 +596,7 @@ test('[NORMAL] [SG2-41:AC2] [SG2-41:AC3] native venue and equipment request proj
   }
 });
 
-test('[NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC7] an organiser notification target follows current organisation while historical read receipts remain owned and idempotent', async () => {
+test('[CONFLICT] [SG2-69:AC3] [SG2-69:AC7] an organiser notification target follows current organisation while historical read receipts remain owned and idempotent', async () => {
   const originalConfig = { ...dbConfig };
   const originalFetch = globalThis.fetch;
   const organiser = await database.from('users').select('organisation').eq('user_id', ids.organiser).single();
@@ -1103,7 +1103,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-106:AC1] [SG2-106:AC2] [SG2-106:AC3] [S
   }
 });
 
-test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] [SG2-69:AC4] [SG2-69:AC5] [SG2-69:AC6] [SG2-69:AC7] native inbox pages both notice sources, counts all unread rows, marks only owned identities and delivers coordinator-only reminders', async () => {
+test('[NORMAL] [SG2-69:AC1] [SG2-69:AC2] [SG2-69:AC3] [SG2-69:AC4] [SG2-69:AC5] [SG2-69:AC6] [SG2-69:AC7] native inbox pages both notice sources, counts all unread rows, marks only owned identities and delivers coordinator-only reminders', async () => {
   const originalConfig = { ...dbConfig };
   const originalFetch = globalThis.fetch;
   const tokens = Object.fromEntries(Object.entries(ids).map(([name, id]) => [name, jwt('authenticated', id)]));
@@ -1213,7 +1213,7 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
   }
 });
 
-test('[NORMAL] [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-69:AC7] [SG2-104:AC2] native notification targets and cadence follow the acting role while historical ownership survives a role switch or revocation', async () => {
+test('[CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-69:AC7] [SG2-104:AC2] native notification targets and cadence follow the acting role while historical ownership survives a role switch or revocation', async () => {
   const originalConfig = { ...dbConfig };
   const originalFetch = globalThis.fetch;
   const eventId = await planned();

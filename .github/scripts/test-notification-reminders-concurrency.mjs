@@ -101,6 +101,23 @@ try {
   assert.equal(await root.query(`SELECT count(*) FROM public.notification_reminder_receipts WHERE event_id=${event};`), '1');
   console.log('PASS [SG2-69:simultaneous-sweeps] [SG2-69:AC6] [SG2-104:AC1] [CONFLICT] Simultaneous scheduler sessions publish one reminder and receipt for a multi-role coordinator without a web acting role.');
 
+  for (const days of [1, 3]) {
+    await reset();
+    await root.query(`INSERT INTO public.notification_reminder_settings(user_id,frequency_days) VALUES('${coordinator}',${days})
+      ON CONFLICT(user_id) DO UPDATE SET frequency_days=excluded.frequency_days;
+      INSERT INTO public.notification_reminder_receipts(event_id,recipient_id,last_sent_at)
+      VALUES(${event},'${coordinator}',date_trunc('hour',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+        -make_interval(days=>${days})+interval '59 minutes 59 seconds');`);
+    await first.query('BEGIN;'); assert.equal(await scheduler(first), '1');
+    await second.query('BEGIN;'); assert.equal(await scheduler(second), '0');
+    await second.query('COMMIT;'); await first.query('COMMIT;');
+    assert.equal(await scheduler(second), '0');
+    assert.equal(await count(), '1');
+    assert.equal(await root.query(`SELECT count(*) FROM public.notification_reminder_receipts WHERE event_id=${event};`), '1');
+    console.log(`PASS [SG2-69:hour-aligned-${days}-day-sweeps] [SG2-69:AC6] [CONFLICT] Concurrent ${days}-day sweeps in the due UTC hour publish once, then a repeat sweep stays suppressed.`);
+  }
+  await root.query(`DELETE FROM public.notification_reminder_settings WHERE user_id='${coordinator}';`);
+
   await reset();
   await root.query(`BEGIN; UPDATE public.events SET status='cancelled' WHERE event_id=${event};`);
   await first.query('BEGIN;'); const cancelled = scheduler(first);

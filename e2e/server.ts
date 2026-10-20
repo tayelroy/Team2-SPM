@@ -323,7 +323,12 @@ app.post('/__e2e/event-notifications', (_req, res) => {
   res.status(204).end();
 });
 app.post('/__e2e/notification-inbox', (req, res) => {
-  seedNotificationInbox(database, req.body?.large === true, req.body?.multiRole === true);
+  const unreadCount = req.body?.unreadCount;
+  if (unreadCount !== undefined && (!Number.isInteger(unreadCount) || unreadCount < 2 || unreadCount > 1000)) {
+    res.status(400).json({ error: 'Unread fixture count must be a whole number from 2 through 1000.' });
+    return;
+  }
+  seedNotificationInbox(database, req.body?.large === true, req.body?.multiRole === true, unreadCount);
   res.status(204).end();
 });
 app.get('/__e2e/notification-inbox-ledger', (_req, res) => res.json({

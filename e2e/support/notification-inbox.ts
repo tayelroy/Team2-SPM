@@ -79,7 +79,7 @@ export function createMemoryNotificationInbox(database: MemoryDatabase) {
 }
 
 /** Repeated numeric IDs in different sources are intentional. */
-export function seedNotificationInbox(database: MemoryDatabase, large = false, multiRole = false) {
+export function seedNotificationInbox(database: MemoryDatabase, large = false, multiRole = false, unreadCount?: number) {
   if (multiRole) database.tables.account_roles.push({ user_id: 'user-coordinator', role: 'attendee' });
   database.tables.events.push({ ...database.tables.events[0], event_id: 691, name: 'Reminder Forum',
     coordinator_id: 'user-coordinator', status: 'planning', proposed_date: '2030-06-20T02:00:00.000Z' });
@@ -91,6 +91,14 @@ export function seedNotificationInbox(database: MemoryDatabase, large = false, m
   );
   database.tables.venue_hold_notifications.push({ ...base, notification_id: 1, hold_id: 1, kind: 'expired',
     message: 'Reminder Forum tentative venue hold expired.', created_at: '2030-06-01T02:00:00.000Z' });
-  if (large) for (let id = 3; id <= 53; id++) database.tables.notifications.push({ ...base, notification_id: id,
-    kind: 'coordinator_assigned', message: `Earlier notice ${id}`, created_at: '2030-05-31T00:00:00.000Z' });
+  // Large custom totals exercise the real inbox/read-all handlers without
+  // overlapping the deliberately private notification ID 90. Keep the older
+  // 53-notice fixture's identities and order for the pagination journeys.
+  const totalUnread = unreadCount ?? (large ? 53 : 2);
+  for (let index = 2; index < totalUnread; index++) {
+    const id = unreadCount === undefined ? index + 1 : 1000 + index;
+    database.tables.notifications.push({ ...base, notification_id: id, kind: 'coordinator_assigned',
+      message: unreadCount === undefined ? `Earlier notice ${id}` : `Archived notice ${index}`,
+      created_at: '2030-05-31T00:00:00.000Z' });
+  }
 }

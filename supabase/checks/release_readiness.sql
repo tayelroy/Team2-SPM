@@ -83,6 +83,7 @@ begin
     ('public.notification_inbox(integer,timestamptz,text,bigint)'), ('public.read_notification(text,bigint)'),
     ('public.read_all_notifications()'), ('public.notification_event(text,bigint)'),
     ('public.notification_reminder_preferences()'), ('public.set_notification_reminder_preferences(integer)'),
+    ('private.notification_reminder_due(timestamptz,timestamptz,integer)'),
     ('public.send_outstanding_arrangement_reminders()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
@@ -110,6 +111,16 @@ begin
       coalesce(has_function_privilege((select oid from pg_roles where rolname=role.name),to_regprocedure(f.signature),'EXECUTE')=
         case role.name when 'authenticated' then f.authenticated_execute when 'service_role' then f.service_execute else false end,false) as passed
     from inbox_rpc_contracts f cross join (values('anon'),('authenticated'),('service_role')) role(name)
+  ), reminder_cadence_helper as (
+    select 'notification cadence helper private immutable invoker empty search_path' as name,
+      coalesce(p.provolatile='i' and not p.prosecdef and p.proconfig @> array['search_path=""']::text[],false) as passed
+    from (values(1)) singleton(n) left join pg_proc p
+      on p.oid=to_regprocedure('private.notification_reminder_due(timestamptz,timestamptz,integer)')
+  ), reminder_cadence_grants as (
+    select 'notification cadence helper EXECUTE '||role.name||' = false' as name,
+      coalesce(not has_function_privilege((select oid from pg_roles where rolname=role.name),
+        to_regprocedure('private.notification_reminder_due(timestamptz,timestamptz,integer)'),'EXECUTE'),false) as passed
+    from (values('anon'),('authenticated'),('service_role')) role(name)
   ), inbox_function_security as (
     select 'notification RPC security definer empty search_path ' || signature as name,
       coalesce(p.prosecdef and p.proconfig @> array['search_path=""']::text[],false) as passed
@@ -209,6 +220,7 @@ begin
     union all select * from draft_rpc_grants
     union all select * from operations_rpc_grants
     union all select * from inbox_rpc_grants union all select * from inbox_function_security
+    union all select * from reminder_cadence_helper union all select * from reminder_cadence_grants
     union all select * from inbox_type_checks union all select * from inbox_table_checks
     union all select * from recheck_function_checks
     union all select * from disruption_function_check
