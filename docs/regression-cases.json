@@ -2036,7 +2036,7 @@
     "steps": [
       "request.post('/__e2e/coordinator-access')",
       "As coordinator@example.test, attempt review, decision, planning update, clarification and venue request on events 82-87 (another coordinator's and unassigned, in each state)",
-      "As support@example.test, read the history of events 82-87",
+      "As lead@example.test, read the history of events 82-87",
       "As coordinator@example.test, review event 88, decide event 89, update planning on event 81 and request a venue for event 81",
       "As lead@example.test, reassign events 81, 90 and 91 to the second coordinator, then repeat every coordinator action on each"
     ],
@@ -2054,10 +2054,10 @@
     "evidence": "e2e/regression.spec.ts:688",
     "layer": "Playwright fixture API",
     "status": "Pass",
-    "actual": "SG2-90-P01 passed in the 43-journey Chromium run (42 passed, 1 failed). The one failure, SG2-85-P02 (tentative-hold notices), fails identically on a clean origin/main at 5531afa, so it predates this story; npm run test:e2e therefore exits 1 until that is fixed.",
-    "execution_date": "5 Oct 2026",
+    "actual": "Passed in the full Chromium run on the SG2-104 branch, with the history now read as the Event Coordinator Lead (SG2-104 AC6: Technical Support relate only to events with equipment).",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Marcus Chua",
-    "execution_evidence": "5 Oct 2026; feature/SG2-90-restrict-coordinators-to-assigned working tree on main at 5531afa; npm run test:e2e with Supabase variables blanked; SG2-90-P01 green, SG2-85-P02 red on both this branch and main; test-only Chromium; no hosted Supabase."
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase."
   },
   {
     "id": "SG2-90-P02",
@@ -2079,7 +2079,7 @@
       "As coordinator@example.test, update planning on event 81",
       "Reassign event 81 to the second coordinator; repeat the planning update",
       "Reassign event 81 back; repeat the planning update",
-      "As support@example.test, read the history of event 81"
+      "As lead@example.test, read the history of event 81"
     ],
     "data": [
       "Event 81 'Own Forum' (approved), coordinator Regression coordinator",
@@ -2094,10 +2094,10 @@
     "evidence": "e2e/regression.spec.ts:738",
     "layer": "Playwright fixture API",
     "status": "Pass",
-    "actual": "Passed alongside SG2-90-P01 in the Chromium run; removing the same-coordinator no-op in assignCoordinator.ts makes it fail.",
-    "execution_date": "5 Oct 2026",
+    "actual": "Passed in the full Chromium run on the SG2-104 branch, with the history now read as the Event Coordinator Lead (SG2-104 AC6: Technical Support relate only to events with equipment).",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Marcus Chua",
-    "execution_evidence": "npx playwright test -g SG2-90 on feature/SG2-90-restrict-coordinators-to-assigned working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase."
   },
   {
     "id": "SG2-37-P01",
@@ -3269,7 +3269,7 @@
     "steps": [
       "request.post('/__e2e/legacy-assignment')",
       "As support@example.test: GET /api/event-requests/assignable and PATCH /api/event-requests/95/coordinator",
-      "As support@example.test: GET /api/event-requests/95/history",
+      "As lead@example.test: GET /api/event-requests/95/history",
       "As organiser@example.test: GET /api/event-requests/95",
       "Sign in as lead@example.test; at 390px and 1440px open Assign coordinators"
     ],
@@ -3286,10 +3286,10 @@
     "evidence": "e2e/regression.spec.ts:1935",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in Chromium; restoring the grant to Technical Support Staff makes it fail.",
-    "execution_date": "6 Oct 2026",
+    "actual": "Passed in the full Chromium run on the SG2-104 branch, with the history now read as the Event Coordinator Lead (SG2-104 AC6: Technical Support relate only to events with equipment).",
+    "execution_date": "20 Oct 2026",
     "executed_by": "Marcus Chua",
-    "execution_evidence": "npx playwright test on feature/SG2-97-move-assignment-to-lead working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase."
   },
   {
     "id": "SG2-97-P02",
@@ -7129,10 +7129,10 @@
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the Chromium run with the other journeys.",
-    "execution_date": "19 Oct 2026",
+    "actual": "Passed in the full Chromium run with the other journeys.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "19 Oct 2026; feature/SG2-104-multi-role-accounts on main 67753f7; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase.",
     "review": {
       "date": "2026-10-19",
       "by": "YE ZHAN",
@@ -7162,10 +7162,10 @@
     "evidence": "supabase/tests/account_multi_roles.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "status": "Pass",
-    "actual": "Suite passed. Mutation checks: an acting_role() that trusts the header, one that ignores it, the previous decide_venue_booking_request(), no organiser/coordinator check, no self-change check, no last-role check and the previous history policy each made the suite fail on the matching assertion.",
-    "execution_date": "19 Oct 2026",
+    "actual": "Suite passed. Mutation checks: an acting_role() that trusts the header, one that ignores it, the previous decide_venue_booking_request(), a decide check on a held rather than acting Venue Staff role, no organiser/coordinator check, no self-change check, no last-role check, the previous history policy and the relationship check back in public each made the suite fail on the matching assertion.",
+    "execution_date": "20 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "19 Oct 2026; feature/SG2-104-multi-role-accounts on main 67753f7; server and client suites at 100% coverage; browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-104-multi-role-accounts at 53cb6c5 (synced with main 0bbceeb); npm run test:e2e 127/127 and test:smoke 7/7 in test-only Chromium; server 1662/1662 and client 1612/1612 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and every SQL suite including account_multi_roles; API integration 18/18; no hosted Supabase.",
     "review": {
       "date": "2026-10-19",
       "by": "YE ZHAN",
