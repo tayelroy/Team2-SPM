@@ -272,6 +272,14 @@ describe('PATCH and close of the registration settings (SG2-63)', () => {
     assert.deepEqual(writes, []);
   });
 
+  test('[FAILURE] [SG2-63:AC10] clearing a setting on a confirmed event is refused before anything is written', async () => {
+    const { app, writes } = harness(as(OWNER));
+    const res = await request(app).patch('/events/12/registration-settings').send({ registration_closes_at: null });
+    assert.deepEqual([res.status, res.body], [400, { error: 'Invalid registration settings', details: [
+      'Capacity and opening and closing times cannot be cleared once the event is confirmed. Close registration early instead.'] }]);
+    assert.equal(writes.length, 0);
+  });
+
   test('[BOUNDARY] [SG2-63:AC5] capacity comes down to the registered count but not below it', async () => {
     const { app, writes } = harness(as(OWNER));
     const below = await request(app).patch('/events/12/registration-settings').send({ registration_capacity: 1 });

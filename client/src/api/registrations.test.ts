@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { closeRegistrationNow, fetchRegistrations, readRegistrationView, saveRegistrationSettings, type RegistrationView } from './registrations';
 
 const VIEW: RegistrationView = {
-  event_id: 12, registration_needed: true, registration_capacity: 3,
+  event_id: 12, status: 'confirmed', registration_needed: true, registration_capacity: 3,
   registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z', window: 'open',
   registered_count: 1, places_remaining: 2, contact_details_visible: true,
   attendees: [{ registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
@@ -33,7 +33,8 @@ describe('readRegistrationView (SG2-63)', () => {
     for (const bad of [null, 'text', { ...VIEW, window: 'paused' }, { ...VIEW, attendees: [{ ...VIEW.attendees[0], name: 4 }] },
       { ...VIEW, attendees: [null] }, { ...VIEW, attendees: [{ ...VIEW.attendees[0], email: 5 }] },
       { ...VIEW, attendees: [{ ...VIEW.attendees[0], phone: 5 }] }, { ...VIEW, capacity_warnings: [1] }, { ...VIEW, venues: {} },
-      { ...VIEW, registration_capacity: '3' }, { ...VIEW, can_edit: 'yes' }, { ...VIEW, registered_count: null }]) {
+      { ...VIEW, registration_capacity: '3' }, { ...VIEW, can_edit: 'yes' }, { ...VIEW, registered_count: null },
+      { ...VIEW, status: undefined }]) {
       expect(readRegistrationView(bad)).toBeNull();
     }
   });

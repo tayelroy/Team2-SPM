@@ -13,6 +13,7 @@ export interface RegisteredAttendee {
 
 export interface RegistrationView {
   event_id: number;
+  status: string;
   registration_needed: boolean;
   registration_capacity: number | null;
   registration_opens_at: string | null;
@@ -57,7 +58,7 @@ function isAttendee(value: unknown): value is RegisteredAttendee {
 export function readRegistrationView(body: unknown): RegistrationView | null {
   if (typeof body !== 'object' || body === null) return null;
   const view = body as Record<string, unknown>;
-  const valid = typeof view.event_id === 'number' && typeof view.registration_needed === 'boolean'
+  const valid = typeof view.event_id === 'number' && isText(view.status) && typeof view.registration_needed === 'boolean'
     && isCountOrNull(view.registration_capacity) && isTextOrNull(view.registration_opens_at)
     && isTextOrNull(view.registration_closes_at) && WINDOWS.includes(view.window as RegistrationWindow)
     && typeof view.registered_count === 'number' && isCountOrNull(view.places_remaining)

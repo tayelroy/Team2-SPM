@@ -30,7 +30,7 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/registrations')).status()).toBe(204);
 });
 
-test('SG2-63-P01 | [NORMAL] [BOUNDARY] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC7] [SG2-63:AC9] [SG2-63:AC10] the organiser sees who is coming, raises capacity past the venue with a warning, closes registration early and reopens it', async ({ page }) => {
+test('SG2-63-P01 | [NORMAL] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC7] [SG2-63:AC9] [SG2-63:AC10] the organiser sees who is coming, raises capacity past the venue with a warning, closes registration early and reopens it', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -126,7 +126,7 @@ test('SG2-63-P02 | [NORMAL] [SG2-63:AC3] [SG2-63:AC4] [SG2-63:AC8] the coordinat
   await expect(colleague.getByRole('form', { name: 'Registration settings' })).toHaveCount(0);
 });
 
-test('SG2-63-N01 | [FAILURE] [CONFLICT] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC8] only the creating organiser changes the settings, and only with valid times', async ({ page }) => {
+test('SG2-63-N01 | [FAILURE] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC8] only the creating organiser changes the settings, and only with valid times', async ({ page }) => {
   const [organiser, colleague, outsider, coordinator, attendee] = await Promise.all(
     ['organiser', 'colleague', 'organiser2', 'coordinator', 'attendee'].map(account => auth(page, account)));
   const settings = (headers: Record<string, string>, data: unknown) =>

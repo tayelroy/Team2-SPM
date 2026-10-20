@@ -150,6 +150,19 @@ export function belowRegisteredMessage(registered: number): string {
   return `${registered} people are already registered, so the capacity cannot be lower than ${registered}.`;
 }
 
+/**
+ * Once an event is confirmed its capacity and times stay set: clearing one
+ * would end registration without the AC10 notice and undo what confirmation
+ * needed (SG2-57). Closing early is the way to stop registration.
+ */
+export const CLEARED_ONCE_CONFIRMED_MESSAGE =
+  'Capacity and opening and closing times cannot be cleared once the event is confirmed. Close registration early instead.';
+
+export function clearedOnceConfirmed(status: string, values: RegistrationSettingValues): string[] {
+  return status === 'confirmed' && REGISTRATION_SETTING_FIELDS.some(field => values[field] === null)
+    ? [CLEARED_ONCE_CONFIRMED_MESSAGE] : [];
+}
+
 /** AC1: places left, never below zero; null when no capacity is set. */
 export function placesRemaining(capacity: number | null, registered: number): number | null {
   return capacity === null ? null : Math.max(capacity - registered, 0);

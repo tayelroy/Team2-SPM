@@ -30,7 +30,8 @@ registration and are past Draft.
 - Where registration stands uses SG2-58's window: registration is open only for
   a Confirmed event, from its opening time until its closing time.
 - Each attendee is listed earliest first with name, organisation and when they
-  registered, plus email and phone for those allowed to see them.
+  registered, plus email and phone for those allowed to see them. Only an
+  email-shaped address is made a `mailto:` link; anything else is shown as text.
 - A capacity above a booked venue's capacity (any pending or approved booking
   request) is allowed. A warning names each venue it exceeds, as the organiser
   types and after saving.
@@ -46,6 +47,10 @@ Cancelled or Rejected, including once it is Confirmed.
 - **Reopen or extend:** save a later closing time. A new closing time must be in
   the future.
 - Registration closes after it opens, and both times are before the event starts.
+- Once the event is Confirmed, capacity and times can be changed but not cleared:
+  clearing one would end registration with no notice and undo what confirmation
+  needed (SG2-57). *Close registration now* is the way to stop it. Before
+  confirmation they can still be cleared.
 - Capacity can come down to the number already registered, but not below it:
   `2 people are already registered, so the capacity cannot be lower than 2.` No
   story says who would lose their place (SG2-61 AC4 only speaks of raising it), so

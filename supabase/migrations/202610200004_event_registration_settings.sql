@@ -213,6 +213,13 @@ begin
     exception when invalid_datetime_format or datetime_field_overflow then
       return jsonb_build_object('outcome', 'invalid');
     end;
+    -- Once confirmed, clearing a setting would end registration with no
+    -- notice and undo what confirmation needed (SG2-57): close early instead.
+    if e.status = 'confirmed' and ((p_values ? 'registration_capacity' and capacity is null)
+        or (p_values ? 'registration_opens_at' and opens is null)
+        or (p_values ? 'registration_closes_at' and closes is null)) then
+      return jsonb_build_object('outcome', 'invalid');
+    end if;
     -- Nobody already registered loses their place (counted under the event lock).
     if capacity is not null and capacity < (select count(*) from public.registrations r
         where r.event_id = p_event_id and lower(coalesce(r.status, '')) <> 'cancelled') then

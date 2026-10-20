@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   closeRegistrationNow,
   fetchRegistrations,
@@ -119,7 +119,7 @@ function Attendees({ view }: { view: RegistrationView }) {
               {attendee.organisation ? <span>{attendee.organisation}</span> : null}
               {view.contact_details_visible ? (
                 <>
-                  <span>{attendee.email ? <a href={`mailto:${attendee.email}`}>{attendee.email}</a> : 'No email on record'}</span>
+                  <span>{attendee.email ? <EmailAddress email={attendee.email} /> : 'No email on record'}</span>
                   <span>{attendee.phone ?? 'No phone on record'}</span>
                 </>
               ) : null}
@@ -135,6 +135,13 @@ function Attendees({ view }: { view: RegistrationView }) {
       ) : null}
     </div>
   );
+}
+
+/** Only something shaped like an email address becomes a mailto link; anything else is plain text. */
+const EMAIL_SHAPE = /^[^@\s:/]+@[^@\s:/]+\.[^@\s:/]+$/;
+
+function EmailAddress({ email }: { email: string }) {
+  return EMAIL_SHAPE.test(email) ? <a href={`mailto:${email}`}>{email}</a> : <>{email}</>;
 }
 
 /** What the form holds, as typed: capacity text and Singapore-time datetime-local values. */
@@ -158,8 +165,15 @@ function changesOf(view: RegistrationView, draft: Draft): RegistrationSettingsIn
   return changes;
 }
 
-function problemsOf(draft: Draft, registered: number): string[] {
+function problemsOf(draft: Draft, view: RegistrationView): string[] {
+  const registered = view.registered_count;
   const problems: string[] = [];
+  // Once confirmed, a setting that is set stays set; closing early is the way to stop registration.
+  const stored = draftOf(view);
+  if (view.status === 'confirmed' && (['capacity', 'opens', 'closes'] as const)
+    .some((field) => stored[field] !== '' && draft[field].trim() === '')) {
+    problems.push('Capacity and opening and closing times cannot be cleared once the event is confirmed. Close registration early instead.');
+  }
   const capacity = draft.capacity.trim();
   if (capacity !== '' && !(/^\d+$/.test(capacity) && Number(capacity) >= 1 && Number(capacity) <= MAX_CAPACITY)) {
     problems.push('Capacity must be a whole number of at least 1.');
@@ -178,6 +192,9 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(view));
   const [busy, setBusy] = useState(false);
+  // State updates land on the next render, so a second click in the same tick
+  // would still see busy as false; the ref closes that gap.
+  const inFlight = useRef(false);
   const [problems, setProblems] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
   const changes = changesOf(view, draft);
@@ -190,6 +207,7 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
     : [];
 
   const finish = (result: RegistrationResult, done: string) => {
+    inFlight.current = false;
     setBusy(false);
     if (result.ok) {
       onChanged(result.view);
@@ -203,14 +221,18 @@ function SettingsForm({ view, eventId, accessToken, onChanged }: {
   const save = async (event: FormEvent) => {
     event.preventDefault();
     setNotice('');
-    const found = problemsOf(draft, view.registered_count);
+    const found = problemsOf(draft, view);
     setProblems(found);
-    if (found.length > 0 || !changed) return;
+    if (found.length > 0 || !changed || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     finish(await saveRegistrationSettings(eventId, accessToken, changes), 'Registration settings saved.');
   };
 
+  // The button is disabled while anything is saving; marking the request in
+  // flight stops a form submit landing straight after it.
   const closeNow = async () => {
+    inFlight.current = true;
     setNotice('');
     setProblems([]);
     setBusy(true);

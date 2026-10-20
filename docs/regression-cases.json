@@ -678,11 +678,10 @@
   {
     "id": "SG2-63-P01",
     "title": "The organiser sees who is coming, raises capacity past the venue with a warning, closes registration early and reopens it",
-    "type": "NORMAL / BOUNDARY",
+    "type": "NORMAL",
     "story": "SG2-63",
     "categories": [
-      "NORMAL",
-      "BOUNDARY"
+      "NORMAL"
     ],
     "mapped_acs": [
       "SG2-63:AC1",
@@ -752,11 +751,10 @@
   {
     "id": "SG2-63-N01",
     "title": "Only the creating organiser changes the settings, and only with valid times",
-    "type": "FAILURE / CONFLICT",
+    "type": "FAILURE",
     "story": "SG2-63",
     "categories": [
-      "FAILURE",
-      "CONFLICT"
+      "FAILURE"
     ],
     "mapped_acs": [
       "SG2-63:AC3",

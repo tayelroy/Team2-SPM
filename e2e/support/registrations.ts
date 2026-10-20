@@ -90,6 +90,7 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
       if (event.status !== 'confirmed' || opens === null || closes === null || now < opens || now >= closes) return { outcome: 'not_open' };
       next.registration_closes_at = new Date(now).toISOString();
     } else {
+      if (event.status === 'confirmed' && Object.values(input.values).some(value => value === null)) return { outcome: 'invalid' };
       Object.assign(next, input.values);
       const registered = database.tables.registrations.filter(row => row.event_id === input.eventId
         && String(row.status ?? '').toLowerCase() !== 'cancelled').length;

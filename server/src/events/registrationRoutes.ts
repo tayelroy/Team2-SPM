@@ -15,6 +15,7 @@ import {
   SETTLED_STATUSES,
   belowRegisteredMessage,
   capacityWarnings,
+  clearedOnceConfirmed,
   placesRemaining,
   validateRegistrationSchedule,
   validateRegistrationSettings
@@ -204,7 +205,8 @@ export function createRegistrationHandlers({
       res.status(400).json({ error: 'Invalid registration settings', details: validated.errors });
       return;
     }
-    const schedule = validateRegistrationSchedule(loaded.overview.event, validated.values, now());
+    const schedule = [...clearedOnceConfirmed(loaded.overview.event.status, validated.values),
+      ...validateRegistrationSchedule(loaded.overview.event, validated.values, now())];
     const registered = loaded.overview.attendees.length;
     const capacity = validated.values.registration_capacity;
     if (typeof capacity === 'number' && capacity < registered) schedule.push(belowRegisteredMessage(registered));

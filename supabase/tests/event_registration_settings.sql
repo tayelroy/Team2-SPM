@@ -139,6 +139,20 @@ begin
     raise exception '[SG2-63:capacity-above-venue] [BOUNDARY] [SG2-63:AC5] [SG2-63:AC7] A confirmed event takes a capacity above its venues';
   end if;
 
+  -- Once confirmed, a setting cannot be cleared (that would end registration
+  -- with no notice); before confirmation it can (96308, in Planning).
+  foreach invalid in array array['{"registration_capacity": null}'::jsonb, '{"registration_opens_at": null}',
+      '{"registration_closes_at": null}'] loop
+    if public.update_registration_settings(96302, owner, invalid, false) ->> 'outcome' is distinct from 'invalid' then
+      raise exception '[SG2-63:confirmed-not-cleared] [FAILURE] [SG2-63:AC10] % must be refused on a confirmed event', invalid;
+    end if;
+  end loop;
+  if (select registration_closes_at from public.events where event_id = 96302) is null
+      or public.update_registration_settings(96308, owner, '{"registration_capacity": null}', false) ->> 'outcome' is distinct from 'ok'
+      or public.update_registration_settings(96308, owner, '{"registration_capacity": 12}', false) ->> 'outcome' is distinct from 'ok' then
+    raise exception '[SG2-63:planning-may-clear] [BOUNDARY] [SG2-63:AC5] Before confirmation a setting can still be cleared';
+  end if;
+
   -- Nobody already registered loses their place: 96302 holds two.
   if public.update_registration_settings(96302, owner, '{"registration_capacity": 1}', false)
       is distinct from '{"outcome": "below_registered", "registered": 2}'::jsonb

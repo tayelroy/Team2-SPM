@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   belowRegisteredMessage,
+  clearedOnceConfirmed,
   capacityWarnings,
   isRegistrationSettingField,
   placesRemaining,
@@ -131,6 +132,15 @@ describe('capacity warnings and places remaining (SG2-63)', () => {
   test('[BOUNDARY] [SG2-63:AC7] no capacity or no booked venue gives no warning', () => {
     assert.deepEqual(capacityWarnings(null, VENUES), []);
     assert.deepEqual(capacityWarnings(500, []), []);
+  });
+
+  test('[FAILURE] [SG2-63:AC10] once confirmed, no setting can be cleared; before that, or when only changed, it can', () => {
+    const message = 'Capacity and opening and closing times cannot be cleared once the event is confirmed. Close registration early instead.';
+    for (const field of ['registration_capacity', 'registration_opens_at', 'registration_closes_at'] as const) {
+      assert.deepEqual(clearedOnceConfirmed('confirmed', { [field]: null }), [message], field);
+      assert.deepEqual(clearedOnceConfirmed('planning', { [field]: null }), [], field);
+    }
+    assert.deepEqual(clearedOnceConfirmed('confirmed', { registration_capacity: 9, registration_closes_at: '2030-06-12T01:00:00.000Z' }), []);
   });
 
   test('[NORMAL] [SG2-63:AC5] a capacity below the registered count is explained with the count', () => {

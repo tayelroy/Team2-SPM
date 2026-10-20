@@ -5,7 +5,7 @@ import RegistrationPanel from './RegistrationPanel';
 import type { RegistrationView } from '../api/registrations';
 
 const OWNER_VIEW: RegistrationView = {
-  event_id: 12, registration_needed: true, registration_capacity: 3,
+  event_id: 12, status: 'confirmed', registration_needed: true, registration_capacity: 3,
   registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z', window: 'open',
   registered_count: 2, places_remaining: 1, contact_details_visible: true,
   attendees: [
@@ -61,6 +61,17 @@ describe('RegistrationPanel picture (SG2-63)', () => {
     expect(panel().queryByText('ana@attendee.test')).toBeNull();
     expect(panel().getByText('Only the organiser who created this event can change its registration settings.')).toBeVisible();
     expect(panel().queryByRole('form', { name: 'Registration settings' })).toBeNull();
+  });
+
+  test('[FAILURE] [SG2-63:AC4] only an email-shaped address becomes a mailto link; anything else is shown as text', async () => {
+    serve(() => Response.json({ ...OWNER_VIEW, attendees: [
+      { ...OWNER_VIEW.attendees[0], email: 'javascript:alert(1)' },
+      { ...OWNER_VIEW.attendees[1], registration_id: 5, email: 'not an email' },
+    ] }));
+    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    expect(await screen.findByText('javascript:alert(1)')).toBeVisible();
+    expect(panel().getByText('not an email')).toBeVisible();
+    expect(panel().queryAllByRole('link')).toHaveLength(0);
   });
 
   test('[BOUNDARY] [SG2-63:AC1] no capacity, no times and no registrations read plainly', async () => {
@@ -139,10 +150,11 @@ describe('RegistrationPanel settings (SG2-63)', () => {
     expect(form.queryByRole('list', { name: 'Capacity warnings' })).toBeNull();
   });
 
-  test('[NORMAL] [SG2-63:AC5] [SG2-63:AC6] new opening and closing times are sent in Singapore time, and cleared settings as null', async () => {
-    const cleared = { ...OWNER_VIEW, registration_capacity: null, places_remaining: null, registration_opens_at: null,
+  test('[NORMAL] [SG2-63:AC5] [SG2-63:AC6] new opening and closing times are sent in Singapore time, and before confirmation cleared settings as null', async () => {
+    const planning = { ...OWNER_VIEW, status: 'planning', window: 'not_confirmed' as const };
+    const cleared = { ...planning, registration_capacity: null, places_remaining: null, registration_opens_at: null,
       registration_closes_at: null, capacity_warnings: [] };
-    const { fetch, form } = await open(OWNER_VIEW, () => Response.json(OWNER_VIEW), () => Response.json(cleared));
+    const { fetch, form } = await open(planning, () => Response.json(planning), () => Response.json(cleared));
     fireEvent.change(form.getByLabelText('Opens (Singapore time)'), { target: { value: '2030-06-02T10:00' } });
     fireEvent.change(form.getByLabelText('Closes (Singapore time)'), { target: { value: '2030-06-15T18:30' } });
     fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
@@ -176,6 +188,45 @@ describe('RegistrationPanel settings (SG2-63)', () => {
     fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
     expect(form.getByRole('alert')).toHaveTextContent('Registration must close after it opens.');
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('[FAILURE] [SG2-63:AC10] once confirmed, clearing capacity or a time is refused before sending, pointing to closing early', async () => {
+    const { fetch, form } = await open();
+    for (const label of ['Capacity', 'Opens (Singapore time)', 'Closes (Singapore time)']) {
+      const input = form.getByLabelText(label);
+      const before = (input as HTMLInputElement).value;
+      fireEvent.change(input, { target: { value: '' } });
+      fireEvent.click(form.getByRole('button', { name: 'Save settings' }));
+      expect(form.getByRole('alert')).toHaveTextContent(
+        'Capacity and opening and closing times cannot be cleared once the event is confirmed. Close registration early instead.');
+      fireEvent.change(input, { target: { value: before } });
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('[CONFLICT] [SG2-63:AC5] [SG2-63:AC6] rapid clicks send one request: a double Save, Save then Close now, or Close now then Save', async () => {
+    let answer!: (response: Response) => void;
+    let closed!: (response: Response) => void;
+    const { fetch, form } = await open(OWNER_VIEW, () => new Promise<Response>((resolve) => { answer = resolve; }),
+      () => new Promise<Response>((resolve) => { closed = resolve; }));
+    fireEvent.change(form.getByLabelText('Capacity'), { target: { value: '5' } });
+    const save = form.getByRole('button', { name: 'Save settings' });
+    const close = form.getByRole('button', { name: 'Close registration now' });
+    fireEvent.submit(save.closest('form')!);
+    fireEvent.submit(save.closest('form')!);
+    fireEvent.click(close);
+    answer(Response.json({ ...OWNER_VIEW, registration_capacity: 5 }));
+    await form.findByText('Registration settings saved.');
+    expect(fetch.mock.calls.filter(([, init]) => init?.method)).toHaveLength(1);
+    // Close now first: a submit straight after it sends nothing more.
+    fireEvent.change(form.getByLabelText('Capacity'), { target: { value: '6' } });
+    fireEvent.click(form.getByRole('button', { name: 'Close registration now' }));
+    fireEvent.submit(save.closest('form')!);
+    closed(Response.json({ ...OWNER_VIEW, window: 'closed' }));
+    await form.findByText('Registration is closed.');
+    expect(fetch.mock.calls.filter(([, init]) => init?.method).map(([url]) => url)).toEqual([
+      '/api/event-requests/12/registration-settings', '/api/event-requests/12/registration-settings/close',
+    ]);
   });
 
   test('[CONFLICT] [SG2-63:AC5] the server\'s refusal is shown with each reason, and the typed values stay', async () => {
