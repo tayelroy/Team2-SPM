@@ -36,7 +36,8 @@ const COMPLETE_BODY = {
   preferred_layout: 'Theatre',
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'Lectern, 2 radio mics',
-  registration_needed: true
+  registration_needed: true,
+  category: 'conference' as const
 };
 
 interface HarnessOptions {
@@ -412,7 +413,8 @@ describe('missingForSubmission', () => {
       preferred_layout: 'Theatre',
       accessibility_needs: 'None',
       equipment_requirements: 'None',
-      registration_needed: false
+      registration_needed: false,
+      category: 'seminar'
     });
     assert.deepEqual(missing, ['name', 'purpose', 'description']);
   });

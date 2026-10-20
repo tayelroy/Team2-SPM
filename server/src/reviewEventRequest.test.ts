@@ -26,6 +26,7 @@ const REVIEWED_REQUEST = {
   expected_attendance: 120,
   venue_requirements: 'Stage, PA, step-free access',
   preferred_layout: null,
+  category: null,
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'Lectern, 2 radio mics',
   registration_needed: true,

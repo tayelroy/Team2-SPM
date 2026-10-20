@@ -25,6 +25,7 @@ const DRAFT_REQUEST = {
   expected_attendance: null,
   venue_requirements: null,
   preferred_layout: null,
+  category: null,
   accessibility_needs: null,
   equipment_requirements: null,
   registration_needed: null

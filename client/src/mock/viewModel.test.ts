@@ -145,6 +145,30 @@ describe('role-scoped chrome', () => {
   });
 });
 
+describe('Find an event in the navigation (SG2-70)', () => {
+  const granted = (role: string, permissions: string[]) => ({ userId: 'user-1', role, permissions });
+
+  test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Event Coordinator Lead', 'Safety Officer'] as const)(
+    '[NORMAL] [SG2-70:AC3] %s is offered Find an event once the server grants event search',
+    (role) => {
+      expect(navFor(role, granted('internal', ['events.search'])).at(-1)).toEqual({ screen: 'findEvent', label: 'Find an event' });
+    },
+  );
+
+  test.each(['Event Coordinator', 'Safety Officer'] as const)(
+    '[FAILURE] [SG2-70:AC3] %s is not offered Find an event while permissions load or without the grant',
+    (role) => {
+      for (const access of [undefined, null, granted('internal', [])]) {
+        expect(navFor(role, access).some((item) => item.screen === 'findEvent')).toBe(false);
+      }
+    },
+  );
+
+  test.each(['Event Organiser', 'Attendee'] as const)('[FAILURE] [SG2-70:AC3] %s is never offered Find an event, even with a forged grant', (role) => {
+    expect(navFor(role, granted('event_organiser', ['events.search'])).some((item) => item.screen === 'findEvent')).toBe(false);
+  });
+});
+
 describe('navFor / primaryActionFor (SG2-86)', () => {
   const leadAccess = (permissions: string[]) => ({ userId: 'user-lead', role: 'event_coordinator_lead', permissions });
 

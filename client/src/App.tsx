@@ -24,6 +24,7 @@ import Login from './screens/Login';
 import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
 import SafetyChecks from './screens/SafetyChecks';
+import EventSearch from './screens/EventSearch';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
 import VenueHolds from './screens/VenueHolds';
@@ -287,7 +288,9 @@ export default function App() {
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
     safetyChecks: <SafetyChecks key={session!.accessToken} accessToken={session!.accessToken} focusEventId={safetyFocus} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
-      accessToken={session!.accessToken} prefill={venuePrefill} />
+      accessToken={session!.accessToken} prefill={venuePrefill} />,
+    // SG2-70: find an event across the system.
+    findEvent: <EventSearch key={session!.accessToken} accessToken={session!.accessToken} />
   }[screen];
 
   return (

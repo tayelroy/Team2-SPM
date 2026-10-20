@@ -104,7 +104,7 @@ export type DecideEventRequestResult =
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
   'proposed_date, expected_attendance, venue_requirements, preferred_layout, accessibility_needs, ' +
-  'equipment_requirements, registration_needed';
+  'equipment_requirements, registration_needed, category';
 
 /** Columns returned for list summary views (SG2-31). */
 const SUMMARY_COLUMNS =
@@ -114,7 +114,7 @@ const SUMMARY_COLUMNS =
 const DETAIL_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
   'proposed_date, expected_attendance, venue_requirements, preferred_layout, accessibility_needs, ' +
-  'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
+  'equipment_requirements, registration_needed, category, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
   // SG2-37: the organiser sees the outcome and, for a rejection, why.
   'decided_at, decision_reason, ' +
   // SG2-100 AC4: who marked the event completed and when, plus the bookings

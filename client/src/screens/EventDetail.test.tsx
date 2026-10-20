@@ -1495,6 +1495,27 @@ describe('confirmed arrangements (SG2-58)', () => {
   });
 });
 
+describe('category on the request (SG2-70)', () => {
+  const base: eventRequestsApi.EventRequestDetail = {
+    eventId: 70, organiserId: 'org-1', organisation: 'Acme Corp', status: 'submitted', name: 'Category Forum',
+    purpose: 'Partner briefing', description: '', proposedDate: null, expectedAttendance: 40,
+    venueRequirements: 'Projector', accessibilityNeeds: 'None', equipmentRequirements: 'None', registrationNeeded: false,
+    coordinatorId: 'coord-1', coordinatorName: 'Assigned coordinator', canManage: false, waitingOnMe: false,
+    decisionReason: null, decidedAt: null, completedBy: null, completedAt: null, endsAt: null,
+  };
+
+  test.each([['seminar', 'Seminar'], [null, 'Uncategorised']] as const)(
+    '[NORMAL] [SG2-70:AC2] a request with category %s shows %s on its detail',
+    async (category, shown) => {
+      vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: { ...base, category } });
+      vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+      render(<EventDetail role="Event Coordinator" currentUserId="coord-1" selectedEventId={70} accessToken="token" onNavigate={vi.fn()} />);
+      expect(await screen.findByRole('heading', { name: 'Category Forum' })).toBeInTheDocument();
+      expect(within(screen.getByText('Category').closest('div')!).getByText(shown)).toBeInTheDocument();
+    },
+  );
+});
+
 describe('preferred room layout on the request (SG2-105)', () => {
   function detail(overrides: Partial<eventRequestsApi.EventRequestDetail>): eventRequestsApi.EventRequestDetail {
     return {
