@@ -1,7 +1,7 @@
 -- SG2-70: hand-picked categories for the events already in the live project,
 -- so the category filter has a realistic spread to demonstrate. NOT a
 -- migration and NOT run by CI. Run it by hand (Supabase SQL Editor or psql)
--- after 202610200002_event_search.sql, which has already given every event a
+-- after 202610200003_event_search.sql, which has already given every event a
 -- category inferred from its name (mostly Other for these test events).
 --
 -- Each row is matched on both its id and its name as read on 2026-10-20, so it

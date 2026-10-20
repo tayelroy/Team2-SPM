@@ -214,7 +214,7 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
 // mirrored in the event_audit_logs RLS policy (latest version:
 // 202610130001_event_history_internal_fields.sql), in the 'events.search'
 // grant above and in event_search_caller_is_internal()
-// (202610200002_event_search.sql); they must all change together.
+// (202610200003_event_search.sql); they must all change together.
 export const INTERNAL_ROLES: readonly Role[] = [
   'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
 ];

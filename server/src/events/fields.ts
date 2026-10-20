@@ -16,7 +16,7 @@
 /**
  * SG2-70 AC2: what kind of event this is, so internal users can filter by it.
  * Mirrors the events_category_known check in
- * supabase/migrations/202610200002_event_search.sql; the two must change
+ * supabase/migrations/202610200003_event_search.sql; the two must change
  * together.
  */
 export const EVENT_CATEGORIES = [

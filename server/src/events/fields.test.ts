@@ -173,7 +173,7 @@ describe('the event category (SG2-70)', () => {
   });
 
   test('[CONFLICT] [SG2-70:AC2] the list matches the database check, so the API never accepts a category the database refuses', () => {
-    const migration = readFileSync(join(__dirname, '../../../supabase/migrations/202610200002_event_search.sql'), 'utf8');
+    const migration = readFileSync(join(__dirname, '../../../supabase/migrations/202610200003_event_search.sql'), 'utf8');
     const check = /events_category_known check \(category is null or category in\s*\(([^)]*)\)/.exec(migration);
     assert.ok(check, 'the events_category_known check is defined');
     assert.deepEqual(check[1].split(',').map(value => value.trim().replace(/'/g, '')), [...EVENT_CATEGORIES]);

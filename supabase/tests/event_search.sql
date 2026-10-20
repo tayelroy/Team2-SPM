@@ -187,15 +187,17 @@ end $$;
 reset role;
 
 -- AC3: every internal role may search; nobody else may.
-create function pg_temp.can_search(p_user uuid) returns boolean language plpgsql as $$
+create function pg_temp.can_search(p_user uuid, p_acting text default null) returns boolean language plpgsql as $$
 begin
  perform set_config('request.jwt.claim.sub', coalesce(p_user::text, ''), true);
+ -- SG2-104: the acting role arrives as the x-acting-role request header.
+ perform set_config('request.headers', case when p_acting is null then '' else json_build_object('x-acting-role', p_acting)::text end, true);
  perform public.search_events(p_query => 'Harbour');
  perform public.event_search_options();
  return true;
 exception when insufficient_privilege then return false;
 end $$;
-grant execute on function pg_temp.can_search(uuid) to authenticated;
+grant execute on function pg_temp.can_search(uuid, text) to authenticated;
 set local role authenticated;
 do $$
 declare who uuid;
@@ -218,6 +220,31 @@ begin
  end if;
 end $$;
 reset role;
+
+-- AC3 with SG2-104: an account holding an organiser and a coordinator role
+-- searches only while acting as the coordinator, never as the organiser, with
+-- no acting role chosen, or as a role it does not hold.
+insert into public.account_roles(user_id,role) values
+ ('d7000000-0000-4000-8000-000000000001','event_coordinator');
+set local role authenticated;
+do $$
+declare dual constant uuid := 'd7000000-0000-4000-8000-000000000001';
+begin
+ if not pg_temp.can_search(dual, 'event_coordinator') then
+  raise exception '[SG2-70:acting-internal-searches] [SG2-70:AC3] [NORMAL] An account acting as its coordinator role must be able to search';
+ end if;
+ if pg_temp.can_search(dual, 'event_organiser') then
+  raise exception '[SG2-70:acting-organiser-refused] [SG2-70:AC3] [CONFLICT] The same account acting as its organiser role must be refused';
+ end if;
+ if pg_temp.can_search(dual) then
+  raise exception '[SG2-70:no-acting-role-refused] [SG2-70:AC3] [BOUNDARY] An account with two roles and no acting role chosen must be refused';
+ end if;
+ if pg_temp.can_search(dual, 'safety_officer') then
+  raise exception '[SG2-70:unheld-acting-role-refused] [SG2-70:AC3] [FAILURE] Acting as an internal role the account does not hold must be refused';
+ end if;
+end $$;
+reset role;
+delete from public.account_roles where user_id='d7000000-0000-4000-8000-000000000001' and role='event_coordinator';
 
 -- AC3 conflict: a coordinator whose stored role changes after sign-in is
 -- refused on the next search, not served from their old role.

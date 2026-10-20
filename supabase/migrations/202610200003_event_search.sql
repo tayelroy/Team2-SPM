@@ -8,8 +8,8 @@
 --      events.category, from the fixed list below, chosen by the organiser on
 --      the request form. It joins the customer minimum (SG2-30 / SG2-105), so
 --      this story also changes what a request needs before it is submitted.
--- AC3  Only internal roles may call search_events() or event_search_options();
---      the stored role is checked here as well as by the route permission
+-- AC3  Only internal roles may call search_events() or event_search_options():
+--      the acting role (SG2-104) is checked here as well as by the route permission
 --      ('events.search' in server/src/auth/policy.ts, mirrored from
 --      INTERNAL_ROLES). Drafts are never returned: they belong to their
 --      organiser until submitted.
@@ -62,9 +62,11 @@ revoke all on function public.events_require_category_on_submit() from public, a
 create trigger events_category_required_on_submit before update of status on public.events
   for each row execute function public.events_require_category_on_submit();
 
--- Unchanged from SG2-105's 202610200001_event_preferred_layout.sql except for
--- `category`: saved with the draft, checked against the list, and recorded in
--- the change history like every other request field.
+-- Copied verbatim from its latest definition, SG2-104's
+-- 202610200002_acting_role_functions.sql (which keeps SG2-105's fields and
+-- checks the actor holds event_organiser), except for `category`: saved with
+-- the draft, checked against the list, and recorded in the change history
+-- like every other request field.
 create or replace function public.update_event_request_draft(
   p_event_id integer, p_actor_id uuid, p_values jsonb
 ) returns jsonb
@@ -88,8 +90,11 @@ declare
 begin
   -- Keep membership/role stable until the transaction finishes, then lock the
   -- event. The event lock serializes saves and status changes (including submit).
-  select ar.role into actor_role from public.account_roles ar
-    where ar.user_id = p_actor_id for share;
+  -- SG2-104: the actor may hold several roles; one of them must be
+  -- event_organiser (the server has already checked it is the acting role).
+  perform 1 from public.account_roles ar
+    where ar.user_id = p_actor_id and ar.role = 'event_organiser' for share;
+  actor_role := case when found then 'event_organiser' end;
   select u.organisation into membership from public.users u
     where u.user_id = p_actor_id for share;
   if actor_role is distinct from 'event_organiser' or membership is null
@@ -181,13 +186,15 @@ $function$;
 comment on function public.update_event_request_draft(integer, uuid, jsonb) is
   'SG2-40/SG2-105/SG2-70: creator draft/clarification save and per-field history commit atomically; server-verified actor only.';
 
--- AC3: the internal roles, mirrored from INTERNAL_ROLES in
--- server/src/auth/policy.ts; the two must change together.
+-- AC3: the role the caller is acting as (SG2-104's acting_role(), checked
+-- against their own account_roles rows) must be internal. An account that
+-- also holds an organiser role cannot search while acting as the organiser.
+-- Mirrored from INTERNAL_ROLES in server/src/auth/policy.ts; the two must
+-- change together.
 create function public.event_search_caller_is_internal()
 returns boolean language sql stable security definer set search_path = '' as $$
-  select exists (select 1 from public.account_roles ar where ar.user_id = auth.uid()
-    and ar.role in ('event_coordinator', 'venue_staff', 'technical_support_staff',
-      'event_coordinator_lead', 'safety_officer'));
+  select coalesce(public.acting_role() in ('event_coordinator', 'venue_staff', 'technical_support_staff',
+    'event_coordinator_lead', 'safety_officer'), false);
 $$;
 revoke all on function public.event_search_caller_is_internal() from public, anon, authenticated;
 
