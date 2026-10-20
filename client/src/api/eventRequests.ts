@@ -8,6 +8,27 @@ import { loadSession } from '../auth/session';
  * a discriminated union so callers can handle success and every documented
  * server error without relying on try/catch alone.
  */
+/**
+ * SG2-70 AC2: the kinds of event an organiser chooses from, in the order the
+ * form offers them. Mirrors EVENT_CATEGORIES in server/src/events/fields.ts.
+ */
+export const EVENT_CATEGORIES = [
+  { value: 'conference', label: 'Conference' },
+  { value: 'workshop', label: 'Workshop' },
+  { value: 'seminar', label: 'Seminar' },
+  { value: 'training', label: 'Training' },
+  { value: 'networking', label: 'Networking' },
+  { value: 'social', label: 'Social' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export type EventCategory = (typeof EVENT_CATEGORIES)[number]['value'];
+
+/** The category's label, or "Uncategorised" for one never chosen or no longer offered. */
+export function categoryLabel(value: string | null | undefined): string {
+  return EVENT_CATEGORIES.find((category) => category.value === value)?.label ?? 'Uncategorised';
+}
+
 export interface EventRequestDraftInput {
   name?: string;
   purpose?: string;
@@ -21,6 +42,8 @@ export interface EventRequestDraftInput {
   equipment_requirements?: string;
   /** Null on a stored draft that has not answered yet (SG2-105). */
   registration_needed?: boolean | null;
+  /** SG2-70: required before submission; null on a draft not yet categorised. */
+  category?: EventCategory | null;
 }
 
 export interface EventRequestDraft extends EventRequestDraftInput {
@@ -117,6 +140,8 @@ export interface EventRequestDetail {
   venueRequirements: string | null;
   /** SG2-105; null on requests submitted before it was asked for. */
   preferredLayout?: string | null;
+  /** SG2-70: one of EVENT_CATEGORIES, or null for a draft not yet categorised. */
+  category?: string | null;
   accessibilityNeeds: string | null;
   equipmentRequirements: string | null;
   registrationNeeded: boolean;
@@ -205,6 +230,7 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
         : null,
     venueRequirements: typeof raw.venue_requirements === 'string' ? raw.venue_requirements : null,
     preferredLayout: typeof raw.preferred_layout === 'string' ? raw.preferred_layout : null,
+    category: typeof raw.category === 'string' ? raw.category : null,
     accessibilityNeeds: typeof raw.accessibility_needs === 'string' ? raw.accessibility_needs : null,
     equipmentRequirements:
       typeof raw.equipment_requirements === 'string' ? raw.equipment_requirements : null,

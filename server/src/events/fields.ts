@@ -9,8 +9,31 @@
  * Completeness is a separate question, answered by SUBMISSION_REQUIRED_FIELDS
  * and missingForSubmission(). Those are the shared contract with SG2-30
  * (submit an event request), which enforces completeness at submission time.
- * SG2-105 widened that list to the customer's full minimum.
+ * SG2-105 widened that list to the customer's full minimum, and SG2-70 adds
+ * the event's category.
  */
+
+/**
+ * SG2-70 AC2: what kind of event this is, so internal users can filter by it.
+ * Mirrors the events_category_known check in
+ * supabase/migrations/202610200002_event_search.sql; the two must change
+ * together.
+ */
+export const EVENT_CATEGORIES = [
+  'conference',
+  'workshop',
+  'seminar',
+  'training',
+  'networking',
+  'social',
+  'other'
+] as const;
+
+export type EventCategory = (typeof EVENT_CATEGORIES)[number];
+
+export function isEventCategory(value: unknown): value is EventCategory {
+  return typeof value === 'string' && (EVENT_CATEGORIES as readonly string[]).includes(value);
+}
 
 /** Columns a client may supply. Anything else is ignored (no mass assignment). */
 export const DRAFT_FIELDS = [
@@ -24,7 +47,9 @@ export const DRAFT_FIELDS = [
   'preferred_layout',
   'accessibility_needs',
   'equipment_requirements',
-  'registration_needed'
+  'registration_needed',
+  // SG2-70: one of EVENT_CATEGORIES.
+  'category'
 ] as const;
 
 export type DraftField = (typeof DRAFT_FIELDS)[number];
@@ -38,7 +63,8 @@ export type DraftField = (typeof DRAFT_FIELDS)[number];
  * and equipment requirements may be answered "None" but not left blank, and
  * `registration_needed` must be answered either way (false is an answer).
  * Only submission checks this list, so requests already submitted are not
- * affected and drafts still save incomplete.
+ * affected and drafts still save incomplete. SG2-70 adds `category`, also
+ * enforced at submission by the events_category_required_on_submit trigger.
  */
 export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'name',
@@ -50,7 +76,8 @@ export const SUBMISSION_REQUIRED_FIELDS: readonly DraftField[] = [
   'preferred_layout',
   'accessibility_needs',
   'equipment_requirements',
-  'registration_needed'
+  'registration_needed',
+  'category'
 ];
 
 export interface DraftValues {
@@ -64,6 +91,7 @@ export interface DraftValues {
   accessibility_needs: string | null;
   equipment_requirements: string | null;
   registration_needed: boolean | null;
+  category: EventCategory | null;
 }
 
 export type DraftValidation =
@@ -158,6 +186,15 @@ function readRegistrationNeeded(value: unknown, errors: string[]): boolean | nul
   return value;
 }
 
+function readCategory(value: unknown, errors: string[]): EventCategory | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (!isEventCategory(value)) {
+    errors.push(`category must be one of: ${EVENT_CATEGORIES.join(', ')}.`);
+    return null;
+  }
+  return value;
+}
+
 /**
  * Validates a draft payload. Missing fields are always allowed; malformed ones
  * are rejected with a message naming the field and what was expected.
@@ -177,6 +214,7 @@ export function validateDraftInput(body: unknown): DraftValidation {
   values.expected_attendance = readAttendance(input.expected_attendance, errors);
   values.proposed_date = readProposedDate(input.proposed_date, errors);
   values.registration_needed = readRegistrationNeeded(input.registration_needed, errors);
+  values.category = readCategory(input.category, errors);
 
   if (errors.length > 0) return { valid: false, errors };
   return { valid: true, values };

@@ -384,7 +384,7 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 // SG2-97 gives the Lead its own dedicated test below, so this loop now covers
 // only the Safety Officer.
 for (const role of ['safety_officer'] as const) {
-  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision`, async () => {
+  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] [SG2-70:AC3] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision, and event search`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, 200);
@@ -403,6 +403,7 @@ for (const role of ['safety_officer'] as const) {
         'venues.operations.read',
         'equipment_requirements.read',
         'safety_checks.read',
+        'events.search',
         'profile.read',
         'profile.update'
       ]
@@ -411,7 +412,7 @@ for (const role of ['safety_officer'] as const) {
   });
 }
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, stage, history and their own notices to the profile grants', async () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, stage, history, their own notices and event search to the profile grants', async () => {
   const fetchMock = provider({ role: 'event_coordinator_lead' });
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
@@ -419,7 +420,7 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] GET /api/au
     userId, role: 'event_coordinator_lead',
     permissions: [
       'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view', 'event_request.history.view',
-      'notifications.read', 'profile.read', 'profile.update'
+      'notifications.read', 'events.search', 'profile.read', 'profile.update'
     ]
   });
   assert.equal(fetchMock.mock.callCount(), 2);
@@ -437,7 +438,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-70:AC3] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -454,20 +455,20 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'event_request.safety_decisions.view', 'event_request.safety_rework',
       'venues.read', 'venues.layouts.read', 'venues.operations.read', 'venues.search', 'venues.suitability.view', 'venue_booking.request',
       'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.withdraw', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release', 'venue_clashes.view', 'venues.holds.read',
-      'equipment_requirements.read', 'equipment_requirements.request', 'profile.read', 'profile.update'
+      'equipment_requirements.read', 'equipment_requirements.request', 'events.search', 'profile.read', 'profile.update'
     ],
     venue_staff: [
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.create', 'venues.update', 'venues.delete', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
       'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'venue_bookings.view', 'venue_bookings.release',
-      'venue_bookings.by_venue', 'venue_clashes.view', 'venues.holds.read', 'venues.holds.manage', 'profile.read', 'profile.update'
+      'venue_bookings.by_venue', 'venue_clashes.view', 'venues.holds.read', 'venues.holds.manage', 'events.search', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
       'work_queue.read', 'venues.availability.view', 'users.role.update',
       'event_request.stage.view', 'event_request.history.view', 'venues.operations.read', 'venues.suitability.view',
       'notifications.read', 'venues.holds.read',
-      'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'profile.read', 'profile.update'
+      'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'events.search', 'profile.read', 'profile.update'
     ],
     attendee: ['profile.read', 'profile.update']
   };
@@ -476,7 +477,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
   }
 });
 
-test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] the Safety Officer holds exactly the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision', () => {
+test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] [SG2-70:AC3] the Safety Officer holds exactly the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision, and event search', () => {
   // Written as an independent literal, never computed from PERMISSIONS: this
   // file's snapshot went stale during SG2-86 for exactly that reason.
   const EXPECTED = [
@@ -487,13 +488,14 @@ test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1
     'venues.operations.read',
     'equipment_requirements.read',
     'safety_checks.read',
+    'events.search',
     'profile.read',
     'profile.update'
   ];
   assert.deepEqual(permissionsFor('safety_officer', PERMISSIONS).sort(), [...EXPECTED].sort());
 });
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] the Event Coordinator Lead holds exactly the profile grants plus assignment, the unassigned queue, stage, history and their own notices', () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] the Event Coordinator Lead holds exactly the profile grants plus assignment, the unassigned queue, stage, history, their own notices and event search', () => {
   // Written as an independent literal, never computed from PERMISSIONS, for
   // the same reason as the Safety Officer's test above.
   const EXPECTED = [
@@ -502,10 +504,17 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] the Event C
     'event_request.stage.view',
     'event_request.history.view',
     'notifications.read',
+    'events.search',
     'profile.read',
     'profile.update'
   ];
   assert.deepEqual(permissionsFor('event_coordinator_lead', PERMISSIONS).sort(), [...EXPECTED].sort());
+});
+
+test('[FAILURE] [SG2-70:AC3] event search is held by exactly the internal roles, never an organiser or attendee', () => {
+  const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('events.search'));
+  assert.deepEqual(holders.sort(), ['event_coordinator', 'event_coordinator_lead', 'safety_officer', 'technical_support_staff', 'venue_staff']);
+  assert.deepEqual([...holders].sort(), [...INTERNAL_ROLES].sort());
 });
 
 test('[NORMAL] [SG2-100:AC13] only an Event Coordinator may complete an event', () => {

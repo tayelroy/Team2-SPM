@@ -182,6 +182,12 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-91 AC2/AC4: only Safety Officers open the list of events awaiting an
   // operational safety check; safety_check_queue() rechecks the stored role.
   'safety_checks.read': ['safety_officer'],
+  // SG2-70 AC3: every internal role finds an event across the system (drafts
+  // excepted); search_events() rechecks the stored role, mirroring
+  // INTERNAL_ROLES below, and the two must change together.
+  'events.search': [
+    'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
+  ],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]
@@ -192,8 +198,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
 // client-side/external users. Team decision, 2026-09-15. SG2-86 adds
 // event_coordinator_lead and safety_officer as internal; this list is
 // mirrored in the event_audit_logs RLS policy (latest version:
-// 202610130001_event_history_internal_fields.sql) and the two must change
-// together.
+// 202610130001_event_history_internal_fields.sql), in the 'events.search'
+// grant above and in event_search_caller_is_internal()
+// (202610200002_event_search.sql); they must all change together.
 export const INTERNAL_ROLES: readonly Role[] = [
   'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
 ];

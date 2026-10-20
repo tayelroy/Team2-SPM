@@ -716,6 +716,7 @@ describe('the request form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
     fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
     fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Workshop' }));
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
@@ -755,6 +756,7 @@ describe('the request form', () => {
     fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
     fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
     fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Workshop' }));
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });
@@ -811,6 +813,7 @@ describe('editing a draft (SG2-29)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
     fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
     fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Workshop' }));
     fireEvent.change(screen.getByLabelText(/Description/i), {
       target: { value: 'A half-day forum with two keynotes and a panel.' },
     });

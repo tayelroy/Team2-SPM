@@ -276,7 +276,8 @@ const EMPTY_VALUES: DraftValues = {
   preferred_layout: null,
   accessibility_needs: null,
   equipment_requirements: null,
-  registration_needed: null
+  registration_needed: null,
+  category: null
 };
 
 // Only the external PostgREST boundary is simulated. The real SDK builds each
@@ -423,9 +424,34 @@ describe('insertEventRequestDraft', () => {
         values: EMPTY_VALUES
       });
       assert.equal(result.ok, false);
-      if (!result.ok) assert.match(result.message, /not returned/);
+      if (!result.ok && result.reason === 'unavailable') assert.match(result.message, /not returned/);
     });
   }
+});
+
+describe('the event category is read back (SG2-70)', () => {
+  test('[NORMAL] [SG2-70:AC2] a created draft and a request detail both select the category from storage', async () => {
+    const selected: string[] = [];
+    const row = { event_id: 7, organiser_id: 'user-1', status: 'draft', category: 'seminar' };
+    const admin = {
+      from() {
+        return {
+          insert: () => ({ select: async (columns: string) => { selected.push(columns); return { data: [row], error: null }; } }),
+          select: (columns: string) => {
+            selected.push(columns);
+            const chain = { eq: () => chain, then: (resolve: (value: Result) => unknown) => Promise.resolve({ data: [row], error: null }).then(resolve) };
+            return chain;
+          }
+        };
+      }
+    } as unknown as SupabaseClient;
+
+    const created = await insertEventRequestDraft(admin, { organiserId: 'user-1', organisation: null, values: { ...EMPTY_VALUES, category: 'seminar' } });
+    const detail = await fetchOwnEventRequest(admin, 7, 'user-1');
+    assert.equal(created.ok && created.request.category, 'seminar');
+    assert.equal(detail.ok && detail.request.category, 'seminar');
+    for (const columns of selected) assert.ok(columns.split(/,\s*/).includes('category'), columns);
+  });
 });
 
 describe('the preferred room layout is read back (SG2-105)', () => {
@@ -754,8 +780,31 @@ describe('submitEventRequest', () => {
       7
     );
     assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.message, 'connection reset');
+    if (!result.ok && result.reason === 'unavailable') assert.equal(result.message, 'connection reset');
     assert.equal(calls.length, 1);
+  });
+
+  // SG2-70: the database refuses a submission whose category a racing draft
+  // save cleared (events_category_required_on_submit), on either path.
+  const missingCategory = { code: '23514', message: 'An event request needs a category before it is submitted' };
+
+  test('[CONFLICT] [SG2-70:AC2] reports a missing category when the database refuses the unheld submission', async () => {
+    let calls: SubmitCall[] = [];
+    const result = await submitEventRequest(fakeSubmitEventClient([{ data: null, error: missingCategory }], (c) => (calls = c)), 7);
+    assert.deepEqual(result, { ok: false, reason: 'missing_category' });
+    assert.equal(calls.length, 1);
+  });
+
+  test('[CONFLICT] [SG2-70:AC2] reports a missing category when the database refuses the held resubmission', async () => {
+    const result = await submitEventRequest(fakeSubmitEventClient([{ data: [], error: null }, { data: null, error: missingCategory }]), 7);
+    assert.deepEqual(result, { ok: false, reason: 'missing_category' });
+  });
+
+  test('[FAILURE] [SG2-70:AC2] another check violation is still reported as unavailable, not as a missing category', async () => {
+    for (const error of [{ code: '23514', message: 'events_rejection_requires_reason' }, { code: '23514' }]) {
+      const result = await submitEventRequest(fakeSubmitEventClient([{ data: null, error: error as { message: string } }]), 7);
+      assert.equal(result.ok === false && result.reason, 'unavailable');
+    }
   });
 
   test('[FAILURE] [SG2-30:AC1] reports unavailable when the held update errors', async () => {
@@ -767,7 +816,7 @@ describe('submitEventRequest', () => {
       7
     );
     assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.message, 'connection reset');
+    if (!result.ok && result.reason === 'unavailable') assert.equal(result.message, 'connection reset');
   });
 
   for (const data of [[], null]) {
@@ -777,7 +826,7 @@ describe('submitEventRequest', () => {
         7
       );
       assert.equal(result.ok, false);
-      if (!result.ok) assert.match(result.message, /not returned/);
+      if (!result.ok && result.reason === 'unavailable') assert.match(result.message, /not returned/);
     });
   }
 
@@ -1083,7 +1132,7 @@ describe('updateEventRequestDraft', () => {
         EMPTY_VALUES
       );
       assert.equal(result.ok, false);
-      if (!result.ok) assert.match(result.message, /not returned/);
+      if (!result.ok && result.reason === 'unavailable') assert.match(result.message, /not returned/);
     });
   }
 });

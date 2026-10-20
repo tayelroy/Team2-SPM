@@ -5,6 +5,7 @@ import {
   type EventAuditLogEntry,
 } from '../api/eventRequests';
 import { loadSession } from '../auth/session';
+import { categoryLabel } from '../api/eventRequests';
 import { statusLabel } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import {
@@ -24,6 +25,8 @@ const FIELD_LABELS: Record<string, string> = {
   venue_requirements: 'Venue Requirements',
   // SG2-105: the organiser's preferred room layout, saved with the draft.
   preferred_layout: 'Preferred Room Layout',
+  // SG2-70: the kind of event, chosen from a fixed list.
+  category: 'Category',
   equipment_requirements: 'Equipment Requirements',
   accessibility_needs: 'Accessibility Needs',
   registration_needed: 'Registration Needed',
@@ -75,6 +78,8 @@ export function humanizeFieldValue(field: string, value: string | null): string 
   if (field === 'status') return statusLabel(value);
   if ((field === 'proposed_date' || field.endsWith('_at')) && !Number.isNaN(Date.parse(value))) return formatSgtTimestamp(value);
   if (field === 'registration_needed' && (value === 'true' || value === 'false')) return value === 'true' ? 'Yes' : 'No';
+  // SG2-70: "training" reads as Training.
+  if (field === 'category') return categoryLabel(value);
   // SG2-106: "Hold 7 expires 2090-06-25T02:00:00Z" shows the time in Singapore time.
   if (field === 'venue_hold_expiry') return value.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z/, instant => formatSgtTimestamp(instant));
   return value;

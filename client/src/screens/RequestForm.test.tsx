@@ -66,6 +66,8 @@ function fillAllFields() {
   fireEvent.change(screen.getByLabelText(/Accessibility needs/i), { target: { value: 'Hearing loop' } });
   fireEvent.change(screen.getByLabelText(/Equipment requirements/i), { target: { value: 'Lectern' } });
   fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+  // SG2-70: and the category.
+  fireEvent.click(screen.getByRole('button', { name: 'Workshop' }));
 }
 
 function draftResponse(missing: string[] = [], eventId = 12) {
@@ -112,8 +114,8 @@ describe('AC2 — submit button disabled until all fields are filled', () => {
     const nameField = screen.getByLabelText(/Event name/i);
     fireEvent.change(nameField, { target: { value: 'x' } });
     fireEvent.change(nameField, { target: { value: '' } });
-    // Nine text answers plus whether registration is needed (SG2-105).
-    expect(screen.getByText('10 required fields still empty.')).toBeInTheDocument();
+    // Nine text answers plus whether registration is needed (SG2-105) and the category (SG2-70).
+    expect(screen.getByText('11 required fields still empty.')).toBeInTheDocument();
   });
 
   test('[FAILURE] [SG2-30:AC2] inline error appears for a touched field left blank', () => {
@@ -453,6 +455,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     accessibility_needs: 'Hearing loop',
     equipment_requirements: 'Lectern',
     registration_needed: true,
+    category: 'seminar' as const,
   };
 
   function updateResponse(missing: string[] = []) {
@@ -587,6 +590,7 @@ describe('stored draft values (SG2-30 walkthrough fixes)', () => {
     accessibility_needs: 'None',
     equipment_requirements: 'Projector',
     registration_needed: false,
+    category: 'workshop' as const,
   };
 
   function renderStored(onSuccess = vi.fn()) {
@@ -800,7 +804,7 @@ describe('the customer minimum before submitting (SG2-105)', () => {
     fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'A half-day forum.' } });
   }
 
-  test('[BOUNDARY] [SG2-105:AC1] the original six fields are no longer enough: layout, accessibility, equipment and registration must be answered too', () => {
+  test('[BOUNDARY] [SG2-105:AC1] [SG2-70:AC2] the original six fields are no longer enough: layout, accessibility, equipment, registration and category must be answered too', () => {
     render(<RequestForm {...DEFAULT_PROPS} />);
     const submit = screen.getByRole('button', { name: /Submit request/i });
     fillOriginalSix();
@@ -810,6 +814,8 @@ describe('the customer minimum before submitting (SG2-105)', () => {
     fireEvent.change(screen.getByLabelText(/Equipment requirements/i), { target: { value: 'Two microphones' } });
     expect(submit).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Registration needed' }));
+    expect(submit).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Networking' }));
     expect(submit).not.toBeDisabled();
   });
 
@@ -824,6 +830,7 @@ describe('the customer minimum before submitting (SG2-105)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'No accessibility needs' }));
     fireEvent.click(screen.getByRole('button', { name: 'No equipment needed' }));
     fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Seminar' }));
     expect(screen.getByLabelText(/Accessibility needs/i)).toHaveValue('None');
     expect(screen.getByLabelText(/Equipment requirements/i)).toHaveValue('None');
 
@@ -1008,5 +1015,66 @@ describe('EventDetail requires an authenticated selected request', () => {
   test('[FAILURE] [SG2-26:AC2] coordinator cannot view organiser request details', () => {
     render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} eventStatus="submitted" />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+  });
+});
+
+describe('the event category (SG2-70)', () => {
+  test('[NORMAL] [SG2-70:AC2] the organiser picks one of the seven categories and the latest choice is saved', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(draftResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
+    const group = screen.getByRole('group', { name: /Category/ });
+    expect(Array.from(group.querySelectorAll('button')).map((button) => button.textContent))
+      .toEqual(['Conference', 'Workshop', 'Seminar', 'Training', 'Networking', 'Social', 'Other']);
+    fireEvent.click(screen.getByRole('button', { name: 'Conference' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Training' }));
+    expect(screen.getByRole('button', { name: 'Conference' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Training' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText(/Draft 12 saved/);
+    expect(sentDraftBody(fetchMock).category).toBe('training');
+  });
+
+  test('[BOUNDARY] [SG2-70:AC2] a draft saved without a category leaves it out and lists it as still needed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(draftResponse(['category'], 9));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft 9 saved. Still needed to submit: Category.')).toBeInTheDocument();
+    expect('category' in sentDraftBody(fetchMock)).toBe(false);
+  });
+
+  test('[FAILURE] [SG2-70:AC2] submission stays disabled and the category is flagged until one is chosen', () => {
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    expect(screen.queryByText('Choose a category')).not.toBeInTheDocument();
+    fillAllFields();
+    expect(screen.getByRole('button', { name: /Submit request/i })).not.toBeDisabled();
+    cleanup();
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Forum' } });
+    expect(screen.getByText('Choose a category')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Submit request/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Other' }));
+    expect(screen.queryByText('Choose a category')).not.toBeInTheDocument();
+  });
+
+  test('[CONFLICT] [SG2-70:AC2] a category the server says is missing (cleared by another save) is named and flagged', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementationOnce(async () => draftResponse()).mockResolvedValue(
+      new Response(JSON.stringify({ missing: ['category'] }), { status: 400 })));
+    render(<RequestForm {...DEFAULT_PROPS} />);
+    fillAllFields();
+    fireEvent.click(screen.getByRole('button', { name: /Submit request/i }));
+    expect(await screen.findByText('Please complete the following required fields before submitting: Category.')).toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-70:AC2] a reopened draft shows its stored category, and none when it was never chosen', () => {
+    const { unmount } = render(<RequestForm eventId="7" accessToken="t" initialValues={{ category: 'social' }} />);
+    expect(screen.getByRole('button', { name: 'Social' })).toHaveAttribute('aria-pressed', 'true');
+    unmount();
+    render(<RequestForm eventId="7" accessToken="t" initialValues={{ category: null }} />);
+    for (const name of ['Conference', 'Workshop', 'Seminar', 'Training', 'Networking', 'Social', 'Other']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+    }
   });
 });

@@ -23,7 +23,8 @@ const COMPLETE_BODY = {
   preferred_layout: 'Theatre',
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'Lectern, 2 radio mics',
-  registration_needed: true
+  registration_needed: true,
+  category: 'conference' as const
 };
 
 const DRAFT_REQUEST = {
@@ -40,7 +41,8 @@ const DRAFT_REQUEST = {
   preferred_layout: null,
   accessibility_needs: null,
   equipment_requirements: null,
-  registration_needed: null
+  registration_needed: null,
+  category: null
 };
 
 interface HarnessOptions {
@@ -133,7 +135,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.equal(response.status, 200);
     assert.deepEqual(response.body.missingForSubmission, [
       'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
-      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
+      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category'
     ]);
   });
 
@@ -179,7 +181,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.deepEqual(response.body.request, { ...DRAFT_REQUEST, name: null });
     assert.deepEqual(response.body.missingForSubmission, [
       'name', 'purpose', 'description', 'proposed_date', 'expected_attendance', 'venue_requirements',
-      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed'
+      'preferred_layout', 'accessibility_needs', 'equipment_requirements', 'registration_needed', 'category'
     ]);
   });
 

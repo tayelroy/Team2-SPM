@@ -29,7 +29,8 @@ const COMPLETE_DRAFT = {
   preferred_layout: 'Theatre',
   accessibility_needs: 'Hearing loop',
   equipment_requirements: 'None',
-  registration_needed: true
+  registration_needed: true,
+  category: 'conference' as const
 };
 
 interface HarnessOptions {
@@ -331,6 +332,38 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
       buildApp({ fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, registration_needed: false } } })
     ).patch('/api/event-requests/7/submit');
     assert.equal(response.status, 200);
+  });
+
+  test('[FAILURE] [SG2-70:AC2] a draft without a category is refused, names the category and stays a draft', async () => {
+    let writes = 0;
+    const app = buildApp({
+      captureSubmit: () => { writes++; },
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, category: null } }
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'Event request is missing required fields.', missing: ['category'] });
+    assert.equal(writes, 0);
+    assert.deepEqual([app.history, app.notices], [[], []]);
+  });
+
+  test('[NORMAL] [SG2-70:AC2] a draft with a category is submitted with it', async () => {
+    const app = buildApp({
+      fetchResult: { ok: true, request: { ...COMPLETE_DRAFT, category: 'workshop' } },
+      submitResult: { ok: true, request: { ...COMPLETE_DRAFT, category: 'workshop', status: 'unassigned' } }
+    });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.category, 'workshop');
+  });
+
+  test('[CONFLICT] [SG2-70:AC2] a category cleared by a draft save racing the submission is refused by the database and reported as missing', async () => {
+    const app = buildApp({ submitResult: { ok: false, reason: 'missing_category' } });
+    const response = await request(app).patch('/api/event-requests/7/submit');
+    assert.equal(response.status, 400);
+    assert.deepEqual(response.body, { error: 'Event request is missing required fields.', missing: ['category'] });
+    // Nothing moved, so there is no status change to record or announce.
+    assert.deepEqual([app.history, app.notices], [[], []]);
   });
 
   test('[FAILURE] [SG2-30:AC1] [SG2-40:AC1] returns 503 without leaking the database error when the update fails, recording nothing', async () => {

@@ -246,6 +246,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - identity and status: `event_id, organiser_id, organisation, status`
   - details: `name, purpose, description, proposed_date, expected_attendance`
   - requirements: `venue_requirements, preferred_layout, accessibility_needs, equipment_requirements, registration_needed`
+  - kind: `category` (SG2-70)
 - **DetailRecord:** DraftRecord plus:
   - assignment: `coordinator_id, coordinator_name`
   - decision and completion: `decided_at, decision_reason, completed_by, completed_at`
@@ -260,6 +261,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - `proposed_date`: ISO date-time
   - `expected_attendance`: integer from 1 to 2147483647
   - `registration_needed`: boolean
+  - `category` (SG2-70): one of `conference`, `workshop`, `seminar`, `training`, `networking`, `social`, `other`
 - **201:** `{ request: DraftRecord, missingForSubmission: string[] }`. `status` is `draft`; `organiser_id` and `organisation` come from the caller.
 - **Errors:**
   - 400 `{ error: "Invalid event request details", details[] }`
@@ -289,14 +291,14 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 ### 4.4 PATCH /api/event-requests/:eventId
 - **Source:** `events/updateDraft.ts` (`createUpdateEventDraftHandler`), `db/eventRequests.ts` (`updateEventRequestDraft`), migration `202610170003_event_draft_change_history.sql` (`update_event_request_draft`).
 - **Permission:** `event_request.update` (EO).
-- **Body:** the same ten fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
+- **Body:** the same eleven fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
 - **200:** `{ request: DraftRecord, missingForSubmission }`. The DraftRecord shape is unchanged; this endpoint does not submit a request.
 - **Errors:**
   - 400 `{ error: "Invalid event request details", details[] }` for HTTP validation; a private RPC validation refusal returns the same error without details.
   - 404 `No event request found for this account.` for a missing event, wrong creator or changed organisation membership.
   - 409 `Only a draft or returned event request can be edited.` if the status is no longer editable, including a change after the initial lookup.
   - 503 generic service error if storage or audit insertion fails; private database errors are not exposed.
-- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the ten fields (`preferred_layout` added by migration `202610200001_event_preferred_layout.sql`, SG2-105). The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
+- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the eleven fields (`preferred_layout` added by migration `202610200001_event_preferred_layout.sql`, SG2-105; `category` by `202610200002_event_search.sql`, SG2-70, which also refuses a category outside the list). The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
 - **History:** the same transaction inserts one `event_audit_logs` row per actual changed field with verified actor, old/new values and a common save time. An audit failure rolls back the draft update. Unchanged saves, including equivalent timestamp offsets, add no history. Null remains null; numeric and boolean values are stored as text; dates use canonical UTC timestamp text. History reads still apply the existing owner/internal-field visibility rules.
 - **Internal result:** JSON object `{ outcome: "updated", request }` or `{ outcome: "not_found"|"not_editable"|"invalid" }`; the adapter maps these to the public response above. A successful earlier precheck cannot override a later locked refusal.
 - **Limits:** only the existing draft/clarification edit path is repaired. This adds no rejected-request rework policy and does not reconstruct edits made before the migration.
@@ -324,7 +326,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `Only a draft or rejected event request can be submitted.`
   - 503
 - **Rule:** only the creating EO; status must be `draft`, `rejected` or `needs_clarification`.
-- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked.
+- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. SG2-70 adds `category`, also enforced by the `events_category_required_on_submit` trigger: if a draft save clears it after the check, the write is refused and the response is the same 400 with `missing: ["category"]`. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked; existing events were given a category by the migration.
 - **Side effects:**
   - an `event_audit_logs` status row
   - `notifications` of kind `event_submitted`: to every ECL when the status is `unassigned`, otherwise to the coordinator
@@ -1073,6 +1075,19 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Data:** RPC `manage_equipment_reservations('read', …)`.
 
 ---
+
+## 9A. Event search (SG2-70)
+
+### 9A.1 GET /api/event-search
+- **Source:** `eventSearch/index.ts` (`createEventSearchRouter`), `db/eventSearch.ts`, migration `202610200002_event_search.sql` (`search_events`).
+- **Permission:** `events.search` (EC, VS, TSS, Lead, Safety Officer). `search_events` runs with the caller's JWT and rechecks the stored role, so a role changed after sign-in is refused (403).
+- **Query (all optional; blank leaves the filter out):** `q` (name or client organisation, case-insensitive, at most 255 characters), `from` and `to` (YYYY-MM-DD, inclusive, Singapore calendar days on `proposed_date`), `status` (any event status except `draft`), `venue` (venue id; an event booked, held or requested there), `category` (one of the list in 4.1), `coordinator` (account id). A repeated or malformed value is 400 naming it.
+- **200:** `{ events: [{ event_id, name, organisation, category, status, proposed_date, coordinator_id, coordinator_name, venues[] }], truncated, filters }`. At most 100 events, soonest first; `truncated` is true when more matched. Drafts are never returned. `filters` echoes what was applied (`query, date_from, date_to, status, venue_id, category, coordinator_id`) for the empty state.
+- **Errors:** 400 for a malformed filter, 401/403 for an unsigned or non-internal caller, 503 otherwise without database detail.
+
+### 9A.2 GET /api/event-search/options
+- **Permission:** as 9A.1 (`event_search_options`).
+- **200:** `{ venues: [{ venue_id, name }], coordinators: [{ user_id, name }] }`: venues not deleted, and every Event Coordinator account.
 
 ## 10. Health
 
