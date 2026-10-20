@@ -37,15 +37,23 @@ alter table public.events
   add column registration_announced text
     constraint events_registration_announced_known check (registration_announced in ('open', 'closed'));
 
--- Rebuilds the list 202610190005 (SG2-92) left, so every earlier kind stays allowed.
-alter table public.notifications
-  drop constraint notifications_kind_check,
-  add constraint notifications_kind_check check (kind in
-    ('venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
-     'equipment_reserved', 'venue_booking_clash', 'event_confirmed',
-     'event_submitted', 'coordinator_assigned', 'clarification_requested',
-     'event_approved', 'event_rejected', 'venue_unavailable', 'event_returned_to_planning',
-     'safety_decision', 'registration_opened', 'registration_closed'));
+-- Adds the two kinds to whatever list is already allowed, rather than
+-- restating it, so a kind another open story adds (e.g. SG2-69's
+-- outstanding_arrangements) survives whichever order the migrations land in.
+do $$
+declare
+  kinds text[];
+begin
+  select array(select (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1])
+    into kinds from pg_constraint c
+    where c.conrelid = 'public.notifications'::regclass and c.conname = 'notifications_kind_check';
+  kinds := kinds || array(select kind from unnest(array['registration_opened', 'registration_closed']) kind
+    where not kind = any(kinds));
+  alter table public.notifications drop constraint notifications_kind_check;
+  execute format('alter table public.notifications add constraint notifications_kind_check check (kind in (%s))',
+    (select string_agg(quote_literal(kind), ', ' order by position) from unnest(kinds) with ordinality as k(kind, position)));
+end;
+$$;
 
 -- AC10: tells the organiser and the assigned coordinator when a confirmed
 -- event's registration has opened or closed since it was last announced.
