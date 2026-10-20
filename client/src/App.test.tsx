@@ -44,6 +44,10 @@ function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ??
       if (url === '/api/venue-holds/options') return Response.json({ events: [], venues: [] });
       if (url === '/api/equipment') return Response.json({ equipment: [{ equipment_id: 1, type: 'Wireless microphone',
         description: 'Handheld microphone', location: 'Store A', quantity_held: 8, operational_status: 'operational', available_quantity: 8, version: 1 }] });
+      if (url === '/api/notifications/inbox') return Response.json({ notifications: role === 'Event Coordinator' ? [{ source: 'hold', notification_id: 1, event_id: 41,
+        kind: 'warning', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2026-10-07T02:00:00.000Z', read_at: null }] : [],
+        unread_count: role === 'Event Coordinator' ? 1 : 0, next_cursor: null });
+      if (url === '/api/notifications/reminder-preferences') return Response.json({ frequency_days: 1 });
       // SG2-49: venue request decision notices share the notification drawer.
       if (url === '/api/notifications') return Response.json({ notifications: [] });
       // SG2-87: the Lead's desk counts the unassigned queue.
@@ -1027,6 +1031,48 @@ test.each(['Venue Staff'] as const)(
     ]);
   }
 );
+
+test.each(['Event Coordinator', 'Event Organiser', 'Safety Officer'] as const)('[NORMAL] [SG2-69:AC3] %s opens a notice, marks it read and sees its related event', async role => {
+  await signInAs(role);
+  const fetch = vi.mocked(globalThis.fetch); const existing = fetch.getMockImplementation()!;
+  fetch.mockImplementation(async (...args) => {
+    const url = String(args[0]);
+    if (url === '/api/notifications/inbox') return Response.json({ notifications: [{ source: 'hold', notification_id: 1,
+      event_id: 41, kind: 'warning', message: 'Tentative hold for Atrium Hall expires 14 June 2030.',
+      created_at: '2026-10-07T02:00:00.000Z', read_at: null }], unread_count: 1, next_cursor: null });
+    if (url === '/api/equipment-requests?event_id=41') return Response.json({ event: { event_id: 41, name: 'Notification target forum', status: 'planning' },
+      requests: [], equipment: [], venues: [], can_request: false, can_arrange: false });
+    if (url === '/api/equipment-reservations?event_id=41') return Response.json({ reservations: [], can_reserve: false });
+    if (url === '/api/notifications/hold/1/read') return Response.json({ notification: { source: 'hold', notification_id: 1,
+      event_id: 41, kind: 'warning', message: 'Tentative hold for Atrium Hall expires 14 June 2030.',
+      created_at: '2026-10-07T02:00:00.000Z', read_at: '2026-10-20T03:00:00Z' }, unread_count: 0 });
+    if (url === '/api/notifications/hold/1/event') return Response.json({ event: { event_id: 41, name: 'Notification target forum',
+      status: 'planning', proposed_date: '2030-06-14' } });
+    if (url === '/api/work-queue/event/41') return Response.json({ items: [{ kind: 'event', item_id: 41, event_id: 41, title: 'Notification target forum',
+      event_name: 'Notification target forum', status: 'planning', starts_at: '2030-06-14T02:00:00Z', ends_at: null, category: 'assigned', assigned_to_me: true, details: { organisation: 'Test Org', expected_attendance: 20 } }] });
+    if (url === '/api/event-requests/41') return Response.json({ request: { event_id: 41, name: 'Notification target forum', status: 'planning',
+      can_manage: true, organiser_id: 'organiser', organisation: 'Test Org', coordinator_id: 'user-1' } });
+    return existing(...args);
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /^Notifications \(/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Unread: Tentative hold for Atrium Hall expires 14 June 2030.' }));
+  expect(await screen.findByRole('heading', { name: 'Notification target forum' })).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Notification event' })).toBeVisible();
+  expect(screen.getByText('14 Jun 2030, 08:00 SGT')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Notifications (0)' })).toBeVisible();
+  if (role === 'Safety Officer') expect(screen.queryByRole('button', { name: 'View event details' })).not.toBeInTheDocument();
+  else {
+    fireEvent.click(screen.getByRole('button', { name: 'View event details' }));
+    if (role === 'Event Coordinator') {
+      expect(await screen.findByRole('heading', { name: 'Notification target forum' })).toBeVisible();
+      expect(screen.getByRole('article', { name: 'Event request' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Edit Planning Information' })).toBeVisible();
+      expect(fetch).not.toHaveBeenCalledWith('/api/event-requests/41', expect.anything());
+      fireEvent.click(screen.getByRole('button', { name: 'Find venues for this event' }));
+      expect(await screen.findByRole('heading', { level: 1, name: 'Find venues' })).toBeVisible();
+    } else await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/event-requests/41', expect.anything()));
+  }
+});
 
 test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that role's home and remembers it", async () => {
   await signInAs('Event Coordinator');

@@ -41,6 +41,23 @@ function unique(values) { return [...new Set(values)]; }
 
 const methods = [];
 const errors = [];
+// Supabase tracks the numeric version, not the descriptive filename. Reject
+// new collisions without renumbering the two historical legacy files.
+const migrationDirectory = resolve(root, 'supabase/migrations');
+if (existsSync(migrationDirectory)) {
+  const versions = new Map();
+  for (const name of readdirSync(migrationDirectory).filter(name => name.endsWith('.sql')).sort()) {
+    const version = /^(\d+)_/.exec(name)?.[1];
+    if (!version) continue;
+    versions.set(version, [...(versions.get(version) ?? []), name]);
+  }
+  for (const [version, names] of versions) {
+    const historicalPair = version === '202609220001' && names.length === 2
+      && names[0] === '202609220001_internal_work_queue.sql'
+      && names[1] === '202609220001_venue_layouts.sql';
+    if (names.length > 1 && !historicalPair) errors.push(`Duplicate migration version ${version}: ${names.join(', ')}`);
+  }
+}
 const paths = ['server/src', 'client/src', 'e2e', 'integration', '.github/scripts'].concat(existsSync(resolve(root, 'hosted-e2e')) ? ['hosted-e2e'] : []).flatMap(directory =>
   files(resolve(root, directory)).filter(path => /\.(?:test|spec)\.(?:ts|tsx|mjs)$/.test(path))).sort();
 

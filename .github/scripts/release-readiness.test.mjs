@@ -171,3 +171,66 @@ test('[FAILURE] [SG2-25:AC2] [SG2-77:AC6] release readiness requires authenticat
     ['GRANT EXECUTE ON FUNCTION public.venue_exists_for_operations_read(integer) TO PUBLIC;', 'operations identity RPC EXECUTE anon = false'],
   ]) assertReadinessRejects(mutation, diagnostic);
 });
+
+test('[SG2-69:release-read-state-columns] [SG2-69:AC1] [FAILURE] deployment requires both real read receipt columns', () => {
+  assertReadinessRejects('ALTER TABLE public.notifications DROP COLUMN read_at; ALTER TABLE public.venue_hold_notifications DROP COLUMN read_at;',
+    'column public.notifications.read_at', 'column public.venue_hold_notifications.read_at');
+});
+
+test('[SG2-69:release-reminder-kind] [SG2-69:AC5] [FAILURE] deployment refuses a notification constraint missing the reminder kind', () => {
+  assertReadinessRejects(`TRUNCATE public.notifications; DO $$ DECLARE definition text; BEGIN
+    SELECT pg_get_constraintdef(oid) INTO definition FROM pg_constraint WHERE conrelid='public.notifications'::regclass AND conname='notifications_kind_check';
+    ALTER TABLE public.notifications DROP CONSTRAINT notifications_kind_check;
+    EXECUTE 'ALTER TABLE public.notifications ADD CONSTRAINT notifications_kind_check ' || replace(definition,
+      '''outstanding_arrangements''', '''old_outstanding_arrangements''');
+  END $$;`, 'notifications_kind_check allows outstanding_arrangements');
+});
+
+test('[SG2-69:release-inbox-grants] [SG2-69:AC1] [SG2-69:AC7] [FAILURE] deployment enforces caller inbox and service scheduler privilege separation', () => {
+  for (const [mutation, diagnostic] of [
+    ['REVOKE EXECUTE ON FUNCTION public.notification_inbox(integer,timestamptz,text,bigint) FROM authenticated;', 'notification RPC EXECUTE public.notification_inbox(integer,timestamptz,text,bigint) authenticated'],
+    ['GRANT EXECUTE ON FUNCTION public.send_outstanding_arrangement_reminders() TO authenticated;', 'notification RPC EXECUTE public.send_outstanding_arrangement_reminders() authenticated'],
+    ['GRANT EXECUTE ON FUNCTION public.notification_unread_count(uuid) TO anon;', 'notification RPC EXECUTE public.notification_unread_count(uuid) anon'],
+    ['REVOKE EXECUTE ON FUNCTION public.send_outstanding_arrangement_reminders() FROM service_role;', 'notification RPC EXECUTE public.send_outstanding_arrangement_reminders() service_role'],
+  ]) assertReadinessRejects(mutation, diagnostic);
+});
+
+test('[SG2-69:release-private-preferences] [SG2-69:AC6] [SG2-69:AC7] [FAILURE] deployment refuses disabled reminder RLS or direct caller grants', () => {
+  for (const mutation of [
+    'ALTER TABLE public.notification_reminder_settings DISABLE ROW LEVEL SECURITY;',
+    'GRANT SELECT ON public.notification_reminder_settings TO authenticated;',
+    'GRANT INSERT ON public.notification_reminder_settings TO anon;',
+  ]) assertReadinessRejects(mutation, 'notification private RLS and grants public.notification_reminder_settings');
+});
+
+test('[SG2-69:release-empty-function-search-path] [SG2-69:AC7] [FAILURE] deployment requires the inbox functions to retain fixed empty search paths', () => {
+  assertReadinessRejects('ALTER FUNCTION public.read_notification(text,bigint) SET search_path=public;',
+    'notification RPC security definer empty search_path public.read_notification(text,bigint)');
+});
+
+test('[SG2-69:release-acting-role-dependencies] [SG2-69:AC7] [SG2-104:AC2] [FAILURE] deployment refuses missing acting-role or private relationship dependencies', () => {
+  for (const [signature, replacement] of [
+    ['public.acting_role()', 'readiness_missing_acting_role'],
+    ['public.lock_acting_role()', 'readiness_missing_lock_acting_role'],
+    ['private.event_relationship_exists(integer,text)', 'readiness_missing_event_relationship'],
+  ]) assertReadinessRejects(`ALTER FUNCTION ${signature} RENAME TO ${replacement};`, `RPC ${signature}`);
+});
+
+test('[SG2-69:release-cadence-helper] [SG2-69:AC6] [FAILURE] deployment refuses a missing deterministic UTC cadence helper', () => {
+  const signature = 'private.notification_reminder_due(timestamptz,timestamptz,integer)';
+  assertReadinessRejects(`ALTER FUNCTION ${signature} RENAME TO readiness_missing_notification_cadence;`, `RPC ${signature}`);
+});
+
+test('[SG2-69:release-cadence-helper-grants] [SG2-69:AC7] [FAILURE] deployment refuses direct role access to the private cadence helper', () => {
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assertReadinessRejects(`GRANT EXECUTE ON FUNCTION private.notification_reminder_due(timestamptz,timestamptz,integer) TO ${role};`,
+      `notification cadence helper EXECUTE ${role} = false`);
+  }
+});
+
+test('[SG2-69:release-cadence-helper-security] [SG2-69:AC7] [FAILURE] deployment requires immutable invoker cadence with a fixed empty search path', () => {
+  for (const change of ['VOLATILE', 'SECURITY DEFINER', 'SET search_path=public']) {
+    assertReadinessRejects(`ALTER FUNCTION private.notification_reminder_due(timestamptz,timestamptz,integer) ${change};`,
+      'notification cadence helper private immutable invoker empty search_path');
+  }
+});

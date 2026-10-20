@@ -1502,18 +1502,14 @@ test.describe('Tentative venue holds (SG2-84/85)', () => {
     await page.clock.fastForward(30_000);
     await expect(page.getByRole('button', { name: 'Notifications (2)', exact: true })).toBeVisible();
     await capture(page, 'coordinator-automatic-warning-badge', false);
-    // Opening shows cached notices immediately and also refreshes both inboxes.
+    // Opening shows cached notices immediately and refreshes the unified inbox.
     // Finish that refresh before advancing expiry, otherwise its in-flight guard
     // can correctly skip our only simulated polling tick on a slower CI runner.
-    const openingRefresh = Promise.all([
-      page.waitForResponse(response => response.url().endsWith('/api/venue-holds/notifications') && response.request().method() === 'GET'),
-      page.waitForResponse(response => response.url().endsWith('/api/notifications') && response.request().method() === 'GET'),
-    ]);
+    const openingRefresh = page.waitForResponse(response => response.url().endsWith('/api/notifications/inbox') && response.request().method() === 'GET');
     await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
-    for (const response of await openingRefresh) {
-      expect(response.status()).toBe(200);
-      expect(await response.finished()).toBeNull();
-    }
+    const response = await openingRefresh;
+    expect(response.status()).toBe(200);
+    expect(await response.finished()).toBeNull();
     // Let response-consumption microtasks settle before simulating the next tick.
     await page.clock.runFor(1);
     await expect(page.getByText('Hold expiring soon', { exact: true })).toBeVisible();

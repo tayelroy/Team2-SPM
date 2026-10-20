@@ -7105,6 +7105,561 @@
     "review": null
   },
   {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-P01",
+    "title": "Unread badge, ordered merged inbox and safe event opening",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3"
+    ],
+    "purpose": "Prove read state changes only the chosen source/ID and survives a reload.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Seed two unread notices (event:1 and hold:1) and one read notice, plus another recipient notice.",
+      "Sign in as coordinator at 1440px. Open Notifications (2); assert exact newest-first source identities and read/unread counts.",
+      "Open the outstanding-arrangements notice. Assert event691 summary and badge1; use View event details and assert the real assigned WorkQueue article and Edit Planning Information action, with no session-expired error. Inspect only event:1 gained a timestamp and hold:1 is still unread.",
+      "Reload and reopen; assert unread1, original read timestamp unchanged, no other-organisation notice, no page/console errors or horizontal overflow."
+    ],
+    "data": "Reminder Forum event691; event notice1, read eventnotice2, holdnotice1; another recipient eventnotice90.",
+    "expected": "Exact three-row order; event691 summary then authorised coordinator workflow; badge2→1; only own event:1 changed; reload retains state.",
+    "evidence": "e2e/notification-inbox.spec.ts; docs/notification-inbox.md",
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-B01",
+    "title": "All-page unread total and clearing both inbox sources at phone width",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC4"
+    ],
+    "purpose": "Verify counts and clear-all cover unloaded rows and tied-time pagination.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Seed54 own rows with53 unread, including51 earlier tied-time rows, plus another person’s unread row.",
+      "Sign in at390px. Badge53 exceeds first50. Load older; assert earliest row3 appears and53 unread rows are visible.",
+      "Mark all read, inspect54 own read timestamps and unchanged other recipient state, reload and retain badge0; verify no horizontal overflow."
+    ],
+    "data": "54 ownrows, 53 unread, tiedtime earlierIDs3–53 and repeated sourceID1.",
+    "expected": "Badge53→0 and54 ownrows read; other person unread; no lost/duplicate cursor pages or overflow.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-P02",
+    "title": "Default daily reminder setting and saved thirty-day boundary",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC5",
+      "SG2-69:AC6"
+    ],
+    "purpose": "Prove preference save and reload use the real HTTP route.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Open coordinator inbox; assert default1 day.",
+      "Set30, save and assert success plus exact persisted current-user preference.",
+      "Reload; reopen and assert30 remains."
+    ],
+    "data": "Coordinator user-coordinator, frequency1 default and30 maximum.",
+    "expected": "One exact current-user setting30; reload displays30. This browser case seeds a reminder; it does not prove scheduler delivery.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-N01",
+    "title": "Recipient and coordinator-setting isolation",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Prove another account cannot read or mutate a coordinator notice/settings.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "As other organiser, POST event:1/read and GET event:1/event; expect404.",
+      "PUT coordinator frequency as organiser; expect403. Mark all only own notices.",
+      "Inspect coordinator event/hold unread state unchanged and no settings created; sign in attendee and verify an empty real inbox with no reminder preference editor."
+    ],
+    "data": "Other organiser own notice90; coordinatornotice1 and holdnotice1; attendee account.",
+    "expected": "404/403 without cross-account writes; attendee empty inbox and no preference control.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-F01",
+    "title": "Failed read retains unread state and supports retry",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC3"
+    ],
+    "purpose": "Verify failure feedback does not pretend a notice was handled.",
+    "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
+    "steps": [
+      "Intercept only event:1/read with503 in the isolated browser.",
+      "Open reminder row; assert visible alert, drawer and badge2 unchanged, stored read_at null.",
+      "Remove failure; retry. Assert event691 opens and badge1."
+    ],
+    "data": "One controlled HTTP503 for the read mutation, then real route success.",
+    "expected": "No optimistic unread loss on503; successful retry marks read and opens correct event.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "133/133 complete browser regressions pass, including six SG2-69 journeys and the dedicated notification smoke journey. Production React and real Express use isolated identity/storage.",
+        "execution_evidence": "20 Oct 2026; npm run test:e2e, 133/133 and all 13 report-gate checks pass; /tmp/sg69-followup-browser.log. In-app browser verifies badge2 to1 to0, event summary and assigned work, saved frequency1 to2 and reload persistence. Desktop1440x1000 and mobile390x844 have no overflow, framework overlay or console errors; screenshots /tmp/sg69-followup-desktop.png, /tmp/sg69-followup-mobile-inbox.png, /tmp/sg69-followup-mobile-work.png, /tmp/sg69-followup-mobile-cleared.png. Hosted feature rollout remains pending.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "All61 migrations,37 policy suites,87 SG69 SQL assertion contracts,11 notification concurrency scenarios and26 release-readiness checks pass in disposable PostgreSQL17.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-DB01",
+    "title": "Native read-state, cursor, recipient and scheduled reminder contracts",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC5",
+      "SG2-69:AC6",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Check SQL authorization, exact unread state and scheduler cadence with real database rows.",
+    "preconditions": "Disposable PostgreSQL17 with all committed migrations. Hosted database untouched.",
+    "steps": [
+      "Replay authfixture and all migrations; execute notification_inbox_reminders.sql in a rolled-back transaction.",
+      "Assert source collisions, cursor ties, older-page count, mark-one idempotence and mark-all snapshot semantics.",
+      "Assert current recipient/event relationships, role checks, preference1..30 boundaries, private receipts and denied direct scheduler execution.",
+      "Assert outstanding venue/equipment/registration and recheck readiness, default/configured cadence, new assignment, fully ready/terminal/past suppression and no unrelated recipients.",
+      "Under America/New_York across a DST change, use fixed timestamps to check exact1/3-day intervals, one second before (same due UTC hour), one hour before (not due), and same-hour receipt suppression."
+    ],
+    "data": "Synthetic users/roles/events/notices/arrangements in disposable PostgreSQL17.",
+    "expected": "Every tagged SQL assertion passes; no application user can edit another recipient or invoke private delivery helpers. UTC-hour cadence does not drift by another hour or depend on the session timezone; same-hour reruns remain suppressed.",
+    "evidence": "supabase/tests/notification_inbox_reminders.sql; supabase/migrations/202610200003_notifications_inbox_reminders.sql",
+    "layer": "Native PostgreSQL contracts",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "All 57 migrations and 36 non-upgrade SQL suites pass in disposable PostgreSQL17, including the 67 SG2-69 assertion contracts; 22 release-readiness checks pass.",
+        "execution_evidence": "20 Oct 2026; native Docker postgres:17; supabase/tests/notification_inbox_reminders.sql; /tmp/sg69-all-sql.log and /tmp/sg69-sql-tests.log. Actual hosted pg_cron registration remains a deployment prerequisite.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "All61 migrations replay; all37 CI SQL policy suites,79 SG2-69 assertion contracts and23 release-readiness tests pass after integrating SG2-104 acting roles.",
+        "execution_evidence": "20 Oct2026; exact CI database-policy and legacy-upgrade scripts, disposable PostgreSQL17; /tmp/sg69-merge-native.log. The unique SG69 migration202610200003 follows SG104 acting-role functions202610200002; role-scoped summaries/preferences and held-role scheduler eligibility are exercised. Hosted migration and actual pg_cron checks remain pending.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "All11 native multi-session scenarios pass, including due-hour daily/three-day contention and same-hour suppression.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-CONC01",
+    "title": "Reminder, lifecycle and read-receipt races",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC5",
+      "SG2-69:AC6",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Verify competing real SQL transactions preserve recipients and delivery/read receipts.",
+    "preconditions": "Disposable PostgreSQL17 with committed migrations; synthetic fixtures only.",
+    "steps": [
+      "Run test-notification-reminders-concurrency.mjs with a disposable POSTGRES_CONTAINER.",
+      "Observe lock waits while sweeps compete and while cancellation/reassignment/readiness/role changes hold locks.",
+      "Check a new notice arriving after mark-all snapshot stays unread, concurrent read keeps its first timestamp, and a delivery failure rolls back notice and receipt together.",
+      "Revoke only the selected coordinator role during a waiting preference update while another held role remains; require42501 and no preference write.",
+      "For one-day and three-day settings, use a receipt one second below the elapsed interval in the due UTC hour. Concurrent sweep returns0; exactly1 notice and receipt commit; subsequent sweep in the same UTC hour returns0."
+    ],
+    "data": "Eleven disposable PostgreSQL multi-session scenarios, including daily and three-day due-hour contention.",
+    "expected": "At most one eligible delivery; none to stale/unrelated roles or terminal/ready events; atomic receipts; new arrivals remain unread.",
+    "evidence": ".github/scripts/test-notification-reminders-concurrency.mjs",
+    "layer": "Native PostgreSQL concurrency",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "All 8 native multi-session races pass, including competing sweeps, cancellation, reassignment, completed arrangements, revoked role, clear-all arrival snapshot, idempotent concurrent read and notice/cadence rollback.",
+        "execution_evidence": "20 Oct 2026; .github/scripts/test-notification-reminders-concurrency.mjs; disposable PostgreSQL17, /tmp/sg69-concurrency.log; fixture cleanup complete.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "All9 notification concurrency scenarios pass, including same-recipient multi-role scheduler eligibility and coordinator-role revocation while a preference save waits on its role lock.",
+        "execution_evidence": "20 Oct2026; exact CI database sequence plus .github/scripts/test-notification-reminders-concurrency.mjs; /tmp/sg69-merge-native.log; disposable PostgreSQL17 containers removed.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "actual": "21/21 native API integration tests pass after the complete CI database policy/concurrency/upgrade sequence.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "id": "SG2-69-API01",
+    "title": "JWT-scoped inbox across Express, PostgREST and PostgreSQL",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3",
+      "SG2-69:AC4",
+      "SG2-69:AC5",
+      "SG2-69:AC6",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Check that the production adapter reaches the actual guarded SQL RPCs.",
+    "preconditions": "All migrations applied in disposable Docker containers, controlled authfixture, production Express/Supabase adapter.",
+    "steps": [
+      "Run the complete CI database-policy/concurrency sequence and legacy-upgrade checks, then npm run test:integration against disposable PostgreSQL17 and PostgREST12.2.12.",
+      "Exercise new notification routes with caller JWTs, exact read/count/target/preferences responses and denied unrelated access.",
+      "Check scheduler-generated reminder contents/cadence and resulting unread receipt behavior through the production API seam."
+    ],
+    "data": "Dedicated SG2-69 venue and assigned event created by this case; synthetic users from integration/seed.sql; event and venue removed in finally. No fixed global venue ID.",
+    "expected": "Production HTTP and JWT/RPC contracts agree with database state; cleanup succeeds and no hosted URL or secrets are used.",
+    "evidence": "integration/api.test.ts; server/src/notifications/index.ts; server/src/db/notificationInbox.ts",
+    "layer": "Native API + PostgREST + PostgreSQL",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "20/20 native API integration methods pass, including caller-scoped inbox paging/read/clear/target/preferences, scheduler recipient/cadence and current organiser organisation revocation/restoration.",
+        "execution_evidence": "20 Oct 2026; npm run test:integration; /tmp/sg69-followup-integration.log. Real Express and production caller-JWT Supabase adapter use disposable PostgreSQL17/PostgREST12.2.12 with all57 migrations. Startup waits for the final TCP listener to avoid the image bootstrap-server shutdown race. Dedicated fixture IDs and cleanup remain independent of identity sequence state.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "21/21 native API integration methods pass, including current acting-role headers, multi-role ownership, target restrictions and role revocation.",
+        "execution_evidence": "20 Oct2026; exact full CI policy/concurrency and legacy-upgrade sequence followed by npm run test:integration; /tmp/sg69-merge-native.log. Production caller-JWT adapter forwards validated X-Acting-Role to real PostgreSQL/PostgREST.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SMOKE-INBOX-01",
+    "title": "Notification inbox fast smoke gate on a phone",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC3",
+      "SG2-69:AC4"
+    ],
+    "purpose": "Protect the dedicated smoke CI job with the built notification-to-assigned-work and clear-all flow.",
+    "preconditions": "Built production React app and real Express on loopback with isolated, resettable providers; no hosted data.",
+    "steps": [
+      "Seed the inbox and sign in coordinator at390px; assert2 unread notices.",
+      "Open the reminder, verify badge1 and event691, follow View event details into the assigned Event request article and its Edit Planning Information action.",
+      "Clear all; assert badge0, three read notices, disabled clear action and unchanged other-recipient read_at. Reload and reopen; retain read state and exclude the private notice.",
+      "Assert no horizontal overflow or browser errors and attach assigned-work and cleared-inbox screenshots."
+    ],
+    "data": "Coordinator synthetic account; event691, eventnotice1 and holdnotice1, private notice90.",
+    "expected": "Badge2 to1 to0, real assigned work opens, clearing persists across reload and affects only the signed-in recipient; mobile layout fits.",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "evidence": "e2e/smoke.spec.ts",
+    "layer": "Dedicated Playwright smoke + fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "Passed in the separate smoke gate (8/8) and complete browser suite (133/133).",
+        "execution_evidence": "20 Oct2026; npm run test:smoke and npm run test:e2e; /tmp/sg69-followup-smoke.log and /tmp/sg69-followup-browser.log. Passing smoke screenshots, video and trace are retained by the smoke job.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-R01",
+    "title": "Loaded history reconciles a second session read on focus",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC3"
+    ],
+    "purpose": "Prevent unread staleness, history truncation, duplication or reordering when refreshing pages already loaded by the user.",
+    "preconditions": "Built app and real routes on loopback; large synthetic inbox and two authenticated coordinator sessions.",
+    "steps": [
+      "Seed54 own rows with53 unread; open inbox and load older rows. Save the exact54-message order.",
+      "Sign into a second same-user session through the real login route and mark older eventnotice3 read; assert API unread52.",
+      "Focus the first browser. Assert badge52, Read:Earlier notice3, all54 rows in the original exact order,52 unread and2 read, no duplicate messages or extra next-page button.",
+      "Verify private-recipient notice is absent and unrelated holdnotice1 remains unread."
+    ],
+    "data": "54 own source/ID rows, eventnotice3 on the second page; second authenticated session uses production read endpoint.",
+    "expected": "Cross-session read state refreshes atomically across the loaded page depth while every older row and its ordering remain intact.",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "evidence": "e2e/notification-inbox.spec.ts",
+    "layer": "Playwright regression + real fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "Passed within133/133 full browser regressions; no retries/skips.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-followup-browser.log.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "135/135 complete browser regressions pass on the merged build, including seven SG69 journeys and the separate notification smoke case; smoke8/8. Production React and real Express use isolated providers.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e, /tmp/sg69-merge-browser.log; npm run test:smoke, /tmp/sg69-merge-smoke.log. In-app1440x1000/390x844 multi-role check verifies attendee/coordinator switch, coordinator-only preferences, badge2to1, real assigned-event work, cleared prior navigation and retained historical read receipt. No horizontal overflow, console warnings/errors or framework overlay. Proof /tmp/sg69-merge-desktop-role.png, /tmp/sg69-merge-mobile-work.png, /tmp/sg69-merge-mobile-attendee.png.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-API02",
+    "title": "Organiser target access follows current organisation",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC7"
+    ],
+    "purpose": "Verify real API-to-SQL recipient and current-organisation checks with an unchanged caller JWT.",
+    "preconditions": "Disposable PostgreSQL17/PostgREST12.2.12; committed migrations and synthetic authfixture; production router and caller-JWT adapter.",
+    "steps": [
+      "Create an approved event and two recipient notices with returned IDs. Fetch organiser-owned target; assert exactly four permitted fields and exact event/name/status/date instant.",
+      "Attempt to fetch and mark the coordinator notice as organiser; expect404.",
+      "Change the organiser current organisation in real PostgreSQL. With the same JWT, target becomes404; own historical notice can still be marked read with a finite timestamp and repeated response unchanged.",
+      "Read stored receipts; own timestamp matches exactly and other recipient stays unread. Restore organisation; target returns the identical minimal summary.",
+      "Finally restore user/config/fetch and delete the dedicated event/notice fixtures."
+    ],
+    "data": "Synthetic organiser and coordinator UUIDs; dedicated event and notices, no global fixed event/venue IDs.",
+    "expected": "Current organisation revokes/restores event-summary access independently of historical notice ownership; no cross-recipient writes and no extra fields.",
+    "actual": "21/21 native API integration tests pass after the complete CI database policy/concurrency/upgrade sequence.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "evidence": "integration/api.test.ts",
+    "layer": "Native API + PostgREST + PostgreSQL",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "20/20 native integration methods pass, including this case.",
+        "execution_evidence": "20 Oct2026; npm run test:integration; /tmp/sg69-followup-integration.log. Production Express/Supabase adapter and real PostgREST/SQL, no hosted URL.",
+        "source_revision": "364b8d0e13c43b2fafad97ef2b6a393c0eadde8d"
+      },
+      {
+        "execution_date": "20 Oct 2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "21/21 native API integration methods pass, including current acting-role headers, multi-role ownership, target restrictions and role revocation.",
+        "execution_evidence": "20 Oct2026; exact full CI policy/concurrency and legacy-upgrade sequence followed by npm run test:integration; /tmp/sg69-merge-native.log. Production caller-JWT adapter forwards validated X-Acting-Role to real PostgreSQL/PostgREST.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
     "id": "SG2-104-P01",
     "title": "an account with two roles switches between them, and each role reaches only its own functions",
     "story": "SG2-104",
@@ -7175,6 +7730,123 @@
         "source": "supabase/tests/account_multi_roles.sql"
       }
     }
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-R02",
+    "title": "Role switching preserves owned notices while selecting current event and cadence permissions",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC6",
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prevent notification data or coordinator controls surviving the wrong acting-role view.",
+    "preconditions": "Built React/real Express loopback fixture with a coordinator+attendee account and a current assigned event; no hosted data.",
+    "steps": [
+      "Seed multiRole:true inbox. Sign in at least-privileged Attendee; assert2 unread and no reminder preference editor. Default-role event target404 and cadence PUT403.",
+      "Select Event Coordinator in the actual header switcher. Open inbox, assert daily default, save4, open reminder and assert event691 plus its read receipt.",
+      "Switch back to Attendee. Assert badge1 and the historical Read reminder, absent coordinator preference editor, exact saved4 and unchanged receipt/hold unread state.",
+      "Verify explicit attendee target404 while explicit coordinator target200."
+    ],
+    "data": "One synthetic recipient holds attendee+event_coordinator; event691, own event/hold source-ID1.",
+    "expected": "No permission union: selected role controls target/settings, while recipient-owned notices and read receipts persist across role switches.",
+    "actual": "136/136 full browser regressions and8/8 separate smoke cases pass. Production React and real Express use isolated providers; the new1000-unread mobilecase keeps99+ visible and exact totals accessible.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "evidence": "e2e/notification-inbox.spec.ts; client/src/App.tsx; client/src/screens/AppShell.tsx",
+    "layer": "Playwright browser + real fixture API",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "Passed within135/135 browser regressions.",
+        "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-merge-browser.log. In-app desktop/mobile inspection also verifies real work navigation and role-switch cleanup.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-API03",
+    "title": "Caller JWT and validated acting role reach native notification RPCs",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC3",
+      "SG2-69:AC6",
+      "SG2-69:AC7",
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prove gateway and real SQL agree on multi-role target access, cadence and historical ownership.",
+    "preconditions": "Exact CI SQL suites applied in disposable PostgreSQL17/PostgREST12.2.12; synthetic dual-role coordinator and production router/adapter.",
+    "steps": [
+      "Create assigned event/owned notice with returned IDs and add attendee role. Default attendee inbox200 and target404; explicit coordinator target200. Capture exact attendee/coordinator X-Acting-Role headers alongside unchanged JWT/apikey.",
+      "Default/explicit attendee cadence writes403; unheld venue target403. Denied calls do not reach the RPC transport. Direct PostgreSQL RPC cadence call under attendee also403.",
+      "Mark owned history read as attendee. Revoke coordinator role in actual account_roles while retaining attendee; explicit coordinator target403 before storage, default target404, and repeated owned read returns the original timestamp/count.",
+      "Restore roles/config/fetch and remove the dedicated event in finally."
+    ],
+    "data": "One caller JWT, held coordinator+attendee then attendee only; returned notice/event IDs; captured role-specific PostgREST headers.",
+    "expected": "No role union or stale revoked-role access; real SQL denies attendee cadence and event target; owned read receipt remains idempotent.",
+    "actual": "21/21 native API integration tests pass after the complete CI database policy/concurrency/upgrade sequence.",
+    "execution_evidence": "20 Oct2026; Dao Jun review follow-up. npm run ci, full browser regression, separate smoke and exact CI database sequence/native API; /tmp/sg69-review-ci.log, /tmp/sg69-review-browser.log, /tmp/sg69-review-smoke.log, /tmp/sg69-review-native.log. In-app visual proof /tmp/sg69-review-mobile-badge.png and /tmp/sg69-review-desktop-inbox.png. Hosted Supabase unchanged; independent peer re-review pending.",
+    "evidence": "integration/api.test.ts; supabase/migrations/202610200003_notifications_inbox_reminders.sql",
+    "layer": "Native API + PostgREST + PostgreSQL",
+    "previous_executions": [
+      {
+        "execution_date": "20 Oct2026",
+        "executed_by": "Automated verification",
+        "status": "Pass",
+        "actual": "21/21 native API integration tests pass, including this case.",
+        "execution_evidence": "20 Oct2026; exact CI policy/concurrency and upgrade steps then npm run test:integration; /tmp/sg69-merge-native.log.",
+        "source_revision": "fb922e43ac337bb5549da5addd2d0a99d25ab77d"
+      }
+    ]
+  },
+  {
+    "story": "SG2-69",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated verification",
+    "review": null,
+    "status": "Pass",
+    "id": "SG2-69-B02",
+    "title": "Compact badge preserves the exact thousand-notice total at phone width",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-69:AC1",
+      "SG2-69:AC2",
+      "SG2-69:AC4"
+    ],
+    "purpose": "Prevent large unread totals overflowing the header while retaining exact accessible and inbox totals.",
+    "preconditions": "Production React and real Express on loopback with isolated1000-unread fixture;390x844viewport.",
+    "steps": [
+      "Seed1000 own unread notices,1 own previously read notice and an unrelated recipient notice. Sign in as coordinator at390x844.",
+      "Assert visible99+, accessible Notifications(1000), no horizontal overflow. Open inbox; assert exact1000unread,50first-page rows and older-page control.",
+      "Mark all read. Inspect all1001own rows are read, original timestamp unchanged and other recipient unread.",
+      "Reload; assert Notifications(0) and no documentoverflow."
+    ],
+    "data": "1000ownunread +1ownread +1privateotherrecipient; mixed event/hold sources.",
+    "expected": "Visible99+ without overflow; accessible/headerdrawer exact1000; clearall1000to0 across unloadedrows, preserving existingreceipt and otherrecipient.",
+    "actual": "Passed within136/136 full browser regressions; component boundary cases99/100/1000 also pass.",
+    "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-review-browser.log. In-app phone/desktop checks: /tmp/sg69-review-mobile-badge.png, /tmp/sg69-review-desktop-inbox.png.",
+    "evidence": "e2e/notification-inbox.spec.ts; client/src/components/HoldNotifications.test.tsx",
+    "layer": "Playwright browser + real fixture API"
   },
   {
     "id": "SG2-70-P01",

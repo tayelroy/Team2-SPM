@@ -15,6 +15,9 @@ import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
 import EquipmentDesk from './screens/EquipmentDesk';
 import EventDetail from './screens/EventDetail';
+import NotificationEvent from './screens/NotificationEvent';
+import WorkQueue from './screens/WorkQueue';
+import type { NotificationSource } from './api/notificationInboxApi';
 import EventsTable from './screens/EventsTable';
 import Landing from './screens/Landing';
 import Login from './screens/Login';
@@ -70,6 +73,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>(() => initialScreen(loadSession()));
   const [logoutState, setLogoutState] = useState<'pending' | 'failed' | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | undefined>(undefined);
+  const [notificationTarget, setNotificationTarget] = useState<{ source: NotificationSource; id: number } | null>(null);
   // The draft "My drafts" → Edit currently has open, if any (SG2-29).
   const [editingRequest, setEditingRequest] = useState<EventRequestDraft | null>(null);
   // The approved event venue search was opened from, if any (SG2-46).
@@ -77,9 +81,9 @@ export default function App() {
   // SG2-91: the awaiting event a Safety desk card opened, if any.
   const [safetyFocus, setSafetyFocus] = useState<number | undefined>(undefined);
   // The server's permissions for the signed-in account (SG2-86 AC2), tagged
-  // with the token they were loaded for so a previous session's never leak
-  // into the next one's navigation.
-  const [loadedAccess, setLoadedAccess] = useState<{ token: string; access: Access | null } | null>(null);
+  // with their session and acting role so previous permissions never leak
+  // into another role's navigation.
+  const [loadedAccess, setLoadedAccess] = useState<{ token: string; role: string; access: Access | null } | null>(null);
   // SG2-30 AC1: the request just submitted, confirmed on its detail page.
   // Cleared as soon as the user leaves that page.
   const [submittedName, setSubmittedName] = useState<string | null>(null);
@@ -95,6 +99,7 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     const token = session.accessToken;
+    const actingRole = session.user.role;
     const controller = new AbortController();
     const settle = (apply: () => void) => {
       if (!controller.signal.aborted) apply();
@@ -102,7 +107,7 @@ export default function App() {
     loadAccess(token, controller.signal).then(
       (access) => settle(() => {
         if (access) {
-          setLoadedAccess({ token, access });
+          setLoadedAccess({ token, role: actingRole, access });
           return;
         }
         clearSession();
@@ -110,7 +115,7 @@ export default function App() {
         setScreen('landing');
       }),
       // Unknown permissions gate like none: ungated items stay, gated ones wait.
-      () => settle(() => setLoadedAccess({ token, access: null })),
+      () => settle(() => setLoadedAccess({ token, role: actingRole, access: null })),
     );
     return () => controller.abort();
     // Re-check when the signed-in identity or the role it acts as changes.
@@ -125,6 +130,9 @@ export default function App() {
     setSession(next);
     setLoadedAccess(null);
     setSelectedEventId(undefined);
+    setNotificationTarget(null);
+    setSafetyFocus(undefined);
+    setSubmittedName(null);
     setEditingRequest(null);
     setVenuePrefill(null);
     setScreen(landingScreenFor(nextRole));
@@ -182,9 +190,17 @@ export default function App() {
   // SG2-104: every role the account holds (just its role for older sessions).
   const roles = (session!.user.roles ?? [role]).filter(isRole);
   // `undefined` while this session's permissions are still loading.
-  const access = loadedAccess?.token === session!.accessToken ? loadedAccess.access : undefined;
+  const access = loadedAccess?.token === session!.accessToken && loadedAccess.role === session!.user.role
+    ? loadedAccess.access : undefined;
 
   const body = {
+    notificationWork: <WorkQueue key={`${session!.accessToken}:${selectedEventId}`} role="Event Coordinator"
+      accessToken={session!.accessToken} initialSelection={{ kind: 'event', item_id: selectedEventId! }}
+      onFindVenues={prefill => { setVenuePrefill(prefill); setScreen('search'); }} />,
+    notificationEvent: notificationTarget && <NotificationEvent accessToken={session!.accessToken}
+      source={notificationTarget.source} notificationId={notificationTarget.id}
+      onViewEvent={role === 'Event Organiser' || role === 'Event Coordinator'
+        ? id => { setSelectedEventId(id); setScreen(role === 'Event Coordinator' ? 'notificationWork' : 'detail'); } : undefined} />,
     dashboard: (
       <Dashboard
         role={role}
@@ -279,7 +295,8 @@ export default function App() {
 
   return (
     <AppShell key={`${session!.accessToken}:${role}`} accessToken={session!.accessToken} role={role} roles={roles} onSwitchRole={handleSwitchRole}
-      access={access} screen={screen} onSignOut={handleSignOut} onNavigate={(nextScreen) => {
+      access={access} screen={screen} onSignOut={handleSignOut}
+      onOpenNotification={(source, id) => { setNotificationTarget({ source, id }); setScreen('notificationEvent'); }} onNavigate={(nextScreen) => {
       // Menu navigation opens venue search blank, not for the last event,
       // and the safety check list at the top (SG2-91).
       setVenuePrefill(null);
