@@ -15,7 +15,21 @@ export const ROLES = [
 
 export type Role = typeof ROLES[number];
 export type PermissionMap = Readonly<Record<string, readonly Role[]>>;
-export interface Principal { userId: string; role: Role }
+/**
+ * The caller of a request. `role` is the role the request acts as (SG2-104),
+ * so every role check below and in the handlers applies to that one role;
+ * `roles` is every role the account holds, in ROLES order. requireAuth always
+ * sets both; a principal built by hand in a test may leave `roles` out.
+ */
+export interface Principal { userId: string; role: Role; roles?: readonly Role[] }
+
+/** What a principal resolver may return: the account's role or roles. */
+export interface ResolvedPrincipal { userId: string; role?: Role; roles?: readonly Role[] }
+
+/** Every role the principal's account holds (just the acting role if unknown). */
+export function heldRoles(principal: Principal): readonly Role[] {
+  return principal.roles ?? [principal.role];
+}
 
 // Actions without an explicit role grant are denied.
 export const PERMISSIONS: PermissionMap = Object.freeze({

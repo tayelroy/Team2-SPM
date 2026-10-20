@@ -217,3 +217,11 @@ test('[BOUNDARY] [SG2-86:AC3] shows the Role fact for an unaffected existing rol
   expect(screen.getByText('Attendee')).toBeInTheDocument();
   expect(screen.queryByLabelText('Department')).not.toBeInTheDocument();
 });
+
+test('[NORMAL] [SG2-104:AC3] an account with two roles sees both, and the one it is acting as', async () => {
+  stubFetch(INTERNAL_PROFILE);
+  render(<Profile role="Venue Staff" roles={['Event Coordinator', 'Venue Staff']} />);
+  await screen.findByLabelText('Name');
+  expect(screen.getByText('Event Coordinator, Venue Staff')).toBeInTheDocument();
+  expect(screen.getByText('Acting as')).toBeInTheDocument();
+});

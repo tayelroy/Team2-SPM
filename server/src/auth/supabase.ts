@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import WebSocket from 'ws';
 import { dbConfig } from '../db/config';
-import { AccessError, isRole, Principal } from './policy';
+import { AccessError, isRole, ResolvedPrincipal } from './policy';
 
-/** Verifies the token and loads the current role using a client scoped to this request. */
-export async function resolveSupabasePrincipal(token: string): Promise<Principal> {
+/** Verifies the token and loads the current roles using a client scoped to this request. */
+export async function resolveSupabasePrincipal(token: string): Promise<ResolvedPrincipal> {
   const url = dbConfig.supabaseUrl;
   const key = dbConfig.supabaseAnonKey;
   if (!url || !key || new URL(url).protocol !== 'https:') throw new AccessError(503);
@@ -29,10 +29,13 @@ export async function resolveSupabasePrincipal(token: string): Promise<Principal
   }
   if (!identity.user?.id || identity.user.is_anonymous) throw new AccessError(401);
 
-  // Read the database role so role changes apply without refreshing the token.
+  // Read the database roles so role changes apply without refreshing the
+  // token. SG2-104: an account may hold several; every row must be a known
+  // role, and an account with none is refused.
   const { data, error, status } = await client.from('account_roles')
-    .select('role').eq('user_id', identity.user.id).maybeSingle();
+    .select('role').eq('user_id', identity.user.id).order('role');
   if (error) throw new AccessError(status === 401 ? 401 : 503);
-  if (!isRole(data?.role)) throw new AccessError(403);
-  return { userId: identity.user.id, role: data.role };
+  const roles = (data as { role: unknown }[]).map(row => row.role);
+  if (roles.length === 0 || !roles.every(isRole)) throw new AccessError(403);
+  return { userId: identity.user.id, roles };
 }

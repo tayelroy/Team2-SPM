@@ -53,7 +53,7 @@ pg_cron: the `venue-hold-deadlines` job runs `process_venue_hold_deadlines()` ev
 | Class | Source |
 |---|---|
 | Event, EventStatus | `events`, `event_status`; `EVENT_STATUSES` and `STATUS_TRANSITIONS` in `server/src/events/fields.ts`; `confirm_event()` final body in 202610170002, combining affected bookings and persisted planning rechecks |
-| User, AccountRole, AccountRoleName, Role | `users`, `account_roles`, `roles`; `server/src/auth/policy.ts` (`ROLES`); `updateAccountRole` in `server/src/db/accountRoles.ts` |
+| User, AccountRole, AccountRoleName, Role | `users`, `account_roles`, `roles`; `server/src/auth/policy.ts` (`ROLES`); `changeAccountRoles` / `getHeldRoles` in `server/src/db/accountRoles.ts` |
 | CoordinatorAssignment (W7) | Not a table: it is `events.coordinator_id`. Sources: `server/src/events/assignCoordinator.ts`, `assignEventCoordinator` and `COORDINATOR_ASSIGNABLE_STATUSES` in `server/src/db/eventRequests.ts`, `fetchUnassignedQueue` in `server/src/db/assignmentQueue.ts`, and permissions `event_request.assign_coordinator` and `event_request.queue.view` in `policy.ts` |
 | EventAuditLog, Clarification, Registration | `event_audit_logs`, `event_clarifications`, `registrations` |
 | Notification, NotificationKind | `notifications` and its final `notifications_kind_check` (202610170001), including `venue_unavailable` |

@@ -19,9 +19,10 @@ insert into public.account_roles (user_id, role) values
   ('c4000000-0000-4000-8000-000000000002', 'event_organiser'),
   ('c4000000-0000-4000-8000-000000000003', 'safety_officer');
 
+-- At its safety check, so the Safety Officer has a relationship to it (SG2-104 AC6).
 insert into public.events (event_id, organiser_id, coordinator_id, organisation, name, status) values
   (94001, 'c4000000-0000-4000-8000-000000000002', 'c4000000-0000-4000-8000-000000000001',
-   'Acme Corp', 'Event With Notes', 'planning');
+   'Acme Corp', 'Event With Notes', 'awaiting_safety_check');
 
 insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value) values
   (94001, 'c4000000-0000-4000-8000-000000000001', 'planning_notes', null, 'Internal coordinator note'),
@@ -60,7 +61,7 @@ select set_config('request.jwt.claims', '{"sub":"c4000000-0000-4000-8000-0000000
 do $$
 begin
   if (select count(*) from public.event_audit_logs where event_id = 94001) <> 3 then
-    raise exception '[SG2-40:internal-staff-full-history] [SG2-40:AC3] [NORMAL] Internal staff must read every history entry, planning notes included';
+    raise exception '[SG2-40:internal-staff-full-history] [SG2-40:AC3] [SG2-104:AC6] [NORMAL] Internal staff working on the event must read every history entry, planning notes included';
   end if;
 end $$;
 reset role;

@@ -3,8 +3,9 @@ import rateLimit from 'express-rate-limit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../db';
 import { resolveSupabasePrincipal } from './supabase';
-import { AccessError, type Principal } from './policy';
+import { AccessError, type ResolvedPrincipal } from './policy';
 import { toDisplayRole } from './roleFormat';
+import { heldRolesOf, selectActingRole } from './actingRole';
 
 export interface LoginInput {
   email: string;
@@ -14,7 +15,10 @@ export interface LoginInput {
 export interface LoginUser {
   userId: string;
   email: string;
+  /** The role the account starts acting as (SG2-104): its only role, else the least-privileged one. */
   role: string;
+  /** Every role the account holds, in display form (SG2-104 AC1). */
+  roles: string[];
 }
 
 export type LoginResult =
@@ -65,7 +69,7 @@ export function createLoginRateLimiter(options: { windowMs?: number; limit?: num
 export async function loginAccount(
   input: unknown,
   getClient: () => SupabaseClient | null = getSupabaseClient,
-  resolvePrincipal: (token: string) => Promise<Principal> = resolveSupabasePrincipal
+  resolvePrincipal: (token: string) => Promise<ResolvedPrincipal> = resolveSupabasePrincipal
 ): Promise<LoginResult> {
   // HTTP request bodies are untrusted regardless of the TypeScript caller's
   // type. Reject malformed values before trimming or contacting Auth, using
@@ -94,10 +98,14 @@ export async function loginAccount(
 
   try {
     const principal = await resolvePrincipal(data.session.access_token);
+    const roles = heldRolesOf(principal);
     return {
       outcome: 'success',
       accessToken: data.session.access_token,
-      user: { userId: principal.userId, email: data.user.email ?? email, role: toDisplayRole(principal.role) }
+      user: {
+        userId: principal.userId, email: data.user.email ?? email,
+        role: toDisplayRole(selectActingRole(roles, [])), roles: roles.map(toDisplayRole)
+      }
     };
   } catch (err) {
     if (err instanceof AccessError && err.status === 403) {
