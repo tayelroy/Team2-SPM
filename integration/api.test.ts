@@ -1044,8 +1044,15 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
   const holdingApi = request(createApp(undefined, callerAccess));
   const as = (who: string) => ({ Authorization: `Bearer ${tokens[who]}` });
   const eventId = await planned();
+  let venueId: number | undefined;
   let transport: ReturnType<typeof mock.method> | undefined;
   try {
+    // SQL suites share this disposable DB in CI. Their rolled-back inserts
+    // still advance identity sequences, so no global venue ID is a fixture.
+    const venue = await database.from('venues').insert({ name: 'Integration SG2-69 inbox venue', capacity: 200 })
+      .select('venue_id').single();
+    assert.equal(venue.error, null);
+    venueId = venue.data!.venue_id;
     Object.assign(dbConfig, { supabaseUrl: 'https://notifications-integration.supabase.test', supabaseAnonKey: jwt('anon') });
     transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       const original = new Request(input, init);
@@ -1056,7 +1063,7 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
       } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
       return originalFetch(new Request(url, original));
     });
-    const held = await holdingApi.post('/api/venue-holds').set(as('venue')).send({ event_id: eventId, venue_id: 1,
+    const held = await holdingApi.post('/api/venue-holds').set(as('venue')).send({ event_id: eventId, venue_id: venueId,
       starts_at: '2099-07-03T02:00:00Z', ends_at: '2099-07-03T04:00:00Z', expires_at: '2098-06-20T02:00:00Z' });
     assert.equal(held.status, 201, JSON.stringify(held.body));
     const cleared = await callerApi.post('/api/notifications/read-all').set(as('coordinator'));
@@ -1125,5 +1132,7 @@ test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-69:AC1] [SG2-69:AC2] [SG2-69
     assert.equal((await callerApi.post(`/api/notifications/event/${selectedId}/read`).set(as('coordinator'))).status, 200, 'Historical owned notices remain readable.');
   } finally {
     transport?.mock.restore(); Object.assign(dbConfig, originalConfig);
+    assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
+    if (venueId !== undefined) assert.equal((await database.from('venues').delete().eq('venue_id', venueId)).error, null);
   }
 });

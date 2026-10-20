@@ -7340,7 +7340,7 @@
     "review": null,
     "status": "Pass",
     "actual": "19/19 native API integration tests pass, including caller-scoped inbox paging/read/clear/target/preferences and scheduler recipient/cadence contracts.",
-    "execution_evidence": "20 Oct 2026; npm run test:integration via /tmp/sg69-run-api.mjs; real Express and production Supabase adapter, disposable PostgreSQL17/PostgREST12.2.12; /tmp/sg69-native-api.log.",
+    "execution_evidence": "20 Oct 2026; exact CI database sequence replay, then npm run test:integration; 19/19 pass through real Express and production Supabase adapter with disposable PostgreSQL17/PostgREST12.2.12. /tmp/sg69-ci-sequence-api.log. SQL rollback advances identity sequences; each new API fixture uses its returned venue ID and cleans up independently.",
     "id": "SG2-69-API01",
     "title": "JWT-scoped inbox across Express, PostgREST and PostgreSQL",
     "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
@@ -7362,11 +7362,11 @@
     "purpose": "Check that the production adapter reaches the actual guarded SQL RPCs.",
     "preconditions": "All migrations applied in disposable Docker containers, controlled authfixture, production Express/Supabase adapter.",
     "steps": [
-      "Run npm run test:integration against disposable PostgreSQL17 and PostgREST12.2.12.",
+      "Run the complete CI database-policy/concurrency sequence and legacy-upgrade checks, then npm run test:integration against disposable PostgreSQL17 and PostgREST12.2.12.",
       "Exercise new notification routes with caller JWTs, exact read/count/target/preferences responses and denied unrelated access.",
       "Check scheduler-generated reminder contents/cadence and resulting unread receipt behavior through the production API seam."
     ],
-    "data": "Integration synthetic users/events from integration/seed.sql plus test-local transactional fixtures.",
+    "data": "Dedicated SG2-69 venue and assigned event created by this case; synthetic users from integration/seed.sql; event and venue removed in finally. No fixed global venue ID.",
     "expected": "Production HTTP and JWT/RPC contracts agree with database state; cleanup succeeds and no hosted URL or secrets are used.",
     "evidence": "integration/api.test.ts; server/src/notifications/index.ts; server/src/db/notificationInbox.ts",
     "layer": "Native API + PostgREST + PostgreSQL"
