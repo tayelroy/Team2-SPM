@@ -17,6 +17,7 @@ import ConfirmedArrangements from '../components/ConfirmedArrangements';
 import RecheckSettleActions from '../components/RecheckSettleActions';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
+import RegistrationPanel from '../components/RegistrationPanel';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -432,6 +433,13 @@ export default function EventDetail({
               canRework={isAssignedCoordinator}
               onReworked={() => setReloadKey((value) => value + 1)}
             />
+          )}
+          {/* SG2-63: the registration picture for the organisation's organisers
+              and the assigned coordinator; only the creating organiser changes
+              the settings, and the server decides who sees contact details. */}
+          {(isOrganiser || isAssignedCoordinator) && accessToken && detail.registrationNeeded
+            && detail.status.toLowerCase() !== 'draft' && (
+            <RegistrationPanel eventId={detail.eventId} accessToken={accessToken} />
           )}
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>

@@ -697,10 +697,13 @@ const NOW = '2030-06-15T12:00:00.000Z';
 const held: WorkItem = { ...review, item_id: 28, event_id: 28, title: 'Held Forum', category: 'assigned',
   status: 'confirmed', assigned_to_me: true, ends_at: '2030-06-15T10:00:00.000Z' };
 
+// SG2-63's registration panel is not what these tests are about: 404 hides it.
+const noRegistrations = () => Response.json({ error: 'Event not found.' }, { status: 404 });
+
 function completionFetch(item: WorkItem, complete: () => Promise<Response> | Response) {
   return vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/complete')
     ? complete()
-    : Response.json({ items: [item] }));
+    : url.endsWith('/registrations') ? noRegistrations() : Response.json({ items: [item] }));
 }
 
 async function openHeld(item: WorkItem, fetch: ReturnType<typeof vi.fn>) {
@@ -796,7 +799,7 @@ const ready: WorkItem = { ...review, item_id: 7, event_id: 7, title: 'Confirmati
 function confirmationFetch(item: WorkItem, confirm: () => Promise<Response> | Response) {
   return vi.fn(async (url: string, init?: RequestInit) => init?.method === 'PATCH' && url.endsWith('/confirm')
     ? confirm()
-    : Response.json({ items: [item] }));
+    : url.endsWith('/registrations') ? noRegistrations() : Response.json({ items: [item] }));
 }
 
 test('[NORMAL] [SG2-58:AC1] the assigned coordinator confirms a ready event and the organiser notification is reported', async () => {

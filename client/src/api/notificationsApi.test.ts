@@ -83,6 +83,22 @@ test('[NORMAL] [SG2-92:AC5] a safety check decision notice survives response val
   expect(await loadNotifications('organiser-token')).toEqual({ ok: true, notifications: [decided] });
 });
 
+test('[NORMAL] [SG2-63:AC10] registration opened and closed notices survive response validation', async () => {
+  const opened = { notification_id: 81, event_id: 7, request_id: null, kind: 'registration_opened',
+    message: 'Registration for Partner Forum is now open.', created_at: '2026-10-20T02:00:00.000Z' };
+  const closed = { ...opened, notification_id: 82, kind: 'registration_closed',
+    message: 'Registration for Partner Forum was closed early by the organiser.' };
+  respond(() => Response.json({ notifications: [opened, closed] }));
+  expect(await loadNotifications('coordinator-token')).toEqual({ ok: true, notifications: [opened, closed] });
+});
+
+test('[FAILURE] [SG2-63:AC10] a near-miss registration notice kind is refused rather than shown unlabelled', async () => {
+  for (const kind of ['registration_open', 'registration_closed ', 'Registration_opened']) {
+    respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));
+    expect(await loadNotifications('token')).toEqual({ ok: false, message: 'Could not load notifications. Please try again.' });
+  }
+});
+
 test('[FAILURE] [SG2-92:AC5] a near-miss safety decision kind is refused rather than shown unlabelled', async () => {
   for (const kind of ['safety_decisions', 'Safety_decision', 'safety_decision ']) {
     respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));

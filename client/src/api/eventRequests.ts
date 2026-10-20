@@ -723,10 +723,8 @@ export interface PlanningUpdatePayload {
   venue_requirements?: string | null;
   equipment_requirements?: string | null;
   accessibility_needs?: string | null;
+  /** Capacity and times are the organiser's (SG2-63 AC8), never sent here. */
   registration_needed?: boolean | null;
-  registration_capacity?: number | null;
-  registration_opens_at?: string | null;
-  registration_closes_at?: string | null;
   planning_notes?: string | null;
   /** SG2-91 AC3: shown to the Safety Officer in the safety check. */
   expected_crowd_movement?: string | null;

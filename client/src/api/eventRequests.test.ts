@@ -1311,9 +1311,6 @@ describe('updateEventPlanning (SG2-39)', () => {
     equipment_requirements: 'Projector',
     accessibility_needs: 'Wheelchair ramp',
     registration_needed: true,
-    registration_capacity: 200,
-    registration_opens_at: '2026-10-01T00:00:00.000Z',
-    registration_closes_at: '2026-11-10T23:59:59.000Z',
     planning_notes: 'All catering set',
     confirm_impact: false,
   };

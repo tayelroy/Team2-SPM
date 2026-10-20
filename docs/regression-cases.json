@@ -676,6 +676,195 @@
     "actual": "PASS: ran in the full local Chromium run on 19 Oct 2026 against the production build and loopback fixture."
   },
   {
+    "id": "SG2-63-P01",
+    "title": "The organiser sees who is coming, raises capacity past the venue with a warning, closes registration early and reopens it",
+    "type": "NORMAL",
+    "story": "SG2-63",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-63:AC1",
+      "SG2-63:AC2",
+      "SG2-63:AC4",
+      "SG2-63:AC5",
+      "SG2-63:AC6",
+      "SG2-63:AC7",
+      "SG2-63:AC9",
+      "SG2-63:AC10"
+    ],
+    "method_id": "TC-8d202a582029",
+    "purpose": "Catch a registration picture that miscounts, hides who is coming from the creator, refuses a capacity above the venue, or a close/reopen that is not recorded or announced.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrations seed before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1683 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as organiser at 1440px and open Harbour Lecture from My events.",
+      "Read the Registration panel: state, Registered, Places remaining and the attendee list with contact details.",
+      "Type capacity 150; check the warning appears before saving; save and read Places remaining and the warning.",
+      "Close registration now; check it reads closed and the close button is gone.",
+      "At 390px set a later closing time (18 Jul 2030 18:00) and save; check it reads open with the new time and no horizontal overflow.",
+      "Read the ledger; sign in as coordinator and open the notifications."
+    ],
+    "data": "Harbour Lecture (631), confirmed for 20 Jul 2030, organiser 'organiser', coordinator 'coordinator', Regression Hall (capacity 100) booked; capacity 80, open since 1 Oct 2026, closing 19 Jul 2030 10:00 SGT; registered: Regression attendee (attendee@example.test) and Guest Attendee (no phone); one cancelled.",
+    "expected": "Registration is open, 2 registered, 78 remaining, both attendees listed with the email link and 'No phone on record'. The warning 'A capacity of 150 is more than Regression Hall holds (100).' shows while typing and after saving; 148 remain. Closing shows 'Registration has closed.'; reopening shows open and 18 Jul 2030, 18:00 SGT. History: capacity 80→150 and two closing-time changes, all by the organiser. Notices: closed early, then now open, each to the organiser and the coordinator; the coordinator's bell shows both. No console errors.",
+    "evidence": "e2e/registrations.spec.ts; e2e/support/registrations.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-63-P02",
+    "title": "The coordinator sees the picture with contact details but cannot change it, and a colleague sees names only",
+    "type": "NORMAL",
+    "story": "SG2-63",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-63:AC3",
+      "SG2-63:AC4",
+      "SG2-63:AC8"
+    ],
+    "method_id": "TC-c84f994440dd",
+    "purpose": "Catch contact details reaching organisation colleagues, or the coordinator being able to change the organiser's settings.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrations seed before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1683 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as coordinator at 390px; open Harbour Lecture from My assigned events.",
+      "Read the Registration panel and check there is no settings form and no horizontal overflow.",
+      "Open Edit Planning Information and read the registration settings.",
+      "Sign in as colleague at 1440px; open Harbour Lecture from My events and read the panel."
+    ],
+    "data": "Harbour Lecture (631), confirmed for 20 Jul 2030, organiser 'organiser', coordinator 'coordinator', Regression Hall (capacity 100) booked; capacity 80, open since 1 Oct 2026, closing 19 Jul 2030 10:00 SGT; registered: Regression attendee (attendee@example.test) and Guest Attendee (no phone); one cancelled.",
+    "expected": "The coordinator sees 2 registered with the attendee's email link and 'Only the organiser who created this event can change its registration settings.', no form; the drawer shows 80 and 19 Jul 2030, 10:00 SGT read-only, 'Set by the event organiser.', with no capacity input. The colleague sees 2 registered and the names, no email, and 'Contact details are shown only to the organiser who created this event and its coordinator.', no form.",
+    "evidence": "e2e/registrations.spec.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-63-N01",
+    "title": "Only the creating organiser changes the settings, and only with valid times",
+    "type": "FAILURE",
+    "story": "SG2-63",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-63:AC3",
+      "SG2-63:AC5",
+      "SG2-63:AC6",
+      "SG2-63:AC8"
+    ],
+    "method_id": "TC-658ed0fced32",
+    "purpose": "Catch the coordinator (either route), a colleague, another organisation or an attendee reaching the settings, or an invalid closing time being saved.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrations seed before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "20 Oct 2026; feature/SG2-63-registration-picture-and-settings on origin/main 0bbceeb; npm run test:e2e locally in Chromium: 129/129 passed, required SG2-26 gate passed; npm run ci green (1683 server / 1638 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "As coordinator, PATCH /planning with registration_capacity and PATCH /registration-settings.",
+      "As colleague, PATCH /registration-settings.",
+      "As organiser2 and attendee, GET /registrations.",
+      "As organiser, set capacity 1 with two registered.",
+      "As organiser, set a closing time at the event start, then one in the past.",
+      "As organiser, close registration twice.",
+      "Read the ledger."
+    ],
+    "data": "Event 631 as seeded for SG2-63-P01.",
+    "expected": "Planning route 403 with the 'set by the Event Organiser' message and fields [registration_capacity]; coordinator 403 on the settings route; colleague 403 'Only the organiser who created this event can change its registration settings.'; organiser2 404, attendee 403; capacity 1 refused 400 '2 people are already registered, so the capacity cannot be lower than 2.'; 400 'Registration must close before the event starts.'; 400 naming close-after-open and the future rule; first close 200, second 409 'Registration is not open, so it cannot be closed early.'. Capacity stays 80 and the only history row is the closing time.",
+    "evidence": "e2e/registrations.spec.ts",
+    "layer": "Playwright Chromium + isolated production app (API level)"
+  },
+  {
+    "id": "SG2-63-INT01",
+    "title": "Native registration settings: the organiser changes them with history, closes and reopens with notices, and the coordinator reads the picture",
+    "type": "NORMAL / CONFLICT / FAILURE",
+    "story": "SG2-63",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-63:AC1",
+      "SG2-63:AC2",
+      "SG2-63:AC4",
+      "SG2-63:AC5",
+      "SG2-63:AC6",
+      "SG2-63:AC8",
+      "SG2-63:AC9",
+      "SG2-63:AC10"
+    ],
+    "purpose": "Prove the real Express handlers, Supabase client and SQL functions agree over PostgREST.",
+    "preconditions": "Disposable PostgreSQL 17 and PostgREST 12, committed migrations and synthetic role identities; real Express/Supabase adapters over loopback HTTP. No hosted Supabase.",
+    "steps": [
+      "Plan an event; set registration as the organiser; insert two registrations and one cancelled.",
+      "Read the picture as the coordinator and as another coordinator.",
+      "Try the settings as the coordinator through both routes.",
+      "Read the history.",
+      "Confirm the event with registration open; close it, reopen it, read the notices; close twice."
+    ],
+    "data": "Integration workshop; capacity 136; opens 1 Oct 2089 13:30, closes 2 Oct 2089 13:30 UTC.",
+    "expected": "2 registered, 134 remaining, contact details visible, no edit for the coordinator; 404 for the other coordinator; 403 on both coordinator routes; three history rows by the organiser; closed-early then now-open notices to the organiser and the coordinator; a second close is 409.",
+    "evidence": "integration/api.test.ts",
+    "layer": "PostgREST integration",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran locally as described in execution_evidence.",
+    "execution_evidence": "20 Oct 2026; same branch; npm run test:integration against disposable PostgreSQL 17 + PostgREST: 19/19 passed (a first run lost two unrelated tests to a dropped local connection; the rerun passed). No hosted Supabase validation.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated local run"
+  },
+  {
+    "id": "SG2-63-DB01",
+    "title": "Registration settings, the picture, notices and the schedule in SQL",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "story": "SG2-63",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-63:AC1",
+      "SG2-63:AC2",
+      "SG2-63:AC3",
+      "SG2-63:AC4",
+      "SG2-63:AC5",
+      "SG2-63:AC6",
+      "SG2-63:AC7",
+      "SG2-63:AC8",
+      "SG2-63:AC9",
+      "SG2-63:AC10"
+    ],
+    "purpose": "Prove the database functions own the rules: who may change the settings, valid times, history, once-only notices, the per-minute schedule and server-only grants.",
+    "preconditions": "Disposable PostgreSQL 17 with every committed migration; rollback-only test data.",
+    "steps": [
+      "Run supabase/tests/event_registration_settings.sql."
+    ],
+    "data": "Events 96301–96308 covering planning, confirmed open, cancelled, no registration, started, not yet open, past closing and unconfirmed-in-window.",
+    "expected": "Every assertion passes, including capacity coming down to the registered count but not below it; no notice for unconfirmed events; each opening or closing is announced once.",
+    "evidence": "supabase/tests/event_registration_settings.sql",
+    "layer": "PostgreSQL",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran locally as described in execution_evidence.",
+    "execution_evidence": "20 Oct 2026; same branch; CI's database job replayed locally on fresh postgres:17 (every migration, release_readiness.sql and its tests, every listed SQL suite and concurrency script, and the upgrade replay): passed. 17 SQL mutations of the migration each failed this suite.",
+    "execution_date": "20 Oct 2026",
+    "executed_by": "Automated local run"
+  },
+  {
     "id": "SG2-32-P01",
     "title": "My drafts excludes non-drafts and confirmed deletion survives reload",
     "type": "Positive / negative",
@@ -5457,12 +5646,12 @@
     "purpose": "Catch missing planning queue fields and unrelated-save data loss through the browser.",
     "preconditions": "Production frontend build served by the isolated loopback Express fixture with synthetic accounts.",
     "steps": [
-      "Prepare saved settings via API with required impact confirmation.",
+      "Prepare saved registration settings as the organiser (SG2-63) and a planning note as the coordinator via API.",
       "Inspect drawer at390px and1440px.",
-      "Edit equipment requirement, save, reload and compare persisted metadata."
+      "Edit the planning note, save, reload and compare persisted metadata."
     ],
     "data": "Synthetic records and accounts only.",
-    "expected": "Capacity 136, one-minute window and note render at 390/1440 without overflow, survive unrelated save and full page reload, and match fixture ledger.",
+    "expected": "Capacity 136 and the opening and closing times render read-only in the drawer, marked as set by the event organiser, at 390/1440 without overflow; the edited note survives save and full page reload, and the registration settings match the fixture ledger.",
     "evidence": "e2e/smoke.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -5948,12 +6137,12 @@
     "steps": [
       "Start with approved venue booking, reserved/placed equipment and fully configured registration.",
       "Increase attendance, observe impact409 and no mutation, then confirm impact and save.",
-      "Read venue/equipment Outstanding while registration stays Ready; increase registration capacity to mark its recheck too.",
+      "Read venue/equipment Outstanding while registration stays Ready; a coordinator's registration capacity change is refused (SG2-63 AC8) and adds no recheck.",
       "Compare original booking and receipt snapshots.",
       "Attempt confirmation on otherwise-ready fixtures with each known active recheck and all three.",
       "Exercise inactive/null/empty/unknown marker compatibility and stale-deployed-function release diagnostics."
     ],
-    "data": "Synthetic event attendance136→137, registration capacity136→137; venue_recheck/equipment_recheck/registration_recheck; false/null flags, duplicates, unknown markers, JSON null/object arrays.",
+    "data": "Synthetic event attendance136→137, coordinator registration capacity 137 refused; venue_recheck/equipment_recheck/registration_recheck; false/null flags, duplicates, unknown markers, JSON null/object arrays.",
     "expected": "Only known active impacts mark their category Outstanding and prevent confirmation. Rechecks retain booking/reservation facts and remain persisted. Refused confirmation changes no event, history, notification, booking or receipt. Inactive/unknown legacy metadata preserves ordinary readiness.",
     "evidence": "server/src/events/arrangementReadiness.test.ts; server/src/getEventArrangements.test.ts; integration/api.test.ts; supabase/tests/event_confirmation.sql; .github/scripts/release-readiness.test.mjs",
     "layer": "Native Express/Supabase/PostgREST/PostgreSQL, public read-model/API tests and rollback SQL",
@@ -6727,7 +6916,7 @@
   },
   {
     "id": "SG2-66-INT02",
-    "title": "Confirmed and Preparation events refuse direct detail edits but keep registration edits; a later-stage impact edit returns to Planning with notices",
+    "title": "Confirmed and Preparation events refuse direct detail edits but keep the organiser's registration edits; a later-stage impact edit returns to Planning with notices",
     "type": "CONFLICT / NORMAL",
     "story": "SG2-66",
     "categories": [
@@ -6744,7 +6933,7 @@
       "For Confirmed then Preparation, PATCH expected_attendance with confirm_impact, then PATCH only registration_capacity and planning_notes.",
       "Move the event to Awaiting Safety Check with a pending venue request and PATCH expected_attendance with confirm_impact."
     ],
-    "data": "Attendance 136 -> 137; registration capacity 130.",
+    "data": "Attendance 136 -> 137; registration capacity 130 set by the organiser (SG2-63).",
     "expected": "Detail edits answer 409 change_request_required naming expected_attendance with nothing written; registration/notes edits answer 200 and keep the status. The Awaiting Safety Check edit moves the event to Planning with a status history row and the two exact back-to-Planning notices.",
     "evidence": "integration/api.test.ts; server/src/events/updatePlanning.ts",
     "layer": "Real local public API/PostgREST/PostgreSQL integration",

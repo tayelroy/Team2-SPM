@@ -99,6 +99,12 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.safety_decision.record': ['safety_officer'],
   'event_request.safety_decisions.view': ['safety_officer', 'event_coordinator', 'event_organiser'],
   'event_request.safety_rework': ['event_coordinator'],
+  // SG2-63: the registration picture for an organiser of the event's
+  // organisation or its assigned coordinator (per-row, 404 otherwise), and the
+  // creating organiser's registration settings (per-row; the coordinator can
+  // see them but not change them, replacing SG2-39 AC4).
+  'event_request.registrations.view': ['event_organiser', 'event_coordinator'],
+  'event_request.registration_settings.update': ['event_organiser'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing

@@ -257,3 +257,27 @@ input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
   .safety-decision-facts { grid-template-columns: minmax(0, 1fr); }
   .safety-panel { padding: 16px; }
 }
+
+/* SG2-63: the registration picture and the organiser's registration settings. */
+.registration-panel { display: grid; gap: 16px; padding: 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(1,29,28,.6); min-width: 0; }
+.registration-panel h3, .registration-panel h4 { margin: 0; color: #edfffe; font-weight: 500; }
+.registration-panel h4 { font-size: 14px; }
+.registration-state { margin: 0; color: #edfffe; font-size: 15px; }
+.registration-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px 24px; margin: 0; }
+.registration-facts dt { color: #bbc7c6; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 4px; }
+.registration-facts dd { color: #edfffe; font-size: 14px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.registration-warnings { margin: 0; padding: 12px 16px 12px 32px; border: 1px solid rgba(246,190,76,.4); border-radius: 8px; background: rgba(246,190,76,.1); color: #f6be4c; font-size: 13px; line-height: 1.5; }
+.registration-attendees { display: grid; gap: 10px; min-width: 0; }
+.registration-attendees ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.registration-attendee { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,.04); color: #edfffe; font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.registration-attendee a { color: #cbfffc; }
+.registration-form { display: grid; gap: 12px; border-top: 1px solid rgba(255,255,255,.1); padding-top: 16px; min-width: 0; }
+.registration-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px 18px; }
+.registration-fields label { display: flex; flex-direction: column; gap: 6px; color: #bbc7c6; font-size: 12px; min-width: 0; }
+.registration-fields input { min-width: 0; width: 100%; box-sizing: border-box; padding: 10px 12px; background: #011d1c; color: #edfffe; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; font: inherit; font-size: 14px; color-scheme: dark; }
+.registration-problems { margin: 0; padding-left: 20px; color: #ffb4ab; font-size: 13px; line-height: 1.5; }
+.registration-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+@media (max-width: 600px) {
+  .registration-panel { padding: 16px; }
+  .registration-row button { width: 100%; }
+}

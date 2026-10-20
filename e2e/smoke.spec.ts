@@ -186,13 +186,17 @@ test('SMOKE-ASSIGN-01 | [NORMAL] [BOUNDARY] [SG2-28:AC1] [SG2-30:AC2] [SG2-87:AC
   });
 });
 
-test('SMOKE-PLANNING-01 | [NORMAL] [BOUNDARY] [SG2-39:AC1] [SG2-41:AC4] queue reload and unrelated edit retain stored registration settings on mobile and desktop', async ({ page, request }, testInfo) => {
-  await test.step('Seed saved registration values through the application API', async () => {
+test('SMOKE-PLANNING-01 | [NORMAL] [BOUNDARY] [SG2-39:AC1] [SG2-41:AC4] [SG2-63:AC8] queue reload and unrelated edit retain the organiser\'s registration settings on mobile and desktop', async ({ page, request }, testInfo) => {
+  await test.step('Seed saved registration and planning values through the application API', async () => {
     expect((await request.post('/__e2e/event-confirmation')).status()).toBe(204);
+    // SG2-63: the organiser sets registration; the coordinator keeps the notes.
+    const organiser = await token(request, 'organiser');
+    expect((await request.patch('/api/event-requests/581/registration-settings', { headers: organiser, data: {
+      registration_capacity: 136, registration_opens_at: '2026-10-01T13:30:00.000Z', registration_closes_at: '2030-06-01T13:31:00.000Z',
+    } })).status()).toBe(200);
     const coordinator = await token(request, 'coordinator');
     expect((await request.patch('/api/event-requests/581/planning', { headers: coordinator, data: {
-      registration_capacity: 136, registration_opens_at: '2026-10-01T13:30:00.000Z',
-      registration_closes_at: '2026-10-01T13:31:00.000Z', planning_notes: 'Keep the loading bay clear', confirm_impact: true,
+      planning_notes: 'Keep the loading bay clear', confirm_impact: true,
     } })).status()).toBe(200);
   });
   let drawer = await test.step('The coordinator opens the saved planning information', async () => {
@@ -202,9 +206,12 @@ test('SMOKE-PLANNING-01 | [NORMAL] [BOUNDARY] [SG2-39:AC1] [SG2-41:AC4] queue re
   for (const width of [390, 1440]) {
     await test.step(`Stored planning values remain visible at ${width}px`, async () => {
       await page.setViewportSize({ width, height: 900 });
-      await expect(drawer.getByLabel('Registration Capacity')).toHaveValue('136');
-      await expect(drawer.getByLabel('Opens At')).toHaveValue('2026-10-01T21:30');
-      await expect(drawer.getByLabel('Closes At')).toHaveValue('2026-10-01T21:31');
+      const settings = drawer.getByTestId('epd-registration-settings');
+      await expect(settings).toContainText('136');
+      await expect(settings).toContainText('1 Oct 2026, 21:30 SGT');
+      await expect(settings).toContainText('1 Jun 2030, 21:31 SGT');
+      await expect(settings).toContainText('Set by the event organiser.');
+      await expect(drawer.getByLabel('Registration Capacity')).toHaveCount(0);
       await expect(drawer.getByLabel(/Planning Notes/i)).toHaveValue('Keep the loading bay clear');
       expect(await noOverflow(page)).toBe(true);
       await drawer.getByLabel(/Planning Notes/i).scrollIntoViewIfNeeded();
@@ -212,18 +219,18 @@ test('SMOKE-PLANNING-01 | [NORMAL] [BOUNDARY] [SG2-39:AC1] [SG2-41:AC4] queue re
     });
   }
   await test.step('An unrelated edit and page reload preserve the stored values', async () => {
-    await drawer.getByLabel('Equipment Requirements').fill('12 microphones and 1 projector');
+    // Event 581 is in Preparation, so the notes are what the coordinator can still edit (SG2-66 AC6).
+    await drawer.getByLabel(/Planning Notes/i).fill('Keep the loading bay clear and lit');
     await drawer.getByRole('button', { name: 'Save Planning Details' }).click();
     await expect(drawer).toHaveCount(0);
     await page.reload();
     drawer = await openPlanning(page);
-    await expect(drawer.getByLabel('Registration Capacity')).toHaveValue('136');
-    await expect(drawer.getByLabel(/Planning Notes/i)).toHaveValue('Keep the loading bay clear');
+    await expect(drawer.getByTestId('epd-registration-settings')).toContainText('136');
+    await expect(drawer.getByLabel(/Planning Notes/i)).toHaveValue('Keep the loading bay clear and lit');
     const ledger = await (await request.get('/__e2e/event-confirmation-ledger')).json();
     expect(ledger.events.find((row: { event_id: number }) => row.event_id === 581)).toMatchObject({
       registration_capacity: 136, registration_opens_at: '2026-10-01T13:30:00.000Z',
-      registration_closes_at: '2026-10-01T13:31:00.000Z', planning_notes: 'Keep the loading bay clear',
-      equipment_requirements: '12 microphones and 1 projector',
+      registration_closes_at: '2030-06-01T13:31:00.000Z', planning_notes: 'Keep the loading bay clear and lit',
     });
     await drawer.getByLabel(/Planning Notes/i).scrollIntoViewIfNeeded();
     await attachScreenshot(page, testInfo, 'planning-values-retained-after-save-and-reload', false);

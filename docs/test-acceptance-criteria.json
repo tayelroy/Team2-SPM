@@ -468,6 +468,24 @@
       }
     },
     {
+      "id": "SG2-63",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-63",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Can see how many have registered and how many places remain for an event I organise or coordinate",
+        "AC2": "Can see the list of registered attendees",
+        "AC3": "An Event Organiser sees this only for their own organisation's events",
+        "AC4": "Attendee contact details are shown only to users authorised to see them",
+        "AC5": "As the Event Organiser, I can set the registration capacity and the opening and closing times for my event, and change them at any time before the event starts, including after it is confirmed",
+        "AC6": "As the Event Organiser, I can close registration early, reopen it or extend it",
+        "AC7": "A capacity above the venue's capacity shows a warning but is allowed",
+        "AC8": "The assigned Event Coordinator can view the registration settings but not change them (replaces SG2-39 AC4)",
+        "AC9": "Each change to the registration settings is recorded with who made it and when",
+        "AC10": "When registration opens or closes (on schedule or closed early by the Organiser), the Event Organiser and the assigned Event Coordinator are notified"
+      }
+    },
+    {
       "id": "SG2-50",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
       "originalPullRequests": [],

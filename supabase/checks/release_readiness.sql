@@ -9,10 +9,11 @@ declare
   reminder_job_ready boolean;
 begin
   with required_columns(relation, columns) as (values
-    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
+    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
     ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
+    ('registrations', 'registration_id,event_id,attendee_id,status,registered_at'),
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
     ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at,read_at'),
     ('venue_hold_notifications', 'notification_id,recipient_id,event_id,kind,message,created_at,read_at'),
@@ -84,7 +85,9 @@ begin
     ('public.read_all_notifications()'), ('public.notification_event(text,bigint)'),
     ('public.notification_reminder_preferences()'), ('public.set_notification_reminder_preferences(integer)'),
     ('private.notification_reminder_due(timestamptz,timestamptz,integer)'),
-    ('public.send_outstanding_arrangement_reminders()')
+    ('public.send_outstanding_arrangement_reminders()'),
+    ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
+    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -195,7 +198,8 @@ begin
     ('equipment_reserved'), ('venue_booking_clash'), ('event_confirmed'),
     ('event_submitted'), ('coordinator_assigned'), ('clarification_requested'),
     ('event_approved'), ('event_rejected'), ('venue_unavailable'), ('event_returned_to_planning'),
-    ('safety_decision'), ('outstanding_arrangements')
+    ('safety_decision'), ('outstanding_arrangements'),
+    ('registration_opened'), ('registration_closed')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),

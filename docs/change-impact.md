@@ -10,8 +10,9 @@ The other SG2-66 rules are documented with the features they change:
 - AC5, Venue Staff-only capacity exceptions (including booked venues outgrown by a revised
   attendance): [venue holds](venue-holds.md) and the capacity-exception sections of
   [the API specification](design/api-specification.md);
-- AC6, the direct-edit lock on Confirmed and Preparation events (registration settings and
-  planning notes excepted), and AC7 on that path: [work queue](work-queue.md) and
+- AC6, the direct-edit lock on Confirmed and Preparation events (whether registration is
+  needed and planning notes excepted; registration capacity and times are the organiser's,
+  see [registrations](registrations.md)), and AC7 on that path: [work queue](work-queue.md) and
   [notifications](notifications.md).
 
 ## Change requests are sample data (stand-in for SG2-64 / SG2-65)

@@ -407,14 +407,14 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Body** (partial update):
   - `expected_attendance`, `proposed_date`
   - `venue_requirements`, `equipment_requirements`, `accessibility_needs`, `planning_notes`
-  - `registration_needed`, `registration_capacity`, `registration_opens_at`, `registration_closes_at`
+  - `registration_needed`
   - `confirm_impact`
+- **SG2-63 AC8:** `registration_capacity`, `registration_opens_at` and `registration_closes_at` are the organiser's (§4.13a); a body carrying any of them is refused 403 `{ error: "Registration capacity and opening and closing times are set by the Event Organiser.", fields[] }` before anything is read.
 - **Schedule rules:**
   - a changed date must be in the future
-  - registration must open before it closes
-  - registration must close before the event
+  - the stored registration opening and closing times must still be before the event
 - **200:** `{ event: PlanningRecord, arrangements_recheck_needed, outstanding_arrangements[] }`. The status becomes `planning` when it was `approved` or when an arrangement impact is confirmed.
-- **SG2-66 AC6:** on a `confirmed` or `preparation` event only registration settings and `planning_notes` may change; unchanged values are ignored.
+- **SG2-66 AC6:** on a `confirmed` or `preparation` event only `registration_needed` and `planning_notes` may change; unchanged values are ignored.
 - **Errors:**
   - 400 `{ error: "Invalid planning details", details[] }`
   - 403 `Only the assigned event coordinator can update planning details.`
@@ -425,6 +425,19 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `This event is no longer assigned to you. Refresh and try again.` (SG2-90: the guarded update matched no row)
   - 503
 - **Side effect:** one history row per audited field. `planning_notes` rows are internal-only. A move from `awaiting_safety_check`, `preparation` or `confirmed` back to `planning` clears `confirmed_by`/`confirmed_at` and sends `event_returned_to_planning` notices to the organiser and the coordinator (SG2-66 AC7; 503 if they cannot be stored).
+
+
+### 4.13a SG2-63 registration picture and settings
+- **Source:** `events/registrationRoutes.ts`, `events/registrationSettings.ts`, `db/registrations.ts`; migration `202610200004_event_registration_settings.sql`. See [Registrations](../registrations.md).
+- **GET /api/event-requests/:eventId/registrations** — permission `event_request.registrations.view` (EO, EC). An organiser of the event's organisation or its assigned coordinator; anyone else gets 404.
+  - **200:** `{ event_id, name, status, registration_needed, registration_capacity, registration_opens_at, registration_closes_at, window, registered_count, places_remaining, contact_details_visible, attendees[], venues[], capacity_warnings[], can_edit }`. `window` is SG2-58's `not_required | not_confirmed | not_yet_open | open | closed`. Each attendee has `registration_id, name, organisation, registered_at`, plus `email` and `phone` only when `contact_details_visible` (the creating organiser and the assigned coordinator).
+- **PATCH /api/event-requests/:eventId/registration-settings** — permission `event_request.registration_settings.update` (EO); the creating organiser only (403 otherwise).
+  - **Body:** any of `registration_capacity` (1–2147483647 or null), `registration_opens_at`, `registration_closes_at` (ISO date-time or null). Nothing else.
+  - **Rules:** closes after it opens; a new closing time is in the future; both before the event starts; capacity not below the registrations already held; none of the three cleared once the event is confirmed; allowed in any status but completed, cancelled or rejected, and only before the event starts. A capacity above a booked venue is allowed and returned in `capacity_warnings`.
+  - **200:** the registration picture as it now stands.
+- **POST /api/event-requests/:eventId/registration-settings/close** — same permission; closes open registration now.
+- **Errors:** 400 `{ error: "Invalid registration settings", details[] }`; 403; 404 `Event not found.`; 409 for a closed event (`status`), no registration, an event that has started, closing registration that is not open, or a registration arriving between the check and the write (`registered`); 503.
+- **Side effects:** one `event_audit_logs` row per changed setting; a `registration_opened` or `registration_closed` notice to the organiser and the assigned coordinator when a confirmed event's registration opens or closes, including on schedule (`process_registration_windows()`, every minute through pg_cron).
 
 ### 4.14 GET /api/event-requests/:eventId/arrangements
 - **Week 7:** New since W7 — SG2-57; #3 — SG2-82.
