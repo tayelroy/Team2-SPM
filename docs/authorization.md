@@ -222,7 +222,9 @@ by `(user_id, role)`), but every request runs as exactly **one** of them, its
 
 Reading an event's stage or change history needs a relationship to that event
 (AC6, `server/src/events/eventRelationship.ts`, mirrored by
-`public.event_relationship_exists()` and the `event_audit_logs` read policy):
+`private.event_relationship_exists()` and the `event_audit_logs` read policy;
+the function sits in the unexposed `private` schema so clients cannot call it
+through `/rpc`):
 its organiser, its current coordinator (so a reassigned coordinator loses
 access at once), the Lead for any submitted event, Venue Staff when it has a
 venue request or booking, Technical Support when it has an equipment request

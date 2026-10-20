@@ -444,8 +444,16 @@ begin
       or exists (select 1 from public.event_audit_logs where event_id = 104003 and field_name = 'planning_notes') then
     raise exception '[SG2-104:union-does-not-leak-internal-fields] [SG2-104:AC6] [CONFLICT] Holding a coordinator role must not reveal another event''s internal fields to its organiser';
   end if;
-  if public.event_relationship_exists(104002, 'venue_staff') then
+  if private.event_relationship_exists(104002, 'venue_staff') then
     raise exception '[SG2-104:relationship-needs-held-role] [SG2-104:AC6] [FAILURE] The relationship check answered for a role the caller does not hold';
+  end if;
+  -- Only reachable through the history policy: not in an API-exposed schema,
+  -- and never callable by anonymous clients.
+  if to_regprocedure('public.event_relationship_exists(integer, text)') is not null
+      or to_regnamespace('private') is null
+      or has_function_privilege('anon', 'private.event_relationship_exists(integer, text)', 'execute')
+      or has_schema_privilege('anon', 'private', 'usage') then
+    raise exception '[SG2-104:relationship-check-not-exposed] [SG2-104:AC6] [FAILURE] The relationship check must not be callable through the Data API';
   end if;
 end $$;
 

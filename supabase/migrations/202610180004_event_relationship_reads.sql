@@ -15,6 +15,11 @@
 --   attendee                 never
 -- It deliberately does not read event_audit_logs, whose policy calls it.
 --
+-- It lives in the private schema, which the Data API does not expose, so a
+-- client cannot call it through /rpc to probe which events have bookings or
+-- equipment requests. authenticated keeps EXECUTE (and USAGE on the schema)
+-- only because a row policy runs its function calls as the reader.
+--
 -- The read policy below lets a caller read an entry when one role they hold
 -- has a relationship to the event and, for the internal-only fields
 -- (INTERNAL_ONLY_AUDIT_FIELDS in server/src/auth/policy.ts), that role is
@@ -22,7 +27,11 @@
 -- it only as its organiser, so never its planning notes.
 begin;
 
-create function public.event_relationship_exists(p_event_id integer, p_role text)
+create schema if not exists private;
+revoke all on schema private from public, anon;
+grant usage on schema private to authenticated, service_role;
+
+create function private.event_relationship_exists(p_event_id integer, p_role text)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
     select 1
@@ -46,8 +55,8 @@ returns boolean language sql stable security definer set search_path = '' as $$
   );
 $$;
 
-revoke all on function public.event_relationship_exists(integer, text) from public, anon;
-grant execute on function public.event_relationship_exists(integer, text) to authenticated, service_role;
+revoke all on function private.event_relationship_exists(integer, text) from public, anon;
+grant execute on function private.event_relationship_exists(integer, text) to authenticated, service_role;
 
 drop policy if exists event_audit_logs_read on public.event_audit_logs;
 create policy event_audit_logs_read on public.event_audit_logs
@@ -56,7 +65,7 @@ create policy event_audit_logs_read on public.event_audit_logs
     exists (
       select 1 from public.account_roles ar
       where ar.user_id = (select auth.uid())
-        and public.event_relationship_exists(event_audit_logs.event_id, ar.role)
+        and private.event_relationship_exists(event_audit_logs.event_id, ar.role)
         and (
           ar.role in ('event_coordinator', 'venue_staff', 'technical_support_staff',
             'event_coordinator_lead', 'safety_officer')

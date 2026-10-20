@@ -26,7 +26,7 @@ async function anyRow(admin: SupabaseClient, tables: string[], eventId: number):
 /**
  * SG2-104 AC6: whether the caller, acting as `role`, has a relationship to the
  * event and may read its stage and change history. Mirrored by
- * public.event_relationship_exists() (202610180004); the two change together.
+ * private.event_relationship_exists() (202610180004); the two change together.
  * The coordinator check reads the event's current coordinator, so a
  * reassigned coordinator loses access immediately.
  */
