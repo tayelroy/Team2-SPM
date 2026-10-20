@@ -777,6 +777,18 @@
         "AC5": "The assigned Event Coordinator and the Event Organiser are notified of the decision and its reason",
         "AC6": "Each decision is recorded with who made it, when, and the reason"
       }
+    },
+    {
+      "id": "SG2-70",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-70",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Can search by event name and client organisation",
+        "AC2": "Can filter by date, state, venue, category and assigned coordinator",
+        "AC3": "Results include only events I am permitted to see",
+        "AC4": "When nothing matches, this is stated along with the filters in force"
+      }
     }
   ]
 }
