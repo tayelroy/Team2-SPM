@@ -34,6 +34,9 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   event_returned_to_planning: 'Back in Planning',
   // SG2-92 AC5: the Safety Officer recorded the event's operational safety check decision.
   safety_decision: 'Safety check',
+  // SG2-63 AC10: registration opened or closed, on schedule or closed early.
+  registration_opened: 'Registration open',
+  registration_closed: 'Registration closed',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
@@ -50,6 +53,8 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'], string> = {
   event_rejected: color.silver,
   event_returned_to_planning: color.silver,
   safety_decision: color.accent,
+  registration_opened: color.accent,
+  registration_closed: color.silver,
 };
 
 /** One line in the drawer, whichever inbox it came from. */

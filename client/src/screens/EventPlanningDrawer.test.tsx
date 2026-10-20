@@ -49,7 +49,6 @@ describe('Helper functions', () => {
       now: Date.parse('2026-10-01T00:00:00.000Z'),
       expectedAttendance: '150',
       registrationNeeded: false,
-      registrationCapacity: '',
       registrationOpensAt: '',
       registrationClosesAt: '',
       venueRequirements: 'Auditorium',
@@ -88,10 +87,9 @@ describe('Helper functions', () => {
       ).toContain('Expected attendance must be at most 2147483647.');
     });
 
-    test.each(['1', '2147483647'])('[BOUNDARY] [SG2-39:AC4] accepts the exact inclusive attendance and registration capacity limit %s', (limit) => {
+    test.each(['1', '2147483647'])('[BOUNDARY] [SG2-39:AC4] accepts the exact inclusive attendance limit %s', (limit) => {
       expect(validatePlanningForm({ ...baseValid, expectedAttendance: limit,
-        registrationNeeded: true, registrationCapacity: limit,
-        registrationOpensAt: '2026-11-10T10:00', registrationClosesAt: '2026-11-10T10:01',
+        registrationNeeded: true, registrationOpensAt: '2026-11-10T10:00', registrationClosesAt: '2026-11-15T08:59',
       })).toEqual([]);
     });
 
@@ -118,47 +116,6 @@ describe('Helper functions', () => {
       expect(errors).toContain('Planning notes must be 5000 characters or fewer.');
     });
 
-    test('[BOUNDARY] [SG2-39:AC4] validates registration parameters when registration is needed', () => {
-      const regInvalid = {
-        ...baseValid,
-        registrationNeeded: true,
-        registrationCapacity: '-5',
-        registrationOpensAt: 'invalid-open',
-        registrationClosesAt: 'invalid-close',
-      };
-
-      const errors = validatePlanningForm(regInvalid);
-      expect(errors).toContain('Registration capacity must be a positive whole number.');
-      expect(errors).toContain('Registration opening time must be a valid date and time.');
-      expect(errors).toContain('Registration closing time must be a valid date and time.');
-
-      // Check capacity overflow
-      const overflow = validatePlanningForm({
-        ...baseValid,
-        registrationNeeded: true,
-        registrationCapacity: '3000000000',
-      });
-      expect(overflow).toContain('Registration capacity must be at most 2147483647.');
-
-      // Check registration window sequence
-      const badWindow = validatePlanningForm({
-        ...baseValid,
-        registrationNeeded: true,
-        registrationOpensAt: '2026-11-20T10:00',
-        registrationClosesAt: '2026-11-10T10:00',
-      });
-      expect(badWindow).toContain('Registration closing time must be after opening time.');
-
-      // Equal times also invalid
-      const equalWindow = validatePlanningForm({
-        ...baseValid,
-        registrationNeeded: true,
-        registrationOpensAt: '2026-11-10T10:00',
-        registrationClosesAt: '2026-11-10T10:00',
-      });
-      expect(equalWindow).toContain('Registration closing time must be after opening time.');
-    });
-
     test('[BOUNDARY] [SG2-39:AC4] a newly chosen proposed date must be in the future', () => {
       const past = 'Proposed date must be in the future.';
       expect(validatePlanningForm({ ...baseValid, proposedDate: '2020-01-01T01:00' })).toEqual([past]);
@@ -169,15 +126,17 @@ describe('Helper functions', () => {
         initialProposedDate: '2020-01-01T01:00' })).toEqual([]);
     });
 
-    test('[FAILURE] [SG2-39:AC4] registration must open and close before the event starts', () => {
+    test('[FAILURE] [SG2-39:AC4] [SG2-63:AC5] the event must still start after the organiser\'s registration times', () => {
       const event = { ...baseValid, proposedDate: '2030-06-20T01:00', initialProposedDate: '2030-06-20T01:00',
-        registrationNeeded: true, registrationCapacity: '50' };
+        registrationNeeded: true };
       expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-01T01:00',
-        registrationClosesAt: '2030-12-31T01:00' })).toEqual(['Registration closing time must be before the event starts.']);
+        registrationClosesAt: '2030-12-31T01:00' })).toEqual([
+        'The event must start after registration closes. Ask the organiser to change the registration times first.',
+      ]);
       expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-20T01:00',
         registrationClosesAt: '2030-06-21T01:00' })).toEqual([
-        'Registration opening time must be before the event starts.',
-        'Registration closing time must be before the event starts.',
+        'The event must start after registration opens. Ask the organiser to change the registration times first.',
+        'The event must start after registration closes. Ask the organiser to change the registration times first.',
       ]);
       expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-01T01:00',
         registrationClosesAt: '2030-06-20T00:59' })).toEqual([]);
@@ -190,7 +149,7 @@ describe('Helper functions', () => {
       const errors = validatePlanningForm({
         ...baseValid,
         registrationNeeded: false,
-        registrationCapacity: '-10',
+        proposedDate: '2026-11-15T09:00',
         registrationOpensAt: '2026-11-20T10:00',
         registrationClosesAt: '2026-11-10T10:00',
       });
@@ -238,16 +197,21 @@ describe('EventPlanningDrawer Component', () => {
     });
     const onClose = vi.fn();
     render(<EventPlanningDrawer eventId={17} initialValues={savedPlanning} onClose={onClose} />);
-    expect(screen.getByLabelText('Registration Capacity')).toHaveValue(136);
-    expect(screen.getByLabelText('Opens At')).toHaveValue('2026-10-01T13:30');
-    expect(screen.getByLabelText('Closes At')).toHaveValue('2026-10-01T13:31');
+    // SG2-63 AC8: the organiser's settings are shown in Singapore time, not as inputs.
+    const settings = within(screen.getByTestId('epd-registration-settings'));
+    expect(settings.getByText('136')).toBeVisible();
+    expect(settings.getByText('1 Oct 2026, 21:30 SGT')).toBeVisible();
+    expect(settings.getByText('1 Oct 2026, 21:31 SGT')).toBeVisible();
+    expect(settings.getByText('Set by the event organiser. Ask them to change the capacity or times.')).toBeVisible();
+    expect(screen.queryByLabelText('Registration Capacity')).toBeNull();
     expect(screen.getByLabelText(/Planning Notes/i)).toHaveValue('Keep the loading bay clear');
     fireEvent.change(screen.getByLabelText('Equipment Requirements'), { target: { value: '2 projectors' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(update).toHaveBeenCalledWith(17, expect.objectContaining({
-      ...storedRegistration, equipment_requirements: '2 projectors',
-    }), 'valid-token');
+    const sent = update.mock.calls[0][1];
+    expect(sent).toMatchObject({ registration_needed: true, planning_notes: 'Keep the loading bay clear',
+      equipment_requirements: '2 projectors' });
+    expect(Object.keys(sent).filter(key => /^registration_(capacity|opens_at|closes_at)$/.test(key))).toEqual([]);
   });
 
   test('[BOUNDARY] [SG2-39:AC1] distinguishes loaded empty values from omitted fields while retaining explicit clearing', async () => {
@@ -258,13 +222,12 @@ describe('EventPlanningDrawer Component', () => {
       registration_needed: true, registration_capacity: 136, registration_opens_at: null,
       registration_closes_at: null, planning_notes: 'Clear this note',
     }} />);
-    fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '' } });
+    expect(within(screen.getByTestId('epd-registration-settings')).getAllByText('Not set')).toHaveLength(2);
     fireEvent.change(screen.getByLabelText(/Planning Notes/i), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
     await screen.findByText('Planning unavailable.');
     expect(update).toHaveBeenCalledWith(17, {
-      registration_needed: true, registration_capacity: null, registration_opens_at: null,
-      registration_closes_at: null, planning_notes: null, confirm_impact: false,
+      registration_needed: true, planning_notes: null, confirm_impact: false,
     }, 'valid-token');
   });
 
@@ -372,13 +335,15 @@ describe('EventPlanningDrawer Component', () => {
     expect(scroll.mock.contexts).toEqual([alert]);
   });
 
-  test('[FAILURE] [SG2-39:AC4] a past proposed date or a registration window after the start is refused before saving', () => {
+  test('[FAILURE] [SG2-39:AC4] [SG2-63:AC5] a past proposed date, or one before registration closes, is refused before saving', () => {
     const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning');
     render(
       <EventPlanningDrawer
         eventId={91}
         onClose={vi.fn()}
-        initialValues={{ proposed_date: '2030-06-20T01:00:00.000Z', expected_attendance: 100, status: 'approved' }}
+        initialValues={{ proposed_date: '2030-06-20T01:00:00.000Z', expected_attendance: 100, status: 'approved',
+          registration_needed: true, registration_opens_at: '2030-06-01T01:00:00.000Z',
+          registration_closes_at: '2030-06-10T01:00:00.000Z' }}
       />,
     );
 
@@ -386,14 +351,10 @@ describe('EventPlanningDrawer Component', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
     expect(screen.getByTestId('client-validation-errors')).toHaveTextContent('Proposed date must be in the future.');
 
-    fireEvent.change(screen.getByLabelText('Proposed Date & Time'), { target: { value: '2030-06-20T01:00' } });
-    fireEvent.click(screen.getByText('Registration Disabled'));
-    fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '50' } });
-    fireEvent.change(screen.getByLabelText('Opens At'), { target: { value: '2030-06-01T01:00' } });
-    fireEvent.change(screen.getByLabelText('Closes At'), { target: { value: '2030-12-31T01:00' } });
+    fireEvent.change(screen.getByLabelText('Proposed Date & Time'), { target: { value: '2030-06-05T01:00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
     const errors = screen.getByTestId('client-validation-errors');
-    expect(errors).toHaveTextContent('Registration closing time must be before the event starts.');
+    expect(errors).toHaveTextContent('The event must start after registration closes. Ask the organiser to change the registration times first.');
     expect(errors).not.toHaveTextContent('Proposed date must be in the future.');
     expect(updateSpy).not.toHaveBeenCalled();
   });
@@ -448,7 +409,7 @@ describe('EventPlanningDrawer Component', () => {
     ).toBe('Initial discussion logged');
 
     expect(screen.getByText('Registration Enabled')).toBeDefined();
-    expect((screen.getByLabelText('Registration Capacity') as HTMLInputElement).value).toBe('150');
+    expect(within(screen.getByTestId('epd-registration-settings')).getByText('150')).toBeVisible();
   });
 
   test('[BOUNDARY] [SG2-39:AC1] renders with empty initial values and defaults', () => {
@@ -463,7 +424,7 @@ describe('EventPlanningDrawer Component', () => {
     expect((screen.getByLabelText('Expected Attendance') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('Venue Requirements') as HTMLTextAreaElement).value).toBe('');
     expect(screen.getByText('Registration Disabled')).toBeDefined();
-    expect(screen.queryByLabelText('Registration Capacity')).toBeNull();
+    expect(screen.queryByTestId('epd-registration-settings')).toBeNull();
   });
 
   test('[NORMAL] [SG2-39:AC1] toggles registration needed section and updates state', () => {
@@ -479,11 +440,11 @@ describe('EventPlanningDrawer Component', () => {
     fireEvent.click(toggleButton);
 
     expect(screen.getByText('Registration Enabled')).toBeDefined();
-    expect(screen.getByLabelText('Registration Capacity')).toBeDefined();
+    expect(screen.getByTestId('epd-registration-settings')).toBeVisible();
 
     fireEvent.click(screen.getByText('Registration Enabled'));
     expect(screen.getByText('Registration Disabled')).toBeDefined();
-    expect(screen.queryByLabelText('Registration Capacity')).toBeNull();
+    expect(screen.queryByTestId('epd-registration-settings')).toBeNull();
   });
 
   test('[NORMAL] [SG2-39:AC1] calls onClose when backdrop or close button is clicked', () => {
@@ -647,17 +608,8 @@ describe('EventPlanningDrawer Component', () => {
       target: { value: 'All confirmed' },
     });
 
-    // Enable registration and set values
+    // Enable registration; its capacity and times are the organiser's (SG2-63).
     fireEvent.click(screen.getByText('Registration Disabled'));
-    fireEvent.change(screen.getByLabelText('Registration Capacity'), {
-      target: { value: '250' },
-    });
-    fireEvent.change(screen.getByLabelText('Opens At'), {
-      target: { value: '2026-10-01T00:00' },
-    });
-    fireEvent.change(screen.getByLabelText('Closes At'), {
-      target: { value: '2026-11-19T23:59' },
-    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
 
@@ -671,7 +623,6 @@ describe('EventPlanningDrawer Component', () => {
           accessibility_needs: 'Wheelchair access ramp',
           planning_notes: 'All confirmed',
           registration_needed: true,
-          registration_capacity: 250,
           confirm_impact: false,
         }),
         'custom-token',
@@ -845,24 +796,24 @@ describe('EventPlanningDrawer Component', () => {
   });
 
   for (const [status, stage] of [['confirmed', 'Confirmed'], ['PREPARATION', 'in Preparation']] as const) {
-    test(`[NORMAL] [SG2-66:AC6] a ${status} event locks its details, points to a change request and saves only registration and notes`, async () => {
+    test(`[NORMAL] [SG2-66:AC6] a ${status} event locks its details, points to a change request and saves only the registration choice and notes`, async () => {
       const update = vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
         ok: true, event: { ...savedPlanning, status }, arrangements_recheck_needed: false, outstanding_arrangements: [],
       });
       const onClose = vi.fn();
       render(<EventPlanningDrawer eventId={17} initialValues={{ ...savedPlanning, status }} onClose={onClose} />);
       expect(screen.getByTestId('change-request-lock-notice')).toHaveTextContent(
-        `This event is ${stage}, so its date, attendance and requirements can no longer be edited here. Ask for those changes through a change request; registration settings and planning notes can still be updated.`);
+        `This event is ${stage}, so its date, attendance and requirements can no longer be edited here. Ask for those changes through a change request; whether registration is needed and planning notes can still be updated.`);
       for (const label of ['Proposed Date & Time', 'Expected Attendance', 'Venue Requirements', 'Equipment Requirements', 'Accessibility Needs']) {
         expect(screen.getByLabelText(label)).toBeDisabled();
       }
-      expect(screen.getByLabelText('Registration Capacity')).toBeEnabled();
       expect(screen.getByLabelText(/Planning Notes/i)).toBeEnabled();
-      fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '120' } });
+      fireEvent.change(screen.getByLabelText(/Planning Notes/i), { target: { value: 'Doors at 6' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Registration Enabled' }));
       fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
       await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
       expect(update).toHaveBeenCalledWith(17, {
-        ...storedRegistration, registration_capacity: 120, confirm_impact: false,
+        registration_needed: false, planning_notes: 'Doors at 6', expected_crowd_movement: null, confirm_impact: false,
       }, 'valid-token');
     });
   }
@@ -874,7 +825,7 @@ describe('EventPlanningDrawer Component', () => {
   });
 
   test('[CONFLICT] [SG2-66:AC6] the server refusing a direct edit shows its change request message and keeps the drawer open', async () => {
-    const message = 'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.';
+    const message = 'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only whether registration is needed and planning notes can still be edited here.';
     vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
       ok: false, kind: 'change_request_required', message, fields: ['expected_attendance'],
     });

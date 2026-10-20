@@ -256,6 +256,20 @@ test('[NORMAL] [SG2-92:AC5] a safety check decision notice is labelled and shows
   expect(screen.getByText(message)).toBeVisible();
 });
 
+test('[NORMAL] [SG2-63:AC10] registration opening and closing notices are labelled with what happened', async () => {
+  vi.mocked(notices.loadNotifications).mockResolvedValue({ ok: true, notifications: [
+    { notification_id: 81, event_id: 7, request_id: null, kind: 'registration_opened',
+      message: 'Registration for Partner Forum is now open.', created_at: '2026-10-20T02:00:00.000Z' },
+    { notification_id: 82, event_id: 7, request_id: null, kind: 'registration_closed',
+      message: 'Registration for Partner Forum has closed.', created_at: '2026-10-21T02:00:00.000Z' },
+  ] });
+  render(<HoldNotifications accessToken="organiser-token" holds={false} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Notifications (2)' }));
+  expect(screen.getByText('Registration open')).toBeVisible();
+  expect(screen.getByText('Registration closed')).toBeVisible();
+  expect(screen.getByText('Registration for Partner Forum has closed.')).toBeVisible();
+});
+
 test('[BOUNDARY] [SG2-68:AC3] the Safety Officer, who receives no notices yet, keeps the empty placeholder and makes no notice request', () => {
   render(<AppShell role="Safety Officer" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()} accessToken="safety-token">Dashboard</AppShell>);
   expect(screen.getByRole('button', { name: 'Notifications (0)' })).toBeInTheDocument();

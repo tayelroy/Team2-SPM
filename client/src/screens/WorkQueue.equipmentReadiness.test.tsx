@@ -180,6 +180,8 @@ function registrationFixture(failSave = false) {
       };
       return Response.json(result);
     }
+    // SG2-63's registration panel is covered elsewhere; 404 keeps it hidden.
+    if (url === '/api/event-requests/17/registrations') return Response.json({ error: 'Event not found.' }, { status: 404 });
     return base.fetch(url, init);
   });
   vi.stubGlobal('fetch', fetch);
@@ -192,32 +194,29 @@ async function openRegistrationPlanning() {
   await screen.findByText('Registration not required.');
   fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
   fireEvent.click(screen.getByRole('button', { name: 'Registration Disabled' }));
-  fireEvent.change(screen.getByLabelText('Registration Capacity'), { target: { value: '20' } });
 }
 
-test('[NORMAL] [SG2-39:AC1] [SG2-57:AC2] saving registration planning immediately refreshes readiness and retains configured dates on reopen', async () => {
+test('[NORMAL] [SG2-39:AC1] [SG2-57:AC2] [SG2-63:AC8] turning registration on saves only that, and it stays outstanding until the organiser sets capacity and times', async () => {
   const current = registrationFixture();
   await openRegistrationPlanning();
-  fireEvent.change(screen.getByLabelText('Opens At'), { target: { value: '2030-06-01T10:00' } });
-  fireEvent.change(screen.getByLabelText('Closes At'), { target: { value: '2030-06-10T18:00' } });
+  expect(screen.queryByLabelText('Registration Capacity')).not.toBeInTheDocument();
+  expect(within(screen.getByTestId('epd-registration-settings')).getAllByText('Not set')).toHaveLength(3);
   fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
-  await screen.findByText('Registration capacity and opening and closing times set.');
-  expect(screen.getByTestId('arrangement-registration-state')).toHaveTextContent('Ready');
-  expect(screen.queryByText('Registration not required.')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
-  expect(screen.getByLabelText('Registration Capacity')).toHaveValue(20);
-  expect(screen.getByLabelText('Opens At')).toHaveValue('2030-06-01T10:00');
-  expect(screen.getByLabelText('Closes At')).toHaveValue('2030-06-10T18:00');
+  await screen.findByText('Registration opening and closing times are missing.');
+  expect(screen.getByTestId('arrangement-registration-state')).toHaveTextContent('Outstanding');
+  const save = current.fetch.mock.calls.find(([url, init]) => url === '/api/event-requests/17/planning' && init?.method === 'PATCH')!;
+  const sent = JSON.parse(String(save[1]!.body)) as Record<string, unknown>;
+  expect(sent.registration_needed).toBe(true);
+  expect(Object.keys(sent).filter(key => /^registration_(capacity|opens_at|closes_at)$/.test(key))).toEqual([]);
   expect(current.readinessReads()).toBe(2);
   expect(current.state).toMatchObject({ queueReads: 2, requirementReads: 1 });
 });
 
-test('[BOUNDARY] [SG2-39:AC1] [SG2-57:AC2] incomplete registration becomes outstanding after save and disabling it restores not-required readiness', async () => {
+test('[BOUNDARY] [SG2-39:AC1] [SG2-57:AC2] turning registration back off restores not-required readiness', async () => {
   const current = registrationFixture();
   await openRegistrationPlanning();
   fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
   await screen.findByText('Registration opening and closing times are missing.');
-  expect(screen.getByTestId('arrangement-registration-state')).toHaveTextContent('Outstanding');
   fireEvent.click(screen.getByRole('button', { name: 'Edit Planning Information' }));
   fireEvent.click(screen.getByRole('button', { name: 'Registration Enabled' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
@@ -227,12 +226,11 @@ test('[BOUNDARY] [SG2-39:AC1] [SG2-57:AC2] incomplete registration becomes outst
   expect(current.state).toMatchObject({ queueReads: 2, requirementReads: 1 });
 });
 
-test('[FAILURE] [SG2-39:AC4] [SG2-57:AC2] a failed planning save leaves readiness unchanged and keeps the registration draft', async () => {
+test('[FAILURE] [SG2-39:AC4] [SG2-57:AC2] a failed planning save leaves readiness unchanged and keeps the registration choice', async () => {
   const current = registrationFixture(true);
   await openRegistrationPlanning();
   fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
   await screen.findByText('Planning service unavailable');
-  expect(screen.getByLabelText('Registration Capacity')).toHaveValue(20);
   expect(screen.getByRole('button', { name: 'Registration Enabled' })).toBeVisible();
   expect(screen.getByTestId('arrangement-registration-state')).toHaveTextContent('Not required');
   expect(current.readinessReads()).toBe(1);
