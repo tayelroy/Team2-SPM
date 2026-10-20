@@ -8,10 +8,11 @@ declare
   failures text[];
 begin
   with required_columns(relation, columns) as (values
-    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,registration_capacity,registration_opens_at,registration_closes_at,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
+    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
     ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
+    ('registrations', 'registration_id,event_id,attendee_id,status,registered_at'),
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
     ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at'),
     ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
@@ -72,7 +73,9 @@ begin
     ('public.list_venue_unavailability(integer,timestamptz)'),
     ('public.release_replaced_booking(bigint,text)'), ('public.venue_disruption_notify()'),
     -- SG2-106: venue delete and hold expiry change.
-    ('public.delete_venue(integer)'), ('public.change_venue_hold_expiry(bigint,timestamptz)')
+    ('public.delete_venue(integer)'), ('public.change_venue_hold_expiry(bigint,timestamptz)'),
+    ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
+    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -140,7 +143,8 @@ begin
     ('venue_request_approved'), ('venue_request_rejected'), ('venue_booking_released'),
     ('equipment_reserved'), ('venue_booking_clash'), ('event_confirmed'),
     ('event_submitted'), ('coordinator_assigned'), ('clarification_requested'),
-    ('event_approved'), ('event_rejected'), ('venue_unavailable')
+    ('event_approved'), ('event_rejected'), ('venue_unavailable'),
+    ('registration_opened'), ('registration_closed')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),
