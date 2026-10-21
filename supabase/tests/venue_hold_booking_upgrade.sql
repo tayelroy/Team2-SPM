@@ -15,8 +15,9 @@ begin
     where (f.n in(2,3,12) and r.status<>'cancelled') or(f.n in(1,4) and r.status<>'approved')) then
   raise exception '[SG2-51:legacy-released-hold-requests-cancelled] [SG2-51:AC2] [SG2-84:AC5] [NORMAL] Released bookings must not leave approved requests; cancelled requests must never reactivate';
  end if;
+ -- SG2-83 adds change_reason (null) after this fixture was taken.
  if exists(select 1 from public.venue_booking_requests r join hold_link_upgrade_fixture.before f using(request_id)
-    where (f.n between 5 and 11 or f.n>=13) and to_jsonb(r) is distinct from f.request_before) then
+    where (f.n between 5 and 11 or f.n>=13) and (to_jsonb(r)-'change_reason') is distinct from f.request_before) then
   raise exception '[SG2-84:legacy-hold-mismatches-not-guessed] [SG2-84:AC5] [FAILURE] Request/booking event, venue and period identities, conflicting direct links and non-converted/non-approved controls must not be repaired';
  end if;
  if exists(select 1 from hold_link_upgrade_fixture.before f
@@ -24,7 +25,7 @@ begin
     join public.venue_holds h on h.request_id=r.request_id
     left join public.venue_bookings b on b.booking_id=h.booking_id
     join public.events e on e.event_id=h.event_id
-    where (to_jsonb(r)-'venue_booking_id'-'status') is distinct from(f.request_before-'venue_booking_id'-'status')
+    where (to_jsonb(r)-'venue_booking_id'-'status'-'change_reason') is distinct from(f.request_before-'venue_booking_id'-'status')
      -- SG2-106 adds expiry_revision (default 0) after this fixture was taken.
      or (to_jsonb(h)-'expiry_revision') is distinct from f.hold_before or to_jsonb(b) is distinct from f.booking_before
      -- SG2-91 adds columns and may move a ready event into the safety check
