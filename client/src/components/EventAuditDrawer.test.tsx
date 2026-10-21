@@ -556,3 +556,9 @@ test('[NORMAL] [SG2-92:AC6] a safety check decision reads as a labelled history 
   expect(humanizeFieldValue('safety_decision', 'Changes requested (Venue, Other): Widen the aisles'))
     .toBe('Changes requested (Venue, Other): Widen the aisles');
 });
+
+test('[NORMAL] [SG2-56:AC3] a released equipment reservation reads as a labelled history entry, as recorded', () => {
+  expect(humanizeFieldName('equipment_reservation')).toBe('Equipment Reservation');
+  expect(humanizeFieldValue('equipment_reservation', 'Released: 6 × Microphones (reservation 12) — Event cancelled'))
+    .toBe('Released: 6 × Microphones (reservation 12) — Event cancelled');
+});

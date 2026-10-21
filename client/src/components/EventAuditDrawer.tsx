@@ -45,6 +45,8 @@ const FIELD_LABELS: Record<string, string> = {
   arrangement_recheck: 'Arrangement Recheck',
   // SG2-92 AC6: the Safety Officer's operational safety check decision and its reason.
   safety_decision: 'Safety Decision',
+  // SG2-56 AC3: a reservation released because the event was cancelled.
+  equipment_reservation: 'Equipment Reservation',
 };
 
 /** Formats an ISO string into Singapore Standard Time (SGT). */
