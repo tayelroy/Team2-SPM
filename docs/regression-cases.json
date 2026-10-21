@@ -8215,5 +8215,74 @@
     "execution_evidence": "20 Oct 2026; feature/SG2-70-find-event at 8c83142; npm run test:e2e locally in Chromium: 132/132 journeys passed including this one, regression gate passed. No hosted Supabase validation.",
     "actual": "PASS: ran in the full local Chromium regression run at 8c83142 against the production build and loopback fixture; assertions checked the visible and stored results above.",
     "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-56-DB01",
+    "title": "cancelling an event releases all of its equipment reservations, once, and records each release in the event history",
+    "story": "SG2-56",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-56:AC1",
+      "SG2-56:AC3"
+    ],
+    "purpose": "Verify that moving an event into Cancelled releases every reservation it holds, records who released it, when and why, adds one history entry per reservation, leaves other events alone, and cannot be repeated or written by hand.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back. SG2-67 cancel_event() is not built yet, so a test stand-in cancels the event as its assigned coordinator.",
+    "steps": [
+      "Seed event 95601 with 6 microphones and 3 projectors reserved, and events 95602 and 95604 with their own microphone reservations.",
+      "Cancel 95601 through the SG2-67 stand-in as its coordinator.",
+      "Read the reservations and the event audit log.",
+      "Update the cancelled event again and confirm event 95602; try a direct release and the release function as an authenticated caller, and store a blank reason."
+    ],
+    "data": "Synthetic 956xx events, equipment, reservations and requests; d5600000 fixture identities.",
+    "expected": "Both of 95601's reservations show released_at, the coordinator and 'Event cancelled'; two 'equipment_reservation' history entries read 'Reserved: …' then 'Released: … — Event cancelled'; no other event changes; later updates add nothing; direct writes and the function are refused; a blank reason fails its check.",
+    "evidence": "supabase/tests/equipment_release.sql; .github/workflows/ci.yml; docs/equipment-reservations.md",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay.",
+    "status": "Pass",
+    "execution_date": "21 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "21 Oct 2026; feature/SG2-56-release-equipment on main 5d5709b; disposable PostgreSQL 17 replay of the auth fixture and every migration, then supabase/tests/equipment_release.sql; sabotage runs (trigger dropped, release function opened to callers) made the suite fail. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-21",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-56-DB02",
+    "title": "released equipment returns only when operational and not committed to another event in the same period",
+    "story": "SG2-56",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-56:AC2"
+    ],
+    "purpose": "Verify that a cancellation frees stock for the period, that stock another event still holds stays committed, and that released equipment under maintenance stays unavailable.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back. SG2-67 cancel_event() is not built yet, so a test stand-in cancels the event as its assigned coordinator.",
+    "steps": [
+      "Before cancelling, check microphone availability for event 95603 in the shared period (10 held: 6 by 95601, 4 by 95602).",
+      "Cancel 95601 and put the projectors under maintenance.",
+      "Check availability again, try to reserve 7 microphones, then 6, and check projector availability."
+    ],
+    "data": "Synthetic 956xx events, equipment, reservations and requests; d5600000 fixture identities.",
+    "expected": "0 microphones remain before cancelling and 6 after; reserving 7 is refused as insufficient and reserving exactly 6 succeeds; 0 projectors remain while under maintenance.",
+    "evidence": "supabase/tests/equipment_release.sql; .github/workflows/ci.yml; docs/equipment-reservations.md",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay.",
+    "status": "Pass",
+    "execution_date": "21 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "21 Oct 2026; feature/SG2-56-release-equipment on main 5d5709b; disposable PostgreSQL 17 replay of the auth fixture and every migration, then supabase/tests/equipment_release.sql; sabotage runs (trigger dropped, release function opened to callers) made the suite fail. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-21",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

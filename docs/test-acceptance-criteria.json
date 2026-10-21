@@ -680,6 +680,18 @@
       "source": "Live SG2-55 Jira description, bullet order, read in the in-app browser."
     },
     {
+      "id": "SG2-56",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-56",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Cancelling an event releases the equipment reserved for it",
+        "AC2": "Releasing a reservation returns equipment to the available quantity for that period only if it is operational and not committed elsewhere; damaged equipment or equipment under maintenance remains unavailable",
+        "AC3": "The release is recorded against the event"
+      },
+      "verifiedAt": "2026-10-21",
+      "source": "Live SG2-56 Jira description, bullet order, read through the Atlassian connector."
+    },
+    {
       "id": "SG2-58",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-58",
       "summary": "Confirm an event",
