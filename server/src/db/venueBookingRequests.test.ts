@@ -177,6 +177,26 @@ test('[FAILURE] [SG2-81:AC2] bookings or flags that cannot be read are reported 
   }
 });
 
+test('[NORMAL] [SG2-83:AC1] the bookings a coordinator may change are the event\'s confirmed ones not yet over, read by id', async () => {
+  const calls: Call[] = [];
+  const store = createVenueBookingRequestStore(fakeAdmin({ venue_bookings: [{ data: [{ booking_id: 9 }, { booking_id: '14' }], error: null }] }, calls));
+  assert.deepEqual(await store.changeableBookings(7, '2030-01-01T00:00:00.000Z'), [9, 14]);
+  assert.deepEqual(calls.filter(call => call.table === 'venue_bookings' && ['eq', 'gt', 'order'].includes(call.method)).map(call => [call.method, ...call.args]),
+    [['eq', 'event_id', 7], ['eq', 'status', 'confirmed'], ['gt', 'ends_at', '2030-01-01T00:00:00.000Z'], ['order', 'booking_id']]);
+});
+
+test('[CONFLICT] [SG2-83:AC1] a change refused by the database because its booking was just cancelled is reported as stale, not a failure', async () => {
+  const store = createVenueBookingRequestStore(fakeAdmin({
+    venue_booking_requests: [{ data: null, error: { code: '23514', message: 'A change must replace a confirmed booking' } }]
+  }));
+  assert.equal(await store.create({ ...values, replaces_booking_id: 9, change_reason: 'Bigger room' }), 'stale');
+});
+
+test('[FAILURE] [SG2-83:AC1] current bookings that cannot be read are reported as temporarily unavailable', async () => {
+  await assert.rejects(createVenueBookingRequestStore(fakeAdmin({ venue_bookings: [{ data: null, error: { message: 'offline' } }] }))
+    .changeableBookings(7, 'now'), (error: unknown) => error instanceof AccessError && error.status === 503);
+});
+
 test('[FAILURE] [SG2-82:AC5] venue requests that cannot be read for readiness are reported as temporarily unavailable', async () => {
   const store = createVenueBookingRequestStore(fakeAdmin({ venue_booking_requests: [{ data: null, error: { message: 'offline' } }] }));
   await assert.rejects(store.venueStatuses(7), (error: unknown) => error instanceof AccessError && error.status === 503);

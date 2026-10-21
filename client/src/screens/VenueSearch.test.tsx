@@ -367,6 +367,32 @@ test('[BOUNDARY] [SG2-81:AC4] an affected booking whose venue has no recorded na
   expect(await screen.findByText(/Finding a replacement for venue #1 \(booking #11/)).toBeVisible();
 });
 
+test('[NORMAL] [SG2-83:AC1] [SG2-83:AC4] the coordinator changes a venue that is not affected: the same period is searched and the change carries its reason', async () => {
+  const made: Record<string, unknown>[] = [];
+  const searched: Record<string, string>[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/venues/suitability')) return Response.json({ venues: [] });
+    if (url.startsWith('/api/venue-bookings')) return Response.json({ bookings: [{ ...affectedBooking, affected_by: [] }] });
+    if (url.startsWith('/api/venue-booking-requests') && init?.method === 'POST') {
+      made.push(JSON.parse(init.body as string));
+      return Response.json({ request: requested, booking: 'allowed' }, { status: 201 });
+    }
+    if (url.startsWith('/api/venue-booking-requests')) return Response.json({ requests: [], arrangement: { state: 'ready', needed: 1, approved: 1,
+      pending: 0, rejected: 0, unbooked: 0, affected: 0 } });
+    searched.push(Object.fromEntries(new URL(url, 'http://local').searchParams));
+    return Response.json({ venues: [terrace] });
+  }));
+  render(<VenueSearch accessToken="token" prefill={prefill} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Change venue' }));
+  await vi.waitFor(() => expect(searched).toHaveLength(2));
+  expect(screen.getByText(/Changing Atrium Hall \(booking #11/)).toHaveTextContent('the event\'s other venues are not affected');
+  fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
+  fireEvent.change(screen.getByLabelText('Reason for the change'), { target: { value: 'More seats needed' } });
+  fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
+  expect(await screen.findByText(/Rooftop Terrace requested/)).toBeVisible();
+  expect(made).toEqual([expect.objectContaining({ replaces_booking_id: 11, change_reason: 'More seats needed' })]);
+});
+
 // Real child panels and their public reads: another user can decide a request
 // while this coordinator keeps the same search screen open.
 const confirmedSearchBooking = { ...affectedBooking, booking_id: 42, venue_id: 3, venue_name: 'Rooftop Terrace',

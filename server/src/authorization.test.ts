@@ -439,7 +439,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -463,7 +463,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'work_queue.read', 'venues.availability.view', 'event_request.stage.view', 'event_request.history.view',
       'venues.read', 'venues.create', 'venues.update', 'venues.delete', 'venues.layouts.read', 'venues.layouts.update',
       'venues.blocks.manage', 'venues.operations.read', 'venues.operations.update', 'venues.suitability.view', 'venue_booking.capacity_exception.approve',
-      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'notifications.inbox', 'venue_bookings.view', 'venue_bookings.release',
+      'venue_booking.request.view', 'venue_booking.conflicts.view', 'venue_booking.decide', 'notifications.read', 'notifications.inbox', 'venue_bookings.view',
       'venue_bookings.by_venue', 'venue_clashes.view', 'venues.holds.read', 'venues.holds.manage', 'events.search', 'profile.read', 'profile.update'
     ],
     technical_support_staff: [
