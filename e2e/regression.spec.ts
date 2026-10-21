@@ -1828,7 +1828,7 @@ test('SG2-83-P01 | [SG2-83:AC1] [SG2-83:AC2] [SG2-83:AC3] [SG2-83:AC4] [NORMAL] 
   await expect(drawer.getByText(/^Regression coordinator cancelled the booking of Quiet Room for Venue Request Forum \(.*\): Breakout sessions dropped\. The venue is available again for that period\.$/)).toBeVisible();
 });
 
-test('SG2-83-P02 | [SG2-83:AC1] [SG2-83:AC4] [NORMAL] the coordinator changes one venue to another with a reason; the current booking stays until Venue Staff decide, and they are told', async ({ page, request }) => {
+test('SG2-83-P02 | [SG2-83:AC1] [SG2-83:AC4] [NORMAL] the coordinator changes one venue to another with a reason; the current booking stays until Venue Staff approve, which releases only it', async ({ page, request }) => {
   expect((await request.post('/__e2e/venue-change')).status()).toBe(204);
   await signIn(page, 'coordinator');
   await openVenueRequestSearch(page);
@@ -1862,6 +1862,21 @@ test('SG2-83-P02 | [SG2-83:AC1] [SG2-83:AC4] [NORMAL] the coordinator changes on
   const drawer = page.getByRole('complementary', { name: 'Notifications' });
   await expect(drawer.getByText('Venue change requested', { exact: true })).toBeVisible();
   await expect(drawer.getByText(/^A change is requested for Venue Request Forum: Quiet Room \(booking 22\) to Breakout Studio.*: Breakouts need a projector\. The current booking stays until the change is approved\.$/)).toBeVisible();
+
+  // AC1: once Venue Staff approve the change, only the replaced booking is released, with the coordinator's reason.
+  const venueHeaders = await authHeaders(page);
+  const listed = await (await page.request.get('/api/venue-booking-requests?event_id=91', { headers: venueHeaders })).json();
+  const change = listed.requests.find((row: { venue_name: string; status: string }) => row.venue_name === 'Breakout Studio' && row.status === 'pending');
+  const approved = await page.request.post(`/api/venue-booking-requests/${change.request_id}/decision`, { headers: venueHeaders, data: { decision: 'approve' } });
+  expect(approved.status()).toBe(200);
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  await expect(room.getByText('Released', { exact: true })).toBeVisible();
+  await expect(room.getByText(/: Changed to Breakout Studio: Breakouts need a projector$/)).toBeVisible();
+  await expect(hall.getByText('Confirmed', { exact: true })).toBeVisible();
+  await expect(booked.getByRole('listitem').filter({ hasText: 'Breakout Studio' }).getByText('Confirmed', { exact: true })).toBeVisible();
 });
 
 test('SG2-83-N01 | [SG2-83:AC5] [SG2-83:AC2] [FAILURE] [CONFLICT] [BOUNDARY] Venue Staff and other roles cannot cancel a venue booking, and naming a booking that is not the event\'s cancels nothing', async ({ page, request }) => {

@@ -4248,7 +4248,7 @@
   },
   {
     "id": "SG2-83-P02",
-    "title": "the coordinator changes one venue to another with a reason; the current booking stays until Venue Staff decide, and they are told",
+    "title": "the coordinator changes one venue to another with a reason; the current booking stays until Venue Staff approve, which releases only it",
     "type": "NORMAL",
     "categories": [
       "NORMAL"
@@ -4257,20 +4257,22 @@
       "SG2-83:AC1",
       "SG2-83:AC4"
     ],
-    "purpose": "Catch a change that drops the current booking before Venue Staff approve, touches the event's other venue, can be sent without a reason, or is not announced to Venue Staff, or a screen that scrolls sideways at 390px or 1440px.",
+    "purpose": "Catch a change that drops the current booking before Venue Staff approve, touches the event's other venue, can be sent without a reason, is not announced to Venue Staff, or leaves the replaced booking in place once approved, or a screen that scrolls sideways at 390px or 1440px.",
     "steps": [
       "Seed event 91 with bookings #21 and #22 and a free Breakout Studio.",
       "Sign in as the coordinator, open Find venues for Venue Request Forum and press Change venue on #22.",
       "Request Breakout Studio; send without a reason, then with 'Breakouts need a projector'.",
       "Read both bookings; check the layout at 1440px and 390px.",
-      "Sign in as Venue Staff and open Notifications."
+      "Sign in as Venue Staff and open Notifications.",
+      "As Venue Staff, approve the Breakout Studio request; sign in as the coordinator and reopen the booked venues."
     ],
     "data": "Event 91, venues 1, 2 and 5, bookings #21 and #22; reason 'Breakouts need a projector'.",
     "expected": [
       "The search says it is changing Quiet Room (booking #22) and the form says #22 is released once Venue Staff approve",
       "Sending without a reason is stopped; with it, Breakout Studio is requested",
       "#22 shows Change requested: Breakout Studio, awaiting Venue Staff, and stays Confirmed; #21 stays Confirmed; neither width scrolls sideways",
-      "Venue Staff see Venue change requested with the venues and the reason"
+      "Venue Staff see Venue change requested with the venues and the reason",
+      "#22 shows Released with 'Changed to Breakout Studio: Breakouts need a projector'; Breakout Studio is Confirmed; #21 stays Confirmed"
     ],
     "story": "SG2-83",
     "method_id": null,
