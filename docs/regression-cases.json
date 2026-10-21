@@ -4171,7 +4171,7 @@
   },
   {
     "id": "SG2-51-P02",
-    "title": "Venue Staff release a booking from the catalogue; other roles cannot release",
+    "title": "Venue Staff see a released booking from the catalogue but cannot release one; other roles cannot release",
     "story": "SG2-51",
     "categories": [
       "NORMAL",
@@ -4179,30 +4179,148 @@
     ],
     "mapped_acs": [
       "SG2-51:AC1",
-      "SG2-51:AC3"
+      "SG2-51:AC3",
+      "SG2-83:AC6"
     ],
-    "purpose": "Verify Venue Staff release a venue's booking from the catalogue with a reason, a second release is refused, the event's other booking is unchanged, and organisers, Technical Support Staff, attendees and anonymous callers cannot release.",
+    "purpose": "SG2-83 AC6 replaces Venue Staff release: verify Venue Staff still see a venue's bookings and who released one and why, but get no Release button and a 403 from the API, the event's other booking is unchanged, and organisers, Technical Support Staff, attendees and anonymous callers cannot release.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
       "Seed event 91 with bookings #21 and #22.",
-      "Sign in as Venue Staff, open Catalogue, then Bookings for Quiet Room; release #22 with 'Flooded floor'.",
-      "Release #22 again through the API and list event 91's bookings.",
+      "As the coordinator, release #22 through the API with 'Flooded floor'.",
+      "Sign in as Venue Staff, open Catalogue, then Bookings for Quiet Room; read #22 and look for a Release button.",
+      "Release #22 as Venue Staff through the API and list event 91's bookings.",
       "Sign in as organiser, Technical Support Staff and attendee and try to release #21; try without credentials."
     ],
     "data": "Event 91, venues 1 and 2, bookings #21 and #22; venue, organiser, support and attendee fixture accounts.",
-    "expected": "#22 shows Released by Regression venue with the reason; the second release gets 409; #21 stays confirmed; other roles get 403 and no credentials get 401.",
+    "expected": "#22 shows Released by Regression coordinator with the reason and no Release button is offered; Venue Staff's release gets 403; #21 stays confirmed; other roles get 403 and no credentials get 401.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the Chromium run with the other venue journeys.",
-    "execution_date": "9 Oct 2026",
-    "executed_by": "YE ZHAN",
-    "execution_evidence": "9 Oct 2026; feature/SG2-51-release-venue-booking merged with main c872e6b (SG2-50 #64, SG2-87 #66, SG2-53 #67, SG2-100 #68, SG2-57 #69, SG2-80 #70); server and client suites at 100% coverage; 69/69 browser journeys passed; disposable PostgreSQL 17 replay of all migrations and every suite including venue_booking_release. Hosted CI evidence comes from the PR check.",
+    "actual": "PASS: ran in the full local Chromium regression run against the production build and loopback fixture; assertions checked the visible and stored results above.",
+    "execution_date": "21 Oct 2026",
+    "executed_by": "Automated test runner",
+    "execution_evidence": "21 Oct 2026; feature/SG2-83-change-or-cancel-one-venue on main 5d5709b; npm run test:e2e locally in Chromium: 147/147 journeys passed including this one, regression gate passed; layout checked at 390px and 1440px with no sideways scroll. No hosted Supabase validation.",
     "review": {
       "date": "2026-10-09",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-83-P01",
+    "title": "the coordinator cancels one of two venues, leaving the other unticked; it stays booked, the period is free and Venue Staff are told",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-83:AC1",
+      "SG2-83:AC2",
+      "SG2-83:AC3",
+      "SG2-83:AC4"
+    ],
+    "purpose": "Catch a cancellation that takes the event's other venue with it, ticks it by default, leaves the period occupied, loses who cancelled and why, or does not tell Venue Staff, or a screen that scrolls sideways at 390px or 1440px.",
+    "steps": [
+      "Seed event 91 with bookings #21 (Regression Hall) and #22 (Quiet Room) on 20 Jun 2030, 10:00–12:00 SGT.",
+      "Sign in as the coordinator and open Find venues for Venue Request Forum.",
+      "Release #22; check Regression Hall is offered unticked; give 'Breakout sessions dropped' and confirm.",
+      "Read both bookings and each venue's availability for the period; check the layout at 1440px and 390px.",
+      "Sign in as Venue Staff and open Notifications."
+    ],
+    "data": "Event 91, venues 1 and 2, bookings #21 and #22; reason 'Breakout sessions dropped'.",
+    "expected": [
+      "The notice says Quiet Room is available again, the Event Organiser and Venue Staff are notified and the event's other venues are unchanged",
+      "#22 shows Released by Regression coordinator with the reason; #21 stays Confirmed",
+      "Quiet Room has no entries for the period; Regression Hall still has one; neither width scrolls sideways",
+      "Venue Staff see Venue booking cancelled, naming the coordinator, the venue, the event, the period and the reason"
+    ],
+    "story": "SG2-83",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "review": null,
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "status": "Pass",
+    "execution_date": "21 Oct 2026",
+    "execution_evidence": "21 Oct 2026; feature/SG2-83-change-or-cancel-one-venue on main 5d5709b; npm run test:e2e locally in Chromium: 147/147 journeys passed including this one, regression gate passed; layout checked at 390px and 1440px with no sideways scroll. No hosted Supabase validation.",
+    "actual": "PASS: ran in the full local Chromium regression run against the production build and loopback fixture; assertions checked the visible and stored results above.",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-83-P02",
+    "title": "the coordinator changes one venue to another with a reason; the current booking stays until Venue Staff decide, and they are told",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-83:AC1",
+      "SG2-83:AC4"
+    ],
+    "purpose": "Catch a change that drops the current booking before Venue Staff approve, touches the event's other venue, can be sent without a reason, or is not announced to Venue Staff, or a screen that scrolls sideways at 390px or 1440px.",
+    "steps": [
+      "Seed event 91 with bookings #21 and #22 and a free Breakout Studio.",
+      "Sign in as the coordinator, open Find venues for Venue Request Forum and press Change venue on #22.",
+      "Request Breakout Studio; send without a reason, then with 'Breakouts need a projector'.",
+      "Read both bookings; check the layout at 1440px and 390px.",
+      "Sign in as Venue Staff and open Notifications."
+    ],
+    "data": "Event 91, venues 1, 2 and 5, bookings #21 and #22; reason 'Breakouts need a projector'.",
+    "expected": [
+      "The search says it is changing Quiet Room (booking #22) and the form says #22 is released once Venue Staff approve",
+      "Sending without a reason is stopped; with it, Breakout Studio is requested",
+      "#22 shows Change requested: Breakout Studio, awaiting Venue Staff, and stays Confirmed; #21 stays Confirmed; neither width scrolls sideways",
+      "Venue Staff see Venue change requested with the venues and the reason"
+    ],
+    "story": "SG2-83",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "review": null,
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "status": "Pass",
+    "execution_date": "21 Oct 2026",
+    "execution_evidence": "21 Oct 2026; feature/SG2-83-change-or-cancel-one-venue on main 5d5709b; npm run test:e2e locally in Chromium: 147/147 journeys passed including this one, regression gate passed; layout checked at 390px and 1440px with no sideways scroll. No hosted Supabase validation.",
+    "actual": "PASS: ran in the full local Chromium regression run against the production build and loopback fixture; assertions checked the visible and stored results above.",
+    "executed_by": "Automated test runner"
+  },
+  {
+    "id": "SG2-83-N01",
+    "title": "Venue Staff and other roles cannot cancel a venue booking, and naming a booking that is not the event's cancels nothing",
+    "type": "FAILURE",
+    "categories": [
+      "FAILURE",
+      "CONFLICT",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-83:AC5",
+      "SG2-83:AC2"
+    ],
+    "purpose": "Catch Venue Staff still being offered or allowed a release, or a cancellation that goes ahead in part when another booking named with it is not a live booking of the event, or that accepts more than 50 others.",
+    "steps": [
+      "Seed event 91 with bookings #21 and #22.",
+      "Sign in as Venue Staff, open Catalogue, then Bookings for Quiet Room; look for a Release button; release #22 through the API.",
+      "Sign in as the coordinator; release #21 naming booking 999 as well; then naming 51 others.",
+      "List event 91's bookings."
+    ],
+    "data": "Event 91, bookings #21 and #22; booking 999 does not exist.",
+    "expected": [
+      "Venue Staff see no Release button and are told only the coordinator cancels or changes a booking; the API answers 403",
+      "Naming booking 999 gets 409 'Each other booking chosen must be a confirmed booking of this event that has not ended. Nothing was cancelled.'; 51 others get 400",
+      "#21 and #22 are both still confirmed"
+    ],
+    "story": "SG2-83",
+    "method_id": null,
+    "evidence": "e2e/regression.spec.ts",
+    "layer": "Playwright browser + fixture API",
+    "review": null,
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
+    "status": "Pass",
+    "execution_date": "21 Oct 2026",
+    "execution_evidence": "21 Oct 2026; feature/SG2-83-change-or-cancel-one-venue on main 5d5709b; npm run test:e2e locally in Chromium: 147/147 journeys passed including this one, regression gate passed; layout checked at 390px and 1440px with no sideways scroll. No hosted Supabase validation.",
+    "actual": "PASS: ran in the full local Chromium regression run against the production build and loopback fixture; assertions checked the visible and stored results above.",
+    "executed_by": "Automated test runner"
   },
   {
     "id": "DB-VENUE-RELEASE-01",
