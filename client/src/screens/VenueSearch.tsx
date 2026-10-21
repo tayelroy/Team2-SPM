@@ -50,6 +50,13 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   // Local changes and a fresh search can reveal another user's decision.
   const refreshRequests = () => setRequestsVersion(version => version + 1);
   const pending = useRef<AbortController | null>(null);
+  // SG2-83: the booking list sits below the results, so starting a change or
+  // replacement scrolls up to the banner saying which booking is being
+  // replaced, with the new search beneath it.
+  const banner = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (replacing) banner.current!.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [replacing]);
 
   async function run(criteria: VenueSearchValues) {
     pending.current?.abort();
@@ -155,14 +162,14 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
         </form>
       </RecessedCard>
 
-      {replacing ? <RecessedCard padding="18px 24px" style={{ gap: '10px' }}>
+      {replacing ? <div ref={banner} style={{ scrollMarginTop: '96px' }}><RecessedCard padding="18px 24px" style={{ gap: '10px' }}>
         <p role="status" style={{ margin: 0, color: color.mist }}>
           {replacing.affected_by.length > 0 ? 'Finding a replacement for' : 'Changing'} {replacing.venue_name ?? `venue #${replacing.venue_id}`} (booking #{replacing.booking_id}, {formatSgt(replacing.starts_at)} – {formatSgt(replacing.ends_at)}).
           The search uses this event&apos;s requirements. The booking is released once Venue Staff approve the replacement you request;
           the event&apos;s other venues are not affected.
         </p>
         <GhostButton onClick={() => setReplacing(null)} style={{ alignSelf: 'flex-start' }}>Stop replacing this booking</GhostButton>
-      </RecessedCard> : null}
+      </RecessedCard></div> : null}
       {loading ? <p role="status">Searching venues…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {notice ? <p role="status" style={{ margin: 0, color: color.accent }}>{notice}</p> : null}

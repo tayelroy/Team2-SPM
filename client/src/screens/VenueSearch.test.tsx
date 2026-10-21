@@ -382,10 +382,17 @@ test('[NORMAL] [SG2-83:AC1] [SG2-83:AC4] the coordinator changes a venue that is
     searched.push(Object.fromEntries(new URL(url, 'http://local').searchParams));
     return Response.json({ venues: [terrace] });
   }));
+  // The page scrolls up to say which booking is being changed (jsdom has no scrolling of its own).
+  const scrolled: Element[] = [];
+  const scrollIntoView = vi.fn(function (this: Element) { scrolled.push(this); });
+  Element.prototype.scrollIntoView = scrollIntoView;
   render(<VenueSearch accessToken="token" prefill={prefill} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Change venue' }));
   await vi.waitFor(() => expect(searched).toHaveLength(2));
   expect(screen.getByText(/Changing Atrium Hall \(booking #11/)).toHaveTextContent('the event\'s other venues are not affected');
+  expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  expect(scrolled[0]).toContainElement(screen.getByText(/Changing Atrium Hall/));
+  delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   fireEvent.click(await screen.findByRole('button', { name: 'Request this venue' }));
   fireEvent.change(screen.getByLabelText('Reason for the change'), { target: { value: 'More seats needed' } });
   fireEvent.submit(screen.getByRole('form', { name: 'Request Rooftop Terrace' }));
