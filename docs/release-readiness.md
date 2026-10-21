@@ -16,7 +16,19 @@ acceptance tests or the Definition of Done.
 2. Review unapplied migrations and apply them to that project in filename order.
    Use the migration ledger together with the actual schema. Some historical
    setups used SQL Editor without a ledger; do not blindly reapply the entire
-   directory to an existing database. Keep the release's migration result.
+   directory to an existing database. Rehearse before applying (DoD v2.2):
+   - In the SQL Editor, write `begin;` on the first line, paste the unapplied
+     migration files in filename order, delete every line that is exactly
+     `commit;`, and write `rollback;` on the last line. Run it. It must finish
+     without an error; a failed rehearsal changes nothing.
+   - Do not just wrap a file in `begin;` … `rollback;`. Almost every migration
+     ends with its own `commit;`, which saves the changes for real before the
+     `rollback;` is reached.
+   - A statement that cannot run inside a transaction, such as
+     `create index concurrently`, cannot be rehearsed this way. Rehearse it on a
+     disposable copy and say so in the PR.
+   - After a clean rehearsal, run the unedited files in filename order. Keep the
+     release's rehearsal and migration results.
 3. Run the complete contents of
    [`supabase/checks/release_readiness.sql`](../supabase/checks/release_readiness.sql)
    in that project's SQL Editor as the database operator. The script only reads

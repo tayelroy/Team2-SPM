@@ -182,3 +182,30 @@ follow-up.
 
 ![Desktop reserved arrangement](screenshots/sg2-55-edge-cases/desktop.png)
 ![Mobile reserved arrangement](screenshots/sg2-55-edge-cases/mobile.png)
+
+## SG2-56: release equipment when an event is cancelled
+
+Migration `202610210001_equipment_release.sql` adds `released_at`,
+`released_by` and `release_reason` to `equipment_reservations`, and a trigger
+on `events` that runs when an event's status moves into `cancelled`:
+
+- **AC1**: every reservation the event still holds is released in the same
+  transaction as the cancellation. Whatever cancels the event only has to set
+  the status. SG2-67's `cancel_event()` is not built yet, so
+  `supabase/tests/equipment_release.sql` stands in for it by cancelling as the
+  assigned coordinator.
+- **AC2**: no new stock rule. `check_equipment_availability()` and
+  `manage_equipment_reservations()` already skip reservations of cancelled
+  events and count only operational stock, less anything still committed to
+  other events in the period. Damaged equipment and equipment under
+  maintenance stay at 0.
+- **AC3**: each released reservation keeps who released it (the canceller),
+  when, and the reason `Event cancelled`. The event's history gets one
+  "Equipment Reservation" entry per reservation, for example
+  `Reserved: 6 × Microphones (reservation 12)` →
+  `Released: 6 × Microphones (reservation 12) — Event cancelled`.
+
+The trigger function is `security definer` with an empty `search_path`, and
+no client role can execute it. Authenticated callers still have no direct
+access to `equipment_reservations`. A status change into Cancelled releases
+equipment once: later updates to a cancelled event add nothing.
