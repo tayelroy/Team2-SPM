@@ -1,4 +1,4 @@
--- Rollback for 202610210001_venue_booking_change_cancel.sql (SG2-83).
+-- Rollback for 202610210002_venue_booking_change_cancel.sql (SG2-83).
 --
 -- Restores the database to how it was before that migration, so it can be
 -- applied again later:
