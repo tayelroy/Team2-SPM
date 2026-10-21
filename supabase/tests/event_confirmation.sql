@@ -361,12 +361,19 @@ begin
    raise exception '[SG2-58:hold-convert-fixture] [SG2-58:AC2] [NORMAL] The hold fixture must convert into a booking: % %',hold,result;
   end if;
   if n=2 then
-   result := public.release_venue_booking((result->'hold'->>'booking_id')::bigint,'Venue flooded');
-   if result->>'outcome' is distinct from 'released' then
-    raise exception '[SG2-58:hold-release-fixture] [SG2-58:AC2] [CONFLICT] The converted booking must release: %',result;
-   end if;
+   perform set_config('confirmation.release_booking',result->'hold'->>'booking_id',true);
   end if;
  end loop;
+end $$;
+-- SG2-83 AC5: the event's coordinator releases it; Venue Staff no longer can.
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+declare result jsonb;
+begin
+ result := public.release_venue_booking(current_setting('confirmation.release_booking')::bigint,'Venue flooded');
+ if result->>'outcome' is distinct from 'released' then
+  raise exception '[SG2-58:hold-release-fixture] [SG2-58:AC2] [CONFLICT] The converted booking must release: %',result;
+ end if;
 end $$;
 reset role;
 update public.events set status='preparation' where event_id in (95891,95892);

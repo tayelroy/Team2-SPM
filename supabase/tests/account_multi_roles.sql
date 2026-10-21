@@ -195,10 +195,16 @@ begin
     raise exception '[SG2-104:release-unheld-role-refused] [SG2-104:AC2] [FAILURE] Acting as a role not held must be refused';
   exception when insufficient_privilege then null;
   end;
+  -- SG2-83 AC5: Venue Staff no longer release bookings, whatever else the
+  -- account holds.
   perform set_config('request.headers', '{"x-acting-role":"venue_staff"}', true);
-  result := public.release_venue_booking(104101, 'Room no longer needed');
-  if result ->> 'outcome' is distinct from 'released' then
-    raise exception '[SG2-104:release-as-venue-staff] [SG2-104:AC1] [NORMAL] Acting as Venue Staff must release any booking: %', result;
+  begin
+    perform public.release_venue_booking(104101, 'Room no longer needed');
+    raise exception '[SG2-83:acting-venue-staff-release-refused] [SG2-83:AC5] [FAILURE] Acting as Venue Staff must not release a booking';
+  exception when insufficient_privilege then null;
+  end;
+  if (select status from public.venue_bookings where booking_id = 104101) <> 'confirmed' then
+    raise exception '[SG2-83:acting-venue-staff-release-no-change] [SG2-83:AC5] [FAILURE] A refused release changed the booking';
   end if;
 end $$;
 
