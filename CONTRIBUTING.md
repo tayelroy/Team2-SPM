@@ -1,6 +1,9 @@
 # Contributing
 
-How the team branches, commits and merges (SOP §3.1, Definition of Done v2.1).
+How the team branches, commits and merges (SOP §3.1, Definition of Done v2.2).
+The Definition of Done itself is the team Google Doc "Definition of Done (DoD)"
+in the shared `4_Scrum_Process_Evidence` folder; it is the only copy. The DoD
+checklist in `.github/pull_request_template.md` must stay in step with it.
 
 ## Branches
 
@@ -38,4 +41,6 @@ key decisions, what changed per area, and how it was verified.
 - Tag every test with its category and AC, e.g.
   `[BOUNDARY] [SG2-39:AC2] rejects an event title of 256 characters`, and run
   `npm run test:inventory:update` after adding or renaming tests.
+- If the PR adds a migration, rehearse it on hosted Supabase and roll it back,
+  then apply it before merging (`docs/release-readiness.md`, step 2).
 - Run `npm run ci` before pushing. Squash-merge once approved and delete the branch.
