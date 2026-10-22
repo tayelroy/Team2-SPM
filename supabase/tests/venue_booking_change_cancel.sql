@@ -276,9 +276,11 @@ end $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002', true);
 do $$
+declare result jsonb := public.confirm_event(98303);
 begin
-  if public.confirm_event(98303)->>'outcome' <> 'closed' then
-    raise exception '[SG2-83:confirmed-must-recheck] [SG2-83:AC7] [FAILURE] An event returned to Planning must not confirm straight away';
+  -- SG2-94 AC5: back in Planning, the refusal lists the safety check among what is outstanding.
+  if result->>'outcome' is distinct from 'outstanding' or not (result->'outstanding' @> '["safety"]'::jsonb) then
+    raise exception '[SG2-83:confirmed-must-recheck] [SG2-83:AC7] [SG2-94:AC5] [FAILURE] An event returned to Planning must not confirm straight away: %', result;
   end if;
 end $$;
 reset role;

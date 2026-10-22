@@ -25,8 +25,8 @@ describe('confirmEvent RPC adapter (SG2-58)', () => {
     assert.deepEqual(calls, [['confirm_event', { p_event_id: 7 }]]);
   });
 
-  test('[NORMAL] [SG2-58:AC2] an outstanding refusal keeps the listed keys in venue, equipment, registration order', async () => {
-    for (const outstanding of [['venue'], ['equipment'], ['registration'], ['venue', 'equipment', 'registration']]) {
+  test('[NORMAL] [SG2-58:AC2] [SG2-94:AC5] an outstanding refusal keeps the listed keys in venue, equipment, registration, safety order', async () => {
+    for (const outstanding of [['venue'], ['equipment'], ['registration'], ['safety'], ['venue', 'equipment', 'registration', 'safety']]) {
       assert.deepEqual(await confirmEvent('token', 7, () => rpcClient({ outcome: 'outstanding', outstanding })),
         { outcome: 'outstanding', outstanding });
     }

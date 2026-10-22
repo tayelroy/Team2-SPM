@@ -833,6 +833,15 @@ test('[FAILURE] [SG2-58:AC2] a refusal lists every outstanding arrangement by la
   expect(screen.getByRole('button', { name: 'Confirm event' })).toBeEnabled();
 });
 
+test('[CONFLICT] [SG2-94:AC5] an event whose safety approval no longer stands is refused with the safety check listed as outstanding', async () => {
+  await openHeld(ready, confirmationFetch(ready, () => Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['safety'] }, { status: 409 })));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm event' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Confirmation refused: arrangements are still outstanding.');
+  const list = screen.getByRole('list', { name: 'Outstanding arrangements' });
+  expect(within(list).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Safety check']);
+  expect(screen.getByRole('button', { name: 'Confirm event' })).toBeEnabled();
+});
+
 test('[BOUNDARY] [SG2-58:AC2] one outstanding arrangement is listed alone, and a later different refusal clears the list', async () => {
   const responses = [
     Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['equipment'] }, { status: 409 }),

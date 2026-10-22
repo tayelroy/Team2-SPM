@@ -1,4 +1,4 @@
-# Operational safety check decisions (SG2-92)
+# Operational safety check decisions (SG2-92, SG2-94)
 
 "Record an operational safety check decision." The Safety Officer reviews an event
 that is Awaiting Safety Check and records one of three decisions: Approve, Reject or
@@ -101,11 +101,54 @@ five-argument version no longer exists.
 `supabase/tests/safety_decisions.sql` covers each decision, validation boundaries,
 refusals, the stale revision, rework and the grants.
 
+## Safety approval gates Preparation and confirmation (SG2-94)
+
+An event's **safety approval** is its latest decision when that decision is Approve
+and the event is still in Preparation or Confirmed. Every way back (an accepted
+change, a planning edit, an unavailable venue) moves the event to Planning, which
+ends the approval without rewriting the decision history.
+`public.event_safety_approved(events)` applies the rule in the database and
+`isSafetyApproved` in `server/src/events/arrangementReadiness.ts` mirrors it.
+
+- **AC1/AC2.** The `safety_approval_gate` trigger on `public.events` refuses any
+  move into Preparation unless the event is leaving Awaiting Safety Check on an
+  Approve made during that wait. The refusal is a `check_violation` on
+  `events_preparation_needs_safety_approval` with the message "An event can move to
+  Preparation only once the Safety Officer has approved its safety check." and a
+  detail naming the status and the latest decision. `record_safety_decision`'s
+  Approve is the only writer that passes; an older Approve from an earlier wait
+  does not count.
+- **AC3.** When an accepted change request alters a significant field (date and time,
+  attendance, venue, accessibility or equipment requirements) of an event in
+  Preparation or Confirmed, `apply_accepted_event_change` returns it to Planning even
+  when no recheck was named, clears its confirmation and adds a `safety_approval`
+  history row ("Withdrawn: the accepted <change request> changed what was approved, so
+  the event must pass the safety check again"). SG2-91 brings it back to Awaiting
+  Safety Check once its arrangements are in place; a new Approve is needed. A change to
+  the name, purpose or description keeps the approval. The coordinator's and the
+  organiser's Latest safety decision panel says the approval was withdrawn.
+- **AC4/AC5.** The coordinator's arrangement readiness panel lists **Safety check** as
+  an item after venue, equipment and registration: Ready ("Approved by the Safety
+  Officer.") or Outstanding with the reason (awaiting the check, rejected, changes
+  requested, approval withdrawn, or not approved yet). `confirm_event` lists `safety`
+  among the outstanding items unless the event holds a current approval, and answers
+  an attempt on an event in Approved, Planning, Awaiting Safety Check or Safety
+  Rejected with what is outstanding instead of "closed". This replaces SG2-58 AC1's
+  venue-and-equipment rule.
+- **AC6.** Registration settings no longer hold confirmation up: an event that needs
+  registration can be confirmed before its capacity and times are set; the Event
+  Organiser sets them (SG2-63) and attendees can register once registration opens.
+  An outstanding SG2-66 registration recheck still blocks, and its recheck no longer
+  waits for a closing time that is not set.
+
+Migration `supabase/migrations/202610220001_safety_approval_gate.sql` adds the
+function and the trigger and replaces `apply_accepted_event_change` and
+`confirm_event`. `supabase/tests/safety_approval_gate.sql` covers the gate, the
+withdrawal and confirmation on the safety check; `supabase/tests/event_confirmation.sql`
+covers the outstanding order and the registration rule. The release readiness check
+requires the trigger and the safety approval in `confirm_event`.
+
 ## Follow-ups
 
 - **SG2-93**: on Request Changes, mark the named arrangements outstanding and return the
   event to Awaiting Safety Check once they are confirmed again.
-- **SG2-94**: treat only an event's latest decision, when it is Approve, as its safety
-  approval. SG2-66's `apply_accepted_event_change` already sends a Preparation or
-  Confirmed event back to Planning, so the approval no longer applies there and a new
-  check is needed; the decision history itself is never rewritten.

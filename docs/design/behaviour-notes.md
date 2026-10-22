@@ -44,9 +44,9 @@ As of PR90 head 61416cc (16 Oct 2026). Files: `sequence-diagrams.puml` (5 blocks
 | under_review → approved / rejected | `PATCH /:id/decision` → `decideEventRequest` |
 | approved → planning | `PATCH /:id/planning` → `updateEventPlanningFields` (`server/src/events/updatePlanning.ts`) |
 | planning → awaiting_safety_check | «planned» SG2-91 |
-| awaiting_safety_check → preparation / safety_rejected / planning | `POST /:id/safety-decision` → RPC `record_safety_decision` (SG2-92: Approve / Reject / Request Changes) |
+| awaiting_safety_check → preparation / safety_rejected / planning | `POST /:id/safety-decision` → RPC `record_safety_decision` (SG2-92: Approve / Reject / Request Changes). SG2-94: the `safety_approval_gate` trigger refuses any other move into `preparation` |
 | safety_rejected → planning | `POST /:id/rework` → RPC `rework_safety_rejected_event` (SG2-92 AC4, the assigned coordinator) |
-| preparation → confirmed | `PATCH /:id/confirm` → RPC `confirm_event` |
+| preparation → confirmed | `PATCH /:id/confirm` → RPC `confirm_event`, which since SG2-94 also needs the latest safety decision to be Approve |
 | preparation / confirmed → completed | `PATCH /:id/complete` → `completeEvent` |
 | awaiting_safety_check → planning | `PATCH /:id/planning` → `updateEventPlanningFields` on an edit with arrangement impact; SG2-92's Request Changes decision |
 | preparation / confirmed → planning (now in `STATUS_TRANSITIONS`, SG2-81) | `venue_disruption_notify` on a new affected-booking flag (202610170001), or `PATCH /:id/planning` on an edit with arrangement impact |

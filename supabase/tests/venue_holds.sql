@@ -539,6 +539,9 @@ begin
   raise exception '[SG2-51:hold-release-history-and-notices] [SG2-51:AC4] [SG2-51:AC5] [NORMAL] Real release must retain one actor/reason history entry and notify the coordinator and organiser';
  end if;
 end $$;
+-- SG2-94: the event reaches Preparation through the Safety Officer's approval.
+update public.events set status='awaiting_safety_check' where event_id=98404;
+insert into public.event_safety_decisions(event_id,decision,decided_by) values (98404,'approve','d8400000-0000-4000-8000-000000000001');
 update public.events set status='preparation' where event_id=98404;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000002',true);

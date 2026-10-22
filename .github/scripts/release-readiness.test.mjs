@@ -122,6 +122,17 @@ test('[CONFLICT] [SG2-81:AC2] [SG2-58:AC2] a stale confirmation RPC missing the 
   END $$;`, 'confirm_event venue disruption guard');
 });
 
+test('[CONFLICT] [SG2-94:AC1] [SG2-94:AC5] a database without the Preparation gate or a confirmation RPC that skips the safety approval blocks release', () => {
+  for (const [mutation, diagnostic] of [
+    ['DROP TRIGGER safety_approval_gate ON public.events;', 'events safety_approval_gate trigger'],
+    ['ALTER TABLE public.events DISABLE TRIGGER safety_approval_gate;', 'events safety_approval_gate trigger'],
+    [`DO $$ BEGIN
+      EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
+        'not public.event_safety_approved(event_row)', 'false');
+    END $$;`, 'confirm_event safety approval'],
+  ]) assertReadinessRejects(mutation, diagnostic);
+});
+
 test('[FAILURE] [SG2-23:AC1] missing Safety Officer role catalogue entry blocks release without requiring a seeded login', () => {
   assertReadinessRejects("UPDATE public.roles SET role_name = 'Retired Safety Officer' WHERE role_name = 'Safety Officer';", 'Safety Officer');
 });

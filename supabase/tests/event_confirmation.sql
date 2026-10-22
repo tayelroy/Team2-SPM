@@ -23,11 +23,14 @@ insert into public.account_roles(user_id,role) values
  ('d5800000-0000-4000-8000-000000000008','safety_officer');
 insert into public.venues(venue_id,name) values (95860,'Confirmation hall'),(95861,'Confirmation annex');
 insert into public.equipment(equipment_id,name,quantity_total) values (95860,'Confirmation projectors',20);
--- Every event starts ready: Preparation, one approved venue request, no
--- equipment, registration not needed. Each case then removes one item.
+-- Every event starts ready: Preparation on the Safety Officer's approval
+-- (SG2-94), one approved venue request, no equipment, registration not
+-- needed. Each case then removes one item.
 insert into public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed)
  select 95860+n,'d5800000-0000-4000-8000-000000000002','d5800000-0000-4000-8000-000000000003',
   'Confirmation event '||n,'preparation',false from generate_series(1,19) n;
+insert into public.event_safety_decisions(event_id,decision,decided_by)
+ select 95860+n,'approve','d5800000-0000-4000-8000-000000000008' from generate_series(1,19) n;
 insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status)
  select 95860+n,95860,'2031-11-01T09:00Z'::timestamptz+n*interval '1 day','2031-11-01T17:00Z'::timestamptz+n*interval '1 day','approved'
  from generate_series(1,19) n where n not in (2,4,10);
@@ -146,9 +149,14 @@ insert into public.equipment_requests(request_id,event_id,equipment_id,quantity,
 insert into public.equipment_reservations(event_id,equipment_id,quantity_reserved,starts_at,ends_at,request_id,reserved_at) values
  (95866,95860,1,'2031-11-06T09:00Z','2031-11-06T17:00Z',95866,'2031-10-01T00:00Z'),
  (95868,95860,1,'2031-11-08T09:00Z','2031-11-08T17:00Z',95868,'2031-10-01T00:00Z');
+-- SG2-94 AC6: registration needed with no capacity or window set yet.
 update public.events set registration_needed=true,registration_capacity=null,
- registration_opens_at='2031-10-01T00:00Z',registration_closes_at='2031-10-02T00:00Z' where event_id=95869;
-update public.events set registration_needed=true where event_id=95870;
+ registration_opens_at=null,registration_closes_at=null where event_id=95869;
+-- Every kind outstanding at once: no venue, unreserved equipment, a
+-- registration recheck (SG2-66) and no current safety approval (SG2-94).
+update public.events set registration_needed=true,arrangements_recheck_needed=true,
+ outstanding_arrangements='["registration_recheck"]' where event_id=95870;
+delete from public.event_safety_decisions where event_id=95870;
 insert into public.equipment_requests(request_id,event_id,equipment_id,quantity) values (95870,95870,95860,1);
 set local role authenticated;
 select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
@@ -175,12 +183,9 @@ begin
  if public.confirm_event(95868) is distinct from '{"outcome":"outstanding","outstanding":["equipment"]}'::jsonb then
   raise exception '[SG2-58:unknown-shortfall-outstanding] [SG2-58:AC2] [BOUNDARY] Reserved placed equipment with an unknown shortfall must refuse confirmation';
  end if;
- if public.confirm_event(95869) is distinct from '{"outcome":"outstanding","outstanding":["registration"]}'::jsonb then
-  raise exception '[SG2-58:registration-capacity-outstanding] [SG2-58:AC2] [NORMAL] Needed registration without capacity must refuse confirmation';
- end if;
  if public.confirm_event(95870) is distinct from
-   '{"outcome":"outstanding","outstanding":["venue","equipment","registration"]}'::jsonb then
-  raise exception '[SG2-58:all-outstanding-ordered] [SG2-58:AC2] [NORMAL] Every outstanding arrangement must be listed in venue, equipment, registration order';
+   '{"outcome":"outstanding","outstanding":["venue","equipment","registration","safety"]}'::jsonb then
+  raise exception '[SG2-58:all-outstanding-ordered] [SG2-58:AC2] [SG2-94:AC5] [NORMAL] Every outstanding item must be listed in venue, equipment, registration, safety order';
  end if;
 end $$;
 reset role;
@@ -195,23 +200,34 @@ begin
 end $$;
 reset role;
 do $$
-declare field text; result jsonb;
 begin
- foreach field in array array['registration_opens_at','registration_closes_at'] loop
-  update public.events set registration_capacity=50,registration_opens_at='2031-10-01T00:00Z',
-   registration_closes_at='2031-10-02T00:00Z' where event_id=95869;
-  execute format('update public.events set %I=null where event_id=95869',field);
-  perform set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
-  result := public.confirm_event(95869);
-  if result is distinct from '{"outcome":"outstanding","outstanding":["registration"]}'::jsonb then
-   raise exception '[SG2-58:registration-window-outstanding] [SG2-58:AC2] [BOUNDARY] Needed registration missing % must refuse confirmation: %',field,result;
-  end if;
- end loop;
- if exists(select 1 from public.events where event_id between 95862 and 95870
+ if exists(select 1 from public.events where event_id between 95862 and 95870 and event_id <> 95869
      and (status <> 'preparation' or confirmed_by is not null or confirmed_at is not null))
-   or exists(select 1 from public.event_audit_logs where event_id between 95862 and 95870)
-   or exists(select 1 from public.notifications where event_id between 95862 and 95870) then
+   or exists(select 1 from public.event_audit_logs where event_id between 95862 and 95870 and event_id <> 95869)
+   or exists(select 1 from public.notifications where event_id between 95862 and 95870 and event_id <> 95869) then
   raise exception '[SG2-58:refusal-has-no-side-effects] [SG2-58:AC2] [FAILURE] A refused confirmation must not change status, history or notifications';
+ end if;
+end $$;
+
+-- SG2-94 AC6: registration settings belong to the organiser (SG2-63) and do
+-- not hold confirmation up; attendees can register only once they are set.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
+do $$
+declare result jsonb;
+begin
+ result := public.confirm_event(95869);
+ if result->>'outcome' is distinct from 'ok' or result->>'status' is distinct from 'confirmed' then
+  raise exception '[SG2-94:registration-settings-do-not-block] [SG2-94:AC6] [NORMAL] An event needing registration must confirm before its capacity and times are set: %',result;
+ end if;
+end $$;
+reset role;
+do $$
+begin
+ if (select status::text||'|'||registration_needed||'|'||coalesce(registration_capacity::text,'null')
+     ||'|'||coalesce(registration_opens_at::text,'null')||'|'||coalesce(registration_closes_at::text,'null')
+     from public.events where event_id=95869) is distinct from 'confirmed|true|null|null|null' then
+  raise exception '[SG2-94:registration-left-to-organiser] [SG2-94:AC6] [BOUNDARY] Confirming must leave the unset registration settings for the organiser';
  end if;
 end $$;
 
@@ -240,7 +256,10 @@ begin
  end if;
 end $$;
 
--- Decision 1: only Preparation can be confirmed.
+-- Decision 1: only Preparation can be confirmed. SG2-94 AC5: an event still
+-- on its way to the safety check is refused with the check outstanding, even
+-- with every arrangement in place and an earlier Approve on record; every
+-- other status is closed.
 do $$
 declare state public.event_status; result jsonb;
 begin
@@ -252,7 +271,11 @@ begin
    where event_id=95873;
   perform set_config('request.jwt.claim.sub','d5800000-0000-4000-8000-000000000003',true);
   result := public.confirm_event(95873);
-  if result is distinct from jsonb_build_object('outcome','closed','status',state::text) then
+  if state in ('approved','planning','awaiting_safety_check','safety_rejected') then
+   if result is distinct from '{"outcome":"outstanding","outstanding":["safety"]}'::jsonb then
+    raise exception '[SG2-94:unapproved-stage-lists-safety] [SG2-94:AC5] [FAILURE] An event in % must be refused with the safety check outstanding: %',state,result;
+   end if;
+  elsif result is distinct from jsonb_build_object('outcome','closed','status',state::text) then
    raise exception '[SG2-58:non-preparation-closed] [SG2-58:AC1] [FAILURE] An event in % must not be confirmable: %',state,result;
   end if;
  end loop;
@@ -376,6 +399,10 @@ begin
  end if;
 end $$;
 reset role;
+-- SG2-94: each reaches Preparation on the Safety Officer's approval.
+update public.events set status='awaiting_safety_check' where event_id in (95891,95892);
+insert into public.event_safety_decisions(event_id,decision,decided_by)
+ select event_id,'approve','d5800000-0000-4000-8000-000000000008' from unnest(array[95890,95891,95892]) event_id;
 update public.events set status='preparation' where event_id in (95891,95892);
 do $$
 begin
@@ -426,6 +453,8 @@ insert into public.events(event_id,organiser_id,coordinator_id,name,status,regis
    when 6 then '[]'::jsonb when 7 then '["unknown_recheck"]'::jsonb
    when 8 then 'null'::jsonb else '{"venue_recheck":true}'::jsonb end
  from generate_series(1,9) n;
+insert into public.event_safety_decisions(event_id,decision,decided_by)
+ select 95900+n,'approve','d5800000-0000-4000-8000-000000000008' from generate_series(1,9) n;
 do $$
 declare n integer; booking bigint;
 begin

@@ -116,6 +116,29 @@ export async function listSafetyDecisions(admin: SupabaseClient, eventId: number
   };
 }
 
+export type FetchLatestSafetyDecisionResult =
+  | { ok: true; decision: SafetyDecisionKind | null }
+  | { ok: false };
+
+/**
+ * SG2-94: the event's latest decision, in the order public.event_safety_approved()
+ * reads it (newest decided_at, then newest decision_id); null when there is none.
+ * Service role only, like the list above.
+ */
+export async function fetchLatestSafetyDecision(admin: SupabaseClient, eventId: number): Promise<FetchLatestSafetyDecisionResult> {
+  const rows = await admin.from('event_safety_decisions')
+    .select('decision')
+    .eq('event_id', eventId)
+    .order('decided_at', { ascending: false })
+    .order('decision_id', { ascending: false })
+    .limit(1);
+  if (rows.error) return { ok: false };
+  const latest = ((rows.data ?? []) as { decision: unknown }[])[0]?.decision;
+  if (latest === undefined) return { ok: true, decision: null };
+  // The check constraint keeps the column inside the vocabulary; anything else is not a usable read.
+  return isSafetyDecision(latest) ? { ok: true, decision: latest } : { ok: false };
+}
+
 /**
  * Records a decision through `public.record_safety_decision` (service role):
  * the decision, the status move, its history and the notices are one
