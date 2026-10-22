@@ -77,7 +77,7 @@ async function waitsFor(root, promise, waitingPid, owningPid) {
 const root = await connect();
 const sessions = [];
 try {
-  // Every event starts ready: Preparation, one approved venue request, nothing else required.
+  // Every event starts ready: Preparation on its safety approval (SG2-94), one approved venue request, nothing else required.
   await root.query(`BEGIN;
     INSERT INTO auth.users(id) VALUES('${coordinator}'),('${other}'),('${organiser}'),('${venueStaff}');
     INSERT INTO public.users(user_id,name,role_id) VALUES
@@ -90,6 +90,8 @@ try {
     INSERT INTO public.equipment(equipment_id,name,quantity_total) VALUES(95880,'Confirmation race screens',10);
     INSERT INTO public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed)
       SELECT 95880+n,'${organiser}','${coordinator}','Confirmation race '||n,'preparation',false FROM generate_series(0,5)n;
+    INSERT INTO public.event_safety_decisions(event_id,decision,decided_by)
+      SELECT 95880+n,'approve','${venueStaff}' FROM generate_series(0,5)n;
     INSERT INTO public.venue_bookings(booking_id,venue_id,event_id,starts_at,ends_at,status)
       SELECT 95880+n,95880,95880+n,'2031-12-01T09:00Z'::timestamptz+n*interval '1 day','2031-12-01T17:00Z'::timestamptz+n*interval '1 day',
         'confirmed' FROM generate_series(0,5)n;
@@ -145,15 +147,19 @@ try {
   assert.equal(await root.query(notices(95882)), '1');
   console.log('PASS [CONFLICT] [SG2-58:AC1] equipment reserved and placed while confirmation waits on the event lock is seen and the event confirms.');
 
-  await root.query('BEGIN; UPDATE public.events SET registration_capacity=null WHERE event_id=95883;');
+  // SG2-94 AC6 removed the registration-settings gate; the race that still
+  // matters is an accepted significant change withdrawing the approval (AC3).
+  await root.query(`BEGIN; SELECT public.apply_accepted_event_change(95883,'${coordinator}','preparation',
+    'change request race-95883','{"expected_attendance":300}','[]');`);
   await login(first);
-  const afterPlanningEdit = confirm(first, 95883);
-  await waitsFor(root, afterPlanningEdit, firstPid, rootPid);
+  const afterWithdrawal = confirm(first, 95883);
+  await waitsFor(root, afterWithdrawal, firstPid, rootPid);
   await root.query('COMMIT;');
-  assert.deepEqual(JSON.parse(await afterPlanningEdit), outstanding(['registration']));
+  assert.deepEqual(JSON.parse(await afterWithdrawal), outstanding(['safety']));
   await first.query('COMMIT;');
+  assert.equal(await root.query("SELECT status FROM public.events WHERE event_id=95883;"), 'awaiting_safety_check');
   assert.equal(await root.query(notices(95883)), '0');
-  console.log('PASS [CONFLICT] [SG2-58:AC2] a registration capacity cleared while confirmation waits is listed as outstanding.');
+  console.log('PASS [CONFLICT] [SG2-94:AC3] [SG2-94:AC5] an approval withdrawn by a change accepted while confirmation waits refuses it with the safety check outstanding.');
 
   await root.query(`BEGIN; UPDATE public.events SET coordinator_id='${other}' WHERE event_id=95884;`);
   await login(first);

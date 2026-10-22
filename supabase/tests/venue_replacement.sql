@@ -36,6 +36,10 @@ insert into public.events (event_id, organiser_id, coordinator_id, name, status,
   (98105, 'f8100000-0000-4000-8000-000000000003', 'f8100000-0000-4000-8000-000000000002', 'Confirmed Gala', 'confirmed', 60, 'Stage');
 update public.events set confirmed_by = 'f8100000-0000-4000-8000-000000000002', confirmed_at = '2031-01-01 00:00+00'
   where event_id = 98105;
+-- SG2-94: an event in Preparation or Confirmed holds the Safety Officer's
+-- approval (the decision's author is not under test here).
+insert into public.event_safety_decisions (event_id, decision, decided_by)
+  select event_id, 'approve', 'f8100000-0000-4000-8000-000000000001' from unnest(array[98101, 98102, 98105]) event_id;
 insert into public.venue_bookings (booking_id, venue_id, event_id, starts_at, ends_at, status) values
   (98101, 982, 98101, '2031-05-01 09:00+00', '2031-05-01 17:00+00', 'confirmed'),
   (98102, 982, 98102, '2031-05-10 09:00+00', '2031-05-10 17:00+00', 'confirmed'),
@@ -184,6 +188,9 @@ end $$;
 -- AC2/AC3: the event advances to Preparation again with the booking still
 -- affected: it is outstanding, so the event cannot be confirmed, and nothing
 -- about the event or its booking has changed.
+-- SG2-94: back to Preparation only through a new approval of a new check.
+update public.events set status = 'awaiting_safety_check' where event_id = 98101;
+insert into public.event_safety_decisions (event_id, decision, decided_by) values (98101, 'approve', 'f8100000-0000-4000-8000-000000000001');
 update public.events set status = 'preparation' where event_id = 98101;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', 'f8100000-0000-4000-8000-000000000002', true);
@@ -324,6 +331,8 @@ end $$;
 -- AC2/AC5: with nothing affected left, the event is ready to confirm again.
 -- (The event is advanced to Preparation again, and the rejected replacement is withdrawn first: SG2-82 keeps a rejected
 -- request outstanding until the coordinator withdraws it.)
+update public.events set status = 'awaiting_safety_check' where event_id = 98101;
+insert into public.event_safety_decisions (event_id, decision, decided_by) values (98101, 'approve', 'f8100000-0000-4000-8000-000000000001');
 update public.events set status = 'preparation' where event_id = 98101;
 update public.venue_booking_requests set status = 'cancelled', withdrawn_by = 'f8100000-0000-4000-8000-000000000002',
   withdrawn_at = now() where request_id = 98104;
@@ -437,6 +446,8 @@ begin
   raise exception '[SG2-81:replacement-retires-converted-hold-request] [SG2-81:AC3] [SG2-81:AC5] [CONFLICT] Replacement must cancel the old held request/booking, preserve the new booking and leave other events untouched';
  end if;
 end $$;
+update public.events set status='awaiting_safety_check' where event_id=98106;
+insert into public.event_safety_decisions(event_id,decision,decided_by) values (98106,'approve','f8100000-0000-4000-8000-000000000001');
 update public.events set status='preparation' where event_id=98106;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','f8100000-0000-4000-8000-000000000002',true);

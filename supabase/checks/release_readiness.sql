@@ -87,7 +87,9 @@ begin
     ('private.notification_reminder_due(timestamptz,timestamptz,integer)'),
     ('public.send_outstanding_arrangement_reminders()'),
     ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
-    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()')
+    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()'),
+    -- SG2-94: the safety approval that gates Preparation and confirmation.
+    ('public.event_safety_approved(public.events)'), ('public.safety_approval_gate()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -158,6 +160,16 @@ begin
     select 'confirm_event venue disruption guard' as name,
       coalesce(position('public.venue_booking_disruptions' in definition) > 0, false) as passed
     from confirmation_definition
+  ), safety_approval_checks as (
+    -- SG2-94: structural fingerprint only; safety_approval_gate.sql proves behavior.
+    select 'confirm_event safety approval' as name,
+      coalesce(position('public.event_safety_approved' in definition) > 0, false) as passed
+    from confirmation_definition
+    union all
+    select 'events safety_approval_gate trigger' as name,
+      exists (select 1 from pg_trigger t where t.tgrelid = to_regclass('public.events')
+        and t.tgname = 'safety_approval_gate' and not t.tgisinternal and t.tgenabled <> 'D'
+        and t.tgfoid = to_regprocedure('public.safety_approval_gate()')) as passed
   ), required_foreign_keys(relation, column_name, target, target_column) as (values
     ('events', 'organiser_id', 'users', 'user_id'),
     ('events', 'coordinator_id', 'users', 'user_id'),
@@ -228,6 +240,7 @@ begin
     union all select * from inbox_type_checks union all select * from inbox_table_checks
     union all select * from recheck_function_checks
     union all select * from disruption_function_check
+    union all select * from safety_approval_checks
     union all select * from grant_checks union all select * from view_checks
     union all select * from confirmation_pair_check
     union all select * from notification_checks
