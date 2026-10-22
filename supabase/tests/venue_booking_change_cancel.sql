@@ -326,6 +326,63 @@ begin
   end if;
 end $$;
 
+-- 8a. AC5: the internal helpers are callable by no API role, the service
+-- role included (Supabase grants it EXECUTE by default).
+do $$
+declare
+  fn text;
+  who text;
+begin
+  foreach fn in array array['public.notify_venue_staff(integer,uuid,text,text)',
+      'public.return_event_to_planning_for_venue(integer,uuid,boolean)',
+      'public.venue_change_request_check()', 'public.venue_change_requested()'] loop
+    foreach who in array array['anon', 'authenticated', 'service_role'] loop
+      if has_function_privilege(who, fn, 'execute') then
+        raise exception '[SG2-83:internal-functions-private] [SG2-83:AC5] [FAILURE] % may execute %', who, fn;
+      end if;
+    end loop;
+  end loop;
+  if not has_function_privilege('authenticated', 'public.release_venue_bookings(bigint,bigint[],text)', 'execute') then
+    raise exception '[SG2-83:release-callable] [SG2-83:AC5] [NORMAL] Signed-in callers must reach release_venue_bookings(), which checks the role itself';
+  end if;
+end $$;
+
+-- 8b. AC1/AC7: cancelling a booking withdraws a change still waiting to
+-- replace it, so Venue Staff cannot approve it later as a new booking.
+insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, layout, requested_by,
+    replaces_booking_id, change_reason) values
+  (98344, 98303, 98303, '2031-04-01 01:00+00', '2031-04-01 05:00+00', 'theatre', 'e8300000-0000-4000-8000-000000000002',
+    98332, 'Hall B is being repainted');
+set local role authenticated;
+select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002', true);
+do $$
+begin
+  if public.release_venue_bookings(98332, array[]::bigint[], 'Gala moved off site')->>'outcome' <> 'released' then
+    raise exception '[SG2-83:cancel-with-pending-change] [SG2-83:AC1] [NORMAL] The coordinator could not cancel a booking with a pending change';
+  end if;
+end $$;
+select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000001', true);
+do $$
+declare result jsonb := public.decide_venue_booking_request(98344, 'approve', null);
+begin
+  if result->>'outcome' <> 'decided' or result->>'status' <> 'cancelled' then
+    raise exception '[SG2-83:withdrawn-change-not-approvable] [SG2-83:AC1] [CONFLICT] A change whose booking was cancelled must not be approvable: %', result;
+  end if;
+end $$;
+reset role;
+do $$
+begin
+  if not exists (select 1 from public.venue_booking_requests where request_id = 98344 and status = 'cancelled'
+      and withdrawn_by = 'e8300000-0000-4000-8000-000000000002' and withdrawn_at is not null) then
+    raise exception '[SG2-83:pending-change-withdrawn] [SG2-83:AC1] [NORMAL] Cancelling a booking must withdraw the change waiting to replace it, as the coordinator';
+  end if;
+  if not exists (select 1 from public.event_audit_logs where event_id = 98303 and field_name = 'venue_booking_request'
+      and new_value = 'Withdrawn: Change Hall C (request 98344) — the booking it would replace, Change Hall B (booking 98332), was released')
+      or exists (select 1 from public.venue_bookings where event_id = 98303 and venue_id = 98303) then
+    raise exception '[SG2-83:pending-change-withdrawal-recorded] [SG2-83:AC4] [NORMAL] The withdrawal must be in the history and no booking made for it';
+  end if;
+end $$;
+
 -- 9. The database backstop: a change must name a live booking of the same
 -- event, so one raised as the booking is cancelled, or for another event's
 -- booking, is refused.

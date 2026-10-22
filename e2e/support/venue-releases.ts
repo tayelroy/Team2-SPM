@@ -41,6 +41,16 @@ export function createMemoryReleaseStore(database: MemoryDatabase) {
           if (request.venue_booking_id === id && request.status === 'approved') request.status = 'cancelled';
         }
         const venue = database.tables.venues.find(row => row.venue_id === cancelled.venue_id)!;
+        // SG2-83 AC1: a change still waiting to replace this booking is withdrawn.
+        for (const change of database.tables.venue_booking_requests) {
+          if (change.replaces_booking_id !== id || change.status !== 'pending') continue;
+          Object.assign(change, { status: 'cancelled', withdrawn_by: userId, withdrawn_at: now });
+          const target = database.tables.venues.find(row => row.venue_id === change.venue_id)?.name;
+          database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: event.event_id,
+            actor_id: userId, field_name: 'venue_booking_request', old_value: `Pending: ${target} (request ${change.request_id})`,
+            new_value: `Withdrawn: ${target} (request ${change.request_id}) — the booking it would replace, ${venue.name} (booking ${id}), was released`,
+            created_at: now });
+        }
         const period = `${sgt(cancelled.starts_at)} – ${sgt(cancelled.ends_at)} SGT`;
         database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: event.event_id,
           actor_id: userId, field_name: 'venue_booking', old_value: `Confirmed: ${venue.name} (booking ${id})`,

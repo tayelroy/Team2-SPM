@@ -59,7 +59,7 @@ returns void language sql volatile security definer set search_path = '' as $$
     from public.account_roles ar
     where ar.role = 'venue_staff' and ar.user_id is distinct from p_actor;
 $$;
-revoke all on function public.notify_venue_staff(integer, uuid, text, text) from public, anon, authenticated;
+revoke all on function public.notify_venue_staff(integer, uuid, text, text) from public, anon, authenticated, service_role;
 
 -- AC7: a Confirmed or Preparation event goes back to Planning because one of
 -- its venues is being cancelled or changed. Its confirmation stamp is no
@@ -101,7 +101,7 @@ begin
   return true;
 end;
 $$;
-revoke all on function public.return_event_to_planning_for_venue(integer, uuid, boolean) from public, anon, authenticated;
+revoke all on function public.return_event_to_planning_for_venue(integer, uuid, boolean) from public, anon, authenticated, service_role;
 
 -- AC1/AC2/AC5: the coordinator cancels one booking of their event, and only
 -- the others they name as well. Everything is checked before anything
@@ -126,6 +126,7 @@ declare
   released bigint[] := array[]::bigint[];
   returned boolean;
   actor_name text;
+  withdrawn record;
 begin
   -- AC5: only while acting as Event Coordinator. Venue Staff and every other
   -- role are refused here as well as by the API.
@@ -180,6 +181,22 @@ begin
     select * into v from public.venues where venue_id = b.venue_id;
     period := to_char(b.starts_at at time zone 'Asia/Singapore', 'DD Mon YYYY HH24:MI') || ' – '
       || to_char(b.ends_at at time zone 'Asia/Singapore', 'DD Mon YYYY HH24:MI');
+    -- AC1/AC7: a change still waiting to replace this booking has nothing left
+    -- to replace, so it is withdrawn rather than approved later as a new
+    -- booking. The history says so.
+    for withdrawn in
+      update public.venue_booking_requests q
+        set status = 'cancelled', withdrawn_by = auth.uid(), withdrawn_at = instant
+        from public.venues nv
+        where q.replaces_booking_id = b.booking_id and q.status = 'pending' and nv.venue_id = q.venue_id
+        returning q.request_id, nv.name
+    loop
+      insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value)
+        values (e.event_id, auth.uid(), 'venue_booking_request',
+          'Pending: ' || withdrawn.name || ' (request ' || withdrawn.request_id || ')',
+          'Withdrawn: ' || withdrawn.name || ' (request ' || withdrawn.request_id || ') — the booking it would replace, '
+            || v.name || ' (booking ' || b.booking_id || '), was released');
+    end loop;
     -- AC4: who, when and why, in the event's history (SG2-40).
     insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value)
       values (e.event_id, auth.uid(), 'venue_booking',
@@ -233,21 +250,26 @@ $$;
 -- AC1/AC4/AC7: a request that replaces a booking (SG2-81's link, now for any
 -- confirmed booking of the event) is a change of that venue. The database
 -- refuses one that names a booking of another event, or one already cancelled
--- or over, so a change raised while the booking is being cancelled cannot
--- slip through. Locks the event row, as every arrangement writer does.
+-- or over. The booking row is share-locked, so a change raised while the
+-- booking is being cancelled waits for that cancellation and is then refused,
+-- and a cancellation that starts after the change waits for it and then
+-- withdraws it (release_venue_bookings()). Either way no pending change is
+-- left naming a cancelled booking.
 create function public.venue_change_request_check()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   if new.replaces_booking_id is null then return new; end if;
-  if not exists (select 1 from public.venue_bookings b where b.booking_id = new.replaces_booking_id
-      and b.event_id = new.event_id and b.status = 'confirmed' and b.ends_at > clock_timestamp()) then
+  perform 1 from public.venue_bookings b where b.booking_id = new.replaces_booking_id
+    and b.event_id = new.event_id and b.status = 'confirmed' and b.ends_at > clock_timestamp()
+    for share;
+  if not found then
     raise exception using errcode = '23514',
       message = 'A change must replace a confirmed booking of the same event that has not ended';
   end if;
   return new;
 end;
 $$;
-revoke all on function public.venue_change_request_check() from public, anon, authenticated;
+revoke all on function public.venue_change_request_check() from public, anon, authenticated, service_role;
 
 create trigger venue_change_request_check before insert on public.venue_booking_requests
   for each row when (new.replaces_booking_id is not null)
@@ -288,7 +310,7 @@ begin
   return null;
 end;
 $$;
-revoke all on function public.venue_change_requested() from public, anon, authenticated;
+revoke all on function public.venue_change_requested() from public, anon, authenticated, service_role;
 
 create trigger venue_change_requested after insert on public.venue_booking_requests
   for each row when (new.replaces_booking_id is not null)
