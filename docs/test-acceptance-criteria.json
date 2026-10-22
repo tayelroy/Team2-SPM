@@ -879,6 +879,17 @@
         "AC6": "SG2-51 tests that expect Venue Staff to release a booking are updated to expect refusal",
         "AC7": "If the event is Confirmed or in Preparation, cancelling or changing one venue sends that venue back through change approval and returns the event to Planning (SG2-66), while the event's other venue bookings stay intact"
       }
+    },
+    {
+      "id": "SG2-59",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-59",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-22",
+      "acceptanceCriteria": {
+        "AC1": "Confirmed events with registration open are listed with name, date, time and venue",
+        "AC2": "Events that are not confirmed, or have registration disabled, are not listed",
+        "AC3": "Opening an event shows attendee-facing details only, with no internal planning information"
+      }
     }
   ]
 }
