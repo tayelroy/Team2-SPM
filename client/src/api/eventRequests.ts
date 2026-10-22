@@ -646,7 +646,7 @@ export async function getEventStage(
 }
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
-export type ArrangementKey = 'venue' | 'equipment' | 'registration';
+export type ArrangementKey = 'venue' | 'equipment' | 'registration' | 'safety';
 
 export interface ArrangementStatus {
   key: ArrangementKey;
@@ -671,8 +671,9 @@ export type GetEventArrangementsOutcome =
     };
 
 /**
- * Retrieves which of an event's arrangements (venue, equipment, registration)
- * are ready or outstanding and whether it is ready for confirmation (SG2-57).
+ * Retrieves which of an event's arrangements (venue, equipment, registration,
+ * safety check) are ready or outstanding and whether it is ready for
+ * confirmation (SG2-57, SG2-94).
  * Maps to `GET /api/event-requests/:eventId/arrangements`.
  */
 export async function getEventArrangements(

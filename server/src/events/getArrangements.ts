@@ -9,6 +9,10 @@ import {
   fetchEventArrangementFacts,
   type FetchEventArrangementFactsResult
 } from '../db/eventArrangements';
+import {
+  fetchLatestSafetyDecision,
+  type FetchLatestSafetyDecisionResult
+} from '../db/safetyDecisions';
 import { computeArrangementReadiness } from './arrangementReadiness';
 import type { Principal } from '../auth/policy';
 
@@ -27,12 +31,16 @@ export interface GetEventArrangementsDependencies {
     client: SupabaseClient,
     eventId: number
   ) => Promise<FetchEventArrangementFactsResult>;
+  fetchLatestDecision?: (
+    client: SupabaseClient,
+    eventId: number
+  ) => Promise<FetchLatestSafetyDecisionResult>;
 }
 
 /**
- * GET /api/event-requests/:eventId/arrangements — returns which arrangements
- * (venue, equipment, registration) are ready or outstanding and whether the
- * event is ready for confirmation (SG2-57).
+ * GET /api/event-requests/:eventId/arrangements — returns which items
+ * (venue, equipment, registration, safety check) are ready or outstanding and
+ * whether the event is ready for confirmation (SG2-57, SG2-94 AC4).
  *
  * Restricted to the event's assigned coordinator: the story is written from the
  * coordinator's perspective, and ownership is enforced per-row here as in the
@@ -42,7 +50,8 @@ export function createGetEventArrangementsHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchPlanningRecord = fetchEventPlanningRecord,
-  fetchArrangementFacts = fetchEventArrangementFacts
+  fetchArrangementFacts = fetchEventArrangementFacts,
+  fetchLatestDecision = fetchLatestSafetyDecision
 }: GetEventArrangementsDependencies): RequestHandler {
   return async (req, res) => {
     const principal = getPrincipal(req);
@@ -95,9 +104,16 @@ export function createGetEventArrangementsHandler({
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
+    const latest = await fetchLatestDecision(admin, eventId);
+    if (!latest.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
 
     const readiness = computeArrangementReadiness({
       event_id: eventId,
+      status: event.status,
+      latest_safety_decision: latest.decision,
       registration_needed: event.registration_needed,
       registration_capacity: event.registration_capacity,
       registration_opens_at: event.registration_opens_at,

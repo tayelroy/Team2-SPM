@@ -23,7 +23,7 @@ test('[NORMAL] [SG2-58:AC1] confirming sends one authorised PATCH and returns th
   expect(fetch).toHaveBeenCalledWith('/api/event-requests/7/confirm', { method: 'PATCH', headers: { Authorization: 'Bearer coordinator-token' } });
   respond(() => Response.json({ confirmed_at: '2026-10-11T02:00:00.000Z', organiser_notified: false }));
   expect(await confirmEvent(7, 'coordinator-token')).toEqual({ ok: true, confirmedAt: '2026-10-11T02:00:00.000Z', organiserNotified: false });
-  expect(ARRANGEMENT_LABELS).toEqual({ venue: 'Venue booking', equipment: 'Equipment', registration: 'Registration' });
+  expect(ARRANGEMENT_LABELS).toEqual({ venue: 'Venue booking', equipment: 'Equipment', registration: 'Registration', safety: 'Safety check' });
 });
 
 test('[CONFLICT] [SG2-58:AC2] an outstanding refusal keeps the server message and order and drops unknown keys', async () => {
@@ -33,6 +33,13 @@ test('[CONFLICT] [SG2-58:AC2] an outstanding refusal keeps the server message an
   expect(await confirmEvent(7, 'token')).toEqual({ ok: false, kind: 'outstanding', message: 'Confirmation refused: arrangements are still outstanding.', outstanding: ['registration', 'venue'] });
   respond(() => Response.json({ error: 'Refused.', code: 'outstanding', outstanding: 'venue' }, { status: 409 }));
   expect(await confirmEvent(7, 'token')).toEqual({ ok: false, kind: 'outstanding', message: 'Refused.', outstanding: [] });
+});
+
+test('[CONFLICT] [SG2-94:AC5] a refusal for an unapproved safety check keeps safety among the outstanding items in server order', async () => {
+  respond(() => Response.json({ error: 'Confirmation refused: arrangements are still outstanding.', code: 'outstanding', outstanding: ['venue', 'safety'] }, { status: 409 }));
+  expect(await confirmEvent(7, 'token')).toEqual({ ok: false, kind: 'outstanding', message: 'Confirmation refused: arrangements are still outstanding.', outstanding: ['venue', 'safety'] });
+  respond(() => Response.json({ code: 'outstanding', outstanding: ['safety'] }, { status: 409 }));
+  expect(await confirmEvent(7, 'token')).toEqual({ ok: false, kind: 'outstanding', message: 'Confirmation refused: arrangements are still outstanding.', outstanding: ['safety'] });
 });
 
 test('[CONFLICT] [SG2-58:AC1] a stale status, missing event or invalid id is refused with the server text verbatim', async () => {

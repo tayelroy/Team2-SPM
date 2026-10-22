@@ -10,7 +10,7 @@ export type ConfirmEventResult =
   | { outcome: 'closed'; status: string }
   | { outcome: 'outstanding'; outstanding: ArrangementKey[] };
 
-const ARRANGEMENT_KEYS: readonly string[] = ['venue', 'equipment', 'registration'];
+const ARRANGEMENT_KEYS: readonly string[] = ['venue', 'equipment', 'registration', 'safety'];
 
 function parseResult(data: unknown): ConfirmEventResult | null {
   if (typeof data !== 'object' || data === null) return null;

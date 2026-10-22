@@ -2,15 +2,19 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeArrangementReadiness,
+  isSafetyApproved,
   type ArrangementReadinessInput,
   type ArrangementKey,
   type ArrangementState
 } from './arrangementReadiness';
 
-/** A base event with every arrangement in place; tests override one facet. */
+/** A base event with every arrangement in place, in Preparation on the
+ * Safety Officer's approval; tests override one facet. */
 function baseInput(overrides: Partial<ArrangementReadinessInput> = {}): ArrangementReadinessInput {
   return {
     event_id: 101,
+    status: 'preparation',
+    latest_safety_decision: 'approve',
     registration_needed: true,
     registration_capacity: 120,
     registration_opens_at: '2026-11-01T00:00:00.000Z',
@@ -30,7 +34,7 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     const input = baseInput({ arrangements_recheck_needed: true, outstanding_arrangements: ['venue_recheck', 'equipment_recheck'] });
     const result = computeArrangementReadiness(input);
     assert.deepEqual(result.outstanding, ['venue', 'equipment']);
-    assert.deepEqual(result.arrangements.map(item => item.state), ['outstanding', 'outstanding', 'ready']);
+    assert.deepEqual(result.arrangements.map(item => item.state), ['outstanding', 'outstanding', 'ready', 'ready']);
     assert.match(result.arrangements[0].detail, /approved.*recheck.*planning/i);
     assert.match(result.arrangements[1].detail, /reserved and placed.*recheck.*planning/i);
     assert.equal(result.ready_for_confirmation, false);
@@ -59,7 +63,7 @@ describe('computeArrangementReadiness (SG2-57)', () => {
       arrangements_recheck_needed: true, outstanding_arrangements: ['registration_recheck', 'unknown', 'equipment_recheck', 'venue_recheck', 'venue_recheck'] }));
     assert.deepEqual(result.outstanding, ['venue', 'equipment', 'registration']);
     assert.equal(result.ready_for_confirmation, false);
-    assert.ok(result.arrangements.every(item => item.state === 'outstanding'));
+    assert.deepEqual(result.arrangements.map(item => item.state), ['outstanding', 'outstanding', 'outstanding', 'ready']);
   });
 
   test('[CONFLICT] [SG2-39:AC2] [SG2-81:AC2] venue disruptions and planning impacts remain outstanding together without hiding either explanation', () => {
@@ -274,38 +278,48 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.equal(result.ready_for_confirmation, true);
   });
 
-  test('[FAILURE] [SG2-57:AC1] registration needed but a time is unset is outstanding and names the gap', () => {
+  test('[NORMAL] [SG2-94:AC6] registration needed with a time unset does not hold confirmation up, and names the gap for the organiser', () => {
     const result = computeArrangementReadiness(
       baseInput({ registration_closes_at: null })
     );
 
-    assert.equal(stateOf(result, 'registration'), 'outstanding');
-    assert.match(result.arrangements.find(a => a.key === 'registration')!.detail, /closing time/);
-    assert.deepEqual(result.outstanding, ['registration']);
-    assert.equal(result.ready_for_confirmation, false);
+    assert.equal(stateOf(result, 'registration'), 'ready');
+    assert.match(result.arrangements.find(a => a.key === 'registration')!.detail, /closing time not set yet\. The Event Organiser sets them/);
+    assert.deepEqual(result.outstanding, []);
+    assert.equal(result.ready_for_confirmation, true);
   });
 
-  test('[BOUNDARY] [SG2-57:AC1] registration missing both capacity and opening time names each gap', () => {
+  test('[BOUNDARY] [SG2-94:AC6] registration with capacity and both times unset is still ready and names each gap', () => {
     const result = computeArrangementReadiness(
-      baseInput({ registration_capacity: null, registration_opens_at: null })
+      baseInput({ registration_capacity: null, registration_opens_at: null, registration_closes_at: null })
     );
 
-    assert.equal(stateOf(result, 'registration'), 'outstanding');
-    const detail = result.arrangements.find(a => a.key === 'registration')!.detail;
-    assert.match(detail, /capacity/);
-    assert.match(detail, /opening time/);
+    assert.equal(stateOf(result, 'registration'), 'ready');
+    assert.match(result.arrangements.find(a => a.key === 'registration')!.detail, /^Registration capacity, opening time, closing time not set yet\./);
+    assert.equal(result.ready_for_confirmation, true);
   });
 
-  test('[NORMAL] [SG2-57:AC2] every outstanding arrangement is listed in order', () => {
+  test('[CONFLICT] [SG2-94:AC6] [SG2-66:AC4] a registration recheck still holds confirmation up when the settings are unset', () => {
+    const result = computeArrangementReadiness(baseInput({ registration_capacity: null,
+      arrangements_recheck_needed: true, outstanding_arrangements: ['registration_recheck'] }));
+    assert.deepEqual(result.outstanding, ['registration']);
+    assert.match(result.arrangements.find(a => a.key === 'registration')!.detail, /not set yet.*Recheck required after planning changes/);
+  });
+
+  test('[NORMAL] [SG2-57:AC2] [SG2-94:AC4] every outstanding item is listed in order, the safety check last', () => {
     const result = computeArrangementReadiness(
       baseInput({
+        status: 'planning',
+        latest_safety_decision: null,
         venue_requests: [{ status: 'pending', booked: false }],
         equipment_requests: [{ status: 'pending', shortfall: null, placement_venue_id: null, reserved: false }],
-        registration_capacity: null
+        arrangements_recheck_needed: true,
+        outstanding_arrangements: ['registration_recheck']
       })
     );
 
-    assert.deepEqual(result.outstanding, ['venue', 'equipment', 'registration']);
+    assert.deepEqual(result.outstanding, ['venue', 'equipment', 'registration', 'safety']);
+    assert.deepEqual(result.arrangements.map(item => item.label), ['Venue booking', 'Equipment', 'Registration', 'Safety check']);
     assert.equal(result.ready_for_confirmation, false);
   });
 
@@ -334,5 +348,54 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.match(detail({ venue_requests: [{ status: 'approved', booked: true }, { status: 'pending', booked: false }] }), /awaiting approval/);
     assert.match(detail({ venue_requests: [{ status: 'approved', booked: true }, { status: 'rejected', booked: false }] }), /rejected/);
     assert.match(detail({ venue_requests: [{ status: 'approved', booked: false }] }), /affected by venue unavailability/);
+  });
+});
+
+describe('the safety check as an outstanding item (SG2-94)', () => {
+  const safety = (input: Partial<ArrangementReadinessInput>) => {
+    const result = computeArrangementReadiness(baseInput(input));
+    return { result, item: result.arrangements.find(a => a.key === 'safety')! };
+  };
+
+  test('[NORMAL] [SG2-94:AC2] [SG2-94:AC4] an event in Preparation or Confirmed whose latest decision is Approve has the safety check ready', () => {
+    for (const status of ['preparation', 'confirmed']) {
+      const { result, item } = safety({ status });
+      assert.deepEqual(item, { key: 'safety', label: 'Safety check', state: 'ready', detail: 'Approved by the Safety Officer.' });
+      assert.equal(result.ready_for_confirmation, true, status);
+    }
+  });
+
+  test('[FAILURE] [SG2-94:AC5] without a current approval the safety check is outstanding with the reason, even with everything else in place', () => {
+    for (const [status, latest, reason] of [
+      ['awaiting_safety_check', null, /^Awaiting the Safety Officer's operational safety check\.$/],
+      ['safety_rejected', 'reject', /rejected the safety check\. Rework the arrangements/],
+      ['planning', 'request_changes', /requested changes\. The event goes back to the safety check once they are confirmed again/],
+      ['planning', null, /^Not approved yet\. The event goes to the Safety Officer once its venue and equipment are in place\.$/],
+      ['preparation', null, /^Not approved yet\./],
+      ['preparation', 'request_changes', /requested changes/],
+    ] as const) {
+      const { result, item } = safety({ status, latest_safety_decision: latest });
+      assert.equal(item.state, 'outstanding', `${status}/${latest}`);
+      assert.match(item.detail, reason);
+      assert.deepEqual(result.outstanding, ['safety']);
+      assert.equal(result.ready_for_confirmation, false);
+    }
+  });
+
+  test('[CONFLICT] [SG2-94:AC3] an Approve that is still the latest decision no longer counts once the event is back in Planning', () => {
+    for (const status of ['planning', 'approved']) {
+      const { result, item } = safety({ status, latest_safety_decision: 'approve' });
+      assert.equal(item.state, 'outstanding');
+      assert.match(item.detail, /^The approval was withdrawn after the event changed\. It must pass the safety check again/);
+      assert.equal(result.ready_for_confirmation, false);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-94:AC2] Approve on an event waiting for its next check is not yet an approval of that check', () => {
+    const { item } = safety({ status: 'awaiting_safety_check', latest_safety_decision: 'approve' });
+    assert.equal(item.state, 'outstanding');
+    assert.equal(isSafetyApproved('awaiting_safety_check', 'approve'), false);
+    assert.equal(isSafetyApproved('confirmed', 'approve'), true);
+    assert.equal(isSafetyApproved('confirmed', 'reject'), false);
   });
 });

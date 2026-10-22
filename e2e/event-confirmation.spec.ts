@@ -76,15 +76,17 @@ test('SG2-58-P01 | [NORMAL] [SG2-58:AC1] [SG2-58:AC3] the coordinator confirms a
   expect(errors).toEqual([]);
 });
 
-test('SG2-58-N01 | [FAILURE] [SG2-58:AC2] confirmation is refused while one of two venues is pending, equipment is unreserved and registration has no capacity', async ({ page }) => {
+test('SG2-58-N01 | [FAILURE] [SG2-58:AC2] [SG2-94:AC6] confirmation is refused while one of two venues is pending and equipment is unreserved, but not for a registration with no capacity', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await signIn(page, 'coordinator'); await openAssigned(page, 'Outstanding Forum');
   await expect(page.getByTestId('arrangement-venue')).toContainText('1 venue booking still awaiting approval.');
   await expect(page.getByTestId('arrangement-equipment')).toContainText('1 equipment request not yet reserved and placed with no shortfall.');
+  // SG2-94 AC6: the organiser sets registration later; it does not hold confirmation up.
+  await expect(page.getByTestId('arrangement-registration-state')).toHaveText('Ready');
   await confirmPanel(page).getByRole('button', { name: 'Confirm event', exact: true }).click();
   await expect(confirmPanel(page).getByRole('alert')).toHaveText('Confirmation refused: arrangements are still outstanding.');
   await expect(confirmPanel(page).getByRole('list', { name: 'Outstanding arrangements' }).getByRole('listitem'))
-    .toHaveText(['Venue booking', 'Equipment', 'Registration']);
+    .toHaveText(['Venue booking', 'Equipment']);
   await expect(page.locator('.work-queue-status')).toHaveText('preparation');
   const stored = await ledger(page);
   expect(eventRow(stored, 582)).toMatchObject({ status: 'preparation', confirmed_by: null, confirmed_at: null });

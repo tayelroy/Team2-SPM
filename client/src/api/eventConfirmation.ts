@@ -1,8 +1,8 @@
 /** SG2-58: confirming an event and reading its confirmed arrangements. */
-export type ArrangementKey = 'venue' | 'equipment' | 'registration';
+export type ArrangementKey = 'venue' | 'equipment' | 'registration' | 'safety';
 
 export const ARRANGEMENT_LABELS: Record<ArrangementKey, string> = {
-  venue: 'Venue booking', equipment: 'Equipment', registration: 'Registration',
+  venue: 'Venue booking', equipment: 'Equipment', registration: 'Registration', safety: 'Safety check',
 };
 
 export type ConfirmEventOutcome =
@@ -14,7 +14,8 @@ export type ConfirmEventOutcome =
 
 const UNAVAILABLE = { ok: false, kind: 'unavailable', message: 'Could not confirm the event. Please try again.' } as const;
 const OUTSTANDING = 'Confirmation refused: arrangements are still outstanding.';
-const isKey = (value: unknown): value is ArrangementKey => value === 'venue' || value === 'equipment' || value === 'registration';
+const isKey = (value: unknown): value is ArrangementKey => value === 'venue' || value === 'equipment' || value === 'registration'
+  || value === 'safety';
 
 async function readJson(response: Response): Promise<Record<string, unknown> | null> {
   const body: unknown = await response.json().catch(() => null);

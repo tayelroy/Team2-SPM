@@ -260,7 +260,9 @@ export function detectArrangementImpact(
   update: PlanningUpdateValues,
   facts: EventArrangementFacts
 ): ArrangementImpact {
-  const readiness = computeArrangementReadiness({ ...current, ...facts });
+  // Only the venue and equipment items are read here, so the safety check's
+  // decision is not fetched.
+  const readiness = computeArrangementReadiness({ ...current, ...facts, latest_safety_decision: null });
   const [, equipment] = readiness.arrangements;
   const venueArranged = readiness.venue_requested;
   const equipmentRequested = equipment.state !== 'not_required';
