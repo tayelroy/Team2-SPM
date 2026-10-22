@@ -30,12 +30,15 @@ export class MemoryDatabase {
   sessions = new Map<string, string>();
   venueHoldNow: () => number = Date.now;
   private sessionSequence = 0;
+  /** SG2-89: sign-in accounts a seed adds for one test, cleared on reset. */
+  private seededAccounts: { key: string; email: string; role: string }[] = [];
 
   constructor() { this.reset(); }
 
   reset() {
     this.sessions.clear();
     this.sessionSequence = 0;
+    this.seededAccounts = [];
     const draft = {
       name: 'Planning workshop', purpose: 'Team planning', description: 'A planning workshop.',
       proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 20,
@@ -186,6 +189,34 @@ export class MemoryDatabase {
     this.tables.events.push({
       ...this.tables.events[0], event_id: 71, name: 'Assignment Forum', status: 'submitted', coordinator_id: null
     });
+  }
+
+  /** SG2-89: two Leads and two coordinators. The signed-in Lead supervises
+   * 201 (awaiting the organiser's clarification) and 202 (planning) and once
+   * supervised 205 (completed, so no longer active); a second Lead, who can
+   * sign in, supervises 203; 204 waits unassigned in the queue both share. */
+  seedCoordinatorOversight() {
+    this.seededAccounts.push({ key: 'lead2', email: 'lead2@example.test', role: 'event_coordinator_lead' });
+    for (const [user_id, name, role] of [
+      ['user-lead2', 'Regression second lead', 'event_coordinator_lead'],
+      ['user-coordinator2', 'Regression second coordinator', 'event_coordinator']
+    ]) {
+      this.tables.users.push({ user_id, name, organisation: 'Regression Organisation', phone: null,
+        communication_preferences: [], department: 'Operations' });
+      this.tables.account_roles.push({ user_id, role });
+    }
+    const base = { ...this.tables.events[0], expected_attendance: 60 };
+    const rows: [number, string, string, string | null, string | null, string][] = [
+      [201, 'Clarification Forum', 'needs_clarification', 'user-coordinator', 'user-lead', '2030-07-01T02:00:00.000Z'],
+      [202, 'Planning Forum', 'planning', 'user-coordinator2', 'user-lead', '2030-07-02T02:00:00.000Z'],
+      [203, 'Other Lead Forum', 'approved', 'user-coordinator', 'user-lead2', '2030-07-03T02:00:00.000Z'],
+      [204, 'Queued Forum', 'unassigned', null, null, '2030-07-04T02:00:00.000Z'],
+      [205, 'Finished Forum', 'completed', 'user-coordinator', 'user-lead', '2030-05-01T02:00:00.000Z']
+    ];
+    for (const [event_id, name, status, coordinator_id, coordinator_assigned_by, proposed_date] of rows) {
+      this.tables.events.push({ ...base, event_id, name, status, coordinator_id, coordinator_assigned_by, proposed_date,
+        submitted_at: '2026-10-20T02:00:00.000Z' });
+    }
   }
 
   /** SG2-90: events in every state a coordinator can act on, for each
@@ -511,7 +542,7 @@ export class MemoryDatabase {
     },
     auth: {
       signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
-        const account = accounts.find(account => account.email === email && password === TEST_PASSWORD);
+        const account = [...accounts, ...this.seededAccounts].find(account => account.email === email && password === TEST_PASSWORD);
         if (!account) return { data: null, error: { message: 'Invalid credentials' } };
         const token = `regression-${account.key}-${++this.sessionSequence}`;
         this.sessions.set(token, `user-${account.key}`);

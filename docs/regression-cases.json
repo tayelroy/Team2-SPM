@@ -3333,7 +3333,7 @@
     ],
     "expected": [
       "Safety desk heading, a live '0 events are awaiting a safety check.' count (SG2-91 replaced the earlier 'No safety checks yet' placeholder), a menu of exactly [Dashboard, Safety checks, Find an event] (SG2-70 added Find an event) and no prototype event",
-      "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators, Find an event], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
+      "Coordination lead desk heading, a menu of exactly [Dashboard, Unassigned queue, Assign coordinators, Coordinator overview, Find an event], a live 'N request(s) awaiting a coordinator.' count and no prototype event",
       "Open unassigned queue lands on the Unassigned queue page, never the Attendee Event page"
     ],
     "evidence": "e2e/regression.spec.ts; client/src/App.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/mock/viewModel.test.ts",
@@ -8404,5 +8404,157 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-89-P01",
+    "title": "the Lead oversees their events, filters them and reassigns one awaiting clarification without changing its status",
+    "story": "SG2-89",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-89:AC1",
+      "SG2-89:AC2",
+      "SG2-89:AC3",
+      "SG2-89:AC6"
+    ],
+    "method_id": "TC-0393a3df162f",
+    "purpose": "Verify that an event awaiting the organiser's clarification stays in its coordinator's work queue; that the Event Coordinator Lead's Coordinator overview (laid out cleanly at 390px and 1440px) lists only the active events whose coordinator they assigned, with each coordinator and status and every coordinator's workload; that it filters by coordinator and by status; and that reassigning an event awaiting clarification keeps its status and moves it to the new coordinator's queue.",
+    "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-oversight: lead@example.test supervises 201 'Clarification Forum' (needs_clarification, Regression coordinator), 202 'Planning Forum' (planning, Regression second coordinator) and 205 'Finished Forum' (completed); a second Lead supervises 203 'Other Lead Forum'.",
+    "steps": [
+      "As coordinator@example.test: GET /api/work-queue",
+      "Sign in as lead@example.test; at 390px and at 1440px open Coordinator overview",
+      "Choose Regression second coordinator in the workload list, then Clear filters and choose status Clarification Needed",
+      "On Clarification Forum choose Regression second coordinator and click Reassign",
+      "As organiser@example.test: GET /api/event-requests/201; as coordinator@example.test: GET /api/work-queue"
+    ],
+    "data": [
+      "Events 201, 202, 203, 205",
+      "Coordinators: Regression coordinator, Regression second coordinator"
+    ],
+    "expected": [
+      "Event 201 is in the coordinator's work queue as needs_clarification under review",
+      "The overview reads '2 active events under your supervision', shows Clarification Forum as Clarification Needed with Regression coordinator and Planning Forum with Regression second coordinator, omits 203 and 205, lists each coordinator with 1 active event, and has no horizontal overflow at either width",
+      "Each filter reads '1 active event matches these filters' and shows only the matching event",
+      "The screen says 'Clarification Forum is now with Regression second coordinator. It is still Clarification Needed.'",
+      "Event 201 is still needs_clarification with Regression second coordinator and has left the first coordinator's work queue"
+    ],
+    "evidence": "e2e/regression.spec.ts:2212",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in Chromium. With needs_clarification removed from the fixture's work-queue statuses it fails at the first work-queue check.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "npx playwright test on feature/SG2-89-coordinator-oversight working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
+    "id": "SG2-89-P02",
+    "title": "supervision follows the Lead who last reassigned, and every Lead sees the whole unassigned queue",
+    "story": "SG2-89",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-89:AC1",
+      "SG2-89:AC5"
+    ],
+    "method_id": "TC-7e134c65ed22",
+    "purpose": "Verify that with two Event Coordinator Leads each sees the whole unassigned queue, each overview holds only the events whose coordinator that Lead last assigned, and supervision moves to the Lead who reassigns an event.",
+    "preconditions": "Reset loopback memory fixture. Seeded via /__e2e/coordinator-oversight, which adds lead2@example.test (a second Event Coordinator Lead who can sign in) and queued event 204 'Queued Forum'.",
+    "steps": [
+      "As lead@example.test and lead2@example.test: GET /api/assignment-queue and GET /api/coordinator-overview",
+      "As lead2: PATCH /api/event-requests/202/coordinator to user-coordinator",
+      "As lead: PATCH /api/event-requests/202/coordinator to user-coordinator again",
+      "As lead2: PATCH /api/event-requests/204/coordinator to user-coordinator2"
+    ],
+    "data": [
+      "Events 201, 202, 203 (supervised) and 204 (unassigned)"
+    ],
+    "expected": [
+      "Both Leads' queues are [204]",
+      "lead supervises [201, 202]; lead2 supervises [203]",
+      "After lead2 reassigns 202, lead supervises [201] and lead2 supervises [202, 203]",
+      "lead re-choosing the coordinator 202 already has returns 200 and leaves it with lead2",
+      "After lead2 assigns 204 both queues are empty and lead2 supervises [202, 203, 204]"
+    ],
+    "evidence": "e2e/regression.spec.ts:2266",
+    "layer": "Playwright fixture API",
+    "status": "Pass",
+    "actual": "Passed in Chromium.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "npx playwright test on feature/SG2-89-coordinator-oversight working tree; isolated loopback storage; no hosted Supabase."
+  },
+  {
+    "id": "SG2-89-N01",
+    "title": "only the Event Coordinator Lead can open the coordinator overview, and bad filters are refused",
+    "story": "SG2-89",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-89:AC4",
+      "SG2-89:AC3"
+    ],
+    "method_id": "TC-0110c5d70b4b",
+    "purpose": "Verify that Event Coordinators and every other role are refused the coordinator overview on the server without any event detail leaking, that it needs a signed-in caller, that an unknown status or coordinator filter is refused, and that the coordinator's navigation does not offer it.",
+    "preconditions": "Reset loopback memory fixture; production app build. Seeded via /__e2e/coordinator-oversight.",
+    "steps": [
+      "As organiser, coordinator, venue, support, safety and attendee: GET /api/coordinator-overview",
+      "Without a token: GET /api/coordinator-overview",
+      "As lead@example.test: GET /api/coordinator-overview?status=draft and ?coordinatorId=user-organiser",
+      "Sign in as coordinator@example.test and wait for the navigation to load"
+    ],
+    "data": [
+      "Event 201 'Clarification Forum' as the detail that must not leak"
+    ],
+    "expected": [
+      "Every other role receives 403 and the body does not contain 'Clarification Forum'",
+      "No token receives 401",
+      "Both bad filters receive 400",
+      "The coordinator's navigation has no Coordinator overview button"
+    ],
+    "evidence": "e2e/regression.spec.ts:2303",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in Chromium.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "npx playwright test on feature/SG2-89-coordinator-oversight working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+  },
+  {
+    "id": "SG2-89-DB01",
+    "title": "the supervising Lead moves with each reassignment and events awaiting clarification stay in the coordinator's queue",
+    "story": "SG2-89",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-89:AC1",
+      "SG2-89:AC4",
+      "SG2-89:AC6"
+    ],
+    "purpose": "Verify in the database that an event awaiting clarification is in its own coordinator's review queue only, that reassigning it keeps its status and moves supervision in the same write, that a reassignment read against a replaced coordinator changes nothing, that no event without a coordinator can have a supervising Lead, and that the work queue view stays server-only.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
+    "steps": [
+      "Read internal_work_items for a needs_clarification event and a draft.",
+      "Reassign the needs_clarification event with a new supervising Lead, then retry with the replaced coordinator as the guard.",
+      "Clear a coordinator while keeping its Lead; give an unassigned event a Lead; clear both together.",
+      "Check the column is nullable and the view's grants."
+    ],
+    "data": "Synthetic 989xx events; e8900000 fixture identities (an organiser, two Leads, two coordinators).",
+    "expected": "The clarification event is in its coordinator's review queue and no one else's, and drafts are not; the reassignment keeps needs_clarification and moves the queue entry and supervisor; the stale reassignment updates 0 rows; both orphan supervisors are refused with check_violation and clearing both together is allowed; authenticated and anon cannot select the view.",
+    "evidence": "supabase/tests/coordinator_oversight.sql; .github/workflows/ci.yml; supabase/rollbacks/202610220001_coordinator_oversight_down.sql",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay.",
+    "status": "Pass",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "22 Oct 2026; feature/SG2-89-coordinator-oversight on main c252795; disposable PostgreSQL 17 replay of the auth fixture and every migration, then all 42 CI SQL suites; sabotage runs (check constraint dropped, previous work queue view restored) made the suite fail. Rollback rehearsal: schema dumps before the migration and after migrate, write and roll back match; main's work queue suite passes on the rolled-back database; re-applying the migration passes the new suite."
   }
 ]

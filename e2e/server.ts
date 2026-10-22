@@ -459,6 +459,11 @@ app.post('/__e2e/coordinator-assignment', (_req, res) => {
   database.seedCoordinatorAssignment();
   res.status(204).end();
 });
+// SG2-89: two Leads, the events each supervises, and a shared queue entry.
+app.post('/__e2e/coordinator-oversight', (_req, res) => {
+  database.seedCoordinatorOversight();
+  res.status(204).end();
+});
 app.post('/__e2e/coordinator-access', (_req, res) => {
   database.seedCoordinatorAccess();
   res.status(204).end();

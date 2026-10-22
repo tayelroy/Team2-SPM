@@ -2078,7 +2078,8 @@ test('SG2-86-P02 | [SG2-86:AC2] [NORMAL] [FAILURE] the Week 7 desks show no prot
   await page.getByRole('button', { name: 'Logout', exact: true }).click();
   await signIn(page, 'lead');
   await expect(page.getByRole('heading', { level: 1, name: 'Coordination lead desk' })).toBeVisible();
-  await expect(menu).toHaveText(['Dashboard', 'Unassigned queue', 'Assign coordinators', 'Find an event']);
+  // SG2-89: the Lead's overview of the events they supervise.
+  await expect(menu).toHaveText(['Dashboard', 'Unassigned queue', 'Assign coordinators', 'Coordinator overview', 'Find an event']);
   await expect(page.getByText(/^\d+ requests? (is|are) awaiting a coordinator\.$/)).toBeVisible();
   await expect(prototypeEvent).toHaveCount(0);
   await page.getByRole('button', { name: 'Open unassigned queue', exact: true }).click();
@@ -2206,6 +2207,123 @@ test('SG2-88-P01 | [SG2-88:AC1] [SG2-88:AC2] [SG2-88:AC3] [SG2-88:AC4] [SG2-88:A
   // CONFLICT: assigning the coordinator who already holds the event changes nothing and tells no one.
   expect((await request.patch('/api/event-requests/1/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator2' } })).status()).toBe(200);
   expect((await notices(organiser)).length).toBe(2);
+});
+
+test('SG2-89-P01 | [SG2-89:AC1] [SG2-89:AC2] [SG2-89:AC3] [SG2-89:AC6] [NORMAL] [BOUNDARY] the Lead oversees their events, filters them and reassigns one awaiting clarification without changing its status', async ({ page, request }) => {
+  expect((await request.post('/__e2e/coordinator-oversight')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const [organiser, coordinator] = [await tokenFor('organiser'), await tokenFor('coordinator')];
+  const workQueue = async () => ((await (await request.get('/api/work-queue', { headers: coordinator })).json()).items as Record<string, unknown>[])
+    .filter(item => item.kind === 'event').map(item => [item.event_id, item.status, item.category]);
+
+  // AC6: an event awaiting the organiser's clarification stays in its coordinator's work queue.
+  expect(await workQueue()).toContainEqual([201, 'needs_clarification', 'review']);
+
+  // AC1/AC2: the Lead's overview at phone and laptop widths (DoD v2.1).
+  await signIn(page, 'lead');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await nav(page, 'Coordinator overview');
+    await expect(page.getByRole('heading', { name: '2 active events under your supervision' })).toBeVisible();
+    const clarification = page.getByRole('article', { name: 'Clarification Forum' });
+    await expect(clarification.getByText('Clarification Needed')).toBeVisible();
+    await expect(clarification.getByText('Regression coordinator', { exact: true })).toBeVisible();
+    await expect(page.getByRole('article', { name: 'Planning Forum' }).getByText('Regression second coordinator')).toBeVisible();
+    // Another Lead's event and a completed one are not this Lead's active events.
+    await expect(page.getByRole('article', { name: 'Other Lead Forum' })).toHaveCount(0);
+    await expect(page.getByRole('article', { name: 'Finished Forum' })).toHaveCount(0);
+    const workload = page.getByRole('list', { name: 'Coordinator workload' });
+    await expect(workload.getByRole('button', { name: /^Regression coordinator 1 active event$/ })).toBeVisible();
+    await expect(workload.getByRole('button', { name: /^Regression second coordinator 1 active event$/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+
+  // AC2/AC3: one coordinator's events, then by status.
+  await page.getByRole('list', { name: 'Coordinator workload' }).getByRole('button', { name: /Regression second coordinator/ }).click();
+  await expect(page.getByRole('heading', { name: '1 active event matches these filters' })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'Planning Forum' })).toBeVisible();
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await page.getByLabel('Status').selectOption({ label: 'Clarification Needed' });
+  await expect(page.getByRole('heading', { name: '1 active event matches these filters' })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'Clarification Forum' })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'Planning Forum' })).toHaveCount(0);
+
+  // AC6: the Lead reassigns it; it stays awaiting clarification and moves to the new coordinator's queue.
+  const card = page.getByRole('article', { name: 'Clarification Forum' });
+  await card.getByLabel('Reassign Clarification Forum to').selectOption({ label: 'Regression second coordinator' });
+  await card.getByRole('button', { name: 'Reassign' }).click();
+  await expect(page.getByText('Clarification Forum is now with Regression second coordinator. It is still Clarification Needed.')).toBeVisible();
+  await expect(card.getByText('Regression second coordinator', { exact: true })).toBeVisible();
+  const detail = await (await request.get('/api/event-requests/201', { headers: organiser })).json();
+  expect([detail.request.status, detail.request.coordinator_name]).toEqual(['needs_clarification', 'Regression second coordinator']);
+  expect((await workQueue()).some(([eventId]) => eventId === 201)).toBe(false);
+});
+
+test('SG2-89-P02 | [SG2-89:AC1] [SG2-89:AC5] [CONFLICT] [NORMAL] supervision follows the Lead who last reassigned, and every Lead sees the whole unassigned queue', async ({ request }) => {
+  expect((await request.post('/__e2e/coordinator-oversight')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  const [lead, lead2] = [await tokenFor('lead'), await tokenFor('lead2')];
+  const supervised = async (headers: Record<string, string>) =>
+    ((await (await request.get('/api/coordinator-overview', { headers })).json()).events as Record<string, unknown>[]).map(event => event.event_id);
+
+  // AC5: both Leads see the same, whole unassigned queue.
+  const queue = async (headers: Record<string, string>) =>
+    ((await (await request.get('/api/assignment-queue', { headers })).json()).entries as Record<string, unknown>[]).map(entry => entry.event_id);
+  expect(await queue(lead)).toEqual([204]);
+  expect(await queue(lead2)).toEqual(await queue(lead));
+
+  // AC1: each Lead sees only the events whose coordinator they assigned.
+  expect(await supervised(lead)).toEqual([201, 202]);
+  expect(await supervised(lead2)).toEqual([203]);
+
+  // CONFLICT: the second Lead reassigns the first Lead's event; supervision moves with it.
+  expect((await request.patch('/api/event-requests/202/coordinator', { headers: lead2, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(200);
+  expect(await supervised(lead)).toEqual([201]);
+  expect(await supervised(lead2)).toEqual([202, 203]);
+
+  // A Lead who read the old coordinator cannot silently undo it: re-choosing the
+  // coordinator the event now has changes nothing and does not take it back.
+  expect((await request.patch('/api/event-requests/202/coordinator', { headers: lead, data: { coordinatorId: 'user-coordinator' } })).status()).toBe(200);
+  expect(await supervised(lead2)).toEqual([202, 203]);
+
+  // A queued event assigned by the second Lead joins their overview and leaves the shared queue for both.
+  expect((await request.patch('/api/event-requests/204/coordinator', { headers: lead2, data: { coordinatorId: 'user-coordinator2' } })).status()).toBe(200);
+  expect([await queue(lead), await queue(lead2)]).toEqual([[], []]);
+  expect(await supervised(lead2)).toEqual([202, 203, 204]);
+});
+
+test('SG2-89-N01 | [SG2-89:AC4] [SG2-89:AC3] [FAILURE] only the Event Coordinator Lead can open the coordinator overview, and bad filters are refused', async ({ page, request }) => {
+  expect((await request.post('/__e2e/coordinator-oversight')).status()).toBe(204);
+  const tokenFor = async (account: string) => {
+    const login = await request.post('/api/auth/login', { data: { email: `${account}@example.test`, password } });
+    expect(login.status()).toBe(200);
+    return { Authorization: `Bearer ${(await login.json()).accessToken}` };
+  };
+  // AC4: every other role is refused on the server, and nothing about the events leaks.
+  for (const account of ['organiser', 'coordinator', 'venue', 'support', 'safety', 'attendee']) {
+    const response = await request.get('/api/coordinator-overview', { headers: await tokenFor(account) });
+    expect(response.status(), account).toBe(403);
+    expect(await response.text(), account).not.toContain('Clarification Forum');
+  }
+  expect((await request.get('/api/coordinator-overview')).status()).toBe(401);
+
+  // AC3: an unknown status or coordinator is refused rather than showing an empty list.
+  const lead = await tokenFor('lead');
+  expect((await request.get('/api/coordinator-overview?status=draft', { headers: lead })).status()).toBe(400);
+  expect((await request.get('/api/coordinator-overview?coordinatorId=user-organiser', { headers: lead })).status()).toBe(400);
+
+  // AC4 on screen: the coordinator is not offered the overview.
+  await signIn(page, 'coordinator');
+  await expect(page.getByRole('navigation')).not.toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByRole('button', { name: 'Coordinator overview' })).toHaveCount(0);
 });
 
 test('SG2-97-P01 | [SG2-97:AC1] [SG2-97:AC2] [SG2-97:AC3] [NORMAL] [FAILURE] assignment moves to the Event Coordinator Lead while earlier assignments, their history and the organiser contact stay', async ({ page, request }) => {
