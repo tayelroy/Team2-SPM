@@ -226,7 +226,7 @@ begin
  end if;
  begin
   insert into public.notifications(recipient_id,event_id,kind,message)
-   values('e6800000-0000-4000-8000-000000000003',96801,'event_cancelled','Notice forum was cancelled.');
+   values('e6800000-0000-4000-8000-000000000003',96801,'event_postponed','Notice forum was postponed.');
   raise exception '[SG2-68:unknown-kind-refused] [SG2-68:AC1] [FAILURE] A notification kind outside the agreed list was accepted';
  exception when check_violation then null; end;
 end $$;

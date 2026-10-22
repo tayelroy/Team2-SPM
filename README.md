@@ -190,6 +190,7 @@ uploaded as the `browser-regression` artifact.
 - [Equipment requirements](docs/equipment-requirements.md) — SG2-53 coordinator requests, support updates, placement and migration
 - [Equipment availability](docs/equipment-availability.md) — SG2-54 dated commitments, remaining stock, shortfall and migration
 - [Equipment reservations](docs/equipment-reservations.md) — SG2-55 atomic reservations, event receipts, coordinator notices and continued placement work; SG2-56 release on event cancellation
+- [Event cancellation](docs/event-cancellation.md) — SG2-67 organiser request, coordinator cancellation, venue and equipment release, attendee notices and migration
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 - [Change impact](docs/change-impact.md) — SG2-66 what an accepted change breaks, returning to Planning, settling rechecks, and the sample change requests standing in for SG2-64/SG2-65

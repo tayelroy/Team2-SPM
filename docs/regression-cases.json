@@ -8592,6 +8592,120 @@
     "executed_by": "Claude (automated local verification)"
   },
   {
+    "id": "SG2-67-DB01",
+    "title": "only the creating organiser asks and only the assigned coordinator cancels; every other caller is refused",
+    "story": "SG2-67",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-67:AC1",
+      "SG2-67:AC4"
+    ],
+    "purpose": "Verify the request and cancellation functions accept only their intended callers and states, keep the reason within 500 characters, accept one request, and record who asked and when.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
+    "steps": [
+      "As the coordinator, cancel before any request; ask for a cancellation.",
+      "As the organiser, cancel directly and update the status through the table; as Venue Staff, ask and cancel.",
+      "As a colleague organiser, ask. As the organiser, ask with a blank and a 501-character reason, then 500 characters on an unassigned event; ask for a draft and a completed event.",
+      "Ask for event 96701 with a reason, then ask again; read the event, the coordinator notice and the history.",
+      "As another coordinator, cancel event 96701."
+    ],
+    "data": "Synthetic 967xx events, venues, bookings, requests, equipment and registrations; d6700000 fixture identities for organiser, colleague, two coordinators, two attendees and Venue Staff.",
+    "expected": "Cancelling before a request returns not_requested; other roles and direct calls are refused (42501); the colleague and the other coordinator get missing; blank and 501 characters are invalid and 500 is accepted with no coordinator notified; draft and completed are closed; the second request returns requested; the event keeps the trimmed reason, asker and time; the coordinator gets 'The organiser asked to cancel Cancel Summit: The keynote speaker withdrew'; history shows 'Requested: The keynote speaker withdrew'.",
+    "evidence": "supabase/tests/event_cancellation.sql; .github/workflows/ci.yml; docs/event-cancellation.md",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay.",
+    "status": "Pass",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "22 Oct 2026; feature/SG2-67-cancel-event merged with main 9850b8e (SG2-83, SG2-94); disposable PostgreSQL 17 replay of every migration, the CI database job and the legacy upgrade step, then supabase/tests/event_cancellation.sql; sabotage runs (reinstatement trigger dropped; assignment check removed; hold release removed from cancel_event) made the suite fail. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-22",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-67-DB02",
+    "title": "cancelling frees venues, tentative holds and equipment, tells registered attendees, is recorded, and cannot be undone",
+    "story": "SG2-67",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-67:AC2",
+      "SG2-67:AC3",
+      "SG2-67:AC4",
+      "SG2-67:AC5"
+    ],
+    "purpose": "Verify the assigned coordinator's cancellation releases future bookings and their requests, releases equipment through SG2-56, notifies registered attendees and the organiser only, records the cancellation, and that no path can reinstate it.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
+    "steps": [
+      "Seed event 96701 with two future and one past confirmed booking, an approved venue request, a tentative hold on a third venue behind a pending request, a pending equipment request, a 4-microphone reservation and one registered and one withdrawn attendee.",
+      "Before cancelling, try to book the held slot for another event.",
+      "Cancel it as the assigned coordinator after the organiser asked.",
+      "Read bookings, the request, the reservation, notifications, the event and its history.",
+      "Cancel and ask again; set the status back to planning on 96701 and on a legacy cancelled event; rename 96701; store a cancellation time on a planning event."
+    ],
+    "data": "Synthetic 967xx events, venues, bookings, requests, equipment and registrations; d6700000 fixture identities for organiser, colleague, two coordinators, two attendees and Venue Staff.",
+    "expected": "bookings_released 2 and attendees_notified 1; both future bookings are cancelled with 'Event cancelled: The keynote speaker withdrew', the past one stays confirmed, the request is cancelled and the main venue cleared; the tentative hold is released with a venue_hold_status history entry, its pending request and the pending equipment request are cancelled, and the held slot that was refused before can now be booked for another event; the reservation is released by the coordinator; the registered attendee and organiser get 'Cancel Summit has been cancelled: The keynote speaker withdrew' and the withdrawn attendee nothing; the event keeps who and when with two venue_booking and one status history entries; repeats return closed; reinstating either event fails with 'A cancelled event cannot be reinstated.'; renaming keeps it cancelled; a cancellation time on a planning event fails its check.",
+    "evidence": "supabase/tests/event_cancellation.sql; .github/workflows/ci.yml; docs/event-cancellation.md",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay.",
+    "status": "Pass",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "22 Oct 2026; feature/SG2-67-cancel-event merged with main 9850b8e (SG2-83, SG2-94); disposable PostgreSQL 17 replay of every migration, the CI database job and the legacy upgrade step, then supabase/tests/event_cancellation.sql; sabotage runs (reinstatement trigger dropped; assignment check removed; hold release removed from cancel_event) made the suite fail. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-22",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-67-C01",
+    "title": "the organiser asks and the assigned coordinator cancels from the event page, through the protected API",
+    "story": "SG2-67",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-67:AC1",
+      "SG2-67:AC4",
+      "SG2-67:AC5"
+    ],
+    "purpose": "Verify the Cancellation panel offers each person only their step, validates the reason, confirms before cancelling, reports refusals, and that both routes pass the caller token and map every database outcome to a safe status.",
+    "preconditions": "Vitest with rendered React components and controlled fetch; Node test runner with supertest over the Express handlers and fake RPC clients.",
+    "steps": [
+      "Render EventDetail as the creating organiser, a colleague and coordinators, and the WorkQueue pane as the assigned and an unassigned coordinator, for planning, draft, completed and cancelled events.",
+      "In the panel, ask with blank, 501- and 500-character reasons; ask and be refused; as coordinator, keep the event, then confirm and be refused, then confirm and succeed.",
+      "Call both routes with valid, malformed and boundary ids, missing reasons, each database outcome and each thrown failure."
+    ],
+    "data": "Event 67 and 7 fixtures; organiser-token and coordinator-token.",
+    "expected": "Only the creating organiser (event page) and the assigned coordinator (work queue, with the request from its details) see the panel, and not for drafts or completed events; invalid reasons are stopped before sending and 500 characters are sent; a refusal shows the server message; cancelling needs a confirmation; routes return 201/200 on success, 400 for bad ids or reasons, 404 for missing, 409 for closed, requested and not_requested, and 401/403/503 for failures.",
+    "evidence": "client/src/components/CancellationPanel.test.tsx; client/src/screens/EventDetail.cancellation.test.tsx; client/src/api/eventCancellation.test.ts; server/src/eventCancellation.test.ts; server/src/db/eventCancellation.test.ts; client/src/screens/WorkQueue.cancellation.test.tsx",
+    "layer": "Rendered React component / public API boundary",
+    "actual": "Passed in the local client and server suites at 100% coverage.",
+    "status": "Pass",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "22 Oct 2026; feature/SG2-67-cancel-event merged with main 9850b8e; client and server suites at 100% coverage.",
+    "review": {
+      "date": "2026-10-22",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
     "id": "SG2-59-P01",
     "title": "An attendee finds the events open or opening for registration and opens one without seeing planning details",
     "type": "NORMAL",

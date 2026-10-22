@@ -785,6 +785,20 @@
       }
     },
     {
+      "id": "SG2-67",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-67",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "The Event Organiser asks for cancellation, giving a reason, and only the assigned Event Coordinator carries it out, provided the event is not already completed or cancelled; a direct cancellation by the Organiser or any other role is refused on the server side",
+        "AC2": "Cancelling releases all of the event's venue bookings (SG2-82) and its equipment reservations (SG2-56)",
+        "AC3": "Registered attendees are notified",
+        "AC4": "The reason, who cancelled it and when are recorded",
+        "AC5": "A cancelled event cannot be reinstated; a similar event needs a new request"
+      },
+      "verifiedAt": "2026-10-21",
+      "source": "Live SG2-67 Jira description, bullet order, read through the Atlassian connector."
+    },
+    {
       "id": "SG2-91",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-91",
       "originalPullRequests": [],
