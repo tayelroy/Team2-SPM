@@ -276,8 +276,10 @@ export function assessChangeImpact(
  *   exception for at least that attendance).
  * - equipment_recheck: every live equipment request and every dated
  *   reservation covers the event start.
- * - registration_recheck: when registration is needed, it closes before the
- *   event starts and holds no more registrations than its capacity.
+ * - registration_recheck: when registration is needed and its closing time is
+ *   set, it closes before the event starts; it holds no more registrations
+ *   than its capacity. Unset settings are the organiser's to fill in and do
+ *   not block (SG2-94 AC6).
  */
 export function recheckBlockers(key: RecheckKey, event: ChangeImpactEventFacts, facts: ChangeImpactFacts): string[] {
   const start = event.proposed_date;
@@ -308,7 +310,7 @@ export function recheckBlockers(key: RecheckKey, event: ChangeImpactEventFacts, 
   } else if (event.registration_needed === true) {
     const closes = event.registration_closes_at ?? null;
     if (closes === null) {
-      blockers.push('Registration has no closing time.');
+      // SG2-94 AC6: no window yet, so nothing to check against the event.
     } else if (start === null) {
       blockers.push('Registration cannot be checked against the event, which has no date.');
     } else if (new Date(closes).getTime() >= new Date(start).getTime()) {

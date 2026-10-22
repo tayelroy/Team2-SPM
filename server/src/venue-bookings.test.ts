@@ -7,7 +7,7 @@ import { createAuthorization, AccessError, type Principal } from './auth';
 import { dbConfig } from './db';
 import type { SuitabilityEventRow } from './db/venueSuitability';
 import type { ReleaseResult, VenueBookingRecord, VenueBookingStore } from './db/venueBookings';
-import { createVenueBookingsRouter, validateReleaseReason, type VenueBookingDependencies } from './venues/bookings';
+import { createVenueBookingsRouter, validateAlsoCancel, validateReleaseReason, type VenueBookingDependencies } from './venues/bookings';
 
 // Unit tests must not connect to a developer's configured database.
 before(() => {
@@ -39,8 +39,10 @@ const hall: VenueBookingRecord = { booking_id: 11, venue_id: 1, venue_name: 'Atr
   cancelled_at: null, cancellation_reason: null, canceller_name: null, affected_by: [], replacement: null };
 const annex: VenueBookingRecord = { ...hall, booking_id: 12, venue_id: 2, venue_name: 'Annex' };
 
+const RELEASED: ReleaseResult = { outcome: 'released', booking_id: 11, cancelled_at: '2030-01-01T00:00:00.000Z', also_released: [], returned_to_planning: false };
+
 function fixture(seed: { results?: ReleaseResult[]; fail?: Error } = {}) {
-  const released: [string, number, string][] = [];
+  const released: [string, number, string, number[]][] = [];
   const asked: unknown[][] = [];
   const store: VenueBookingStore = {
     async event(id) { if (seed.fail) throw seed.fail; return id === summit.event_id ? summit : null; },
@@ -48,12 +50,12 @@ function fixture(seed: { results?: ReleaseResult[]; fail?: Error } = {}) {
     async forEvent(id) { asked.push(['event', id]); return [hall, annex]; },
     async forVenue(id, now) { asked.push(['venue', id, now]); return [hall]; }
   };
-  const results = seed.results ?? [{ outcome: 'released', booking_id: 11, cancelled_at: '2030-01-01T00:00:00.000Z' }];
+  const results = seed.results ?? [RELEASED];
   const deps: VenueBookingDependencies = {
     getAdminClient: () => ({}) as SupabaseClient, store: () => store, now: () => NOW,
     releases: token => ({
-      async release(bookingId, reason) {
-        released.push([token, bookingId, reason]);
+      async release(bookingId, reason, also) {
+        released.push([token, bookingId, reason, also]);
         return results.shift()!;
       }
     })
@@ -81,16 +83,47 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC5] the assigned coordinator releases a boo
   const { composed, released } = fixture();
   const response = await release(composed, 'coordinator', { reason: '  The workshop moved online  ' });
   assert.deepEqual([response.status, response.body], [200, {
-    booking_id: 11, status: 'cancelled', cancelled_at: '2030-01-01T00:00:00.000Z', cancellation_reason: 'The workshop moved online'
+    booking_id: 11, status: 'cancelled', cancelled_at: '2030-01-01T00:00:00.000Z', cancellation_reason: 'The workshop moved online',
+    also_released: [], returned_to_planning: false
   }]);
-  // The database records the caller, so it runs with their own token.
-  assert.deepEqual(released, [['coordinator', 11, 'The workshop moved online']]);
+  // The database records the caller, so it runs with their own token, and
+  // SG2-83 AC1: no other booking goes with it unless named.
+  assert.deepEqual(released, [['coordinator', 11, 'The workshop moved online', []]]);
 });
 
-test('[NORMAL] [SG2-51:AC1] Venue Staff release a booking too', async () => {
+test('[FAILURE] [SG2-83:AC5] [SG2-83:AC6] Venue Staff can no longer release a booking; they mark the venue unavailable instead', async () => {
   const { composed, released } = fixture();
-  assert.equal((await release(composed, 'venue', { reason: 'Burst pipe' })).status, 200);
-  assert.deepEqual(released, [['venue', 11, 'Burst pipe']]);
+  const response = await release(composed, 'venue', { reason: 'Burst pipe' });
+  assert.deepEqual([response.status, response.body], [403, { error: new AccessError(403).message }]);
+  assert.deepEqual(released, []);
+});
+
+test('[NORMAL] [SG2-83:AC2] [SG2-83:AC7] the other bookings the coordinator names are cancelled too, and a Confirmed event is reported back in Planning', async () => {
+  const { composed, released } = fixture({ results: [{ ...RELEASED, also_released: [12], returned_to_planning: true }] });
+  const response = await release(composed, 'coordinator', { reason: 'Moved online', also_cancel: [12, 12, 11] });
+  assert.deepEqual([response.status, response.body.also_released, response.body.returned_to_planning], [200, [12], true]);
+  // Repeats are dropped, and the booking being released is not named twice.
+  assert.deepEqual(released, [['coordinator', 11, 'Moved online', [12]]]);
+});
+
+test('[BOUNDARY] [SG2-83:AC2] up to 50 other bookings may be named, each a positive whole number; none or null means none', async () => {
+  const { composed, released } = fixture({ results: [RELEASED, RELEASED, RELEASED] });
+  for (const also_cancel of [Array.from({ length: 51 }, (_, i) => i + 20), [0], [1.5], ['12'], 'all', {}]) {
+    const response = await release(composed, 'coordinator', { reason: 'x', also_cancel });
+    assert.deepEqual([response.status, response.body.error], [400, 'Choose at most 50 other bookings of this event to cancel as well.'], JSON.stringify(also_cancel));
+  }
+  for (const also_cancel of [Array.from({ length: 50 }, (_, i) => i + 20), null, undefined]) {
+    assert.equal((await release(composed, 'coordinator', { reason: 'x', also_cancel })).status, 200);
+  }
+  assert.deepEqual(released.map(([, , , also]) => also.length), [50, 0, 0]);
+  assert.deepEqual(validateAlsoCancel('not an object'), []);
+});
+
+test('[CONFLICT] [SG2-83:AC2] a named booking that is no longer a live booking of the event cancels nothing', async () => {
+  const { composed } = fixture({ results: [{ outcome: 'others_invalid' }] });
+  const response = await release(composed, 'coordinator', { reason: 'x', also_cancel: [99] });
+  assert.deepEqual([response.status, response.body.error],
+    [409, 'Each other booking chosen must be a confirmed booking of this event that has not ended. Nothing was cancelled.']);
 });
 
 test('[NORMAL] [SG2-81:AC1] [SG2-81:AC2] the coordinator and Venue Staff see which of the event\'s bookings a venue\'s unavailability affects, and the replacement asked for', async () => {
@@ -111,12 +144,12 @@ test('[NORMAL] [SG2-81:AC1] [SG2-81:AC2] the coordinator and Venue Staff see whi
 });
 
 test('[BOUNDARY] [SG2-51:AC1] a reason is required and may be 500 characters but not 501', async () => {
-  const { composed, released } = fixture({ results: [{ outcome: 'released', booking_id: 11, cancelled_at: '2030-01-01T00:00:00.000Z' }] });
+  const { composed, released } = fixture({ results: [RELEASED] });
   for (const body of [{}, { reason: '' }, { reason: '   ' }, { reason: 42 }, { reason: '🚪'.repeat(501) }, [], null]) {
-    const response = await release(composed, 'venue', body);
+    const response = await release(composed, 'coordinator', body);
     assert.deepEqual([response.status, response.body.error], [400, 'Give a reason for releasing this booking, in 500 characters or fewer.'], JSON.stringify(body));
   }
-  assert.equal((await release(composed, 'venue', { reason: '🚪'.repeat(500) })).status, 200);
+  assert.equal((await release(composed, 'coordinator', { reason: '🚪'.repeat(500) })).status, 200);
   assert.equal(released.length, 1);
   assert.equal(validateReleaseReason('not an object'), null);
 });
@@ -127,7 +160,7 @@ test('[CONFLICT] [SG2-51:AC1] a booking already released, held or over is not re
   ] });
   const answers = [];
   for (let i = 0; i < 3; i += 1) {
-    const response = await release(composed, 'venue', { reason: 'No longer needed' });
+    const response = await release(composed, 'coordinator', { reason: 'No longer needed' });
     answers.push([response.status, response.body.error]);
   }
   assert.deepEqual(answers, [
@@ -141,9 +174,9 @@ test('[FAILURE] [SG2-51:AC1] an unknown booking, or one for another coordinator\
   const { composed } = fixture({ results: [{ outcome: 'missing' }, { outcome: 'invalid' }] });
   assert.deepEqual([(await release(composed, 'other_coordinator', { reason: 'Mine now' })).status], [404]);
   // The database's own reason check answers like the API's.
-  assert.equal((await release(composed, 'venue', { reason: 'x' })).status, 400);
+  assert.equal((await release(composed, 'coordinator', { reason: 'x' })).status, 400);
   for (const id of ['0', 'abc', '2147483648']) {
-    assert.equal((await release(composed, 'venue', { reason: 'x' }, id)).status, 400, id);
+    assert.equal((await release(composed, 'coordinator', { reason: 'x' }, id)).status, 400, id);
   }
 });
 
@@ -162,12 +195,12 @@ test('[FAILURE] [SG2-51:AC1] a refused or failing release is reported without de
       getAdminClient: () => ({}) as SupabaseClient, store: () => ({}) as VenueBookingStore,
       releases: () => ({ async release() { throw error; } })
     });
-    const response = await release(composed, 'venue', { reason: 'x' });
+    const response = await release(composed, 'coordinator', { reason: 'x' });
     assert.deepEqual([response.status, response.body], [status, { error: new AccessError(status).message }]);
   }
   // Without a configured database the default release store is unavailable.
   const unconfigured = compose({ getAdminClient: () => ({}) as SupabaseClient, store: () => ({}) as VenueBookingStore });
-  assert.equal((await release(unconfigured, 'venue', { reason: 'x' })).status, 503);
+  assert.equal((await release(unconfigured, 'coordinator', { reason: 'x' })).status, 503);
 });
 
 // --- GET /?event_id= and /?venue_id= ---------------------------------------------

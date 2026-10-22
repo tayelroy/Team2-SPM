@@ -227,7 +227,7 @@ test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] clarification POST immediately returns 
   assert.equal((await api.get(`/api/event-requests/${id}/clarifications`).set(auth('other'))).status, 404);
 });
 
-test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] [SG2-94:AC4] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
   const id = await planned();
   await setRegistration(id);
   const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 200 }).select('venue_id').single();
@@ -247,7 +247,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
   assert.equal(receipt.error, null);
   const initial = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.equal(initial.status, 200);
-  assert.equal(initial.body.ready_for_confirmation, true);
+  // SG2-91 moved the event into its check; SG2-94: the safety check is the one item left.
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
+  assert.deepEqual(initial.body.outstanding, ['safety']);
+  assert.equal(initial.body.arrangements[3].detail, 'Awaiting the Safety Officer\'s operational safety check.');
   const warned = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137 });
   assert.equal(warned.status, 409);
   assert.deepEqual(warned.body.affected_arrangements, ['venue_recheck', 'equipment_recheck']);
@@ -257,15 +260,15 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   const after = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.equal(after.status, 200);
-  assert.deepEqual(after.body.outstanding, ['venue', 'equipment']);
+  assert.deepEqual(after.body.outstanding, ['venue', 'equipment', 'safety']);
   assert.equal(after.body.ready_for_confirmation, false);
-  assert.deepEqual(after.body.arrangements.map((item: { state: string }) => item.state), ['outstanding', 'outstanding', 'ready']);
+  assert.deepEqual(after.body.arrangements.map((item: { state: string }) => item.state), ['outstanding', 'outstanding', 'ready', 'outstanding']);
   assert.match(after.body.arrangements[0].detail, /recheck.*planning/i);
   // SG2-63 AC8: registration capacity is the organiser's, so the coordinator's change is refused and adds no recheck.
   const capacity = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 137, confirm_impact: true });
   assert.equal(capacity.status, 403, JSON.stringify(capacity.body));
   const all = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
-  assert.deepEqual(all.body.outstanding, ['venue', 'equipment']);
+  assert.deepEqual(all.body.outstanding, ['venue', 'equipment', 'safety']);
   const persisted = await stored(id);
   assert.equal(persisted.arrangements_recheck_needed, true);
   assert.equal(persisted.registration_capacity, 136);
@@ -277,7 +280,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
   assert.equal(disruption.error, null);
   const combined = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.equal(combined.status, 200);
-  assert.deepEqual(combined.body.outstanding, ['venue', 'equipment']);
+  assert.deepEqual(combined.body.outstanding, ['venue', 'equipment', 'safety']);
   assert.match(combined.body.arrangements[0].detail, /affected by venue unavailability/);
   assert.match(combined.body.arrangements[0].detail, /recheck.*planning/i);
   assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
@@ -286,7 +289,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
 test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation events refuse direct detail edits, keep registration edits, and a later-stage impact returns to Planning with notices and history', async () => {
   const id = await planned();
   await setRegistration(id);
-  for (const status of ['confirmed', 'preparation']) {
+  // SG2-94: the event reaches Preparation on the Safety Officer's approval of its current check.
+  assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
+  assert.equal((await database.from('event_safety_decisions').insert({ event_id: id, decision: 'approve', decided_by: ids.safety })).error, null);
+  for (const status of ['preparation', 'confirmed']) {
     assert.equal((await database.from('events').update({ status }).eq('event_id', id)).error, null);
     const before = await stored(id);
     const refused = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137, confirm_impact: true });
@@ -331,7 +337,7 @@ test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation ev
   ].sort());
 });
 
-test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] [SG2-66:AC5] [SG2-66:AC7] native change impact lists what a change breaks, accepting it returns a Confirmed event to Planning, and each recheck settles only once it passes', async () => {
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] [SG2-66:AC5] [SG2-66:AC7] [SG2-94:AC3] native change impact lists what a change breaks, accepting it returns a Confirmed event to Planning and withdraws its safety approval, and each recheck settles only once it passes', async () => {
   const id = await planned();
   await setRegistration(id);
   const venue = await database.from('venues').insert({ name: 'Integration Change Hall', capacity: 150 }).select('venue_id').single();
@@ -355,6 +361,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
     { event_id: id, attendee_id: ids.other, status: 'registered' }, { event_id: id, attendee_id: ids.support, status: 'registered' },
     { event_id: id, attendee_id: ids.lead, status: 'cancelled' }
   ])).error, null);
+  // SG2-94: the event is confirmed on the Safety Officer's approval of the check SG2-91 put it in.
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
+  assert.equal((await database.from('event_safety_decisions').insert({ event_id: id, decision: 'approve', decided_by: ids.safety })).error, null);
+  assert.equal((await database.from('events').update({ status: 'preparation' }).eq('event_id', id)).error, null);
   assert.equal((await database.from('events').update({ status: 'confirmed', confirmed_by: ids.coordinator, confirmed_at: '2089-10-03T00:00:00Z' })
     .eq('event_id', id)).error, null);
 
@@ -397,12 +407,14 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   const row = await stored(id);
   assert.deepEqual([row.status, row.expected_attendance, row.confirmed_by, row.confirmed_at], ['planning', 204, null, null]);
   const history = await database.from('event_audit_logs').select('field_name,old_value,new_value').eq('event_id', id)
-    .in('field_name', ['expected_attendance', 'change_request', 'status']).order('log_id');
+    .in('field_name', ['expected_attendance', 'change_request', 'status', 'safety_approval']).order('log_id');
   assert.equal(history.error, null);
-  assert.deepEqual(history.data!.slice(-3), [
+  assert.deepEqual(history.data!.slice(-4), [
     { field_name: 'expected_attendance', old_value: '136', new_value: '204' },
     { field_name: 'change_request', old_value: null, new_value: `Accepted change request ${attendance.id}` },
-    { field_name: 'status', old_value: 'confirmed', new_value: 'planning' }
+    { field_name: 'status', old_value: 'confirmed', new_value: 'planning' },
+    { field_name: 'safety_approval', old_value: 'Approved',
+      new_value: `Withdrawn: the accepted change request ${attendance.id} changed what was approved, so the event must pass the safety check again` }
   ]);
   const notices = await database.from('notifications').select('recipient_id,message').eq('event_id', id).eq('kind', 'event_returned_to_planning');
   assert.equal(notices.error, null);
@@ -429,8 +441,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   assert.deepEqual([last.status, last.body.arrangements_recheck_needed, last.body.outstanding_arrangements], [200, false, []]);
   const settled = await database.from('event_audit_logs').select('new_value').eq('event_id', id).eq('field_name', 'arrangement_recheck').order('log_id');
   assert.deepEqual(settled.data!.map(entry => entry.new_value), ['venue_recheck settled', 'equipment_recheck settled', 'registration_recheck settled']);
+  // SG2-94 AC3: with every recheck settled SG2-91 returns the event to its check; a new approval is needed.
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
   const readiness = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
-  assert.deepEqual([readiness.status, readiness.body.outstanding], [200, []]);
+  assert.deepEqual([readiness.status, readiness.body.outstanding], [200, ['safety']]);
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] [SG2-92:AC5] [SG2-92:AC6] native safety decisions on SG2-91\'s list move each event on, refuse a stale review, notify both people, keep who and why, and let the coordinator rework a rejection', async () => {

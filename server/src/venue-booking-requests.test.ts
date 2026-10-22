@@ -53,12 +53,13 @@ const body = (overrides: Record<string, unknown> = {}) => ({
 
 function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBookingRequestRecord[]; raceOnCreate?: boolean;
   holds?: Record<number, number>; exceptions?: CapacityExceptionRecord[]; occupied?: VenueConflictRow[]; unbooked?: number[];
-  affected?: number[] } = {}) {
+  affected?: number[]; changeable?: number[]; staleOnCreate?: boolean } = {}) {
   const events = seed.events ?? [forum];
   const venues = [atrium, theatre, seminar, bare];
   const requests: VenueBookingRequestRecord[] = seed.requests ?? [];
   const created: NewVenueBookingRequest[] = [];
   const checked: [ConflictPeriod, ConflictOptions][] = [];
+  const changeableAsked: [number, string][] = [];
   const store: VenueBookingRequestStore = {
     async event(id) { return events.find(event => event.event_id === id) ?? null; },
     async venue(id) { return venues.find(venue => venue.venue_id === id) ?? null; },
@@ -70,6 +71,7 @@ function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBooki
     },
     async create(values) {
       if (seed.raceOnCreate) return null;
+      if (seed.staleOnCreate) return 'stale';
       created.push(values);
       const { requested_by: _requester, ...rest } = values;
       const record: VenueBookingRequestRecord = { ...rest, request_id: 40 + created.length, status: 'pending',
@@ -93,9 +95,11 @@ function fakeStore(seed: { events?: SuitabilityEventRow[]; requests?: VenueBooki
         .map(row => ({ status: row.status, booked: row.status === 'approved' && !(seed.unbooked ?? []).includes(row.request_id) }));
     },
     // SG2-81: the event's confirmed bookings a venue's unavailability affects.
-    async affectedBookings() { return seed.affected ?? []; }
+    async affectedBookings() { return seed.affected ?? []; },
+    // SG2-83: the event's confirmed bookings not yet over.
+    async changeableBookings(id, now) { changeableAsked.push([id, now]); return seed.changeable ?? [12, 13]; }
   };
-  return { store, created, requests, checked };
+  return { store, created, requests, checked, changeableAsked };
 }
 
 function app(store: VenueBookingRequestStore | null, dependencies: VenueBookingRequestDependencies = {}) {
@@ -535,16 +539,48 @@ test('[NORMAL] [SG2-81:AC4] a replacement is also requested for an event that is
   }
 });
 
-test('[FAILURE] [SG2-81:AC4] a replacement may only name an affected booking of the same event, so it cannot release anything else', async () => {
-  const { store, created } = fakeStore({ events: [preparing], affected: [12] });
+test('[FAILURE] [SG2-81:AC4] [SG2-83:AC1] a change may only name a current booking of the same event, so it cannot release anything else', async () => {
+  const { store, created, changeableAsked } = fakeStore({ events: [preparing], affected: [12] });
   const composed = app(store);
-  // Not flagged, or flagged on another event: the event\'s own affected list does not include it.
-  const unaffected = await post(composed, 'coordinator', replacement({ replaces_booking_id: 13 }));
-  assert.deepEqual([unaffected.status, unaffected.body], [409, { error: 'That booking is not affected by venue unavailability, so it cannot be replaced.' }]);
+  // Another event\'s booking, or one cancelled or over: the event\'s own current bookings do not include it.
+  const foreign = await post(composed, 'coordinator', replacement({ replaces_booking_id: 99, change_reason: 'Bigger room' }));
+  assert.deepEqual([foreign.status, foreign.body], [409, { error: 'That booking is not a current confirmed booking of this event, so it cannot be changed.' }]);
+  assert.deepEqual(changeableAsked, [[7, '2030-01-01T00:00:00.000Z']]);
   assert.equal(created.length, 0);
   // Another coordinator is told the event does not exist, whatever the booking.
   assert.equal((await post(composed, 'other_coordinator', replacement())).status, 404);
   assert.equal((await post(composed, 'organiser', replacement())).status, 403);
+});
+
+test('[NORMAL] [SG2-83:AC1] [SG2-83:AC4] [SG2-83:AC7] the coordinator asks to change a booking that is not affected, giving why; it waits for Venue Staff like any request', async () => {
+  for (const status of ['planning', 'preparation', 'confirmed']) {
+    const { store, created } = fakeStore({ events: [{ ...forum, status }] });
+    const response = await post(app(store), 'coordinator', replacement({ replaces_booking_id: 13, change_reason: '  Need a bigger stage  ' }));
+    assert.deepEqual([response.status, response.body.request.status], [201, 'pending'], status);
+    assert.deepEqual([created[0].replaces_booking_id, created[0].change_reason], [13, 'Need a bigger stage']);
+  }
+});
+
+test('[BOUNDARY] [SG2-83:AC4] a change of an unaffected booking needs a reason of at most 500 characters; one for an affected booking may leave it out', async () => {
+  const { store, created } = fakeStore({ events: [preparing], affected: [12] });
+  const composed = app(store);
+  const missing = await post(composed, 'coordinator', replacement({ replaces_booking_id: 13, change_reason: '   ' }));
+  assert.deepEqual([missing.status, missing.body], [400, { error: 'Give a reason for changing this venue, in 500 characters or fewer.' }]);
+  assert.equal((await post(composed, 'coordinator', replacement({ replaces_booking_id: 13, change_reason: '🎪'.repeat(501) }))).status, 400);
+  assert.equal((await post(composed, 'coordinator', replacement({ replaces_booking_id: 13, change_reason: '🎪'.repeat(500) }))).status, 201);
+  assert.equal((await post(composed, 'coordinator', replacement({ venue_id: 1, starts_at: '2030-06-16T02:00:00.000Z', ends_at: '2030-06-16T10:00:00.000Z' }))).status, 201);
+  assert.deepEqual(created.map(row => row.change_reason?.length), [1000, undefined]);
+  const ok = body({ replaces_booking_id: 12 });
+  // A reason belongs only to a change, and must be text.
+  assert.equal(validateVenueBookingRequest({ ...body(), change_reason: 'No booking named' }, NOW), null);
+  assert.equal(validateVenueBookingRequest({ ...ok, change_reason: 42 }, NOW), null);
+  assert.equal(validateVenueBookingRequest({ ...ok, change_reason: null }, NOW)!.change_reason, undefined);
+});
+
+test('[CONFLICT] [SG2-83:AC1] a change raised as the booking is cancelled is refused by the database and reported', async () => {
+  const { store } = fakeStore({ events: [preparing], staleOnCreate: true });
+  const response = await post(app(store), 'coordinator', replacement({ replaces_booking_id: 13, change_reason: 'Bigger room' }));
+  assert.deepEqual([response.status, response.body], [409, { error: 'That booking is not a current confirmed booking of this event, so it cannot be changed.' }]);
 });
 
 test('[CONFLICT] [SG2-81:AC4] an ordinary request is still refused once the event is past planning; only a replacement is allowed', async () => {

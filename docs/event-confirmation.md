@@ -11,8 +11,11 @@ to register during its registration period.
 Product-owner decisions (binding):
 
 1. Only an event in **Preparation** can be confirmed (SG2-100
-   `STATUS_TRANSITIONS`: `preparation → confirmed`). Every other status is
-   refused with `closed`, including a second confirmation of the same event.
+   `STATUS_TRANSITIONS`: `preparation → confirmed`). SG2-94 AC5: an attempt on
+   an event still in Approved, Planning, Awaiting Safety Check or Safety
+   Rejected is refused with `outstanding`, the safety check included; every
+   other status is refused with `closed`, including a second confirmation of
+   the same event.
 2. The readiness gate is exactly SG2-57's readiness, tightened so equipment
    must be **reserved and placed** (see
    [Event arrangement readiness](event-arrangements.md)):
@@ -34,13 +37,19 @@ Product-owner decisions (binding):
      otherwise outstanding if any live request lacks an
      `equipment_reservations` receipt with its `request_id`, has no
      `placement_venue_id`, or has a `shortfall` other than 0.
-   - **Registration** — not required unless `registration_needed` is true;
-     then outstanding if capacity, opening time or closing time is unset.
+   - **Registration** — not required unless `registration_needed` is true.
+     SG2-94 AC6: unset capacity or times no longer block (the Event
+     Organiser sets them under SG2-63); only an outstanding
+     `registration_recheck` (SG2-66) does.
+   - **Safety check** (SG2-94 AC4/AC5) — outstanding unless the event is in
+     Preparation or Confirmed and its latest safety decision is Approve
+     (`public.event_safety_approved`; see [Safety checks](safety-checks.md)).
 
    Outstanding keys are always reported in the order `venue`, `equipment`,
-   `registration`. Not-required arrangements never block. The TypeScript
-   computation (`server/src/events/arrangementReadiness.ts`) and the SQL gate
-   in `confirm_event` must stay identical.
+   `registration`, `safety`. Not-required arrangements never block. The
+   TypeScript computation (`server/src/events/arrangementReadiness.ts`) and
+   the SQL gate in `confirm_event` (latest:
+   `202610220001_safety_approval_gate.sql`) must stay identical.
 3. AC3 is a rule, not a registration feature: registration is **open** when
    the event is `confirmed`, `registration_needed` is true and
    `registration_opens_at <= now < registration_closes_at`
@@ -56,8 +65,8 @@ Product-owner decisions (binding):
 caller's JWT. It rechecks the caller's stored role in `account_roles`
 (anyone but `event_coordinator` is refused with `42501`), locks the event row
 `FOR UPDATE`, and returns `missing` for an event that does not exist or is
-assigned to another coordinator. After the lock it reads the venue, equipment
-and registration facts and either returns the outstanding list with no writes
+assigned to another coordinator. After the lock it reads the venue, equipment,
+registration-recheck and latest safety decision facts and either returns the outstanding list with no writes
 or, in one transaction, sets `status = 'confirmed'`, `confirmed_by`,
 `confirmed_at`, writes a `status` audit row (`preparation → confirmed`) and one
 `event_confirmed` notification to the organiser. Every writer of venue
@@ -75,7 +84,7 @@ with the caller's token; it never decides readiness itself.
 | ok | 200 | `{ "event_id": 7, "status": "confirmed", "confirmed_at": "<iso>", "organiser_notified": true }` |
 | missing | 404 | `{ "error": "No event in preparation is assigned to this account." }` |
 | closed | 409 | `{ "error": "Only an event in Preparation can be confirmed.", "code": "closed" }` |
-| outstanding | 409 | `{ "error": "Confirmation refused: arrangements are still outstanding.", "code": "outstanding", "outstanding": ["venue", "equipment", "registration"] }` |
+| outstanding | 409 | `{ "error": "Confirmation refused: arrangements are still outstanding.", "code": "outstanding", "outstanding": ["venue", "equipment", "registration", "safety"] }` |
 
 Invalid ids return 400. A refused role (route grant or the RPC's `42501`)
 returns 403, an expired session 401, and any other provider failure 503 —

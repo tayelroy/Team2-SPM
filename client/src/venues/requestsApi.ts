@@ -74,6 +74,9 @@ function isConflict(value: unknown): value is VenueConflict {
   return typeof conflict?.reference_id === 'number' && typeof conflict.starts_at === 'string' && typeof conflict.ends_at === 'string';
 }
 
+/** The longest change reason the server accepts (SG2-83). */
+export const MAX_CHANGE_REASON = 500;
+
 export interface NewVenueRequest {
   event_id: number;
   venue_id: number;
@@ -82,6 +85,8 @@ export interface NewVenueRequest {
   layout: Layout;
   /** SG2-81 AC4: the affected booking this request replaces. */
   replaces_booking_id?: number;
+  /** SG2-83 AC4: why a booking that is not affected is being changed. */
+  change_reason?: string;
 }
 
 export type Result<T> = ({ ok: true } & T) | { ok: false; error: string };

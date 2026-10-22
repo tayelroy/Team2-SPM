@@ -68,6 +68,7 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
 import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
+import { seedSafetyApprovalGate } from './support/safety-approval';
 import { createEventSearchRouter } from '../server/src/eventSearch';
 import { createMemoryEventSearchStore, seedEventSearch } from './support/event-search';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
@@ -311,6 +312,18 @@ app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
     audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
   });
 });
+// SG2-94: one event awaiting its check, and one approved event in Preparation.
+app.post('/__e2e/safety-approval', (_req, res) => {
+  seedSafetyApprovalGate(database);
+  res.status(204).end();
+});
+app.get('/__e2e/safety-approval-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [941, 942].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), decisions: database.tables.event_safety_decisions.filter(seeded),
+    audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
+  });
+});
 // SG2-63: a confirmed event with open registration, two registered and one withdrawn.
 app.post('/__e2e/registrations', (_req, res) => {
   seedRegistrations(database);
@@ -429,6 +442,11 @@ app.post('/__e2e/venue-multiple', (_req, res) => {
 });
 app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
+  res.status(204).end();
+});
+// SG2-83: the released-venue event plus a free venue to change one booking to.
+app.post('/__e2e/venue-change', (_req, res) => {
+  database.seedVenueChange();
   res.status(204).end();
 });
 // SG2-104: the venue account also holds the Event Coordinator role.

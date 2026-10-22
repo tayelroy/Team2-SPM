@@ -21,7 +21,7 @@ cancel" form on the event page, and the coordinator's "Cancel event" step,
 with a confirmation, in the work queue. A cancelled event leaves the
 coordinator's queue.
 
-## Migration `202610210002_event_cancellation.sql`
+## Migration `202610220002_event_cancellation.sql`
 
 - `events` gains `cancellation_requested_at`, `cancellation_requested_by`,
   `cancellation_reason`, `cancelled_at` and `cancelled_by`, with checks that a

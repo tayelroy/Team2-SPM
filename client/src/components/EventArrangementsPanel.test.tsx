@@ -70,3 +70,20 @@ describe('EventArrangementsPanel once confirmed (SG2-58)', () => {
     expect(screen.queryByText(/ready for confirmation/i)).not.toBeInTheDocument();
   });
 });
+
+describe('EventArrangementsPanel safety check (SG2-94)', () => {
+  test('[NORMAL] [SG2-94:AC4] the safety check is a step: outstanding with its reason, holding the event back', () => {
+    const detail = "Awaiting the Safety Officer's operational safety check.";
+    render(<EventArrangementsPanel arrangements={{
+      ...READY,
+      arrangements: [...READY.arrangements, { key: 'safety', label: 'Safety check', state: 'outstanding', detail }],
+      outstanding: ['safety'],
+      ready_for_confirmation: false
+    }} />);
+    const row = screen.getByTestId('arrangement-safety');
+    expect(within(row).getByText('Safety check')).toBeInTheDocument();
+    expect(within(row).getByText(detail)).toBeInTheDocument();
+    expect(screen.getByTestId('arrangement-safety-state')).toHaveTextContent('Outstanding');
+    expect(screen.getByTestId('readiness-badge')).toHaveTextContent('Arrangements outstanding');
+  });
+});
