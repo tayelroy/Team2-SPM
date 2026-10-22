@@ -1106,7 +1106,7 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 ## 9B. Events open for registration (SG2-59)
 
 ### 9B.1 GET /api/registrable-events
-- **Source:** `registrableEvents/index.ts` (`createRegistrableEventsRouter`), `db/registrableEvents.ts`, migration `202610220002_registrable_events.sql` (`registrable_events`).
+- **Source:** `registrableEvents/index.ts` (`createRegistrableEventsRouter`), `db/registrableEvents.ts`, migration `202610220003_registrable_events.sql` (`registrable_events`).
 - **Permission:** `events.registrable.read` (Attendee). `registrable_events` runs with the caller's JWT and acting role (SG2-104) and refuses (403) unless that role is `attendee`.
 - **Listed:** status `confirmed`, `registration_needed` true, both registration times set, `now < registration_closes_at` and the event not started. That covers registration open now and registration that opens later (team reading of AC1/AC2, 22 Oct 2026, so SG2-60 AC3 can say when it opens). Closed, unconfirmed and walk-in events are never returned. Soonest first.
 - **200:** `{ events: [{ event_id, name, organisation, category, description, proposed_date, registration_opens_at, registration_closes_at, venues: [{ name, location }] }] }`. Venues are the event's confirmed bookings. No other event field is returned (AC3).

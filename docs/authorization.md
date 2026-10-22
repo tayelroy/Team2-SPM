@@ -248,7 +248,7 @@ act as the attendee. They return only confirmed events that take registration
 and whose registration is open or yet to open, and only the attendee-facing
 fields (name, host organisation, category, description, date and time,
 registration times, confirmed venues). Migration
-`202610220002_registrable_events.sql`; tests `supabase/tests/registrable_events.sql`
+`202610220003_registrable_events.sql`; tests `supabase/tests/registrable_events.sql`
 and browser journeys `SG2-59-P01` and `SG2-59-N01`.
 
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
