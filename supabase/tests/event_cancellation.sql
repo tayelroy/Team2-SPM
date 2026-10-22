@@ -25,7 +25,7 @@ insert into public.account_roles(user_id,role) values
  ('d6700000-0000-4000-8000-000000000005','attendee'),
  ('d6700000-0000-4000-8000-000000000006','attendee'),
  ('d6700000-0000-4000-8000-000000000007','venue_staff');
--- 96701 is the event cancelled below (its confirmed venues move it on to
+-- 96701 is the event cancelled below (its confirmed venues may move it on to
 -- awaiting_safety_check through SG2-91's trigger); 96702 a draft; 96703 completed;
 -- 96704 still waiting for a coordinator; 96705 another coordinator's;
 -- 96706 cancelled before SG2-67, with no cancellation record.
@@ -36,7 +36,9 @@ insert into public.events(event_id,organiser_id,coordinator_id,name,status) valu
  (96704,'d6700000-0000-4000-8000-000000000001',null,'Cancel unassigned','submitted'),
  (96705,'d6700000-0000-4000-8000-000000000001','d6700000-0000-4000-8000-000000000004','Cancel other','planning'),
  (96706,'d6700000-0000-4000-8000-000000000001','d6700000-0000-4000-8000-000000000003','Cancel legacy','cancelled');
-insert into public.venues(venue_id,name) values (96701,'Cancel Hall'),(96702,'Cancel Annex');
+insert into public.events(event_id,organiser_id,coordinator_id,name,status,decision_reason) values
+ (96707,'d6700000-0000-4000-8000-000000000001','d6700000-0000-4000-8000-000000000003','Cancel rejected','rejected','Not suitable');
+insert into public.venues(venue_id,name) values (96701,'Cancel Hall'),(96702,'Cancel Annex'),(96703,'Cancel Studio');
 insert into public.venue_bookings(booking_id,venue_id,event_id,starts_at,ends_at,status) values
  (96701,96701,96701,'2031-12-01 01:00+00','2031-12-01 05:00+00','confirmed'),
  (96702,96702,96701,'2031-12-01 01:00+00','2031-12-01 05:00+00','confirmed'),
@@ -48,12 +50,29 @@ insert into public.venue_booking_requests(request_id,event_id,venue_id,starts_at
   status,decided_by,decided_at,venue_booking_id) values
  (96701,96701,96701,'2031-12-01 01:00+00','2031-12-01 05:00+00','theatre','d6700000-0000-4000-8000-000000000003',
   'approved','d6700000-0000-4000-8000-000000000007',now(),96701);
+-- A third venue is only tentatively held, behind a pending request, and one
+-- equipment request is still waiting for Technical Support.
+insert into public.venue_booking_requests(request_id,event_id,venue_id,starts_at,ends_at,layout,requested_by,status) values
+ (96702,96701,96703,'2031-12-02 01:00+00','2031-12-02 05:00+00','theatre','d6700000-0000-4000-8000-000000000003','pending');
+insert into public.venue_holds(hold_id,event_id,venue_id,request_id,starts_at,ends_at,expires_at,created_by) values
+ (96701,96701,96703,96702,'2031-12-02 01:00+00','2031-12-02 05:00+00',now() + interval '7 days','d6700000-0000-4000-8000-000000000007');
 insert into public.equipment(equipment_id,name,quantity_total) values (96701,'Cancel microphones',10);
+insert into public.equipment_requests(request_id,event_id,equipment_id,quantity) values (96701,96701,96701,2);
 insert into public.equipment_reservations(reservation_id,event_id,equipment_id,quantity_reserved,starts_at,ends_at,reserved_at) values
  (96701,96701,96701,4,'2031-12-01 01:00+00','2031-12-01 05:00+00',now());
 insert into public.registrations(registration_id,event_id,attendee_id,status) values
  (96701,96701,'d6700000-0000-4000-8000-000000000005','registered'),
  (96702,96701,'d6700000-0000-4000-8000-000000000006','cancelled');
+
+do $$
+begin
+ begin
+  insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status)
+   values (96703,96705,'2031-12-02 01:00+00','2031-12-02 05:00+00','confirmed');
+  raise exception '[SG2-67:hold-blocks-before-cancel] [SG2-67:AC2] [BOUNDARY] Another event booked a slot the tentative hold still covers';
+ exception when exclusion_violation then null;
+ end;
+end $$;
 
 set local role authenticated;
 
@@ -126,8 +145,9 @@ begin
   raise exception '[SG2-67:reason-at-limit-accepted] [SG2-67:AC1] [BOUNDARY] A 500-character reason must be accepted, with no coordinator yet to tell: %', result;
  end if;
  if public.request_event_cancellation(96702, 'Draft')->>'outcome' is distinct from 'closed'
-   or public.request_event_cancellation(96703, 'Finished')->>'outcome' is distinct from 'closed' then
-  raise exception '[SG2-67:draft-or-completed-refused] [SG2-67:AC1] [FAILURE] A draft or a completed event accepted a cancellation request';
+   or public.request_event_cancellation(96703, 'Finished')->>'outcome' is distinct from 'closed'
+   or public.request_event_cancellation(96707, 'Rejected')->>'outcome' is distinct from 'closed' then
+  raise exception '[SG2-67:draft-or-completed-refused] [SG2-67:AC1] [FAILURE] A draft, completed or rejected event accepted a cancellation request';
  end if;
 
  result := public.request_event_cancellation(96701, '  The keynote speaker withdrew  ');
@@ -194,6 +214,19 @@ begin
      and released_by = 'd6700000-0000-4000-8000-000000000003' and release_reason = 'Event cancelled') then
   raise exception '[SG2-67:equipment-released] [SG2-67:AC2] [NORMAL] Cancelling must release the equipment through SG2-56';
  end if;
+ if (select status from public.venue_holds where hold_id = 96701) <> 'released'
+   or (select status from public.venue_booking_requests where request_id = 96702) <> 'cancelled'
+   or (select status from public.equipment_requests where request_id = 96701) <> 'cancelled'
+   or not exists (select 1 from public.event_audit_logs where event_id = 96701 and field_name = 'venue_hold_status'
+     and new_value = 'Released hold 96701 — Event cancelled') then
+  raise exception '[SG2-67:holds-and-requests-released] [SG2-67:AC2] [NORMAL] The tentative hold must be released with history, and pending venue and equipment requests cancelled';
+ end if;
+ begin
+  insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status)
+   values (96703,96705,'2031-12-02 01:00+00','2031-12-02 05:00+00','confirmed');
+ exception when exclusion_violation then
+  raise exception '[SG2-67:slot-free-for-another-event] [SG2-67:AC2] [NORMAL] Another event still cannot book the slot the cancelled event held';
+ end;
  if (select count(*) from public.notifications where event_id = 96701 and kind = 'event_cancelled'
      and message = 'Cancel Summit has been cancelled: The keynote speaker withdrew') <> 2
    or not exists (select 1 from public.notifications where kind = 'event_cancelled'
@@ -210,7 +243,7 @@ begin
    or (select count(*) from public.event_audit_logs where event_id = 96701 and field_name = 'venue_booking'
      and new_value like 'Released: % — Event cancelled') <> 2
    or not exists (select 1 from public.event_audit_logs where event_id = 96701 and field_name = 'status'
-     and old_value = 'awaiting_safety_check' and new_value = 'cancelled'
+     and old_value in ('planning', 'awaiting_safety_check') and new_value = 'cancelled'
      and actor_id = 'd6700000-0000-4000-8000-000000000003') then
   raise exception '[SG2-67:cancellation-recorded] [SG2-67:AC4] [NORMAL] The reason, who cancelled and when must stay on the event and in its history';
  end if;

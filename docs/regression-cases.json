@@ -8620,18 +8620,18 @@
     "layer": "Disposable PostgreSQL SQL assertions",
     "actual": "Passed in the disposable PostgreSQL 17 replay.",
     "status": "Pass",
-    "execution_date": "21 Oct 2026",
+    "execution_date": "22 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "21 Oct 2026; feature/SG2-67-cancel-event on main cb004c6; disposable PostgreSQL 17 replay of the auth fixture and every migration, then supabase/tests/event_cancellation.sql; sabotage runs (reinstatement trigger dropped, assignment check removed from cancel_event) made the suite fail. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-67-cancel-event merged with main 9850b8e (SG2-83, SG2-94); disposable PostgreSQL 17 replay of every migration, the CI database job and the legacy upgrade step, then supabase/tests/event_cancellation.sql; sabotage runs (reinstatement trigger dropped; assignment check removed; hold release removed from cancel_event) made the suite fail. Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-21",
+      "date": "2026-10-22",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
   },
   {
     "id": "SG2-67-DB02",
-    "title": "cancelling frees venues and equipment, tells registered attendees, is recorded, and cannot be undone",
+    "title": "cancelling frees venues, tentative holds and equipment, tells registered attendees, is recorded, and cannot be undone",
     "story": "SG2-67",
     "categories": [
       "NORMAL",
@@ -8647,22 +8647,23 @@
     "purpose": "Verify the assigned coordinator's cancellation releases future bookings and their requests, releases equipment through SG2-56, notifies registered attendees and the organiser only, records the cancellation, and that no path can reinstate it.",
     "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
     "steps": [
-      "Seed event 96701 with two future and one past confirmed booking, an approved venue request, a 4-microphone reservation and one registered and one withdrawn attendee.",
+      "Seed event 96701 with two future and one past confirmed booking, an approved venue request, a tentative hold on a third venue behind a pending request, a pending equipment request, a 4-microphone reservation and one registered and one withdrawn attendee.",
+      "Before cancelling, try to book the held slot for another event.",
       "Cancel it as the assigned coordinator after the organiser asked.",
       "Read bookings, the request, the reservation, notifications, the event and its history.",
       "Cancel and ask again; set the status back to planning on 96701 and on a legacy cancelled event; rename 96701; store a cancellation time on a planning event."
     ],
     "data": "Synthetic 967xx events, venues, bookings, requests, equipment and registrations; d6700000 fixture identities for organiser, colleague, two coordinators, two attendees and Venue Staff.",
-    "expected": "bookings_released 2 and attendees_notified 1; both future bookings are cancelled with 'Event cancelled: The keynote speaker withdrew', the past one stays confirmed, the request is cancelled and the main venue cleared; the reservation is released by the coordinator; the registered attendee and organiser get 'Cancel Summit has been cancelled: The keynote speaker withdrew' and the withdrawn attendee nothing; the event keeps who and when with two venue_booking and one status history entries; repeats return closed; reinstating either event fails with 'A cancelled event cannot be reinstated.'; renaming keeps it cancelled; a cancellation time on a planning event fails its check.",
+    "expected": "bookings_released 2 and attendees_notified 1; both future bookings are cancelled with 'Event cancelled: The keynote speaker withdrew', the past one stays confirmed, the request is cancelled and the main venue cleared; the tentative hold is released with a venue_hold_status history entry, its pending request and the pending equipment request are cancelled, and the held slot that was refused before can now be booked for another event; the reservation is released by the coordinator; the registered attendee and organiser get 'Cancel Summit has been cancelled: The keynote speaker withdrew' and the withdrawn attendee nothing; the event keeps who and when with two venue_booking and one status history entries; repeats return closed; reinstating either event fails with 'A cancelled event cannot be reinstated.'; renaming keeps it cancelled; a cancellation time on a planning event fails its check.",
     "evidence": "supabase/tests/event_cancellation.sql; .github/workflows/ci.yml; docs/event-cancellation.md",
     "layer": "Disposable PostgreSQL SQL assertions",
     "actual": "Passed in the disposable PostgreSQL 17 replay.",
     "status": "Pass",
-    "execution_date": "21 Oct 2026",
+    "execution_date": "22 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "21 Oct 2026; feature/SG2-67-cancel-event on main cb004c6; disposable PostgreSQL 17 replay of the auth fixture and every migration, then supabase/tests/event_cancellation.sql; sabotage runs (reinstatement trigger dropped, assignment check removed from cancel_event) made the suite fail. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-67-cancel-event merged with main 9850b8e (SG2-83, SG2-94); disposable PostgreSQL 17 replay of every migration, the CI database job and the legacy upgrade step, then supabase/tests/event_cancellation.sql; sabotage runs (reinstatement trigger dropped; assignment check removed; hold release removed from cancel_event) made the suite fail. Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-21",
+      "date": "2026-10-22",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
@@ -8695,11 +8696,11 @@
     "layer": "Rendered React component / public API boundary",
     "actual": "Passed in the local client and server suites at 100% coverage.",
     "status": "Pass",
-    "execution_date": "21 Oct 2026",
+    "execution_date": "22 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "21 Oct 2026; feature/SG2-67-cancel-event on main cb004c6; client and server suites at 100% coverage.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-67-cancel-event merged with main 9850b8e; client and server suites at 100% coverage.",
     "review": {
-      "date": "2026-10-21",
+      "date": "2026-10-22",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }

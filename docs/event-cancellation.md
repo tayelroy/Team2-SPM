@@ -27,6 +27,9 @@ coordinator's queue.
   `cancellation_reason`, `cancelled_at` and `cancelled_by`, with checks that a
   request always has a reason of at most 500 characters and that a
   cancellation time is only stored on a cancelled event.
+- A rejected event cannot be asked about or cancelled: it will not happen anyway.
+  The database is the authority here; `STATUS_TRANSITIONS` in
+  `server/src/events/fields.ts` lists the organiser's own edit transitions.
 - `request_event_cancellation(event, reason)` records the request, adds a
   `cancellation_request` history entry, and sends the assigned coordinator a
   `cancellation_requested` notice. An event still waiting for a coordinator
@@ -36,6 +39,11 @@ coordinator's queue.
   - releases every held or confirmed booking that has not ended, with the
     reason `Event cancelled: <reason>`, and cancels the approved request
     behind each one (as SG2-51 does);
+  - releases every tentative hold, cancelling its request and adding a
+    `venue_hold_status` history entry (as `change_venue_hold()` does), so
+    another event can book the slot;
+  - cancels the event's other pending venue and equipment requests, so they
+    leave the Venue Staff and Technical Support queues;
   - sets the status to `cancelled`, so SG2-56's trigger releases the equipment;
   - records who cancelled and when, plus `venue_booking` and `status` history
     entries;
@@ -63,5 +71,4 @@ Tests: `supabase/tests/event_cancellation.sql` (in the CI database job),
 `client/src/screens/EventDetail.cancellation.test.tsx` and
 `client/src/screens/WorkQueue.cancellation.test.tsx`.
 
-Not included: a coordinator "decline the request" action, and cancelling an
-event's pending venue requests or tentative holds.
+Not included: a coordinator "decline the request" action.

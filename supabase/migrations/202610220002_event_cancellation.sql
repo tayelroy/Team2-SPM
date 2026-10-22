@@ -5,8 +5,10 @@
 -- (SG2-104). Authenticated callers have no write access to events, so nobody
 -- can set the status directly.
 -- AC2: cancel_event() releases the event's held and confirmed venue bookings
--- that have not ended, as SG2-51 does for one; SG2-56's trigger releases the
--- equipment when the status moves into cancelled.
+-- that have not ended, as SG2-51 does for one, releases its tentative holds
+-- (cancelling their requests) and cancels its other pending venue and
+-- equipment requests; SG2-56's trigger releases the equipment when the
+-- status moves into cancelled.
 -- AC3: every registered attendee, and the organiser, gets an event_cancelled
 -- notice in the SG2-69 inbox.
 -- AC4: the reason, who asked and when, and who cancelled and when stay on the
@@ -65,7 +67,8 @@ begin
   if not found or e.organiser_id is distinct from caller then
     return jsonb_build_object('outcome', 'missing');
   end if;
-  if e.status in ('draft', 'completed', 'cancelled') then
+  -- A rejected event will not happen anyway, so there is nothing to cancel.
+  if e.status in ('draft', 'completed', 'cancelled', 'rejected') then
     return jsonb_build_object('outcome', 'closed', 'status', e.status);
   end if;
   if e.cancellation_requested_at is not null then
@@ -100,6 +103,7 @@ declare
   e public.events;
   instant timestamptz;
   released record;
+  held record;
   bookings integer := 0;
   attendees integer;
 begin
@@ -113,7 +117,9 @@ begin
   -- and every other booking writer uses.
   perform 1 from public.venues v
     where v.venue_id in (select b.venue_id from public.venue_bookings b
-      where b.event_id = p_event_id and b.status in ('held', 'confirmed'))
+        where b.event_id = p_event_id and b.status in ('held', 'confirmed')
+      union select h.venue_id from public.venue_holds h
+        where h.event_id = p_event_id and h.status = 'tentative')
     order by v.venue_id for update;
   perform 1 from public.venue_bookings b
     where b.event_id = p_event_id and b.status in ('held', 'confirmed')
@@ -123,7 +129,7 @@ begin
   if not found or e.coordinator_id is distinct from caller then
     return jsonb_build_object('outcome', 'missing');
   end if;
-  if e.status in ('completed', 'cancelled') then
+  if e.status in ('completed', 'cancelled', 'rejected') then
     return jsonb_build_object('outcome', 'closed', 'status', e.status);
   end if;
   if e.cancellation_requested_at is null then
@@ -150,6 +156,26 @@ begin
         'Booked: ' || released.name || ' (booking ' || released.booking_id || ')',
         'Released: ' || released.name || ' (booking ' || released.booking_id || ') — Event cancelled');
   end loop;
+
+  -- AC2: a tentative hold also keeps the venue from other events, so each one
+  -- is released and its request cancelled, as change_venue_hold() does.
+  for held in
+    update public.venue_holds h set status = 'released'
+      where h.event_id = e.event_id and h.status = 'tentative'
+      returning h.hold_id, h.request_id
+  loop
+    update public.venue_booking_requests set status = 'cancelled'
+      where request_id = held.request_id and status = 'pending';
+    insert into public.event_audit_logs (event_id, actor_id, field_name, old_value, new_value)
+      values (e.event_id, caller, 'venue_hold_status', 'Tentative hold ' || held.hold_id,
+        'Released hold ' || held.hold_id || ' — Event cancelled');
+  end loop;
+  -- Requests still waiting for Venue Staff or Technical Support would
+  -- otherwise sit in their queues for an event that will not happen.
+  update public.venue_booking_requests set status = 'cancelled'
+    where event_id = e.event_id and status = 'pending';
+  update public.equipment_requests set status = 'cancelled'
+    where event_id = e.event_id and status = 'pending';
 
   -- SG2-56's trigger releases the equipment in this same statement.
   update public.events
