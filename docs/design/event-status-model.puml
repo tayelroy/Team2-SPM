@@ -37,8 +37,8 @@ approved --> planning : PATCH /:id/planning\n(updateEventPlanningHandler)
 approved --> awaiting_safety_check : safety_check_refresh trigger\n(SG2-91: venues booked, equipment reserved)
 planning --> awaiting_safety_check : safety_check_refresh trigger\n(SG2-91: venues booked, equipment reserved)
 planning -[#888888,dashed]-> cancelled : <<planned>> SG2-67
-awaiting_safety_check -[#888888,dashed]-> preparation : <<planned>> SG2-92 pass
-awaiting_safety_check -[#888888,dashed]-> safety_rejected : <<planned>> SG2-92 fail
+awaiting_safety_check --> preparation : POST /:id/safety-decision Approve\n(rpc record_safety_decision, SG2-92);\nsafety_approval_gate refuses any other way in (SG2-94)
+awaiting_safety_check --> safety_rejected : POST /:id/safety-decision Reject (SG2-92)
 awaiting_safety_check --> planning : PATCH /:id/planning (arrangement impact),\nor safety_check_refresh trigger (SG2-91: an arrangement\nadded, released or disrupted); SG2-92 return <<planned>>
 awaiting_safety_check -[#888888,dashed]-> cancelled : <<planned>> SG2-67
 safety_rejected -[#888888,dashed]-> cancelled : <<planned>> SG2-67
@@ -52,8 +52,8 @@ cancelled --> [*]
 
 needs_clarification -[#C0392B]-> submitted : PATCH /:id/submit\n(coordinator held; off-table)
 rejected -[#C0392B]-> submitted : PATCH /:id/submit\n(coordinator held; off-table)
-preparation --> planning : venue_disruption_notify (SG2-81)\nor PATCH /:id/planning (arrangement impact)
-confirmed --> planning : venue_disruption_notify (SG2-81)\nor PATCH /:id/planning (arrangement impact)
+preparation --> planning : venue_disruption_notify (SG2-81),\nPATCH /:id/planning (arrangement impact)\nor an accepted significant change (SG2-66, SG2-94 AC3)
+confirmed --> planning : venue_disruption_notify (SG2-81),\nPATCH /:id/planning (arrangement impact)\nor an accepted significant change (SG2-66, SG2-94 AC3)
 
 note left of confirmed
   202610170001: a new disruption flag returns Preparation/Confirmed
@@ -61,6 +61,8 @@ note left of confirmed
   the Coordinator and Organiser. Other event details remain.
   202610170002: confirmation refuses affected bookings AND
   persisted venue/equipment/registration rechecks.
+  202610220001 (SG2-94): confirmation also needs the latest safety
+  decision to be Approve; leaving Preparation/Confirmed withdraws it.
 end note
 
 note right of cancelled

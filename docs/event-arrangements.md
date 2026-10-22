@@ -1,11 +1,11 @@
-# Event arrangement readiness (SG2-57)
+# Event arrangement readiness (SG2-57, SG2-94)
 
 An Event Coordinator can see, for an event they are assigned, which of its
 arrangements are in place and which still stand between it and confirmation.
-Three arrangements are reported — the venue booking(s), any requested equipment,
-and registration — each labelled **Ready**, **Outstanding** or **Not required**,
-with a one-line detail. When every *required* arrangement is ready the event is
-shown as **ready for confirmation**.
+Four items are reported — the venue booking(s), any requested equipment,
+registration and (SG2-94) the safety check — each labelled **Ready**,
+**Outstanding** or **Not required**, with a one-line detail. When every
+*required* item is ready the event is shown as **ready for confirmation**.
 
 ## What "ready" means per arrangement
 
@@ -39,14 +39,18 @@ follows:
   gate must agree with this panel. A legacy reservation without a `request_id`
   reserves no request.
 - **Registration** — `not_required` when `registration_needed` is not true.
-  Otherwise ready only when capacity, opening time and closing time are all set;
-  the detail names whichever are missing.
+  Otherwise ready (SG2-94 AC6): capacity and times are the Event Organiser's
+  (SG2-63) and do not hold confirmation up; the detail names whichever are not
+  set yet. Only an outstanding SG2-66 registration recheck makes it outstanding.
+- **Safety check** (SG2-94 AC4/AC5) — always required. Ready only when the event
+  is in Preparation or Confirmed and its latest safety decision is Approve
+  ("Approved by the Safety Officer."). Otherwise outstanding with the reason:
+  awaiting the check, rejected, changes requested, the approval withdrawn after
+  the event changed, or not approved yet.
 
-`ready_for_confirmation` is true exactly when nothing is outstanding. Because
-SG2-100 inserted **Safety Check** and **Preparation** between Arrangements and
-Confirmed, this flag means "arrangements complete" — the event still has to
-reach Preparation before it can be confirmed. SG2-58's `confirm_event` RPC
-re-applies exactly these three rules in SQL as its gate (see
+`ready_for_confirmation` is true exactly when nothing is outstanding, so since
+SG2-94 it also means the Safety Officer has approved the event. SG2-58's
+`confirm_event` RPC re-applies exactly these rules in SQL as its gate (see
 [Event confirmation](event-confirmation.md)), so the panel and the Confirm
 action never disagree; a change to one must be made to the other.
 

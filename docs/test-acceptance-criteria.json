@@ -811,6 +811,20 @@
       }
     },
     {
+      "id": "SG2-94",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-94",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-22",
+      "acceptanceCriteria": {
+        "AC1": "Given an event with no approved safety check, any attempt to move it to Preparation is refused on the server side, and the reason is shown",
+        "AC2": "Given an event whose most recent safety decision is Approve, it can move to Preparation",
+        "AC3": "If a significant change (date/time, attendance, venue, equipment) is accepted after safety approval, the approval is withdrawn and the event must be checked again",
+        "AC4": "The event's status and its outstanding items show the safety check as a step",
+        "AC5": "Given an event whose most recent safety decision is not Approve, when the Event Coordinator tries to confirm it, then confirmation is refused on the server side and the safety check is listed among the outstanding items; the coordinator can confirm only once the Safety Officer has approved. This supersedes SG2-58 AC1, which allowed confirmation on venue and equipment alone",
+        "AC6": "Registration settings do not block confirmation: an event that needs registration can be confirmed before its capacity and times are set, and Attendees can register only once the Event Organiser has set them and registration is open (SG2-63). This supersedes the registration condition in SG2-57 AC1 and SG2-58 AC1/AC2"
+      }
+    },
+    {
       "id": "SG2-69",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-69",
       "originalPullRequests": [],
