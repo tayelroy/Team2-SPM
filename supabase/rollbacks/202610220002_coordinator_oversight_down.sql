@@ -1,4 +1,4 @@
--- Rollback for 202610220001_coordinator_oversight.sql (SG2-89).
+-- Rollback for 202610220002_coordinator_oversight.sql (SG2-89).
 --
 -- Restores the database to how it was before that migration, so it can be
 -- applied again later:

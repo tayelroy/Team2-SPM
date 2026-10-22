@@ -8735,7 +8735,7 @@
     ],
     "data": "Synthetic 989xx events; e8900000 fixture identities (an organiser, two Leads, two coordinators).",
     "expected": "The clarification event is in its coordinator's review queue and no one else's, and drafts are not; the reassignment keeps needs_clarification and moves the queue entry and supervisor; the stale reassignment updates 0 rows; both orphan supervisors are refused with check_violation and clearing both together is allowed; authenticated and anon cannot select the view.",
-    "evidence": "supabase/tests/coordinator_oversight.sql; .github/workflows/ci.yml; supabase/rollbacks/202610220001_coordinator_oversight_down.sql",
+    "evidence": "supabase/tests/coordinator_oversight.sql; .github/workflows/ci.yml; supabase/rollbacks/202610220002_coordinator_oversight_down.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "actual": "Passed in the disposable PostgreSQL 17 replay.",
     "status": "Pass",
