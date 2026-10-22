@@ -8704,5 +8704,70 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-59-P01",
+    "title": "An attendee finds the events open or opening for registration and opens one without seeing planning details",
+    "type": "NORMAL",
+    "story": "SG2-59",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-59:AC1",
+      "SG2-59:AC2",
+      "SG2-59:AC3"
+    ],
+    "method_id": "TC-1a1335b69308",
+    "purpose": "Catch an unconfirmed, closed or walk-in event reaching attendees, a list missing its date, time or venue, or planning details leaking into the attendee's view.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrable-events seed before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-59-find-registrable-events on origin/main 9850b8e; npm run test:e2e locally in Chromium: 152/152 passed, required SG2-26 gate passed; npm run ci green (1786 server / 1823 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee at 1440px and open Find events.",
+      "Read the two listed events in order: state badge, date and time, venue and registration time.",
+      "Check the closed, planning, walk-in and draft events are absent.",
+      "Open Harbour Lecture; read description, category, host and venue; check no planning note, purpose, coordinator, requirement or status is shown; read the detail API's field list.",
+      "At 390px check the detail and the list have no horizontal overflow; go back to the list."
+    ],
+    "data": "Harbour Lecture (591): confirmed, 20 Jul 2030 19:00 SGT, registration open until 19 Jul 2030 10:00 SGT, Regression Hall (Level 1) booked, planning note 'Brief security on the VIP entrance'. Bayfront Workshop (592): confirmed, registration opens 1 Jun 2030 08:00 SGT, no venue. Closed Briefing (593), Planning Forum (594), Walk-in Social (595), Planning workshop (1, draft).",
+    "expected": "Bayfront Workshop then Harbour Lecture. Bayfront: 'Opening soon', 'Opens 1 Jun 2030, 8:00 am', venue 'To be announced'. Harbour: 'Registration open', 'Closes 19 Jul 2030, 10:00 am', 20 Jul 2030 7:00 pm, Regression Hall. Detail shows the description, Seminar, Harbour Foundation and 'Regression Hall, Level 1' and none of the internal values; the API returns exactly category, description, event_id, name, organisation, proposed_date, registration_closes_at, registration_opens_at, venues. No overflow at 390px; no console errors.",
+    "evidence": "e2e/find-events.spec.ts; e2e/support/registrable-events.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-59-N01",
+    "title": "Unlisted events do not open for an attendee, and other roles cannot browse",
+    "type": "FAILURE",
+    "story": "SG2-59",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-59:AC1",
+      "SG2-59:AC2"
+    ],
+    "method_id": "TC-cca1f0f3911f",
+    "purpose": "Catch an attendee opening an event that is closed, unconfirmed, without registration or missing by guessing its id, or a non-attendee role reading the attendee list.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrable-events seed before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-59-find-registrable-events on origin/main 9850b8e; npm run test:e2e locally in Chromium: 152/152 passed, required SG2-26 gate passed; npm run ci green (1786 server / 1823 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "As attendee, GET /api/registrable-events/{593,594,595,1,9999}.",
+      "As organiser, coordinator and Lead, GET the list and event 591.",
+      "Sign in as organiser and read the navigation."
+    ],
+    "data": "Same seed as SG2-59-P01.",
+    "expected": "Each attendee read answers 404 'This event is not open for registration.'; every other role gets 403 on both paths; the organiser is not offered Find events.",
+    "evidence": "e2e/find-events.spec.ts",
+    "layer": "Playwright Chromium + isolated production app"
   }
 ]

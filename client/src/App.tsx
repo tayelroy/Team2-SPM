@@ -25,6 +25,7 @@ import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
 import SafetyChecks from './screens/SafetyChecks';
 import EventSearch from './screens/EventSearch';
+import FindEvents from './screens/FindEvents';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
 import VenueHolds from './screens/VenueHolds';
@@ -290,7 +291,9 @@ export default function App() {
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
       accessToken={session!.accessToken} prefill={venuePrefill} />,
     // SG2-70: find an event across the system.
-    findEvent: <EventSearch key={session!.accessToken} accessToken={session!.accessToken} />
+    findEvent: <EventSearch key={session!.accessToken} accessToken={session!.accessToken} />,
+    // SG2-59: an attendee finds events open for registration.
+    findEvents: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />
   }[screen];
 
   return (

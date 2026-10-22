@@ -92,7 +92,10 @@ begin
     ('public.release_venue_bookings(bigint,bigint[],text)'), ('public.venue_change_requested()'),
     ('public.venue_change_request_check()'),
     -- SG2-94: the safety approval that gates Preparation and confirmation.
-    ('public.event_safety_approved(public.events)'), ('public.safety_approval_gate()')
+    ('public.event_safety_approved(public.events)'), ('public.safety_approval_gate()'),
+    -- SG2-59: attendees find events they can register for.
+    ('public.registrable_events()'), ('public.registrable_event(integer)'),
+    ('private.registrable_events_json(integer)')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
