@@ -273,12 +273,18 @@ do $$ begin if public.send_outstanding_arrangement_reminders() is distinct from 
 -- Terminal/past events stop even when otherwise outstanding and due.
 do $$ declare stage text; sent integer; begin
  foreach stage in array array['cancelled','completed','rejected'] loop
-  update public.events set status=stage::public.event_status,
-    completed_by=case when stage='completed' then 'e6900000-0000-4000-8000-000000000001'::uuid else null end,
-    completed_at=case when stage='completed' then clock_timestamp() else null end,
-    decision_reason=case when stage='rejected' then 'No longer needed' else null end where event_id=96901;
-  update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;
-  if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:terminal-stops-reminders] [SG2-69:AC6] [NORMAL] Terminal stage % must stop reminders',stage; end if;
+  -- SG2-67 AC5: a cancelled event can no longer be reinstated, so each stage
+  -- is checked in a block that is then undone.
+  begin
+   update public.events set status=stage::public.event_status,
+     completed_by=case when stage='completed' then 'e6900000-0000-4000-8000-000000000001'::uuid else null end,
+     completed_at=case when stage='completed' then clock_timestamp() else null end,
+     decision_reason=case when stage='rejected' then 'No longer needed' else null end where event_id=96901;
+   update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;
+   if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:terminal-stops-reminders] [SG2-69:AC6] [NORMAL] Terminal stage % must stop reminders',stage; end if;
+   raise sqlstate 'SG267' using message = 'undo this stage';
+  exception when sqlstate 'SG267' then null;
+  end;
  end loop;
  update public.events set status='planning',proposed_date=clock_timestamp()-interval '1 second' where event_id=96901;
  if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:past-event-stops] [SG2-69:AC6] [BOUNDARY] Past event must receive no reminders'; end if;

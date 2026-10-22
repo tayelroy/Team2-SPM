@@ -168,7 +168,11 @@ try {
   assert.equal(await root.query('SELECT count(*) FROM public.equipment_reservations WHERE request_id=95590;'), '0');
   console.log('PASS [CONFLICT] [SG2-55:AC1] an event cancelled during the event-lock wait refuses reservation.');
 
-  await root.query(`UPDATE public.events SET status='planning' WHERE event_id=95590;
+  // SG2-67 AC5 refuses reinstating a cancelled event, so this fixture reset
+  // turns that one rule off for its own statement.
+  await root.query(`ALTER TABLE public.events DISABLE TRIGGER keep_cancelled_events_cancelled;
+    UPDATE public.events SET status='planning' WHERE event_id=95590;
+    ALTER TABLE public.events ENABLE TRIGGER keep_cancelled_events_cancelled;
     BEGIN; UPDATE public.events SET coordinator_id='${other}' WHERE event_id=95590;`);
   await login(first);
   const reassigned = reserve(first, 95590, currentVersion);

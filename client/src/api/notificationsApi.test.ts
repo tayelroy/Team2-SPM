@@ -107,7 +107,7 @@ test('[FAILURE] [SG2-92:AC5] a near-miss safety decision kind is refused rather 
 });
 
 test('[FAILURE] [SG2-68:AC2] a near-miss or inherited kind name is refused rather than shown unlabelled', async () => {
-  for (const kind of ['event_submitted ', 'Event_approved', 'event_cancelled', 'venue_unavailable ', 'Venue_unavailable', 'toString', 7]) {
+  for (const kind of ['event_submitted ', 'Event_approved', 'event_postponed', 'venue_unavailable ', 'Venue_unavailable', 'toString', 7]) {
     respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));
     expect(await loadNotifications('token')).toEqual({ ok: false, message: 'Could not load notifications. Please try again.' });
   }

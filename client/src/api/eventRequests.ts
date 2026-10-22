@@ -157,6 +157,10 @@ export interface EventRequestDetail {
   /** Who marked the event completed, and when (SG2-100 AC4). */
   completedBy: string | null;
   completedAt: string | null;
+  /** The organiser's request to cancel, and when it was carried out (SG2-67). */
+  cancellationRequestedAt?: string | null;
+  cancellationReason?: string | null;
+  cancelledAt?: string | null;
   /**
    * When the event finishes — the latest end of its confirmed venue bookings
    * (SG2-100 AC4). Null while nothing confirms when it ends, which must be
@@ -244,6 +248,9 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     decidedAt: typeof raw.decided_at === 'string' ? raw.decided_at : null,
     completedBy: typeof raw.completed_by === 'string' ? raw.completed_by : null,
     completedAt: typeof raw.completed_at === 'string' ? raw.completed_at : null,
+    cancellationRequestedAt: typeof raw.cancellation_requested_at === 'string' ? raw.cancellation_requested_at : null,
+    cancellationReason: typeof raw.cancellation_reason === 'string' ? raw.cancellation_reason : null,
+    cancelledAt: typeof raw.cancelled_at === 'string' ? raw.cancelled_at : null,
     endsAt: typeof raw.ends_at === 'string' ? raw.ends_at : null,
   };
 }

@@ -40,6 +40,7 @@ import { createEquipmentRequirementsRouter } from './equipment/requirements';
 import { createEquipmentAvailabilityRouter } from './equipment/availability';
 import { createEquipmentReservationsRouter } from './equipment/reservations';
 import { createConfirmEventHandler } from './events/confirm';
+import { createEventCancellationHandlers } from './events/cancellation';
 import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
@@ -118,7 +119,9 @@ export function createApp(
   // SG2-70: appended last for the same reason.
   eventSearchRouter = createEventSearchRouter(access),
   // SG2-63: appended last for the same reason.
-  registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal })
+  registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-67: appended last for the same reason.
+  cancellationHandlers = createEventCancellationHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -229,6 +232,19 @@ export function createApp(
     '/:eventId/confirm',
     access.requirePermission('event_request.confirm'),
     confirmEventHandler
+  );
+  // SG2-67 AC1: the creating organiser asks for a cancellation, and only the
+  // assigned coordinator carries it out. Registered before '/:eventId' for
+  // the same reason as '/complete'.
+  eventRequests.post(
+    '/:eventId/cancellation-request',
+    access.requirePermission('event_request.cancellation.request'),
+    cancellationHandlers.request
+  );
+  eventRequests.patch(
+    '/:eventId/cancel',
+    access.requirePermission('event_request.cancel'),
+    cancellationHandlers.cancel
   );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(

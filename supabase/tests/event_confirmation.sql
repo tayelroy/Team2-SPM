@@ -244,7 +244,8 @@ end $$;
 do $$
 declare state public.event_status; result jsonb;
 begin
- foreach state in array (select array_agg(s) from unnest(enum_range(null::public.event_status)) s where s <> 'preparation') loop
+ -- SG2-67 AC5: a cancelled event can no longer be reinstated, so it comes last.
+ foreach state in array (select array_agg(s order by s = 'cancelled', s) from unnest(enum_range(null::public.event_status)) s where s <> 'preparation') loop
   update public.events set status=state,
    decision_reason=case when state='rejected' then 'Not suitable' end,
    completed_by=case when state='completed' then 'd5800000-0000-4000-8000-000000000003'::uuid end,

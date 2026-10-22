@@ -18,6 +18,7 @@ import RecheckSettleActions from '../components/RecheckSettleActions';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import RegistrationPanel from '../components/RegistrationPanel';
+import CancellationPanel from '../components/CancellationPanel';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -440,6 +441,21 @@ export default function EventDetail({
           {(isOrganiser || isAssignedCoordinator) && accessToken && detail.registrationNeeded
             && detail.status.toLowerCase() !== 'draft' && (
             <RegistrationPanel eventId={detail.eventId} accessToken={accessToken} />
+          )}
+          {/* SG2-67: the creating organiser asks to cancel with a reason, and the
+              assigned coordinator carries it out; both see a cancellation. */}
+          {accessToken && ((isOrganiser && detail.canManage) || isAssignedCoordinator)
+            && !['draft', 'completed'].includes(detail.status.toLowerCase()) && (
+            <CancellationPanel
+              eventId={detail.eventId}
+              accessToken={accessToken}
+              mode={isOrganiser ? 'organiser' : 'coordinator'}
+              status={detail.status.toLowerCase()}
+              requestedAt={detail.cancellationRequestedAt ?? null}
+              reason={detail.cancellationReason ?? null}
+              cancelledAt={detail.cancelledAt ?? null}
+              onChanged={() => setReloadKey((value) => value + 1)}
+            />
           )}
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
