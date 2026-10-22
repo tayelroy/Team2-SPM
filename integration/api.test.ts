@@ -33,6 +33,8 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
+import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
+import { createRegistrableEventsStore } from '../server/src/db/registrableEvents';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -527,6 +529,45 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-
   const reworked = await safety.post(`/api/event-requests/${rejected}/rework`).set(auth('coordinator'));
   assert.deepEqual([reworked.status, reworked.body], [200, { event_id: rejected, status: 'planning' }]);
   assert.equal((await stored(rejected)).status, 'planning');
+});
+
+test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] native attendee browsing lists only confirmed events taking registration, with attendee-facing fields, and refuses other roles', async () => {
+  const listed = await planned();
+  const unconfirmed = await planned();
+  await setRegistration(listed);
+  await setRegistration(unconfirmed);
+  assert.equal((await database.from('events').update({ status: 'confirmed', registration_opens_at: '2026-01-01T00:00:00Z',
+    planning_notes: 'Integration internal note' }).eq('event_id', listed)).error, null);
+  const attendeeArgs = [...args] as Parameters<typeof createApp>;
+  // The reads run registrable_events() with the caller's own JWT, as in production.
+  attendeeArgs[40] = createRegistrableEventsRouter(access, token => createRegistrableEventsStore(token, () =>
+    createClient(rest.origin, jwt('authenticated', ids[token]), { auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: loopbackFetch } })));
+  const attendee = request(createApp(...attendeeArgs));
+  // Coordinators are refused before and after the account becomes an attendee's.
+  assert.equal((await attendee.get('/api/registrable-events').set(auth('other'))).status, 403);
+  assert.equal((await database.from('account_roles').update({ role: 'attendee' }).eq('user_id', ids.other)).error, null);
+  try {
+    const list = await attendee.get('/api/registrable-events').set(auth('other'));
+    assert.equal(list.status, 200, JSON.stringify(list.body));
+    const ours = list.body.events.filter((event: { event_id: number }) => [listed, unconfirmed].includes(event.event_id));
+    assert.deepEqual(ours.map((event: { event_id: number }) => event.event_id), [listed]);
+    const detail = await attendee.get(`/api/registrable-events/${listed}`).set(auth('other'));
+    assert.equal(detail.status, 200, JSON.stringify(detail.body));
+    assert.deepEqual(Object.keys(detail.body.event).sort(), ['category', 'description', 'event_id', 'name', 'organisation',
+      'proposed_date', 'registration_closes_at', 'registration_opens_at', 'venues']);
+    assert.equal(detail.body.event.name, 'Integration workshop');
+    assert.doesNotMatch(JSON.stringify(detail.body), /Integration internal note|Exercise actual storage|confirmed/);
+    assert.equal((await attendee.get(`/api/registrable-events/${unconfirmed}`).set(auth('other'))).status, 404);
+  } finally {
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
+  }
+  // The database refuses a caller whose stored role is not attendee even if the route let it through.
+  const permissive = createAuthorization({ resolvePrincipal: async token => ({ userId: ids[token], roles: ['attendee'] as Role[] }) });
+  const forged = request(express().use('/api/registrable-events', createRegistrableEventsRouter(permissive, token =>
+    createRegistrableEventsStore(token, () => createClient(rest.origin, jwt('authenticated', ids[token]),
+      { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: loopbackFetch } })))));
+  assert.equal((await forged.get('/api/registrable-events').set(auth('organiser'))).status, 403);
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC8] [SG2-63:AC9] [SG2-63:AC10] native registration settings: the organiser changes them with history, closes and reopens with notices, and the coordinator reads the picture', async () => {

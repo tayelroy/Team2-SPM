@@ -1103,6 +1103,20 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Permission:** as 9A.1 (`event_search_options`).
 - **200:** `{ venues: [{ venue_id, name }], coordinators: [{ user_id, name }] }`: venues not deleted, and every Event Coordinator account plus anyone still assigned to a submitted event after losing that role.
 
+## 9B. Events open for registration (SG2-59)
+
+### 9B.1 GET /api/registrable-events
+- **Source:** `registrableEvents/index.ts` (`createRegistrableEventsRouter`), `db/registrableEvents.ts`, migration `202610220003_registrable_events.sql` (`registrable_events`).
+- **Permission:** `events.registrable.read` (Attendee). `registrable_events` runs with the caller's JWT and acting role (SG2-104) and refuses (403) unless that role is `attendee`.
+- **Listed:** status `confirmed`, `registration_needed` true, both registration times set, `now < registration_closes_at` and the event not started. That covers registration open now and registration that opens later (team reading of AC1/AC2, 22 Oct 2026, so SG2-60 AC3 can say when it opens). Closed, unconfirmed and walk-in events are never returned. Soonest first.
+- **200:** `{ events: [{ event_id, name, organisation, category, description, proposed_date, registration_opens_at, registration_closes_at, venues: [{ name, location }] }] }`. Venues are the event's confirmed bookings. No other event field is returned (AC3).
+- **Errors:** 401/403 for an unsigned or non-attendee caller, 503 otherwise without database detail.
+
+### 9B.2 GET /api/registrable-events/:eventId
+- **Permission:** as 9B.1 (`registrable_event`).
+- **200:** `{ event }` with the same fields as one list item.
+- **Errors:** 400 for an id that is not a positive 32-bit integer; 404 `This event is not open for registration.` for any event the list would not show, whether it exists or not; 401/403/503 as 9B.1.
+
 ## 10. Health
 
 ### 10.1 GET /health and GET /api/health

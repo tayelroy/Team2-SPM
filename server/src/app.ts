@@ -47,6 +47,7 @@ import { createSafetyChecksRouter } from './safetyChecks';
 import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
 import { createEventSearchRouter } from './eventSearch';
 import { createRegistrationHandlers } from './events/registrationRoutes';
+import { createRegistrableEventsRouter } from './registrableEvents';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -118,7 +119,9 @@ export function createApp(
   // SG2-70: appended last for the same reason.
   eventSearchRouter = createEventSearchRouter(access),
   // SG2-63: appended last for the same reason.
-  registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal })
+  registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-59: appended last for the same reason.
+  registrableEventsRouter = createRegistrableEventsRouter(access)
 ) {
   const app = express();
 
@@ -166,6 +169,8 @@ export function createApp(
   app.use('/api/safety-checks', safetyChecksRouter);
   // SG2-70: internal users find an event across the system.
   app.use('/api/event-search', eventSearchRouter);
+  // SG2-59: attendees find the events they can register for.
+  app.use('/api/registrable-events', registrableEventsRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
