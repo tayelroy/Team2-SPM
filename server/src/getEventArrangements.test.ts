@@ -7,6 +7,7 @@ import { createGetEventArrangementsHandler } from './events/getArrangements';
 import type { Principal } from './auth/policy';
 import type { EventPlanningRecord, FetchEventPlanningResult } from './db/eventPlanning';
 import type { FetchEventArrangementFactsResult } from './db/eventArrangements';
+import type { FetchLatestSafetyDecisionResult } from './db/safetyDecisions';
 
 const COORDINATOR: Principal = {
   userId: '20000000-0000-4000-8000-000000000002',
@@ -30,7 +31,7 @@ const ATTENDEE: Principal = {
 
 const MOCK_EVENT: EventPlanningRecord = {
   event_id: 101,
-  status: 'planning',
+  status: 'preparation',
   coordinator_id: COORDINATOR.userId,
   coordinator_name: 'Sarah Coordinator',
   organiser_id: ORGANISER.userId,
@@ -62,6 +63,8 @@ interface HarnessOptions {
   admin?: SupabaseClient | null;
   planning?: FetchEventPlanningResult;
   facts?: FetchEventArrangementFactsResult;
+  latest?: FetchLatestSafetyDecisionResult;
+  latestReads?: number[];
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -73,7 +76,11 @@ function buildApp(options: HarnessOptions = {}) {
       getPrincipal: () => ('principal' in options ? options.principal : COORDINATOR),
       getAdminClient: () => (options.admin === undefined ? ({} as SupabaseClient) : options.admin),
       fetchPlanningRecord: async () => options.planning ?? { ok: true, event: MOCK_EVENT },
-      fetchArrangementFacts: async () => options.facts ?? READY_FACTS
+      fetchArrangementFacts: async () => options.facts ?? READY_FACTS,
+      fetchLatestDecision: async (_client, eventId) => {
+        options.latestReads?.push(eventId);
+        return options.latest ?? { ok: true, decision: 'approve' };
+      }
     })
   );
   return app;
@@ -87,7 +94,7 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
     assert.equal(res.body.event_id, 101);
     assert.equal(res.body.ready_for_confirmation, true);
     assert.deepEqual(res.body.outstanding, []);
-    assert.equal(res.body.arrangements.length, 3);
+    assert.equal(res.body.arrangements.length, 4);
   });
 
   test('[NORMAL] [SG2-57:AC1] [SG2-57:AC3] reports outstanding arrangements and withholds readiness', async () => {
@@ -117,7 +124,7 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(res.body.outstanding, ['venue', 'equipment']);
     assert.equal(res.body.ready_for_confirmation, false);
-    assert.deepEqual(res.body.arrangements.map((row: { state: string }) => row.state), ['outstanding', 'outstanding', 'ready']);
+    assert.deepEqual(res.body.arrangements.map((row: { state: string }) => row.state), ['outstanding', 'outstanding', 'ready', 'ready']);
     assert.match(res.body.arrangements[0].detail, /recheck.*planning/i);
     assert.match(res.body.arrangements[1].detail, /recheck.*planning/i);
     assert.equal(res.body.venue_requested, true);
@@ -136,6 +143,31 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
     assert.deepEqual(res.body.outstanding, ['venue']);
     assert.equal(res.body.ready_for_confirmation, false);
     assert.match(res.body.arrangements[0].detail, /affected by venue unavailability/);
+  });
+
+  test('[NORMAL] [SG2-94:AC4] [SG2-94:AC5] the safety check is an outstanding item, with its reason, until the Safety Officer approves', async () => {
+    const latestReads: number[] = [];
+    const res = await request(buildApp({
+      planning: { ok: true, event: { ...MOCK_EVENT, status: 'awaiting_safety_check' } },
+      latest: { ok: true, decision: null },
+      latestReads
+    })).get('/api/event-requests/101/arrangements');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(latestReads, [101]);
+    assert.deepEqual(res.body.outstanding, ['safety']);
+    assert.equal(res.body.ready_for_confirmation, false);
+    assert.deepEqual(res.body.arrangements[3], { key: 'safety', label: 'Safety check', state: 'outstanding',
+      detail: 'Awaiting the Safety Officer\'s operational safety check.' });
+  });
+
+  test('[CONFLICT] [SG2-94:AC3] an approval withdrawn by a return to Planning is outstanding again', async () => {
+    const res = await request(buildApp({ planning: { ok: true, event: { ...MOCK_EVENT, status: 'planning' } } }))
+      .get('/api/event-requests/101/arrangements');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.outstanding, ['safety']);
+    assert.match(res.body.arrangements[3].detail, /approval was withdrawn/);
   });
 
   test('[FAILURE] [SG2-57:AC1] returns 401 when the caller is not authenticated', async () => {
@@ -199,6 +231,12 @@ describe('GET /api/event-requests/:eventId/arrangements (SG2-57)', () => {
     const res = await request(
       buildApp({ facts: { ok: false, reason: 'unavailable', message: 'down' } })
     ).get('/api/event-requests/101/arrangements');
+
+    assert.equal(res.status, 503);
+  });
+
+  test('[FAILURE] [SG2-94:AC4] returns 503 when the latest safety decision cannot be read', async () => {
+    const res = await request(buildApp({ latest: { ok: false } })).get('/api/event-requests/101/arrangements');
 
     assert.equal(res.status, 503);
   });

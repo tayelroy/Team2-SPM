@@ -69,9 +69,10 @@ try {
     INSERT INTO public.venue_booking_requests(request_id,event_id,venue_id,starts_at,ends_at,layout,requested_by) VALUES
       (98290,98290,98290,'2030-08-01T02:00Z','2030-08-01T06:00Z','theatre','${coordinator}'),
       (98291,98290,98291,'2030-08-01T02:00Z','2030-08-01T06:00Z','theatre','${coordinator}');
-    -- An event ready to confirm (SG2-58) but for one rejected venue.
+    -- An event ready to confirm (SG2-58, approved for SG2-94) but for one rejected venue.
     INSERT INTO public.events(event_id,organiser_id,coordinator_id,name,status,registration_needed)
       VALUES(98291,'${organiser}','${coordinator}','Withdraw gala','preparation',false);
+    INSERT INTO public.event_safety_decisions(event_id,decision,decided_by) VALUES(98291,'approve','${staff}');
     INSERT INTO public.venue_bookings(booking_id,venue_id,event_id,starts_at,ends_at,status)
       VALUES(98291,98290,98291,'2030-08-03T02:00Z','2030-08-03T06:00Z','confirmed');
     INSERT INTO public.venue_booking_requests(request_id,event_id,venue_id,starts_at,ends_at,layout,requested_by,status,decided_by,decided_at,decision_reason,venue_booking_id) VALUES

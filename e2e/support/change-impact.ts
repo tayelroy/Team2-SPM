@@ -3,9 +3,18 @@ import type {
   ApplyAcceptedEventChangeResult,
   SettleArrangementRecheckResult
 } from '../../server/src/db/changeImpact';
+import { fetchEventArrangementFacts } from '../../server/src/db/eventArrangements';
 import { eventLabel, eventNoticeMessages } from '../../server/src/db/eventNotifications';
-import { CHANGEABLE_FIELDS, RECHECK_KEYS, RETURNS_TO_PLANNING, type RecheckKey } from '../../server/src/events/changeImpact';
+import { computeArrangementReadiness, isSafetyApproved } from '../../server/src/events/arrangementReadiness';
+import {
+  CHANGEABLE_FIELDS,
+  RECHECK_KEYS,
+  RETURNS_TO_PLANNING,
+  SIGNIFICANT_CHANGE_FIELDS,
+  type RecheckKey
+} from '../../server/src/events/changeImpact';
 import type { MemoryDatabase } from './memory-database';
+import { latestSafetyDecision } from './safety-decisions';
 
 type Row = Record<string, unknown>;
 
@@ -13,9 +22,11 @@ function nextId(rows: Row[], key: string) {
   return Math.max(0, ...rows.map(row => Number(row[key]))) + 1;
 }
 
-/** Loopback UI fixture mirroring public.apply_accepted_event_change and
- * public.settle_arrangement_recheck over the in-memory tables. The SQL suite
- * (supabase/tests/event_change_impact.sql) proves the production functions,
+/** Loopback UI fixture mirroring public.apply_accepted_event_change (with
+ * SG2-94's withdrawal of the safety approval and SG2-91's
+ * refresh_safety_check_status) and public.settle_arrangement_recheck over the
+ * in-memory tables. The SQL suites (supabase/tests/event_change_impact.sql,
+ * supabase/tests/safety_approval_gate.sql) prove the production functions,
  * their locking, whitelist and grants. */
 export function createMemoryChangeImpact(database: MemoryDatabase) {
   const audit = (eventId: number, actorId: string, field: string, from: unknown, to: unknown) => {
@@ -25,28 +36,58 @@ export function createMemoryChangeImpact(database: MemoryDatabase) {
       created_at: new Date().toISOString() });
   };
 
+  // SG2-91 safety_check_arrangements_ready: no recheck outstanding, and the
+  // venue and equipment rules confirm_event applies.
+  const arrangementsReady = async (event: Row, eventId: number) => {
+    if (event.arrangements_recheck_needed === true && ((event.outstanding_arrangements ?? []) as string[]).length > 0) return false;
+    const facts = await fetchEventArrangementFacts(database.client, eventId);
+    if (!facts.ok) throw new Error('Arrangement facts unavailable');
+    const { arrangements } = computeArrangementReadiness({ event_id: eventId, status: String(event.status), latest_safety_decision: null,
+      registration_needed: false, registration_capacity: null, registration_opens_at: null, registration_closes_at: null,
+      venue_requests: facts.facts.venue_requests, affected_bookings: facts.facts.affected_bookings,
+      equipment_requests: facts.facts.equipment_requests });
+    return arrangements.every(arrangement => arrangement.key === 'safety' || arrangement.state !== 'outstanding');
+  };
+
+  // SG2-91 refresh_safety_check_status for an event SG2-94 has just returned
+  // to Planning: it goes straight back to the check when everything is in place.
+  const refreshSafetyCheck = async (event: Row, eventId: number, actorId: string) => {
+    if (!['approved', 'planning'].includes(String(event.status)) || !(await arrangementsReady(event, eventId))) return;
+    const previous = String(event.status);
+    Object.assign(event, { status: 'awaiting_safety_check', awaiting_safety_check_since: new Date().toISOString(),
+      safety_check_revision: Number(event.safety_check_revision ?? 0) + 1 });
+    audit(eventId, actorId, 'status', previous, 'awaiting_safety_check');
+  };
+
   const applyChange = async (_admin: unknown, input: ApplyAcceptedEventChangeInput): Promise<ApplyAcceptedEventChangeResult> => {
     const event = database.tables.events.find(row => row.event_id === input.eventId);
     if (!event || event.status !== input.expectedStatus || event.coordinator_id !== input.actorId) return { outcome: 'stale' };
     const previous = String(event.status);
+    const wasApproved = isSafetyApproved(previous, latestSafetyDecision(database, input.eventId));
+    let changedSignificant = false;
     for (const field of CHANGEABLE_FIELDS) {
       if (!(field in input.changes)) continue;
       const to = input.changes[field] ?? null;
-      if ((event[field] ?? null) !== to) audit(input.eventId, input.actorId, field, event[field], to);
+      if ((event[field] ?? null) !== to) {
+        audit(input.eventId, input.actorId, field, event[field], to);
+        if ((SIGNIFICANT_CHANGE_FIELDS as readonly string[]).includes(field)) changedSignificant = true;
+      }
       event[field] = to;
     }
     audit(input.eventId, input.actorId, 'change_request', null, `Accepted ${input.changeReference}`);
     const added = RECHECK_KEYS.filter(key => input.outstanding.includes(key));
     const outstanding = [...((event.outstanding_arrangements ?? []) as RecheckKey[])];
     for (const key of added) if (!outstanding.includes(key)) outstanding.push(key);
-    const returned = added.length > 0 && (RETURNS_TO_PLANNING as readonly string[]).includes(previous);
-    if (added.length > 0) {
-      Object.assign(event, { arrangements_recheck_needed: true, outstanding_arrangements: outstanding });
-      if (returned || previous === 'approved') {
-        event.status = 'planning';
-        audit(input.eventId, input.actorId, 'status', previous, 'planning');
-      }
-      if (returned) Object.assign(event, { confirmed_by: null, confirmed_at: null });
+    // SG2-94 AC3: what was approved has changed, so the approval cannot stand.
+    const withdrawn = changedSignificant && (previous === 'preparation' || previous === 'confirmed');
+    const returned = (added.length > 0 && (RETURNS_TO_PLANNING as readonly string[]).includes(previous)) || withdrawn;
+    if (added.length > 0) Object.assign(event, { arrangements_recheck_needed: true, outstanding_arrangements: outstanding });
+    if (returned || (added.length > 0 && previous === 'approved')) event.status = 'planning';
+    if (returned) Object.assign(event, { confirmed_by: null, confirmed_at: null });
+    if (event.status !== previous) audit(input.eventId, input.actorId, 'status', previous, event.status);
+    if (withdrawn && wasApproved) {
+      audit(input.eventId, input.actorId, 'safety_approval', 'Approved',
+        `Withdrawn: the accepted ${input.changeReference} changed what was approved, so the event must pass the safety check again`);
     }
     if (returned) {
       const label = eventLabel(event.name as string | null);
@@ -60,6 +101,9 @@ export function createMemoryChangeImpact(database: MemoryDatabase) {
           request_id: null, kind: 'event_returned_to_planning', message, created_at: new Date().toISOString() });
       }
     }
+    // With no recheck named, nothing else refreshes the event: one whose
+    // arrangements are all still in place goes straight back to the check.
+    if (withdrawn && added.length === 0) await refreshSafetyCheck(event, input.eventId, input.actorId);
     return { outcome: 'ok', previous_status: previous, status: String(event.status), returned_to_planning: returned,
       arrangements_recheck_needed: Boolean(event.arrangements_recheck_needed),
       outstanding_arrangements: [...((event.outstanding_arrangements ?? []) as RecheckKey[])] };

@@ -44,6 +44,9 @@ insert into public.events (event_id, organiser_id, coordinator_id, organisation,
   (104005, 'd1040000-0000-4000-8000-000000000006', 'd1040000-0000-4000-8000-000000000001', 'Acme Corp', 'Kit forum', 'planning', 50),
   (104006, 'd1040000-0000-4000-8000-000000000001', null, 'Acme Corp', 'Draft forum', 'draft', 50),
   (104007, 'd1040000-0000-4000-8000-000000000006', 'd1040000-0000-4000-8000-000000000009', 'Acme Corp', 'Safety forum', 'awaiting_safety_check', 50);
+-- SG2-94: an event in Preparation holds the Safety Officer's approval.
+insert into public.event_safety_decisions (event_id, decision, decided_by)
+  values (104004, 'approve', 'd1040000-0000-4000-8000-000000000008');
 insert into public.venues (venue_id, name, capacity) values (104, 'Multi Hall', 100);
 insert into public.venue_bookings (booking_id, venue_id, event_id, starts_at, ends_at, status) values
   (104101, 104, 104002, '2031-01-10T02:00Z', '2031-01-10T04:00Z', 'confirmed'),

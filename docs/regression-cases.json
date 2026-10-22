@@ -4811,13 +4811,14 @@
     "execution_date": "11 Oct 2026",
     "executed_by": "Automated test runner",
     "id": "SG2-58-N01",
-    "title": "confirmation is refused while one of two venues is pending, equipment is unreserved and registration has no capacity",
+    "title": "confirmation is refused while one of two venues is pending and equipment is unreserved, but not for a registration with no capacity",
     "type": "FAILURE",
     "categories": [
       "FAILURE"
     ],
     "mapped_acs": [
-      "SG2-58:AC2"
+      "SG2-58:AC2",
+      "SG2-94:AC6"
     ],
     "purpose": "Refuse confirmation when any required arrangement is outstanding, list every outstanding item, and write nothing.",
     "steps": [
@@ -4825,7 +4826,7 @@
       "Select Confirm event and read the alert and the Outstanding arrangements list.",
       "Read the status badge and fixture ledger."
     ],
-    "expected": "Venue reads '1 venue booking still awaiting approval.' and equipment '1 equipment request not yet reserved and placed with no shortfall.'. The alert reads 'Confirmation refused: arrangements are still outstanding.' listing Venue booking, Equipment, Registration in that order. The status stays preparation with no confirmed_by/confirmed_at, no audit row and no notification."
+    "expected": "Venue reads '1 venue booking still awaiting approval.' and equipment '1 equipment request not yet reserved and placed with no shortfall.'. The alert reads 'Confirmation refused: arrangements are still outstanding.' listing Venue booking, Equipment in that order; registration with no capacity reads Ready and is not listed (SG2-94 AC6). The status stays preparation with no confirmed_by/confirmed_at, no audit row and no notification."
   },
   {
     "story": "SG2-58",
@@ -8404,5 +8405,190 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-94-P01",
+    "title": "The coordinator sees the safety check outstanding on an event awaiting it, and confirmation is refused for it",
+    "type": "NORMAL",
+    "story": "SG2-94",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-94:AC4",
+      "SG2-94:AC5"
+    ],
+    "purpose": "Browser journey showing the safety check as an outstanding item in the coordinator's arrangement readiness and the server refusing confirmation for it.",
+    "preconditions": "Production React build on the isolated loopback Express fixture; /__e2e/reset then /__e2e/safety-approval seed 941 Lantern Forum in awaiting_safety_check with its venue booked and equipment reserved and placed, assigned to coordinator. No hosted Supabase.",
+    "steps": [
+      "Sign in as coordinator at 1440px and open Lantern Forum from My assigned events.",
+      "Read the arrangement readiness panel.",
+      "Send PATCH /api/event-requests/941/confirm as the coordinator and read the ledger."
+    ],
+    "data": "Event 941; coordinator account.",
+    "expected": "Venue booking and Equipment read Ready; Safety check reads Outstanding with \"Awaiting the Safety Officer's operational safety check.\"; the badge says Arrangements outstanding and no Confirm event action is offered. The confirm call answers 409 { error: \"Confirmation refused: arrangements are still outstanding.\", code: \"outstanding\", outstanding: [\"safety\"] }; the event stays awaiting_safety_check with no history row.",
+    "evidence": "e2e/safety-approval.spec.ts; e2e/support/safety-approval.ts; e2e/support/event-confirmation.ts; e2e/support/change-impact.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS in the 147/147 local Chromium run.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-94-block-preparation-until-safety-approved on origin/main cb004c6; npm run build && npm run test:e2e; 147 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. Visual check of the readiness panel and the Latest safety decision panel at 1440px and 390px (no horizontal overflow). No hosted Supabase validation.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
+  },
+  {
+    "id": "SG2-94-P02",
+    "title": "Once the Safety Officer approves, the coordinator sees the safety check ready and confirms the event",
+    "type": "NORMAL",
+    "story": "SG2-94",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-94:AC2",
+      "SG2-94:AC5"
+    ],
+    "purpose": "Browser journey from the Safety Officer's Approve to the coordinator's confirmation, proving the approval is what opens Preparation and confirmation.",
+    "preconditions": "As SG2-94-P01.",
+    "steps": [
+      "Sign in as safety, open Safety checks and record Approve on Lantern Forum.",
+      "Sign in as coordinator, open Lantern Forum and read the readiness panel.",
+      "Choose Confirm event and read the ledger."
+    ],
+    "data": "Event 941; safety and coordinator accounts.",
+    "expected": "The Safety Officer sees \"Approved for Lantern Forum. The organiser and the coordinator have been notified.\" and the event is in preparation. Safety check reads Ready (\"Approved by the Safety Officer.\") and the badge Ready for confirmation; confirming says \"Event confirmed. The Event Organiser has been notified.\"; the event is confirmed by the coordinator, one approve decision by the Safety Officer is stored, and the status history is awaiting_safety_check → preparation → confirmed.",
+    "evidence": "e2e/safety-approval.spec.ts; e2e/support/safety-approval.ts; e2e/support/event-confirmation.ts; e2e/support/change-impact.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS in the 147/147 local Chromium run.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-94-block-preparation-until-safety-approved on origin/main cb004c6; npm run build && npm run test:e2e; 147 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. Visual check of the readiness panel and the Latest safety decision panel at 1440px and 390px (no horizontal overflow). No hosted Supabase validation.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
+  },
+  {
+    "id": "SG2-94-C01",
+    "title": "Accepting a significant change on an approved event withdraws the approval and the event must be checked again",
+    "type": "CONFLICT",
+    "story": "SG2-94",
+    "categories": [
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-94:AC3",
+      "SG2-94:AC5"
+    ],
+    "purpose": "Browser journey for the approval being withdrawn by an accepted attendance change, with the reason shown and confirmation refused.",
+    "preconditions": "As SG2-94-P01, plus 942 Beacon Forum in preparation on an Approve, with the sample change request mock-942-attendance.",
+    "steps": [
+      "Sign in as coordinator at 1440px, open Beacon Forum and read Safety check and the Latest safety decision panel.",
+      "Accept the attendance change and read the ledger.",
+      "Sign in again, reopen Beacon Forum, read both panels, then send PATCH /api/event-requests/942/confirm."
+    ],
+    "data": "Event 942; change request mock-942-attendance (expected attendance to 120).",
+    "expected": "Before: Safety check Ready, Latest safety decision Approved with no withdrawal hint. After accepting: the event is in planning with its confirmation cleared; history is expected_attendance, change_request, status, then safety_approval \"Approved\" → \"Withdrawn: the accepted change request mock-942-attendance changed what was approved, so the event must pass the safety check again\"; the Approve stays on record. Reopened: Safety check Outstanding with \"The approval was withdrawn after the event changed. It must pass the safety check again once its arrangements are in place.\", the badge Arrangements outstanding, the hint \"This approval was withdrawn because the event changed after it was approved. It must pass the safety check again.\"; confirming answers 409 outstanding ending in safety and the event stays in planning.",
+    "evidence": "e2e/safety-approval.spec.ts; e2e/support/safety-approval.ts; e2e/support/event-confirmation.ts; e2e/support/change-impact.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Pass",
+    "actual": "PASS in the 147/147 local Chromium run; withdrawn panels checked by eye at 390px.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-94-block-preparation-until-safety-approved on origin/main cb004c6; npm run build && npm run test:e2e; 147 passed, 0 failed, flaky or skipped; required SG2-26 gate passed. Visual check of the readiness panel and the Latest safety decision panel at 1440px and 390px (no horizontal overflow). No hosted Supabase validation.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
+  },
+  {
+    "id": "SG2-94-DB01",
+    "title": "Only an Approve made during the current check lets an event into Preparation, and a significant accepted change withdraws it",
+    "type": "CONFLICT",
+    "story": "SG2-94",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-94:AC1",
+      "SG2-94:AC2",
+      "SG2-94:AC3",
+      "SG2-94:AC5"
+    ],
+    "purpose": "Database proof of the safety_approval_gate trigger, event_safety_approved() and the withdrawal in apply_accepted_event_change.",
+    "preconditions": "Disposable PostgreSQL with the auth fixture and every migration; transactional fixtures rolled back.",
+    "steps": [
+      "Try to move planning, awaiting (no decision, changes requested, an approval from an earlier wait) and safety_rejected events into Preparation directly.",
+      "Approve awaiting events through record_safety_decision; confirm one.",
+      "Accept a significant change with a recheck on a Preparation event, one with none on a Confirmed event, and a name-only change; then try Preparation and confirmation again, settle the recheck and approve again.",
+      "Confirm Preparation events with no decision and with a later Request Changes."
+    ],
+    "data": "Synthetic 994xx events and d9400000 fixture identities.",
+    "expected": "Each direct move is refused with check_violation events_preparation_needs_safety_approval, the message \"An event can move to Preparation only once the Safety Officer has approved its safety check.\" and a detail naming status and latest decision; nothing changes. Approve moves to Preparation. The significant changes return the events to Planning (the Confirmed one straight back to Awaiting Safety Check with its confirmation cleared), each with one safety_approval history row; the name-only change keeps the approval; the decision history is untouched. The withdrawn approval no longer opens Preparation; confirmation lists [\"venue\",\"safety\"]; settling the recheck returns the event to the check and a new Approve lets it confirm. No decision or a later Request Changes lists [\"safety\"] and writes nothing. Clients cannot call event_safety_approved().",
+    "evidence": "supabase/tests/safety_approval_gate.sql; supabase/migrations/202610220001_safety_approval_gate.sql; .github/workflows/ci.yml",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "status": "Pass",
+    "actual": "Passed in the disposable PostgreSQL 17 replay of the CI job.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-94-block-preparation-until-safety-approved on origin/main cb004c6; replay of CI's database-tests job on disposable postgres:17 (auth fixture, every migration, release readiness and its tests, every SQL suite and concurrency script, the upgrade job) passed; also passed on a local PostgreSQL 16 replay. Hosted rehearsal of 202610220001 in a rolled-back transaction ran cleanly and release readiness returned ready inside it.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
+  },
+  {
+    "id": "SG2-94-DB02",
+    "title": "Confirmation lists the safety check after venue, equipment and registration, and unset registration settings no longer block it",
+    "type": "NORMAL",
+    "story": "SG2-94",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-94:AC5",
+      "SG2-94:AC6",
+      "SG2-94:AC3"
+    ],
+    "purpose": "Database proof that confirm_event applies the SG2-94 rules that supersede SG2-58 AC1/AC2 and SG2-57 AC1, including under concurrency.",
+    "preconditions": "Disposable PostgreSQL with the auth fixture and every migration; transactional fixtures rolled back; the confirmation concurrency script uses its own committed fixtures and removes them.",
+    "steps": [
+      "Confirm an approved event that needs registration with capacity and times unset.",
+      "Confirm an event with no venue, unreserved equipment, a registration recheck and no approval.",
+      "Confirm an approved event after moving it through every other status.",
+      "Hold the event row while an accepted significant change withdraws the approval, and confirm from a second session."
+    ],
+    "data": "Synthetic 958xx–959xx events; confirmation race events 95880–95885.",
+    "expected": "The registration event confirms and keeps its unset settings for the organiser. The second is refused with [\"venue\",\"equipment\",\"registration\",\"safety\"] in that order. Approved, Planning, Awaiting Safety Check and Safety Rejected answer outstanding [\"safety\"]; every other status is closed; nothing is written. The waiting confirmation sees the withdrawn approval and is refused with [\"safety\"], the event is back in awaiting_safety_check and no event_confirmed notice exists.",
+    "evidence": "supabase/tests/event_confirmation.sql; .github/scripts/test-event-confirmation-concurrency.mjs; .github/scripts/release-readiness.test.mjs",
+    "layer": "Disposable PostgreSQL SQL assertions and multi-session script",
+    "status": "Pass",
+    "actual": "Passed in the disposable PostgreSQL 17 replay of the CI job.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-94-block-preparation-until-safety-approved on origin/main cb004c6; replay of CI's database-tests job on disposable postgres:17 (auth fixture, every migration, release readiness and its tests, every SQL suite and concurrency script, the upgrade job) passed; also passed on a local PostgreSQL 16 replay. Hosted rehearsal of 202610220001 in a rolled-back transaction ran cleanly and release readiness returned ready inside it.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
+  },
+  {
+    "id": "SG2-94-INT01",
+    "title": "Through PostgREST, readiness lists the safety check and an accepted change withdraws a confirmed event's approval until a new check",
+    "type": "NORMAL",
+    "story": "SG2-94",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-94:AC3",
+      "SG2-94:AC4"
+    ],
+    "purpose": "Native integration of the Express routes with the SQL gate and withdrawal on real PostgreSQL through PostgREST.",
+    "preconditions": "CI integration job: disposable postgres:17 with every migration, integration/seed.sql and PostgREST.",
+    "steps": [
+      "Read GET /arrangements for an event SG2-91 moved into its check, then after a planning impact.",
+      "Confirm an event on an approval, accept its attendance change request, settle every recheck and read readiness."
+    ],
+    "data": "integration/api.test.ts fixtures.",
+    "expected": "Readiness lists [\"safety\"] while the event awaits its check and [\"venue\",\"equipment\",\"safety\"] after the impact. Accepting the change returns the Confirmed event to Planning with the history row safety_approval \"Approved\" → \"Withdrawn: the accepted change request … so the event must pass the safety check again\"; after the rechecks settle the event is awaiting_safety_check and readiness lists [\"safety\"].",
+    "evidence": "integration/api.test.ts",
+    "layer": "Express + PostgREST + PostgreSQL integration",
+    "status": "Pass",
+    "actual": "Passed: 22/22 integration tests in the CI replay.",
+    "execution_evidence": "22 Oct 2026; feature/SG2-94-block-preparation-until-safety-approved on origin/main cb004c6; replay of CI's database-tests job on disposable postgres:17 (auth fixture, every migration, release readiness and its tests, every SQL suite and concurrency script, the upgrade job) passed; also passed on a local PostgreSQL 16 replay. Hosted rehearsal of 202610220001 in a rolled-back transaction ran cleanly and release readiness returned ready inside it.",
+    "execution_date": "22 Oct 2026",
+    "executed_by": "Claude (automated local verification)"
   }
 ]

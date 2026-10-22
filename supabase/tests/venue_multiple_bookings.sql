@@ -188,6 +188,9 @@ end $$;
 -- approved: a rejected venue blocks it until the coordinator withdraws it.
 insert into public.events (event_id, organiser_id, coordinator_id, name, status, registration_needed) values
   (98203, 'e8200000-0000-4000-8000-000000000003', 'e8200000-0000-4000-8000-000000000002', 'Multi Gala', 'preparation', false);
+-- SG2-94: in Preparation on the Safety Officer's approval.
+insert into public.event_safety_decisions (event_id, decision, decided_by)
+  values (98203, 'approve', 'e8200000-0000-4000-8000-000000000001');
 insert into public.venue_bookings (booking_id, venue_id, event_id, starts_at, ends_at, status) values
   (98203, 98201, 98203, '2030-10-05 01:00+00', '2030-10-05 05:00+00', 'confirmed');
 insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, layout, requested_by,

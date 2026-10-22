@@ -443,12 +443,12 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Week 7:** New since W7 — SG2-57; #3 — SG2-82.
 - **Source:** `app.ts:233-237`; `events/getArrangements.ts`, `events/arrangementReadiness.ts`.
 - **Permission:** `event_request.arrangements.view` (EC).
-- **200:** `{ event_id, arrangements: [{ key: "venue"|"equipment"|"registration", label, state: "ready"|"outstanding"|"not_required", detail }], outstanding[], ready_for_confirmation, venue_requested }`
+- **200:** `{ event_id, arrangements: [{ key: "venue"|"equipment"|"registration"|"safety", label, state: "ready"|"outstanding"|"not_required", detail }], outstanding[], ready_for_confirmation, venue_requested }`
 - **Errors:**
   - 403 `Only the assigned event coordinator can view these arrangements.`
   - 404 `Event not found.`
   - 503
-- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding. SG2-81 additionally counts affected confirmed bookings as outstanding. Persisted `arrangements_recheck_needed` with `venue_recheck`, `equipment_recheck` or `registration_recheck` keeps the corresponding arrangement outstanding even when its booking/receipt data exists.
+- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding. SG2-81 additionally counts affected confirmed bookings as outstanding. Persisted `arrangements_recheck_needed` with `venue_recheck`, `equipment_recheck` or `registration_recheck` keeps the corresponding arrangement outstanding even when its booking/receipt data exists. SG2-94: registration with unset settings is `ready` (AC6), and a fourth item, `safety` ("Safety check"), is `ready` only for an event in Preparation or Confirmed whose latest safety decision is Approve, otherwise `outstanding` with the reason (AC4/AC5).
 
 ### 4.15 PATCH /api/event-requests/:eventId/confirm
 - **Week 7:** New since W7 — SG2-58; #3 — SG2-82.
@@ -461,11 +461,12 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `{ error: "Only an event in Preparation can be confirmed.", code: "closed" }`
   - 409 `{ error: "Confirmation refused: arrangements are still outstanding.", code: "outstanding", outstanding[] }`
   - 401/403/503 mapped from the RPC
-- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610170002_confirmation_rechecks_and_disruptions.sql` (merges PR90 rechecks with PR92 disruption checks). Under `for update` the RPC:
+- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610220001_safety_approval_gate.sql` (SG2-94). Under `for update` the RPC:
   - rechecks the caller's role and assignment
-  - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment or registration needs, and persisted venue/equipment/registration rechecks; refusal changes no event, booking, receipt, history or notification
+  - answers an event in `approved`, `planning`, `awaiting_safety_check` or `safety_rejected` with `outstanding` (the safety check included) and any other status but `preparation` with `closed`
+  - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment needs, persisted venue/equipment/registration rechecks and a missing safety approval (`safety`, SG2-94 AC5); unset registration settings no longer block (AC6); refusal changes no event, booking, receipt, history or notification
   - writes the status, a history row and an `event_confirmed` notice
-- **Note:** no endpoint at this snapshot moves an event into `preparation`. That is the safety-check outcome (SG2-91..94, «planned»).
+- **Note:** the only way into `preparation` is the Safety Officer's Approve (`POST /api/event-requests/:eventId/safety-decision`); the `safety_approval_gate` trigger refuses any other move (SG2-94 AC1).
 
 ### 4.16 GET /api/event-requests/:eventId/confirmation
 - **Week 7:** New since W7 — SG2-58.
@@ -1128,7 +1129,7 @@ No endpoint at this snapshot delivers these planned stories. They are listed so 
 |---|---|---|
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
-| #6 | SG2-93, SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; see [safety-checks.md](../safety-checks.md). Still planned: flagging Request Changes arrangements (SG2-93) and treating only the latest Approve as the safety approval (SG2-94). |
+| #6 | SG2-93 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; SG2-94 (22 Oct 2026) made the latest Approve the only way into Preparation and a condition of confirmation, with no new endpoint; see [safety-checks.md](../safety-checks.md). Still planned: flagging Request Changes arrangements (SG2-93). |
 
 ---
 

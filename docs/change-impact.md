@@ -103,10 +103,14 @@ event row lock it:
    event moves to Planning as its normal next step, without a notice. A Planning event
    stays in Planning.
 
-**Safety approval withdrawal.** AC4 also withdraws any safety approval. No safety-approval
-record exists yet (the Safety Officer workflow is SG2-92); returning to Planning already
-sends the event through the safety check again. When SG2-92 adds its record, it must
-clear it inside `apply_accepted_event_change`.
+**Safety approval withdrawal (SG2-94 AC3).** A significant change (date and time,
+attendance, venue, accessibility or equipment requirements) to an event in Preparation or
+Confirmed always returns it to Planning, even when no recheck was named, and its approval
+no longer counts: `202610220001_safety_approval_gate.sql` replaces
+`apply_accepted_event_change` to add a `safety_approval` history row ("Withdrawn: …")
+when the event held an approval, and the event must pass the safety check again before
+Preparation. The decision history in `event_safety_decisions` is never rewritten. See
+[Safety checks](safety-checks.md).
 
 **The coordinator is notified too.** The usual rule is that nobody is told about their own
 action, but AC7 names both the organiser and the assigned coordinator, so the coordinator

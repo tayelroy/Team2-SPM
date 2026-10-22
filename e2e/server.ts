@@ -68,6 +68,7 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
 import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
+import { seedSafetyApprovalGate } from './support/safety-approval';
 import { createEventSearchRouter } from '../server/src/eventSearch';
 import { createMemoryEventSearchStore, seedEventSearch } from './support/event-search';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
@@ -308,6 +309,18 @@ app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
   const seeded = (row: Record<string, unknown>) => [921, 922, 923].includes(Number(row.event_id));
   res.json({
     events: database.tables.events.filter(seeded), decisions: database.tables.event_safety_decisions,
+    audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
+  });
+});
+// SG2-94: one event awaiting its check, and one approved event in Preparation.
+app.post('/__e2e/safety-approval', (_req, res) => {
+  seedSafetyApprovalGate(database);
+  res.status(204).end();
+});
+app.get('/__e2e/safety-approval-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [941, 942].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), decisions: database.tables.event_safety_decisions.filter(seeded),
     audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
   });
 });

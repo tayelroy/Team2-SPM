@@ -797,7 +797,7 @@ test('SG2-37-P01 | [SG2-37:AC1] [NORMAL] approving a request under review persis
 
   await expect(page.getByRole('heading', { name: 'Decision Forum' })).toBeVisible();
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(page.getByText('approved')).toBeVisible();
+  await expect(page.getByText('approved', { exact: true })).toBeVisible();
 
   // The decision persisted rather than only showing on the open screen. A
   // coordinator reads it back through their own queue: the organiser event
@@ -2435,7 +2435,7 @@ test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2
     .getByRole('button', { name: /Planning workshop/ }).click();
   await expect(page.getByRole('heading', { name: 'Planning workshop' })).toBeVisible();
   await page.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(page.getByText('approved')).toBeVisible();
+  await expect(page.getByText('approved', { exact: true })).toBeVisible();
   await signOut(page);
 
   // AC5: the stepper and waiting-on card reflect the approved stage.
