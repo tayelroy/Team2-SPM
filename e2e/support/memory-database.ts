@@ -420,7 +420,8 @@ export class MemoryDatabase {
   }
 
   private workItems(): Row[] {
-    const REVIEW_STATUSES = ['unassigned', 'submitted', 'under_review'];
+    // SG2-89 AC6: an event awaiting clarification stays in its coordinator's queue.
+    const REVIEW_STATUSES = ['unassigned', 'submitted', 'under_review', 'needs_clarification'];
     const ASSIGNED_STATUSES = ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'];
     const active = this.tables.events.filter(event => [...REVIEW_STATUSES, ...ASSIGNED_STATUSES].includes(String(event.status)));
     const items = active.filter(event => REVIEW_STATUSES.includes(String(event.status)) || event.coordinator_id !== null).map(event => ({

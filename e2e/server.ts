@@ -49,6 +49,7 @@ import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
+import { createCoordinatorOverviewRouter } from '../server/src/coordinatorOverview';
 import { createMemoryEquipmentStore } from './support/equipment';
 import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
@@ -254,7 +255,9 @@ const app = createApp(
   createEventSearchRouter(access, token => createMemoryEventSearchStore(database, token)),
   // SG2-63: the registration picture and settings mirror their SQL functions
   // over the in-memory tables.
-  createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) })
+  createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) }),
+  // SG2-89: the Lead's overview, against the in-memory client.
+  createCoordinatorOverviewRouter(access, { getAdminClient: getClient })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not

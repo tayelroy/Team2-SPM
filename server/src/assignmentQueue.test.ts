@@ -51,6 +51,23 @@ test('[NORMAL] [SG2-88:AC1] the queue also lists the Event Coordinators the Lead
   assert.deepEqual(response.body.coordinators.map((c: { name: string }) => c.name), ['Casey Coordinator', 'Robin Second']);
 });
 
+test('[NORMAL] [SG2-89:AC5] with several Leads, each one reads the whole unassigned queue', async () => {
+  const queue = [ENTRY, { ...ENTRY, event_id: 2, name: 'Second Forum' }];
+  const bodies: unknown[] = [];
+  for (const userId of ['lead-1', 'lead-2']) {
+    const access = createAuthorization({ resolvePrincipal: async () => ({ userId, role: 'event_coordinator_lead' }) });
+    const app = express().use('/api/assignment-queue', createAssignmentQueueRouter(access, {
+      getAdminClient: () => ({}) as SupabaseClient,
+      fetchQueue: async () => ({ ok: true, entries: queue }),
+      fetchCoordinators: async () => ({ ok: true, coordinators: COORDINATORS })
+    }));
+    const response = await request(app).get('/api/assignment-queue').set('Authorization', 'Bearer token');
+    assert.equal(response.status, 200, userId);
+    bodies.push(response.body.entries);
+  }
+  assert.deepEqual(bodies, [queue, queue]);
+});
+
 test('[FAILURE] [SG2-87:AC2] every other role is refused before the queue is read', async () => {
   const others = ROLES.filter(role => role !== 'event_coordinator_lead');
   assert.equal(others.length, 6);

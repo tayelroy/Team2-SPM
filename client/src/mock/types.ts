@@ -38,6 +38,8 @@ export type Screen =
   | 'profile'
   | 'assign'
   | 'queue'
+  // SG2-89: the Lead's overview of the events they supervise.
+  | 'overview'
   | 'safetyChecks'
   | 'search'
   // SG2-70: find an event across the system.

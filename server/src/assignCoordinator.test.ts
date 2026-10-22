@@ -14,6 +14,7 @@ import type {
   FetchEventRequestResult
 } from './db/eventRequests';
 import type { GetHeldRolesResult } from './db/accountRoles';
+import type { FetchEventSupervisorResult } from './db/coordinatorOverview';
 import type { InsertAuditLogInput, InsertAuditLogsResult } from './db/auditLogs';
 import type { EventNotice, NotifyEventResult } from './db/eventNotifications';
 
@@ -60,6 +61,10 @@ interface HarnessOptions {
   notifyResult?: NotifyEventResult;
   /** SG2-68: each notice batch, with how many history batches preceded it. */
   notices?: { afterHistory: number; batch: EventNotice[] }[];
+  /** SG2-89: the Lead supervising the event before the change. */
+  supervisorResult?: FetchEventSupervisorResult;
+  /** SG2-89: the supervising Lead each coordinator write carried, in order. */
+  assigners?: (string | null)[];
 }
 
 function buildApp(options: HarnessOptions = {}) {
@@ -78,9 +83,11 @@ function buildApp(options: HarnessOptions = {}) {
         options.captureRole?.(userId);
         return options.roleResult ?? { ok: true, roles: ['event_coordinator'] };
       },
-      assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent, statusTransition) => {
+      fetchSupervisor: async () => options.supervisorResult ?? { ok: true, supervisorId: 'lead-before' },
+      assignCoordinator: async (_admin, eventId, { coordinatorId, assignedBy }, expectedCurrent, statusTransition) => {
         options.writes?.push([eventId, coordinatorId, expectedCurrent]);
         options.transitions?.push(statusTransition);
+        options.assigners?.push(assignedBy);
         const isRollback = (options.writes?.length ?? 0) > 1;
         if (isRollback) {
           return options.rollbackResult ?? { ok: true, request: SUBMITTED_REQUEST };
@@ -487,7 +494,8 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
       getAdminClient: () => ({}) as SupabaseClient,
       fetchRequest: async () => ({ ok: true, request: { ...SUBMITTED_REQUEST, coordinator_id: storedCoordinator } }),
       lookupRole: async () => ({ ok: true, roles: ['event_coordinator'] }),
-      assignCoordinator: async (_admin, eventId, coordinatorId, expectedCurrent) => {
+      fetchSupervisor: async () => ({ ok: true, supervisorId: null }),
+      assignCoordinator: async (_admin, eventId, { coordinatorId }, expectedCurrent) => {
         writes.push([eventId, coordinatorId, expectedCurrent]);
         assert.equal(expectedCurrent, storedCoordinator);
         if (writes.length === 2) return { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' };
@@ -689,4 +697,63 @@ test("[FAILURE] [SG2-104:AC2] the Lead cannot make an event's own organiser its 
     .patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'user-1' });
   assert.equal(response.status, 400);
   assert.deepEqual([writes, audits], [[], []]);
+});
+
+describe('PATCH /api/event-requests/:eventId/coordinator supervision (SG2-89)', () => {
+  const AWAITING_ANSWERS = { ...SUBMITTED_REQUEST, status: 'needs_clarification', coordinator_id: 'coord-old', coordinator_name: 'Old Coordinator' };
+
+  test('[NORMAL] [SG2-89:AC1] the Lead who assigns the coordinator becomes the supervising Lead in the same write', async () => {
+    const assigners: (string | null)[] = [];
+    const response = await request(buildApp({ assigners })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 200);
+    assert.deepEqual(assigners, ['staff-1']);
+  });
+
+  test('[NORMAL] [SG2-89:AC6] the Lead reassigns an event awaiting clarification and its status stays put', async () => {
+    const writes: [number, string | null, string | null][] = [];
+    const transitions: (AssignStatusTransition | undefined)[] = [];
+    const audits: InsertAuditLogInput[][] = [];
+    const response = await request(buildApp({
+      writes, transitions, audits,
+      fetchResult: { ok: true, request: AWAITING_ANSWERS },
+      assignResult: { ok: true, request: { ...AWAITING_ANSWERS, coordinator_id: 'coord-new', coordinator_name: 'New Coordinator' } }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-new' });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.request.status, 'needs_clarification');
+    assert.deepEqual(writes, [[7, 'coord-new', 'coord-old']]);
+    assert.deepEqual(transitions, [undefined]);
+    assert.deepEqual(audits[0].map(entry => entry.field_name), ['coordinator_id']);
+  });
+
+  test('[CONFLICT] [SG2-89:AC6] [SG2-89:AC1] when another Lead reassigns first, the second reassignment changes nothing', async () => {
+    const audits: InsertAuditLogInput[][] = [];
+    const response = await request(buildApp({
+      audits,
+      fetchResult: { ok: true, request: AWAITING_ANSWERS },
+      assignResult: { ok: false, reason: 'not_assignable', message: 'moved on' }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-new' });
+    assert.equal(response.status, 409);
+    assert.deepEqual(audits, []);
+  });
+
+  test('[FAILURE] [SG2-89:AC1] an unrecorded reassignment is undone back under the Lead who supervised it before', async () => {
+    const assigners: (string | null)[] = [];
+    const response = await request(buildApp({
+      assigners,
+      fetchResult: { ok: true, request: AWAITING_ANSWERS },
+      auditResult: { ok: false, reason: 'unavailable', message: 'down' }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-new' });
+    assert.equal(response.status, 503);
+    assert.deepEqual(assigners, ['staff-1', 'lead-before']);
+  });
+
+  test('[FAILURE] [SG2-89:AC1] when the supervising Lead cannot be read, nothing is written', async () => {
+    const writes: [number, string | null, string | null][] = [];
+    const response = await request(buildApp({
+      writes, supervisorResult: { ok: false, reason: 'unavailable', message: 'PRIVATE_SENTINEL' }
+    })).patch('/api/event-requests/7/coordinator').send({ coordinatorId: 'coord-1' });
+    assert.equal(response.status, 503);
+    assert.doesNotMatch(response.text, /SENTINEL/);
+    assert.deepEqual(writes, []);
+  });
 });

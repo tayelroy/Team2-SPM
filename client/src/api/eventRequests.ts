@@ -983,8 +983,9 @@ export async function assignCoordinator(
     const status = data?.request?.status;
     // Mirror the server's live assignable states. An absent or invalid status
     // preserves the caller's existing state instead of inventing a transition.
+    // SG2-89 AC6: an event awaiting clarification can be reassigned too.
     return typeof status === 'string' && [
-      'unassigned', 'submitted', 'under_review', 'approved', 'planning',
+      'unassigned', 'submitted', 'under_review', 'needs_clarification', 'approved', 'planning',
       'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed',
     ].includes(status) ? { ok: true, status } : { ok: true };
   }

@@ -1215,6 +1215,7 @@ const ASSIGNABLE = [
   'unassigned',
   'submitted',
   'under_review',
+  'needs_clarification',
   'approved',
   'planning',
   'awaiting_safety_check',
@@ -1235,7 +1236,7 @@ describe('assignEventCoordinator', () => {
         (c) => (captured = c)
       ),
       7,
-      'coord-1',
+      { coordinatorId: 'coord-1', assignedBy: 'lead-1' },
       null
     );
 
@@ -1244,7 +1245,7 @@ describe('assignEventCoordinator', () => {
       assert.equal(result.request.coordinator_id, 'coord-1');
       assert.equal(result.request.coordinator_name, 'Coord One');
     }
-    assert.deepEqual(captured?.row, { coordinator_id: 'coord-1' });
+    assert.deepEqual(captured?.row, { coordinator_id: 'coord-1', coordinator_assigned_by: 'lead-1' });
     assert.deepEqual(captured?.filters, [
       ['eq', 'event_id', 7],
       ['in', 'status', ASSIGNABLE],
@@ -1263,7 +1264,7 @@ describe('assignEventCoordinator', () => {
         (c) => (captured = c)
       ),
       7,
-      'coord-new',
+      { coordinatorId: 'coord-new', assignedBy: 'lead-1' },
       'coord-old'
     );
     assert.equal(result.ok, true);
@@ -1280,12 +1281,12 @@ describe('assignEventCoordinator', () => {
     const result = await assignEventCoordinator(
       fakeAssignClient({ data: [{ event_id: 7, status: 'submitted', coordinator_id: null }], error: null }, (c) => (captured = c)),
       7,
-      null,
+      { coordinatorId: null, assignedBy: null },
       'coord-1'
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.coordinator_id, null);
-    assert.deepEqual(captured?.row, { coordinator_id: null });
+    assert.deepEqual(captured?.row, { coordinator_id: null, coordinator_assigned_by: null });
     assert.deepEqual(captured?.filters.at(-1), ['eq', 'coordinator_id', 'coord-1']);
   });
 
@@ -1293,7 +1294,7 @@ describe('assignEventCoordinator', () => {
     const result = await assignEventCoordinator(
       fakeAssignClient({ data: null, error: { message: 'connection reset' } }),
       7,
-      'coord-1',
+      { coordinatorId: 'coord-1', assignedBy: 'lead-1' },
       null
     );
     assert.deepEqual(result, { ok: false, reason: 'unavailable', message: 'connection reset' });
@@ -1301,7 +1302,7 @@ describe('assignEventCoordinator', () => {
 
   for (const data of [[], null]) {
     test(`[CONFLICT] [SG2-33:AC1] [SG2-34:AC1] reports not_assignable when the status or coordinator moved on, matching ${JSON.stringify(data)} rows`, async () => {
-      const result = await assignEventCoordinator(fakeAssignClient({ data, error: null }), 7, 'coord-1', 'coord-old');
+      const result = await assignEventCoordinator(fakeAssignClient({ data, error: null }), 7, { coordinatorId: 'coord-1', assignedBy: 'lead-1' }, 'coord-old');
       assert.equal(result.ok, false);
       if (!result.ok) assert.equal(result.reason, 'not_assignable');
     });
@@ -1320,14 +1321,14 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
         (c) => (captured = c)
       ),
       7,
-      'coord-1',
+      { coordinatorId: 'coord-1', assignedBy: 'lead-1' },
       null,
       { from: 'unassigned', to: 'submitted' }
     );
 
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.request.status, 'submitted');
-    assert.deepEqual(captured?.row, { coordinator_id: 'coord-1', status: 'submitted' });
+    assert.deepEqual(captured?.row, { coordinator_id: 'coord-1', coordinator_assigned_by: 'lead-1', status: 'submitted' });
     // The `from` status is a condition on the write, not a pre-check: a row
     // that moved on between read and write matches zero rows instead of
     // being rewound.
@@ -1347,12 +1348,12 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
           (c) => (captured = c)
         ),
         7,
-        'coord-new',
+        { coordinatorId: 'coord-new', assignedBy: 'lead-1' },
         'coord-old'
       );
       assert.equal(result.ok, true);
       if (result.ok) assert.equal(result.request.status, status);
-      assert.deepEqual(Object.keys(captured?.row ?? {}), ['coordinator_id']);
+      assert.deepEqual(Object.keys(captured?.row ?? {}), ['coordinator_id', 'coordinator_assigned_by']);
       assert.equal(Object.prototype.hasOwnProperty.call(captured?.row ?? {}, 'status'), false);
       assert.deepEqual(captured?.filters, [
         ['eq', 'event_id', 7],
@@ -1370,12 +1371,12 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
         (c) => (captured = c)
       ),
       7,
-      null,
+      { coordinatorId: null, assignedBy: null },
       'coord-1',
       { from: 'submitted', to: 'unassigned' }
     );
     assert.equal(result.ok, true);
-    assert.deepEqual(captured?.row, { coordinator_id: null, status: 'unassigned' });
+    assert.deepEqual(captured?.row, { coordinator_id: null, coordinator_assigned_by: null, status: 'unassigned' });
     assert.deepEqual(captured?.filters, [
       ['eq', 'event_id', 7],
       ['eq', 'status', 'submitted'],
@@ -1387,12 +1388,41 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
     const result = await assignEventCoordinator(
       fakeAssignClient({ data: [], error: null }),
       7,
-      'coord-1',
+      { coordinatorId: 'coord-1', assignedBy: 'lead-1' },
       null,
       { from: 'unassigned', to: 'submitted' }
     );
     assert.equal(result.ok, false);
     if (!result.ok) assert.equal(result.reason, 'not_assignable');
+  });
+});
+
+describe('assignEventCoordinator supervision (SG2-89)', () => {
+  test('[BOUNDARY] [SG2-89:AC1] clearing the coordinator always clears the supervising Lead, whatever the caller passes', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
+    await assignEventCoordinator(
+      fakeAssignClient({ data: [{ event_id: 7, status: 'submitted', coordinator_id: null }], error: null }, (c) => (captured = c)),
+      7,
+      { coordinatorId: null, assignedBy: 'lead-1' },
+      'coord-1'
+    );
+    assert.deepEqual(captured?.row, { coordinator_id: null, coordinator_assigned_by: null });
+  });
+
+  test('[NORMAL] [SG2-89:AC6] an event awaiting clarification can be reassigned without a status key', async () => {
+    let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
+    const result = await assignEventCoordinator(
+      fakeAssignClient(
+        { data: [{ event_id: 7, status: 'needs_clarification', coordinator_id: 'coord-new' }], error: null },
+        (c) => (captured = c)
+      ),
+      7,
+      { coordinatorId: 'coord-new', assignedBy: 'lead-2' },
+      'coord-old'
+    );
+    assert.equal(result.ok && result.request.status, 'needs_clarification');
+    assert.deepEqual(captured?.row, { coordinator_id: 'coord-new', coordinator_assigned_by: 'lead-2' });
+    assert.ok((captured?.filters.find(([, column]) => column === 'status')?.[2] as string[]).includes('needs_clarification'));
   });
 });
 
