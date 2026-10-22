@@ -108,17 +108,20 @@ try {
   const firstPid = await first.query('SELECT pg_backend_pid();');
   const secondPid = await second.query('SELECT pg_backend_pid();');
 
-  await login(first, venueStaff);
+  // SG2-83 AC5/AC7: only the coordinator releases, and releasing a venue of an
+  // event in Preparation returns it to Planning.
+  await login(first);
   assert.equal(JSON.parse(await first.query(`SELECT public.release_venue_booking(95880,'Flooded')::text;`)).outcome, 'released');
   await login(second);
   const afterRelease = confirm(second, 95880);
   await waitsFor(root, afterRelease, secondPid, firstPid);
   await first.query('COMMIT;');
-  assert.deepEqual(JSON.parse(await afterRelease), outstanding(['venue']));
+  // SG2-94 AC5: back in Planning, the attempt lists what is outstanding, the safety check included.
+  assert.deepEqual(JSON.parse(await afterRelease), outstanding(['venue', 'safety']));
   await second.query('COMMIT;');
-  assert.equal(await root.query("SELECT status||'|'||coalesce(confirmed_at::text,'null') FROM public.events WHERE event_id=95880;"), 'preparation|null');
+  assert.equal(await root.query("SELECT status||'|'||coalesce(confirmed_at::text,'null') FROM public.events WHERE event_id=95880;"), 'planning|null');
   assert.equal(await root.query(notices(95880)), '0');
-  console.log('PASS [CONFLICT] [SG2-58:AC2] a venue booking released while confirmation waits on the event lock refuses confirmation with the venue outstanding.');
+  console.log('PASS [CONFLICT] [SG2-58:AC2] [SG2-83:AC7] [SG2-94:AC5] a venue booking released while confirmation waits on the event lock refuses confirmation and returns the event to Planning.');
 
   await login(first); await login(second);
   assert.equal(JSON.parse(await confirm(first, 95881)).outcome, 'ok');

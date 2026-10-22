@@ -88,6 +88,9 @@ begin
     ('public.send_outstanding_arrangement_reminders()'),
     ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
     ('public.event_registration_overview(integer)'), ('public.process_registration_windows()'),
+    -- SG2-83: change or cancel one venue of a multi-venue event.
+    ('public.release_venue_bookings(bigint,bigint[],text)'), ('public.venue_change_requested()'),
+    ('public.venue_change_request_check()'),
     -- SG2-94: the safety approval that gates Preparation and confirmation.
     ('public.event_safety_approved(public.events)'), ('public.safety_approval_gate()')
   ), function_checks as (

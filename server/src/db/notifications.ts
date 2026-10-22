@@ -6,13 +6,15 @@ import type { EventNoticeKind } from './eventNotifications';
  * a venue booking was released (SG2-51), equipment was reserved (SG2-55),
  * the organiser's event was confirmed (SG2-58), or a step in the event's
  * request lifecycle happened (SG2-68, see eventNotifications.ts), or a booked
- * venue became unavailable (SG2-81), or an event moved back to Planning (SG2-66). */
+ * venue became unavailable (SG2-81), or an event moved back to Planning (SG2-66),
+ * or, for Venue Staff, a venue booking was cancelled or a change requested (SG2-83). */
 export interface NotificationRecord {
   notification_id: number;
   event_id: number | null;
   request_id: number | null;
   kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
-    | 'venue_unavailable' | 'event_confirmed' | 'outstanding_arrangements' | EventNoticeKind;
+    | 'venue_unavailable' | 'event_confirmed' | 'outstanding_arrangements' | 'venue_booking_cancelled' | 'venue_change_requested'
+    | EventNoticeKind;
   message: string;
   created_at: string;
 }

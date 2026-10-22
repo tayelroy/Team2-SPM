@@ -129,14 +129,14 @@ test('[FAILURE] [SG2-51:AC1] any failed read is reported as temporarily unavaila
   }
 });
 
-test('[NORMAL] [SG2-51:AC1] [SG2-51:AC5] a release is one database call made with the caller\'s own token', async () => {
+test('[NORMAL] [SG2-51:AC1] [SG2-51:AC5] [SG2-83:AC2] a release, with any other bookings named, is one database call made with the caller\'s own token', async () => {
   const calls: unknown[] = [];
   const client = { rpc: async (...args: unknown[]) => { calls.push(args); return { data: { outcome: 'released', booking_id: 11, cancelled_at: 'now' }, error: null, status: 200 }; } };
   let token = '';
-  const store = createVenueBookingReleaseStore('staff-token', given => { token = given; return client as unknown as SupabaseClient; });
-  assert.deepEqual(await store.release(11, 'Burst pipe'), { outcome: 'released', booking_id: 11, cancelled_at: 'now' });
-  assert.equal(token, 'staff-token');
-  assert.deepEqual(calls, [['release_venue_booking', { p_booking_id: 11, p_reason: 'Burst pipe' }]]);
+  const store = createVenueBookingReleaseStore('coordinator-token', given => { token = given; return client as unknown as SupabaseClient; });
+  assert.deepEqual(await store.release(11, 'Burst pipe', [12]), { outcome: 'released', booking_id: 11, cancelled_at: 'now' });
+  assert.equal(token, 'coordinator-token');
+  assert.deepEqual(calls, [['release_venue_bookings', { p_booking_id: 11, p_also_cancel: [12], p_reason: 'Burst pipe' }]]);
 });
 
 test('[FAILURE] [SG2-51:AC1] database refusals become sign-in, permission or availability errors without the database text', async () => {
@@ -149,7 +149,7 @@ test('[FAILURE] [SG2-51:AC1] database refusals become sign-in, permission or ava
   ];
   for (const [result, status] of cases) {
     const store = createVenueBookingReleaseStore('t', () => ({ rpc: async () => result }) as unknown as SupabaseClient);
-    await assert.rejects(store.release(11, 'x'), (error: unknown) => error instanceof AccessError && error.status === status);
+    await assert.rejects(store.release(11, 'x', []), (error: unknown) => error instanceof AccessError && error.status === status);
   }
   assert.throws(() => createVenueBookingReleaseStore('t', () => null), (error: unknown) => error instanceof AccessError && error.status === 503);
 });

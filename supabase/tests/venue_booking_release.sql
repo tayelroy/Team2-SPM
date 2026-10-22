@@ -113,14 +113,28 @@ begin
   end if;
 end $$;
 
--- 3. Venue Staff release the other venue; the freed period can be booked again:
+-- 3. SG2-83 AC5/AC6: Venue Staff no longer release; they mark the venue
+-- unavailable (SG2-80). The coordinator releases the other venue, and the
+-- freed period can be booked again:
 select set_config('request.jwt.claim.sub', 'e5100000-0000-4000-8000-000000000001', true);
+do $$
+begin
+  begin
+    perform public.release_venue_booking(95102, 'Annex flooded');
+    raise exception '[SG2-83:staff-release-refused] [SG2-83:AC6] [FAILURE] Venue Staff released a venue booking';
+  exception when insufficient_privilege then null;
+  end;
+  if (select status from public.venue_bookings where booking_id = 95102) <> 'confirmed' then
+    raise exception '[SG2-83:staff-release-no-change] [SG2-83:AC6] [FAILURE] A refused Venue Staff release changed the booking';
+  end if;
+end $$;
+select set_config('request.jwt.claim.sub', 'e5100000-0000-4000-8000-000000000002', true);
 do $$
 declare result jsonb;
 begin
   result := public.release_venue_booking(95102, 'Annex flooded');
   if result->>'outcome' <> 'released' or (select venue_booking_id from public.events where event_id = 95101) is not null then
-    raise exception '[SG2-51:staff-releases] [SG2-51:AC1] [NORMAL] Venue Staff could not release a booking, or the event kept pointing at it: %', result;
+    raise exception '[SG2-51:last-venue-released] [SG2-51:AC1] [NORMAL] The coordinator could not release the last venue, or the event kept pointing at it: %', result;
   end if;
   insert into public.venue_bookings (venue_id, starts_at, ends_at, status)
     values (95101, '2030-09-01 02:00+00', '2030-09-01 03:00+00', 'confirmed');

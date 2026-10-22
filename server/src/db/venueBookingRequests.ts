@@ -46,8 +46,9 @@ export interface VenueBookingRequestStore {
    * tentative hold creates for itself (SG2-84) have no requester. */
   duplicate(values: VenueBookingRequestValues): Promise<VenueBookingRequestRecord | null>;
   /** Null when the same request was made concurrently and the database
-   * refused it as a duplicate. */
-  create(values: NewVenueBookingRequest): Promise<VenueBookingRequestRecord | null>;
+   * refused it as a duplicate; 'stale' when the booking it changes was
+   * cancelled or ended meanwhile (SG2-83, venue_change_request_check). */
+  create(values: NewVenueBookingRequest): Promise<VenueBookingRequestRecord | null | 'stale'>;
   /** The event's requests, earliest first. */
   list(eventId: number): Promise<VenueBookingRequestRecord[]>;
   /** SG2-49: one request, with names. */
@@ -64,6 +65,9 @@ export interface VenueBookingRequestStore {
   venueStatuses(eventId: number): Promise<VenueBookingStatusRow[]>;
   /** SG2-81: the event's confirmed bookings a venue's unavailability affects. */
   affectedBookings(eventId: number): Promise<number[]>;
+  /** SG2-83 AC1: the event's confirmed bookings not yet over, which the
+   * coordinator may change. */
+  changeableBookings(eventId: number, now: string): Promise<number[]>;
 }
 
 const REQUEST_COLUMNS = 'request_id,event_id,venue_id,starts_at,ends_at,status,layout,venue_requirements,requested_by,requested_at,decided_by,decided_at,decision_reason,withdrawn_by,withdrawn_at';
@@ -119,6 +123,8 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
       const { data, error } = await admin.from('venue_booking_requests').insert(values).select(REQUEST_COLUMNS).maybeSingle();
       // venue_booking_requests_no_duplicate: the same request made at once.
       if ((error as { code?: string } | null)?.code === '23P01') return null;
+      // venue_change_request_check: the booking changed was cancelled or ended.
+      if ((error as { code?: string } | null)?.code === '23514') return 'stale';
       check(error || !data);
       return (await present([data as Row]))[0];
     },
@@ -150,6 +156,12 @@ export function createVenueBookingRequestStore(admin: SupabaseClient): VenueBook
       const affected = await fetchAffectedBookingIds(admin, ((data ?? []) as { booking_id: number }[]).map(row => Number(row.booking_id)));
       if (!affected.ok) throw new AccessError(503);
       return [...affected.ids].sort((a, b) => a - b);
+    },
+    async changeableBookings(eventId, now) {
+      const { data, error } = await admin.from('venue_bookings').select('booking_id')
+        .eq('event_id', eventId).eq('status', 'confirmed').gt('ends_at', now).order('booking_id');
+      check(error);
+      return (data as { booking_id: number }[]).map(row => Number(row.booking_id));
     }
   };
 }
