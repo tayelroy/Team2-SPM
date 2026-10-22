@@ -177,10 +177,13 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'notifications.inbox': [...ROLES],
   'notifications.reminders.manage': ['event_coordinator'],
   // SG2-51: Venue Staff, or the event's assigned coordinator (enforced
-  // per-row), see an event's bookings and release one with a reason. Only
-  // Venue Staff list a whole venue's bookings (enforced by the handler).
+  // per-row), see an event's bookings. Only Venue Staff list a whole venue's
+  // bookings (enforced by the handler).
   'venue_bookings.view': ['venue_staff', 'event_coordinator'],
-  'venue_bookings.release': ['venue_staff', 'event_coordinator'],
+  // SG2-83 AC5: only the event's assigned coordinator (enforced per-row by
+  // release_venue_bookings()) cancels a booking. Venue Staff no longer
+  // release; they mark the venue unavailable (SG2-80) instead.
+  'venue_bookings.release': ['event_coordinator'],
   'venue_bookings.by_venue': ['venue_staff'],
   // SG2-79 AC3: bookings that clash once setup and turnaround apply, for
   // Venue Staff and the coordinator of each affected event (per-row).

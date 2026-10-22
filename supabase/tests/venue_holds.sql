@@ -492,7 +492,7 @@ begin
   raise exception '[SG2-51:hold-booking-unassigned-release-refused] [SG2-51:AC1] [FAILURE] A different coordinator must not release a converted hold booking';
  end if;
 end $$;
-select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000002',true);
 do $$
 begin
  if public.release_venue_booking(current_setting('holds.release_booking')::bigint,'  ')->>'outcome' is distinct from 'invalid' then
@@ -510,11 +510,11 @@ begin
  end if;
 end $$;
 set local role authenticated;
-select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000001',true);
+select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000002',true);
 do $$
 begin
  if public.release_venue_booking(current_setting('holds.release_booking')::bigint,'QA hold conversion cleanup')->>'outcome' is distinct from 'released' then
-  raise exception '[SG2-51:converted-hold-booking-released] [SG2-51:AC1] [SG2-84:AC5] [NORMAL] Venue Staff must release the converted booking through the normal reasoned release';
+  raise exception '[SG2-51:converted-hold-booking-released] [SG2-51:AC1] [SG2-84:AC5] [NORMAL] The assigned coordinator must release the converted booking (SG2-83 AC5) through the normal reasoned release';
  end if;
 end $$;
 reset role;
@@ -524,7 +524,7 @@ begin
    join public.venue_bookings b on b.booking_id=h.booking_id
    where h.hold_id=current_setting('holds.release_round_trip')::bigint and h.status='converted'
     and r.status='cancelled' and r.venue_booking_id=b.booking_id and b.status='cancelled'
-    and b.cancelled_by='d8400000-0000-4000-8000-000000000001' and b.cancelled_at is not null
+    and b.cancelled_by='d8400000-0000-4000-8000-000000000002' and b.cancelled_at is not null
     and b.cancellation_reason='QA hold conversion cleanup') then
   raise exception '[SG2-51:released-hold-request-no-longer-required] [SG2-51:AC2] [SG2-84:AC5] [NORMAL] Releasing a converted booking must cancel its request while retaining the hold, booking and real release metadata';
  end if;
@@ -534,7 +534,7 @@ begin
   raise exception '[SG2-51:hold-release-keeps-original-booking] [SG2-51:AC3] [NORMAL] The original venue and request must remain live and become the event primary booking again';
  end if;
  if (select count(*) from public.event_audit_logs where event_id=98404 and field_name='venue_booking'
-      and actor_id='d8400000-0000-4000-8000-000000000001' and new_value like '%QA hold conversion cleanup') <> 1
+      and actor_id='d8400000-0000-4000-8000-000000000002' and new_value like '%QA hold conversion cleanup') <> 1
     or (select count(*) from public.notifications where event_id=98404 and kind='venue_booking_released') <> 2 then
   raise exception '[SG2-51:hold-release-history-and-notices] [SG2-51:AC4] [SG2-51:AC5] [NORMAL] Real release must retain one actor/reason history entry and notify the coordinator and organiser';
  end if;

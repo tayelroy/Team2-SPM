@@ -16,6 +16,10 @@ const annex: VenueBooking = { ...hall, booking_id: 12, venue_id: 2, venue_name: 
 const releasedHall: VenueBooking = { ...hall, status: 'cancelled', cancelled_at: '2030-01-02T01:00:00.000Z',
   cancellation_reason: 'The workshop moved online', canceller_name: 'Casey Coordinator' };
 const period = `${formatSgt(hall.starts_at)} – ${formatSgt(hall.ends_at)}`;
+/** What the server answers for a release (SG2-83: and what went with it). */
+const done = (extra: Record<string, unknown> = {}) => ({ booking_id: 11, status: 'cancelled', cancelled_at: '2030-01-02T01:00:00.000Z',
+  cancellation_reason: 'The workshop moved online', also_released: [], returned_to_planning: false, ...extra });
+const NOTIFIED = 'available again, and the Event Organiser and Venue Staff have been notified.';
 
 type Reply = (url: string, init?: RequestInit) => Response | Promise<Response>;
 function serve(reply: Reply) {
@@ -32,7 +36,7 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC3] [SG2-51:AC5] the coordinator releases o
   const fetch = serve((_url, init) => {
     if (init?.method === 'POST') {
       released = true;
-      return Response.json({ booking_id: 11, status: 'cancelled', cancelled_at: '2030-01-02T01:00:00.000Z', cancellation_reason: 'The workshop moved online' });
+      return Response.json(done());
     }
     return Response.json({ bookings: released ? [releasedHall, annex] : [hall, annex] });
   });
@@ -42,9 +46,11 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC3] [SG2-51:AC5] the coordinator releases o
   expect(within(item(12)).getByText('Confirmed')).toBeVisible();
   fireEvent.click(within(item(11)).getByRole('button', { name: 'Release booking' }));
   fireEvent.change(within(item(11)).getByLabelText('Reason for releasing'), { target: { value: '  The workshop moved online ' } });
+  // SG2-83 AC2: the event's other venue is offered, unticked.
+  expect(within(item(11)).getByRole('checkbox', { name: `Annex · ${period} · Booking #12` })).not.toBeChecked();
   fireEvent.click(within(item(11)).getByRole('button', { name: 'Confirm release' }));
   expect(await screen.findByRole('status')).toHaveTextContent(
-    `Atrium Hall released for ${period}. It is available again, and the coordinator and Event Organiser have been notified.`);
+    `Atrium Hall released for ${period}. It is ${NOTIFIED} The event's other venues are unchanged.`);
   expect(await within(item(11)).findByText('Released')).toBeVisible();
   expect(within(item(11)).getByText(`Released by Casey Coordinator on ${formatSgt('2030-01-02T01:00:00.000Z')}: The workshop moved online`)).toBeVisible();
   expect(within(item(11)).queryByRole('button', { name: 'Release booking' })).toBeNull();
@@ -53,7 +59,7 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC3] [SG2-51:AC5] the coordinator releases o
   expect(onReleased).toHaveBeenCalledTimes(1);
   const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST')!;
   expect(post[0]).toBe('/api/venue-bookings/11/release');
-  expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'The workshop moved online' });
+  expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'The workshop moved online', also_cancel: [] });
   expect(fetch).toHaveBeenCalledWith('/api/venue-bookings?event_id=7', { headers: { Authorization: 'Bearer token' }, cache: 'no-store' });
 });
 
@@ -64,7 +70,7 @@ test('[BOUNDARY] [SG2-51:AC1] a release without a reason is stopped before sendi
   expect(screen.getByLabelText('Reason for releasing')).toHaveAttribute('maxLength', '500');
   fireEvent.change(screen.getByLabelText('Reason for releasing'), { target: { value: '   ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm release' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('Give a reason for releasing this booking. The coordinator and Event Organiser will see it.');
+  expect(screen.getByRole('alert')).toHaveTextContent('Give a reason for releasing this booking. The Event Organiser and Venue Staff will see it.');
   expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
   // Keeping the booking closes the form without releasing.
   fireEvent.click(screen.getByRole('button', { name: 'Keep booking' }));
@@ -146,6 +152,11 @@ test('[FAILURE] [SG2-51:AC1] expired sessions, other roles, missing records, net
   expect(await fetchVenueBookings(null, 1)).toEqual({ ok: false, error: 'Your session has expired. Sign in again.' });
   serve(() => Response.json({ booking_id: 11, status: 'confirmed' }));
   expect(await releaseBooking('token', 11, 'x')).toEqual({ ok: false, error: 'Venue bookings are unavailable right now. Please try again.' });
+  // SG2-83: a reply that does not say what went with the release, or whether the event moved, is not trusted.
+  for (const reply of [{ ...done(), also_released: undefined }, { ...done(), returned_to_planning: 'yes' }]) {
+    serve(() => Response.json(reply));
+    expect(await releaseBooking('token', 11, 'x')).toEqual({ ok: false, error: 'Venue bookings are unavailable right now. Please try again.' });
+  }
 });
 
 test('[CONFLICT] [SG2-51:AC1] pressing Confirm release twice sends one release', async () => {
@@ -158,7 +169,7 @@ test('[CONFLICT] [SG2-51:AC1] pressing Confirm release twice sends one release',
   fireEvent.submit(form);
   fireEvent.submit(form);
   expect(await screen.findByRole('button', { name: 'Releasing…' })).toBeDisabled();
-  answer(Response.json({ booking_id: 11, status: 'cancelled', cancelled_at: '2030-01-02T01:00:00.000Z', cancellation_reason: 'Moved online' }));
+  answer(Response.json(done({ cancellation_reason: 'Moved online' })));
   await screen.findByText(/released for/);
   expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 });
@@ -167,7 +178,7 @@ test('[NORMAL] [SG2-51:AC5] a booking with no venue or releaser name is still de
   const unnamed = { ...hall, venue_name: null };
   let released = false;
   serve((_url, init) => {
-    if (init?.method === 'POST') { released = true; return Response.json({ booking_id: 11, status: 'cancelled', cancelled_at: 'x', cancellation_reason: 'Gone' }); }
+    if (init?.method === 'POST') { released = true; return Response.json(done({ cancelled_at: 'x', cancellation_reason: 'Gone' })); }
     return Response.json({ bookings: released
       ? [{ ...unnamed, status: 'cancelled', cancelled_at: null, cancellation_reason: 'Gone', canceller_name: null }] : [unnamed] });
   });
@@ -176,7 +187,9 @@ test('[NORMAL] [SG2-51:AC5] a booking with no venue or releaser name is still de
   fireEvent.click(screen.getByRole('button', { name: 'Release booking' }));
   fireEvent.change(screen.getByLabelText('Reason for releasing'), { target: { value: 'Gone' } });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm release' }));
-  expect(await screen.findByRole('status')).toHaveTextContent(/^The venue released for/);
+  expect(await screen.findByRole('status')).toHaveTextContent(`Venue #1 released for ${period}. It is ${NOTIFIED}`);
+  // With no other venue there is nothing to say about the others.
+  expect(screen.getByRole('status')).not.toHaveTextContent('other venues');
   expect(await within(list()).findByText('Released by an unnamed account: Gone')).toBeVisible();
 });
 
@@ -193,24 +206,84 @@ test('[NORMAL] [SG2-51:AC1] Venue Staff open a venue\'s bookings from the catalo
   expect(await screen.findByRole('button', { name: 'Bookings for Atrium Hall' })).toBeVisible();
 });
 
-test('[BOUNDARY] [SG2-51:AC4] releasing a booking with no event says nobody was notified, because nobody is', async () => {
-  let released = false;
-  serve((_url, init) => {
-    if (init?.method === 'POST') { released = true; return Response.json({ booking_id: 12, status: 'cancelled', cancelled_at: 'x', cancellation_reason: 'Legacy hold' }); }
-    return Response.json({ bookings: [released ? { ...annex, event_id: null, event_name: null, status: 'cancelled' } : { ...annex, event_id: null, event_name: null }] });
-  });
+test('[FAILURE] [SG2-83:AC5] [SG2-83:AC6] Venue Staff listing a venue\'s bookings are not offered a release, and are pointed to marking the venue unavailable', async () => {
+  const fetch = serve(() => Response.json({ bookings: [hall, { ...annex, event_id: null, event_name: null }] }));
   render(<VenueBookings token="token" venue={{ venue_id: 2, name: 'Annex' } as never} onClose={vi.fn()} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Release booking' }));
-  fireEvent.change(screen.getByLabelText('Reason for releasing'), { target: { value: 'Legacy hold' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm release' }));
-  expect(await screen.findByRole('status')).toHaveTextContent(`Annex released for ${period}. It is available again.`);
-  expect(screen.getByRole('status')).not.toHaveTextContent('notified');
+  expect(await screen.findAllByRole('listitem')).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: 'Release booking' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Change venue' })).toBeNull();
+  expect(screen.getByText(/Only the event.s coordinator cancels or changes a booking/)).toHaveTextContent('mark it unavailable for that period instead');
+  expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+});
+
+// --- SG2-83: change or cancel one venue of a multi-venue event -------------------
+
+const theatre: VenueBooking = { ...hall, booking_id: 13, venue_id: 3, venue_name: 'Lecture Theatre' };
+
+test('[NORMAL] [SG2-83:AC2] the coordinator ticks other venues to cancel with this one; only those go', async () => {
+  const fetch = serve((_url, init) => init?.method === 'POST'
+    ? Response.json(done({ also_released: [13] }))
+    : Response.json({ bookings: [hall, annex, theatre, { ...releasedHall, booking_id: 14 }] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
+  fireEvent.click(within(await screen.findByRole('listitem', { name: 'Booking #11' })).getByRole('button', { name: 'Release booking' }));
+  // Only the event's other current venues are offered.
+  expect(within(item(11)).getAllByRole('checkbox')).toHaveLength(2);
+  const annexBox = within(item(11)).getByRole('checkbox', { name: /^Annex/ });
+  fireEvent.click(annexBox);
+  fireEvent.click(annexBox);
+  fireEvent.click(within(item(11)).getByRole('checkbox', { name: /^Lecture Theatre/ }));
+  fireEvent.change(within(item(11)).getByLabelText('Reason for releasing'), { target: { value: 'Moved online' } });
+  fireEvent.click(within(item(11)).getByRole('button', { name: 'Confirm release' }));
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    `Atrium Hall released for ${period}, with 1 other venue. They are ${NOTIFIED} The event's other venues are unchanged.`);
+  const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST')!;
+  expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'Moved online', also_cancel: [13] });
+});
+
+test('[NORMAL] [SG2-83:AC7] cancelling every venue of a Confirmed event says it is back in Planning', async () => {
+  serve((_url, init) => init?.method === 'POST'
+    ? Response.json(done({ also_released: [12, 13], returned_to_planning: true }))
+    : Response.json({ bookings: [hall, annex, theatre] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
+  fireEvent.click(within(await screen.findByRole('listitem', { name: 'Booking #11' })).getByRole('button', { name: 'Release booking' }));
+  for (const box of within(item(11)).getAllByRole('checkbox')) fireEvent.click(box);
+  fireEvent.change(within(item(11)).getByLabelText('Reason for releasing'), { target: { value: 'Cancelled' } });
+  fireEvent.click(within(item(11)).getByRole('button', { name: 'Confirm release' }));
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    `Atrium Hall released for ${period}, with 2 other venues. They are ${NOTIFIED} The event is back in Planning: recheck its venues before it is confirmed again.`);
+});
+
+test('[NORMAL] [SG2-83:AC1] the coordinator can change one venue that is not affected; a change already asked for is shown instead', async () => {
+  serve(() => Response.json({ bookings: [hall, { ...annex, replacement: { request_id: 90, venue_name: 'Lecture Theatre' } },
+    { ...theatre, replacement: { request_id: 91, venue_name: null } }] }));
+  const onFindReplacement = vi.fn();
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onFindReplacement={onFindReplacement} />);
+  fireEvent.click(within(await screen.findByRole('listitem', { name: 'Booking #11' })).getByRole('button', { name: 'Change venue' }));
+  expect(onFindReplacement).toHaveBeenCalledWith(expect.objectContaining({ booking_id: 11 }));
+  expect(within(item(12)).getByText('Change requested: Lecture Theatre, awaiting Venue Staff. This booking stays until then.')).toBeVisible();
+  expect(within(item(13)).getByText('Change requested: request #91, awaiting Venue Staff. This booking stays until then.')).toBeVisible();
+  expect(within(item(12)).queryByRole('button', { name: 'Change venue' })).toBeNull();
+  // Each can still be released on its own.
+  expect(within(item(12)).getByRole('button', { name: 'Release booking' })).toBeVisible();
+});
+
+test('[BOUNDARY] [SG2-83:AC1] without a way to search, or for an affected booking, no Change venue is offered', async () => {
+  serve(() => Response.json({ bookings: [hall, affectedHallFor(12)] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
+  expect(await within(list()).findAllByRole('listitem')).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: 'Change venue' })).toBeNull();
+  cleanup();
+  serve(() => Response.json({ bookings: [affectedHallFor(12)] }));
+  render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onFindReplacement={vi.fn()} />);
+  expect(await screen.findByRole('button', { name: 'Find a replacement venue' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Change venue' })).toBeNull();
 });
 
 // --- SG2-81: a venue that has become unavailable ---------------------------------
 
 const disruption = { starts_at: '2030-06-15T00:00:00.000Z', ends_at: '2030-06-16T00:00:00.000Z', category: 'equipment_failure', reason: 'Air conditioning failed' };
 const affectedHall: VenueBooking = { ...hall, affected_by: [disruption] };
+function affectedHallFor(bookingId: number): VenueBooking { return { ...affectedHall, booking_id: bookingId }; }
 
 test('[NORMAL] [SG2-81:AC1] [SG2-81:AC2] an affected booking says the venue is unavailable, for when and why, and that alternatives are required', async () => {
   serve(() => Response.json({ bookings: [affectedHall, annex] }));

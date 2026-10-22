@@ -850,6 +850,21 @@
         "AC3": "Results include only events I am permitted to see",
         "AC4": "When nothing matches, this is stated along with the filters in force"
       }
+    },
+    {
+      "id": "SG2-83",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-83",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-21",
+      "acceptanceCriteria": {
+        "AC1": "Given an event with several venue bookings, when I change or cancel one of them, the event's other venue bookings stay unchanged",
+        "AC2": "The other bookings are removed only if I explicitly choose to cancel them too",
+        "AC3": "The cancelled venue becomes available again for that period (including its setup/turnaround time)",
+        "AC4": "The change or cancellation, its reason, who made it and when are all recorded, and Venue Staff for the affected venue are notified",
+        "AC5": "Only the assigned Event Coordinator can cancel or release a venue booking; an attempt by Venue Staff or any other role is refused on the server side and in the database. This replaces Venue Staff release in SG2-51; Venue Staff record operational problems by marking the venue unavailable (SG2-80) instead",
+        "AC6": "SG2-51 tests that expect Venue Staff to release a booking are updated to expect refusal",
+        "AC7": "If the event is Confirmed or in Preparation, cancelling or changing one venue sends that venue back through change approval and returns the event to Planning (SG2-66), while the event's other venue bookings stay intact"
+      }
     }
   ]
 }

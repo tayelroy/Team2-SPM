@@ -45,10 +45,18 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
   // Each completed search remounts the fit panel so it re-reads suitability (it was fetched once and went stale).
   const [searchRun, setSearchRun] = useState(0);
   // SG2-81 AC4: the affected booking a request made from this search replaces.
+  // SG2-83 AC1: or the current booking it changes.
   const [replacing, setReplacing] = useState<VenueBooking | null>(null);
   // Local changes and a fresh search can reveal another user's decision.
   const refreshRequests = () => setRequestsVersion(version => version + 1);
   const pending = useRef<AbortController | null>(null);
+  // SG2-83: the booking list sits below the results, so starting a change or
+  // replacement scrolls up to the banner saying which booking is being
+  // replaced, with the new search beneath it.
+  const banner = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (replacing) banner.current!.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [replacing]);
 
   async function run(criteria: VenueSearchValues) {
     pending.current?.abort();
@@ -154,13 +162,14 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
         </form>
       </RecessedCard>
 
-      {replacing ? <RecessedCard padding="18px 24px" style={{ gap: '10px' }}>
+      {replacing ? <div ref={banner} style={{ scrollMarginTop: '96px' }}><RecessedCard padding="18px 24px" style={{ gap: '10px' }}>
         <p role="status" style={{ margin: 0, color: color.mist }}>
-          Finding a replacement for {replacing.venue_name ?? `venue #${replacing.venue_id}`} (booking #{replacing.booking_id}, {formatSgt(replacing.starts_at)} – {formatSgt(replacing.ends_at)}).
-          The search uses this event&apos;s requirements. The booking is released once Venue Staff approve the replacement you request.
+          {replacing.affected_by.length > 0 ? 'Finding a replacement for' : 'Changing'} {replacing.venue_name ?? `venue #${replacing.venue_id}`} (booking #{replacing.booking_id}, {formatSgt(replacing.starts_at)} – {formatSgt(replacing.ends_at)}).
+          The search uses this event&apos;s requirements. The booking is released once Venue Staff approve the replacement you request;
+          the event&apos;s other venues are not affected.
         </p>
         <GhostButton onClick={() => setReplacing(null)} style={{ alignSelf: 'flex-start' }}>Stop replacing this booking</GhostButton>
-      </RecessedCard> : null}
+      </RecessedCard></div> : null}
       {loading ? <p role="status">Searching venues…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {notice ? <p role="status" style={{ margin: 0, color: color.accent }}>{notice}</p> : null}
@@ -205,6 +214,7 @@ export default function VenueSearch({ accessToken, prefill = null }: { accessTok
                         period={{ from: searched.from, until: searched.until }} layout={searched.layout}
                         venueRequirements={prefill.venueRequirements} onCancel={() => setRequesting(null)}
                         replacesBookingId={replacing?.booking_id}
+                        changeReasonRequired={replacing !== null && replacing.affected_by.length === 0}
                         onRequested={(_request, booking, conflicts) => {
                           setRequesting(null);
                           setReplacing(null);

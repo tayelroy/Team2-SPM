@@ -6,7 +6,7 @@ import { inputStyle } from './VenueForm';
 import { LAYOUT_LABELS, describeLayouts, type Layout, type VenueLayout } from './layoutsApi';
 import { formatSgt, sgtToIso } from './searchApi';
 import {
-  describeConflict, fetchVenueRequests, requestVenue, withdrawVenueRequest,
+  MAX_CHANGE_REASON, describeConflict, fetchVenueRequests, requestVenue, withdrawVenueRequest,
   type VenueArrangement, type VenueConflict, type VenueRequest
 } from './requestsApi';
 import type { BookingReadiness } from './suitabilityApi';
@@ -56,8 +56,11 @@ interface RequestFormProps {
   period: { from: string; until: string };
   layout: Layout | '';
   venueRequirements: string | null;
-  /** SG2-81 AC4: the affected booking this request replaces, if it does. */
+  /** SG2-81 AC4: the affected booking this request replaces, if it does.
+   * SG2-83 AC1: or the current booking it changes. */
   replacesBookingId?: number;
+  /** SG2-83 AC4: a change of a booking that is not affected says why. */
+  changeReasonRequired?: boolean;
   onRequested: (request: VenueRequest, booking: BookingReadiness, conflicts: VenueConflict[]) => void;
   onCancel: () => void;
 }
@@ -78,11 +81,14 @@ export function VenueRequestForm(props: RequestFormProps) {
   return <RequestFields {...props} layout={props.layout && offered.includes(props.layout) ? props.layout : offered[0]} />;
 }
 
-function RequestFields({ accessToken, eventId, venue, period, layout, venueRequirements, replacesBookingId, onRequested, onCancel }: RequestFormProps & { layout: Layout }) {
+function RequestFields({ accessToken, eventId, venue, period, layout, venueRequirements, replacesBookingId, changeReasonRequired = false,
+  onRequested, onCancel }: RequestFormProps & { layout: Layout }) {
   const [values, setValues] = useState({ from: period.from, until: period.until, layout });
+  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const id = `request-${venue.venue_id}`;
+  const asksReason = replacesBookingId !== undefined && changeReasonRequired;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -90,12 +96,17 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
       setError('Enter a period that starts before it ends.');
       return;
     }
+    if (asksReason && !reason.trim()) {
+      setError('Give a reason for changing this venue. Venue Staff will see it.');
+      return;
+    }
     setError('');
     setSubmitting(true);
     const result = await requestVenue(accessToken, {
       event_id: eventId, venue_id: venue.venue_id, layout: values.layout,
       starts_at: sgtToIso(values.from), ends_at: sgtToIso(values.until),
-      ...(replacesBookingId === undefined ? {} : { replaces_booking_id: replacesBookingId })
+      ...(replacesBookingId === undefined ? {} : { replaces_booking_id: replacesBookingId }),
+      ...(asksReason ? { change_reason: reason.trim() } : {})
     });
     setSubmitting(false);
     if (result.ok) onRequested(result.request, result.booking, result.conflicts);
@@ -121,6 +132,11 @@ function RequestFields({ accessToken, eventId, venue, period, layout, venueRequi
     <Fact label="Venue requirements" value={venueRequirements ?? 'None recorded for this event'} />
     {replacesBookingId === undefined ? null
       : <p style={{ margin: 0, color: color.silver, fontSize: '13px' }}>This replaces booking #{replacesBookingId}, which is released once Venue Staff approve this request.</p>}
+    {asksReason ? <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+      <label htmlFor={`${id}-reason`} style={label}>Reason for the change</label>
+      <textarea id={`${id}-reason`} rows={2} maxLength={MAX_CHANGE_REASON} value={reason} placeholder="e.g. The new seating plan needs a larger room"
+        style={{ ...inputStyle, resize: 'vertical' }} onChange={event => setReason(event.target.value)} />
+    </div> : null}
     {error ? <p role="alert" style={{ margin: 0 }}>{error}</p> : null}
     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
       <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: radius.sm, padding: '15px 22px',

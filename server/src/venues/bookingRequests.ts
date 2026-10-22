@@ -20,7 +20,7 @@ import {
 } from '../db/venueBookingWithdrawals';
 import type { VenueBookingStatusRow } from '../db/eventArrangements';
 import { venueTally, type VenueTally } from '../events/arrangementReadiness';
-import { validateVenueBookingRequest } from './bookingRequestFields';
+import { MAX_CHANGE_REASON, validateVenueBookingRequest } from './bookingRequestFields';
 import { assessSuitability, bookingReadiness } from './suitability';
 import { canSeeEvent, parseId } from './suitabilityRoutes';
 import { conflictsFor } from './conflicts';
@@ -59,10 +59,12 @@ export function venueArrangement(requests: VenueBookingStatusRow[], affectedBook
  * new pending request returns it to Planning (202610190004_safety_check_queue.sql). */
 const REQUESTABLE_EVENT_STATUSES = ['approved', 'planning', 'awaiting_safety_check'];
 /** SG2-81: a replacement for an unavailable venue is also requested once the
- * event has reached preparation or been confirmed. */
+ * event has reached preparation or been confirmed. SG2-83 AC7: so is any
+ * change of one venue; the database then returns the event to Planning. */
 const REPLACEMENT_EVENT_STATUSES = [...REQUESTABLE_EVENT_STATUSES, 'preparation', 'confirmed'];
 
 const INVALID_REQUEST = 'Choose an event, a venue, a layout and a future period that starts before it ends.';
+const CHANGE_STALE = 'That booking is not a current confirmed booking of this event, so it cannot be changed.';
 
 function duplicateMessage(existing: VenueBookingRequestRecord | null) {
   return existing
@@ -143,7 +145,8 @@ function handler(
  * written to venue_bookings, so the venue is neither held nor shown as
  * unavailable (AC3). Several venues may be requested for one event, but not
  * the same venue twice over an overlapping period (AC4). A request may name
- * the affected booking it replaces (SG2-81 AC4); approving it releases that
+ * the affected booking it replaces (SG2-81 AC4), or any current booking of the
+ * event it changes, with why (SG2-83 AC1/AC4); approving it releases that
  * booking. Anything already
  * committing the venue over the period is reported with the new request, by
  * booking or hold number (SG2-50 AC1); the request is still made, but it
@@ -176,11 +179,21 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
       respond(409, { error: `A venue can be requested only for an approved event. This event is ${event.status.replace('_', ' ')}.` });
       return;
     }
-    // SG2-81 AC4: a replacement must name a booking of this event that a
-    // venue's unavailability affects, so it cannot release anything else.
-    if (values.replaces_booking_id !== undefined && !(await database.affectedBookings(event.event_id)).includes(values.replaces_booking_id)) {
-      respond(409, { error: 'That booking is not affected by venue unavailability, so it cannot be replaced.' });
-      return;
+    // SG2-83 AC1: a change names one of this event's current bookings, so it
+    // cannot release anything else. SG2-81's replacement of an affected
+    // booking is one such change; its reason is the venue's unavailability,
+    // so only a change of an unaffected booking must say why (AC4).
+    if (values.replaces_booking_id !== undefined) {
+      const [changeable, affected] = await Promise.all([
+        database.changeableBookings(event.event_id, new Date(now()).toISOString()), database.affectedBookings(event.event_id)]);
+      if (!changeable.includes(values.replaces_booking_id)) {
+        respond(409, { error: CHANGE_STALE });
+        return;
+      }
+      if (values.change_reason === undefined && !affected.includes(values.replaces_booking_id)) {
+        respond(400, { error: `Give a reason for changing this venue, in ${MAX_CHANGE_REASON} characters or fewer.` });
+        return;
+      }
     }
     const venue = await database.venue(values.venue_id);
     if (!venue) {
@@ -212,6 +225,11 @@ export function createVenueBookingRequestsRouter(access: ReturnType<typeof creat
     // Refused by the database: the same request was made at the same moment.
     if (!request) {
       respond(409, { error: duplicateMessage(null) });
+      return;
+    }
+    // SG2-83: the booking being changed was cancelled or ended meanwhile.
+    if (request === 'stale') {
+      respond(409, { error: CHANGE_STALE });
       return;
     }
     const conflicts = await conflictsFor(database, request, principal, now(), request.request_id);

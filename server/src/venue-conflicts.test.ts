@@ -85,7 +85,8 @@ function requestStore(occupied: VenueConflictRow[]) {
       return overlapping(occupied, at);
     },
     async venueStatuses() { return []; },
-    async affectedBookings() { return []; }
+    async affectedBookings() { return []; },
+    async changeableBookings() { return []; }
   };
   const composed = express();
   composed.use(express.json());

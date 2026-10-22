@@ -31,7 +31,23 @@ export function validateReleaseReason(input: unknown): string | null {
   return Array.from(trimmed).length > MAX_RELEASE_REASON ? null : trimmed;
 }
 
+/** The most other bookings one release may cancel, matching release_venue_bookings(). */
+export const MAX_ALSO_CANCEL = 50;
+
+/**
+ * SG2-83 AC2: the event's other bookings the coordinator explicitly chose to
+ * cancel as well; none unless named. Null when the list is malformed.
+ */
+export function validateAlsoCancel(input: unknown): number[] | null {
+  const also = (input && typeof input === 'object' && !Array.isArray(input) ? (input as Record<string, unknown>).also_cancel : undefined);
+  if (also === undefined || also === null) return [];
+  if (!Array.isArray(also) || also.length > MAX_ALSO_CANCEL
+    || !also.every(id => Number.isSafeInteger(id) && (id as number) > 0)) return null;
+  return [...new Set(also as number[])];
+}
+
 const INVALID_REASON = `Give a reason for releasing this booking, in ${MAX_RELEASE_REASON} characters or fewer.`;
+const INVALID_ALSO = `Choose at most ${MAX_ALSO_CANCEL} other bookings of this event to cancel as well.`;
 
 /** Why a release was refused at the moment of committing. */
 function refusal(result: Exclude<ReleaseResult, { outcome: 'released' }>): [number, string] {
@@ -40,6 +56,7 @@ function refusal(result: Exclude<ReleaseResult, { outcome: 'released' }>): [numb
       ? 'This booking has already been released.'
       : 'Only a confirmed booking can be released.'];
     case 'past': return [409, 'This booking has already ended, so there is nothing to release.'];
+    case 'others_invalid': return [409, 'Each other booking chosen must be a confirmed booking of this event that has not ended. Nothing was cancelled.'];
     case 'missing': return [404, 'Booking not found.'];
     default: return [400, INVALID_REASON];
   }
@@ -75,11 +92,14 @@ function handler(
  * GET /?venue_id= — a venue's upcoming confirmed and released bookings, for
  * Venue Staff only.
  *
- * POST /:bookingId/release — Venue Staff, or the event's assigned
- * coordinator, release a confirmed booking with a reason (AC1). The period is
- * free again (AC2), the event's other bookings are untouched (AC3), the
- * coordinator and Event Organiser are notified (AC4) and the release is
- * recorded with who, when and why (AC5), all by release_venue_booking().
+ * POST /:bookingId/release — the event's assigned coordinator releases a
+ * confirmed booking with a reason (AC1; SG2-83 AC5: Venue Staff no longer
+ * can). The period is free again (AC2), the event's other bookings are
+ * untouched unless named in also_cancel (AC3; SG2-83 AC1/AC2), the
+ * coordinator, Event Organiser and Venue Staff are notified (AC4; SG2-83 AC4)
+ * and the release is recorded with who, when and why (AC5). A Confirmed or
+ * Preparation event returns to Planning (SG2-83 AC7). All of it is done by
+ * release_venue_bookings().
  */
 export function createVenueBookingsRouter(access: ReturnType<typeof createAuthorization>, dependencies: VenueBookingDependencies = {}) {
   const router = access.protectedRouter();
@@ -130,13 +150,19 @@ export function createVenueBookingsRouter(access: ReturnType<typeof createAuthor
       respond(400, { error: INVALID_REASON });
       return;
     }
-    const result = await releases(req.get('authorization')!.slice(7)).release(bookingId, reason);
+    const also = validateAlsoCancel(req.body);
+    if (also === null) {
+      respond(400, { error: INVALID_ALSO });
+      return;
+    }
+    const result = await releases(req.get('authorization')!.slice(7)).release(bookingId, reason, also.filter(id => id !== bookingId));
     if (result.outcome !== 'released') {
       const [status, error] = refusal(result);
       respond(status, { error });
       return;
     }
-    respond(200, { booking_id: result.booking_id, status: 'cancelled', cancelled_at: result.cancelled_at, cancellation_reason: reason });
+    respond(200, { booking_id: result.booking_id, status: 'cancelled', cancelled_at: result.cancelled_at, cancellation_reason: reason,
+      also_released: result.also_released, returned_to_planning: result.returned_to_planning });
   }));
 
   return router;

@@ -343,10 +343,21 @@ reset role;
 -- release nothing and are not approved.
 insert into public.events (event_id, organiser_id, coordinator_id, name, status) values
   (98104, 'f8100000-0000-4000-8000-000000000003', 'f8100000-0000-4000-8000-000000000004', 'Late Event', 'preparation');
+-- SG2-83: the database now refuses a replacement naming another event's
+-- booking outright, so there is nothing to approve or release.
+do $$
+begin
+  begin
+    insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, layout, requested_by,
+        venue_requirements, replaces_booking_id) values
+      (98105, 98104, 983, '2031-06-01 09:00+00', '2031-06-01 17:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000004',
+        null, 98102);
+    raise exception '[SG2-81:foreign-replacement-refused] [SG2-81:AC4] [SG2-83:AC1] [FAILURE] A replacement naming another event''s booking was accepted';
+  exception when check_violation then null;
+  end;
+end $$;
 insert into public.venue_booking_requests (request_id, event_id, venue_id, starts_at, ends_at, layout, requested_by,
     venue_requirements, replaces_booking_id) values
-  (98105, 98104, 983, '2031-06-01 09:00+00', '2031-06-01 17:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000004',
-    null, 98102),
   (98106, 98104, 983, '2031-06-02 09:00+00', '2031-06-02 17:00+00', 'theatre', 'f8100000-0000-4000-8000-000000000004',
     null, null);
 set local role authenticated;
@@ -356,10 +367,6 @@ do $$
 declare
   result jsonb;
 begin
-  result := public.decide_venue_booking_request(98105, 'approve', null);
-  if result->>'outcome' <> 'updated' then
-    raise exception '[SG2-81:foreign-replacement-approvable] [SG2-81:AC4] [FAILURE] The request itself is decided as normal: %', result;
-  end if;
   if not exists (select 1 from public.venue_bookings where booking_id = 98102 and status = 'confirmed') then
     raise exception '[SG2-81:foreign-booking-not-released] [SG2-81:AC4] [FAILURE] A replacement naming another event''s booking must not release it';
   end if;

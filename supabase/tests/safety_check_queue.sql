@@ -289,19 +289,22 @@ begin
  end if;
 end $$;
 
--- AC1: a booking of an awaiting event released by Venue Staff, or
--- made unavailable, takes the event off the list.
+-- AC1: a booking of an awaiting event released by its coordinator (SG2-83
+-- AC5: Venue Staff no longer release), or made unavailable, takes the event
+-- off the list.
 select set_config('sg2_91.booking',
  (select venue_booking_id from public.venue_booking_requests where event_id=99109 and status='approved')::text,true);
 set local role authenticated;
+select set_config('request.jwt.claim.sub','d9100000-0000-4000-8000-000000000002',true);
 do $$
 declare result jsonb;
 begin
  result := public.release_venue_booking(current_setting('sg2_91.booking')::bigint,'Ceiling repairs');
  if result->>'outcome' <> 'released' then
-  raise exception '[SG2-91:booking-release-fixture] [SG2-91:AC1] [CONFLICT] Venue Staff must be able to release the booking: %',result;
+  raise exception '[SG2-91:booking-release-fixture] [SG2-91:AC1] [CONFLICT] The coordinator must be able to release the booking: %',result;
  end if;
 end $$;
+select set_config('request.jwt.claim.sub','d9100000-0000-4000-8000-000000000003',true);
 reset role;
 do $$
 begin

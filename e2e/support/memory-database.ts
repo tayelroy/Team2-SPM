@@ -303,6 +303,33 @@ export class MemoryDatabase {
     }
   }
 
+  /** SG2-83: test equivalent of the venue_change_requested() trigger. The
+   * change and its reason go in the history, Venue Staff are told, and a
+   * Confirmed or Preparation event returns to Planning (AC4/AC7). */
+  recordVenueChange(request: Row) {
+    const event = this.tables.events.find(row => row.event_id === request.event_id)!;
+    const booking = this.tables.venue_bookings.find(row => row.booking_id === request.replaces_booking_id)!;
+    const name = (venueId: unknown) => this.tables.venues.find(row => row.venue_id === venueId)?.name;
+    const now = new Date().toISOString();
+    const log = (field: string, oldValue: string, newValue: string) => this.tables.event_audit_logs.push({
+      log_id: Math.max(0, ...this.tables.event_audit_logs.map(row => Number(row.log_id))) + 1, event_id: event.event_id,
+      actor_id: request.requested_by, field_name: field, old_value: oldValue, new_value: newValue, created_at: now });
+    const reason = request.change_reason ? ` — ${request.change_reason}` : '';
+    log('venue_booking', `Confirmed: ${name(booking.venue_id)} (booking ${booking.booking_id})`,
+      `Change requested: ${name(booking.venue_id)} (booking ${booking.booking_id}) to ${name(request.venue_id)} (request ${request.request_id})${reason}`);
+    for (const staff of this.tables.account_roles.filter(row => row.role === 'venue_staff' && row.user_id !== request.requested_by)) {
+      this.tables.notifications.push({ notification_id: Math.max(0, ...this.tables.notifications.map(row => Number(row.notification_id))) + 1,
+        recipient_id: staff.user_id, event_id: event.event_id, request_id: null, kind: 'venue_change_requested',
+        message: `A change is requested for ${event.name || 'Untitled event'}: ${name(booking.venue_id)} (booking ${booking.booking_id}) to `
+          + `${name(request.venue_id)}${request.change_reason ? `: ${request.change_reason}` : ''}. The current booking stays until the change is approved.`,
+        created_at: now });
+    }
+    if (event.status === 'confirmed' || event.status === 'preparation') {
+      log('status', String(event.status), 'planning');
+      Object.assign(event, { status: 'planning', confirmed_by: null, confirmed_at: null });
+    }
+  }
+
   /** SG2-79: on top of seedVenueRequest, event 91 holds Regression Hall from
    * 12:30 to 13:30 SGT on 15 Jun 2030, 30 minutes after booking #1 ends. */
   seedVenueClash() {
@@ -324,6 +351,15 @@ export class MemoryDatabase {
       ends_at: '2030-06-20T04:00:00.000Z', status: 'approved', layout: 'theatre', venue_requirements: 'A projector', notes: null,
       requested_by: 'user-coordinator', requested_at: '2030-01-01T00:00:00.000Z', decided_by: 'user-venue',
       decided_at: '2030-01-02T00:00:00.000Z', decision_reason: null, venue_booking_id: 21 });
+  }
+
+  /** SG2-83: on top of seedVenueRelease, Breakout Studio is free on 20 June,
+   * so one of event 91's two venues can be changed to it. */
+  seedVenueChange() {
+    this.seedVenueRelease();
+    this.tables.venues.push({ venue_id: 5, name: 'Breakout Studio', location: 'Level 3', capacity: 100, facilities: 'Projector, whiteboards',
+      operating_information: '08:00–22:00', accessibility_features: 'Step-free' });
+    this.tables.venue_layouts.push({ venue_id: 5, layout: 'theatre', other_description: null });
   }
 
   /** SG2-49: on top of seedVenueRequest, four pending requests from event 91's
@@ -609,6 +645,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         // SG2-48: the column defaults a new venue request takes.
         if (this.table === 'venue_booking_requests') { row.status ??= 'pending'; row.requested_at ??= new Date().toISOString(); }
         table.push(row);
+        if (this.table === 'venue_booking_requests' && row.replaces_booking_id) this.database.recordVenueChange(row);
         return row;
       });
     } else if (this.operation === 'update') {

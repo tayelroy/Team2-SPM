@@ -87,7 +87,10 @@ begin
     ('private.notification_reminder_due(timestamptz,timestamptz,integer)'),
     ('public.send_outstanding_arrangement_reminders()'),
     ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
-    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()')
+    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()'),
+    -- SG2-83: change or cancel one venue of a multi-venue event.
+    ('public.release_venue_bookings(bigint,bigint[],text)'), ('public.venue_change_requested()'),
+    ('public.venue_change_request_check()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions

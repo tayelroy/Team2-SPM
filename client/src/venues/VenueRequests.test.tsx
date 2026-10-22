@@ -255,6 +255,34 @@ test('[NORMAL] [SG2-81:AC4] a request made to replace an affected booking names 
   });
 });
 
+test('[NORMAL] [SG2-83:AC4] changing a booking that is not affected asks why, and sends the reason with the change', async () => {
+  const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ request: pending, booking: 'allowed' }, { status: 201 }));
+  vi.stubGlobal('fetch', fetch);
+  const { onRequested } = form({ replacesBookingId: 12, changeReasonRequired: true });
+  expect(screen.getByLabelText('Reason for the change')).toHaveAttribute('maxLength', '500');
+  fireEvent.change(screen.getByLabelText('Reason for the change'), { target: { value: '  Needs a bigger stage ' } });
+  send();
+  await vi.waitFor(() => expect(onRequested).toHaveBeenCalled());
+  expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toMatchObject({ replaces_booking_id: 12, change_reason: 'Needs a bigger stage' });
+});
+
+test('[BOUNDARY] [SG2-83:AC4] a change without a reason is stopped before sending; a replacement for an affected booking needs none', async () => {
+  const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ request: pending, booking: 'allowed' }, { status: 201 }));
+  vi.stubGlobal('fetch', fetch);
+  form({ replacesBookingId: 12, changeReasonRequired: true });
+  fireEvent.change(screen.getByLabelText('Reason for the change'), { target: { value: '   ' } });
+  send();
+  expect(screen.getByRole('alert')).toHaveTextContent('Give a reason for changing this venue. Venue Staff will see it.');
+  expect(fetch).not.toHaveBeenCalled();
+  cleanup();
+  form({ replacesBookingId: 12 });
+  expect(screen.queryByLabelText('Reason for the change')).toBeNull();
+  // Asked for without a booking to change, there is nothing to explain.
+  cleanup();
+  form({ changeReasonRequired: true });
+  expect(screen.queryByLabelText('Reason for the change')).toBeNull();
+});
+
 test('[BOUNDARY] [SG2-81:AC4] an ordinary request names no booking and says nothing about replacing one', async () => {
   const fetch = vi.fn(async (_url: string, _init?: RequestInit) => Response.json({ request: pending, booking: 'allowed' }, { status: 201 }));
   vi.stubGlobal('fetch', fetch);

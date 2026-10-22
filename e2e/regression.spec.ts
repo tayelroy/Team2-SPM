@@ -1718,7 +1718,7 @@ test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:A
   // AC1: a reason is required, then the release goes through.
   await hall.getByRole('button', { name: 'Release booking', exact: true }).click();
   await hall.getByRole('button', { name: 'Confirm release', exact: true }).click();
-  await expect(hall.getByRole('alert')).toHaveText('Give a reason for releasing this booking. The coordinator and Event Organiser will see it.');
+  await expect(hall.getByRole('alert')).toHaveText('Give a reason for releasing this booking. The Event Organiser and Venue Staff will see it.');
   await hall.getByLabel('Reason for releasing').fill('The keynote moved online');
   await hall.getByRole('button', { name: 'Confirm release', exact: true }).click();
   // The list reloads after a release, so "Loading bookings…" can briefly be a second status.
@@ -1749,21 +1749,25 @@ test('SG2-51-P01 | [SG2-51:AC1] [SG2-51:AC2] [SG2-51:AC3] [SG2-51:AC4] [SG2-51:A
   await expect(page.getByRole('complementary', { name: 'Notifications' }).getByText(/The keynote moved online$/)).toBeVisible();
 });
 
-test('SG2-51-P02 | [SG2-51:AC1] [SG2-51:AC3] [NORMAL] [FAILURE] Venue Staff release a booking from the catalogue; other roles cannot release', async ({ page, request }) => {
+test('SG2-51-P02 | [SG2-51:AC1] [SG2-51:AC3] [SG2-83:AC6] [NORMAL] [FAILURE] Venue Staff see a released booking from the catalogue but cannot release one; other roles cannot release', async ({ page, request }) => {
   expect((await request.post('/__e2e/venue-release')).status()).toBe(204);
+  // SG2-83 AC6: Venue Staff no longer release; the coordinator does.
+  await signIn(page, 'coordinator');
+  const released = await page.request.post('/api/venue-bookings/22/release', { headers: await authHeaders(page), data: { reason: 'Flooded floor' } });
+  expect(released.status()).toBe(200);
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
   await signIn(page, 'venue');
   await page.getByRole('button', { name: 'Catalogue', exact: true }).click();
   await page.getByRole('button', { name: 'Bookings for Quiet Room', exact: true }).click();
   const upcoming = page.getByRole('region', { name: 'Upcoming bookings for Quiet Room' });
   const booking = upcoming.getByRole('listitem', { name: 'Booking #22' });
   await expect(booking.getByText('Venue Request Forum', { exact: true })).toBeVisible();
-  await booking.getByRole('button', { name: 'Release booking', exact: true }).click();
-  await booking.getByLabel('Reason for releasing').fill('Flooded floor');
-  await booking.getByRole('button', { name: 'Confirm release', exact: true }).click();
-  await expect(booking.getByText(/^Released by Regression venue on .*: Flooded floor$/)).toBeVisible();
-  // Releasing it again is refused; the event's other venue is still booked.
+  await expect(booking.getByText(/^Released by Regression coordinator on .*: Flooded floor$/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Release booking', exact: true })).toHaveCount(0);
+  // Releasing it as Venue Staff is refused; the event's other venue is still booked.
   const again = await page.request.post('/api/venue-bookings/22/release', { headers: await authHeaders(page), data: { reason: 'Again' } });
-  expect([again.status(), (await again.json()).error]).toEqual([409, 'This booking has already been released.']);
+  expect(again.status()).toBe(403);
   const listed = await page.request.get('/api/venue-bookings?event_id=91', { headers: await authHeaders(page) });
   expect((await listed.json()).bookings.map((row: { booking_id: number; status: string }) => [row.booking_id, row.status]))
     .toEqual([[21, 'confirmed'], [22, 'cancelled']]);
@@ -1778,6 +1782,128 @@ test('SG2-51-P02 | [SG2-51:AC1] [SG2-51:AC3] [NORMAL] [FAILURE] Venue Staff rele
     });
   }
   expect((await page.request.post('/api/venue-bookings/21/release', { data: { reason: 'x' } })).status()).toBe(401);
+});
+
+/** SG2-83 (DoD v2.1): the screen fits the viewport without scrolling sideways;
+ * SG2_83_SCREENSHOTS saves a picture of it for review. */
+async function layoutCheck(page: Page, name: string) {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  if (process.env.SG2_83_SCREENSHOTS) await page.screenshot({ path: `${process.env.SG2_83_SCREENSHOTS}/${name}.png`, fullPage: true });
+}
+
+test('SG2-83-P01 | [SG2-83:AC1] [SG2-83:AC2] [SG2-83:AC3] [SG2-83:AC4] [NORMAL] the coordinator cancels one of two venues, leaving the other unticked; it stays booked, the period is free and Venue Staff are told', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-release')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  const booked = page.getByRole('region', { name: 'Booked venues for Venue Request Forum' });
+  const hall = booked.getByRole('listitem', { name: 'Booking #21' });
+  const room = booked.getByRole('listitem', { name: 'Booking #22' });
+  await room.getByRole('button', { name: 'Release booking', exact: true }).click();
+  // AC2: the event's other venue is offered, but only goes if ticked.
+  await expect(room.getByRole('checkbox', { name: /^Regression Hall · .* · Booking #21$/ })).not.toBeChecked();
+  await room.getByLabel('Reason for releasing').fill('Breakout sessions dropped');
+  await room.getByRole('button', { name: 'Confirm release', exact: true }).click();
+  await expect(booked.getByRole('status').filter({ hasText: 'Quiet Room released for' }))
+    .toContainText('available again, and the Event Organiser and Venue Staff have been notified. The event\'s other venues are unchanged.');
+  // AC1: the other venue is untouched; AC4: who and why are kept.
+  await expect(room.getByText(/^Released by Regression coordinator on .*: Breakout sessions dropped$/)).toBeVisible();
+  await expect(hall.getByText('Confirmed', { exact: true })).toBeVisible();
+  // AC3: Quiet Room is free for the period again; Regression Hall is still booked.
+  const period = `from=${encodeURIComponent('2030-06-20T01:00:00.000Z')}&to=${encodeURIComponent('2030-06-20T05:00:00.000Z')}`;
+  const headers = await authHeaders(page);
+  expect((await (await page.request.get(`/api/venues/2/availability?${period}`, { headers })).json()).entries).toEqual([]);
+  expect((await (await page.request.get(`/api/venues/1/availability?${period}`, { headers })).json()).entries).toHaveLength(1);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await layoutCheck(page, 'sg2-83-cancel-one-venue');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await layoutCheck(page, 'sg2-83-cancel-one-venue-mobile');
+
+  // AC4: Venue Staff are told who cancelled which venue, and why.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  await page.getByRole('button', { name: /^Notifications/ }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue booking cancelled', { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/^Regression coordinator cancelled the booking of Quiet Room for Venue Request Forum \(.*\): Breakout sessions dropped\. The venue is available again for that period\.$/)).toBeVisible();
+});
+
+test('SG2-83-P02 | [SG2-83:AC1] [SG2-83:AC4] [NORMAL] the coordinator changes one venue to another with a reason; the current booking stays until Venue Staff approve, which releases only it', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-change')).status()).toBe(204);
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  const booked = page.getByRole('region', { name: 'Booked venues for Venue Request Forum' });
+  const hall = booked.getByRole('listitem', { name: 'Booking #21' });
+  const room = booked.getByRole('listitem', { name: 'Booking #22' });
+  await room.getByRole('button', { name: 'Change venue', exact: true }).click();
+  await expect(page.getByText(/^Changing Quiet Room \(booking #22/)).toBeVisible();
+  await venueCard(page, 'Breakout Studio').getByRole('button', { name: 'Request this venue', exact: true }).click();
+  const form = page.getByRole('form', { name: 'Request Breakout Studio' });
+  await expect(form.getByText('This replaces booking #22, which is released once Venue Staff approve this request.')).toBeVisible();
+  // AC4: a change says why.
+  await form.getByRole('button', { name: 'Send request', exact: true }).click();
+  await expect(form.getByRole('alert')).toHaveText('Give a reason for changing this venue. Venue Staff will see it.');
+  await form.getByLabel('Reason for the change').fill('Breakouts need a projector');
+  await form.getByRole('button', { name: 'Send request', exact: true }).click();
+  await expect(page.getByText(/^Breakout Studio requested/)).toBeVisible();
+  // AC1: both current bookings stay until the change is approved.
+  await expect(room.getByText('Change requested: Breakout Studio, awaiting Venue Staff. This booking stays until then.')).toBeVisible();
+  await expect(room.getByText('Confirmed', { exact: true })).toBeVisible();
+  await expect(hall.getByText('Confirmed', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await layoutCheck(page, 'sg2-83-change-one-venue');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await layoutCheck(page, 'sg2-83-change-one-venue-mobile');
+
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'venue');
+  await page.getByRole('button', { name: /^Notifications/ }).click();
+  const drawer = page.getByRole('complementary', { name: 'Notifications' });
+  await expect(drawer.getByText('Venue change requested', { exact: true })).toBeVisible();
+  await expect(drawer.getByText(/^A change is requested for Venue Request Forum: Quiet Room \(booking 22\) to Breakout Studio.*: Breakouts need a projector\. The current booking stays until the change is approved\.$/)).toBeVisible();
+
+  // AC1: once Venue Staff approve the change, only the replaced booking is released, with the coordinator's reason.
+  const venueHeaders = await authHeaders(page);
+  const listed = await (await page.request.get('/api/venue-booking-requests?event_id=91', { headers: venueHeaders })).json();
+  const change = listed.requests.find((row: { venue_name: string; status: string }) => row.venue_name === 'Breakout Studio' && row.status === 'pending');
+  const approved = await page.request.post(`/api/venue-booking-requests/${change.request_id}/decision`, { headers: venueHeaders, data: { decision: 'approve' } });
+  expect(approved.status()).toBe(200);
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  await openVenueRequestSearch(page);
+  await expect(room.getByText('Released', { exact: true })).toBeVisible();
+  await expect(room.getByText(/: Changed to Breakout Studio: Breakouts need a projector$/)).toBeVisible();
+  await expect(hall.getByText('Confirmed', { exact: true })).toBeVisible();
+  await expect(booked.getByRole('listitem').filter({ hasText: 'Breakout Studio' }).getByText('Confirmed', { exact: true })).toBeVisible();
+});
+
+test('SG2-83-N01 | [SG2-83:AC5] [SG2-83:AC2] [FAILURE] [CONFLICT] [BOUNDARY] Venue Staff and other roles cannot cancel a venue booking, and naming a booking that is not the event\'s cancels nothing', async ({ page, request }) => {
+  expect((await request.post('/__e2e/venue-release')).status()).toBe(204);
+  // AC5: Venue Staff see the bookings but no way to cancel them, and the API refuses.
+  await signIn(page, 'venue');
+  await page.getByRole('button', { name: 'Catalogue', exact: true }).click();
+  await page.getByRole('button', { name: 'Bookings for Quiet Room', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Upcoming bookings for Quiet Room' }).getByRole('listitem', { name: 'Booking #22' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Release booking', exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Only the event.s coordinator cancels or changes a booking/)).toBeVisible();
+  const refused = await page.request.post('/api/venue-bookings/22/release', { headers: await authHeaders(page), data: { reason: 'Flooded' } });
+  expect(refused.status()).toBe(403);
+
+  // AC2: the coordinator naming a booking that is not one of the event's live ones cancels nothing at all.
+  await page.goto('/');
+  await page.evaluate(() => sessionStorage.clear());
+  await signIn(page, 'coordinator');
+  const headers = await authHeaders(page);
+  const foreign = await page.request.post('/api/venue-bookings/21/release', { headers, data: { reason: 'Tidy up', also_cancel: [999] } });
+  expect([foreign.status(), (await foreign.json()).error])
+    .toEqual([409, 'Each other booking chosen must be a confirmed booking of this event that has not ended. Nothing was cancelled.']);
+  const tooMany = await page.request.post('/api/venue-bookings/21/release', { headers, data: { reason: 'x', also_cancel: Array.from({ length: 51 }, (_, i) => i + 100) } });
+  expect(tooMany.status()).toBe(400);
+  const listed = await page.request.get('/api/venue-bookings?event_id=91', { headers });
+  expect((await listed.json()).bookings.map((row: { booking_id: number; status: string }) => [row.booking_id, row.status]))
+    .toEqual([[21, 'confirmed'], [22, 'confirmed']]);
 });
 
 test('SG2-78-P01 | [SG2-78:AC1] [SG2-78:AC2] [SG2-78:AC3] [SG2-78:AC4] [SG2-78:AC5] [NORMAL] [CONFLICT] setup and turnaround widen a booking in the calendar, conflicts, approval and search, without changing its times', async ({ page, request }) => {
