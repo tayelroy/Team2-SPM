@@ -31,6 +31,15 @@ const MAX_DEPARTMENT_LENGTH = 150;
 /** Eight Singapore national digits, optionally preceded by the +65 country code. */
 const SINGAPORE_PHONE_PATTERN = /^(?:\+65)?[0-9]{8}$/;
 
+/**
+ * Whether trimmed text is a Singapore phone number, ignoring the supported
+ * readability separators. Also the contact phone an attendee gives when
+ * registering (SG2-60 AC4).
+ */
+export function isSingaporePhone(trimmed: string): boolean {
+  return SINGAPORE_PHONE_PATTERN.test(trimmed.replace(/[()\-.\s]/g, ''));
+}
+
 function readName(value: unknown, errors: string[]): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     errors.push('name is required.');
@@ -54,8 +63,7 @@ function readPhone(value: unknown, errors: string[]): string | null {
   if (trimmed.length === 0) return null;
   // Ignore supported readability separators for validation, but preserve the
   // caller's trimmed formatting when storing their profile.
-  const normalized = trimmed.replace(/[()\-.\s]/g, '');
-  if (!SINGAPORE_PHONE_PATTERN.test(normalized)) {
+  if (!isSingaporePhone(trimmed)) {
     errors.push('phone must be a Singapore number with 8 digits, optionally prefixed with +65.');
     return null;
   }

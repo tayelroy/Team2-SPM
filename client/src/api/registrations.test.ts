@@ -6,7 +6,7 @@ const VIEW: RegistrationView = {
   registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z', window: 'open',
   registered_count: 1, places_remaining: 2, contact_details_visible: true,
   attendees: [{ registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
-    email: 'ana@attendee.test', phone: null }],
+    email: 'ana@attendee.test', phone: null, needs: 'Step-free access' }],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 2 }],
   capacity_warnings: ['A capacity of 3 is more than Main hall holds (2).'],
   can_edit: true,
@@ -29,10 +29,11 @@ describe('readRegistrationView (SG2-63)', () => {
     expect(readRegistrationView(colleague)).toEqual(colleague);
   });
 
-  test('[FAILURE] [SG2-63:AC1] anything that is not a registration picture is refused rather than shown half-read', () => {
+  test('[FAILURE] [SG2-63:AC1] [SG2-60:AC4] anything that is not a registration picture is refused rather than shown half-read', () => {
     for (const bad of [null, 'text', { ...VIEW, window: 'paused' }, { ...VIEW, attendees: [{ ...VIEW.attendees[0], name: 4 }] },
       { ...VIEW, attendees: [null] }, { ...VIEW, attendees: [{ ...VIEW.attendees[0], email: 5 }] },
-      { ...VIEW, attendees: [{ ...VIEW.attendees[0], phone: 5 }] }, { ...VIEW, capacity_warnings: [1] }, { ...VIEW, venues: {} },
+      { ...VIEW, attendees: [{ ...VIEW.attendees[0], phone: 5 }] }, { ...VIEW, attendees: [{ ...VIEW.attendees[0], needs: 5 }] },
+      { ...VIEW, capacity_warnings: [1] }, { ...VIEW, venues: {} },
       { ...VIEW, registration_capacity: '3' }, { ...VIEW, can_edit: 'yes' }, { ...VIEW, registered_count: null },
       { ...VIEW, status: undefined }]) {
       expect(readRegistrationView(bad)).toBeNull();

@@ -46,6 +46,8 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandi
   // SG2-67: the organiser asked to cancel, and the coordinator cancelled.
   cancellation_requested: 'Cancellation requested',
   event_cancelled: 'Event cancelled',
+  // SG2-60: the attendee's place is held.
+  registration_confirmed: 'Registration confirmed',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstanding_arrangements', string> = {
   placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
@@ -69,6 +71,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandin
   registration_closed: color.silver,
   cancellation_requested: color.silver,
   event_cancelled: color.silver,
+  registration_confirmed: color.accent,
 };
 
 const identity = (entry: InboxNotification) => `${entry.source}:${entry.notification_id}`;

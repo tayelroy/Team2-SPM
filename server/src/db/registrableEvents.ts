@@ -21,12 +21,38 @@ export interface RegistrableEvent {
   registration_opens_at: string | null;
   registration_closes_at: string | null;
   venues: RegistrableVenue[];
+  /** Whether the caller already holds an active registration (SG2-60 AC2). */
+  registered: boolean;
 }
+
+/** What an attendee gives when registering (SG2-60 AC4), already validated. */
+export interface RegistrationInput {
+  contact_phone: string;
+  needs: string | null;
+}
+
+/** The place an attendee now holds (SG2-60 AC1). */
+export interface Registration {
+  registration_id: number;
+  event_id: number;
+  registered_at: string;
+  contact_phone: string;
+  needs: string | null;
+}
+
+/** What `public.register_for_event` did (SG2-60 AC1-AC4). */
+export type RegisterResult =
+  | { outcome: 'ok'; registration: Registration }
+  | { outcome: 'not_open'; registration_opens_at: string }
+  | { outcome: 'closed'; registration_closes_at: string }
+  /** missing: not an event an attendee may find; invalid: the database refused the details. */
+  | { outcome: 'duplicate' | 'full' | 'missing' | 'invalid' };
 
 export interface RegistrableEventsStore {
   list(): Promise<RegistrableEvent[]>;
   /** Null when the event is not one an attendee may find. */
   get(eventId: number): Promise<RegistrableEvent | null>;
+  register(eventId: number, input: RegistrationInput): Promise<RegisterResult>;
 }
 
 type Row = Record<string, unknown>;
@@ -45,8 +71,39 @@ function event(row: Row): RegistrableEvent {
     registration_closes_at: text(row.registration_closes_at),
     venues: Array.isArray(row.venues)
       ? row.venues.filter(isObject).map(venue => ({ name: text(venue.name) ?? 'Unnamed venue', location: text(venue.location) }))
-      : []
+      : [],
+    registered: row.registered === true
   };
+}
+
+function registration(row: unknown): Registration | null {
+  if (!isObject(row) || typeof row.registration_id !== 'number' || typeof row.event_id !== 'number'
+    || typeof row.registered_at !== 'string' || typeof row.contact_phone !== 'string') return null;
+  return { registration_id: row.registration_id, event_id: row.event_id, registered_at: row.registered_at,
+    contact_phone: row.contact_phone, needs: text(row.needs) };
+}
+
+function registerResult(data: unknown): RegisterResult {
+  if (!isObject(data)) throw new AccessError(503);
+  switch (data.outcome) {
+    case 'ok': {
+      const created = registration(data.registration);
+      if (created) return { outcome: 'ok', registration: created };
+      break;
+    }
+    case 'not_open':
+      if (typeof data.registration_opens_at === 'string') return { outcome: 'not_open', registration_opens_at: data.registration_opens_at };
+      break;
+    case 'closed':
+      if (typeof data.registration_closes_at === 'string') return { outcome: 'closed', registration_closes_at: data.registration_closes_at };
+      break;
+    case 'duplicate':
+    case 'full':
+    case 'missing':
+    case 'invalid':
+      return { outcome: data.outcome };
+  }
+  throw new AccessError(503);
 }
 
 function failure(error: { code?: string }, status: number): AccessError {
@@ -57,7 +114,9 @@ function failure(error: { code?: string }, status: number): AccessError {
  * Reads through `public.registrable_events` and `public.registrable_event`
  * with the caller's JWT and acting role (SG2-104), so the database checks the
  * caller acts as an attendee as well as the route does, and returns only the
- * events and fields an attendee may see (SG2-59 AC1-AC3).
+ * events and fields an attendee may see (SG2-59 AC1-AC3). Registers through
+ * `public.register_for_event` the same way (SG2-60), which decides the
+ * window, duplicate and capacity under the event row lock.
  */
 export function createRegistrableEventsStore(token: string, makeClient = createUserScopedClient): RegistrableEventsStore {
   const client = makeClient(token);
@@ -75,6 +134,12 @@ export function createRegistrableEventsStore(token: string, makeClient = createU
       if (data === null) return null;
       if (!isObject(data)) throw new AccessError(503);
       return event(data);
+    },
+    async register(eventId, input) {
+      const { data, error, status } = await client.rpc('register_for_event',
+        { p_event_id: eventId, p_contact_phone: input.contact_phone, p_needs: input.needs });
+      if (error) throw failure(error, status);
+      return registerResult(data);
     }
   };
 }

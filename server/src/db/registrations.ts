@@ -7,7 +7,10 @@ export interface RegisteredAttendee {
   name: string;
   organisation: string | null;
   email: string | null;
+  /** The phone given at registration (SG2-60), else the profile phone. */
   phone: string | null;
+  /** Accessibility or dietary needs given at registration (SG2-60 AC4). */
+  needs: string | null;
   registered_at: string;
 }
 
@@ -93,6 +96,7 @@ export async function fetchRegistrationOverview(
         organisation: text(row.organisation),
         email: text(row.email),
         phone: text(row.phone),
+        needs: text(row.needs),
         registered_at: String(row.registered_at)
       })),
       venues: (data.venues as Record<string, unknown>[]).map(row => ({
