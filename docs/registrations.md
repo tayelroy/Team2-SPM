@@ -1,9 +1,9 @@
-# Registrations (SG2-63)
+# Registrations (SG2-63, SG2-60)
 
 The registration picture for an event, and the Event Organiser's control of
-its registration settings. Attendees registering, being refused when full and
-withdrawing are SG2-60, SG2-61 and SG2-62; they write the same
-`public.registrations` rows this story reads.
+its registration settings (SG2-63), and attendees registering (SG2-60, see
+[Registering](#registering-sg2-60)). Being refused when full and withdrawing
+are SG2-61 and SG2-62; they write the same `public.registrations` rows.
 
 ## Who sees what
 
@@ -89,3 +89,49 @@ registration is not open to attendees until then.
 - Tests: `supabase/tests/event_registration_settings.sql`,
   `server/src/registrationRoutes.test.ts`, `e2e/registrations.spec.ts` and the
   SG2-63 integration test in `integration/api.test.ts`.
+
+## Registering (SG2-60)
+
+An attendee registers from an open event's details on **Find events**
+(SG2-59). `POST /api/registrable-events/:eventId/registrations` runs
+`public.register_for_event()` with the attendee's own JWT; it rechecks that
+the acting role is `attendee` (`lock_acting_role()`, SG2-104).
+
+| Check, in order | Answer |
+| --- | --- |
+| Contact phone missing or not a Singapore number (8 digits, optional `+65`, separators ignored, at most 40 characters); needs over 500 characters (AC4) | 400, before the database is asked; the database checks again |
+| Not an event an attendee may find: not confirmed, no registration, times or date unset, missing | 404, as SG2-59's detail |
+| The attendee already holds an active registration (AC2) | 409 `duplicate` |
+| At or after the closing time, or the event has started (AC3) | 409 `closed` |
+| Before the opening time (AC3) | 409 `not_open`, with the opening time |
+| Every place is taken (AC1) | 409 `full` |
+| Otherwise | 201: the place is held |
+
+- **Team decision (23 Oct 2026), AC4's "required registration information":**
+  a contact phone is required, filled in from the attendee's profile; any
+  accessibility or dietary needs are optional. Name and email come from the
+  account. Both are stored on the registration (`contact_phone`, `needs`).
+- **Capacity** is the one the organiser set (SG2-63); a cancelled registration
+  holds no place. The function locks the event row before it checks anything,
+  the same lock SG2-63's settings changes take, so two attempts on the last
+  place are decided one at a time
+  (`.github/scripts/test-registration-concurrency.mjs`). SG2-61 adds the full
+  badge, the capacity-reached notices and the waiting list.
+- **One active registration per attendee per event:** checked by the function
+  and backed by the partial unique index `registrations_one_active_per_attendee`.
+  After a withdrawal (SG2-62) the attendee may register again.
+- **Confirmation (AC1):** the screen shows the place held with the date, time
+  and venue, and the attendee is sent a `registration_confirmed` notice
+  ("You are registered for Harbour Lecture on 20 Jul 2030 19:00 SGT at
+  Regression Hall."). An event already registered for shows that instead of
+  the form, and the list marks it **Registered**.
+- **The organiser's picture** shows the phone given at registration (the
+  profile phone for earlier registrations) and the needs, to the same people
+  who see contact details.
+
+Migration `202610230001_event_registration.sql`; tests
+`supabase/tests/event_registration.sql`, the concurrency script above,
+`server/src/registerForEvent.test.ts`,
+`client/src/screens/FindEvents.registration.test.tsx`, integration
+`native registration holds one place per attendee…` and browser journeys
+`SG2-60-P01` and `SG2-60-N01`.

@@ -906,6 +906,18 @@
       }
     },
     {
+      "id": "SG2-60",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-60",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-23",
+      "acceptanceCriteria": {
+        "AC1": "Given an event open for registration with places remaining, when I register, then my place is held and I am given confirmation",
+        "AC2": "Given I have already registered for that event, the duplicate is refused",
+        "AC3": "Given registration is not currently open, registration is refused and I am told when it opens or that it has closed",
+        "AC4": "Required registration information is validated before the registration is accepted"
+      }
+    },
+    {
       "id": "SG2-89",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-89",
       "originalPullRequests": [],
