@@ -25,8 +25,10 @@ test('[NORMAL] [SG2-22:AC3] the CLI writes and verifies a current method ledger'
   assert.equal(run().status, 0);
   const ledger = JSON.parse(readFileSync(join(root, 'docs/test-case-inventory.json'), 'utf8'));
   assert.equal(ledger.methods.length, 1);
-  assert.equal(ledger.methods[0].id, 'SG2-22:accepts-a-valid-record');
-  assert.equal(ledger.methods[0].legacyId, 'TC-45b544aaf96a');
+  assert.equal(ledger.methods[0].file, 'server/src/sample.test.mjs');
+  assert.equal(ledger.methods[0].title, '[NORMAL] [SG2-22:AC3] accepts a valid record');
+  assert.equal(Object.hasOwn(ledger.methods[0], 'id'), false);
+  assert.equal(Object.hasOwn(ledger.methods[0], 'legacyId'), false);
   assert.deepEqual(ledger.methods[0].references, [{ story: 'SG2-22', criterion: 'AC3' }]);
   assert.deepEqual(ledger.methods[0].categories, ['NORMAL']);
 });
@@ -43,8 +45,12 @@ test('[NORMAL] [BOUNDARY] [SG2-22:AC3] readable IDs and legacy aliases agree acr
   assert.equal(after.id, 'SG2-22:accepts-a-valid-record');
   assert.equal(after.id, first.id);
   assert.equal(after.legacyId, first.legacyId);
-  assert.equal(committed.id, after.id);
-  assert.equal(committed.legacyId, after.legacyId);
+  assert.equal(after.legacyId, 'TC-45b544aaf96a');
+  assert.equal(committed.file, after.file);
+  assert.equal(committed.line, after.line);
+  assert.equal(committed.title, after.title);
+  assert.deepEqual(committed.categories, after.categories);
+  assert.deepEqual(committed.references, after.references);
   assert.ok(after.line > first.line);
 });
 
@@ -92,8 +98,9 @@ test('[BOUNDARY] [SG2-22:AC3] long Unicode titles have readable bounded IDs whil
   assert.ok(methods.every(method => method.id.startsWith('SG2-22:cafe-server-src-sample-')));
   assert.ok(methods.every(method => method.id.length < 220));
   const wholeWords = fixture(t, valid.replace('accepts a valid record', 'word '.repeat(18) + 'lengthyword remainder'));
-  assert.equal(wholeWords.run('--write').status, 0);
-  const wholeWordId = JSON.parse(readFileSync(join(wholeWords.root, 'docs/test-case-inventory.json'), 'utf8')).methods[0].id;
+  const wholeWordDetails = join(wholeWords.root, 'details.json');
+  assert.equal(wholeWords.run('--write', '--details', wholeWordDetails).status, 0);
+  const wholeWordId = JSON.parse(readFileSync(wholeWordDetails, 'utf8')).methods[0].id;
   assert.equal(wholeWordId, 'SG2-22:' + Array(18).fill('word').join('-'));
 });
 

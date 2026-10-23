@@ -956,7 +956,8 @@
   ],
   "idFormat": {
     "canonicalMethodId": "SG2-<story>:<semantic-scenario-slug>",
-    "legacyId": "Previous TC-hash retained as an alias on every current method.",
+    "legacyId": "Previous TC-hash retained as an alias on every current method in the --details export.",
+    "committedLedger": "Method entries retain file, line, title, categories and references. Descriptive IDs and legacy aliases are derived by the generator in --details for workbook/reference mapping, avoiding repeated derived fields in the committed ledger.",
     "sqlIds": "Existing explicit story:contract IDs unchanged.",
     "collisionHandling": "Deterministic source/suite context, then numeric suffixes; no hash suffix.",
     "sourceLineMovement": "Line-only movement does not change canonical or legacy IDs.",

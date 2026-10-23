@@ -245,10 +245,11 @@ if (detailsIndex >= 0) {
 }
 // Stable IDs, suites and parameterization remain available in --details.
 // The source path and line identify each committed declaration.
-const ledgerMethods = methods.map(({ id, legacyId, file, line, title, categories, references }) =>
-  ({ id, legacyId, file, line, title, categories, references }));
+const ledgerMethods = methods.map(({ file, line, title, categories, references }) =>
+  ({ file, line, title, categories, references }));
 const ledgerSql = sql.map(({ id, file, line, title, categories, references }) => ({ id, file, line, title, categories, references }));
 const output = '{\n' + `  "schemaVersion": 1,\n  "reviewDate": ${JSON.stringify(catalogue.reviewDate)},\n  "scope": ${JSON.stringify(inventory.scope)},\n`
+  + '  "methodIdPolicy": "Descriptive SG2-story:scenario IDs and TC-hash legacy aliases are derived in --details; committed methods retain source and requirement mappings.",\n'
   + '  "methods": [\n' + ledgerMethods.map(method => '    ' + JSON.stringify(method)).join(',\n') + '\n  ],\n'
   + '  "sqlAssertions": [\n' + ledgerSql.map(method => '    ' + JSON.stringify(method)).join(',\n') + '\n  ]\n}\n';
 const destination = resolve(root, 'docs/test-case-inventory.json');
