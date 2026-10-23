@@ -8818,9 +8818,9 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium. With needs_clarification removed from the fixture's work-queue statuses it fails at the first work-queue check.",
-    "execution_date": "22 Oct 2026",
+    "execution_date": "23 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "npx playwright test on feature/SG2-89-coordinator-oversight working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+    "execution_evidence": "23 Oct 2026; npx playwright test at 54113ae (feature/SG2-89-coordinator-oversight with main 89583c0 merged in), clean tree; 155/155 browser tests and the regression gate passed; isolated loopback storage and test-only Chromium; no hosted Supabase. GitHub Actions run for the pushed commit is linked in the PR."
   },
   {
     "id": "SG2-89-P02",
@@ -8857,9 +8857,9 @@
     "layer": "Playwright fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium.",
-    "execution_date": "22 Oct 2026",
+    "execution_date": "23 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "npx playwright test on feature/SG2-89-coordinator-oversight working tree; isolated loopback storage; no hosted Supabase."
+    "execution_evidence": "23 Oct 2026; npx playwright test at 54113ae (feature/SG2-89-coordinator-oversight with main 89583c0 merged in), clean tree; 155/155 browser tests and the regression gate passed; isolated loopback storage; no hosted Supabase. GitHub Actions run for the pushed commit is linked in the PR."
   },
   {
     "id": "SG2-89-N01",
@@ -8894,9 +8894,9 @@
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
     "actual": "Passed in Chromium.",
-    "execution_date": "22 Oct 2026",
+    "execution_date": "23 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "npx playwright test on feature/SG2-89-coordinator-oversight working tree; isolated loopback storage and test-only Chromium; no hosted Supabase."
+    "execution_evidence": "23 Oct 2026; npx playwright test at 54113ae (feature/SG2-89-coordinator-oversight with main 89583c0 merged in), clean tree; 155/155 browser tests and the regression gate passed; isolated loopback storage and test-only Chromium; no hosted Supabase. GitHub Actions run for the pushed commit is linked in the PR."
   },
   {
     "id": "SG2-89-DB01",
@@ -8927,8 +8927,8 @@
     "layer": "Disposable PostgreSQL SQL assertions",
     "actual": "Passed in the disposable PostgreSQL 17 replay.",
     "status": "Pass",
-    "execution_date": "22 Oct 2026",
+    "execution_date": "23 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "23 Oct 2026; feature/SG2-89-coordinator-oversight with main 4f8657a merged in; disposable PostgreSQL 17 replay of the auth fixture and every migration, then all 45 CI SQL suites; sabotage runs (check constraint dropped, SG2-67's view without needs_clarification restored, an older view without the cancellation fields restored) made the suite fail. Rollback rehearsal: schema dumps before the migration and after migrate, write and roll back match; main's work queue, clarification, status flow, safety approval, cancellation and registrable events suites pass on the rolled-back database; re-applying the migration passes the new suite."
+    "execution_evidence": "23 Oct 2026; 54113ae (feature/SG2-89-coordinator-oversight with main 89583c0 merged in); disposable PostgreSQL 17 replay of the auth fixture and every migration, then all 45 CI SQL suites and the CI upgrade replay step; sabotage runs (check constraint dropped, SG2-67's view without needs_clarification restored, an older view without the cancellation fields restored) made the suite fail. Rollback rehearsal: schema dumps before the migration and after migrate, write and roll back match; main's work queue, clarification, status flow, safety approval, cancellation and registrable events suites pass on the rolled-back database; re-applying the migration passes the new suite."
   }
 ]
