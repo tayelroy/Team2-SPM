@@ -1,25 +1,49 @@
--- Rollback for 202610220002_coordinator_oversight.sql (SG2-89).
+-- SG2-89: the Event Coordinator Lead oversees the coordinators they assigned.
 --
--- Restores the database to how it was before that migration, so it can be
--- applied again later:
---   * internal_work_items goes back to SG2-105's body (copied verbatim from
---     202610200001_event_preferred_layout.sql), so events awaiting the
---     organiser's clarification leave the coordinator's work queue again.
---   * events.coordinator_assigned_by, its index and the
---     events_assigner_needs_coordinator check are dropped.
+-- AC1: a Lead supervises the events whose coordinator they assigned. When
+-- another Lead reassigns the event, supervision moves with that reassignment
+-- (the latest assigner supervises). `coordinator_assigned_by` is written in
+-- the same UPDATE as `coordinator_id` (server/src/db/eventRequests.ts), so
+-- two Leads reassigning at once can never leave the event naming one Lead's
+-- coordinator under the other Lead's supervision: the loser's guarded write
+-- matches zero rows. The check below is the database backstop for the one
+-- rule a write could break on its own: nobody supervises an event that has
+-- no coordinator.
 --
--- Not undone (data, not schema): which Lead supervised each event is lost
--- with the column. Every assignment is still in the event's history, which is
--- what the migration backfills from, so re-applying it restores supervision
--- for every assignment recorded there. Coordinators reassigned while the
--- event awaited clarification keep their assignment. Rehearse it first inside
--- BEGIN ... ROLLBACK on a live database.
+-- Existing assignments are backfilled from SG2-40's event history: the actor
+-- of each event's latest `coordinator_id` entry. An event whose assignment was
+-- never recorded there (seeded or assigned before the history existed) is
+-- left with no supervising Lead. It is still in its coordinator's work queue
+-- and on the Lead's assignment screen, and the next Lead to reassign it takes
+-- over its supervision.
 --
--- Not a migration: keep it out of supabase/migrations, where every file is
--- applied in order.
+-- AC6: an event awaiting the organiser's clarification stays in its
+-- coordinator's work queue. internal_work_items is replaced unchanged from
+-- SG2-67's 202610220002_event_cancellation.sql except that
+-- `needs_clarification` joins the review statuses.
 begin;
 
--- SG2-105's internal_work_items, verbatim.
+alter table public.events
+  add column coordinator_assigned_by uuid references public.users(user_id) on delete set null,
+  add constraint events_assigner_needs_coordinator
+    check (coordinator_assigned_by is null or coordinator_id is not null);
+
+comment on column public.events.coordinator_assigned_by is
+  'SG2-89: the Event Coordinator Lead who last assigned or reassigned this event''s coordinator, and so supervises it.';
+
+update public.events e
+set coordinator_assigned_by = latest.actor_id
+from (
+  select distinct on (l.event_id) l.event_id, l.actor_id
+  from public.event_audit_logs l
+  where l.field_name = 'coordinator_id' and l.new_value is not null
+  order by l.event_id, l.created_at desc, l.log_id desc
+) latest
+where latest.event_id = e.event_id and e.coordinator_id is not null;
+
+create index events_coordinator_assigned_by_idx
+  on public.events (coordinator_assigned_by) where coordinator_assigned_by is not null;
+
 create or replace view public.internal_work_items as
 select 'event'::text as kind, e.event_id::bigint as item_id, e.event_id,
   coalesce(nullif(e.name, ''), 'Untitled event')::text as title,
@@ -28,7 +52,7 @@ select 'event'::text as kind, e.event_id::bigint as item_id, e.event_id,
   (select max(b.ends_at) from public.venue_bookings b
     where b.event_id = e.event_id and b.status = 'confirmed') as ends_at,
   'event_coordinator'::text as audience, e.coordinator_id as assigned_to,
-  case when e.status in ('unassigned', 'submitted', 'under_review') then 'review' else 'assigned' end as category,
+  case when e.status in ('unassigned', 'submitted', 'under_review', 'needs_clarification') then 'review' else 'assigned' end as category,
   jsonb_build_object('organisation', e.organisation, 'purpose', e.purpose,
     'description', e.description, 'expected_attendance', e.expected_attendance,
     'venue_requirements', e.venue_requirements, 'preferred_layout', e.preferred_layout,
@@ -36,9 +60,10 @@ select 'event'::text as kind, e.event_id::bigint as item_id, e.event_id,
     'equipment_requirements', e.equipment_requirements, 'registration_needed', e.registration_needed,
     'registration_capacity', e.registration_capacity, 'registration_opens_at', e.registration_opens_at,
     'registration_closes_at', e.registration_closes_at, 'planning_notes', e.planning_notes,
-    'expected_crowd_movement', e.expected_crowd_movement) as details
+    'expected_crowd_movement', e.expected_crowd_movement,
+    'cancellation_requested_at', e.cancellation_requested_at, 'cancellation_reason', e.cancellation_reason) as details
 from public.events e
-where e.status in ('unassigned', 'submitted', 'under_review')
+where e.status in ('unassigned', 'submitted', 'under_review', 'needs_clarification')
   or (e.coordinator_id is not null and e.status in
       ('approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'))
 union all
@@ -76,9 +101,4 @@ where (r.status = 'pending' or (r.status = 'approved' and exists (
 -- rule stays visible at the point that last replaces the view.
 revoke all on public.internal_work_items from public, anon, authenticated;
 grant select on public.internal_work_items to service_role;
-
-drop index if exists public.events_coordinator_assigned_by_idx;
-alter table public.events
-  drop constraint if exists events_assigner_needs_coordinator,
-  drop column if exists coordinator_assigned_by;
 commit;

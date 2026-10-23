@@ -8904,7 +8904,7 @@
       "SG2-89:AC4",
       "SG2-89:AC6"
     ],
-    "purpose": "Verify in the database that an event awaiting clarification is in its own coordinator's review queue only, that reassigning it keeps its status and moves supervision in the same write, that a reassignment read against a replaced coordinator changes nothing, that no event without a coordinator can have a supervising Lead, and that the work queue view stays server-only.",
+    "purpose": "Verify in the database that an event awaiting clarification is in its own coordinator's review queue only, that reassigning it keeps its status and moves supervision in the same write, that a reassignment read against a replaced coordinator changes nothing, that no event without a coordinator can have a supervising Lead, that the rebuilt work queue view keeps the fields earlier stories added, and that it stays server-only.",
     "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
     "steps": [
       "Read internal_work_items for a needs_clarification event and a draft.",
@@ -8913,13 +8913,13 @@
       "Check the column is nullable and the view's grants."
     ],
     "data": "Synthetic 989xx events; e8900000 fixture identities (an organiser, two Leads, two coordinators).",
-    "expected": "The clarification event is in its coordinator's review queue and no one else's, and drafts are not; the reassignment keeps needs_clarification and moves the queue entry and supervisor; the stale reassignment updates 0 rows; both orphan supervisors are refused with check_violation and clearing both together is allowed; authenticated and anon cannot select the view.",
-    "evidence": "supabase/tests/coordinator_oversight.sql; .github/workflows/ci.yml; supabase/rollbacks/202610220001_coordinator_oversight_down.sql",
+    "expected": "The clarification event is in its coordinator's review queue and no one else's, and drafts are not; the reassignment keeps needs_clarification and moves the queue entry and supervisor; the stale reassignment updates 0 rows; both orphan supervisors are refused with check_violation and clearing both together is allowed; the view still carries SG2-67's cancellation fields and SG2-105's preferred layout; authenticated and anon cannot select the view.",
+    "evidence": "supabase/tests/coordinator_oversight.sql; .github/workflows/ci.yml; supabase/rollbacks/202610220004_coordinator_oversight_down.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
     "actual": "Passed in the disposable PostgreSQL 17 replay.",
     "status": "Pass",
     "execution_date": "22 Oct 2026",
     "executed_by": "LIM DAO JUN",
-    "execution_evidence": "22 Oct 2026; feature/SG2-89-coordinator-oversight on main c252795; disposable PostgreSQL 17 replay of the auth fixture and every migration, then all 42 CI SQL suites; sabotage runs (check constraint dropped, previous work queue view restored) made the suite fail. Rollback rehearsal: schema dumps before the migration and after migrate, write and roll back match; main's work queue suite passes on the rolled-back database; re-applying the migration passes the new suite."
+    "execution_evidence": "23 Oct 2026; feature/SG2-89-coordinator-oversight with main 4f8657a merged in; disposable PostgreSQL 17 replay of the auth fixture and every migration, then all 45 CI SQL suites; sabotage runs (check constraint dropped, SG2-67's view without needs_clarification restored, an older view without the cancellation fields restored) made the suite fail. Rollback rehearsal: schema dumps before the migration and after migrate, write and roll back match; main's work queue, clarification, status flow, safety approval, cancellation and registrable events suites pass on the rolled-back database; re-applying the migration passes the new suite."
   }
 ]

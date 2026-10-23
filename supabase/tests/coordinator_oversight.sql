@@ -41,6 +41,10 @@ begin
  if exists (select 1 from public.internal_work_items where kind='event' and event_id=98901 and assigned_to is distinct from ada) then
    raise exception '[SG2-89:clarification-own-coordinator] [BOUNDARY] [SG2-89:AC6] An event awaiting clarification must reach only its assigned coordinator';
  end if;
+ if not (select details ? 'cancellation_requested_at' and details ? 'cancellation_reason' and details ? 'preferred_layout'
+     from public.internal_work_items where kind='event' and event_id=98901) then
+   raise exception '[SG2-89:queue-keeps-fields] [BOUNDARY] [SG2-89:AC6] Replacing the work queue view must keep the fields earlier stories added';
+ end if;
  if exists (select 1 from public.internal_work_items where kind='event' and event_id=98903) then
    raise exception '[SG2-89:draft-not-in-queue] [BOUNDARY] [SG2-89:AC6] Adding the clarification status must not bring drafts into the work queue';
  end if;
