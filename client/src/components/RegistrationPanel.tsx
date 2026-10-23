@@ -121,6 +121,7 @@ function Attendees({ view }: { view: RegistrationView }) {
                 <>
                   <span>{attendee.email ? <EmailAddress email={attendee.email} /> : 'No email on record'}</span>
                   <span>{attendee.phone ?? 'No phone on record'}</span>
+                  {attendee.needs ? <span>Needs: {attendee.needs}</span> : null}
                 </>
               ) : null}
               <span className="organisation-detail-hint">Registered {formatSgtTimestamp(attendee.registered_at)}</span>
