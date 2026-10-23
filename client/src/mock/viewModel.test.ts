@@ -233,12 +233,6 @@ describe('calendarDays', () => {
     expect(days[34].n).toBe('');
   });
 
-  test('[NORMAL] [SG2-20:prototype-view-model] marked days carry their label', () => {
-    expect(days.find((d) => d.n === '15')?.label).toBe('Confirmed · E-186');
-    expect(days.find((d) => d.n === '24')?.label).toBe('Blocked — maintenance');
-    expect(days.find((d) => d.n === '3')?.label).toBe('');
-  });
-
   test('[NORMAL] [SG2-20:prototype-view-model] the legend and representative days show the four documented availability states', () => {
     expect(CALENDAR_LEGEND).toEqual([
       { label: 'Available', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },

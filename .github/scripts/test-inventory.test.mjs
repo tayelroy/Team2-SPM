@@ -25,8 +25,76 @@ test('[NORMAL] [SG2-22:AC3] the CLI writes and verifies a current method ledger'
   assert.equal(run().status, 0);
   const ledger = JSON.parse(readFileSync(join(root, 'docs/test-case-inventory.json'), 'utf8'));
   assert.equal(ledger.methods.length, 1);
+  assert.equal(ledger.methods[0].id, 'SG2-22:accepts-a-valid-record');
+  assert.equal(ledger.methods[0].legacyId, 'TC-45b544aaf96a');
   assert.deepEqual(ledger.methods[0].references, [{ story: 'SG2-22', criterion: 'AC3' }]);
   assert.deepEqual(ledger.methods[0].categories, ['NORMAL']);
+});
+
+test('[NORMAL] [BOUNDARY] [SG2-22:AC3] readable IDs and legacy aliases agree across exports and ignore line-only changes', t => {
+  const { root, run } = fixture(t);
+  const details = join(root, 'details.json');
+  assert.equal(run('--write', '--details', details).status, 0);
+  const first = JSON.parse(readFileSync(details, 'utf8')).methods[0];
+  writeFileSync(join(root, 'server/src/sample.test.mjs'), '\n// Source formatting does not rename a case.\n' + valid);
+  assert.equal(run('--write', '--details', details).status, 0);
+  const after = JSON.parse(readFileSync(details, 'utf8')).methods[0];
+  const committed = JSON.parse(readFileSync(join(root, 'docs/test-case-inventory.json'), 'utf8')).methods[0];
+  assert.equal(after.id, 'SG2-22:accepts-a-valid-record');
+  assert.equal(after.id, first.id);
+  assert.equal(after.legacyId, first.legacyId);
+  assert.equal(committed.id, after.id);
+  assert.equal(committed.legacyId, after.legacyId);
+  assert.ok(after.line > first.line);
+});
+
+test('[CONFLICT] [BOUNDARY] [SG2-22:AC3] equal readable names remain distinct across files and punctuation without changing explicit SQL IDs', t => {
+  const sql = `do $$ begin
+    raise exception '[SG2-22:accepts-a-valid-record] [SG2-22:AC3] [FAILURE] invalid record accepted';
+  end $$;`;
+  const { root, run } = fixture(t, valid + '\n' + valid.replace('accepts a valid record', 'accepts-a-valid-record'), sql);
+  writeFileSync(join(root, 'client/src/sample.test.mjs'), valid);
+  const details = join(root, 'details.json');
+  assert.equal(run('--write', '--details', details).status, 0);
+  const inventory = JSON.parse(readFileSync(details, 'utf8'));
+  const ids = inventory.methods.map(method => method.id);
+  assert.equal(new Set(ids).size, 3);
+  assert.ok(ids.every(id => /^SG2-22:[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)));
+  assert.ok(ids.some(id => id.includes('client-src-sample')));
+  assert.equal(ids.filter(id => id.includes('server-src-sample')).length, 2);
+  assert.ok(ids.some(id => /-1$/.test(id)));
+  assert.ok(ids.some(id => /-2$/.test(id)));
+  assert.equal(inventory.sqlAssertions[0].id, 'SG2-22:accepts-a-valid-record');
+  assert.ok(ids.every(id => id !== inventory.sqlAssertions[0].id));
+  const firstIds = [...ids];
+  assert.equal(run('--write', '--details', details).status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(details, 'utf8')).methods.map(method => method.id), firstIds);
+
+  const single = fixture(t, valid, sql);
+  const singleDetails = join(single.root, 'details.json');
+  assert.equal(single.run('--write', '--details', singleDetails).status, 0);
+  const singleInventory = JSON.parse(readFileSync(singleDetails, 'utf8'));
+  assert.equal(singleInventory.methods[0].id, 'SG2-22:accepts-a-valid-record-server-src-sample');
+  assert.equal(singleInventory.sqlAssertions[0].id, 'SG2-22:accepts-a-valid-record');
+});
+
+test('[BOUNDARY] [SG2-22:AC3] long Unicode titles have readable bounded IDs while legacy aliases remain distinct', t => {
+  const prefix = 'Café ' + 'a'.repeat(120);
+  const source = valid.replace('accepts a valid record', prefix + ' one') + '\n'
+    + valid.replace('accepts a valid record', prefix + ' two');
+  const { root, run } = fixture(t, source);
+  const details = join(root, 'details.json');
+  assert.equal(run('--write', '--details', details).status, 0);
+  const methods = JSON.parse(readFileSync(details, 'utf8')).methods;
+  assert.equal(new Set(methods.map(method => method.id)).size, 2);
+  assert.equal(new Set(methods.map(method => method.legacyId)).size, 2);
+  assert.ok(methods.every(method => method.id.startsWith('SG2-22:cafe-')));
+  assert.ok(methods.every(method => method.id.startsWith('SG2-22:cafe-server-src-sample-')));
+  assert.ok(methods.every(method => method.id.length < 220));
+  const wholeWords = fixture(t, valid.replace('accepts a valid record', 'word '.repeat(18) + 'lengthyword remainder'));
+  assert.equal(wholeWords.run('--write').status, 0);
+  const wholeWordId = JSON.parse(readFileSync(join(wholeWords.root, 'docs/test-case-inventory.json'), 'utf8')).methods[0].id;
+  assert.equal(wholeWordId, 'SG2-22:' + Array(18).fill('word').join('-'));
 });
 
 test('[CONFLICT] [SG2-22:AC3] duplicate Supabase migration versions block the deployment inventory gate until renumbered', t => {
