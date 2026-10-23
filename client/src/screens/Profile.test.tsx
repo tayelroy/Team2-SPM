@@ -62,13 +62,6 @@ test('[FAILURE] [SG2-27:AC1] shows the load error and no form when the profile c
   expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-27:AC4] hides department for an external role (profile has no department key)', async () => {
-  stubFetch(EXTERNAL_PROFILE);
-  render(<Profile role="Attendee" />);
-  await screen.findByLabelText('Name');
-  expect(screen.queryByLabelText('Department')).not.toBeInTheDocument();
-});
-
 test('[NORMAL] [SG2-27:AC4] shows department for an internal role and saves it', async () => {
   const fetchMock = stubFetch(INTERNAL_PROFILE);
   render(<Profile role="Attendee" />);
@@ -210,7 +203,7 @@ test('[NORMAL] [SG2-86:AC3] shows the Role fact for Safety Officer alongside the
   expect(screen.getByText('Safety Officer')).toBeInTheDocument();
 });
 
-test('[BOUNDARY] [SG2-86:AC3] shows the Role fact for an unaffected existing role with no department', async () => {
+test('[BOUNDARY] [NORMAL] [SG2-86:AC3] [SG2-27:AC4] shows the Role fact for an unaffected existing role with no department', async () => {
   stubFetch(EXTERNAL_PROFILE);
   render(<Profile role="Attendee" />);
   await screen.findByLabelText('Name');

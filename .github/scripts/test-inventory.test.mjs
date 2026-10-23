@@ -19,11 +19,12 @@ function fixture(t, source = valid, sql = '') {
   return { root, run };
 }
 
-test('[NORMAL] [SG2-22:AC3] the CLI writes and verifies a current method ledger', t => {
+test('[NORMAL] [BOUNDARY] [SG2-22:AC3] the CLI writes and verifies a current method ledger', t => {
   const { root, run } = fixture(t);
   assert.equal(run('--write').status, 0);
   assert.equal(run().status, 0);
   const ledger = JSON.parse(readFileSync(join(root, 'docs/test-case-inventory.json'), 'utf8'));
+  // fixture() leaves integration/ empty: the single source case also proves no phantom cases are added.
   assert.equal(ledger.methods.length, 1);
   assert.equal(ledger.methods[0].file, 'server/src/sample.test.mjs');
   assert.equal(ledger.methods[0].title, '[NORMAL] [SG2-22:AC3] accepts a valid record');
@@ -144,14 +145,6 @@ test('[NORMAL] [SG2-22:AC3] database integration declarations enter the same aud
   assert.equal(method.title, '[NORMAL] [SG2-22:AC3] accepts a real database response');
   assert.match(method.preconditions, /Disposable local PostgreSQL and PostgREST/);
   assert.match(method.preconditions, /No hosted Supabase/);
-});
-
-test('[BOUNDARY] [SG2-22:AC3] an empty integration directory adds no phantom test cases', t => {
-  const { root, run } = fixture(t);
-  assert.equal(run('--write').status, 0);
-  const ledger = JSON.parse(readFileSync(join(root, 'docs/test-case-inventory.json'), 'utf8'));
-  assert.equal(ledger.methods.length, 1);
-  assert.equal(ledger.methods[0].file, 'server/src/sample.test.mjs');
 });
 
 test('[CONFLICT] [SG2-22:AC3] changed integration cases invalidate an earlier test register', t => {

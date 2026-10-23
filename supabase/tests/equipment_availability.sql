@@ -300,14 +300,9 @@ begin
 end $$;
 reset role;
 do $$
-declare role_name text;
 begin
- foreach role_name in array array['anon','authenticated'] loop
-  if has_table_privilege(role_name,'public.equipment_reservations','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
-    or has_any_column_privilege(role_name,'public.equipment_reservations','SELECT,INSERT,UPDATE,REFERENCES') then
-   raise exception '[SG2-54:reservation-grants-unchanged] [SG2-54:AC1] [FAILURE] Availability must not grant ordinary callers direct reservation access';
-  end if;
- end loop;
+ -- The identical reservation-table grant invariant is checked for both roles
+ -- in equipment_reservations.sql (SG2-55:no-direct-reservation-access).
  if not exists(select 1 from pg_proc where oid='public.check_equipment_availability(integer,bigint,timestamptz,timestamptz)'::regprocedure
      and provolatile='s' and prosecdef and proconfig @> array['search_path=""'])
     or not has_function_privilege('authenticated','public.check_equipment_availability(integer,bigint,timestamptz,timestamptz)','EXECUTE') then

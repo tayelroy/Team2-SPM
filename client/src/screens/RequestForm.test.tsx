@@ -168,7 +168,7 @@ describe('AC1 — successful submission', () => {
     });
   });
 
-  test('[CONFLICT] [SG2-30:duplicate-submit] keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
+  test('[CONFLICT] [SG2-30:duplicate-submit] [SG2-105:AC1] keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
     let finishSave!: (response: Response) => void;
     let finishSubmit!: (response: Response) => void;
     const fetchMock = vi.fn()
@@ -184,14 +184,38 @@ describe('AC1 — successful submission', () => {
     expect(btn).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     fireEvent.click(btn);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(fetchMock).toHaveBeenCalledOnce();
+    // Independent customer-minimum answers must survive the pending save;
+    // rapid attempts must not create a second draft or omit a required answer.
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/event-requests/12');
+    expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      name: 'Forum 2026',
+      purpose: 'Partner briefing',
+      description: 'A half-day forum with keynotes and a panel.',
+      proposed_date: '2026-10-12T02:00:00.000Z',
+      expected_attendance: 180,
+      venue_requirements: 'Stage + loop',
+      preferred_layout: 'Theatre',
+      accessibility_needs: 'Hearing loop',
+      equipment_requirements: 'Lectern',
+      registration_needed: false,
+    });
     finishSave(draftResponse());
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(btn).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    fireEvent.click(btn);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/event-requests/12/submit', {
+      method: 'PATCH', headers: { Authorization: 'Bearer test-token' },
+    });
     expect(onSuccess).not.toHaveBeenCalled();
     finishSubmit(new Response(null, { status: 204 }));
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(onSuccess).toHaveBeenCalledWith(12, 'Forum 2026');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -326,20 +350,6 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     ).toBeInTheDocument();
   });
 
-  test('[CONFLICT] [SG2-28:duplicate-save] disables the save button while the request is in flight', async () => {
-    let release!: (response: Response) => void;
-    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
-    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    const saving = await screen.findByRole('button', { name: 'Saving…' });
-    expect(saving).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
-
-    release(draftResponse());
-    expect(await screen.findByText(/Draft 12 saved/)).toBeInTheDocument();
-  });
-
   test('[CONFLICT] [SG2-28:duplicate-save] a second click while saving does not save twice', async () => {
     let release!: (response: Response) => void;
     const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve; }));
@@ -347,10 +357,13 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
+    const saving = await screen.findByRole('button', { name: 'Saving…' });
+    expect(saving).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+    fireEvent.click(saving);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     release(draftResponse());
-    await screen.findByText(/Draft 12 saved/);
+    expect(await screen.findByText(/Draft 12 saved/)).toBeInTheDocument();
   });
 
   test('[FAILURE] [SG2-28:AC4] shows the server validation details when the draft is rejected', async () => {

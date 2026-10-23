@@ -1269,19 +1269,6 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     );
   }
 
-  test('[NORMAL] [SG2-100:AC6] the assigned coordinator can close out an event that has finished', async () => {
-    showEvent();
-    const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockResolvedValue({ ok: true });
-    renderAsCoordinator();
-
-    const button = await screen.findByRole('button', { name: 'Mark as Completed' });
-    await act(async () => {
-      fireEvent.click(button);
-    });
-
-    expect(complete).toHaveBeenCalledWith(104, 'token');
-  });
-
   test('[NORMAL] [SG2-100:AC6] a completed event shows who closed it out and when, and offers the action no more', async () => {
     showEvent({
       status: 'completed',
@@ -1338,7 +1325,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     }
   });
 
-  test('[CONFLICT] [SG2-100:AC6] rapid clicking sends exactly one request and disables the button', async () => {
+  test('[CONFLICT] [NORMAL] [SG2-100:AC6] rapid clicking sends exactly one request and disables the button', async () => {
     showEvent();
     let release!: (value: eventRequestsApi.CompleteEventOutcome) => void;
     const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockReturnValue(
@@ -1356,6 +1343,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     const pending = await screen.findByRole('button', { name: 'Marking as Completed…' });
     expect(pending).toBeDisabled();
     expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledWith(104, 'token');
 
     await act(async () => {
       release({ ok: true });

@@ -9,15 +9,16 @@
     "coverageBaselineRerun": false
   },
   "current": {
-    "executableMethodDeclarations": 3093,
-    "taggedSqlInventoryEntries": 1330,
-    "totalInventoryEntries": 4423
+    "executableMethodDeclarations": 3085,
+    "taggedSqlInventoryEntries": 1329,
+    "totalInventoryEntries": 4414
   },
   "counts": {
-    "removedExecutableMethodDeclarations": 14,
+    "removedExecutableMethodDeclarations": 22,
     "removedInformationalSqlSummaryNotices": 5,
     "addedGeneratorIdentityTests": 3,
-    "netInventoryReduction": 16
+    "netInventoryReduction": 25,
+    "removedIdenticalSqlGuards": 1
   },
   "scope": {
     "applicationImplementationChanges": false,
@@ -1051,5 +1052,129 @@
     "generatorIdentityTests": "19 passed, including namespace collisions, legacy aliases, stable line-only movement and export consistency.",
     "frontendTargeted": "2 files,91tests passed.",
     "fullCurrentBranchCI": "Required before merge; no claim of a new full baseline coverage comparison."
+  },
+  "allStoryReview": {
+    "baselineRef": "8511052a9756c69210556d978268d65dc90c9eec",
+    "reviewedStories": 68,
+    "reviewedTestFiles": 224,
+    "reviewedSqlSuites": 46,
+    "reviewedMethodDeclarations": 3093,
+    "reviewedSqlChecks": 1330,
+    "additionalRemovals": [
+      {
+        "removedId": "SG2-20:confirmed-reads-as-solid-teal",
+        "legacyId": "TC-b01014cd21a3",
+        "file": "client/src/mock/viewModel.test.ts",
+        "retainedId": "SG2-20:matching-is-case-insensitive",
+        "retainedLine": 29,
+        "reason": "Both tests use the same pure badgeStyle seam and no setup. The retained normalization loop now includes the exact original mixed-case Confirmed input, and retains the independent literal full-style oracle.",
+        "preservedOracle": "Complete style must equal { badgeBg: '#00827c', badgeFg: '#012624' }."
+      },
+      {
+        "removedId": "SG2-20:s-is-muted-grey",
+        "legacyId": "TC-acc3fd368640",
+        "file": "client/src/mock/viewModel.test.ts",
+        "retainedId": "SG2-100:a-failed-safety-check-reads-as-a-dead-state-like-rejected-and-cancelled",
+        "retainedLine": 312,
+        "reason": "Same pure badgeStyle seam and no setup; the stronger existing dead-style check retains every original capitalized fixture, adds background verification for them, and carries SG2-20:prototype-view-model alongside SG2-100:AC5.",
+        "preservedOracle": "Original badgeFg '#bbc7c6' is retained independently as a literal within the stronger complete style { badgeBg: 'rgba(112,119,119,0.35)', badgeFg: '#bbc7c6' }."
+      },
+      {
+        "removedId": "SG2-27:hides-department-for-an-external-role-profile-has-no-department-key",
+        "legacyId": "TC-e764036159c5",
+        "file": "client/src/screens/Profile.test.tsx",
+        "retainedId": "SG2-86:shows-the-role-fact-for-an-unaffected-existing-role-with-no-department",
+        "retainedLine": 206,
+        "reason": "Exact setup, public component, rendered props and missing-department oracle are already a strict subset of the retained role-fact test. Preserve NORMAL, BOUNDARY, SG2-27:AC4 and SG2-86:AC3.",
+        "preservedOracle": "expect(screen.queryByLabelText(\"Department\")).not.toBeInTheDocument(); retained case additionally asserts Attendee role text."
+      },
+      {
+        "removedId": "SG2-28:disables-the-save-button-while-the-request-is-in-flight",
+        "legacyId": "TC-1d835060e4a6",
+        "file": "client/src/screens/RequestForm.test.tsx",
+        "retainedId": "SG2-28:a-second-click-while-saving-does-not-save-twice",
+        "retainedLine": 353,
+        "reason": "Identical asynchronous fixture/public component and response. Move disabled-controls and visible-success assertions into the stronger existing repeat-click test; remove the repeated render/setup, not a distinct race/error scenario.",
+        "preservedOracle": "Saving button disabled; Submit request disabled; Draft12 confirmation present after resolution. Retained double-click case also requires one fetch."
+      },
+      {
+        "removedId": "SG2-100:the-assigned-coordinator-can-close-out-an-event-that-has-finished",
+        "legacyId": "TC-08fae3b1744b",
+        "file": "client/src/screens/EventDetail.test.tsx",
+        "retainedId": "SG2-100:rapid-clicking-sends-exactly-one-request-and-disables-the-button",
+        "retainedLine": 1328,
+        "reason": "The basic positive dispatch oracle uses the same event/identity/public seam as the stronger pending/success race case. Carry its exact argument oracle and NORMAL tag into that case; all original event/status boundaries remain separate.",
+        "preservedOracle": "expect(complete).toHaveBeenCalledWith(104,\"token\"); retained case also checks exactly one call and disabled pending button before resolving success."
+      },
+      {
+        "removedId": "SG2-88:the-queue-also-lists-the-event-coordinators-the-lead-can-assign-to",
+        "legacyId": "TC-72e6909a05f1",
+        "file": "server/src/assignmentQueue.test.ts",
+        "retainedId": "SG2-87:the-event-coordinator-lead-reads-the-unassigned-queue",
+        "retainedLine": 41,
+        "reason": "Identical Lead principal, bearer token, GET endpoint, default appFor fixture and COORDINATORS. Retained full response deep equality proves both coordinator names and IDs plus entries and 200; removed mapped-name projection is a strict subset."
+      },
+      {
+        "removedId": "SG2-39:returns-404-when-event-record-is-not-found",
+        "legacyId": "TC-205e1533c2c5",
+        "file": "server/src/events/updatePlanning.test.ts",
+        "retainedId": "SG2-39:a-missing-event-returns-404-without-updating-planning-details-or-adding-history",
+        "retainedLine": 802,
+        "reason": "Both valid PATCH inputs reach the same createUpdateEventPlanningHandler fetchPlanningRecord not_found branch. Retained wrong-ID fixture returns identical ok:false/reason:not_found; it asserts identical 404/body plus fetched ID and no planning/history writes. Both payloads validate; only error message differs and neither provider message is exposed."
+      },
+      {
+        "oldId": "SG2-54:reservation-grants-unchanged",
+        "oldFile": "supabase/tests/equipment_availability.sql",
+        "oldLine": 308,
+        "retainedId": "SG2-55:no-direct-reservation-access",
+        "retainedFile": "supabase/tests/equipment_reservations.sql",
+        "retainedBaselineLine": 462,
+        "category": "FAILURE",
+        "preservedMappings": [
+          "SG2-54:AC1",
+          "SG2-55:AC1"
+        ],
+        "removedSetup": false,
+        "equivalence": {
+          "roles": [
+            "anon",
+            "authenticated"
+          ],
+          "relation": "public.equipment_reservations",
+          "tablePrivileges": "SELECT,INSERT,UPDATE,DELETE,TRUNCATE",
+          "columnPrivileges": "SELECT,INSERT,UPDATE,REFERENCES",
+          "condition": "has_table_privilege(role_name,relation,tablePrivileges) OR has_any_column_privilege(role_name,relation,columnPrivileges)",
+          "context": "Both suites run after all committed migrations on the same schema. ACLs do not depend on their transaction-local fixture rows. Neither suite changes ACLs. The retained guard checks exactly the same two roles and both exact privilege lists."
+        }
+      },
+      {
+        "removedId": "SG2-22:an-empty-integration-directory-adds-no-phantom-test-cases",
+        "legacyId": "TC-7d894af1298f",
+        "file": ".github/scripts/test-inventory.test.mjs",
+        "baselineLine": 149,
+        "retainedId": "SG2-22:the-cli-writes-and-verifies-a-current-method-ledger",
+        "retainedLine": 22,
+        "reason": "Both tests use fixture(t) with the same empty integration directory and valid sole source. The retained CLI test asserts the same successful write, length=1 and exact source file, plus ledger validation and metadata; BOUNDARY is carried over."
+      }
+    ],
+    "gapClosure": "SG2-105:AC1 now has concrete conflict assertions for all ten minimum answers during pending persistence/submission; no new method or artificial tag-only coverage.",
+    "validation": {
+      "command": "npm run ci",
+      "result": "PASS on complete post-change rerun",
+      "frontend": {
+        "statements": 100,
+        "branches": 100,
+        "lines": 100,
+        "functions": 100
+      },
+      "backend": {
+        "statements": 100,
+        "branches": 100,
+        "lines": 100,
+        "functions": 100
+      },
+      "coverageConfigurationChanged": false,
+      "earlierRun": "Unchanged work-queue test hit one ECONNRESET; subsequent diagnostics and full rerun passed; exact transport cause unproven, no retry code added."
+    }
   }
 }
