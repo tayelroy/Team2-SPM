@@ -459,7 +459,7 @@ begin
  foreach role_name in array array['anon','authenticated'] loop
   if has_table_privilege(role_name,'public.equipment_reservations','SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
    or has_any_column_privilege(role_name,'public.equipment_reservations','SELECT,INSERT,UPDATE,REFERENCES') then
-   raise exception '[SG2-55:no-direct-reservation-access] [SG2-55:AC1] [FAILURE] Reservation access must remain confined to the guarded RPC';
+   raise exception '[SG2-55:no-direct-reservation-access] [SG2-55:AC1] [SG2-54:AC1] [FAILURE] Availability and reservation access must not grant ordinary callers direct reservation access';
   end if;
  end loop;
  if not exists(select 1 from pg_proc where oid='public.manage_equipment_reservations(text,integer,bigint,bigint,timestamptz,timestamptz)'::regprocedure
