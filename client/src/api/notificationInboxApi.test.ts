@@ -96,3 +96,9 @@ test.each([null, {}, { event: null }, { event: {} },
   '[FAILURE] [SG2-69:AC3] invalid event summary %j is rejected', async value => {
     respond(value); expect((await loadNotificationEvent('token', 'event', 2)).ok).toBe(false);
   });
+
+test('[NORMAL] [SG2-60:AC1] an attendee inbox holding a registration confirmation loads', async () => {
+  const confirmed = { ...entry, kind: 'registration_confirmed', message: 'You are registered for Forum on 20 Jul 2030 19:00 SGT at Main hall.' };
+  respond({ notifications: [confirmed], unread_count: 1, next_cursor: null });
+  expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [confirmed], unread_count: 1, next_cursor: null } });
+});
