@@ -18,6 +18,10 @@ export interface EventRequestRecord extends DraftValues {
   /** Who marked the event completed and when (SG2-100 AC4). */
   completed_by?: string | null;
   completed_at?: string | null;
+  /** The organiser's request to cancel, and when it was carried out (SG2-67). */
+  cancellation_requested_at?: string | null;
+  cancellation_reason?: string | null;
+  cancelled_at?: string | null;
   /**
    * When the event finishes: the latest end of its confirmed venue bookings
    * (SG2-100 AC4). Null while it has none. Derived rather than stored, so it
@@ -125,7 +129,9 @@ const DETAIL_COLUMNS =
   'decided_at, decision_reason, ' +
   // SG2-100 AC4: who marked the event completed and when, plus the bookings
   // the event's end time is derived from.
-  'completed_by, completed_at, venue_bookings!venue_bookings_event_id_fkey(ends_at, status)';
+  'completed_by, completed_at, venue_bookings!venue_bookings_event_id_fkey(ends_at, status), ' +
+  // SG2-67 AC1/AC4: the organiser's request to cancel, and the cancellation.
+  'cancellation_requested_at, cancellation_reason, cancelled_at';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {

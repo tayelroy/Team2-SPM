@@ -58,8 +58,8 @@ test('[NORMAL] [SG2-70:AC1] application composition mounts event search at /api/
 
 test('[NORMAL] [SG2-89:AC1] application composition mounts the Lead\'s overview at /api/coordinator-overview', async () => {
   const overview = Router().get('/', (_req, res) => res.json({ service: 'coordinatorOverview' }));
-  const args = Array.from({ length: 41 }, () => undefined) as unknown as Parameters<typeof createApp>;
-  args[40] = overview;
+  const args = Array.from({ length: 43 }, () => undefined) as unknown as Parameters<typeof createApp>;
+  args[42] = overview;
   const response = await request(createApp(...args)).get('/api/coordinator-overview');
   assert.deepEqual([response.status, response.body], [200, { service: 'coordinatorOverview' }]);
 });

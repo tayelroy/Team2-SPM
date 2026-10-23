@@ -32,6 +32,7 @@ const POLICY_PERMISSIONS: Partial<Record<Role, string[]>> = {
     'event_request.history.view', 'profile.read', 'profile.update'],
   'Safety Officer': ['event_request.stage.view', 'event_request.history.view', 'equipment_requirements.read',
     'safety_checks.read', 'profile.read', 'profile.update'],
+  Attendee: ['events.registrable.read', 'notifications.inbox', 'profile.read', 'profile.update'],
 };
 
 function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ?? []) {
@@ -56,6 +57,10 @@ function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ??
       // SG2-91: the Safety Officer's desk counts the events awaiting a check.
       if (url === '/api/safety-checks') return Response.json({ events: [] });
       if (url === '/api/coordinator-overview') return Response.json({ events: [], coordinators: [], statuses: [] });
+      // SG2-59: the attendee's list of events open for registration.
+      if (url === '/api/registrable-events') return Response.json({ events: [{ event_id: 591, name: 'Harbour Lecture',
+        proposed_date: '2030-07-20T11:00:00.000Z', registration_opens_at: '2020-10-01T00:00:00.000Z',
+        registration_closes_at: '2030-07-19T02:00:00.000Z', venues: [{ name: 'Regression Hall', location: 'Level 1' }] }] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
@@ -196,7 +201,7 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
     ],
-    Attendee: [['My registrations', 'My registrations'], ['Event page', 'Event page']],
+    Attendee: [['My registrations', 'My registrations'], ['Find events', 'Find events'], ['Event page', 'Event page']],
     // SG2-86: only the screens these roles can use; neither holds
     // event_request.view, so neither is offered All events.
     // SG2-97: assignment moved here from Technical Support Staff.
@@ -910,6 +915,20 @@ test('[NORMAL] [SG2-44:AC1] the calendar shows the month grid with real venue av
   expect(await screen.findByText('Atrium Hall · confirmed')).toBeInTheDocument();
   expect(screen.getByText('Booked')).toBeInTheDocument();
   expect(screen.getByText('Unavailable')).toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-59:AC1] an attendee reaches the events open for registration from the menu and from Browse events', async () => {
+  await signInAs('Attendee');
+  fireEvent.click(within(header()).getByRole('button', { name: 'Find events' }));
+  expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('VenueRegression Hall');
+  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'Browse events' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'Find events' })).toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-59:AC1] an attendee without the grant is not offered Find events', async () => {
+  await signInAs('Attendee', ['profile.read']);
+  expect(within(await loadedNav()).queryByRole('button', { name: 'Find events' })).toBeNull();
 });
 
 test('[NORMAL] [SG2-20:prototype-registration] an attendee can withdraw and re-register', async () => {

@@ -43,7 +43,9 @@ export type Screen =
   | 'safetyChecks'
   | 'search'
   // SG2-70: find an event across the system.
-  | 'findEvent';
+  | 'findEvent'
+  // SG2-59: an attendee finds events open for registration.
+  | 'findEvents';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;

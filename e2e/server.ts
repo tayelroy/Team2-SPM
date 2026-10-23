@@ -74,6 +74,8 @@ import { createEventSearchRouter } from '../server/src/eventSearch';
 import { createMemoryEventSearchStore, seedEventSearch } from './support/event-search';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
+import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
+import { createMemoryRegistrableEventsStore, seedRegistrableEvents } from './support/registrable-events';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -257,6 +259,10 @@ const app = createApp(
   // SG2-63: the registration picture and settings mirror their SQL functions
   // over the in-memory tables.
   createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) }),
+  // SG2-59: the attendee's event list mirrors registrable_events over the in-memory tables.
+  createRegistrableEventsRouter(access, token => createMemoryRegistrableEventsStore(database, token)),
+  // SG2-67: cancellation keeps its default handlers, as before.
+  undefined,
   // SG2-89: the Lead's overview, against the in-memory client.
   createCoordinatorOverviewRouter(access, { getAdminClient: getClient })
 );
@@ -348,6 +354,11 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
     bookings: database.tables.venue_bookings.filter(seeded),
   });
+});
+// SG2-59: events an attendee can and cannot find.
+app.post('/__e2e/registrable-events', (_req, res) => {
+  seedRegistrableEvents(database);
+  res.status(204).end();
 });
 // SG2-70: events across organisations to search for, plus a draft that is never found.
 app.post('/__e2e/event-search', (_req, res) => {

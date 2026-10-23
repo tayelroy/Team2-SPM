@@ -637,6 +637,9 @@ describe('fetchOwnEventDetail', () => {
       decidedAt: '2026-09-25T02:00:00.000Z',
       completedBy: null,
       completedAt: null,
+      cancellationRequestedAt: null,
+      cancellationReason: null,
+      cancelledAt: null,
       endsAt: null,
     };
 
@@ -686,6 +689,9 @@ describe('fetchOwnEventDetail', () => {
         decidedAt: null,
         completedBy: null,
         completedAt: null,
+        cancellationRequestedAt: null,
+        cancellationReason: null,
+        cancelledAt: null,
         endsAt: null,
       },
     });
@@ -730,6 +736,9 @@ describe('fetchOwnEventDetail', () => {
         decidedAt: null,
         completedBy: null,
         completedAt: null,
+        cancellationRequestedAt: null,
+        cancellationReason: null,
+        cancelledAt: null,
         endsAt: null,
       },
     });
@@ -2188,5 +2197,27 @@ describe('the completion record on a detail read (SG2-100 AC4)', () => {
       expect(result.request.completedAt).toBeNull();
       expect(result.request.endsAt).toBeNull();
     }
+  });
+});
+
+describe('the cancellation record on a detail read (SG2-67 AC4)', () => {
+  test('[NORMAL] [SG2-67:AC4] the request time, reason and cancellation time are carried through, and non-strings read as unknown', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      request: {
+        event_id: 7, organiser_id: 'org-1', status: 'cancelled', can_manage: true,
+        cancellation_requested_at: '2026-10-21T01:00:00.000Z', cancellation_reason: 'Speaker withdrew',
+        cancelled_at: '2026-10-21T02:00:00.000Z',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const result = await fetchOwnEventDetail(7, 'test-token');
+    expect(result.ok && [result.request.cancellationRequestedAt, result.request.cancellationReason, result.request.cancelledAt])
+      .toEqual(['2026-10-21T01:00:00.000Z', 'Speaker withdrew', '2026-10-21T02:00:00.000Z']);
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      request: { event_id: 7, organiser_id: 'org-1', status: 'planning', can_manage: true, cancellation_reason: 5 },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const plain = await fetchOwnEventDetail(7, 'test-token');
+    expect(plain.ok && [plain.request.cancellationRequestedAt, plain.request.cancellationReason, plain.request.cancelledAt])
+      .toEqual([null, null, null]);
   });
 });

@@ -226,12 +226,18 @@ do $$
 declare state public.event_status; result jsonb;
 begin
  foreach state in array array['draft','submitted','under_review','cancelled']::public.event_status[] loop
-  update public.events set status=state where event_id=95507;
-  result := public.manage_equipment_reservations('reserve',95507,95507,1,'2031-10-04T09:00Z','2031-10-04T17:00Z');
-  if result is distinct from '{"outcome":"closed"}'::jsonb
-   or public.manage_equipment_reservations('read',95507)->>'can_reserve' is distinct from 'false' then
-   raise exception '[SG2-55:closed-event-denied] [SG2-55:AC1] [FAILURE] An ineligible event must close reservation writes: %',state;
-  end if;
+  -- SG2-67 AC5: a cancelled event can no longer be reinstated, so each stage
+  -- is checked in a block that is then undone.
+  begin
+   update public.events set status=state where event_id=95507;
+   result := public.manage_equipment_reservations('reserve',95507,95507,1,'2031-10-04T09:00Z','2031-10-04T17:00Z');
+   if result is distinct from '{"outcome":"closed"}'::jsonb
+    or public.manage_equipment_reservations('read',95507)->>'can_reserve' is distinct from 'false' then
+    raise exception '[SG2-55:closed-event-denied] [SG2-55:AC1] [FAILURE] An ineligible event must close reservation writes: %',state;
+   end if;
+   raise sqlstate 'SG267' using message = 'undo this stage';
+  exception when sqlstate 'SG267' then null;
+  end;
  end loop;
  update public.events set status='planning',coordinator_id=null where event_id=95507;
  if public.manage_equipment_reservations('reserve',95507,95507,1,'2031-10-04T09:00Z','2031-10-04T17:00Z')->>'outcome' is distinct from 'closed'

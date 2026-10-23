@@ -133,6 +133,8 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
   ],
   Attendee: [
     ['dashboard', 'My registrations'],
+    // SG2-59: the confirmed events open, or opening, for registration.
+    ['findEvents', 'Find events', 'events.registrable.read'],
     ['attendee', 'Event page'],
   ],
   // SG2-86: only screens the role can use. Each functional item is gated on
@@ -226,6 +228,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   safetyChecks: 'Safety checks',
   search: 'Find venues',
   findEvent: 'Find an event',
+  findEvents: 'Find events',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -260,6 +263,8 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Venues that meet every criterion and are free for the whole period. Blocked or confirmed-booked venues are left out.',
   findEvent:
     'Search the submitted events you work on by name or client organisation, and narrow by date, state, venue, category or coordinator.',
+  findEvents:
+    'Confirmed events you can register for now, or soon. Open one to read its details.',
 };
 
 /** Headline figures on the Attendee's prototype dashboard. */
@@ -297,7 +302,8 @@ export const PRIMARY_ACTION: Record<Role, { label: string; screen: Screen }> = {
   'Event Coordinator': { label: 'Search venues', screen: 'venues' },
   'Venue Staff': { label: 'Open availability', screen: 'calendar' },
   'Technical Support Staff': { label: 'Check availability', screen: 'equipment' },
-  Attendee: { label: 'Browse events', screen: 'attendee' },
+  // SG2-59: browsing goes to the real list of events open for registration.
+  Attendee: { label: 'Browse events', screen: 'findEvents' },
   // SG2-87/SG2-97: the Lead's dashboard summarises the unassigned queue;
   // its one call to action is the assignment screen.
   'Event Coordinator Lead': { label: 'Assign coordinators', screen: 'assign' },

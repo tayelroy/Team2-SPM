@@ -109,6 +109,12 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // see them but not change them, replacing SG2-39 AC4).
   'event_request.registrations.view': ['event_organiser', 'event_coordinator'],
   'event_request.registration_settings.update': ['event_organiser'],
+  // SG2-67 AC1: the creating organiser asks for a cancellation, and only the
+  // assigned coordinator carries it out. Which event is enforced per-row by
+  // request_event_cancellation and cancel_event (404 otherwise), not by these
+  // grants.
+  'event_request.cancellation.request': ['event_organiser'],
+  'event_request.cancel': ['event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing
@@ -219,6 +225,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'events.search': [
     'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
   ],
+  // SG2-59 AC1-AC3: only attendees browse the events they can register for;
+  // registrable_events() and registrable_event() recheck the acting role.
+  'events.registrable.read': ['attendee'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]
