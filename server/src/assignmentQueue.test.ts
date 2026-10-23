@@ -38,18 +38,13 @@ function appFor(role: Role, {
   return { app, reads: () => reads };
 }
 
-test('[NORMAL] [SG2-87:AC2] [SG2-87:AC3] the Event Coordinator Lead reads the unassigned queue', async () => {
+test('[NORMAL] [SG2-87:AC2] [SG2-87:AC3] [SG2-88:AC1] the Event Coordinator Lead reads the unassigned queue', async () => {
   const { app } = appFor('event_coordinator_lead');
   const response = await request(app).get('/api/assignment-queue').set('Authorization', 'Bearer token');
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { entries: [ENTRY], coordinators: COORDINATORS });
 });
 
-test('[NORMAL] [SG2-88:AC1] the queue also lists the Event Coordinators the Lead can assign to', async () => {
-  const { app } = appFor('event_coordinator_lead');
-  const response = await request(app).get('/api/assignment-queue').set('Authorization', 'Bearer token');
-  assert.deepEqual(response.body.coordinators.map((c: { name: string }) => c.name), ['Casey Coordinator', 'Robin Second']);
-});
 
 test('[NORMAL] [SG2-89:AC5] with several Leads, each one reads the whole unassigned queue', async () => {
   const queue = [ENTRY, { ...ENTRY, event_id: 2, name: 'Second Forum' }];

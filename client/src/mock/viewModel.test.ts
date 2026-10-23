@@ -22,23 +22,12 @@ import {
 import { color } from '../theme';
 
 describe('badgeStyle', () => {
-  test('[NORMAL] [SG2-20:prototype-view-model] confirmed reads as solid teal', () => {
-    expect(badgeStyle('Confirmed')).toEqual({
-      badgeBg: '#00827c',
-      badgeFg: '#012624',
-    });
-  });
-
-  test.each(['Rejected', 'Cancelled', 'Draft'])('[NORMAL] [SG2-20:prototype-view-model] %s is muted grey', (status) => {
-    expect(badgeStyle(status).badgeFg).toBe('#bbc7c6');
-  });
-
   test('[NORMAL] [SG2-20:prototype-view-model] anything in flight gets the neutral pill', () => {
     expect(badgeStyle('Under review').badgeFg).toBe('#edfffe');
   });
 
   test('[NORMAL] [SG2-20:prototype-view-model] matching is case-insensitive', () => {
-    for (const status of ['confirmed', 'CONFIRMED']) {
+    for (const status of ['Confirmed', 'confirmed', 'CONFIRMED']) {
       expect(badgeStyle(status)).toEqual({ badgeBg: '#00827c', badgeFg: '#012624' });
     }
   });
@@ -233,12 +222,6 @@ describe('calendarDays', () => {
     expect(days[34].n).toBe('');
   });
 
-  test('[NORMAL] [SG2-20:prototype-view-model] marked days carry their label', () => {
-    expect(days.find((d) => d.n === '15')?.label).toBe('Confirmed · E-186');
-    expect(days.find((d) => d.n === '24')?.label).toBe('Blocked — maintenance');
-    expect(days.find((d) => d.n === '3')?.label).toBe('');
-  });
-
   test('[NORMAL] [SG2-20:prototype-view-model] the legend and representative days show the four documented availability states', () => {
     expect(CALENDAR_LEGEND).toEqual([
       { label: 'Available', bg: 'rgba(1,29,28,0.5)', bd: 'rgba(255,255,255,0.07)' },
@@ -326,11 +309,13 @@ describe('statusLabel (SG2-100 AC5)', () => {
 });
 
 describe('badgeStyle for the Week 7 statuses (SG2-100 AC5)', () => {
-  test('[NORMAL] [SG2-100:AC5] a failed safety check reads as a dead state, like rejected and cancelled', () => {
-    const dead = { badgeBg: 'rgba(112,119,119,0.35)', badgeFg: color.silver };
-    expect(badgeStyle('safety_rejected')).toEqual(dead);
-    expect(badgeStyle('rejected')).toEqual(dead);
-    expect(badgeStyle('cancelled')).toEqual(dead);
+  test('[NORMAL] [SG2-100:AC5] [SG2-20:prototype-view-model] a failed safety check reads as a dead state, like rejected and cancelled', () => {
+    const dead = { badgeBg: 'rgba(112,119,119,0.35)', badgeFg: '#bbc7c6' };
+    // Keep the original prototype inputs alongside stored status values;
+    // checking the complete style also covers the earlier foreground checks.
+    for (const status of ['safety_rejected', 'rejected', 'cancelled', 'Rejected', 'Cancelled', 'Draft']) {
+      expect(badgeStyle(status)).toEqual(dead);
+    }
   });
 
   test('[BOUNDARY] [SG2-100:AC5] the live Week 7 statuses keep the neutral in-progress pill', () => {

@@ -1,0 +1,1180 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Reduce repeated test assertions without removing distinct inputs, public boundaries or DoD category coverage; migrate canonical method IDs to readable story:scenario names.",
+  "baseline": {
+    "gitRef": "4f8657a244cb02941f915073fba2009fcccc9823",
+    "executableMethodDeclarations": 3104,
+    "taggedSqlInventoryEntries": 1335,
+    "totalInventoryEntries": 4439,
+    "coverageBaselineRerun": false
+  },
+  "current": {
+    "executableMethodDeclarations": 3085,
+    "taggedSqlInventoryEntries": 1329,
+    "totalInventoryEntries": 4414
+  },
+  "counts": {
+    "removedExecutableMethodDeclarations": 22,
+    "removedInformationalSqlSummaryNotices": 5,
+    "addedGeneratorIdentityTests": 3,
+    "netInventoryReduction": 25,
+    "removedIdenticalSqlGuards": 1
+  },
+  "scope": {
+    "applicationImplementationChanges": false,
+    "coverageConfigurationChanges": false,
+    "newMigrations": false,
+    "distinctRoleRlsConcurrencyOrBoundaryScenariosRemoved": false
+  },
+  "dodVersion": "2.2",
+  "tagCarryovers": [
+    {
+      "retainedId": "SG2-23:clearsession-removes-a-stored-session",
+      "tagsAdded": [
+        "BOUNDARY",
+        "SG2-23:session-storage"
+      ],
+      "reason": "The retained clearSession test performs the same empty-storage boundary assertion."
+    },
+    {
+      "retainedId": "SG2-81:planning-is-reachable-only-from-approved-the-normal-way-in-the-safety-check-and-its-rejection",
+      "tagsAdded": [
+        "NORMAL",
+        "FAILURE"
+      ],
+      "reason": "The retained exhaustive transition table asserts the removed allowed and denied input pairs."
+    },
+    {
+      "retainedId": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+      "tagsAdded": [
+        "SG2-66:AC1"
+      ],
+      "reason": "The retained exact permission matrix already asserts all change-request and recheck grants."
+    }
+  ],
+  "removals": [
+    {
+      "removedId": "TC-b5aed24aebfb",
+      "kind": "redundant_assertion_subset",
+      "file": "client/src/auth/session.test.ts",
+      "baselineLines": [
+        24,
+        26
+      ],
+      "retainedIds": [
+        "SG2-23:clearsession-removes-a-stored-session"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-23:clearsession-removes-a-stored-session",
+          "file": "client/src/auth/session.test.ts",
+          "line": 24
+        }
+      ],
+      "reason": "saveSession(session); clearSession(); expect(loadSession()).toBeNull() executes identical absent-storage branch at session.ts37. Carries both old category and supporting contract.",
+      "removedCategories": [
+        "BOUNDARY"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-23",
+          "criterion": "session-storage"
+        }
+      ],
+      "retainedCategories": [
+        "BOUNDARY",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-34d11b485ec6",
+      "kind": "redundant_assertion_subset",
+      "file": "client/src/mock/viewModel.test.ts",
+      "baselineLines": [
+        236,
+        240
+      ],
+      "retainedIds": [
+        "SG2-20:the-legend-and-representative-days-show-the-four-documented-availability-states"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-20:the-legend-and-representative-days-show-the-four-documented-availability-states",
+          "file": "client/src/mock/viewModel.test.ts",
+          "line": 236
+        }
+      ],
+      "reason": "Same const days fixture; retained day3/day15/day24 labels exactly subsume all removed assertions, additionally checks Held day12 and all colors/legend.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-20",
+          "criterion": "prototype-view-model"
+        }
+      ],
+      "retainedCategories": [
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-d4c700cc3687",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        432,
+        435
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+        "SG2-97:refuses-technical-support-staff-now-that-assignment-belongs-to-the-event-coordinator-lead",
+        "SG2-33:denies-roles-that-cannot-assign-a-coordinator-technical-support-staff-included"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        },
+        {
+          "id": "SG2-97:refuses-technical-support-staff-now-that-assignment-belongs-to-the-event-coordinator-lead",
+          "file": "server/src/assignCoordinator.test.ts",
+          "line": 657
+        },
+        {
+          "id": "SG2-33:denies-roles-that-cannot-assign-a-coordinator-technical-support-staff-included",
+          "file": "server/src/listAssignable.test.ts",
+          "line": 120
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-97",
+          "criterion": "AC1"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-82a33e42afde",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        486,
+        503
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-100",
+          "criterion": "AC13"
+        },
+        {
+          "story": "SG2-53",
+          "criterion": "AC6"
+        },
+        {
+          "story": "SG2-77",
+          "criterion": "AC5"
+        },
+        {
+          "story": "SG2-91",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-92",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-70",
+          "criterion": "AC3"
+        }
+      ],
+      "retainedCategories": [
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-79db550e3894",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        505,
+        519
+      ],
+      "retainedIds": [
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-97",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-100",
+          "criterion": "AC13"
+        },
+        {
+          "story": "SG2-87",
+          "criterion": "AC2"
+        },
+        {
+          "story": "SG2-68",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-70",
+          "criterion": "AC3"
+        }
+      ],
+      "retainedCategories": [
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-306e2aad4a8c",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        521,
+        525
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+        "SG2-70:role-cannot-search-or-read-the-filter-options-even-with-a-forged-role-header"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        },
+        {
+          "id": "SG2-70:role-cannot-search-or-read-the-filter-options-even-with-a-forged-role-header",
+          "file": "server/src/eventSearch.test.ts",
+          "line": 140
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-70",
+          "criterion": "AC3"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-7151dcad4e7b",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        527,
+        529
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+        "SG2-59:role-cannot-browse-attendee-events-even-with-a-forged-role-header"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        },
+        {
+          "id": "SG2-59:role-cannot-browse-attendee-events-even-with-a-forged-role-header",
+          "file": "server/src/registrableEvents.test.ts",
+          "line": 91
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-59",
+          "criterion": "AC1"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-4cc0678b4048",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        531,
+        533
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-100",
+          "criterion": "AC13"
+        }
+      ],
+      "retainedCategories": [
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-9fc9bf46819a",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        593,
+        596
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-58",
+          "criterion": "AC1"
+        }
+      ],
+      "retainedCategories": [
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-9a67db532f68",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        598,
+        602
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-66",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-66",
+          "criterion": "AC4"
+        }
+      ],
+      "retainedCategories": [
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-3b148dc81ca5",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        675,
+        677
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+        "SG2-54:role-cannot-read-availability-even-with-a-forged-support-header"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        },
+        {
+          "id": "SG2-54:role-cannot-read-availability-even-with-a-forged-support-header",
+          "file": "server/src/equipmentAvailability.test.ts",
+          "line": 42
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-54",
+          "criterion": "AC1"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-89ccfba4e808",
+      "kind": "redundant_permission_snapshot",
+      "file": "server/src/authorization.test.ts",
+      "baselineLines": [
+        679,
+        681
+      ],
+      "retainedIds": [
+        "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+        "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+        "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+        "SG2-55:role-cannot-reserve-equipment-using-a-forged-support-role-header"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-86:get-api-auth-me-for-role-returns-the-profile-grants-plus-the-sg2-100-reads-venue-safety-details",
+          "file": "server/src/authorization.test.ts",
+          "line": 389
+        },
+        {
+          "id": "SG2-97:get-api-auth-me-for-the-event-coordinator-lead-adds-assignment-the-unassigned-queue-stage",
+          "file": "server/src/authorization.test.ts",
+          "line": 418
+        },
+        {
+          "id": "SG2-86:permissionsfor-existing-roles-separates-requesting-equipment-from-arranging-and-reserving-it",
+          "file": "server/src/authorization.test.ts",
+          "line": 439
+        },
+        {
+          "id": "SG2-55:role-cannot-reserve-equipment-using-a-forged-support-role-header",
+          "file": "server/src/equipmentReservations.test.ts",
+          "line": 59
+        }
+      ],
+      "reason": "Retained independent exact permission sets cover all applicable roles, including absence of every unlisted grant. Existing mounted-route refusal tests retain public failure behavior; no role partition, concurrency or token-boundary checks are removed.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-55",
+          "criterion": "AC1"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-f73bfc1bee3d",
+      "kind": "remove_subsumed_unit_test_declaration",
+      "file": "server/src/events/fields.test.ts",
+      "baselineLines": [
+        45,
+        48
+      ],
+      "retainedIds": [
+        "SG2-81:planning-is-reachable-only-from-approved-the-normal-way-in-the-safety-check-and-its-rejection"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-81:planning-is-reachable-only-from-approved-the-normal-way-in-the-safety-check-and-its-rejection",
+          "file": "server/src/events/fields.test.ts",
+          "line": 45
+        }
+      ],
+      "reason": "Every removed public-helper input pair is already evaluated in the retained exhaustive table (and terminal tables). No application logic or runtime branch is removed.100% coverage still requires actual CI confirmation.",
+      "removedCategories": [
+        "NORMAL"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-81",
+          "criterion": "AC6"
+        }
+      ],
+      "retainedCategories": [
+        "BOUNDARY",
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "TC-dc7dbb5a9091",
+      "kind": "remove_subsumed_unit_test_declaration",
+      "file": "server/src/events/fields.test.ts",
+      "baselineLines": [
+        61,
+        64
+      ],
+      "retainedIds": [
+        "SG2-81:planning-is-reachable-only-from-approved-the-normal-way-in-the-safety-check-and-its-rejection"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-81:planning-is-reachable-only-from-approved-the-normal-way-in-the-safety-check-and-its-rejection",
+          "file": "server/src/events/fields.test.ts",
+          "line": 45
+        }
+      ],
+      "reason": "Every removed public-helper input pair is already evaluated in the retained exhaustive table (and terminal tables). No application logic or runtime branch is removed.100% coverage still requires actual CI confirmation.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-81",
+          "criterion": "AC6"
+        }
+      ],
+      "retainedCategories": [
+        "BOUNDARY",
+        "FAILURE",
+        "NORMAL"
+      ]
+    },
+    {
+      "removedId": "SG2-69:rpc-invalid-identities",
+      "kind": "remove_unconditional_tagged_sql_summary_notice",
+      "file": "supabase/tests/notification_inbox_reminders.sql",
+      "baselineLines": [
+        81,
+        81
+      ],
+      "retainedIds": [
+        "SG2-69:read-zero-id",
+        "SG2-69:read-invalid-source",
+        "SG2-69:target-unsafe-id",
+        "SG2-69:inbox-zero-limit",
+        "SG2-69:inbox-excess-limit",
+        "SG2-69:inbox-partial-cursor",
+        "SG2-69:inbox-infinite-cursor"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-69:read-zero-id",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 73
+        },
+        {
+          "id": "SG2-69:read-invalid-source",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 75
+        },
+        {
+          "id": "SG2-69:target-unsafe-id",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 76
+        },
+        {
+          "id": "SG2-69:inbox-zero-limit",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 77
+        },
+        {
+          "id": "SG2-69:inbox-excess-limit",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 78
+        },
+        {
+          "id": "SG2-69:inbox-partial-cursor",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 79
+        },
+        {
+          "id": "SG2-69:inbox-infinite-cursor",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 80
+        }
+      ],
+      "reason": "This unconditional RAISE NOTICE only logs that preceding checks finished. Every independently tagged RAISE EXCEPTION sentinel/expected SQLSTATE handler and loop remains in place; failed RPC acceptance still aborts ON_ERROR_STOP. No actual predicate, protected operation, role fixture or database state change is deleted.",
+      "removedCategories": [
+        "BOUNDARY"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-69",
+          "criterion": "rpc-invalid-identities"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC2"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC3"
+        }
+      ],
+      "retainedCategories": [
+        "BOUNDARY",
+        "FAILURE"
+      ]
+    },
+    {
+      "removedId": "SG2-69:rpc-only-mutations",
+      "kind": "remove_unconditional_tagged_sql_summary_notice",
+      "file": "supabase/tests/notification_inbox_reminders.sql",
+      "baselineLines": [
+        100,
+        100
+      ],
+      "retainedIds": [
+        "SG2-69:caller-scheduler-denied",
+        "SG2-69:private-unread-counter-denied",
+        "SG2-69:direct-receipt-write-denied",
+        "SG2-69:direct-other-preference-denied"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-69:caller-scheduler-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 95
+        },
+        {
+          "id": "SG2-69:private-unread-counter-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 96
+        },
+        {
+          "id": "SG2-69:direct-receipt-write-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 97
+        },
+        {
+          "id": "SG2-69:direct-other-preference-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 98
+        }
+      ],
+      "reason": "This unconditional RAISE NOTICE only logs that preceding checks finished. Every independently tagged RAISE EXCEPTION sentinel/expected SQLSTATE handler and loop remains in place; failed RPC acceptance still aborts ON_ERROR_STOP. No actual predicate, protected operation, role fixture or database state change is deleted.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-69",
+          "criterion": "rpc-only-mutations"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC7"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE"
+      ]
+    },
+    {
+      "removedId": "SG2-69:coordinator-only-preferences",
+      "kind": "remove_unconditional_tagged_sql_summary_notice",
+      "file": "supabase/tests/notification_inbox_reminders.sql",
+      "baselineLines": [
+        124,
+        124
+      ],
+      "retainedIds": [
+        "SG2-69:non-coordinator-preference-read-denied",
+        "SG2-69:non-coordinator-preference-write-denied"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-69:non-coordinator-preference-read-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 118
+        },
+        {
+          "id": "SG2-69:non-coordinator-preference-write-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 119
+        }
+      ],
+      "reason": "This unconditional RAISE NOTICE only logs that preceding checks finished. Every independently tagged RAISE EXCEPTION sentinel/expected SQLSTATE handler and loop remains in place; failed RPC acceptance still aborts ON_ERROR_STOP. No actual predicate, protected operation, role fixture or database state change is deleted.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-69",
+          "criterion": "coordinator-only-preferences"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC6"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE"
+      ]
+    },
+    {
+      "removedId": "SG2-69:missing-identity-role",
+      "kind": "remove_unconditional_tagged_sql_summary_notice",
+      "file": "supabase/tests/notification_inbox_reminders.sql",
+      "baselineLines": [
+        131,
+        131
+      ],
+      "retainedIds": [
+        "SG2-69:inbox-missing-role-denied",
+        "SG2-69:clear-missing-identity-denied"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-69:inbox-missing-role-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 125
+        },
+        {
+          "id": "SG2-69:clear-missing-identity-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 127
+        }
+      ],
+      "reason": "This unconditional RAISE NOTICE only logs that preceding checks finished. Every independently tagged RAISE EXCEPTION sentinel/expected SQLSTATE handler and loop remains in place; failed RPC acceptance still aborts ON_ERROR_STOP. No actual predicate, protected operation, role fixture or database state change is deleted.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-69",
+          "criterion": "missing-identity-role"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC1"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE"
+      ]
+    },
+    {
+      "removedId": "SG2-69:anonymous-denied",
+      "kind": "remove_unconditional_tagged_sql_summary_notice",
+      "file": "supabase/tests/notification_inbox_reminders.sql",
+      "baselineLines": [
+        333,
+        333
+      ],
+      "retainedIds": [
+        "SG2-69:anonymous-inbox-denied",
+        "SG2-69:anonymous-read-denied",
+        "SG2-69:anonymous-scheduler-denied"
+      ],
+      "retainedSources": [
+        {
+          "id": "SG2-69:anonymous-inbox-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 326
+        },
+        {
+          "id": "SG2-69:anonymous-read-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 327
+        },
+        {
+          "id": "SG2-69:anonymous-scheduler-denied",
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "line": 328
+        }
+      ],
+      "reason": "This unconditional RAISE NOTICE only logs that preceding checks finished. Every independently tagged RAISE EXCEPTION sentinel/expected SQLSTATE handler and loop remains in place; failed RPC acceptance still aborts ON_ERROR_STOP. No actual predicate, protected operation, role fixture or database state change is deleted.",
+      "removedCategories": [
+        "FAILURE"
+      ],
+      "removedReferences": [
+        {
+          "story": "SG2-69",
+          "criterion": "anonymous-denied"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-69",
+          "criterion": "AC7"
+        }
+      ],
+      "retainedCategories": [
+        "FAILURE"
+      ]
+    }
+  ],
+  "idFormat": {
+    "canonicalMethodId": "SG2-<story>:<semantic-scenario-slug>",
+    "legacyId": "Previous TC-hash retained as an alias on every current method in the --details export.",
+    "committedLedger": "Method entries retain file, line, title, categories and references. Descriptive IDs and legacy aliases are derived by the generator in --details for workbook/reference mapping, avoiding repeated derived fields in the committed ledger.",
+    "sqlIds": "Existing explicit story:contract IDs unchanged.",
+    "collisionHandling": "Deterministic source/suite context, then numeric suffixes; no hash suffix.",
+    "sourceLineMovement": "Line-only movement does not change canonical or legacy IDs.",
+    "wholeWordTruncation": true
+  },
+  "regressionReferenceMigration": {
+    "canonicalFields": [
+      "method_id",
+      "method_ids",
+      "case_id",
+      "case_ids",
+      "source_method_ids",
+      "relatedCases",
+      "revised_method_ids",
+      "method_scope.revised_aliases.current"
+    ],
+    "referencesMigrated": 131,
+    "staleReferencesResolvedByUniquePublicJourney": [
+      {
+        "id": "SG2-45:staff-block-a-free-period-see-it-on-the-calendar-then-remove-it",
+        "legacyId": "TC-3d47833c5ba7",
+        "file": "e2e/regression.spec.ts",
+        "line": 946,
+        "journeyId": "SG2-45-P01",
+        "proof": "Unique current declaration in the same source file carries this exact public regression journey ID; record already describes the updated current behavior."
+      },
+      {
+        "id": "SG2-45:other-roles-cannot-block-or-remove-a-block",
+        "legacyId": "TC-779333f69dac",
+        "file": "e2e/regression.spec.ts",
+        "line": 983,
+        "journeyId": "SG2-45-N01",
+        "proof": "Unique current declaration in the same source file carries this exact public regression journey ID; record already describes the updated current behavior."
+      },
+      {
+        "id": "SG2-47:a-missing-facility-cannot-be-excepted-and-only-venue-staff-can-approve-exceptions",
+        "legacyId": "TC-3e035534e069",
+        "file": "e2e/regression.spec.ts",
+        "line": 1273,
+        "journeyId": "SG2-47-N01",
+        "proof": "Unique current declaration in the same source file carries this exact public regression journey ID; record already describes the updated current behavior."
+      },
+      {
+        "id": "SG2-87:a-submitted-request-waits-in-the-leads-unassigned-queue-until-it-is-assigned",
+        "legacyId": "TC-484247d1d3e7",
+        "file": "e2e/regression.spec.ts",
+        "line": 2089,
+        "journeyId": "SG2-87-P01",
+        "proof": "Unique current declaration in the same source file carries this exact public regression journey ID; record already describes the updated current behavior."
+      }
+    ],
+    "unresolvedCanonicalReferences": [],
+    "historicalFreeTextAndExternalEvidencePreserved": true,
+    "historicalSourceReferencesPreserved": [
+      {
+        "record": "SG2-47-CAPACITY-DISCOVERY-01",
+        "ids": [
+          "TC-a6c0b8b9030c",
+          "TC-17e7d2dbef7c",
+          "TC-4d06b4d5e4ae",
+          "TC-bced1830aecd",
+          "TC-3a48cfcc9d5d",
+          "TC-c26acc317a71",
+          "TC-392a7ca9c77e",
+          "TC-ab07f7ca796d",
+          "TC-040f5bb0680d",
+          "TC-1371b802a92e",
+          "TC-59268c4cd719"
+        ],
+        "reason": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
+      },
+      {
+        "record": "SG2-40-DRAFT-HISTORY-01",
+        "ids": [
+          "TC-6086a521446b"
+        ],
+        "reason": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
+      },
+      {
+        "record": "REG-OPTIONAL-HOSTED-SEVEN-ROLE-READONLY",
+        "ids": [
+          "TC-636d33e52f44"
+        ],
+        "reason": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
+      }
+    ],
+    "historicalPreviousAliasesPreserved": true,
+    "schemaCompatibility": "The regression register is documentation; no runtime schema or test restricts its additional provenance fields. Every current exact method reference resolves to the generated inventory."
+  },
+  "verification": {
+    "generatorIdentityTests": "19 passed, including namespace collisions, legacy aliases, stable line-only movement and export consistency.",
+    "frontendTargeted": "2 files,91tests passed.",
+    "fullCurrentBranchCI": "Required before merge; no claim of a new full baseline coverage comparison."
+  },
+  "allStoryReview": {
+    "baselineRef": "8511052a9756c69210556d978268d65dc90c9eec",
+    "reviewedStories": 68,
+    "reviewedTestFiles": 224,
+    "reviewedSqlSuites": 46,
+    "reviewedMethodDeclarations": 3093,
+    "reviewedSqlChecks": 1330,
+    "additionalRemovals": [
+      {
+        "removedId": "SG2-20:confirmed-reads-as-solid-teal",
+        "legacyId": "TC-b01014cd21a3",
+        "file": "client/src/mock/viewModel.test.ts",
+        "retainedId": "SG2-20:matching-is-case-insensitive",
+        "retainedLine": 29,
+        "reason": "Both tests use the same pure badgeStyle seam and no setup. The retained normalization loop now includes the exact original mixed-case Confirmed input, and retains the independent literal full-style oracle.",
+        "preservedOracle": "Complete style must equal { badgeBg: '#00827c', badgeFg: '#012624' }."
+      },
+      {
+        "removedId": "SG2-20:s-is-muted-grey",
+        "legacyId": "TC-acc3fd368640",
+        "file": "client/src/mock/viewModel.test.ts",
+        "retainedId": "SG2-100:a-failed-safety-check-reads-as-a-dead-state-like-rejected-and-cancelled",
+        "retainedLine": 312,
+        "reason": "Same pure badgeStyle seam and no setup; the stronger existing dead-style check retains every original capitalized fixture, adds background verification for them, and carries SG2-20:prototype-view-model alongside SG2-100:AC5.",
+        "preservedOracle": "Original badgeFg '#bbc7c6' is retained independently as a literal within the stronger complete style { badgeBg: 'rgba(112,119,119,0.35)', badgeFg: '#bbc7c6' }."
+      },
+      {
+        "removedId": "SG2-27:hides-department-for-an-external-role-profile-has-no-department-key",
+        "legacyId": "TC-e764036159c5",
+        "file": "client/src/screens/Profile.test.tsx",
+        "retainedId": "SG2-86:shows-the-role-fact-for-an-unaffected-existing-role-with-no-department",
+        "retainedLine": 206,
+        "reason": "Exact setup, public component, rendered props and missing-department oracle are already a strict subset of the retained role-fact test. Preserve NORMAL, BOUNDARY, SG2-27:AC4 and SG2-86:AC3.",
+        "preservedOracle": "expect(screen.queryByLabelText(\"Department\")).not.toBeInTheDocument(); retained case additionally asserts Attendee role text."
+      },
+      {
+        "removedId": "SG2-28:disables-the-save-button-while-the-request-is-in-flight",
+        "legacyId": "TC-1d835060e4a6",
+        "file": "client/src/screens/RequestForm.test.tsx",
+        "retainedId": "SG2-28:a-second-click-while-saving-does-not-save-twice",
+        "retainedLine": 353,
+        "reason": "Identical asynchronous fixture/public component and response. Move disabled-controls and visible-success assertions into the stronger existing repeat-click test; remove the repeated render/setup, not a distinct race/error scenario.",
+        "preservedOracle": "Saving button disabled; Submit request disabled; Draft12 confirmation present after resolution. Retained double-click case also requires one fetch."
+      },
+      {
+        "removedId": "SG2-100:the-assigned-coordinator-can-close-out-an-event-that-has-finished",
+        "legacyId": "TC-08fae3b1744b",
+        "file": "client/src/screens/EventDetail.test.tsx",
+        "retainedId": "SG2-100:rapid-clicking-sends-exactly-one-request-and-disables-the-button",
+        "retainedLine": 1328,
+        "reason": "The basic positive dispatch oracle uses the same event/identity/public seam as the stronger pending/success race case. Carry its exact argument oracle and NORMAL tag into that case; all original event/status boundaries remain separate.",
+        "preservedOracle": "expect(complete).toHaveBeenCalledWith(104,\"token\"); retained case also checks exactly one call and disabled pending button before resolving success."
+      },
+      {
+        "removedId": "SG2-88:the-queue-also-lists-the-event-coordinators-the-lead-can-assign-to",
+        "legacyId": "TC-72e6909a05f1",
+        "file": "server/src/assignmentQueue.test.ts",
+        "retainedId": "SG2-87:the-event-coordinator-lead-reads-the-unassigned-queue",
+        "retainedLine": 41,
+        "reason": "Identical Lead principal, bearer token, GET endpoint, default appFor fixture and COORDINATORS. Retained full response deep equality proves both coordinator names and IDs plus entries and 200; removed mapped-name projection is a strict subset."
+      },
+      {
+        "removedId": "SG2-39:returns-404-when-event-record-is-not-found",
+        "legacyId": "TC-205e1533c2c5",
+        "file": "server/src/events/updatePlanning.test.ts",
+        "retainedId": "SG2-39:a-missing-event-returns-404-without-updating-planning-details-or-adding-history",
+        "retainedLine": 802,
+        "reason": "Both valid PATCH inputs reach the same createUpdateEventPlanningHandler fetchPlanningRecord not_found branch. Retained wrong-ID fixture returns identical ok:false/reason:not_found; it asserts identical 404/body plus fetched ID and no planning/history writes. Both payloads validate; only error message differs and neither provider message is exposed."
+      },
+      {
+        "oldId": "SG2-54:reservation-grants-unchanged",
+        "oldFile": "supabase/tests/equipment_availability.sql",
+        "oldLine": 308,
+        "retainedId": "SG2-55:no-direct-reservation-access",
+        "retainedFile": "supabase/tests/equipment_reservations.sql",
+        "retainedBaselineLine": 462,
+        "category": "FAILURE",
+        "preservedMappings": [
+          "SG2-54:AC1",
+          "SG2-55:AC1"
+        ],
+        "removedSetup": false,
+        "equivalence": {
+          "roles": [
+            "anon",
+            "authenticated"
+          ],
+          "relation": "public.equipment_reservations",
+          "tablePrivileges": "SELECT,INSERT,UPDATE,DELETE,TRUNCATE",
+          "columnPrivileges": "SELECT,INSERT,UPDATE,REFERENCES",
+          "condition": "has_table_privilege(role_name,relation,tablePrivileges) OR has_any_column_privilege(role_name,relation,columnPrivileges)",
+          "context": "Both suites run after all committed migrations on the same schema. ACLs do not depend on their transaction-local fixture rows. Neither suite changes ACLs. The retained guard checks exactly the same two roles and both exact privilege lists."
+        }
+      },
+      {
+        "removedId": "SG2-22:an-empty-integration-directory-adds-no-phantom-test-cases",
+        "legacyId": "TC-7d894af1298f",
+        "file": ".github/scripts/test-inventory.test.mjs",
+        "baselineLine": 149,
+        "retainedId": "SG2-22:the-cli-writes-and-verifies-a-current-method-ledger",
+        "retainedLine": 22,
+        "reason": "Both tests use fixture(t) with the same empty integration directory and valid sole source. The retained CLI test asserts the same successful write, length=1 and exact source file, plus ledger validation and metadata; BOUNDARY is carried over."
+      }
+    ],
+    "gapClosure": "SG2-105:AC1 now has concrete conflict assertions for all ten minimum answers during pending persistence/submission; no new method or artificial tag-only coverage.",
+    "validation": {
+      "command": "npm run ci",
+      "result": "PASS on complete post-change rerun",
+      "frontend": {
+        "statements": 100,
+        "branches": 100,
+        "lines": 100,
+        "functions": 100
+      },
+      "backend": {
+        "statements": 100,
+        "branches": 100,
+        "lines": 100,
+        "functions": 100
+      },
+      "coverageConfigurationChanged": false,
+      "earlierRun": "Unchanged work-queue test hit one ECONNRESET; subsequent diagnostics and full rerun passed; exact transport cause unproven, no retry code added."
+    }
+  }
+}

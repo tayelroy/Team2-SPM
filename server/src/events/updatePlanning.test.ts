@@ -870,15 +870,6 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
   });
 
-  test('[FAILURE] [SG2-39:AC1] returns 404 when event record is not found', async () => {
-    const response = await request(
-      buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'Event not found.' } })
-    )
-      .patch('/api/event-requests/10/planning')
-      .send({});
-    assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: 'Event request not found.' });
-  });
 
   test('[FAILURE] [SG2-39:AC1] returns 503 when fetching event record fails', async () => {
     const response = await request(

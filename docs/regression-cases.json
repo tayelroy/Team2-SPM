@@ -51,7 +51,7 @@
       "SG2-41:AC4",
       "SG2-87:AC1"
     ],
-    "method_id": "TC-0ade7cc1c1aa",
+    "method_id": "SG2-41:internal-users-open-the-exact-events-and-requests-waiting-on-their-role",
     "notes": "Since SG2-87 the coordinator's queue holds only their own assignment (#42); unassigned #41 waits in the Lead's queue. PR #72 corrects the stale absent-section assertion to wait for the loaded queue and assert its exact contents. The old assertion could pass only during the loading gap and failed in hosted CI run 197."
   },
   {
@@ -139,7 +139,7 @@
       "SG2-23:AC1",
       "SG2-24:AC1"
     ],
-    "method_id": "TC-7b6dab994476"
+    "method_id": "SG2-23:each-seeded-role-reaches-its-assigned-application"
   },
   {
     "id": "PW-AUTH-02",
@@ -186,7 +186,7 @@
     "mapped_acs": [
       "SG2-23:AC2"
     ],
-    "method_id": "TC-719cab8f0b9c"
+    "method_id": "SG2-23:invalid-login-stays-signed-out-with-a-generic-message"
   },
   {
     "id": "PW-AUTH-03",
@@ -233,7 +233,7 @@
     "mapped_acs": [
       "SG2-23:AC3"
     ],
-    "method_id": "TC-06196447529c"
+    "method_id": "SG2-23:logout-removes-browser-access-and-revokes-the-fixture-session"
   },
   {
     "id": "SG2-42-P01",
@@ -282,7 +282,7 @@
       "SG2-42:AC1",
       "SG2-42:AC2"
     ],
-    "method_id": "TC-0a69b2cfbad0"
+    "method_id": "SG2-42:staff-create-edit-search-and-reload-persisted-venue-details"
   },
   {
     "id": "SG2-42-N01",
@@ -330,7 +330,7 @@
     "mapped_acs": [
       "SG2-42:AC3"
     ],
-    "method_id": "TC-e78c7e8482d6"
+    "method_id": "SG2-42:read-only-users-cannot-create-venues-through-ui-or-api"
   },
   {
     "id": "SG2-42-B01",
@@ -378,7 +378,7 @@
     "mapped_acs": [
       "SG2-42:AC1"
     ],
-    "method_id": "TC-bd46b4c698d1"
+    "method_id": "SG2-42:venue-capacity-accepts-exact-bounds-and-rejects-adjacent-values"
   },
   {
     "id": "SG2-42-B02",
@@ -425,7 +425,7 @@
     "mapped_acs": [
       "SG2-42:AC1"
     ],
-    "method_id": "TC-dc7871d6dea4"
+    "method_id": "SG2-42:venue-names-accept-255-characters-and-refuse-256-without-writes"
   },
   {
     "id": "SG2-28-P01",
@@ -489,7 +489,7 @@
       "SG2-31:AC3",
       "SG2-87:AC4"
     ],
-    "method_id": "TC-6cea16b8d437",
+    "method_id": "SG2-28:submit-a-fresh-request-and-verify-its-saved-data-and-status",
     "notes": "Since SG2-100 a fresh submission is stored as unassigned and shown as Awaiting Assignment; SG2-87 maps this to its AC4. Since the SG2-30 draft-form fix the date is a Singapore-time date-time input and the detail view opens with a submission confirmation; it is Not Executed until re-run. Updated by SG2-105: the form now also needs the preferred layout, accessibility, equipment and registration answers."
   },
   {
@@ -540,7 +540,7 @@
       "SG2-29:AC1",
       "SG2-30:AC2"
     ],
-    "method_id": "TC-ad7aad397c1b"
+    "method_id": "SG2-28:an-empty-draft-saves-once-but-cannot-be-submitted"
   },
   {
     "id": "SG2-29-P01",
@@ -602,7 +602,7 @@
       "SG2-29:AC2",
       "SG2-30:AC1"
     ],
-    "method_id": "TC-747b61ba6f0a",
+    "method_id": "SG2-29:editing-then-submitting-preserves-the-latest-field-values",
     "notes": "Extended by the SG2-30 draft-form fix (date input, removed prototype chips and banner, venue fit, submission confirmation); it is Not Executed until re-run. Changed by SG2-105 (replaces SG2-28 AC2): accessibility may no longer be blank at submission, so the edit answers \"None\" instead of clearing it."
   },
   {
@@ -626,7 +626,7 @@
       "SG2-105:AC1",
       "SG2-105:AC2"
     ],
-    "method_id": "TC-0749579d7165",
+    "method_id": "SG2-105:an-organiser-must-answer-layout-accessibility-equipment-and-registration-before-submitting-and",
     "purpose": "Catch a request form that lets a request through without the customer's minimum, or that refuses \"None\" as an answer.",
     "steps": [
       "Sign in as Event Organiser and open New request.",
@@ -662,7 +662,7 @@
       "SG2-105:AC3",
       "SG2-105:AC4"
     ],
-    "method_id": "TC-175d06bb7c8a",
+    "method_id": "SG2-105:a-draft-missing-the-customer-minimum-saves-but-submitting-it-is-refused-lists-every-missing-item",
     "purpose": "Catch a submission check that misses a new field, accepts blank accessibility, or moves an incomplete request out of draft.",
     "steps": [
       "As Event Organiser, create a draft through the API with the six original fields and blank accessibility needs.",
@@ -693,7 +693,7 @@
       "SG2-63:AC9",
       "SG2-63:AC10"
     ],
-    "method_id": "TC-8d202a582029",
+    "method_id": "SG2-63:the-organiser-sees-who-is-coming-raises-capacity-past-the-venue-with-a-warning-closes",
     "purpose": "Catch a registration picture that miscounts, hides who is coming from the creator, refuses a capacity above the venue, or a close/reopen that is not recorded or announced.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrations seed before each case; fresh browser context. No hosted Supabase.",
     "review": null,
@@ -728,7 +728,7 @@
       "SG2-63:AC4",
       "SG2-63:AC8"
     ],
-    "method_id": "TC-c84f994440dd",
+    "method_id": "SG2-63:the-coordinator-sees-the-picture-with-contact-details-but-cannot-change-it-and-a-colleague-sees",
     "purpose": "Catch contact details reaching organisation colleagues, or the coordinator being able to change the organiser's settings.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrations seed before each case; fresh browser context. No hosted Supabase.",
     "review": null,
@@ -762,7 +762,7 @@
       "SG2-63:AC6",
       "SG2-63:AC8"
     ],
-    "method_id": "TC-658ed0fced32",
+    "method_id": "SG2-63:only-the-creating-organiser-changes-the-settings-and-only-with-valid-times",
     "purpose": "Catch the coordinator (either route), a colleague, another organisation or an attendee reaching the settings, or an invalid closing time being saved.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrations seed before each case; fresh browser context. No hosted Supabase.",
     "review": null,
@@ -911,7 +911,7 @@
       "SG2-32:AC1",
       "SG2-32:AC2"
     ],
-    "method_id": "TC-994308016312"
+    "method_id": "SG2-32:my-drafts-excludes-non-drafts-and-confirmed-deletion-survives-reload"
   },
   {
     "id": "SG2-27-P01",
@@ -959,7 +959,7 @@
       "SG2-27:AC2",
       "SG2-27:AC4"
     ],
-    "method_id": "TC-1e705fb2ca91"
+    "method_id": "SG2-27:profile-changes-persist-and-external-users-have-no-department-field"
   },
   {
     "id": "SG2-27-B01",
@@ -1007,7 +1007,7 @@
     "mapped_acs": [
       "SG2-27:AC3"
     ],
-    "method_id": "TC-3face3e2aef4"
+    "method_id": "SG2-27:profile-phone-accepts-eight-singapore-digits-with-optional-65"
   },
   {
     "id": "SG2-44-P01",
@@ -1055,7 +1055,7 @@
       "SG2-44:AC1",
       "SG2-44:AC2"
     ],
-    "method_id": "TC-d16f3bc6645c"
+    "method_id": "SG2-44:calendar-renders-fixture-availability-and-changes-its-requested-month"
   },
   {
     "id": "SG2-44-P02",
@@ -1440,7 +1440,7 @@
       "SG2-26:AC3",
       "SG2-25:AC2"
     ],
-    "method_id": "TC-5aa85e6b67b1"
+    "method_id": "SG2-26:colleagues-read-the-same-organisation-events-with-creator-only-actions"
   },
   {
     "id": "SG2-26-N01",
@@ -1490,7 +1490,7 @@
       "SG2-26:AC1",
       "SG2-26:AC2"
     ],
-    "method_id": "TC-bbec8291ae45"
+    "method_id": "SG2-26:another-organisation-and-an-account-without-membership-cannot-read-events"
   },
   {
     "id": "DB-ORG-01",
@@ -1578,7 +1578,7 @@
       "SG2-25:AC1",
       "SG2-25:AC2"
     ],
-    "method_id": "TC-c6fc2aaa8b1a"
+    "method_id": "SG2-25:only-event-organisers-can-access-organisation-event-records"
   },
   {
     "id": "SG2-26-P02",
@@ -1633,7 +1633,7 @@
       "SG2-26:AC3",
       "SG2-29:AC2"
     ],
-    "method_id": "TC-6e3d9ddc7f83"
+    "method_id": "SG2-26:saved-event-changes-reach-a-colleague-dashboard-list-and-detail-after-reload"
   },
   {
     "id": "SG2-45-P01",
@@ -1682,7 +1682,7 @@
       "SG2-45:AC1",
       "SG2-45:AC3"
     ],
-    "method_id": "TC-09212e343f70"
+    "method_id": "SG2-45:staff-block-a-free-period-see-it-on-the-calendar-then-remove-it"
   },
   {
     "id": "SG2-45-N01",
@@ -1736,7 +1736,7 @@
       "SG2-45:AC3",
       "SG2-25:AC1"
     ],
-    "method_id": "TC-3d0422f68056"
+    "method_id": "SG2-45:other-roles-cannot-block-or-remove-a-block"
   },
   {
     "id": "DB-BLOCK-01",
@@ -2002,15 +2002,15 @@
       "SG2-46:AC3",
       "SG2-46:AC4"
     ],
-    "method_id": "TC-414ab324b23c",
+    "method_id": "SG2-46:an-approved-event-opens-a-pre-filled-venue-search-that-leaves-out-busy-venues",
     "source_method_ids": [
-      "TC-414ab324b23c",
-      "TC-251098706967"
+      "SG2-46:an-approved-event-opens-a-pre-filled-venue-search-that-leaves-out-busy-venues",
+      "SG2-46:ac3-an-event-without-accessibility-needs-says-accessibility-is-not-used-to-match"
     ],
     "follow_up_verifications": [
       {
         "status": "Pass",
-        "case_id": "TC-251098706967",
+        "case_id": "SG2-46:ac3-an-event-without-accessibility-needs-says-accessibility-is-not-used-to-match",
         "layer": "Rendered public React component with controlled HTTP responses; local verification only",
         "actual": "16 Oct 2026 local copy follow-up: the event has no accessibility needs, the initial Accessibility field is empty and its initial search omits the accessibility parameter. The exact hint says “No accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.” After manually entering ramp and searching, the request includes accessibility=ramp, the field retains ramp, the searched criteria display Accessibility: ramp, and the same truthful hint remains. Existing method title and ID were preserved; no new declarations.",
         "execution_evidence": "Before the one-string change, the strengthened existing case failed on the obsolete hint (/tmp/spm-accessibility-hint-red.log). Afterward all 26 VenueSearch tests passed (/tmp/spm-accessibility-hint-focused.log); full client 1433/1433 across 70 files passed with 100% statements/branches/functions/lines on every app file, including VenueSearch.tsx (/tmp/spm-accessibility-hint-full-client.log; /tmp/spm-accessibility-hint-full-coverage/coverage-summary.json); client TypeScript passed (/tmp/spm-accessibility-hint-typecheck.log). This local follow-up does not claim a new CI pass or hosted retest.",
@@ -2065,7 +2065,7 @@
       "SG2-25:AC3",
       "SG2-46:AC2"
     ],
-    "method_id": "TC-10aec0a92f0f"
+    "method_id": "SG2-25:only-coordinators-can-search-venues"
   },
   {
     "id": "SG2-35-P01",
@@ -2078,7 +2078,7 @@
       "SG2-35:AC1",
       "SG2-35:AC2"
     ],
-    "method_id": "TC-214d52a40b6d",
+    "method_id": "SG2-35:opening-an-assigned-submitted-request-moves-it-to-under-review",
     "purpose": "Verify the named user journey through the real application routes.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2124,7 +2124,7 @@
       "SG2-35:AC3",
       "SG2-87:AC1"
     ],
-    "method_id": "TC-25650768086e",
+    "method_id": "SG2-35:a-request-awaiting-assignment-never-reaches-a-coordinator-and-never-enters-review",
     "purpose": "Verify that an unassigned submitted request does not appear in any coordinator's work queue (SG2-87) and that reviewing it is refused even when called directly.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2172,7 +2172,7 @@
       "SG2-34:AC4",
       "SG2-97:AC4"
     ],
-    "method_id": "TC-47af2a9b626d",
+    "method_id": "SG2-33:an-assignment-and-a-reassignment-are-recorded-and-the-previous-coordinator-stays-in-the-history",
     "purpose": "Verify that the Event Coordinator Lead assigning and then reassigning a coordinator is recorded with who made each change, that the previous coordinator stays visible in the event history, that the previous coordinator loses the request and that the organiser sees the new contact.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment: unassigned submitted request 71 and a second coordinator.",
     "steps": [
@@ -2219,7 +2219,7 @@
       "SG2-90:AC3",
       "SG2-90:AC4"
     ],
-    "method_id": "TC-63274af11afc",
+    "method_id": "SG2-90:a-coordinator-acts-only-on-events-assigned-to-them-and-loses-an-event-the-moment-it-is",
     "purpose": "Verify, through the real Express API and in-memory fixture, that an Event Coordinator can review, decide, update planning for and request a venue for only the events assigned to them, that another coordinator's and unassigned events are refused on the server in every state, and that a coordinator is refused everywhere once the Event Coordinator Lead reassigns the event.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-access: events 81-91 across approved, submitted and under-review states, owned by the signed-in coordinator, by a second coordinator, or unassigned.",
     "steps": [
@@ -2259,7 +2259,7 @@
       "SG2-90:AC1",
       "SG2-90:AC3"
     ],
-    "method_id": "TC-b438c5e7a741",
+    "method_id": "SG2-90:rights-follow-the-current-assignment-exactly-handing-an-event-back-restores-them-and-reassigning",
     "purpose": "Verify the edge of 'currently assigned': a no-op reassignment to the same coordinator keeps their rights and records nothing, and an event handed away and back is refused while away and actionable again once returned.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-access (event 81 approved, assigned to the signed-in coordinator; second coordinator user-coordinator2).",
     "steps": [
@@ -2298,7 +2298,7 @@
     "mapped_acs": [
       "SG2-37:AC1"
     ],
-    "method_id": "TC-079867206fe9",
+    "method_id": "SG2-37:approving-a-request-under-review-persists-the-approved-outcome",
     "purpose": "Verify the named user journey through the real application routes.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2343,7 +2343,7 @@
     "mapped_acs": [
       "SG2-37:AC2"
     ],
-    "method_id": "TC-32b96c915bb7",
+    "method_id": "SG2-37:rejecting-requires-a-reason-and-shows-it-to-the-organiser",
     "purpose": "Verify the named user journey through the real application routes.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2397,7 +2397,7 @@
       "SG2-35:AC3",
       "SG2-37:AC1"
     ],
-    "method_id": "TC-1d7882c708e2",
+    "method_id": "SG2-35:a-request-another-coordinator-is-reviewing-cannot-be-decided",
     "purpose": "Verify the named user journey through the real application routes.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2441,7 +2441,7 @@
       "SG2-36:AC2",
       "SG2-36:AC3"
     ],
-    "method_id": "TC-c0556ebefca3",
+    "method_id": "SG2-36:a-question-goes-to-the-organiser-who-answers-and-resubmits-for-review",
     "purpose": "Verify the whole clarification round trip through the real application routes: ask, see, answer, amend, resubmit, review again.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2476,7 +2476,7 @@
     "mapped_acs": [
       "SG2-36:AC3"
     ],
-    "method_id": "TC-799f2c06058a",
+    "method_id": "SG2-36:only-the-two-parties-to-the-request-can-read-or-join-the-exchange",
     "purpose": "Verify the exchange is visible only to the assigned coordinator and the owning organiser, and that an organiser post cannot change the request status.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
@@ -2686,7 +2686,7 @@
       "SG2-47:AC2",
       "SG2-47:AC4"
     ],
-    "method_id": "TC-b7ceded9236f"
+    "method_id": "SG2-47:a-coordinator-sees-which-venues-do-not-fit-an-approved-event-and-why"
   },
   {
     "id": "SG2-47-P02",
@@ -2724,7 +2724,7 @@
       "SG2-47:AC3",
       "SG2-47:AC5"
     ],
-    "method_id": "TC-10ecbce02763"
+    "method_id": "SG2-47:venue-staff-approve-a-capacity-exception-without-approving-the-booking"
   },
   {
     "id": "SG2-47-N01",
@@ -2771,7 +2771,7 @@
       "SG2-47:AC3",
       "SG2-66:AC5"
     ],
-    "method_id": "TC-ad0afb3cedb0"
+    "method_id": "SG2-47:a-missing-facility-cannot-be-excepted-and-only-venue-staff-can-approve-exceptions"
   },
   {
     "id": "SG2-40-P01",
@@ -3128,7 +3128,7 @@
       "SG2-48:AC2",
       "SG2-48:AC3"
     ],
-    "method_id": "TC-8e1cdb1d3f1b",
+    "method_id": "SG2-48:a-coordinator-requests-a-venue-it-waits-pending-for-venue-staff-without-holding-the-venue",
     "previous_executions": [
       {
         "status": "Pass",
@@ -3165,7 +3165,7 @@
     "mapped_acs": [
       "SG2-48:AC4"
     ],
-    "method_id": "TC-9b6ac1f0e760",
+    "method_id": "SG2-48:one-event-requests-several-different-venues-each-pending-on-its-own",
     "previous_executions": [
       {
         "status": "Pass",
@@ -3205,7 +3205,7 @@
       "SG2-48:AC1",
       "SG2-48:AC4"
     ],
-    "method_id": "TC-225fa037a5c5",
+    "method_id": "SG2-48:a-duplicate-request-an-unoffered-layout-or-a-non-coordinator-is-refused",
     "previous_executions": [
       {
         "status": "Pass",
@@ -3359,7 +3359,7 @@
       "SG2-87:AC4",
       "SG2-87:AC5"
     ],
-    "method_id": "TC-8efde3a21345",
+    "method_id": "SG2-87:a-submitted-request-waits-in-the-leads-unassigned-queue-until-it-is-assigned",
     "purpose": "Verify that a submitted request enters the Event Coordinator Lead's unassigned queue with its basic details and submission time instead of any coordinator's work queue, that only the Lead can read the queue, that the organiser sees it as awaiting assignment with no coordinator, that the Lead's queue screen lays out cleanly on phone and laptop widths, and that the request leaves the queue once assigned.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment (adds a second coordinator); draft #1 'Planning workshop' belongs to organiser@example.test. Submission lands in SG2-100's unassigned status; assignment moves it to submitted.",
     "steps": [
@@ -3406,7 +3406,7 @@
       "SG2-88:AC4",
       "SG2-88:AC5"
     ],
-    "method_id": "TC-4ab4717e39c8",
+    "method_id": "SG2-88:the-lead-assigns-a-queued-request-reassigns-it-and-everyone-involved-is-told",
     "purpose": "Verify that the Event Coordinator Lead can assign a queued request from the Unassigned queue screen (laid out cleanly at 390px and 1440px), reassign it to a different coordinator, that the new coordinator, the previous coordinator and the organiser each receive the right notice, that the previous coordinator loses the event at once, that Technical Support Staff are refused, and that each change is recorded with who made it.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/coordinator-assignment (adds a second coordinator, user-coordinator2); draft #1 'Planning workshop' belongs to organiser@example.test.",
     "steps": [
@@ -3453,7 +3453,7 @@
       "SG2-97:AC2",
       "SG2-97:AC3"
     ],
-    "method_id": "TC-f8da4a180fa2",
+    "method_id": "SG2-97:assignment-moves-to-the-event-coordinator-lead-while-earlier-assignments-their-history-and-the",
     "purpose": "Verify that Technical Support Staff are refused on the server when listing or assigning coordinators, that an assignment they made before the change stays in place with its history, that the organiser still sees the coordinator's name and phone, and that the Event Coordinator Lead is offered the assignment screen with a clean layout on phone and laptop widths.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/legacy-assignment: approved event 95 'Legacy Forum' assigned to Regression coordinator, with the history row user-support wrote when assigning it.",
     "steps": [
@@ -3491,7 +3491,7 @@
     "mapped_acs": [
       "SG2-97:AC2"
     ],
-    "method_id": "TC-99a39f821568",
+    "method_id": "SG2-97:the-event-coordinator-lead-takes-over-an-assignment-technical-support-made-keeping-its-history",
     "purpose": "Verify that an assignment made by Technical Support Staff before the change survives it and can be taken over by the Event Coordinator Lead: the earlier coordinator loses the event at once and both assignments stay in the history with their original actors.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Seeded via /__e2e/legacy-assignment and /__e2e/coordinator-assignment (event 95 assigned to Regression coordinator by user-support; second coordinator user-coordinator2).",
     "steps": [
@@ -3548,7 +3548,7 @@
       "SG2-49:AC1",
       "SG2-49:AC3"
     ],
-    "method_id": "TC-3258b6383300",
+    "method_id": "SG2-49:venue-staff-approve-a-clear-request-the-venue-is-committed-and-the-coordinator-is-notified",
     "previous_executions": [
       {
         "status": "Pass",
@@ -3587,7 +3587,7 @@
       "SG2-49:AC2",
       "SG2-49:AC3"
     ],
-    "method_id": "TC-6c6474000fac",
+    "method_id": "SG2-49:venue-staff-reject-a-request-with-a-reason-the-coordinator-can-see",
     "previous_executions": [
       {
         "status": "Pass",
@@ -3627,7 +3627,7 @@
       "SG2-49:AC1",
       "SG2-49:AC2"
     ],
-    "method_id": "TC-a05d282f10a1",
+    "method_id": "SG2-49:a-clash-an-uncovered-capacity-shortfall-a-missing-reason-or-another-role-cannot-decide",
     "previous_executions": [
       {
         "status": "Pass",
@@ -3738,7 +3738,7 @@
     "mapped_acs": [
       "SG2-52:AC1"
     ],
-    "method_id": "TC-dbe41c267a89",
+    "method_id": "SG2-52:support-staff-create-update-and-reload-every-equipment-field-on-phone-and-desktop",
     "status": "Pass",
     "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
     "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
@@ -3767,7 +3767,7 @@
     "mapped_acs": [
       "SG2-52:AC2"
     ],
-    "method_id": "TC-27dbfa1a4369",
+    "method_id": "SG2-52:damaged-and-maintenance-stock-remain-held-but-contribute-no-available-quantity",
     "status": "Pass",
     "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
     "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
@@ -3798,7 +3798,7 @@
     "mapped_acs": [
       "SG2-52:AC1"
     ],
-    "method_id": "TC-e806e73f7326",
+    "method_id": "SG2-52:zero-and-the-maximum-whole-quantity-save-while-incomplete-and-out-of-range-records-are-refused",
     "status": "Pass",
     "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
     "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
@@ -3828,7 +3828,7 @@
     "mapped_acs": [
       "SG2-52:AC1"
     ],
-    "method_id": "TC-f6d9993b3831",
+    "method_id": "SG2-52:rapid-save-sends-one-request-and-a-stale-editor-cannot-overwrite-a-newer-record",
     "status": "Pass",
     "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
     "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
@@ -3857,7 +3857,7 @@
     "mapped_acs": [
       "SG2-52:AC3"
     ],
-    "method_id": "TC-35413aed754a",
+    "method_id": "SG2-52:every-other-role-and-unsigned-caller-are-denied-equipment-writes-by-the-api",
     "status": "Pass",
     "actual": "Passed in the complete 56-journey Playwright run against the production app build and real loopback Express routes with reset disposable storage. Assertions checked the specified visible and persisted results.",
     "execution_evidence": "7 Oct 2026; full Playwright run /tmp/test-review-playwright.config.ts; 56/56 journeys passed in installed Chrome against local disposable fixtures. E2E TypeScript, 13/13 report-gate tests and required SG2-26 report gate passed. Log /tmp/test-review-full-browser.log; report /tmp/test-review-qa/regression.json. No hosted acceptance or independent teammate sign-off claimed.",
@@ -6370,9 +6370,9 @@
     "layer": "Public readmodel + native API/PostgreSQL + rollback release guard + exact migration rehearsal",
     "status": "Pass",
     "relatedCases": [
-      "TC-c9484442bdb1",
-      "TC-f3ea905fb5b6",
-      "TC-0fdb7e7b7c93",
+      "SG2-39:venue-disruptions-and-planning-impacts-remain-outstanding-together-without-hiding-either",
+      "SG2-39:confirmed-planning-impacts-mark-ready-arrangements-outstanding-without-changing-bookings-or",
+      "SG2-81:a-stale-confirmation-rpc-missing-the-venue-disruption-guard-blocks-release",
       "SG2-39:disruptions-and-rechecks-combined",
       "SG2-39:combined-readiness-no-side-effects"
     ],
@@ -6460,13 +6460,13 @@
       "SG2-46:AC2"
     ],
     "source_method_ids": [
-      "TC-7374ec3fefa4",
-      "TC-26e7adab3c89",
-      "TC-84c9bb72d424",
-      "TC-9300029d2991",
-      "TC-03588b5b3b63",
-      "TC-b5b1ecf34f9e",
-      "TC-a23df58c1687"
+      "SG2-46:an-event-requiring-a-projector-pre-fills-the-facility-filter-without-losing-its-requirement-text",
+      "SG2-46:multiple-recognised-facilities-survive-mixed-case-and-prose-separators-in-event-prefill",
+      "SG2-46:unrecognised-venue-prose-remains-visible-without-inventing-facility-filters",
+      "SG2-46:an-event-can-pre-fill-all-twelve-supported-facility-requirements-without-truncation",
+      "SG2-46:canonical-event-facility-filters-accept-the-established-projection-wi-fi-and-pa-aliases",
+      "SG2-46:a-venue-missing-any-canonical-required-facility-is-excluded-despite-matching-the-others",
+      "SG2-46:unknown-facility-phrases-stay-literal-and-every-canonical-or-freeform-criterion-must-match"
     ],
     "notes": "Independent PR90 test-case review remains pending. Historical source-test identities and the renamed keyword-boundary workbook identity must be preserved."
   },
@@ -6521,34 +6521,23 @@
       "SG2-66:AC5"
     ],
     "source_method_ids": [
-      "TC-80ad0eda772a",
-      "TC-25f6cc2ada9f",
-      "TC-87c11af29527",
-      "TC-612910aeb6b4",
-      "TC-849a59c8261d",
-      "TC-1a861da9306d",
-      "TC-df9c4d68d2d7",
-      "TC-519f5123d127",
-      "TC-0336ae9929eb",
-      "TC-3d9c9998d39a",
-      "TC-a6c0b8b9030c",
-      "TC-6b2ad4efa1e3",
-      "TC-a7cfcd286148",
-      "TC-675beceeb96b",
-      "TC-de323dc2531e",
-      "TC-17e7d2dbef7c",
-      "TC-4d06b4d5e4ae",
-      "TC-bced1830aecd",
-      "TC-ba1c733ff50e",
-      "TC-3a48cfcc9d5d",
-      "TC-0961d3a822ea",
-      "TC-c26acc317a71",
-      "TC-392a7ca9c77e",
-      "TC-ab07f7ca796d",
-      "TC-ca259369136a",
-      "TC-040f5bb0680d",
-      "TC-1371b802a92e",
-      "TC-59268c4cd719"
+      "SG2-47:s-capacity-exception-discovery-navigation-is-offered-s",
+      "SG2-47:s-is-not-offered-capacity-approval-without-the-actual-server-permission",
+      "SG2-47:s-reaches-a-pending-capacity-request-from-navigation-and-sees-its-real-approval-receipt-without",
+      "SG2-47:selecting-a-real-request-approves-only-its-capacity-exception-and-retains-the-authoritative",
+      "SG2-47:unknown-recorded-venue-capacity-is-displayed-explicitly-while-the-server-suitability-controls",
+      "SG2-47:a-refused-list-shows-an-alert-and-refresh-recovers-instead-of-misrepresenting-an-empty-inbox",
+      "SG2-47:a-refresh-supersedes-an-older-list-response-and-cannot-restore-a-stale-request",
+      "SG2-47:selecting-another-request-loads-its-own-suitability-and-never-carries-the-previous-receipt-into",
+      "SG2-47:an-approval-refused-after-list-selection-keeps-the-real-refusal-and-never-invents-an-exception",
+      "SG2-47:capacity-approvers-read-the-scoped-pending-list-with-their-bearer-session-and-no-cached-response",
+      "SG2-47:a-missing-session-refuses-the-capacity-list-locally-without-sending-an-anonymous-request",
+      "SG2-47:expired-and-forbidden-sessions-receive-distinct-actionable-messages-without-trusting-server-data",
+      "SG2-47:unavailable-network-failed-http-and-invalid-json-never-become-an-empty-eligible-list",
+      "SG2-47:malformed-identifiers-names-attendance-capacity-and-periods-cannot-produce-an-approvable-request",
+      "SG2-47:missing-rows-or-a-failed-capacity-worklist-read-never-return-a-partial-successful-list",
+      "SG2-47:capacity-discovery-refuses-unauthenticated-and-non-approver-roles-before-reading-any-candidates",
+      "SG2-47:unavailable-capacity-discovery-reports-a-safe-retryable-error-rather-than-private-database"
     ],
     "method_scope": {
       "new_declarations": 28,
@@ -6557,8 +6546,8 @@
       "browser": 3,
       "frontend_revised_declarations": 2,
       "revised_method_ids": [
-        "TC-6aa41d5ab5b0",
-        "TC-7e7ab4e858fd"
+        "SG2-23:s",
+        "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles"
       ],
       "browser_case_ids": [
         "SG2-47-P03",
@@ -6566,7 +6555,21 @@
         "SG2-47-N02"
       ]
     },
-    "notes": "Grouped supporting-method record, not 28 independently accepted user workflows. SG2-47-P01/P02/N01 historical executions remain unchanged. Existing permission and POST eligibility rules are reused, not expanded. All four category tags occur in the new source tests; parameterized runner counts differ from declaration counts. DoD test traceability is recorded; independent PR review and full hosted Done acceptance remain open."
+    "notes": "Grouped supporting-method record, not 28 independently accepted user workflows. SG2-47-P01/P02/N01 historical executions remain unchanged. Existing permission and POST eligibility rules are reused, not expanded. All four category tags occur in the new source tests; parameterized runner counts differ from declaration counts. DoD test traceability is recorded; independent PR review and full hosted Done acceptance remain open.",
+    "historical_source_method_ids": [
+      "TC-a6c0b8b9030c",
+      "TC-17e7d2dbef7c",
+      "TC-4d06b4d5e4ae",
+      "TC-bced1830aecd",
+      "TC-3a48cfcc9d5d",
+      "TC-c26acc317a71",
+      "TC-392a7ca9c77e",
+      "TC-ab07f7ca796d",
+      "TC-040f5bb0680d",
+      "TC-1371b802a92e",
+      "TC-59268c4cd719"
+    ],
+    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
   },
   {
     "id": "SG2-40-DRAFT-HISTORY-01",
@@ -6614,15 +6617,14 @@
       "SG2-26:AC2"
     ],
     "source_method_ids": [
-      "TC-cf4357b74d4f",
-      "TC-c27aa7ffe629",
-      "TC-6086a521446b",
-      "TC-44ef6b50a004",
-      "TC-5049d40360f1",
-      "TC-7a76d4090428",
-      "TC-c987ebc832db",
-      "TC-95ae3f9ff622",
-      "TC-f8d610cd06a0"
+      "SG2-40:release-readiness-refuses-a-missing-atomic-draft-audit-rpc",
+      "SG2-25:release-readiness-requires-service-only-execution-of-the-draft-audit-rpc",
+      "SG2-29:unchanged-and-refused-draft-saves-add-no-phantom-history-and-other-accounts-cannot-read-the",
+      "SG2-36:an-explicit-clarification-revision-records-the-organiser-field-changes-while-retaining-the",
+      "SG2-29:native-draft-saves-commit-exact-field-history-and-preserve-owner-only-access",
+      "SG2-29:native-concurrent-draft-saves-serialize-their-old-new-chain-and-submission-closes-the-write-path",
+      "SG2-29:atomic-draft-refusals-preserve-not-found-closed-and-invalid-outcomes",
+      "SG2-29:locked-draft-save-refusals-cannot-be-reported-as-successful-after-a-stale-precheck"
     ],
     "source_sql_contract_ids": [
       "SG2-40:draft-all-field-diffs",
@@ -6651,12 +6653,12 @@
       "revised": 2,
       "revised_aliases": [
         {
-          "current": "TC-458d32beacb0",
+          "current": "SG2-29:sends-the-verified-actor-and-nine-values-to-the-atomic-draft-history-rpc",
           "previous": "TC-f774dfb62d21",
           "reason": "Existing adapter save case now verifies the atomic RPC rather than direct UPDATE filters."
         },
         {
-          "current": "TC-022594d51cca",
+          "current": "SG2-40:humanizefieldname-translates-snake-case-fields-into-user-friendly-labels",
           "previous": "TC-022594d51cca",
           "reason": "Existing field-label case additionally checks Event Name, Purpose and Description."
         }
@@ -6667,7 +6669,11 @@
         "SG2-40-P03"
       ]
     },
-    "notes": "The23 records are supporting methods/contracts, not23 independently accepted workflows. Existing SG2-40 history records and historical executions remain unchanged. All four required categories are represented. DoD inventory now2,396 methods+758SQL; human peer review and remaining hosted Done acceptance remain open. No earlier missing draft values are fabricated."
+    "notes": "The23 records are supporting methods/contracts, not23 independently accepted workflows. Existing SG2-40 history records and historical executions remain unchanged. All four required categories are represented. DoD inventory now2,396 methods+758SQL; human peer review and remaining hosted Done acceptance remain open. No earlier missing draft values are fabricated.",
+    "historical_source_method_ids": [
+      "TC-6086a521446b"
+    ],
+    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
   },
   {
     "id": "REG-EQUIPMENT-SUMMARY-AND-READINESS-REFRESH",
@@ -6705,15 +6711,15 @@
       "SG2-57:AC2"
     ],
     "source_method_ids": [
-      "TC-16f4536430d9",
-      "TC-0560d21103a2",
-      "TC-382177a106d2",
-      "TC-b438717925a1",
-      "TC-f1acada8cbbe",
-      "TC-c453d326d8f3",
-      "TC-9ea38ff9f207",
-      "TC-39dd94b896da",
-      "TC-d9ace0563980"
+      "SG2-53:changing-the-successful-view-observer-preserves-an-unsaved-requirement-and-publishes-its",
+      "SG2-53:refreshing-an-amended-equipment-requirement-updates-the-selected-request-summary-by-identity",
+      "SG2-53:a-failed-requirement-refresh-preserves-the-selected-summary-until-an-authoritative-retry",
+      "SG2-41:a-requirements-response-for-a-different-request-event-j-cannot-substitute-it-into-the-selected",
+      "SG2-53:a-late-load-s-cannot-expose-a-previous-event-after-event-identity-changes",
+      "SG2-53:a-late-save-s-after-account-changes-is-aborted-and-cannot-alter-the-current-view",
+      "SG2-53:refreshing-externally-changed-placement-updates-readiness-in-both-directions-without-discarding",
+      "SG2-53:a-failed-external-placement-refresh-does-not-publish-fresh-readiness-until-an-authoritative",
+      "SG2-53:an-aborted-equipment-refresh-cannot-refresh-or-overwrite-readiness-after-the-event-detail-is"
     ]
   },
   {
@@ -6752,19 +6758,22 @@
       "SG2-86:AC2"
     ],
     "source_method_ids": [
-      "TC-75bdfbc814fb",
-      "TC-ae29d1b8b62b",
-      "TC-dcc55e924120",
-      "TC-8bdef18d29a7",
-      "TC-ef3f16001bee",
-      "TC-e811294c4eb9",
-      "TC-62e073b3223f",
-      "TC-ab057dea8821",
-      "TC-0900841595fc",
-      "TC-f5e67cc9e432",
-      "TC-636d33e52f44",
-      "TC-e35b97c49a37"
-    ]
+      "SG2-22:optional-hosted-role-declarations-enter-the-ledger-without-a-hosted-directory-being-required",
+      "SG2-25:hosted-read-only-guard-permits-normal-auth-but-blocks-booking-profile-and-implicit-review-writes",
+      "SG2-25:hosted-guard-refuses-alternate-origins-and-lookalike-hosts-while-allowing-only-existing-static",
+      "SG2-25:hosted-json-and-junit-omit-password-token-raw-failure-steps-config-and-unsafe-attachments",
+      "SG2-25:optional-hosted-execution-refuses-missing-runtime-credentials-before-starting-playwright",
+      "SG2-23:hosted-role-1-organiser-pages-and-owned-draft23-history-are-read-only",
+      "SG2-23:hosted-role-2-coordinator-pages-and-assigned-event22-readiness-are-read-only",
+      "SG2-23:hosted-role-3-venue-staff-pages-calendar-holds-and-catalogue-are-read-only",
+      "SG2-23:hosted-role-4-technical-support-pages-and-equipment-are-read-only",
+      "SG2-23:hosted-role-5-lead-queue-and-assignment-pages-are-inspected-without-assigning",
+      "SG2-23:hosted-role-7-attendee-prototype-pages-and-real-profile-render-without-registration-mutations"
+    ],
+    "historical_source_method_ids": [
+      "TC-636d33e52f44"
+    ],
+    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
   },
   {
     "id": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
@@ -6811,10 +6820,10 @@
       "SG2-82:AC5"
     ],
     "source_method_ids": [
-      "TC-ed49754c98bb",
-      "TC-4845c2416e81",
-      "TC-519eb1370679",
-      "TC-2ac7873148f4"
+      "SG2-84:approval-updates-only-that-hold-to-a-confirmed-booking-and-removes-its-actions",
+      "SG2-85:a-failed-approval-cannot-display-a-confirmed-booking",
+      "SG2-84:deadline-refresh-waits-for-an-in-flight-approval-and-preserves-the-saved-booking",
+      "SG2-84:staff-approve-a-live-hold-through-its-booking-request-and-release-a-second-hold"
     ],
     "source_sql_contract_ids": [
       "SG2-84:linked-conversion-fixture",
@@ -6881,12 +6890,12 @@
       "SG2-82:AC5"
     ],
     "source_method_ids": [
-      "TC-46857ba61a29",
-      "TC-0fe86dd0560f",
-      "TC-3abe2f6dfd8a",
-      "TC-392972d9707a",
-      "TC-91df6da0dbb1",
-      "TC-8a22bade2fa6"
+      "SG2-48:searching-again-reconciles-an-externally-approved-venue-request-its-confirmed-booking-and-ready",
+      "SG2-48:a-zero-match-search-hides-stale-pending-and-empty-booking-panels-while-their-fresh-reads-are",
+      "SG2-48:a-failed-search-leaves-known-arrangements-alone-and-failed-panel-reads-report-errors-until-a",
+      "SG2-46:an-invalid-new-period-does-not-revalidate-or-erase-the-current-event-arrangement",
+      "SG2-82:a-superseded-late-search-cannot-replace-current-results-or-trigger-an-obsolete-arrangement",
+      "SG2-48:leaving-an-event-aborts-its-search-and-the-next-event-reads-only-its-own-arrangement"
     ]
   },
   {
@@ -6923,7 +6932,7 @@
       "SG2-77:AC4"
     ],
     "source_method_ids": [
-      "TC-aad027991f96",
+      "SG2-77:actual-staff-upserts-record-only-persisted-venue-operation-changes-no-op-saves-add-no-history",
       "SG2-77:upsert-initial-persisted-audit",
       "SG2-77:upsert-only-actual-transition",
       "SG2-77:upsert-history-preserved",
@@ -8718,7 +8727,7 @@
       "SG2-59:AC2",
       "SG2-59:AC3"
     ],
-    "method_id": "TC-1a1335b69308",
+    "method_id": "SG2-59:an-attendee-finds-the-events-open-or-opening-for-registration-and-opens-one-without-seeing",
     "purpose": "Catch an unconfirmed, closed or walk-in event reaching attendees, a list missing its date, time or venue, or planning details leaking into the attendee's view.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrable-events seed before each case; fresh browser context. No hosted Supabase.",
     "review": null,
@@ -8751,7 +8760,7 @@
       "SG2-59:AC1",
       "SG2-59:AC2"
     ],
-    "method_id": "TC-cca1f0f3911f",
+    "method_id": "SG2-59:unlisted-events-do-not-open-for-an-attendee-and-other-roles-cannot-browse",
     "purpose": "Catch an attendee opening an event that is closed, unconfirmed, without registration or missing by guessing its id, or a non-attendee role reading the attendee list.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/registrable-events seed before each case; fresh browser context. No hosted Supabase.",
     "review": null,

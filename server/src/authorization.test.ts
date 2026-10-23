@@ -429,11 +429,6 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3
   assert.equal(fetchMock.mock.callCount(), 2);
 });
 
-test('[FAILURE] [SG2-97:AC1] no role but the Event Coordinator Lead holds the assign-coordinator grant', () => {
-  const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('event_request.assign_coordinator'));
-  assert.deepEqual(holders, ['event_coordinator_lead']);
-});
-
 test('[FAILURE] [SG2-89:AC4] no role but the Event Coordinator Lead holds the coordinator overview grant', () => {
   const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('event_request.oversight.view'));
   assert.deepEqual(holders, ['event_coordinator_lead']);
@@ -446,7 +441,7 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -486,56 +481,6 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
   for (const [role, expected] of Object.entries(EXPECTED)) {
     assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);
   }
-});
-
-test('[NORMAL] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] [SG2-70:AC3] the Safety Officer holds exactly the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision, and event search', () => {
-  // Written as an independent literal, never computed from PERMISSIONS: this
-  // file's snapshot went stale during SG2-86 for exactly that reason.
-  const EXPECTED = [
-    'event_request.safety_decision.record',
-    'event_request.safety_decisions.view',
-    'event_request.stage.view',
-    'event_request.history.view',
-    'venues.operations.read',
-    'equipment_requirements.read',
-    'notifications.inbox',
-    'safety_checks.read',
-    'events.search',
-    'profile.read',
-    'profile.update'
-  ];
-  assert.deepEqual(permissionsFor('safety_officer', PERMISSIONS).sort(), [...EXPECTED].sort());
-});
-
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] [SG2-89:AC4] the Event Coordinator Lead holds exactly the profile grants plus assignment, the unassigned queue, the coordinator overview, stage, history, their own notices and event search', () => {
-  // Written as an independent literal, never computed from PERMISSIONS, for
-  // the same reason as the Safety Officer's test above.
-  const EXPECTED = [
-    'event_request.assign_coordinator',
-    'event_request.queue.view',
-    'event_request.oversight.view',
-    'event_request.stage.view',
-    'event_request.history.view',
-    'notifications.read', 'notifications.inbox',
-    'events.search',
-    'profile.read',
-    'profile.update'
-  ];
-  assert.deepEqual(permissionsFor('event_coordinator_lead', PERMISSIONS).sort(), [...EXPECTED].sort());
-});
-
-test('[FAILURE] [SG2-70:AC3] event search is held by exactly the internal roles, never an organiser or attendee', () => {
-  const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('events.search'));
-  assert.deepEqual(holders.sort(), ['event_coordinator', 'event_coordinator_lead', 'safety_officer', 'technical_support_staff', 'venue_staff']);
-  assert.deepEqual([...holders].sort(), [...INTERNAL_ROLES].sort());
-});
-
-test('[FAILURE] [SG2-59:AC1] only an attendee may browse the events open for registration', () => {
-  assert.deepEqual(SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('events.registrable.read')), ['attendee']);
-});
-
-test('[NORMAL] [SG2-100:AC13] only an Event Coordinator may complete an event', () => {
-  assert.deepEqual([...PERMISSIONS['event_request.complete']], ['event_coordinator']);
 });
 
 for (const role of [
@@ -594,17 +539,6 @@ test('[BOUNDARY] [SG2-100:AC6] the complete route is matched on its own, not cap
   // would have let them through.
   const organiser = await completeAs('event_organiser');
   assert.equal(organiser.status, 403);
-});
-
-test('[NORMAL] [SG2-58:AC1] only an Event Coordinator confirms; only the organiser and coordinator read confirmed arrangements', () => {
-  assert.deepEqual([...PERMISSIONS['event_request.confirm']], ['event_coordinator']);
-  assert.deepEqual([...PERMISSIONS['event_request.confirmation.view']], ['event_organiser', 'event_coordinator']);
-});
-
-test('[NORMAL] [SG2-66:AC1] [SG2-66:AC4] only an Event Coordinator views and accepts change requests and settles rechecks', () => {
-  assert.deepEqual([...PERMISSIONS['event_request.change_request.view']], ['event_coordinator']);
-  assert.deepEqual([...PERMISSIONS['event_request.change_request.accept']], ['event_coordinator']);
-  assert.deepEqual([...PERMISSIONS['event_request.rechecks.settle']], ['event_coordinator']);
 });
 
 for (const role of [
@@ -676,12 +610,4 @@ test('[CONFLICT] [SG2-86:AC1] two concurrent /api/auth/me requests resolving dif
     request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`)));
   assert.equal(lead.body.role, 'event_coordinator_lead');
   assert.equal(safety.body.role, 'safety_officer');
-});
-
-test('[FAILURE] [SG2-54:AC1] only Technical Support holds the equipment availability read grant', () => {
-  assert.deepEqual(SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('equipment.availability.read')), ['technical_support_staff']);
-});
-
-test('[FAILURE] [SG2-55:AC1] only Technical Support holds the equipment reservation write grant', () => {
-  assert.deepEqual(SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('equipment.reservations.manage')), ['technical_support_staff']);
 });
