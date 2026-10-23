@@ -49,6 +49,7 @@ import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
 import { createEventSearchRouter } from './eventSearch';
 import { createRegistrationHandlers } from './events/registrationRoutes';
 import { createRegistrableEventsRouter } from './registrableEvents';
+import { createCoordinatorOverviewRouter } from './coordinatorOverview';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -125,6 +126,8 @@ export function createApp(
   registrableEventsRouter = createRegistrableEventsRouter(access),
   // SG2-67: appended last for the same reason.
   cancellationHandlers = createEventCancellationHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-89: appended last for the same reason.
+  coordinatorOverviewRouter = createCoordinatorOverviewRouter(access)
 ) {
   const app = express();
 
@@ -174,6 +177,8 @@ export function createApp(
   app.use('/api/event-search', eventSearchRouter);
   // SG2-59: attendees find the events they can register for.
   app.use('/api/registrable-events', registrableEventsRouter);
+  // SG2-89: the Event Coordinator Lead's overview of the events they supervise.
+  app.use('/api/coordinator-overview', coordinatorOverviewRouter);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

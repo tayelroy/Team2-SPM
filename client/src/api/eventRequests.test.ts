@@ -1742,6 +1742,11 @@ describe('assignCoordinator (SG2-33/34)', () => {
     });
   });
 
+  test('[NORMAL] [SG2-89:AC6] a reassignment while awaiting clarification reports that status back unchanged', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ request: { status: 'needs_clarification' } })));
+    expect(await assignCoordinator(7, 'c2', 'tok')).toEqual({ ok: true, status: 'needs_clarification' });
+  });
+
   test.each([
     null, {}, { request: null }, { request: {} }, { request: { status: 42 } },
     { request: { status: 'unknown_status' } }, { request: { status: 'completed' } },

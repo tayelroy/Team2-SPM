@@ -33,9 +33,10 @@ begin
      -- adds preferred_layout and SG2-63 registration_announced, which an
      -- event from before them never has, and SG2-70 gives every existing
      -- event a category. SG2-67 adds the cancellation record, empty for an
-     -- event that was never asked to cancel.
+     -- event that was never asked to cancel. SG2-89 adds the supervising
+     -- Lead, backfilled from the event's assignment history.
      or (to_jsonb(e)-'status'-'expected_crowd_movement'-'awaiting_safety_check_since'-'safety_check_revision'-'preferred_layout'-'registration_announced'-'category'
-       -'cancellation_requested_at'-'cancellation_requested_by'-'cancellation_reason'-'cancelled_at'-'cancelled_by')
+       -'cancellation_requested_at'-'cancellation_requested_by'-'cancellation_reason'-'cancelled_at'-'cancelled_by'-'coordinator_assigned_by')
        is distinct from (f.event_before-'status')) then
   raise exception '[SG2-51:legacy-hold-release-metadata-preserved] [SG2-51:AC3] [SG2-51:AC5] [BOUNDARY] Repair must retain original request metadata, all hold/booking history and event information';
  end if;

@@ -57,6 +57,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.assign_coordinator': ['event_coordinator_lead'],
   // SG2-87: only the Event Coordinator Lead sees the queue of unassigned requests.
   'event_request.queue.view': ['event_coordinator_lead'],
+  // SG2-89 AC4: only the Lead sees the overview of the events they supervise
+  // and the coordinators holding them. Which events is enforced per-row by
+  // who assigned their coordinator, not by this grant.
+  'event_request.oversight.view': ['event_coordinator_lead'],
   // SG2-35: a coordinator opens a request for review. Which request is
   // enforced per-row by the assignment made in SG2-33, not by this grant.
   'event_request.review': ['event_coordinator'],

@@ -9,6 +9,7 @@ import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import AssignmentQueue from './screens/AssignmentQueue';
+import CoordinatorOverview from './screens/CoordinatorOverview';
 import CapacityExceptions from './screens/CapacityExceptions';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
@@ -287,6 +288,8 @@ export default function App() {
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
+    // SG2-89: the Lead's overview of the events they supervise.
+    overview: <CoordinatorOverview key={session!.accessToken} accessToken={session!.accessToken} />,
     safetyChecks: <SafetyChecks key={session!.accessToken} accessToken={session!.accessToken} focusEventId={safetyFocus} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
       accessToken={session!.accessToken} prefill={venuePrefill} />,

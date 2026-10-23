@@ -49,6 +49,7 @@ import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
+import { createCoordinatorOverviewRouter } from '../server/src/coordinatorOverview';
 import { createMemoryEquipmentStore } from './support/equipment';
 import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
@@ -259,7 +260,11 @@ const app = createApp(
   // over the in-memory tables.
   createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) }),
   // SG2-59: the attendee's event list mirrors registrable_events over the in-memory tables.
-  createRegistrableEventsRouter(access, token => createMemoryRegistrableEventsStore(database, token))
+  createRegistrableEventsRouter(access, token => createMemoryRegistrableEventsStore(database, token)),
+  // SG2-67: cancellation keeps its default handlers, as before.
+  undefined,
+  // SG2-89: the Lead's overview, against the in-memory client.
+  createCoordinatorOverviewRouter(access, { getAdminClient: getClient })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -476,6 +481,11 @@ app.post('/__e2e/legacy-venue-block', (_req, res) => {
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {
   database.seedCoordinatorAssignment();
+  res.status(204).end();
+});
+// SG2-89: two Leads, the events each supervises, and a shared queue entry.
+app.post('/__e2e/coordinator-oversight', (_req, res) => {
+  database.seedCoordinatorOversight();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-access', (_req, res) => {

@@ -7,8 +7,10 @@ import {
   assignEventCoordinator,
   type FetchEventRequestResult,
   type AssignCoordinatorResult,
-  type AssignStatusTransition
+  type AssignStatusTransition,
+  type CoordinatorAssignment
 } from '../db/eventRequests';
+import { fetchEventSupervisor, type FetchEventSupervisorResult } from '../db/coordinatorOverview';
 import { getHeldRoles, type GetHeldRolesResult } from '../db/accountRoles';
 import { insertAuditLogs, statusChange } from '../db/auditLogs';
 import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
@@ -24,10 +26,12 @@ export interface AssignCoordinatorDependencies {
   getAdminClient?: () => SupabaseClient | null;
   fetchRequest?: (admin: SupabaseClient, eventId: number) => Promise<FetchEventRequestResult>;
   lookupRole?: (admin: SupabaseClient, userId: string) => Promise<GetHeldRolesResult>;
+  /** SG2-89 AC1: the Lead supervising the event before this change. */
+  fetchSupervisor?: (admin: SupabaseClient, eventId: number) => Promise<FetchEventSupervisorResult>;
   assignCoordinator?: (
     admin: SupabaseClient,
     eventId: number,
-    coordinatorId: string | null,
+    assignment: CoordinatorAssignment,
     expectedCurrent: string | null,
     statusTransition?: AssignStatusTransition
   ) => Promise<AssignCoordinatorResult>;
@@ -65,12 +69,17 @@ export interface AssignCoordinatorDependencies {
  * notice that cannot be stored answers 503 but does not undo the
  * assignment: the history already shows it, so it stands (see
  * docs/notifications.md).
+ *
+ * SG2-89 AC1: the Lead making the change becomes the event's supervising
+ * Lead, in the same write. Undoing an unrecorded change puts back the Lead
+ * who supervised it before.
  */
 export function createAssignCoordinatorHandler({
   getPrincipal,
   getAdminClient = getSupabaseAdminClient,
   fetchRequest = fetchEventRequestById,
   lookupRole = getHeldRoles,
+  fetchSupervisor = fetchEventSupervisor,
   assignCoordinator = assignEventCoordinator,
   writeHistory = insertAuditLogs,
   notify = notifyEvent
@@ -154,7 +163,15 @@ export function createAssignCoordinatorHandler({
     const transition: AssignStatusTransition | undefined =
       current.status === 'unassigned' ? { from: 'unassigned', to: 'submitted' } : undefined;
 
-    const assigned = await assignCoordinator(admin, eventId, coordinatorId, previousId, transition);
+    const supervisor = await fetchSupervisor(admin, eventId);
+    if (!supervisor.ok) {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+
+    const assigned = await assignCoordinator(
+      admin, eventId, { coordinatorId, assignedBy: principal.userId }, previousId, transition
+    );
     if (!assigned.ok) {
       if (assigned.reason === 'not_assignable') {
         // The status was assignable when read, so the request was reassigned
@@ -183,7 +200,7 @@ export function createAssignCoordinatorHandler({
       await assignCoordinator(
         admin,
         eventId,
-        previousId,
+        { coordinatorId: previousId, assignedBy: supervisor.supervisorId },
         coordinatorId,
         transition ? { from: transition.to, to: transition.from } : undefined
       );

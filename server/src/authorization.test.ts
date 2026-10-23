@@ -415,18 +415,23 @@ for (const role of ['safety_officer'] as const) {
   });
 }
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, stage, history, their own notices and event search to the profile grants', async () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] [SG2-89:AC4] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, the coordinator overview, stage, history, their own notices and event search to the profile grants', async () => {
   const fetchMock = provider({ role: 'event_coordinator_lead' });
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
   assert.deepEqual(res.body, {
     userId, role: 'event_coordinator_lead', roles: ['event_coordinator_lead'],
     permissions: [
-      'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.stage.view', 'event_request.history.view',
+      'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.oversight.view', 'event_request.stage.view', 'event_request.history.view',
       'notifications.read', 'notifications.inbox', 'events.search', 'profile.read', 'profile.update'
     ]
   });
   assert.equal(fetchMock.mock.callCount(), 2);
+});
+
+test('[FAILURE] [SG2-89:AC4] no role but the Event Coordinator Lead holds the coordinator overview grant', () => {
+  const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('event_request.oversight.view'));
+  assert.deepEqual(holders, ['event_coordinator_lead']);
 });
 
 test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejecting near misses', () => {

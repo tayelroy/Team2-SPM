@@ -904,6 +904,20 @@
         "AC2": "Events that are not confirmed, or have registration disabled, are not listed",
         "AC3": "Opening an event shows attendee-facing details only, with no internal planning information"
       }
+    },
+    {
+      "id": "SG2-89",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-89",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-22",
+      "acceptanceCriteria": {
+        "AC1": "I can view all active events under my supervision (the events whose coordinator I assigned), along with the Event Coordinator assigned to each one and its current status",
+        "AC2": "I can view the events assigned to each Event Coordinator",
+        "AC3": "I can filter by coordinator and by status",
+        "AC4": "Event Coordinators and other roles cannot see this overview",
+        "AC5": "Where there are several Event Coordinator Leads, each can see the whole unassigned queue (SG2-87)",
+        "AC6": "Active events include those awaiting the Organiser's clarification: they stay in the assigned Event Coordinator's work queue (SG2-41) and in this overview, and the Lead can reassign them without changing their status"
+      }
     }
   ]
 }

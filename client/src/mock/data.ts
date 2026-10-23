@@ -147,6 +147,8 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     // SG2-87: the queue of submitted requests no coordinator holds yet.
     ['queue', 'Unassigned queue', 'event_request.queue.view'],
     ['assign', 'Assign coordinators', 'event_request.assign_coordinator'],
+    // SG2-89 AC1-AC4: the events this Lead supervises and who holds them.
+    ['overview', 'Coordinator overview', 'event_request.oversight.view'],
     ['findEvent', 'Find an event', 'events.search'],
   ],
   // SG2-91 AC2/AC4: the list of events awaiting a safety check.
@@ -222,6 +224,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   profile: 'My profile',
   assign: 'Assign coordinators',
   queue: 'Unassigned queue',
+  overview: 'Coordinator overview',
   safetyChecks: 'Safety checks',
   search: 'Find venues',
   findEvent: 'Find an event',
@@ -251,6 +254,8 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   editDraft: 'Update the details, then save your changes or submit when ready.',
   profile: 'View and update your contact details and communication preferences.',
   queue: 'Submitted requests no coordinator holds yet, oldest first. Assign them from Assign coordinators.',
+  overview:
+    'The active events whose coordinator you assigned, who holds each one, and how busy each coordinator is.',
   safetyChecks: 'Events awaiting an operational safety check, oldest first, with everything the review needs.',
   assign:
     'Give each submitted request a named coordinator, or hand it to someone else when plans change.',
