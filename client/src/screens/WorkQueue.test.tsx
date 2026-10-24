@@ -21,6 +21,8 @@ vi.mock('../components/ArrangementRechecks', () => ({ default: () => null }));
 vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
 // SG2-92: stubbed for the same reason; covered in WorkQueue.safety.test.tsx.
 vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
+// SG2-93: stubbed for the same reason; covered in WorkQueue.safety.test.tsx.
+vi.mock('../components/SafetyRereviewQueue', () => ({ default: () => null }));
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const review: WorkItem = { kind: 'event', item_id: 12, event_id: 12, title: 'Leadership Forum',

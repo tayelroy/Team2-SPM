@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as api from '../api/safetyChecks';
-import type { FetchSafetyDecisionsResult, SafetyDecision } from '../api/safetyChecks';
+import type { FetchSafetyDecisionsResult, SafetyDecision, SafetyRereview } from '../api/safetyChecks';
 import SafetyDecisionSummary, { type SafetyDecisionSummaryProps } from './SafetyDecisionSummary';
 import { formatSgtTimestamp } from './EventAuditDrawer';
 
@@ -18,7 +18,14 @@ const REJECTED: SafetyDecision = {
 const EARLIER: SafetyDecision = { ...REJECTED, decision_id: 4, decision: 'request_changes', reason: 'Widen the aisles', arrangements: ['venue', 'other'] };
 const APPROVED: SafetyDecision = { ...REJECTED, decision_id: 11, decision: 'approve', reason: null, decided_by_name: null };
 
-const decisions = (list: SafetyDecision[]) => vi.spyOn(api, 'fetchSafetyDecisions').mockResolvedValue({ ok: true, decisions: list });
+const decisions = (list: SafetyDecision[], rereviews: SafetyRereview[] = []) =>
+  vi.spyOn(api, 'fetchSafetyDecisions').mockResolvedValue({ ok: true, decisions: list, rereviews });
+
+const HALL = 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT)';
+const FLAG: SafetyRereview = {
+  review_id: 1, decision_id: 4, arrangement: 'venue', label: HALL, flagged_at: '2030-06-01T00:00:00.000Z',
+  resolution: null, resolved_by_name: null, resolved_at: null,
+};
 
 function renderSummary(props: Partial<SafetyDecisionSummaryProps> = {}) {
   const onReworked = vi.fn();
@@ -80,7 +87,7 @@ describe('SafetyDecisionSummary (SG2-92 AC4–AC6)', () => {
   test('[FAILURE] [SG2-92:AC6] an unreadable history is reported and retried', async () => {
     const fetch = vi.spyOn(api, 'fetchSafetyDecisions')
       .mockResolvedValueOnce({ ok: false, kind: 'unavailable', message: 'History is down.' })
-      .mockResolvedValueOnce({ ok: true, decisions: [REJECTED] });
+      .mockResolvedValueOnce({ ok: true, decisions: [REJECTED], rereviews: [] });
     renderSummary({ canRework: false });
     expect(await screen.findByRole('alert')).toHaveTextContent('History is down.');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -104,7 +111,49 @@ describe('SafetyDecisionSummary (SG2-92 AC4–AC6)', () => {
     vi.spyOn(api, 'fetchSafetyDecisions').mockReturnValue(new Promise((done) => { resolve = done; }));
     const { view } = renderSummary();
     view.unmount();
-    await act(async () => resolve({ ok: true, decisions: [REJECTED] }));
+    await act(async () => resolve({ ok: true, decisions: [REJECTED], rereviews: [] }));
     expect(screen.queryByTestId('safety-decision-summary')).toBeNull();
+  });
+});
+
+describe('SafetyDecisionSummary: arrangements sent back to staff (SG2-93)', () => {
+  test('[NORMAL] [SG2-93:AC2] [SG2-93:AC5] each flag of the latest Request changes says who must confirm it or how it ended', async () => {
+    decisions([EARLIER], [
+      FLAG,
+      { ...FLAG, review_id: 2, arrangement: 'equipment', label: '4 × Wireless microphones' },
+      { ...FLAG, review_id: 3, label: 'Atrium', resolution: 'confirmed', resolved_by_name: 'Vera Venue', resolved_at: '2030-06-02T00:00:00.000Z' },
+      { ...FLAG, review_id: 5, arrangement: 'equipment', label: '2 × Projectors', resolution: 'confirmed', resolved_at: '2030-06-02T00:00:00.000Z' },
+      { ...FLAG, review_id: 6, label: 'Old Hall', resolution: 'withdrawn', resolved_at: '2030-06-02T00:00:00.000Z' },
+    ]);
+    renderSummary({ status: 'planning', canRework: false });
+    const sentBack = await screen.findByRole('list', { name: 'Sent back to staff' });
+    expect(Array.from(sentBack.querySelectorAll('li'), (item) => item.textContent)).toEqual([
+      `${HALL}: waiting for Venue Staff to confirm it again`,
+      '4 × Wireless microphones: waiting for Technical Support to confirm it again',
+      'Atrium: confirmed again by Vera Venue',
+      '2 × Projectors: confirmed again by Technical Support',
+      'Old Hall: withdrawn',
+    ]);
+  });
+
+  test('[BOUNDARY] [SG2-93:AC3] [SG2-93:AC5] only flags of the latest decision show, and only when it requested changes', async () => {
+    decisions([EARLIER], [{ ...FLAG, decision_id: 2, label: 'Earlier Hall' }, FLAG]);
+    renderSummary({ status: 'planning', canRework: false });
+    const sentBack = await screen.findByRole('list', { name: 'Sent back to staff' });
+    expect(sentBack).toHaveTextContent(`${HALL}: waiting for Venue Staff to confirm it again`);
+    expect(sentBack).not.toHaveTextContent('Earlier Hall');
+    cleanup();
+
+    decisions([APPROVED, EARLIER], [FLAG]);
+    renderSummary({ status: 'preparation', canRework: false });
+    expect(await screen.findByText('Approved')).toBeVisible();
+    expect(screen.queryByRole('list', { name: 'Sent back to staff' })).toBeNull();
+    cleanup();
+
+    // Request changes naming only "other" arrangements sends nothing to staff.
+    decisions([EARLIER]);
+    renderSummary({ status: 'planning', canRework: false });
+    expect(await screen.findByText('Widen the aisles')).toBeVisible();
+    expect(screen.queryByRole('list', { name: 'Sent back to staff' })).toBeNull();
   });
 });

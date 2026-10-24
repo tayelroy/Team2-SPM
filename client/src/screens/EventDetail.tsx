@@ -45,6 +45,10 @@ const ARRANGEMENT_LABELS: Record<string, string> = {
   venue_recheck: 'Venue Suitability Recheck',
   equipment_recheck: 'Equipment Recheck',
   registration_recheck: 'Registration Capacity Recheck',
+  // SG2-93 AC1: arrangements a Safety Officer's Request changes left outstanding.
+  safety_venue_recheck: 'Venue Changes (Safety Check)',
+  safety_equipment_recheck: 'Equipment Changes (Safety Check)',
+  safety_other_recheck: 'Other Changes (Safety Check)',
   venue: 'Venue Suitability Recheck',
   equipment: 'Equipment Recheck',
   registration: 'Registration Capacity Recheck',
