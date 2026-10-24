@@ -6,6 +6,7 @@ import type {
 import { eventLabel, eventNoticeMessages } from '../../server/src/db/eventNotifications';
 import { SAFETY_DECISION_NEXT_STATUS, safetyArrangementList } from '../../server/src/events/safetyDecisions';
 import type { MemoryDatabase } from './memory-database';
+import { flagRequestedChanges } from './safety-rereviews';
 
 type Row = Record<string, unknown>;
 
@@ -41,6 +42,7 @@ export function createMemorySafetyDecisions(database: MemoryDatabase) {
     decisions.push({ decision_id: decisionId, event_id: input.eventId, decision: input.decision, reason: input.reason,
       arrangements: [...input.arrangements], decided_by: input.actorId, decided_at: decidedAt });
     Object.assign(event, { status, awaiting_safety_check_since: null, safety_check_revision: revision + 1 });
+    if (input.decision === 'request_changes') flagRequestedChanges(database, event, decisionId, input.arrangements);
     const named = safetyArrangementList(input.arrangements);
     audit(input.eventId, input.actorId, 'safety_decision', null,
       input.decision === 'approve' ? `Approved${input.reason ? `: ${input.reason}` : ''}`

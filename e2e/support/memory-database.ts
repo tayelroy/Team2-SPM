@@ -67,6 +67,8 @@ export class MemoryDatabase {
       registrations: [],
       // SG2-92: the Safety Officer's decisions, append-only.
       event_safety_decisions: [],
+      // SG2-93: requests a Request Changes decision sent back to staff.
+      safety_rereviews: [],
       equipment: [{ equipment_id: 1, name: 'Wireless microphones', description: 'Handheld wireless microphones',
         quantity_total: 20, location: 'Technical store', operational_status: 'operational', version: 1 }],
       events: [

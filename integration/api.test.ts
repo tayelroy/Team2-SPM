@@ -32,6 +32,7 @@ import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisio
 import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
 import { createNotificationsRouter } from '../server/src/notifications';
+import { createSafetyRereviewHandlers } from '../server/src/events/safetyRereviewRoutes';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -501,6 +502,72 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-
   const reworked = await safety.post(`/api/event-requests/${rejected}/rework`).set(auth('coordinator'));
   assert.deepEqual([reworked.status, reworked.body], [200, { event_id: rejected, status: 'planning' }]);
   assert.equal((await stored(rejected)).status, 'planning');
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-93:AC1] [SG2-93:AC2] [SG2-93:AC3] [SG2-93:AC4] [SG2-93:AC5] native Request Changes sends the named venue back to Venue Staff, and the event returns to the check once it is confirmed again and Other is done', async () => {
+  const id = await planned();
+  const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 200 }).select('venue_id').single();
+  assert.equal(venue.error, null);
+  const period = { event_id: id, venue_id: venue.data!.venue_id, starts_at: '2090-07-10T01:00:00Z', ends_at: '2090-07-10T05:00:00Z' };
+  const booking = await database.from('venue_bookings').insert({ ...period, status: 'confirmed' }).select('booking_id').single();
+  assert.equal(booking.error, null);
+  // The approved request backed by its booking completes the arrangements, so
+  // SG2-91's trigger puts the event on the Safety Officer's list.
+  assert.equal((await database.from('venue_booking_requests').insert({ ...period, status: 'approved',
+    venue_booking_id: booking.data!.booking_id }).select('request_id').single()).error, null);
+  const before = await stored(id);
+  assert.equal(before.status, 'awaiting_safety_check');
+
+  const changeArgs = [...args] as Parameters<typeof createApp>;
+  changeArgs[35] = createChangeRequestHandlers({ ...dependencies, source: createMockChangeRequestSource(() => new Date('2090-07-01T00:00:00Z')) });
+  changeArgs[37] = createSafetyDecisionHandlers(dependencies);
+  changeArgs[38] = createSafetyRereviewHandlers(dependencies);
+  const app = request(createApp(...changeArgs));
+
+  // AC1/AC3: only the named arrangements are outstanding, and the booking is untouched.
+  const decided = await app.post(`/api/event-requests/${id}/safety-decision`).set(auth('safety')).send({
+    decision: 'request_changes', reason: 'Move the stage away from the fire exit', arrangements: ['venue', 'other'],
+    safety_check_revision: before.safety_check_revision });
+  assert.equal(decided.status, 201, JSON.stringify(decided.body));
+  let event = await stored(id);
+  assert.deepEqual([event.status, event.arrangements_recheck_needed, event.outstanding_arrangements],
+    ['planning', true, ['safety_venue_recheck', 'safety_other_recheck']]);
+  assert.equal((await database.from('venue_bookings').select('status').eq('booking_id', booking.data!.booking_id).single()).data!.status, 'confirmed');
+
+  // AC2: Venue Staff see it with the reason; Technical Support and the coordinator do not.
+  const label = 'Integration Hall (10 Jul 2090 09:00 – 13:00 SGT)';
+  const queue = await app.get('/api/safety-rereviews').set(auth('venue'));
+  assert.equal(queue.status, 200, JSON.stringify(queue.body));
+  const flag = queue.body.rereviews.find((item: { event_id: number }) => item.event_id === id);
+  assert.deepEqual([flag.label, flag.reason, flag.decided_by_name], [label, 'Move the stage away from the fire exit', 'Integration safety officer']);
+  assert.equal((await app.get('/api/safety-rereviews').set(auth('support'))).body.rereviews
+    .some((item: { event_id: number }) => item.event_id === id), false);
+  assert.equal((await app.get('/api/safety-rereviews').set(auth('coordinator'))).status, 403);
+
+  // AC4: the venue cannot be marked done before Venue Staff confirm it again.
+  const early = await app.post(`/api/event-requests/${id}/rechecks/safety_venue_recheck/settle`).set(auth('coordinator'));
+  assert.deepEqual([early.status, early.body.blockers], [409, [`${label} is waiting for Venue Staff to confirm it again.`]]);
+  assert.equal((await app.post(`/api/safety-rereviews/${flag.review_id}/confirm`).set(auth('support'))).status, 403);
+  const confirmed = await app.post(`/api/safety-rereviews/${flag.review_id}/confirm`).set(auth('venue'));
+  assert.deepEqual([confirmed.status, confirmed.body], [200, { review_id: flag.review_id, event_id: id, status: 'planning',
+    outstanding_arrangements: ['safety_other_recheck'] }]);
+  assert.equal((await app.post(`/api/safety-rereviews/${flag.review_id}/confirm`).set(auth('venue'))).status, 409);
+  const done = await app.post(`/api/event-requests/${id}/rechecks/safety_other_recheck/settle`).set(auth('coordinator'));
+  assert.deepEqual([done.status, done.body.outstanding_arrangements], [200, []]);
+  event = await stored(id);
+  assert.equal(event.status, 'awaiting_safety_check');
+
+  // AC5: the decision and how its flag was resolved are kept for the organiser to read.
+  const history = await app.get(`/api/event-requests/${id}/safety-decisions`).set(auth('organiser'));
+  assert.deepEqual(history.body.rereviews.map((row: { label: string; resolution: string; resolved_by_name: string }) =>
+    [row.label, row.resolution, row.resolved_by_name]), [[label, 'confirmed', 'Integration venue staff']]);
+  const audit = await database.from('event_audit_logs').select('field_name,new_value').eq('event_id', id)
+    .in('field_name', ['safety_rereview', 'arrangement_recheck']).order('log_id');
+  assert.deepEqual(audit.data, [
+    { field_name: 'safety_rereview', new_value: `Venue Staff confirmed ${label} again` },
+    { field_name: 'arrangement_recheck', new_value: 'safety_venue_recheck settled' },
+    { field_name: 'arrangement_recheck', new_value: 'safety_other_recheck settled' }
+  ]);
 });
 
 test('[NORMAL] [SG2-28:AC1] [SG2-30:AC1] [SG2-87:AC5] [SG2-39:AC1] organiser submission, Lead assignment and planning preserve actual stored values', async () => {
