@@ -195,9 +195,16 @@ export type ApplyAcceptedEventChangeResult =
   | { outcome: 'stale' }
   | { outcome: 'unavailable' };
 
-/** What `public.settle_arrangement_recheck` did (SG2-66 AC4). */
+/** A flagged request still waiting for staff to confirm it again (SG2-93). */
+export interface WaitingSafetyRereview {
+  arrangement: 'venue' | 'equipment';
+  label: string;
+}
+
+/** What `public.settle_arrangement_recheck` did (SG2-66 AC4, SG2-93 AC4). */
 export type SettleArrangementRecheckResult =
   | { outcome: 'ok'; arrangements_recheck_needed: boolean; outstanding_arrangements: RecheckKey[] }
+  | { outcome: 'flagged'; waiting: WaitingSafetyRereview[] }
   | { outcome: 'not_outstanding' }
   | { outcome: 'stale' }
   | { outcome: 'unavailable' };
@@ -265,6 +272,12 @@ export async function settleArrangementRecheck(
   if (error || typeof data !== 'object' || data === null) return { outcome: 'unavailable' };
   const row = data as Record<string, unknown>;
   if (row.outcome === 'stale' || row.outcome === 'not_outstanding') return { outcome: row.outcome };
+  if (row.outcome === 'flagged') {
+    const waiting = Array.isArray(row.waiting) ? row.waiting as Record<string, unknown>[] : [];
+    const valid = waiting.length > 0 && waiting.every(item => (item.arrangement === 'venue' || item.arrangement === 'equipment')
+      && typeof item.label === 'string');
+    return valid ? { outcome: 'flagged', waiting: waiting as unknown as WaitingSafetyRereview[] } : { outcome: 'unavailable' };
+  }
   const outstanding = recheckKeys(row.outstanding_arrangements);
   if (row.outcome !== 'ok' || typeof row.arrangements_recheck_needed !== 'boolean' || outstanding === null) {
     return { outcome: 'unavailable' };

@@ -46,6 +46,7 @@ import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
 import { createSafetyChecksRouter } from './safetyChecks';
 import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
+import { createSafetyRereviewHandlers } from './events/safetyRereviewRoutes';
 import { createEventSearchRouter } from './eventSearch';
 import { createRegistrationHandlers } from './events/registrationRoutes';
 import { createRegistrableEventsRouter } from './registrableEvents';
@@ -127,7 +128,9 @@ export function createApp(
   // SG2-67: appended last for the same reason.
   cancellationHandlers = createEventCancellationHandlers({ getPrincipal: access.getPrincipal }),
   // SG2-89: appended last for the same reason.
-  coordinatorOverviewRouter = createCoordinatorOverviewRouter(access)
+  coordinatorOverviewRouter = createCoordinatorOverviewRouter(access),
+  // SG2-93: appended last for the same reason.
+  safetyRereviewHandlers = createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -179,6 +182,12 @@ export function createApp(
   app.use('/api/registrable-events', registrableEventsRouter);
   // SG2-89: the Event Coordinator Lead's overview of the events they supervise.
   app.use('/api/coordinator-overview', coordinatorOverviewRouter);
+  // SG2-93: the bookings and equipment a Request Changes safety decision sent
+  // back to Venue Staff or Technical Support, each confirmed again in turn.
+  const safetyRereviews = access.protectedRouter();
+  safetyRereviews.get('/', access.requirePermission('safety_rereviews.read'), safetyRereviewHandlers.queue);
+  safetyRereviews.post('/:reviewId/confirm', access.requirePermission('safety_rereviews.confirm'), safetyRereviewHandlers.confirm);
+  app.use('/api/safety-rereviews', safetyRereviews);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the

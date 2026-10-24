@@ -16,6 +16,10 @@ const SETTLE_LABELS: Record<RecheckKey, string> = {
   venue_recheck: 'Mark venue rechecked',
   equipment_recheck: 'Mark equipment rechecked',
   registration_recheck: 'Mark registrations rechecked',
+  // SG2-93 AC4: venue and equipment settle once staff confirm them again; other on the coordinator's word.
+  safety_venue_recheck: 'Mark venue safety changes done',
+  safety_equipment_recheck: 'Mark equipment safety changes done',
+  safety_other_recheck: 'Mark other safety changes done',
 };
 
 /**

@@ -51,6 +51,9 @@ const RECHECK_NAMES: Record<RecheckKey, string> = {
   venue_recheck: 'venue',
   equipment_recheck: 'equipment',
   registration_recheck: 'registrations',
+  safety_venue_recheck: 'venue (safety check)',
+  safety_equipment_recheck: 'equipment (safety check)',
+  safety_other_recheck: 'other arrangements (safety check)',
 };
 
 /**

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { WorkItem } from '../api/workQueue';
 import Dashboard from './Dashboard';
+import WorkQueue from './WorkQueue';
 
 // Coordinators open events from the work queue, so SG2-92's decision summary
 // is wired here. It has its own suite; this stub shows what the pane hands it
@@ -22,6 +23,10 @@ vi.mock('../components/ArrangementRechecks', () => ({ default: () => null }));
 vi.mock('../components/EquipmentRequirements', () => ({ default: () => null }));
 vi.mock('../components/EventArrangements', () => ({ default: () => null }));
 vi.mock('../venues/BookingClashes', () => ({ BookingClashes: () => null }));
+// SG2-93: the staff panel has its own suite; this stub shows the token it is handed.
+vi.mock('../components/SafetyRereviewQueue', () => ({
+  default: ({ accessToken }: { accessToken: string }) => <section aria-label="Safety changes to confirm">Flags for {accessToken}</section>,
+}));
 
 afterEach(() => {
   cleanup();
@@ -72,5 +77,29 @@ describe('work queue safety decision (SG2-92)', () => {
     serveQueue({ ...rejected, ...override });
     const pane = await openForum();
     expect(within(pane).queryByTestId('safety-decision-summary')).not.toBeInTheDocument();
+  });
+});
+
+describe('work queue safety changes to confirm (SG2-93)', () => {
+  test.each(['Venue Staff', 'Technical Support Staff'] as const)(
+    '[NORMAL] [SG2-93:AC2] %s see the safety changes to confirm above their queue, and not inside a request',
+    async (role) => {
+      serveQueue({ ...rejected, kind: role === 'Venue Staff' ? 'venue' : 'equipment', category: role === 'Venue Staff' ? 'venue' : 'equipment', title: 'Hall request' });
+      render(<WorkQueue role={role} accessToken="staff-token" />);
+      expect(screen.getByRole('region', { name: 'Safety changes to confirm' })).toHaveTextContent('Flags for staff-token');
+      fireEvent.click(await screen.findByRole('button', { name: /Hall request/ }));
+      await screen.findByRole('button', { name: /Back to work queue/ });
+      expect(screen.queryByRole('region', { name: 'Safety changes to confirm' })).toBeNull();
+    },
+  );
+
+  test.each([
+    ['an Event Coordinator', 'Event Coordinator', 'coordinator-token', '1 item in your work queue'],
+    ['staff without a session', 'Venue Staff', null, 'Sign in again to view your work queue.'],
+  ] as const)('[BOUNDARY] [SG2-93:AC2] %s see no safety changes to confirm', async (_label, role, token, settled) => {
+    serveQueue(rejected);
+    render(<WorkQueue role={role} accessToken={token} />);
+    expect(await screen.findByText(settled)).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Safety changes to confirm' })).toBeNull();
   });
 });

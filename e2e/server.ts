@@ -69,6 +69,8 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
 import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
+import { createSafetyRereviewHandlers } from '../server/src/events/safetyRereviewRoutes';
+import { createMemorySafetyRereviews } from './support/safety-rereviews';
 import { seedSafetyApprovalGate } from './support/safety-approval';
 import { createEventSearchRouter } from '../server/src/eventSearch';
 import { createMemoryEventSearchStore, seedEventSearch } from './support/event-search';
@@ -252,8 +254,10 @@ const app = createApp(
   // in-memory tables.
   createSafetyChecksRouter(access, token => createMemorySafetyChecksStore(database, token)),
   // SG2-92: the decision history reads the in-memory client; recording and
-  // reworking mirror their SQL functions over the in-memory tables.
-  createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database) }),
+  // reworking mirror their SQL functions over the in-memory tables. SG2-93
+  // adds the requests a Request Changes sent back to staff.
+  createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database),
+    listRereviews: createMemorySafetyRereviews(database).listRereviews }),
   // SG2-70: event search mirrors search_events over the in-memory tables.
   createEventSearchRouter(access, token => createMemoryEventSearchStore(database, token)),
   // SG2-63: the registration picture and settings mirror their SQL functions
@@ -264,7 +268,9 @@ const app = createApp(
   // SG2-67: cancellation keeps its default handlers, as before.
   undefined,
   // SG2-89: the Lead's overview, against the in-memory client.
-  createCoordinatorOverviewRouter(access, { getAdminClient: getClient })
+  createCoordinatorOverviewRouter(access, { getAdminClient: getClient }),
+  // SG2-93: the staff side, mirroring the SQL functions in memory.
+  createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal, getAdminClient: getClient, ...createMemorySafetyRereviews(database) })
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -319,6 +325,8 @@ app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
   res.json({
     events: database.tables.events.filter(seeded), decisions: database.tables.event_safety_decisions,
     audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
+    // SG2-93: the requests a Request Changes sent back to staff.
+    rereviews: database.tables.safety_rereviews.filter(seeded),
   });
 });
 // SG2-94: one event awaiting its check, and one approved event in Preparation.

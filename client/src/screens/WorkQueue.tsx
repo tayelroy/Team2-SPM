@@ -12,6 +12,7 @@ import EventAuditDrawer from '../components/EventAuditDrawer';
 import ArrangementRechecks from '../components/ArrangementRechecks';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
+import SafetyRereviewQueue from '../components/SafetyRereviewQueue';
 import RegistrationPanel from '../components/RegistrationPanel';
 import CancellationPanel from '../components/CancellationPanel';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
@@ -489,6 +490,9 @@ export default function WorkQueue({ role, accessToken, onFindVenues, initialSele
       {selection ? <button type="button" className="organisation-button" onClick={() => setSelection(null)}><span aria-hidden="true">← </span>Back to work queue</button> : <h2>Needs your attention</h2>}
       <button type="button" className="organisation-button" onClick={() => setRevision(value => value + 1)}>Refresh</button>
     </div>
+    {/* SG2-93 AC2: bookings and equipment a Safety Officer's Request changes sent back to staff. */}
+    {!selection && accessToken && role !== 'Event Coordinator'
+      ? <SafetyRereviewQueue key={`safety-rereviews:${revision}`} accessToken={accessToken} /> : null}
     <QueueContent key={`${selection?.kind}:${selection?.item_id}:${revision}`} role={role}
       accessToken={accessToken} selection={selection} onSelect={setSelection} onFindVenues={onFindVenues}
       onReload={() => setRevision(value => value + 1)} />
