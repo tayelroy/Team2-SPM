@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  fetchLatestSafetyDecision,
   fetchSafetyDecisionEvent,
   listSafetyDecisions,
   recordSafetyDecision,
@@ -40,7 +41,11 @@ function fakeClient(responses: Record<string, Response>, queries: string[] = [])
               filters.push(row => values.includes(row[column]));
               return chain;
             },
-            order(column: string) { notes.push(`order ${column}`); return chain; },
+            order(column: string, options?: { ascending?: boolean }) {
+              notes.push(`order ${column}${options?.ascending === false ? ' desc' : ''}`);
+              return chain;
+            },
+            limit(count: number) { notes.push(`limit ${count}`); return chain; },
             async maybeSingle() {
               const response = respond();
               return Array.isArray(response.data) ? { ...response, data: response.data[0] ?? null } : response;
@@ -93,7 +98,7 @@ describe('listSafetyDecisions (SG2-92)', () => {
       ]
     });
     assert.deepEqual(queries, [
-      'event_safety_decisions decision_id, event_id, decision, reason, arrangements, decided_by, decided_at | event_id=7 order decided_at order decision_id',
+      'event_safety_decisions decision_id, event_id, decision, reason, arrangements, decided_by, decided_at | event_id=7 order decided_at desc order decision_id desc',
       'users user_id, name | user_id in safety-1,safety-2'
     ]);
   });
@@ -122,6 +127,27 @@ describe('listSafetyDecisions (SG2-92)', () => {
   test('[FAILURE] [SG2-92:AC6] a failed decision or name read fails the whole list', async () => {
     assert.deepEqual(await listSafetyDecisions(fakeClient({ event_safety_decisions: failed }), 7), { ok: false });
     assert.deepEqual(await listSafetyDecisions(fakeClient({ event_safety_decisions: { data: [approve], error: null }, users: failed }), 7), { ok: false });
+  });
+});
+
+describe('fetchLatestSafetyDecision (SG2-94)', () => {
+  test('[NORMAL] [SG2-94:AC2] reads the newest decision in the order the database gate reads it', async () => {
+    const queries: string[] = [];
+    const client = fakeClient({ event_safety_decisions: { data: [{ event_id: 7, decision: 'request_changes' }], error: null } }, queries);
+    assert.deepEqual(await fetchLatestSafetyDecision(client, 7), { ok: true, decision: 'request_changes' });
+    assert.deepEqual(queries, ['event_safety_decisions decision | event_id=7 order decided_at desc order decision_id desc limit 1']);
+  });
+
+  test('[BOUNDARY] [SG2-94:AC5] no decision yet is null, not a failure', async () => {
+    assert.deepEqual(await fetchLatestSafetyDecision(fakeClient({}), 7), { ok: true, decision: null });
+    assert.deepEqual(await fetchLatestSafetyDecision(fakeClient({ event_safety_decisions: { data: null, error: null } }), 7),
+      { ok: true, decision: null });
+  });
+
+  test('[FAILURE] [SG2-94:AC5] a failed read or a value outside the vocabulary is not treated as an approval', async () => {
+    assert.deepEqual(await fetchLatestSafetyDecision(fakeClient({ event_safety_decisions: failed }), 7), { ok: false });
+    assert.deepEqual(await fetchLatestSafetyDecision(fakeClient({ event_safety_decisions: { data: [{ event_id: 7, decision: 'approved' }], error: null } }), 7),
+      { ok: false });
   });
 });
 

@@ -26,6 +26,7 @@
 - [ ] Zero secrets, tokens or credentials committed.
 - [ ] Dynamic & responsive display: If new webpage or page changes introduced, verified layout adapts cleanly across mobile and laptop viewports.
 - [ ] Traceability matrix / `docs/regression-cases.json` updated.
+- [ ] Database migrations: if this PR adds a file in `supabase/migrations/`, rehearsed it on the hosted Supabase project and rolled it back, then applied it and `supabase/checks/release_readiness.sql` returned `ready` (steps: `docs/release-readiness.md`, "Before accepting a deployment", step 2).
 - [ ] CI pipeline passes on GitHub Actions.
 
 ## Verification Evidence
@@ -33,6 +34,7 @@
 - Local commands and results:
 - CI run for the current commit:
 - Integration and staging/test-environment verification:
+- Migration rehearsal, hosted apply and readiness result (project, time), if any:
 - Outstanding acceptance criteria or missing verification evidence:
 
 <!-- DoD v2.0 section 6 requires the reviewer to post the structured Test Case Peer Review & Sign-Off before approving merge. -->

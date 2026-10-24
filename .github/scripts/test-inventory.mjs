@@ -39,6 +39,63 @@ function plainTitle(title) {
 function compact(node, source) { return node.getText(source).replace(/\s+/g, ' ').trim(); }
 function unique(values) { return [...new Set(values)]; }
 
+function semanticSlug(text) {
+  const slug = plainTitle(text)
+    .replace(/^(?:SG2-\d+-[A-Z]\d+|PW-[A-Z]+-\d+|SMOKE-[A-Z]+-\d+)\s*[|:]?\s*/i, '')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/['’]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  if (slug.length <= 96) return slug || 'test';
+  const prefix = slug.slice(0, 96);
+  const boundary = prefix.lastIndexOf('-');
+  // Keep readable whole words. A single overlong token has no boundary,
+  // so its bounded prefix is the only available semantic fallback.
+  return (slug[96] === '-' ? prefix : boundary > 0 ? prefix.slice(0, boundary) : prefix) || 'test';
+}
+
+function assignDescriptiveIds(methods, sql) {
+  const reserved = new Set(sql.map(assertion => assertion.id));
+  const groups = new Map();
+  for (const method of methods) {
+    const story = method.acceptanceCriteria[0]?.story ?? method.references[0].story;
+    const base = `${story}:${semanticSlug(method.title)}`;
+    groups.set(base, [...(groups.get(base) ?? []), method]);
+  }
+  const proposals = new Map();
+  for (const [base, group] of groups) {
+    for (const method of group) {
+      // Context disambiguates equally named cases without hiding their meaning
+      // behind a hash. Line numbers are deliberately excluded from the ID.
+      const context = semanticSlug([
+        method.file.replace(/\.(?:test|spec)\.(?:ts|tsx|mjs)$/, ''),
+        ...method.suites,
+      ].join(' '));
+      const candidate = group.length === 1 && !reserved.has(base) ? base : `${base}-${context}`;
+      proposals.set(candidate, [...(proposals.get(candidate) ?? []), method]);
+    }
+  }
+  // Reserve every readable proposal before numbering punctuation/truncation
+  // collisions, including IDs already used by explicit SQL contracts.
+  const occupied = new Set([...reserved, ...proposals.keys()]);
+  for (const [candidate, group] of proposals) {
+    const sorted = [...group].sort((a, b) => {
+      const left = `${a.file}\n${a.suites.join(' > ')}\n${a.title}`;
+      const right = `${b.file}\n${b.suites.join(' > ')}\n${b.title}`;
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
+    let suffix = 1;
+    for (const method of sorted) {
+      let id = candidate;
+      if (group.length > 1 || reserved.has(id)) {
+        do { id = `${candidate}-${suffix++}`; } while (occupied.has(id));
+      }
+      occupied.add(id);
+      method.legacyId = method.id;
+      method.id = id;
+    }
+  }
+}
+
 const methods = [];
 const errors = [];
 // Supabase tracks the numeric version, not the descriptive filename. Reject
@@ -172,6 +229,8 @@ if (new Set(methods.map(method => method.id)).size !== methods.length) {
 if (new Set(sql.map(method => method.id)).size !== sql.length) errors.push('Duplicate SQL contract IDs.');
 if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
 
+assignDescriptiveIds(methods, sql);
+
 const inventory = { schemaVersion: 1, reviewDate: catalogue.reviewDate,
   scope: 'Every current leaf test declaration and tagged SQL assertion. Parameterized declarations can execute several runner cases; this is a method inventory, not a count of acceptance workflows.',
   methods, sqlAssertions: sql };
@@ -190,6 +249,7 @@ const ledgerMethods = methods.map(({ file, line, title, categories, references }
   ({ file, line, title, categories, references }));
 const ledgerSql = sql.map(({ id, file, line, title, categories, references }) => ({ id, file, line, title, categories, references }));
 const output = '{\n' + `  "schemaVersion": 1,\n  "reviewDate": ${JSON.stringify(catalogue.reviewDate)},\n  "scope": ${JSON.stringify(inventory.scope)},\n`
+  + '  "methodIdPolicy": "Descriptive SG2-story:scenario IDs and TC-hash legacy aliases are derived in --details; committed methods retain source and requirement mappings.",\n'
   + '  "methods": [\n' + ledgerMethods.map(method => '    ' + JSON.stringify(method)).join(',\n') + '\n  ],\n'
   + '  "sqlAssertions": [\n' + ledgerSql.map(method => '    ' + JSON.stringify(method)).join(',\n') + '\n  ]\n}\n';
 const destination = resolve(root, 'docs/test-case-inventory.json');

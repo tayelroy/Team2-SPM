@@ -9,10 +9,11 @@ declare
   reminder_job_ready boolean;
 begin
   with required_columns(relation, columns) as (values
-    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,registration_capacity,registration_opens_at,registration_closes_at,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
+    ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
     ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
+    ('registrations', 'registration_id,event_id,attendee_id,status,registered_at'),
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
     ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at,read_at'),
     ('venue_hold_notifications', 'notification_id,recipient_id,event_id,kind,message,created_at,read_at'),
@@ -84,7 +85,17 @@ begin
     ('public.read_all_notifications()'), ('public.notification_event(text,bigint)'),
     ('public.notification_reminder_preferences()'), ('public.set_notification_reminder_preferences(integer)'),
     ('private.notification_reminder_due(timestamptz,timestamptz,integer)'),
-    ('public.send_outstanding_arrangement_reminders()')
+    ('public.send_outstanding_arrangement_reminders()'),
+    ('public.update_registration_settings(integer,uuid,jsonb,boolean)'),
+    ('public.event_registration_overview(integer)'), ('public.process_registration_windows()'),
+    -- SG2-83: change or cancel one venue of a multi-venue event.
+    ('public.release_venue_bookings(bigint,bigint[],text)'), ('public.venue_change_requested()'),
+    ('public.venue_change_request_check()'),
+    -- SG2-94: the safety approval that gates Preparation and confirmation.
+    ('public.event_safety_approved(public.events)'), ('public.safety_approval_gate()'),
+    -- SG2-59: attendees find events they can register for.
+    ('public.registrable_events()'), ('public.registrable_event(integer)'),
+    ('private.registrable_events_json(integer)')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -155,6 +166,16 @@ begin
     select 'confirm_event venue disruption guard' as name,
       coalesce(position('public.venue_booking_disruptions' in definition) > 0, false) as passed
     from confirmation_definition
+  ), safety_approval_checks as (
+    -- SG2-94: structural fingerprint only; safety_approval_gate.sql proves behavior.
+    select 'confirm_event safety approval' as name,
+      coalesce(position('public.event_safety_approved' in definition) > 0, false) as passed
+    from confirmation_definition
+    union all
+    select 'events safety_approval_gate trigger' as name,
+      exists (select 1 from pg_trigger t where t.tgrelid = to_regclass('public.events')
+        and t.tgname = 'safety_approval_gate' and not t.tgisinternal and t.tgenabled <> 'D'
+        and t.tgfoid = to_regprocedure('public.safety_approval_gate()')) as passed
   ), required_foreign_keys(relation, column_name, target, target_column) as (values
     ('events', 'organiser_id', 'users', 'user_id'),
     ('events', 'coordinator_id', 'users', 'user_id'),
@@ -195,7 +216,8 @@ begin
     ('equipment_reserved'), ('venue_booking_clash'), ('event_confirmed'),
     ('event_submitted'), ('coordinator_assigned'), ('clarification_requested'),
     ('event_approved'), ('event_rejected'), ('venue_unavailable'), ('event_returned_to_planning'),
-    ('safety_decision'), ('outstanding_arrangements')
+    ('safety_decision'), ('outstanding_arrangements'),
+    ('registration_opened'), ('registration_closed')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),
@@ -224,6 +246,7 @@ begin
     union all select * from inbox_type_checks union all select * from inbox_table_checks
     union all select * from recheck_function_checks
     union all select * from disruption_function_check
+    union all select * from safety_approval_checks
     union all select * from grant_checks union all select * from view_checks
     union all select * from confirmation_pair_check
     union all select * from notification_checks

@@ -41,6 +41,7 @@ const SAMPLE_DETAIL: EventRequestRecord = {
   expected_attendance: 50,
   venue_requirements: 'Auditorium with AV',
   preferred_layout: null,
+  category: null,
   accessibility_needs: 'Step-free access',
   equipment_requirements: 'Projector',
   registration_needed: true,

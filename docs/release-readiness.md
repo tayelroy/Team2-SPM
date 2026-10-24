@@ -16,7 +16,19 @@ acceptance tests or the Definition of Done.
 2. Review unapplied migrations and apply them to that project in filename order.
    Use the migration ledger together with the actual schema. Some historical
    setups used SQL Editor without a ledger; do not blindly reapply the entire
-   directory to an existing database. Keep the release's migration result.
+   directory to an existing database. Rehearse before applying (DoD v2.2):
+   - In the SQL Editor, write `begin;` on the first line, paste the unapplied
+     migration files in filename order, delete every line that is exactly
+     `commit;`, and write `rollback;` on the last line. Run it. It must finish
+     without an error; a failed rehearsal changes nothing.
+   - Do not just wrap a file in `begin;` … `rollback;`. Almost every migration
+     ends with its own `commit;`, which saves the changes for real before the
+     `rollback;` is reached.
+   - A statement that cannot run inside a transaction, such as
+     `create index concurrently`, cannot be rehearsed this way. Rehearse it on a
+     disposable copy and say so in the PR.
+   - After a clean rehearsal, run the unedited files in filename order. Keep the
+     release's rehearsal and migration results.
 3. Run the complete contents of
    [`supabase/checks/release_readiness.sql`](../supabase/checks/release_readiness.sql)
    in that project's SQL Editor as the database operator. The script only reads
@@ -51,6 +63,21 @@ acceptance tests or the Definition of Done.
    migration defines the role catalogue and grants; it does not create hosted
    Auth identities, profiles or account-role assignments. Memory E2E fixtures
    are not hosted accounts. Record the tested roles without recording passwords.
+
+### One-off data scripts
+
+Some stories ship a data script beside their migration. It is not a migration
+and CI never runs it; run it by hand, once, after its migration, on the project
+it names.
+
+- **SG2-70 event categories:** after `202610200005_event_search.sql`, run
+  [`supabase/backfill_event_categories_live.sql`](../supabase/backfill_event_categories_live.sql)
+  on the live project. The migration has already given every existing event a
+  category inferred from its name; the script replaces those with hand-picked
+  categories for the 20 demo events listed in it, each matched by both id and
+  name, so it cannot touch any other event. Re-running it changes nothing more.
+  It does not write `event_audit_logs`: it is a data correction, not an
+  organiser's edit. Record the number of rows it updated in the release evidence.
 
 ## What the structural gate checks
 

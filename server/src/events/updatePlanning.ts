@@ -22,7 +22,8 @@ import {
 } from '../db/eventArrangements';
 import { eventLabel, eventNoticeMessages, notifyEvent } from '../db/eventNotifications';
 import { computeArrangementReadiness } from './arrangementReadiness';
-import { REGISTRATION_SETTINGS, RETURNS_TO_PLANNING } from './changeImpact';
+import { RETURNS_TO_PLANNING } from './changeImpact';
+import { isRegistrationSettingField } from './registrationSettings';
 import type { Principal } from '../auth/policy';
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
@@ -36,9 +37,6 @@ export interface PlanningUpdateValues {
   equipment_requirements?: string | null;
   accessibility_needs?: string | null;
   registration_needed?: boolean | null;
-  registration_capacity?: number | null;
-  registration_opens_at?: string | null;
-  registration_closes_at?: string | null;
   planning_notes?: string | null;
   /** SG2-91 AC3: how attendees arrive, move through and leave the venue. */
   expected_crowd_movement?: string | null;
@@ -97,26 +95,25 @@ export const AUDITED_PLANNING_FIELDS = [
   'accessibility_needs',
   'equipment_requirements',
   'registration_needed',
-  'registration_capacity',
-  'registration_opens_at',
-  'registration_closes_at',
   'planning_notes',
   'expected_crowd_movement'
 ] as const;
 
 /**
  * Fields a coordinator may still edit directly once an event is Confirmed or in
- * Preparation (SG2-66 AC6): registration settings (SG2-63) and the
+ * Preparation (SG2-66 AC6): whether registration is needed and the
  * coordinator's own planning notes, which are an internal log rather than
- * event details. Everything else needs a change request (SG2-64).
+ * event details. Everything else needs a change request (SG2-64). Registration
+ * capacity and times are the organiser's (SG2-63 AC8).
  */
 const LOCKED_STATUS_EDITABLE_FIELDS: Record<string, true> = {
   registration_needed: true,
-  registration_capacity: true,
-  registration_opens_at: true,
-  registration_closes_at: true,
   planning_notes: true
-} satisfies Record<(typeof REGISTRATION_SETTINGS)[number] | 'planning_notes', true>;
+};
+
+/** SG2-63 AC8: refused before anything else is checked. */
+export const REGISTRATION_SETTINGS_MESSAGE =
+  'Registration capacity and opening and closing times are set by the Event Organiser.';
 
 const LOCKED_STATUS_LABELS: Record<'confirmed' | 'preparation', string> = {
   confirmed: 'Confirmed',
@@ -126,7 +123,7 @@ const LOCKED_STATUS_LABELS: Record<'confirmed' | 'preparation', string> = {
 /** The message a refused direct edit shows, pointing to a change request (SG2-66 AC6). */
 export function changeRequestRequiredMessage(status: 'confirmed' | 'preparation'): string {
   return `This event is ${LOCKED_STATUS_LABELS[status]}, so its details can no longer be edited directly. ` +
-    'Ask for the change through a change request instead; only registration settings can still be edited here.';
+    'Ask for the change through a change request instead; only whether registration is needed and planning notes can still be edited here.';
 }
 
 /**
@@ -197,56 +194,6 @@ export function validatePlanningUpdateInput(body: unknown): PlanningValidationRe
     }
   }
 
-  if (input.registration_capacity !== undefined) {
-    if (input.registration_capacity === null) {
-      values.registration_capacity = null;
-    } else if (typeof input.registration_capacity !== 'number' || !Number.isInteger(input.registration_capacity)) {
-      errors.push('registration_capacity must be a whole number.');
-    } else if (input.registration_capacity < 1) {
-      errors.push('registration_capacity must be a positive integer.');
-    } else if (input.registration_capacity > MAX_ATTENDANCE) {
-      errors.push(`registration_capacity must be at most ${MAX_ATTENDANCE}.`);
-    } else {
-      values.registration_capacity = input.registration_capacity;
-    }
-  }
-
-  if (input.registration_opens_at !== undefined) {
-    if (input.registration_opens_at === null) {
-      values.registration_opens_at = null;
-    } else if (typeof input.registration_opens_at !== 'string' || input.registration_opens_at.trim().length === 0) {
-      errors.push('registration_opens_at must be an ISO 8601 date-time string.');
-    } else {
-      const parsed = new Date(input.registration_opens_at);
-      if (Number.isNaN(parsed.getTime())) {
-        errors.push('registration_opens_at must be a valid date and time.');
-      } else {
-        values.registration_opens_at = parsed.toISOString();
-      }
-    }
-  }
-
-  if (input.registration_closes_at !== undefined) {
-    if (input.registration_closes_at === null) {
-      values.registration_closes_at = null;
-    } else if (typeof input.registration_closes_at !== 'string' || input.registration_closes_at.trim().length === 0) {
-      errors.push('registration_closes_at must be an ISO 8601 date-time string.');
-    } else {
-      const parsed = new Date(input.registration_closes_at);
-      if (Number.isNaN(parsed.getTime())) {
-        errors.push('registration_closes_at must be a valid date and time.');
-      } else {
-        values.registration_closes_at = parsed.toISOString();
-      }
-    }
-  }
-
-  if (values.registration_opens_at && values.registration_closes_at) {
-    if (new Date(values.registration_closes_at).getTime() <= new Date(values.registration_opens_at).getTime()) {
-      errors.push('registration_closes_at must be after registration_opens_at.');
-    }
-  }
-
   if (errors.length > 0) {
     return { valid: false, errors };
   }
@@ -264,8 +211,8 @@ export function validatePlanningUpdateInput(body: unknown): PlanningValidationRe
  * stored one, so a request cannot leave the event in an inconsistent state:
  * - a newly chosen proposed date must be in the future (an unchanged past date
  *   is left alone, since the drawer resends every field);
- * - registration must close after it opens;
- * - registration must open and close before the event starts.
+ * - the organiser's registration times (SG2-63) must still open and close
+ *   before the event starts.
  */
 export function validatePlanningSchedule(
   current: EventPlanningRecord,
@@ -273,23 +220,18 @@ export function validatePlanningSchedule(
   now: number
 ): string[] {
   const errors: string[] = [];
-  const pick = (field: 'proposed_date' | 'registration_opens_at' | 'registration_closes_at') =>
-    update[field] !== undefined ? update[field] : current[field];
   const timeOf = (value: string | null | undefined) => (value ? new Date(value).getTime() : null);
 
-  const start = timeOf(pick('proposed_date'));
-  const opens = timeOf(pick('registration_opens_at'));
-  const closes = timeOf(pick('registration_closes_at'));
+  const start = timeOf(update.proposed_date !== undefined ? update.proposed_date : current.proposed_date);
+  // The organiser's registration times (SG2-63) still have to fit a new date.
+  const opens = timeOf(current.registration_opens_at);
+  const closes = timeOf(current.registration_closes_at);
 
   if (update.proposed_date) {
     const chosen = new Date(update.proposed_date).getTime();
     if (chosen !== timeOf(current.proposed_date) && chosen <= now) {
       errors.push('proposed_date must be in the future.');
     }
-  }
-
-  if (opens !== null && closes !== null && closes <= opens) {
-    errors.push('registration_closes_at must be after registration_opens_at.');
   }
 
   if (start !== null) {
@@ -306,8 +248,8 @@ export function validatePlanningSchedule(
 
 /**
  * Detects which existing arrangements an edit affects (AC 2): a date shift or
- * attendance increase affects the venue booking and equipment requests, and a
- * registration capacity increase affects registration. A category is only
+ * attendance increase affects the venue booking and equipment requests.
+ * Registration capacity is the organiser's (SG2-63). A category is only
  * flagged when the event actually has that arrangement, read through SG2-57's
  * readiness view: a live venue booking request (pending, held or approved), a
  * live equipment request or reservation, or registration being needed. An edit to an event
@@ -318,12 +260,13 @@ export function detectArrangementImpact(
   update: PlanningUpdateValues,
   facts: EventArrangementFacts
 ): ArrangementImpact {
-  const readiness = computeArrangementReadiness({ ...current, ...facts });
-  const [, equipment, registration] = readiness.arrangements;
+  // Only the venue and equipment items are read here, so the safety check's
+  // decision is not fetched.
+  const readiness = computeArrangementReadiness({ ...current, ...facts, latest_safety_decision: null });
+  const [, equipment] = readiness.arrangements;
   const venueArranged = readiness.venue_requested;
   const equipmentRequested = equipment.state !== 'not_required';
   const equipmentArranged = equipmentRequested || facts.equipment_reserved === true;
-  const registrationArranged = registration.state !== 'not_required';
 
   const affected = new Set<string>();
   const notes: string[] = [];
@@ -367,20 +310,6 @@ export function detectArrangementImpact(
     );
   }
 
-  // 3. Registration capacity increase on an event that takes registrations
-  if (
-    registrationArranged &&
-    update.registration_capacity !== undefined &&
-    update.registration_capacity !== null &&
-    current.registration_capacity !== null &&
-    update.registration_capacity > current.registration_capacity
-  ) {
-    affected.add('registration_recheck');
-    notes.push(
-      `Registration capacity increased from ${current.registration_capacity} to ${update.registration_capacity}. Existing registration arrangements must be rechecked.`
-    );
-  }
-
   return {
     has_impact: affected.size > 0,
     affected_arrangements: Array.from(affected),
@@ -417,11 +346,7 @@ export function computePlanningDiffs(
       changed = newVal !== null && newVal !== undefined;
     } else if (newVal === null || newVal === undefined) {
       changed = true;
-    } else if (
-      field === 'proposed_date' ||
-      field === 'registration_opens_at' ||
-      field === 'registration_closes_at'
-    ) {
+    } else if (field === 'proposed_date') {
       changed = new Date(String(oldVal)).getTime() !== new Date(String(newVal)).getTime();
     } else {
       changed = oldVal !== newVal;
@@ -472,7 +397,17 @@ export function createUpdateEventPlanningHandler({
       return;
     }
 
-    const validated = validatePlanningUpdateInput(req.body ?? {});
+    // SG2-63 AC8 (replaces SG2-39 AC4): the coordinator can see the
+    // registration settings but not change them.
+    const body: unknown = req.body ?? {};
+    const settings = typeof body === 'object' && body !== null && !Array.isArray(body)
+      ? Object.keys(body).filter(isRegistrationSettingField) : [];
+    if (settings.length > 0) {
+      res.status(403).json({ error: REGISTRATION_SETTINGS_MESSAGE, fields: settings });
+      return;
+    }
+
+    const validated = validatePlanningUpdateInput(body);
     if (!validated.valid) {
       res.status(400).json({ error: 'Invalid planning details', details: validated.errors });
       return;
@@ -556,12 +491,11 @@ export function createUpdateEventPlanningHandler({
       fieldsToUpdate.outstanding_arrangements = Array.from(
         new Set([...currentEvent.outstanding_arrangements, ...impact.affected_arrangements])
       );
+      // Only an Awaiting Safety Check event can come back this way: a Confirmed
+      // or Preparation event's date and attendance are locked (SG2-66 AC6) and
+      // its registration capacity is the organiser's (SG2-63 AC8), so no
+      // confirmation is left to clear.
       fieldsToUpdate.status = 'planning';
-      if (currentEvent.status === 'confirmed' || currentEvent.status === 'preparation') {
-        // A confirmation no longer holds once the event is back in planning.
-        fieldsToUpdate.confirmed_by = null;
-        fieldsToUpdate.confirmed_at = null;
-      }
     } else if (currentEvent.status === 'approved') {
       fieldsToUpdate.status = 'planning';
     }

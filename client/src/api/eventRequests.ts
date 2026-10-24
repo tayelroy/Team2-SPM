@@ -8,6 +8,27 @@ import { loadSession } from '../auth/session';
  * a discriminated union so callers can handle success and every documented
  * server error without relying on try/catch alone.
  */
+/**
+ * SG2-70 AC2: the kinds of event an organiser chooses from, in the order the
+ * form offers them. Mirrors EVENT_CATEGORIES in server/src/events/fields.ts.
+ */
+export const EVENT_CATEGORIES = [
+  { value: 'conference', label: 'Conference' },
+  { value: 'workshop', label: 'Workshop' },
+  { value: 'seminar', label: 'Seminar' },
+  { value: 'training', label: 'Training' },
+  { value: 'networking', label: 'Networking' },
+  { value: 'social', label: 'Social' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export type EventCategory = (typeof EVENT_CATEGORIES)[number]['value'];
+
+/** The category's label, or "Uncategorised" for one never chosen or no longer offered. */
+export function categoryLabel(value: string | null | undefined): string {
+  return EVENT_CATEGORIES.find((category) => category.value === value)?.label ?? 'Uncategorised';
+}
+
 export interface EventRequestDraftInput {
   name?: string;
   purpose?: string;
@@ -21,6 +42,8 @@ export interface EventRequestDraftInput {
   equipment_requirements?: string;
   /** Null on a stored draft that has not answered yet (SG2-105). */
   registration_needed?: boolean | null;
+  /** SG2-70: required before submission; null on a draft not yet categorised. */
+  category?: EventCategory | null;
 }
 
 export interface EventRequestDraft extends EventRequestDraftInput {
@@ -117,6 +140,8 @@ export interface EventRequestDetail {
   venueRequirements: string | null;
   /** SG2-105; null on requests submitted before it was asked for. */
   preferredLayout?: string | null;
+  /** SG2-70: one of EVENT_CATEGORIES, or null for a draft not yet categorised. */
+  category?: string | null;
   accessibilityNeeds: string | null;
   equipmentRequirements: string | null;
   registrationNeeded: boolean;
@@ -132,6 +157,10 @@ export interface EventRequestDetail {
   /** Who marked the event completed, and when (SG2-100 AC4). */
   completedBy: string | null;
   completedAt: string | null;
+  /** The organiser's request to cancel, and when it was carried out (SG2-67). */
+  cancellationRequestedAt?: string | null;
+  cancellationReason?: string | null;
+  cancelledAt?: string | null;
   /**
    * When the event finishes — the latest end of its confirmed venue bookings
    * (SG2-100 AC4). Null while nothing confirms when it ends, which must be
@@ -205,6 +234,7 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
         : null,
     venueRequirements: typeof raw.venue_requirements === 'string' ? raw.venue_requirements : null,
     preferredLayout: typeof raw.preferred_layout === 'string' ? raw.preferred_layout : null,
+    category: typeof raw.category === 'string' ? raw.category : null,
     accessibilityNeeds: typeof raw.accessibility_needs === 'string' ? raw.accessibility_needs : null,
     equipmentRequirements:
       typeof raw.equipment_requirements === 'string' ? raw.equipment_requirements : null,
@@ -218,6 +248,9 @@ function mapEventRequestDetail(raw: Record<string, unknown>): EventRequestDetail
     decidedAt: typeof raw.decided_at === 'string' ? raw.decided_at : null,
     completedBy: typeof raw.completed_by === 'string' ? raw.completed_by : null,
     completedAt: typeof raw.completed_at === 'string' ? raw.completed_at : null,
+    cancellationRequestedAt: typeof raw.cancellation_requested_at === 'string' ? raw.cancellation_requested_at : null,
+    cancellationReason: typeof raw.cancellation_reason === 'string' ? raw.cancellation_reason : null,
+    cancelledAt: typeof raw.cancelled_at === 'string' ? raw.cancelled_at : null,
     endsAt: typeof raw.ends_at === 'string' ? raw.ends_at : null,
   };
 }
@@ -620,7 +653,7 @@ export async function getEventStage(
 }
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
-export type ArrangementKey = 'venue' | 'equipment' | 'registration';
+export type ArrangementKey = 'venue' | 'equipment' | 'registration' | 'safety';
 
 export interface ArrangementStatus {
   key: ArrangementKey;
@@ -645,8 +678,9 @@ export type GetEventArrangementsOutcome =
     };
 
 /**
- * Retrieves which of an event's arrangements (venue, equipment, registration)
- * are ready or outstanding and whether it is ready for confirmation (SG2-57).
+ * Retrieves which of an event's arrangements (venue, equipment, registration,
+ * safety check) are ready or outstanding and whether it is ready for
+ * confirmation (SG2-57, SG2-94).
  * Maps to `GET /api/event-requests/:eventId/arrangements`.
  */
 export async function getEventArrangements(
@@ -697,10 +731,8 @@ export interface PlanningUpdatePayload {
   venue_requirements?: string | null;
   equipment_requirements?: string | null;
   accessibility_needs?: string | null;
+  /** Capacity and times are the organiser's (SG2-63 AC8), never sent here. */
   registration_needed?: boolean | null;
-  registration_capacity?: number | null;
-  registration_opens_at?: string | null;
-  registration_closes_at?: string | null;
   planning_notes?: string | null;
   /** SG2-91 AC3: shown to the Safety Officer in the safety check. */
   expected_crowd_movement?: string | null;
@@ -959,8 +991,9 @@ export async function assignCoordinator(
     const status = data?.request?.status;
     // Mirror the server's live assignable states. An absent or invalid status
     // preserves the caller's existing state instead of inventing a transition.
+    // SG2-89 AC6: an event awaiting clarification can be reassigned too.
     return typeof status === 'string' && [
-      'unassigned', 'submitted', 'under_review', 'approved', 'planning',
+      'unassigned', 'submitted', 'under_review', 'needs_clarification', 'approved', 'planning',
       'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed',
     ].includes(status) ? { ok: true, status } : { ok: true };
   }

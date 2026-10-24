@@ -529,6 +529,16 @@ describe('humanizeFieldValue dates and yes/no (SG2-40 AC2)', () => {
   });
 });
 
+describe('humanizeFieldValue category (SG2-70)', () => {
+  test('[NORMAL] [SG2-70:AC2] a category change reads as its label, and one no longer offered as Uncategorised', () => {
+    expect(humanizeFieldValue('category', 'training')).toBe('Training');
+    expect(humanizeFieldValue('category', 'party')).toBe('Uncategorised');
+    expect(humanizeFieldValue('category', null)).toBe('(empty)');
+    // Only the category field is relabelled.
+    expect(humanizeFieldValue('planning_notes', 'training')).toBe('training');
+  });
+});
+
 test('[NORMAL] [SG2-106:AC5] an expiry change reads as a labelled entry with old and new times in Singapore time', () => {
   expect(humanizeFieldName('venue_hold_expiry')).toBe('Tentative Hold Expiry');
   expect(humanizeFieldValue('venue_hold_expiry', 'Hold 7 expires 2090-06-20T02:00:00Z')).toBe('Hold 7 expires 20 Jun 2090, 10:00 SGT');
@@ -545,4 +555,10 @@ test('[NORMAL] [SG2-92:AC6] a safety check decision reads as a labelled history 
   expect(humanizeFieldName('safety_decision')).toBe('Safety Decision');
   expect(humanizeFieldValue('safety_decision', 'Changes requested (Venue, Other): Widen the aisles'))
     .toBe('Changes requested (Venue, Other): Widen the aisles');
+});
+
+test('[NORMAL] [SG2-56:AC3] a released equipment reservation reads as a labelled history entry, as recorded', () => {
+  expect(humanizeFieldName('equipment_reservation')).toBe('Equipment Reservation');
+  expect(humanizeFieldValue('equipment_reservation', 'Released: 6 × Microphones (reservation 12) — Event cancelled'))
+    .toBe('Released: 6 × Microphones (reservation 12) — Event cancelled');
 });

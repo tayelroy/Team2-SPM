@@ -4,7 +4,11 @@ import type {
   ReworkSafetyRejectedEventResult
 } from '../../server/src/db/safetyDecisions';
 import { eventLabel, eventNoticeMessages } from '../../server/src/db/eventNotifications';
-import { SAFETY_DECISION_NEXT_STATUS, safetyArrangementList } from '../../server/src/events/safetyDecisions';
+import {
+  SAFETY_DECISION_NEXT_STATUS,
+  safetyArrangementList,
+  type SafetyDecisionKind
+} from '../../server/src/events/safetyDecisions';
 import type { MemoryDatabase } from './memory-database';
 import { flagRequestedChanges } from './safety-rereviews';
 
@@ -72,6 +76,23 @@ export function createMemorySafetyDecisions(database: MemoryDatabase) {
   };
 
   return { recordDecision, rework };
+}
+
+/** SG2-94: the event's latest decision as public.event_safety_approved() reads
+ * it, newest decided_at first and then the highest decision_id. */
+export function latestSafetyDecision(database: MemoryDatabase, eventId: number): SafetyDecisionKind | null {
+  const [latest] = database.tables.event_safety_decisions
+    .filter(row => row.event_id === eventId)
+    .sort((a, b) => String(b.decided_at).localeCompare(String(a.decided_at)) || Number(b.decision_id) - Number(a.decision_id));
+  return latest ? latest.decision as SafetyDecisionKind : null;
+}
+
+/** SG2-94: an Approve the Safety Officer recorded on a seeded event, in the
+ * shape recordDecision stores. Seeds use it for events placed past the check. */
+export function seedSafetyApproval(database: MemoryDatabase, eventId: number, decidedAt: string) {
+  const decisions = database.tables.event_safety_decisions;
+  decisions.push({ decision_id: nextId(decisions, 'decision_id'), event_id: eventId, decision: 'approve', reason: null,
+    arrangements: [], decided_by: 'user-safety', decided_at: decidedAt });
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   type PlanningUpdatePayload,
 } from '../api/eventRequests';
 import { loadSession } from '../auth/session';
+import { formatSgtTimestamp } from '../components/EventAuditDrawer';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
 import {
   Badge,
@@ -91,8 +92,8 @@ export function toIsoOrNull(val: string): string | null {
 /**
  * Validates coordinator planning drawer input before dispatching (AC 4). Mirrors
  * the server's date rules: a newly chosen proposed date must be in the future
- * (an unchanged one is not re-judged), and registration must open and close
- * before the event starts.
+ * (an unchanged one is not re-judged), and must still come after the
+ * organiser's registration opening and closing times (SG2-63).
  */
 export function validatePlanningForm({
   proposedDate,
@@ -100,7 +101,6 @@ export function validatePlanningForm({
   now,
   expectedAttendance,
   registrationNeeded,
-  registrationCapacity,
   registrationOpensAt,
   registrationClosesAt,
   venueRequirements,
@@ -116,7 +116,7 @@ export function validatePlanningForm({
   now: number;
   expectedAttendance: string;
   registrationNeeded: boolean;
-  registrationCapacity: string;
+  /** The organiser's stored registration times (SG2-63), as datetime-local values. */
   registrationOpensAt: string;
   registrationClosesAt: string;
   venueRequirements: string;
@@ -164,46 +164,14 @@ export function validatePlanningForm({
     }
   }
 
-  if (registrationNeeded) {
-    if (registrationCapacity.trim() !== '') {
-      const cap = Number(registrationCapacity.trim());
-      if (!Number.isInteger(cap) || cap < 1) {
-        errors.push('Registration capacity must be a positive whole number.');
-      } else if (cap > 2_147_483_647) {
-        errors.push('Registration capacity must be at most 2147483647.');
-      }
+  if (registrationNeeded && startTime !== null) {
+    const opens = registrationOpensAt.trim() ? new Date(registrationOpensAt.trim()).getTime() : null;
+    const closes = registrationClosesAt.trim() ? new Date(registrationClosesAt.trim()).getTime() : null;
+    if (opens !== null && opens >= startTime) {
+      errors.push('The event must start after registration opens. Ask the organiser to change the registration times first.');
     }
-
-    let openTime: number | null = null;
-    let closeTime: number | null = null;
-
-    if (registrationOpensAt.trim()) {
-      const d = new Date(registrationOpensAt.trim());
-      if (isNaN(d.getTime())) {
-        errors.push('Registration opening time must be a valid date and time.');
-      } else {
-        openTime = d.getTime();
-      }
-    }
-
-    if (registrationClosesAt.trim()) {
-      const d = new Date(registrationClosesAt.trim());
-      if (isNaN(d.getTime())) {
-        errors.push('Registration closing time must be a valid date and time.');
-      } else {
-        closeTime = d.getTime();
-      }
-    }
-
-    if (openTime !== null && closeTime !== null && closeTime <= openTime) {
-      errors.push('Registration closing time must be after opening time.');
-    }
-
-    if (startTime !== null && openTime !== null && openTime >= startTime) {
-      errors.push('Registration opening time must be before the event starts.');
-    }
-    if (startTime !== null && closeTime !== null && closeTime >= startTime) {
-      errors.push('Registration closing time must be before the event starts.');
+    if (closes !== null && closes >= startTime) {
+      errors.push('The event must start after registration closes. Ask the organiser to change the registration times first.');
     }
   }
 
@@ -256,15 +224,10 @@ function PlanningDrawerPanel({
   const [registrationNeeded, setRegistrationNeeded] = useState(
     () => Boolean(initialValues?.registration_needed),
   );
-  const [registrationCapacity, setRegistrationCapacity] = useState(() =>
-    initialValues?.registration_capacity != null ? String(initialValues.registration_capacity) : '',
-  );
-  const [registrationOpensAt, setRegistrationOpensAt] = useState(() =>
-    formatForDateTimeInput(initialValues?.registration_opens_at),
-  );
-  const [registrationClosesAt, setRegistrationClosesAt] = useState(() =>
-    formatForDateTimeInput(initialValues?.registration_closes_at),
-  );
+  // SG2-63 AC8: the organiser's settings, shown here but not changed here.
+  const registrationCapacity = initialValues?.registration_capacity ?? null;
+  const registrationOpensAt = formatForDateTimeInput(initialValues?.registration_opens_at);
+  const registrationClosesAt = formatForDateTimeInput(initialValues?.registration_closes_at);
 
   const [clientErrors, setClientErrors] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -296,8 +259,9 @@ function PlanningDrawerPanel({
 
   const statusLower = initialValues?.status?.toLowerCase() ?? '';
   const isTerminal = ['cancelled', 'completed', 'rejected'].includes(statusLower);
-  // SG2-66 AC6: once Confirmed or in Preparation, only registration settings
-  // and planning notes are edited here; everything else needs a change request.
+  // SG2-66 AC6: once Confirmed or in Preparation, only whether registration is
+  // needed and planning notes are edited here; everything else needs a change
+  // request.
   const lockedStage = statusLower === 'confirmed' ? 'Confirmed'
     : statusLower === 'preparation' ? 'in Preparation' : null;
   const detailsDisabled = isTerminal || isSaving || lockedStage !== null;
@@ -318,7 +282,6 @@ function PlanningDrawerPanel({
       now: Date.now(),
       expectedAttendance,
       registrationNeeded,
-      registrationCapacity,
       registrationOpensAt,
       registrationClosesAt,
       venueRequirements,
@@ -351,12 +314,6 @@ function PlanningDrawerPanel({
       planning_notes: planningNotes.trim() || null,
       expected_crowd_movement: expectedCrowdMovement.trim() || null,
       registration_needed: registrationNeeded,
-      registration_capacity:
-        registrationNeeded && registrationCapacity.trim()
-          ? Number(registrationCapacity.trim())
-          : null,
-      registration_opens_at: registrationNeeded ? toIsoOrNull(registrationOpensAt) : null,
-      registration_closes_at: registrationNeeded ? toIsoOrNull(registrationClosesAt) : null,
       confirm_impact: confirmImpact,
     };
 
@@ -488,8 +445,8 @@ function PlanningDrawerPanel({
               <NoticeMark size={20} />
               <span style={{ fontSize: '14px', color: color.mist, lineHeight: 1.45 }}>
                 This event is {lockedStage}, so its date, attendance and requirements can no longer be
-                edited here. Ask for those changes through a change request; registration settings
-                and planning notes can still be updated.
+                edited here. Ask for those changes through a change request; whether registration is
+                needed and planning notes can still be updated.
               </span>
             </div>
           </Notice>
@@ -841,7 +798,7 @@ function PlanningDrawerPanel({
                   Attendee Registration
                 </span>
                 <span style={{ fontSize: '12px', color: color.silver }}>
-                  Configure capacity caps and registration availability windows
+                  Whether attendees register. The organiser sets the capacity and times.
                 </span>
               </div>
               <Chip
@@ -859,90 +816,33 @@ function PlanningDrawerPanel({
               </Chip>
             </div>
 
+            {/* SG2-63 AC8 (replaces SG2-39 AC4): set by the organiser, read here. */}
             {registrationNeeded && (
-              <div
+              <dl
+                data-testid="epd-registration-settings"
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
                   gap: '14px',
+                  margin: 0,
                   paddingTop: '8px',
                   borderTop: '1px solid rgba(255,255,255,0.06)',
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label htmlFor="epd-registration-capacity" style={labelToken}>
-                    Registration Capacity
-                  </label>
-                  <input
-                    id="epd-registration-capacity"
-                    type="number"
-                    min="1"
-                    disabled={isTerminal || isSaving}
-                    value={registrationCapacity}
-                    placeholder="e.g. 200"
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      setRegistrationCapacity(e.target.value)
-                    }
-                    style={{
-                      background: surface.fieldOnAbyss,
-                      border: rule.control,
-                      borderRadius: radius.sm,
-                      padding: '12px 14px',
-                      color: color.mist,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label htmlFor="epd-registration-opens-at" style={labelToken}>
-                    Opens At
-                  </label>
-                  <input
-                    id="epd-registration-opens-at"
-                    type="datetime-local"
-                    disabled={isTerminal || isSaving}
-                    value={registrationOpensAt}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      setRegistrationOpensAt(e.target.value)
-                    }
-                    style={{
-                      background: surface.fieldOnAbyss,
-                      border: rule.control,
-                      borderRadius: radius.sm,
-                      padding: '12px 14px',
-                      color: color.mist,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label htmlFor="epd-registration-closes-at" style={labelToken}>
-                    Closes At
-                  </label>
-                  <input
-                    id="epd-registration-closes-at"
-                    type="datetime-local"
-                    disabled={isTerminal || isSaving}
-                    value={registrationClosesAt}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      setRegistrationClosesAt(e.target.value)
-                    }
-                    style={{
-                      background: surface.fieldOnAbyss,
-                      border: rule.control,
-                      borderRadius: radius.sm,
-                      padding: '12px 14px',
-                      color: color.mist,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
+                {[
+                  ['Registration Capacity', registrationCapacity === null ? 'Not set' : String(registrationCapacity)],
+                  ['Opens At', initialValues?.registration_opens_at ? formatSgtTimestamp(initialValues.registration_opens_at) : 'Not set'],
+                  ['Closes At', initialValues?.registration_closes_at ? formatSgtTimestamp(initialValues.registration_closes_at) : 'Not set'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                    <dt style={labelToken}>{label}</dt>
+                    <dd style={{ margin: 0, color: color.mist, fontSize: '14px', overflowWrap: 'anywhere' }}>{value}</dd>
+                  </div>
+                ))}
+                <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: '12px', color: color.silver }}>
+                  Set by the event organiser. Ask them to change the capacity or times.
+                </p>
+              </dl>
             )}
           </div>
 

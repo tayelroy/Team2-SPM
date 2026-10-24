@@ -40,12 +40,17 @@ import { createEquipmentRequirementsRouter } from './equipment/requirements';
 import { createEquipmentAvailabilityRouter } from './equipment/availability';
 import { createEquipmentReservationsRouter } from './equipment/reservations';
 import { createConfirmEventHandler } from './events/confirm';
+import { createEventCancellationHandlers } from './events/cancellation';
 import { createGetEventConfirmationHandler } from './events/getConfirmation';
 import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
 import { createSafetyChecksRouter } from './safetyChecks';
 import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
 import { createSafetyRereviewHandlers } from './events/safetyRereviewRoutes';
+import { createEventSearchRouter } from './eventSearch';
+import { createRegistrationHandlers } from './events/registrationRoutes';
+import { createRegistrableEventsRouter } from './registrableEvents';
+import { createCoordinatorOverviewRouter } from './coordinatorOverview';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -114,6 +119,16 @@ export function createApp(
   safetyChecksRouter = createSafetyChecksRouter(access),
   // SG2-92: appended last for the same reason.
   safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-70: appended last for the same reason.
+  eventSearchRouter = createEventSearchRouter(access),
+  // SG2-63: appended last for the same reason.
+  registrationHandlers = createRegistrationHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-59: appended last for the same reason.
+  registrableEventsRouter = createRegistrableEventsRouter(access),
+  // SG2-67: appended last for the same reason.
+  cancellationHandlers = createEventCancellationHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-89: appended last for the same reason.
+  coordinatorOverviewRouter = createCoordinatorOverviewRouter(access),
   // SG2-93: appended last for the same reason.
   safetyRereviewHandlers = createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal })
 ) {
@@ -161,6 +176,12 @@ export function createApp(
   app.use('/api/assignment-queue', assignmentQueueRouter);
   // SG2-91: the Safety Officer's list of events awaiting a safety check.
   app.use('/api/safety-checks', safetyChecksRouter);
+  // SG2-70: internal users find an event across the system.
+  app.use('/api/event-search', eventSearchRouter);
+  // SG2-59: attendees find the events they can register for.
+  app.use('/api/registrable-events', registrableEventsRouter);
+  // SG2-89: the Event Coordinator Lead's overview of the events they supervise.
+  app.use('/api/coordinator-overview', coordinatorOverviewRouter);
   // SG2-93: the bookings and equipment a Request Changes safety decision sent
   // back to Venue Staff or Technical Support, each confirmed again in turn.
   const safetyRereviews = access.protectedRouter();
@@ -231,6 +252,19 @@ export function createApp(
     access.requirePermission('event_request.confirm'),
     confirmEventHandler
   );
+  // SG2-67 AC1: the creating organiser asks for a cancellation, and only the
+  // assigned coordinator carries it out. Registered before '/:eventId' for
+  // the same reason as '/complete'.
+  eventRequests.post(
+    '/:eventId/cancellation-request',
+    access.requirePermission('event_request.cancellation.request'),
+    cancellationHandlers.request
+  );
+  eventRequests.patch(
+    '/:eventId/cancel',
+    access.requirePermission('event_request.cancel'),
+    cancellationHandlers.cancel
+  );
   // SG2-32: delete a request while it is still a draft.
   eventRequests.delete(
     '/:eventId',
@@ -296,6 +330,23 @@ export function createApp(
     '/:eventId/rework',
     access.requirePermission('event_request.safety_rework'),
     safetyDecisionHandlers.rework
+  );
+  // SG2-63 AC1-AC10: the registration picture, and the creating organiser's
+  // registration settings (capacity, opening and closing times, close now).
+  eventRequests.get(
+    '/:eventId/registrations',
+    access.requirePermission('event_request.registrations.view'),
+    registrationHandlers.overview
+  );
+  eventRequests.patch(
+    '/:eventId/registration-settings',
+    access.requirePermission('event_request.registration_settings.update'),
+    registrationHandlers.update
+  );
+  eventRequests.post(
+    '/:eventId/registration-settings/close',
+    access.requirePermission('event_request.registration_settings.update'),
+    registrationHandlers.close
   );
   // SG2-40: see who changed what on an event request.
   eventRequests.get(

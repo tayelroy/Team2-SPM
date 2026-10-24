@@ -49,6 +49,7 @@ import { createVenueHoldsRouter } from '../server/src/venues/holds';
 import { VenueHoldFixture } from './support/venue-holds';
 import { createEquipmentRouter } from '../server/src/equipment';
 import { createAssignmentQueueRouter } from '../server/src/assignmentQueue';
+import { createCoordinatorOverviewRouter } from '../server/src/coordinatorOverview';
 import { createMemoryEquipmentStore } from './support/equipment';
 import { createEquipmentRequirementsRouter } from '../server/src/equipment/requirements';
 import { createMemoryRequirementsStore } from './support/equipment-requirements';
@@ -70,6 +71,13 @@ import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisio
 import { changeReviewedDetail, createMemorySafetyDecisions, seedSafetyDecisions } from './support/safety-decisions';
 import { createSafetyRereviewHandlers } from '../server/src/events/safetyRereviewRoutes';
 import { createMemorySafetyRereviews } from './support/safety-rereviews';
+import { seedSafetyApprovalGate } from './support/safety-approval';
+import { createEventSearchRouter } from '../server/src/eventSearch';
+import { createMemoryEventSearchStore, seedEventSearch } from './support/event-search';
+import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
+import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
+import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
+import { createMemoryRegistrableEventsStore, seedRegistrableEvents } from './support/registrable-events';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -250,6 +258,17 @@ const app = createApp(
   // adds the requests a Request Changes sent back to staff.
   createSafetyDecisionHandlers({ ...eventDependencies, ...createMemorySafetyDecisions(database),
     listRereviews: createMemorySafetyRereviews(database).listRereviews }),
+  // SG2-70: event search mirrors search_events over the in-memory tables.
+  createEventSearchRouter(access, token => createMemoryEventSearchStore(database, token)),
+  // SG2-63: the registration picture and settings mirror their SQL functions
+  // over the in-memory tables.
+  createRegistrationHandlers({ ...eventDependencies, ...createMemoryRegistrations(database) }),
+  // SG2-59: the attendee's event list mirrors registrable_events over the in-memory tables.
+  createRegistrableEventsRouter(access, token => createMemoryRegistrableEventsStore(database, token)),
+  // SG2-67: cancellation keeps its default handlers, as before.
+  undefined,
+  // SG2-89: the Lead's overview, against the in-memory client.
+  createCoordinatorOverviewRouter(access, { getAdminClient: getClient }),
   // SG2-93: the staff side, mirroring the SQL functions in memory.
   createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal, getAdminClient: getClient, ...createMemorySafetyRereviews(database) })
 );
@@ -310,6 +329,28 @@ app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
     rereviews: database.tables.safety_rereviews.filter(seeded),
   });
 });
+// SG2-94: one event awaiting its check, and one approved event in Preparation.
+app.post('/__e2e/safety-approval', (_req, res) => {
+  seedSafetyApprovalGate(database);
+  res.status(204).end();
+});
+app.get('/__e2e/safety-approval-ledger', (_req, res) => {
+  const seeded = (row: Record<string, unknown>) => [941, 942].includes(Number(row.event_id));
+  res.json({
+    events: database.tables.events.filter(seeded), decisions: database.tables.event_safety_decisions.filter(seeded),
+    audit: database.tables.event_audit_logs.filter(seeded), notifications: database.tables.notifications.filter(seeded),
+  });
+});
+// SG2-63: a confirmed event with open registration, two registered and one withdrawn.
+app.post('/__e2e/registrations', (_req, res) => {
+  seedRegistrations(database);
+  res.status(204).end();
+});
+app.get('/__e2e/registrations-ledger', (_req, res) => res.json({
+  event: database.tables.events.find(row => row.event_id === 631),
+  audit: database.tables.event_audit_logs.filter(row => row.event_id === 631),
+  notifications: database.tables.notifications.filter(row => row.event_id === 631),
+}));
 app.post('/__e2e/event-confirmation-prepare', (_req, res) => {
   prepareConvertedForum(database);
   res.status(204).end();
@@ -321,6 +362,16 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
     venue_requests: database.tables.venue_booking_requests.filter(seeded), holds: database.tables.venue_holds.filter(seeded),
     bookings: database.tables.venue_bookings.filter(seeded),
   });
+});
+// SG2-59: events an attendee can and cannot find.
+app.post('/__e2e/registrable-events', (_req, res) => {
+  seedRegistrableEvents(database);
+  res.status(204).end();
+});
+// SG2-70: events across organisations to search for, plus a draft that is never found.
+app.post('/__e2e/event-search', (_req, res) => {
+  seedEventSearch(database);
+  res.status(204).end();
 });
 app.post('/__e2e/safety-checks', (_req, res) => {
   seedSafetyChecks(database);
@@ -415,6 +466,11 @@ app.post('/__e2e/venue-release', (_req, res) => {
   database.seedVenueRelease();
   res.status(204).end();
 });
+// SG2-83: the released-venue event plus a free venue to change one booking to.
+app.post('/__e2e/venue-change', (_req, res) => {
+  database.seedVenueChange();
+  res.status(204).end();
+});
 // SG2-104: the venue account also holds the Event Coordinator role.
 app.post('/__e2e/multi-role', (_req, res) => {
   database.tables.account_roles.push({ user_id: 'user-venue', role: 'event_coordinator' });
@@ -433,6 +489,11 @@ app.post('/__e2e/legacy-venue-block', (_req, res) => {
 });
 app.post('/__e2e/coordinator-assignment', (_req, res) => {
   database.seedCoordinatorAssignment();
+  res.status(204).end();
+});
+// SG2-89: two Leads, the events each supervises, and a shared queue entry.
+app.post('/__e2e/coordinator-oversight', (_req, res) => {
+  database.seedCoordinatorOversight();
   res.status(204).end();
 });
 app.post('/__e2e/coordinator-access', (_req, res) => {

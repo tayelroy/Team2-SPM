@@ -14,6 +14,42 @@ const clashes = (row: Row, request: Row, gap: number) => row.venue_id === reques
   && Date.parse(String(row.ends_at)) > Date.parse(String(request.starts_at)) - gap * 60_000;
 
 /**
+ * SG2-81/SG2-83: test equivalent of release_replaced_booking(). Approving a
+ * replacement releases the booking it replaces, with the coordinator's change
+ * reason (or SG2-81's wording when there is none): its request is cancelled,
+ * the event's main venue moves on, the history records it and the
+ * coordinator and organiser are told. A booking already released or over is
+ * left as it is.
+ */
+function releaseReplaced(database: MemoryDatabase, request: Row, replacement: string, userId: unknown, now: string) {
+  const old = database.tables.venue_bookings.find(row => row.booking_id === request.replaces_booking_id && row.event_id === request.event_id);
+  if (!old || old.status !== 'confirmed' || String(old.ends_at) <= now) return;
+  const reason = request.change_reason
+    ? `Changed to ${replacement}: ${request.change_reason}`
+    : `Replaced by ${replacement} after the original venue became unavailable.`;
+  Object.assign(old, { status: 'cancelled', cancelled_by: userId, cancelled_at: now, cancellation_reason: reason });
+  database.refreshVenueClashes(old.venue_id);
+  for (const row of database.tables.venue_booking_requests) {
+    if (row.venue_booking_id === old.booking_id && row.status === 'approved') row.status = 'cancelled';
+  }
+  const event = database.tables.events.find(row => row.event_id === request.event_id)!;
+  if (event.venue_booking_id === old.booking_id) {
+    event.venue_booking_id = database.tables.venue_bookings
+      .filter(row => row.event_id === event.event_id && row.status === 'confirmed' && String(row.ends_at) > now)
+      .sort((a, b) => String(a.starts_at).localeCompare(String(b.starts_at)))[0]?.booking_id ?? null;
+  }
+  const venue = String(database.tables.venues.find(row => row.venue_id === old.venue_id)?.name);
+  database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: event.event_id,
+    actor_id: userId, field_name: 'venue_booking', old_value: `Confirmed: ${venue} (booking ${old.booking_id})`,
+    new_value: `Released: ${venue} (booking ${old.booking_id}) — ${reason}`, created_at: now });
+  for (const recipient of new Set([event.coordinator_id, event.organiser_id].filter(Boolean))) {
+    database.tables.notifications.push({ notification_id: nextId(database.tables.notifications, 'notification_id'), recipient_id: recipient,
+      event_id: event.event_id, request_id: null, kind: 'venue_booking_released',
+      message: `${venue} was released for ${event.name || 'Untitled event'}: ${reason}`, created_at: now });
+  }
+}
+
+/**
  * SG2-49: test equivalent of decide_venue_booking_request() for the browser
  * suite, answering as the signed-in Venue Staff member. The SQL suite and its
  * concurrency script carry the transaction and locking evidence.
@@ -33,7 +69,9 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       const now = new Date().toISOString();
       let booking: number | null = null;
       if (decision === 'approve') {
-        if (!['approved', 'planning'].includes(String(event.status)) || String(request.ends_at) <= now) return { outcome: 'closed' };
+        // SG2-81/SG2-83: a replacement is also decided once the event is in Preparation or Confirmed.
+        const open = ['approved', 'planning', ...(request.replaces_booking_id ? ['preparation', 'confirmed'] : [])];
+        if (!open.includes(String(event.status)) || String(request.ends_at) <= now) return { outcome: 'closed' };
         const name = (eventId: unknown) => String(database.tables.events.find(row => row.event_id === eventId)?.name || 'Untitled event');
         const gap = database.preparationGapMinutes(request.venue_id);
         const confirmed = database.tables.venue_bookings.find(row => row.status === 'confirmed' && clashes(row, request, gap));
@@ -57,6 +95,7 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       }
       const status = decision === 'approve' ? 'approved' : 'rejected';
       Object.assign(request, { status, decided_by: userId, decided_at: now, decision_reason: reason, venue_booking_id: booking });
+      if (booking !== null && request.replaces_booking_id) releaseReplaced(database, request, String(venue.name), userId, now);
       database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: request.event_id,
         actor_id: userId, field_name: 'venue_booking_request', old_value: `Pending: ${venue.name} (request ${requestId})`,
         new_value: `${status[0].toUpperCase()}${status.slice(1)}: ${venue.name} (request ${requestId})${reason ? ` — ${reason}` : ''}`, created_at: now });

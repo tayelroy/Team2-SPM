@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  categoryLabel,
   completeEvent,
   fetchOwnEventDetail,
   getEventStage,
@@ -16,6 +17,8 @@ import ConfirmedArrangements from '../components/ConfirmedArrangements';
 import RecheckSettleActions from '../components/RecheckSettleActions';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
+import RegistrationPanel from '../components/RegistrationPanel';
+import CancellationPanel from '../components/CancellationPanel';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -289,6 +292,8 @@ export default function EventDetail({
         { label: 'Venue requirements', value: detail.venueRequirements || 'None specified' },
         // SG2-105: requests submitted before the layout was asked for have none.
         { label: 'Preferred room layout', value: detail.preferredLayout || 'Not specified' },
+        // SG2-70: the kind of event, which internal users can filter by.
+        { label: 'Category', value: categoryLabel(detail.category) },
         { label: 'Coordinator', value: detail.coordinatorName || 'Unassigned' },
         ...(detail.coordinatorName
           ? [{ label: 'Coordinator contact', value: detail.coordinatorPhone || 'No phone number on file' }]
@@ -432,6 +437,28 @@ export default function EventDetail({
               status={detail.status.toLowerCase()}
               canRework={isAssignedCoordinator}
               onReworked={() => setReloadKey((value) => value + 1)}
+            />
+          )}
+          {/* SG2-63: the registration picture for the organisation's organisers
+              and the assigned coordinator; only the creating organiser changes
+              the settings, and the server decides who sees contact details. */}
+          {(isOrganiser || isAssignedCoordinator) && accessToken && detail.registrationNeeded
+            && detail.status.toLowerCase() !== 'draft' && (
+            <RegistrationPanel eventId={detail.eventId} accessToken={accessToken} />
+          )}
+          {/* SG2-67: the creating organiser asks to cancel with a reason, and the
+              assigned coordinator carries it out; both see a cancellation. */}
+          {accessToken && ((isOrganiser && detail.canManage) || isAssignedCoordinator)
+            && !['draft', 'completed'].includes(detail.status.toLowerCase()) && (
+            <CancellationPanel
+              eventId={detail.eventId}
+              accessToken={accessToken}
+              mode={isOrganiser ? 'organiser' : 'coordinator'}
+              status={detail.status.toLowerCase()}
+              requestedAt={detail.cancellationRequestedAt ?? null}
+              reason={detail.cancellationReason ?? null}
+              cancelledAt={detail.cancelledAt ?? null}
+              onChanged={() => setReloadKey((value) => value + 1)}
             />
           )}
           <footer className="organisation-detail-footer">

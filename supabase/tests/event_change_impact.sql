@@ -26,6 +26,9 @@ update public.events set status='approved' where event_id=96603;
 update public.events set status='confirmed',confirmed_by='d6600000-0000-4000-8000-000000000002',
  confirmed_at='2031-10-01T00:00Z' where event_id in (96604,96606);
 update public.events set status='awaiting_safety_check' where event_id=96607;
+-- SG2-94: Preparation only on an approval made while the event awaited its check.
+update public.events set status='awaiting_safety_check' where event_id=96608;
+insert into public.event_safety_decisions(event_id,decision,decided_by) values (96608,'approve','d6600000-0000-4000-8000-000000000003');
 update public.events set status='preparation' where event_id=96608;
 -- 96605: no name, coordinated by the other coordinator. (SG2-104: an event's
 -- organiser can no longer be its coordinator, so each gets their own notice.)

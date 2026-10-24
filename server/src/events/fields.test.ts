@@ -1,10 +1,12 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  EVENT_CATEGORIES,
   EVENT_STATUSES,
   STATUS_TRANSITIONS,
   SUBMISSION_REQUIRED_FIELDS,
   canTransition,
+  isEventCategory,
   missingForSubmission,
   validateDraftInput,
   type DraftValues,
@@ -40,12 +42,7 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
     assert.equal(canTransition('safety_rejected', 'cancelled'), true);
   });
 
-  test('[NORMAL] [SG2-81:AC6] a Preparation or Confirmed event can move back to Planning when its venue becomes unavailable', () => {
-    assert.equal(canTransition('preparation', 'planning'), true);
-    assert.equal(canTransition('confirmed', 'planning'), true);
-  });
-
-  test('[BOUNDARY] [SG2-81:AC6] [SG2-92:AC4] Planning is reachable only from approved (the normal way in), the safety check and its rejection, Preparation and Confirmed, never from the earlier stages or the terminal ones', () => {
+  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-81:AC6] [SG2-92:AC4] Planning is reachable only from approved (the normal way in), the safety check and its rejection, Preparation and Confirmed, never from the earlier stages or the terminal ones', () => {
     const back = EVENT_STATUSES.filter(from => canTransition(from, 'planning'));
     assert.deepEqual([...back].sort(), ['approved', 'awaiting_safety_check', 'confirmed', 'preparation', 'safety_rejected']);
   });
@@ -54,11 +51,6 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
     assert.equal(canTransition('safety_rejected', 'planning'), true);
     assert.equal(canTransition('safety_rejected', 'preparation'), false);
     assert.equal(canTransition('safety_rejected', 'confirmed'), false);
-  });
-
-  test('[FAILURE] [SG2-81:AC6] a completed or cancelled event still cannot go back to Planning', () => {
-    assert.equal(canTransition('completed', 'planning'), false);
-    assert.equal(canTransition('cancelled', 'planning'), false);
   });
 
   test('[NORMAL] [SG2-91:AC1] an Approved or Planning event whose arrangements are in place can move to Awaiting Safety Check', () => {
@@ -101,7 +93,7 @@ describe('the customer minimum for submission (SG2-105)', () => {
     name: 'Partner Forum', purpose: 'Client relationship building', description: 'Quarterly forum.',
     proposed_date: '2026-11-04T09:00:00.000Z', expected_attendance: 120, venue_requirements: 'Stage',
     preferred_layout: 'Theatre', accessibility_needs: 'None', equipment_requirements: 'None',
-    registration_needed: false
+    registration_needed: false, category: 'conference'
   };
 
   test('[NORMAL] [SG2-105:AC1] submission requires every field the customer listed, layout included', () => {
@@ -143,10 +135,36 @@ describe('the customer minimum for submission (SG2-105)', () => {
   });
 });
 
+describe('the event category (SG2-70)', () => {
+  test('[NORMAL] [SG2-70:AC2] a draft keeps any of the seven categories', () => {
+    assert.deepEqual([...EVENT_CATEGORIES], ['conference', 'workshop', 'seminar', 'training', 'networking', 'social', 'other']);
+    for (const category of EVENT_CATEGORIES) {
+      assert.deepEqual(validateDraftInput({ category }), { valid: true, values: { ...emptyDraft(), category } });
+      assert.equal(isEventCategory(category), true);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-70:AC2] a blank or missing category saves as none and does not hold up submission', () => {
+    for (const body of [{}, { category: '' }, { category: null }]) {
+      const result = validateDraftInput(body);
+      assert.deepEqual(result, { valid: true, values: emptyDraft() });
+      assert.equal(missingForSubmission(result.valid ? result.values : {}).includes('category'), false);
+    }
+  });
+
+  test('[FAILURE] [SG2-70:AC2] a category outside the list, in another case or not text is refused by name', () => {
+    const message = 'category must be one of: conference, workshop, seminar, training, networking, social, other.';
+    for (const category of ['party', 'Conference', ' social', 3, true]) {
+      assert.deepEqual(validateDraftInput({ category }), { valid: false, errors: [message] });
+      assert.equal(isEventCategory(category), false);
+    }
+  });
+});
+
 function emptyDraft(): DraftValues {
   return {
     name: null, purpose: null, description: null, proposed_date: null, expected_attendance: null,
     venue_requirements: null, preferred_layout: null, accessibility_needs: null, equipment_requirements: null,
-    registration_needed: null
+    registration_needed: null, category: null
   };
 }

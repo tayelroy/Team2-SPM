@@ -3,6 +3,11 @@ import type { ConfirmEventResult } from '../../server/src/db/eventConfirmation';
 import { fetchEventArrangementFacts } from '../../server/src/db/eventArrangements';
 import { computeArrangementReadiness } from '../../server/src/events/arrangementReadiness';
 import type { MemoryDatabase } from './memory-database';
+import { latestSafetyDecision, seedSafetyApproval } from './safety-decisions';
+
+// SG2-94 AC5: statuses still on their way to the safety check are answered
+// with what is outstanding (the check included); later ones are closed.
+const CONFIRMABLE = ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation'];
 
 /** Loopback UI fixture mirroring public.confirm_event. The SQL suite and the
  * multi-session concurrency script independently prove the production
@@ -13,18 +18,23 @@ export function createMemoryConfirm(database: MemoryDatabase) {
     if (principal.role !== 'event_coordinator') throw new AccessError(403);
     const event = database.tables.events.find(row => row.event_id === eventId);
     if (!event || event.coordinator_id !== principal.userId) return { outcome: 'missing' };
-    if (event.status !== 'preparation') return { outcome: 'closed', status: String(event.status) };
+    if (!CONFIRMABLE.includes(String(event.status))) return { outcome: 'closed', status: String(event.status) };
     // The same facts and rules the readiness panel reads (and the SQL gate repeats).
     const facts = await fetchEventArrangementFacts(database.client, eventId);
     if (!facts.ok) throw new AccessError(503);
     const { outstanding } = computeArrangementReadiness({
       event_id: eventId,
+      status: String(event.status),
+      latest_safety_decision: latestSafetyDecision(database, eventId),
       registration_needed: (event.registration_needed ?? null) as boolean | null,
       registration_capacity: (event.registration_capacity ?? null) as number | null,
       registration_opens_at: (event.registration_opens_at ?? null) as string | null,
       registration_closes_at: (event.registration_closes_at ?? null) as string | null,
       venue_requests: facts.facts.venue_requests,
-      equipment_requests: facts.facts.equipment_requests
+      affected_bookings: facts.facts.affected_bookings,
+      equipment_requests: facts.facts.equipment_requests,
+      arrangements_recheck_needed: (event.arrangements_recheck_needed ?? null) as boolean | null,
+      outstanding_arrangements: (event.outstanding_arrangements ?? null) as string[] | null
     });
     if (outstanding.length > 0) return { outcome: 'outstanding', outstanding };
     const confirmedAt = new Date().toISOString();
@@ -43,19 +53,22 @@ const START = '2030-06-20T02:00:00.000Z';
 const END = '2030-06-20T06:00:00.000Z';
 
 /**
- * SG2-58 events in Preparation, all organised by `organiser`:
+ * SG2-58 events in Preparation, all organised by `organiser`. Each event in
+ * Preparation holds the Safety Officer's Approve, its latest decision, since
+ * SG2-94 lets no event reach Preparation without one:
  * - 581 Confirmation Forum: two approved venue requests with confirmed bookings,
  *   12 microphones reserved and placed, registration for 120 open from
  *   1 Jan 2026 until 19 Jun 2030 — ready to confirm.
  * - 582 Outstanding Forum: one of two venue requests still pending, microphones
- *   placed but never reserved, registration needed with no capacity.
+ *   placed but never reserved, registration needed with no capacity (which no
+ *   longer blocks confirmation, SG2-94 AC6).
  * - 583 Simple Forum: one approved venue, no equipment, no registration, so
  *   equipment and registration are not required and do not block.
  * - 584 Colleague Forum: ready, but assigned to a second coordinator.
  * - 585 Converted Forum: still in Planning with no venue request, so a journey
  *   can place and convert a tentative hold (which links the booking through
- *   the hold only) before moving it to Preparation; no equipment or
- *   registration is needed.
+ *   the hold only) before it passes its safety check into Preparation; no
+ *   equipment or registration is needed.
  */
 export function seedEventConfirmation(database: MemoryDatabase) {
   const { events, users, account_roles: roles, venue_booking_requests: venueRequests, venue_bookings: bookings,
@@ -95,9 +108,15 @@ export function seedEventConfirmation(database: MemoryDatabase) {
     reservations.push({ reservation_id: reservationId, request_id: requestId, event_id: eventId, equipment_id: 1,
       quantity_reserved: 12, starts_at: START, ends_at: END, reserved_at: '2030-01-03T00:00:00.000Z' });
   }
+  for (const eventId of [581, 582, 583, 584]) seedSafetyApproval(database, eventId, '2030-01-04T00:00:00.000Z');
 }
 
-/** SG2-58: the Planning → Preparation move, which has no route of its own yet. */
+/** SG2-58/SG2-94: the converted event reaches Preparation the only way the
+ * safety_approval_gate allows: it waits for its check, the Safety Officer
+ * approves it during that wait, and only then does it move. */
 export function prepareConvertedForum(database: MemoryDatabase) {
-  database.tables.events.find(row => row.event_id === 585)!.status = 'preparation';
+  const event = database.tables.events.find(row => row.event_id === 585)!;
+  Object.assign(event, { status: 'awaiting_safety_check', awaiting_safety_check_since: '2030-01-05T00:00:00.000Z' });
+  seedSafetyApproval(database, 585, '2030-01-06T00:00:00.000Z');
+  Object.assign(event, { status: 'preparation', awaiting_safety_check_since: null });
 }

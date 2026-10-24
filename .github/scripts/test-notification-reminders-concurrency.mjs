@@ -126,7 +126,11 @@ try {
   assert.equal(await count(), '0');
   console.log('PASS [SG2-69:cancellation-during-sweep] [SG2-69:AC6] [CONFLICT] Cancellation committed during the event lock wait prevents the reminder.');
 
-  await root.query(`UPDATE public.events SET status='planning' WHERE event_id=${event};
+  // SG2-67 AC5 refuses reinstating a cancelled event, so this fixture reset
+  // turns that one rule off for its own statement.
+  await root.query(`ALTER TABLE public.events DISABLE TRIGGER keep_cancelled_events_cancelled;
+    UPDATE public.events SET status='planning' WHERE event_id=${event};
+    ALTER TABLE public.events ENABLE TRIGGER keep_cancelled_events_cancelled;
     BEGIN; UPDATE public.events SET coordinator_id='${other}' WHERE event_id=${event};`);
   await first.query('BEGIN;'); const reassigned = scheduler(first);
   await waitsFor(root, reassigned, firstPid, rootPid); await root.query('COMMIT;');

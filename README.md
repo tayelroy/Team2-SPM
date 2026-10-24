@@ -33,7 +33,7 @@ An npm-workspaces monorepo:
 | Technical Support Staff | View pending and reserved equipment requests; record arrangement updates, shortfalls and placement; maintain equipment records; check dated stock and calculated shortfalls; reserve equipment for events; change a user's role via the API |
 | Attendee | UI prototype only (mock data), not wired to a real backend |
 | Event Coordinator Lead | See the unassigned queue of submitted requests; assign and reassign Event Coordinators; view an event's stage and history; receive submitted-event notices |
-| Safety Officer | View an event's stage and history; read equipment placement and a venue's full operations record (setup and turnaround minutes, emergency access, known restrictions) via the API, read-only. The Operational Safety Check screens (SG2-91 to SG2-94) are not built yet |
+| Safety Officer | View an event's stage and history; read equipment placement and a venue's full operations record (setup and turnaround minutes, emergency access, known restrictions) via the API, read-only; review events awaiting the operational safety check and record Approve, Reject or Request Changes (SG2-91, SG2-92). An event reaches Preparation, and can be confirmed, only on the Safety Officer's approval (SG2-94) |
 
 Every account can view and update its own profile. Technical Support Staff's
 Equipment screen reads and writes stored equipment records, including operational
@@ -189,11 +189,13 @@ uploaded as the `browser-regression` artifact.
 - [Equipment records](docs/equipment.md) — SG2-52 stock, operational status, API, migration and verification
 - [Equipment requirements](docs/equipment-requirements.md) — SG2-53 coordinator requests, support updates, placement and migration
 - [Equipment availability](docs/equipment-availability.md) — SG2-54 dated commitments, remaining stock, shortfall and migration
-- [Equipment reservations](docs/equipment-reservations.md) — SG2-55 atomic reservations, event receipts, coordinator notices and continued placement work
+- [Equipment reservations](docs/equipment-reservations.md) — SG2-55 atomic reservations, event receipts, coordinator notices and continued placement work; SG2-56 release on event cancellation
+- [Event cancellation](docs/event-cancellation.md) — SG2-67 organiser request, coordinator cancellation, venue and equipment release, attendee notices and migration
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
 - [Change impact](docs/change-impact.md) — SG2-66 what an accepted change breaks, returning to Planning, settling rechecks, and the sample change requests standing in for SG2-64/SG2-65
-- [Safety checks](docs/safety-checks.md) — SG2-92 the Safety Officer's Approve / Reject / Request Changes decision on SG2-91's list, refused when the event changed since it was reviewed, its notices and history, and reworking a rejection; SG2-93 sending the named arrangements back to Venue Staff and Technical Support and returning the event to the check once they are confirmed again
+- [Safety checks](docs/safety-checks.md) — SG2-92 the Safety Officer's Approve / Reject / Request Changes decision on SG2-91's list, refused when the event changed since it was reviewed, its notices and history, and reworking a rejection; SG2-93 sending the named arrangements back to Venue Staff and Technical Support and returning the event to the check once they are confirmed again; SG2-94 the approval as the only way into Preparation and a condition of confirmation, withdrawn by a significant accepted change
+- [Registrations](docs/registrations.md) — SG2-63 who has registered and how many places remain, contact details for the creating organiser and the coordinator, and the organiser's capacity, opening and closing times, closing early and reopening, with history and notices
 
 CI runs the complete regression suite before and after each PR merge.
 

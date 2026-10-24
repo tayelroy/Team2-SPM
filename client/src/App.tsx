@@ -9,6 +9,7 @@ import AttendeeEvent from './screens/AttendeeEvent';
 import AvailabilityCalendar from './screens/AvailabilityCalendar';
 import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import AssignmentQueue from './screens/AssignmentQueue';
+import CoordinatorOverview from './screens/CoordinatorOverview';
 import CapacityExceptions from './screens/CapacityExceptions';
 import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
@@ -24,6 +25,8 @@ import Login from './screens/Login';
 import Profile from './screens/Profile';
 import RequestForm from './screens/RequestForm';
 import SafetyChecks from './screens/SafetyChecks';
+import EventSearch from './screens/EventSearch';
+import FindEvents from './screens/FindEvents';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
 import VenueHolds from './screens/VenueHolds';
@@ -285,9 +288,15 @@ export default function App() {
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,
+    // SG2-89: the Lead's overview of the events they supervise.
+    overview: <CoordinatorOverview key={session!.accessToken} accessToken={session!.accessToken} />,
     safetyChecks: <SafetyChecks key={session!.accessToken} accessToken={session!.accessToken} focusEventId={safetyFocus} />,
     search: <VenueSearch key={`${session!.accessToken}:${venuePrefill?.eventId ?? 'manual'}`}
-      accessToken={session!.accessToken} prefill={venuePrefill} />
+      accessToken={session!.accessToken} prefill={venuePrefill} />,
+    // SG2-70: find an event across the system.
+    findEvent: <EventSearch key={session!.accessToken} accessToken={session!.accessToken} />,
+    // SG2-59: an attendee finds events open for registration.
+    findEvents: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />
   }[screen];
 
   return (

@@ -7,7 +7,9 @@ export interface Notification {
   request_id: number | null;
   kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
     | 'venue_unavailable' | 'event_confirmed' | 'event_submitted' | 'coordinator_assigned' | 'clarification_requested' | 'event_approved' | 'event_rejected'
-    | 'event_returned_to_planning' | 'safety_decision' | 'outstanding_arrangements';
+    | 'event_returned_to_planning' | 'safety_decision' | 'outstanding_arrangements' | 'registration_opened'
+    | 'registration_closed' | 'venue_booking_cancelled' | 'venue_change_requested'
+    | 'cancellation_requested' | 'event_cancelled';
   message: string;
   created_at: string;
 }
@@ -22,7 +24,10 @@ const KINDS: Record<Notification['kind'], true> = {
   venue_request_approved: true, venue_request_rejected: true, venue_booking_released: true, equipment_reserved: true,
   venue_booking_clash: true, venue_unavailable: true, event_confirmed: true, event_submitted: true, coordinator_assigned: true,
   clarification_requested: true, event_approved: true, event_rejected: true, event_returned_to_planning: true,
-  safety_decision: true, outstanding_arrangements: true
+  safety_decision: true, outstanding_arrangements: true, registration_opened: true, registration_closed: true,
+  // SG2-83 AC4: Venue Staff hear of a cancelled or changed venue booking.
+  venue_booking_cancelled: true, venue_change_requested: true,
+  cancellation_requested: true, event_cancelled: true
 };
 
 function isNotification(value: unknown): value is Notification {

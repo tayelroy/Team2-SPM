@@ -33,6 +33,9 @@ import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
 import { createNotificationsRouter } from '../server/src/notifications';
 import { createSafetyRereviewHandlers } from '../server/src/events/safetyRereviewRoutes';
+import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
+import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
+import { createRegistrableEventsStore } from '../server/src/db/registrableEvents';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -89,13 +92,25 @@ args[21] = createListClarificationsHandler(dependencies);
 args[22] = createAddClarificationHandler(dependencies);
 args[27] = createAssignmentQueueRouter(access, dependencies);
 args[28] = createGetEventArrangementsHandler(dependencies);
+// SG2-63: the registration picture and the organiser's settings.
+args[39] = createRegistrationHandlers(dependencies);
 const api = request(createApp(...args));
+/** SG2-63: the organiser, not the coordinator, sets registration capacity and times. */
+async function setRegistration(id: number, settings: object = {
+  registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z'
+}) {
+  const saved = await api.patch(`/api/event-requests/${id}/registration-settings`).set(auth('organiser')).send(settings);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  return saved;
+}
 const auth = (who: string) => ({ Authorization: `Bearer ${who}` });
 const values = { name: 'Integration workshop', purpose: 'Exercise actual storage', description: 'Synthetic test event',
   proposed_date: '2090-06-15T02:00:00.000Z', expected_attendance: 136,
   venue_requirements: 'A room with seating', equipment_requirements: '1 projector', registration_needed: true,
   // SG2-105: the rest of the customer's minimum for submission.
-  preferred_layout: 'Classroom', accessibility_needs: 'None' };
+  preferred_layout: 'Classroom', accessibility_needs: 'None',
+  // SG2-70: and the event's category.
+  category: 'workshop' };
 async function draft(body = values) {
   const result = await api.post('/api/event-requests').set(auth('organiser')).send(body);
   assert.equal(result.status, 201, JSON.stringify(result.body));
@@ -215,11 +230,9 @@ test('[NORMAL] [SG2-36:AC1] [SG2-36:AC3] clarification POST immediately returns 
   assert.equal((await api.get(`/api/event-requests/${id}/clarifications`).set(auth('other'))).status, 404);
 });
 
-test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] [SG2-94:AC4] confirmed planning impacts mark ready arrangements outstanding without changing bookings or equipment receipts', async () => {
   const id = await planned();
-  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({
-    registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z'
-  })).status, 200);
+  await setRegistration(id);
   const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 200 }).select('venue_id').single();
   assert.equal(venue.error, null);
   const equipment = await database.from('equipment').insert({ name: 'Integration projector', quantity_total: 10 }).select('equipment_id').single();
@@ -237,7 +250,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
   assert.equal(receipt.error, null);
   const initial = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.equal(initial.status, 200);
-  assert.equal(initial.body.ready_for_confirmation, true);
+  // SG2-91 moved the event into its check; SG2-94: the safety check is the one item left.
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
+  assert.deepEqual(initial.body.outstanding, ['safety']);
+  assert.equal(initial.body.arrangements[3].detail, 'Awaiting the Safety Officer\'s operational safety check.');
   const warned = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137 });
   assert.equal(warned.status, 409);
   assert.deepEqual(warned.body.affected_arrangements, ['venue_recheck', 'equipment_recheck']);
@@ -247,16 +263,19 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   const after = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.equal(after.status, 200);
-  assert.deepEqual(after.body.outstanding, ['venue', 'equipment']);
+  assert.deepEqual(after.body.outstanding, ['venue', 'equipment', 'safety']);
   assert.equal(after.body.ready_for_confirmation, false);
-  assert.deepEqual(after.body.arrangements.map((item: { state: string }) => item.state), ['outstanding', 'outstanding', 'ready']);
+  assert.deepEqual(after.body.arrangements.map((item: { state: string }) => item.state), ['outstanding', 'outstanding', 'ready', 'outstanding']);
   assert.match(after.body.arrangements[0].detail, /recheck.*planning/i);
-  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 137, confirm_impact: true })).status, 200);
+  // SG2-63 AC8: registration capacity is the organiser's, so the coordinator's change is refused and adds no recheck.
+  const capacity = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 137, confirm_impact: true });
+  assert.equal(capacity.status, 403, JSON.stringify(capacity.body));
   const all = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
-  assert.deepEqual(all.body.outstanding, ['venue', 'equipment', 'registration']);
+  assert.deepEqual(all.body.outstanding, ['venue', 'equipment', 'safety']);
   const persisted = await stored(id);
   assert.equal(persisted.arrangements_recheck_needed, true);
-  assert.deepEqual(persisted.outstanding_arrangements, ['venue_recheck', 'equipment_recheck', 'registration_recheck']);
+  assert.equal(persisted.registration_capacity, 136);
+  assert.deepEqual(persisted.outstanding_arrangements, ['venue_recheck', 'equipment_recheck']);
   assert.deepEqual((await database.from('venue_bookings').select('*').eq('booking_id', booking.data!.booking_id).single()).data, booking.data);
   assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
   const disruption = await database.from('venue_unavailability').insert({ venue_id: venue.data!.venue_id,
@@ -264,7 +283,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
   assert.equal(disruption.error, null);
   const combined = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
   assert.equal(combined.status, 200);
-  assert.deepEqual(combined.body.outstanding, ['venue', 'equipment', 'registration']);
+  assert.deepEqual(combined.body.outstanding, ['venue', 'equipment', 'safety']);
   assert.match(combined.body.arrangements[0].detail, /affected by venue unavailability/);
   assert.match(combined.body.arrangements[0].detail, /recheck.*planning/i);
   assert.deepEqual((await database.from('equipment_reservations').select('*').eq('reservation_id', receipt.data!.reservation_id).single()).data, receipt.data);
@@ -272,10 +291,11 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-39:AC2] [SG2-57:AC2] [SG2-81:AC2] confi
 
 test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation events refuse direct detail edits, keep registration edits, and a later-stage impact returns to Planning with notices and history', async () => {
   const id = await planned();
-  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({
-    registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z'
-  })).status, 200);
-  for (const status of ['confirmed', 'preparation']) {
+  await setRegistration(id);
+  // SG2-94: the event reaches Preparation on the Safety Officer's approval of its current check.
+  assert.equal((await database.from('events').update({ status: 'awaiting_safety_check' }).eq('event_id', id)).error, null);
+  assert.equal((await database.from('event_safety_decisions').insert({ event_id: id, decision: 'approve', decided_by: ids.safety })).error, null);
+  for (const status of ['preparation', 'confirmed']) {
     assert.equal((await database.from('events').update({ status }).eq('event_id', id)).error, null);
     const before = await stored(id);
     const refused = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ expected_attendance: 137, confirm_impact: true });
@@ -284,8 +304,10 @@ test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation ev
     assert.deepEqual(refused.body.fields, ['expected_attendance']);
     assert.match(refused.body.error, /change request/);
     assert.deepEqual(await stored(id), before);
-    const registration = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 130, planning_notes: `Seats trimmed while ${status}` });
-    assert.equal(registration.status, 200, JSON.stringify(registration.body));
+    // SG2-63 AC5: the organiser still changes registration once confirmed; the coordinator keeps their notes.
+    await setRegistration(id, { registration_capacity: 130 });
+    const notes = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ planning_notes: `Seats trimmed while ${status}` });
+    assert.equal(notes.status, 200, JSON.stringify(notes.body));
     assert.equal((await stored(id)).status, status);
     assert.equal((await stored(id)).registration_capacity, 130);
     assert.equal((await database.from('events').update({ registration_capacity: 136 }).eq('event_id', id)).error, null);
@@ -318,11 +340,9 @@ test('[CONFLICT] [NORMAL] [SG2-66:AC6] [SG2-66:AC7] confirmed and preparation ev
   ].sort());
 });
 
-test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] [SG2-66:AC5] [SG2-66:AC7] native change impact lists what a change breaks, accepting it returns a Confirmed event to Planning, and each recheck settles only once it passes', async () => {
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] [SG2-66:AC5] [SG2-66:AC7] [SG2-94:AC3] native change impact lists what a change breaks, accepting it returns a Confirmed event to Planning and withdraws its safety approval, and each recheck settles only once it passes', async () => {
   const id = await planned();
-  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({
-    registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z'
-  })).status, 200);
+  await setRegistration(id);
   const venue = await database.from('venues').insert({ name: 'Integration Change Hall', capacity: 150 }).select('venue_id').single();
   assert.equal(venue.error, null);
   const equipment = await database.from('equipment').insert({ name: 'Integration change microphone', quantity_total: 10 }).select('equipment_id').single();
@@ -344,6 +364,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
     { event_id: id, attendee_id: ids.other, status: 'registered' }, { event_id: id, attendee_id: ids.support, status: 'registered' },
     { event_id: id, attendee_id: ids.lead, status: 'cancelled' }
   ])).error, null);
+  // SG2-94: the event is confirmed on the Safety Officer's approval of the check SG2-91 put it in.
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
+  assert.equal((await database.from('event_safety_decisions').insert({ event_id: id, decision: 'approve', decided_by: ids.safety })).error, null);
+  assert.equal((await database.from('events').update({ status: 'preparation' }).eq('event_id', id)).error, null);
   assert.equal((await database.from('events').update({ status: 'confirmed', confirmed_by: ids.coordinator, confirmed_at: '2089-10-03T00:00:00Z' })
     .eq('event_id', id)).error, null);
 
@@ -386,12 +410,14 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   const row = await stored(id);
   assert.deepEqual([row.status, row.expected_attendance, row.confirmed_by, row.confirmed_at], ['planning', 204, null, null]);
   const history = await database.from('event_audit_logs').select('field_name,old_value,new_value').eq('event_id', id)
-    .in('field_name', ['expected_attendance', 'change_request', 'status']).order('log_id');
+    .in('field_name', ['expected_attendance', 'change_request', 'status', 'safety_approval']).order('log_id');
   assert.equal(history.error, null);
-  assert.deepEqual(history.data!.slice(-3), [
+  assert.deepEqual(history.data!.slice(-4), [
     { field_name: 'expected_attendance', old_value: '136', new_value: '204' },
     { field_name: 'change_request', old_value: null, new_value: `Accepted change request ${attendance.id}` },
-    { field_name: 'status', old_value: 'confirmed', new_value: 'planning' }
+    { field_name: 'status', old_value: 'confirmed', new_value: 'planning' },
+    { field_name: 'safety_approval', old_value: 'Approved',
+      new_value: `Withdrawn: the accepted change request ${attendance.id} changed what was approved, so the event must pass the safety check again` }
   ]);
   const notices = await database.from('notifications').select('recipient_id,message').eq('event_id', id).eq('kind', 'event_returned_to_planning');
   assert.equal(notices.error, null);
@@ -418,8 +444,10 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   assert.deepEqual([last.status, last.body.arrangements_recheck_needed, last.body.outstanding_arrangements], [200, false, []]);
   const settled = await database.from('event_audit_logs').select('new_value').eq('event_id', id).eq('field_name', 'arrangement_recheck').order('log_id');
   assert.deepEqual(settled.data!.map(entry => entry.new_value), ['venue_recheck settled', 'equipment_recheck settled', 'registration_recheck settled']);
+  // SG2-94 AC3: with every recheck settled SG2-91 returns the event to its check; a new approval is needed.
+  assert.equal((await stored(id)).status, 'awaiting_safety_check');
   const readiness = await api.get(`/api/event-requests/${id}/arrangements`).set(auth('coordinator'));
-  assert.deepEqual([readiness.status, readiness.body.outstanding], [200, []]);
+  assert.deepEqual([readiness.status, readiness.body.outstanding], [200, ['safety']]);
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-92:AC4] [SG2-92:AC5] [SG2-92:AC6] native safety decisions on SG2-91\'s list move each event on, refuse a stale review, notify both people, keep who and why, and let the coordinator rework a rejection', async () => {
@@ -521,7 +549,7 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-93:AC1] [SG2-93:AC2] [SG2-93:AC3] [SG2-
   const changeArgs = [...args] as Parameters<typeof createApp>;
   changeArgs[35] = createChangeRequestHandlers({ ...dependencies, source: createMockChangeRequestSource(() => new Date('2090-07-01T00:00:00Z')) });
   changeArgs[37] = createSafetyDecisionHandlers(dependencies);
-  changeArgs[38] = createSafetyRereviewHandlers(dependencies);
+  changeArgs[43] = createSafetyRereviewHandlers(dependencies);
   const app = request(createApp(...changeArgs));
 
   // AC1/AC3: only the named arrangements are outstanding, and the booking is untouched.
@@ -570,12 +598,101 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-93:AC1] [SG2-93:AC2] [SG2-93:AC3] [SG2-
   ]);
 });
 
+test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] native attendee browsing lists only confirmed events taking registration, with attendee-facing fields, and refuses other roles', async () => {
+  const listed = await planned();
+  const unconfirmed = await planned();
+  await setRegistration(listed);
+  await setRegistration(unconfirmed);
+  assert.equal((await database.from('events').update({ status: 'confirmed', registration_opens_at: '2026-01-01T00:00:00Z',
+    planning_notes: 'Integration internal note' }).eq('event_id', listed)).error, null);
+  const attendeeArgs = [...args] as Parameters<typeof createApp>;
+  // The reads run registrable_events() with the caller's own JWT, as in production.
+  attendeeArgs[40] = createRegistrableEventsRouter(access, token => createRegistrableEventsStore(token, () =>
+    createClient(rest.origin, jwt('authenticated', ids[token]), { auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: loopbackFetch } })));
+  const attendee = request(createApp(...attendeeArgs));
+  // Coordinators are refused before and after the account becomes an attendee's.
+  assert.equal((await attendee.get('/api/registrable-events').set(auth('other'))).status, 403);
+  assert.equal((await database.from('account_roles').update({ role: 'attendee' }).eq('user_id', ids.other)).error, null);
+  try {
+    const list = await attendee.get('/api/registrable-events').set(auth('other'));
+    assert.equal(list.status, 200, JSON.stringify(list.body));
+    const ours = list.body.events.filter((event: { event_id: number }) => [listed, unconfirmed].includes(event.event_id));
+    assert.deepEqual(ours.map((event: { event_id: number }) => event.event_id), [listed]);
+    const detail = await attendee.get(`/api/registrable-events/${listed}`).set(auth('other'));
+    assert.equal(detail.status, 200, JSON.stringify(detail.body));
+    assert.deepEqual(Object.keys(detail.body.event).sort(), ['category', 'description', 'event_id', 'name', 'organisation',
+      'proposed_date', 'registration_closes_at', 'registration_opens_at', 'venues']);
+    assert.equal(detail.body.event.name, 'Integration workshop');
+    assert.doesNotMatch(JSON.stringify(detail.body), /Integration internal note|Exercise actual storage|confirmed/);
+    assert.equal((await attendee.get(`/api/registrable-events/${unconfirmed}`).set(auth('other'))).status, 404);
+  } finally {
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
+  }
+  // The database refuses a caller whose stored role is not attendee even if the route let it through.
+  const permissive = createAuthorization({ resolvePrincipal: async token => ({ userId: ids[token], roles: ['attendee'] as Role[] }) });
+  const forged = request(express().use('/api/registrable-events', createRegistrableEventsRouter(permissive, token =>
+    createRegistrableEventsStore(token, () => createClient(rest.origin, jwt('authenticated', ids[token]),
+      { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: loopbackFetch } })))));
+  assert.equal((await forged.get('/api/registrable-events').set(auth('organiser'))).status, 403);
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC8] [SG2-63:AC9] [SG2-63:AC10] native registration settings: the organiser changes them with history, closes and reopens with notices, and the coordinator reads the picture', async () => {
+  const id = await planned();
+  await setRegistration(id);
+  // Two active registrations and one cancelled, as SG2-60 and SG2-62 will write them.
+  assert.equal((await database.from('registrations').insert([
+    { event_id: id, attendee_id: ids.venue, status: 'registered', registered_at: '2089-10-01T14:00:00Z' },
+    { event_id: id, attendee_id: ids.support, status: 'registered', registered_at: '2089-10-01T15:00:00Z' },
+    { event_id: id, attendee_id: ids.lead, status: 'cancelled', registered_at: '2089-10-01T16:00:00Z' },
+  ])).error, null);
+  const picture = await api.get(`/api/event-requests/${id}/registrations`).set(auth('coordinator'));
+  assert.equal(picture.status, 200, JSON.stringify(picture.body));
+  assert.deepEqual([picture.body.registered_count, picture.body.places_remaining, picture.body.can_edit, picture.body.contact_details_visible],
+    [2, 134, false, true]);
+  assert.deepEqual(picture.body.attendees.map((row: { name: string }) => row.name), ['Integration venue staff', 'Integration support']);
+  assert.equal((await api.get(`/api/event-requests/${id}/registrations`).set(auth('other'))).status, 404);
+  // AC8: the coordinator cannot change them by either route.
+  assert.equal((await api.patch(`/api/event-requests/${id}/registration-settings`).set(auth('coordinator')).send({ registration_capacity: 9 })).status, 403);
+  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 9 })).status, 403);
+  // AC9: the organiser's settings are in the history, as them.
+  const history = await database.from('event_audit_logs').select('actor_id,field_name,old_value,new_value').eq('event_id', id)
+    .in('field_name', ['registration_capacity', 'registration_opens_at', 'registration_closes_at']);
+  assert.equal(history.error, null);
+  assert.deepEqual(history.data!.map(row => [row.actor_id, row.field_name, row.old_value, row.new_value]).sort(), [
+    [ids.organiser, 'registration_capacity', null, '136'],
+    [ids.organiser, 'registration_closes_at', null, '2089-10-02T13:30:00.000Z'],
+    [ids.organiser, 'registration_opens_at', null, '2089-10-01T13:30:00.000Z'],
+  ]);
+  // AC6, AC10: once confirmed and open, closing early and reopening each tell the organiser and coordinator.
+  assert.equal((await database.from('events').update({ status: 'confirmed', registration_opens_at: '2026-01-01T00:00:00Z' })
+    .eq('event_id', id)).error, null);
+  const closed = await api.post(`/api/event-requests/${id}/registration-settings/close`).set(auth('organiser'));
+  assert.equal(closed.status, 200, JSON.stringify(closed.body));
+  assert.equal(closed.body.window, 'closed');
+  await setRegistration(id, { registration_closes_at: '2089-10-03T13:30:00Z' });
+  const notices = await database.from('notifications').select('recipient_id,kind,message').eq('event_id', id)
+    .in('kind', ['registration_opened', 'registration_closed']).order('notification_id');
+  assert.equal(notices.error, null);
+  assert.deepEqual(notices.data!.map(row => [row.recipient_id, row.kind, row.message]), [
+    [ids.organiser, 'registration_closed', 'Registration for Integration workshop was closed early by the organiser.'],
+    [ids.coordinator, 'registration_closed', 'Registration for Integration workshop was closed early by the organiser.'],
+    [ids.organiser, 'registration_opened', 'Registration for Integration workshop is now open.'],
+    [ids.coordinator, 'registration_opened', 'Registration for Integration workshop is now open.'],
+  ]);
+  const again = await api.post(`/api/event-requests/${id}/registration-settings/close`).set(auth('organiser'));
+  assert.equal(again.status, 200);
+  const twice = await api.post(`/api/event-requests/${id}/registration-settings/close`).set(auth('organiser'));
+  assert.deepEqual([twice.status, twice.body.error], [409, 'Registration is not open, so it cannot be closed early.']);
+});
+
 test('[NORMAL] [SG2-28:AC1] [SG2-30:AC1] [SG2-87:AC5] [SG2-39:AC1] organiser submission, Lead assignment and planning preserve actual stored values', async () => {
   const id = await planned();
   assert.equal((await api.get('/api/assignment-queue').set(auth('lead'))).body.entries.some((entry: { event_id: number }) => entry.event_id === id), false);
   const registration = { registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z',
-    registration_closes_at: '2089-10-01T13:31:00Z', planning_notes: 'Keep the loading bay clear' };
-  const saved = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send(registration);
+    registration_closes_at: '2089-10-01T13:31:00Z' };
+  await setRegistration(id, registration);
+  const saved = await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ planning_notes: 'Keep the loading bay clear' });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
   const queue = await api.get(`/api/work-queue/event/${id}`).set(auth('coordinator'));
   assert.equal(queue.status, 200, JSON.stringify(queue.body));
@@ -602,7 +719,8 @@ test('[BOUNDARY] [SG2-28:AC1] [SG2-30:AC2] [SG2-39:AC4] incomplete draft cannot 
   assert.equal(refused.status, 400);
   assert.equal((await stored(created.body.request.event_id)).status, 'draft');
   const id = await planned();
-  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 1, planning_notes: null })).status, 200);
+  await setRegistration(id, { registration_capacity: 1 });
+  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ planning_notes: null })).status, 200);
   const details = (await api.get(`/api/work-queue/event/${id}`).set(auth('coordinator'))).body.items[0].details;
   assert.equal(details.registration_capacity, 1);
   assert.equal(details.registration_opens_at, null);
@@ -626,7 +744,8 @@ test('[FAILURE] [SG2-41:AC4] [SG2-39:AC4] authentication, role and validation fa
   assert.equal((await api.get('/api/work-queue')).status, 401);
   assert.equal((await api.get('/api/assignment-queue').set(auth('coordinator'))).status, 403);
   assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('venue')).send({ planning_notes: 'Forbidden' })).status, 403);
-  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 0 })).status, 400);
+  // SG2-63 AC8: registration capacity is refused outright on the coordinator's route.
+  assert.equal((await api.patch(`/api/event-requests/${id}/planning`).set(auth('coordinator')).send({ registration_capacity: 0 })).status, 403);
   const direct = await fetch(new URL('/internal_work_items?select=details', rest), { headers: { Authorization: `Bearer ${jwt('anon')}` } });
   assert.ok([401, 403].includes(direct.status), `Direct client view read returned ${direct.status}`);
   available = false;
@@ -825,7 +944,7 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
   assert.deepEqual(result.body.missingForSubmission, []);
   const history = await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'));
   assert.equal(history.status, 200, JSON.stringify(history.body));
-  assert.equal(history.body.history.length, 10);
+  assert.equal(history.body.history.length, 11);
   const names = history.body.history.map((row: { field_name: string }) => row.field_name).sort();
   assert.deepEqual(names, Object.keys(edited).sort());
   for (const row of history.body.history) {
@@ -839,12 +958,12 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
     else assert.equal(row.new_value, String(expected));
   }
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(edited)).status, 200);
-  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 10);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 11);
   assert.equal((await database.from('events').update({ status: 'needs_clarification' }).eq('event_id', id)).error, null);
   const cleared = { ...edited, description: null, registration_needed: false };
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(cleared)).status, 200);
   const changed = (await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history;
-  assert.equal(changed.length, 12);
+  assert.equal(changed.length, 13);
   assert.deepEqual(changed.filter((row: { old_value: unknown }) => row.old_value !== null).map((row: { field_name: string; new_value: string | null }) => [row.field_name, row.new_value]).sort(), [['description', null], ['registration_needed', 'false']]);
   assert.equal((await database.from('account_roles').update({ role: 'event_organiser' }).eq('user_id', ids.other)).error, null);
   assert.equal((await database.from('users').update({ organisation: 'Integration organisation' }).eq('user_id', ids.other)).error, null);
@@ -861,7 +980,7 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
   });
   assert.equal(direct.status, 403);
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('coordinator')).send(edited)).status, 403);
-  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 12);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 13);
 });
 
 test('[CONFLICT] [SG2-29:AC1] [SG2-30:AC3] [SG2-40:AC2] native concurrent draft saves serialize their old/new chain and submission closes the write path', async () => {

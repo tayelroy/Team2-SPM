@@ -2,27 +2,29 @@ import type {
   VenueBookingStatusRow,
   EquipmentRequestArrangementRow
 } from '../db/eventArrangements';
+import type { SafetyDecisionKind } from './safetyDecisions';
 
 /**
  * Computes which of an event's arrangements are in place and which still stand
  * between it and confirmation (SG2-57).
  *
- * The three arrangements are the venue booking(s), any requested equipment, and
- * registration. Each is `ready`, `outstanding`, or `not_required`. Venue is
- * always required; equipment and registration are `not_required` when nothing
- * is requested or registration is not needed.
+ * The items are the venue booking(s), any requested equipment, registration
+ * and, since SG2-94, the operational safety check. Each is `ready`,
+ * `outstanding`, or `not_required`. Venue and the safety check are always
+ * required; equipment and registration are `not_required` when nothing is
+ * requested or registration is not needed. SG2-94 AC6: registration settings
+ * are the organiser's and never hold confirmation up; only a registration
+ * recheck (SG2-66) does.
  *
- * `ready_for_confirmation` means every *required* arrangement is ready. SG2-58's
- * `confirm_event` RPC applies the same three rules in SQL as its gate, so the
+ * `ready_for_confirmation` means every *required* item is ready. SG2-58's
+ * `confirm_event` RPC applies the same rules in SQL as its gate, so the
  * panel and the Confirm action never disagree; any change here must be made
- * there too (supabase/migrations/202610150001_event_confirmation.sql, whose
- * venue rule SG2-82 replaced in 202610150003_confirm_event_rejected_venues.sql.
- * 202610170002_confirmation_rechecks_and_disruptions.sql combines persisted
- * planning rechecks with SG2-81's affected-booking guard).
+ * there too (latest: supabase/migrations/202610220001_safety_approval_gate.sql,
+ * whose event_safety_approved() is mirrored by isSafetyApproved below).
  */
 
 export type ArrangementState = 'ready' | 'outstanding' | 'not_required';
-export type ArrangementKey = 'venue' | 'equipment' | 'registration';
+export type ArrangementKey = 'venue' | 'equipment' | 'registration' | 'safety';
 
 export interface ArrangementStatus {
   key: ArrangementKey;
@@ -33,6 +35,10 @@ export interface ArrangementStatus {
 
 export interface ArrangementReadinessInput {
   event_id: number;
+  /** The event's status: the safety approval only stands in Preparation or Confirmed. */
+  status: string;
+  /** The latest SG2-92 decision on the event, newest first; null when none. */
+  latest_safety_decision: SafetyDecisionKind | null;
   registration_needed: boolean | null;
   registration_capacity: number | null;
   registration_opens_at: string | null;
@@ -220,20 +226,44 @@ function computeRegistration(input: ArrangementReadinessInput): ArrangementStatu
   if (input.registration_opens_at === null) missing.push('opening time');
   if (input.registration_closes_at === null) missing.push('closing time');
 
-  if (missing.length > 0) {
-    return {
-      key: 'registration',
-      label: 'Registration',
-      state: 'outstanding',
-      detail: `Registration ${missing.join(', ')} not set.`
-    };
-  }
+  // SG2-94 AC6: unset settings do not block confirmation; attendees can
+  // register only once the organiser sets them and registration opens (SG2-63).
   return {
     key: 'registration',
     label: 'Registration',
     state: 'ready',
-    detail: 'Registration capacity and opening and closing times set.'
+    detail: missing.length > 0
+      ? `Registration ${missing.join(', ')} not set yet. The Event Organiser sets them; confirmation does not wait for them.`
+      : 'Registration capacity and opening and closing times set.'
   };
+}
+
+/** SG2-94 AC2/AC5: mirrors public.event_safety_approved(). Every way back from
+ * Preparation or Confirmed withdraws the approval, so only an Approve that is
+ * still the latest decision on an event past the check counts. */
+export function isSafetyApproved(status: string, latest: SafetyDecisionKind | null): boolean {
+  return (status === 'preparation' || status === 'confirmed') && latest === 'approve';
+}
+
+function computeSafety(input: ArrangementReadinessInput): ArrangementStatus {
+  const outstanding = (detail: string): ArrangementStatus => ({ key: 'safety', label: 'Safety check', state: 'outstanding', detail });
+  if (isSafetyApproved(input.status, input.latest_safety_decision)) {
+    return { key: 'safety', label: 'Safety check', state: 'ready', detail: 'Approved by the Safety Officer.' };
+  }
+  if (input.status === 'awaiting_safety_check') {
+    return outstanding('Awaiting the Safety Officer\'s operational safety check.');
+  }
+  if (input.status === 'safety_rejected') {
+    return outstanding('The Safety Officer rejected the safety check. Rework the arrangements for a new check.');
+  }
+  switch (input.latest_safety_decision) {
+    case 'approve':
+      return outstanding('The approval was withdrawn after the event changed. It must pass the safety check again once its arrangements are in place.');
+    case 'request_changes':
+      return outstanding('The Safety Officer requested changes. The event goes back to the safety check once they are confirmed again.');
+    default:
+      return outstanding('Not approved yet. The event goes to the Safety Officer once its venue and equipment are in place.');
+  }
 }
 
 export function computeArrangementReadiness(
@@ -248,12 +278,13 @@ export function computeArrangementReadiness(
     // SG2-93: changes the Safety Officer asked for come first; staff must
     // confirm the flagged requests again before the event can go back.
     if (rechecks.includes(`safety_${arrangement.key}_recheck`)) {
-      return { ...arrangement, state: 'outstanding', detail: `${arrangement.detail} The Safety Officer asked for changes.` };
+      return { ...arrangement, state: 'outstanding' as const, detail: `${arrangement.detail} The Safety Officer asked for changes.` };
     }
     return rechecks.includes(`${arrangement.key}_recheck`)
-      ? { ...arrangement, state: 'outstanding', detail: `${arrangement.detail} Recheck required after planning changes.` }
+      ? { ...arrangement, state: 'outstanding' as const, detail: `${arrangement.detail} Recheck required after planning changes.` }
       : arrangement;
   });
+  arrangements.push(computeSafety(input));
 
   const outstanding = arrangements
     .filter(arrangement => arrangement.state === 'outstanding')

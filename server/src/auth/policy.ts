@@ -57,6 +57,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.assign_coordinator': ['event_coordinator_lead'],
   // SG2-87: only the Event Coordinator Lead sees the queue of unassigned requests.
   'event_request.queue.view': ['event_coordinator_lead'],
+  // SG2-89 AC4: only the Lead sees the overview of the events they supervise
+  // and the coordinators holding them. Which events is enforced per-row by
+  // who assigned their coordinator, not by this grant.
+  'event_request.oversight.view': ['event_coordinator_lead'],
   // SG2-35: a coordinator opens a request for review. Which request is
   // enforced per-row by the assignment made in SG2-33, not by this grant.
   'event_request.review': ['event_coordinator'],
@@ -104,6 +108,18 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // The acting role picks the kind; confirm_safety_rereview() rechecks it.
   'safety_rereviews.read': ['venue_staff', 'technical_support_staff'],
   'safety_rereviews.confirm': ['venue_staff', 'technical_support_staff'],
+  // SG2-63: the registration picture for an organiser of the event's
+  // organisation or its assigned coordinator (per-row, 404 otherwise), and the
+  // creating organiser's registration settings (per-row; the coordinator can
+  // see them but not change them, replacing SG2-39 AC4).
+  'event_request.registrations.view': ['event_organiser', 'event_coordinator'],
+  'event_request.registration_settings.update': ['event_organiser'],
+  // SG2-67 AC1: the creating organiser asks for a cancellation, and only the
+  // assigned coordinator carries it out. Which event is enforced per-row by
+  // request_event_cancellation and cancel_event (404 otherwise), not by these
+  // grants.
+  'event_request.cancellation.request': ['event_organiser'],
+  'event_request.cancel': ['event_coordinator'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing
@@ -176,10 +192,13 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'notifications.inbox': [...ROLES],
   'notifications.reminders.manage': ['event_coordinator'],
   // SG2-51: Venue Staff, or the event's assigned coordinator (enforced
-  // per-row), see an event's bookings and release one with a reason. Only
-  // Venue Staff list a whole venue's bookings (enforced by the handler).
+  // per-row), see an event's bookings. Only Venue Staff list a whole venue's
+  // bookings (enforced by the handler).
   'venue_bookings.view': ['venue_staff', 'event_coordinator'],
-  'venue_bookings.release': ['venue_staff', 'event_coordinator'],
+  // SG2-83 AC5: only the event's assigned coordinator (enforced per-row by
+  // release_venue_bookings()) cancels a booking. Venue Staff no longer
+  // release; they mark the venue unavailable (SG2-80) instead.
+  'venue_bookings.release': ['event_coordinator'],
   'venue_bookings.by_venue': ['venue_staff'],
   // SG2-79 AC3: bookings that clash once setup and turnaround apply, for
   // Venue Staff and the coordinator of each affected event (per-row).
@@ -205,6 +224,15 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-91 AC2/AC4: only Safety Officers open the list of events awaiting an
   // operational safety check; safety_check_queue() rechecks the stored role.
   'safety_checks.read': ['safety_officer'],
+  // SG2-70 AC3: every internal role can search; search_events() rechecks the
+  // acting role (mirroring INTERNAL_ROLES below; the two must change together)
+  // and returns only the events that role may see (SG2-104 relationship).
+  'events.search': [
+    'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
+  ],
+  // SG2-59 AC1-AC3: only attendees browse the events they can register for;
+  // registrable_events() and registrable_event() recheck the acting role.
+  'events.registrable.read': ['attendee'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]
@@ -215,8 +243,9 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
 // client-side/external users. Team decision, 2026-09-15. SG2-86 adds
 // event_coordinator_lead and safety_officer as internal; this list is
 // mirrored in the event_audit_logs RLS policy (latest version:
-// 202610130001_event_history_internal_fields.sql) and the two must change
-// together.
+// 202610130001_event_history_internal_fields.sql), in the 'events.search'
+// grant above and in event_search_caller_is_internal()
+// (202610200005_event_search.sql); they must all change together.
 export const INTERNAL_ROLES: readonly Role[] = [
   'event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'
 ];

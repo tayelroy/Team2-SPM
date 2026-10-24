@@ -1291,19 +1291,6 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     );
   }
 
-  test('[NORMAL] [SG2-100:AC6] the assigned coordinator can close out an event that has finished', async () => {
-    showEvent();
-    const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockResolvedValue({ ok: true });
-    renderAsCoordinator();
-
-    const button = await screen.findByRole('button', { name: 'Mark as Completed' });
-    await act(async () => {
-      fireEvent.click(button);
-    });
-
-    expect(complete).toHaveBeenCalledWith(104, 'token');
-  });
-
   test('[NORMAL] [SG2-100:AC6] a completed event shows who closed it out and when, and offers the action no more', async () => {
     showEvent({
       status: 'completed',
@@ -1360,7 +1347,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     }
   });
 
-  test('[CONFLICT] [SG2-100:AC6] rapid clicking sends exactly one request and disables the button', async () => {
+  test('[CONFLICT] [NORMAL] [SG2-100:AC6] rapid clicking sends exactly one request and disables the button', async () => {
     showEvent();
     let release!: (value: eventRequestsApi.CompleteEventOutcome) => void;
     const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockReturnValue(
@@ -1378,6 +1365,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     const pending = await screen.findByRole('button', { name: 'Marking as Completed…' });
     expect(pending).toBeDisabled();
     expect(complete).toHaveBeenCalledTimes(1);
+    expect(complete).toHaveBeenCalledWith(104, 'token');
 
     await act(async () => {
       release({ ok: true });
@@ -1515,6 +1503,27 @@ describe('confirmed arrangements (SG2-58)', () => {
     await screen.findByRole('heading', { name: 'Confirmation Forum' });
     expect(screen.queryByRole('region', { name: 'Confirmed arrangements integration' })).not.toBeInTheDocument();
   });
+});
+
+describe('category on the request (SG2-70)', () => {
+  const base: eventRequestsApi.EventRequestDetail = {
+    eventId: 70, organiserId: 'org-1', organisation: 'Acme Corp', status: 'submitted', name: 'Category Forum',
+    purpose: 'Partner briefing', description: '', proposedDate: null, expectedAttendance: 40,
+    venueRequirements: 'Projector', accessibilityNeeds: 'None', equipmentRequirements: 'None', registrationNeeded: false,
+    coordinatorId: 'coord-1', coordinatorName: 'Assigned coordinator', canManage: false, waitingOnMe: false,
+    decisionReason: null, decidedAt: null, completedBy: null, completedAt: null, endsAt: null,
+  };
+
+  test.each([['seminar', 'Seminar'], [null, 'Uncategorised']] as const)(
+    '[NORMAL] [SG2-70:AC2] a request with category %s shows %s on its detail',
+    async (category, shown) => {
+      vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: { ...base, category } });
+      vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: false, kind: 'unavailable', message: 'No stage fixture' });
+      render(<EventDetail role="Event Coordinator" currentUserId="coord-1" selectedEventId={70} accessToken="token" onNavigate={vi.fn()} />);
+      expect(await screen.findByRole('heading', { name: 'Category Forum' })).toBeInTheDocument();
+      expect(within(screen.getByText('Category').closest('div')!).getByText(shown)).toBeInTheDocument();
+    },
+  );
 });
 
 describe('preferred room layout on the request (SG2-105)', () => {

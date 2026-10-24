@@ -78,7 +78,6 @@ do $$ declare bad text; begin
  begin perform public.notification_inbox(101); raise exception '[SG2-69:inbox-excess-limit] [SG2-69:AC2] [BOUNDARY] Page limit cannot exceed one hundred'; exception when invalid_parameter_value then null; end;
  begin perform public.notification_inbox(50,clock_timestamp(),null,null); raise exception '[SG2-69:inbox-partial-cursor] [SG2-69:AC2] [FAILURE] Cursor fields must be supplied together'; exception when invalid_parameter_value then null; end;
  begin perform public.notification_inbox(50,'infinity','event',1); raise exception '[SG2-69:inbox-infinite-cursor] [SG2-69:AC2] [BOUNDARY] Cursor timestamp must be finite'; exception when invalid_parameter_value then null; end;
- raise notice '[SG2-69:rpc-invalid-identities] [SG2-69:AC2] [SG2-69:AC3] [BOUNDARY] Invalid sources, ids and cursor bounds are rejected';
 end $$;
 do $$ begin
  if public.notification_reminder_preferences()->>'frequency_days' is distinct from '1' then raise exception '[SG2-69:default-frequency] [SG2-69:AC6] [NORMAL] Default reminder frequency must be daily'; end if;
@@ -97,7 +96,6 @@ do $$ begin
  begin perform public.notification_unread_count('e6900000-0000-4000-8000-000000000002'); raise exception '[SG2-69:private-unread-counter-denied] [SG2-69:AC1] [FAILURE] Caller cannot inspect another recipient through the private helper'; exception when insufficient_privilege then null; end;
  begin update public.notifications set read_at=null where notification_id=96901; raise exception '[SG2-69:direct-receipt-write-denied] [SG2-69:AC3] [FAILURE] Caller cannot overwrite receipts through table writes'; exception when insufficient_privilege then null; end;
  begin insert into public.notification_reminder_settings(user_id,frequency_days) values('e6900000-0000-4000-8000-000000000002',2); raise exception '[SG2-69:direct-other-preference-denied] [SG2-69:AC6] [FAILURE] Caller cannot write another recipient preferences'; exception when insufficient_privilege then null; end;
- raise notice '[SG2-69:rpc-only-mutations] [SG2-69:AC4] [SG2-69:AC7] [FAILURE] Ordinary callers cannot run the scheduler, inspect private counts or write table receipts/preferences';
 end $$;
 reset role;
 do $$ begin
@@ -121,14 +119,12 @@ do $$ declare n integer; result jsonb; begin
      begin perform public.set_notification_reminder_preferences(2); raise exception '[SG2-69:non-coordinator-preference-write-denied] [SG2-69:AC6] [FAILURE] Only coordinators may write reminder preferences'; exception when insufficient_privilege then null; end;
    end if;
  end loop;
- raise notice '[SG2-69:coordinator-only-preferences] [SG2-69:AC6] [FAILURE] Other roles cannot read or change reminder frequency';
  perform set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000006',true);
  if public.notification_event('event',97006) is not null then raise exception '[SG2-69:unregistered-attendee-target] [SG2-69:AC3] [FAILURE] An unrelated attendee cannot open event data'; end if;
  perform set_config('request.jwt.claim.sub','e6900000-0000-4000-8000-000000000009',true);
  begin perform public.notification_inbox(); raise exception '[SG2-69:inbox-missing-role-denied] [SG2-69:AC1] [FAILURE] Inbox requires an assigned stored role'; exception when insufficient_privilege then null; end;
  perform set_config('request.jwt.claim.sub','',true);
  begin perform public.read_all_notifications(); raise exception '[SG2-69:clear-missing-identity-denied] [SG2-69:AC4] [FAILURE] Clear all requires a current identity'; exception when insufficient_privilege then null; end;
- raise notice '[SG2-69:missing-identity-role] [SG2-69:AC1] [FAILURE] Missing subject or stored role is denied';
 end $$;
 reset role;
 -- Inbox receipts belong to the person across held roles; the selected role
@@ -273,12 +269,18 @@ do $$ begin if public.send_outstanding_arrangement_reminders() is distinct from 
 -- Terminal/past events stop even when otherwise outstanding and due.
 do $$ declare stage text; sent integer; begin
  foreach stage in array array['cancelled','completed','rejected'] loop
-  update public.events set status=stage::public.event_status,
-    completed_by=case when stage='completed' then 'e6900000-0000-4000-8000-000000000001'::uuid else null end,
-    completed_at=case when stage='completed' then clock_timestamp() else null end,
-    decision_reason=case when stage='rejected' then 'No longer needed' else null end where event_id=96901;
-  update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;
-  if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:terminal-stops-reminders] [SG2-69:AC6] [NORMAL] Terminal stage % must stop reminders',stage; end if;
+  -- SG2-67 AC5: a cancelled event can no longer be reinstated, so each stage
+  -- is checked in a block that is then undone.
+  begin
+   update public.events set status=stage::public.event_status,
+     completed_by=case when stage='completed' then 'e6900000-0000-4000-8000-000000000001'::uuid else null end,
+     completed_at=case when stage='completed' then clock_timestamp() else null end,
+     decision_reason=case when stage='rejected' then 'No longer needed' else null end where event_id=96901;
+   update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '31 days' where event_id=96901;
+   if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:terminal-stops-reminders] [SG2-69:AC6] [NORMAL] Terminal stage % must stop reminders',stage; end if;
+   raise sqlstate 'SG267' using message = 'undo this stage';
+  exception when sqlstate 'SG267' then null;
+  end;
  end loop;
  update public.events set status='planning',proposed_date=clock_timestamp()-interval '1 second' where event_id=96901;
  if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:past-event-stops] [SG2-69:AC6] [BOUNDARY] Past event must receive no reminders'; end if;
@@ -324,7 +326,6 @@ do $$ begin
  begin perform public.notification_inbox(); raise exception '[SG2-69:anonymous-inbox-denied] [SG2-69:AC1] [FAILURE] Anonymous caller cannot read an inbox'; exception when insufficient_privilege then null; end;
  begin perform public.read_notification('event',96901); raise exception '[SG2-69:anonymous-read-denied] [SG2-69:AC3] [FAILURE] Anonymous caller cannot mark a notice read'; exception when insufficient_privilege then null; end;
  begin perform public.send_outstanding_arrangement_reminders(); raise exception '[SG2-69:anonymous-scheduler-denied] [SG2-69:AC7] [FAILURE] Anonymous caller cannot execute the global scheduler'; exception when insufficient_privilege then null; end;
- raise notice '[SG2-69:anonymous-denied] [SG2-69:AC1] [SG2-69:AC7] [FAILURE] Anonymous users cannot access inboxes or scheduler';
 end $$;
 reset role;
 rollback;

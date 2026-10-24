@@ -468,6 +468,24 @@
       }
     },
     {
+      "id": "SG2-63",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-63",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Can see how many have registered and how many places remain for an event I organise or coordinate",
+        "AC2": "Can see the list of registered attendees",
+        "AC3": "An Event Organiser sees this only for their own organisation's events",
+        "AC4": "Attendee contact details are shown only to users authorised to see them",
+        "AC5": "As the Event Organiser, I can set the registration capacity and the opening and closing times for my event, and change them at any time before the event starts, including after it is confirmed",
+        "AC6": "As the Event Organiser, I can close registration early, reopen it or extend it",
+        "AC7": "A capacity above the venue's capacity shows a warning but is allowed",
+        "AC8": "The assigned Event Coordinator can view the registration settings but not change them (replaces SG2-39 AC4)",
+        "AC9": "Each change to the registration settings is recorded with who made it and when",
+        "AC10": "When registration opens or closes (on schedule or closed early by the Organiser), the Event Organiser and the assigned Event Coordinator are notified"
+      }
+    },
+    {
       "id": "SG2-50",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-50",
       "originalPullRequests": [],
@@ -662,6 +680,18 @@
       "source": "Live SG2-55 Jira description, bullet order, read in the in-app browser."
     },
     {
+      "id": "SG2-56",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-56",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "Cancelling an event releases the equipment reserved for it",
+        "AC2": "Releasing a reservation returns equipment to the available quantity for that period only if it is operational and not committed elsewhere; damaged equipment or equipment under maintenance remains unavailable",
+        "AC3": "The release is recorded against the event"
+      },
+      "verifiedAt": "2026-10-21",
+      "source": "Live SG2-56 Jira description, bullet order, read through the Atlassian connector."
+    },
+    {
       "id": "SG2-58",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-58",
       "summary": "Confirm an event",
@@ -755,6 +785,20 @@
       }
     },
     {
+      "id": "SG2-67",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-67",
+      "originalPullRequests": [],
+      "acceptanceCriteria": {
+        "AC1": "The Event Organiser asks for cancellation, giving a reason, and only the assigned Event Coordinator carries it out, provided the event is not already completed or cancelled; a direct cancellation by the Organiser or any other role is refused on the server side",
+        "AC2": "Cancelling releases all of the event's venue bookings (SG2-82) and its equipment reservations (SG2-56)",
+        "AC3": "Registered attendees are notified",
+        "AC4": "The reason, who cancelled it and when are recorded",
+        "AC5": "A cancelled event cannot be reinstated; a similar event needs a new request"
+      },
+      "verifiedAt": "2026-10-21",
+      "source": "Live SG2-67 Jira description, bullet order, read through the Atlassian connector."
+    },
+    {
       "id": "SG2-91",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-91",
       "originalPullRequests": [],
@@ -778,6 +822,20 @@
         "AC4": "On Reject, the event is shown as Safety Rejected, cannot move on to Preparation, and goes back to Planning so the coordinator can rework the arrangements and resubmit them for a new check (the status flow allows safety_rejected → planning)",
         "AC5": "The assigned Event Coordinator and the Event Organiser are notified of the decision and its reason",
         "AC6": "Each decision is recorded with who made it, when, and the reason"
+      }
+    },
+    {
+      "id": "SG2-94",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-94",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-22",
+      "acceptanceCriteria": {
+        "AC1": "Given an event with no approved safety check, any attempt to move it to Preparation is refused on the server side, and the reason is shown",
+        "AC2": "Given an event whose most recent safety decision is Approve, it can move to Preparation",
+        "AC3": "If a significant change (date/time, attendance, venue, equipment) is accepted after safety approval, the approval is withdrawn and the event must be checked again",
+        "AC4": "The event's status and its outstanding items show the safety check as a step",
+        "AC5": "Given an event whose most recent safety decision is not Approve, when the Event Coordinator tries to confirm it, then confirmation is refused on the server side and the safety check is listed among the outstanding items; the coordinator can confirm only once the Safety Officer has approved. This supersedes SG2-58 AC1, which allowed confirmation on venue and equipment alone",
+        "AC6": "Registration settings do not block confirmation: an event that needs registration can be confirmed before its capacity and times are set, and Attendees can register only once the Event Organiser has set them and registration is open (SG2-63). This supersedes the registration condition in SG2-57 AC1 and SG2-58 AC1/AC2"
       }
     },
     {
@@ -807,6 +865,58 @@
         "AC4": "Existing single-role accounts keep working unchanged",
         "AC5": "Tests cover an account holding two roles, for both permitted and refused actions",
         "AC6": "Reading an event's stage or change history requires a relationship to that event (its Organiser, its assigned Event Coordinator, a Lead, or a role that works on its venues, equipment or safety check); an Event Coordinator not assigned to the event is refused by ID, and a reassigned coordinator loses access immediately. Tests cover assigned, unrelated and reassigned coordinators"
+      }
+    },
+    {
+      "id": "SG2-70",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-70",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Can search by event name and client organisation",
+        "AC2": "Can filter by date, state, venue, category and assigned coordinator",
+        "AC3": "Results include only events I am permitted to see",
+        "AC4": "When nothing matches, this is stated along with the filters in force"
+      }
+    },
+    {
+      "id": "SG2-83",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-83",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-21",
+      "acceptanceCriteria": {
+        "AC1": "Given an event with several venue bookings, when I change or cancel one of them, the event's other venue bookings stay unchanged",
+        "AC2": "The other bookings are removed only if I explicitly choose to cancel them too",
+        "AC3": "The cancelled venue becomes available again for that period (including its setup/turnaround time)",
+        "AC4": "The change or cancellation, its reason, who made it and when are all recorded, and Venue Staff for the affected venue are notified",
+        "AC5": "Only the assigned Event Coordinator can cancel or release a venue booking; an attempt by Venue Staff or any other role is refused on the server side and in the database. This replaces Venue Staff release in SG2-51; Venue Staff record operational problems by marking the venue unavailable (SG2-80) instead",
+        "AC6": "SG2-51 tests that expect Venue Staff to release a booking are updated to expect refusal",
+        "AC7": "If the event is Confirmed or in Preparation, cancelling or changing one venue sends that venue back through change approval and returns the event to Planning (SG2-66), while the event's other venue bookings stay intact"
+      }
+    },
+    {
+      "id": "SG2-59",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-59",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-22",
+      "acceptanceCriteria": {
+        "AC1": "Confirmed events with registration open are listed with name, date, time and venue",
+        "AC2": "Events that are not confirmed, or have registration disabled, are not listed",
+        "AC3": "Opening an event shows attendee-facing details only, with no internal planning information"
+      }
+    },
+    {
+      "id": "SG2-89",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-89",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-22",
+      "acceptanceCriteria": {
+        "AC1": "I can view all active events under my supervision (the events whose coordinator I assigned), along with the Event Coordinator assigned to each one and its current status",
+        "AC2": "I can view the events assigned to each Event Coordinator",
+        "AC3": "I can filter by coordinator and by status",
+        "AC4": "Event Coordinators and other roles cannot see this overview",
+        "AC5": "Where there are several Event Coordinator Leads, each can see the whole unassigned queue (SG2-87)",
+        "AC6": "Active events include those awaiting the Organiser's clarification: they stay in the assigned Event Coordinator's work queue (SG2-41) and in this overview, and the Lead can reassign them without changing their status"
       }
     },
     {

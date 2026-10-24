@@ -332,3 +332,13 @@ unchanged save, then verify an unrelated organiser cannot read that history.
 Keep the original empty-history reproduction as historical evidence. A schema
 readiness pass, local coverage or fixture browser pass does not replace this
 hosted acceptance or independent peer approval.
+
+### Resetting a cancelled fixture (SG2-67)
+
+A cancelled event can never change status again (`keep_cancelled_events_cancelled`).
+A suite that needs a stage only briefly checks it inside a block it undoes
+(`raise sqlstate 'SG267'` caught by `exception when sqlstate 'SG267'`), as
+`equipment_reservations.sql` does. A concurrency script that must commit a
+cancellation and then reuse the event turns off only that trigger for its own reset
+statement (`alter table public.events disable trigger keep_cancelled_events_cancelled`
+… `enable trigger`), as `test-equipment-reservations-concurrency.mjs` does.

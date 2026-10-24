@@ -21,11 +21,7 @@ describe('saveSession / loadSession / clearSession', () => {
     expect(loadSession()).toEqual(session);
   });
 
-  test('[BOUNDARY] [SG2-23:session-storage] loadSession returns null when nothing is stored', () => {
-    expect(loadSession()).toBeNull();
-  });
-
-  test('[NORMAL] [SG2-23:AC3] clearSession removes a stored session', () => {
+  test('[NORMAL] [BOUNDARY] [SG2-23:AC3] [SG2-23:session-storage] clearSession removes a stored session', () => {
     saveSession(session);
     clearSession();
     expect(loadSession()).toBeNull();

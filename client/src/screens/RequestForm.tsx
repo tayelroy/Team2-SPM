@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { loadSession } from '../auth/session';
-import { createEventRequestDraft, submitEventRequest, updateEventRequestDraft } from '../api/eventRequests';
-import type { EventRequestDraftInput } from '../api/eventRequests';
+import { createEventRequestDraft, EVENT_CATEGORIES, submitEventRequest, updateEventRequestDraft } from '../api/eventRequests';
+import type { EventCategory, EventRequestDraftInput } from '../api/eventRequests';
 import { NEXT_STEPS } from '../mock/data';
 import { chipStyle } from '../mock/viewModel';
 import { color, radius, rule, surface, label as labelToken } from '../theme';
@@ -223,6 +223,9 @@ function NoneableTextField({
  * accessibility needs and equipment requirements ("None" is an answer,
  * blank is not), and an explicit yes or no on registration.
  *
+ * SG2-70 adds the event's category, picked from a fixed list, so internal
+ * users can filter by it. It is optional.
+ *
  * The date is a `datetime-local` input in Singapore time. The form keeps the
  * stored ISO instant and converts only for display, so an untouched date is
  * sent back exactly as it was loaded.
@@ -283,6 +286,8 @@ export default function RequestForm({
   const [registrationNeeded, setRegistrationNeeded] = useState<boolean | null>(
     initialValues?.registration_needed ?? null,
   );
+  // SG2-70: optional; null until chosen.
+  const [category, setCategory] = useState<EventCategory | null>(initialValues?.category ?? null);
   const [touched, setTouched] = useState<Set<SubmissionField>>(new Set());
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -327,6 +332,7 @@ export default function RequestForm({
         ? { equipment_requirements: values.equipment_requirements.trim() }
         : {}),
       ...(registrationNeeded !== null ? { registration_needed: registrationNeeded } : {}),
+      ...(category !== null ? { category } : {}),
     };
 
     const token = accessToken ?? loadSession()?.accessToken;
@@ -627,6 +633,26 @@ export default function RequestForm({
               Say whether registration is needed
             </span>
           ) : null}
+        </div>
+
+        {/* SG2-70: what kind of event this is */}
+        <div role="group" aria-labelledby="rf-category-label" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <span id="rf-category-label" style={labelToken}>
+            Category <span style={{ color: color.silver, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+          </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {EVENT_CATEGORIES.map((option) => (
+              <Chip
+                key={option.value}
+                {...chipStyle(category === option.value)}
+                pressed={category === option.value}
+                // Optional, so choosing the selected category again clears it.
+                onClick={() => setCategory(category === option.value ? null : option.value)}
+              >
+                {option.label}
+              </Chip>
+            ))}
+          </div>
         </div>
 
         {/* Venue fit for the saved draft (SG2-47 suitability API) */}

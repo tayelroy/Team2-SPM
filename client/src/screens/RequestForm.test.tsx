@@ -66,6 +66,8 @@ function fillAllFields() {
   fireEvent.change(screen.getByLabelText(/Accessibility needs/i), { target: { value: 'Hearing loop' } });
   fireEvent.change(screen.getByLabelText(/Equipment requirements/i), { target: { value: 'Lectern' } });
   fireEvent.click(screen.getByRole('button', { name: 'No registration needed' }));
+  // SG2-70: and the category.
+  fireEvent.click(screen.getByRole('button', { name: 'Workshop' }));
 }
 
 function draftResponse(missing: string[] = [], eventId = 12) {
@@ -166,7 +168,7 @@ describe('AC1 — successful submission', () => {
     });
   });
 
-  test('[CONFLICT] [SG2-30:duplicate-submit] keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
+  test('[CONFLICT] [SG2-30:duplicate-submit] [SG2-105:AC1] keeps save and submit disabled through persistence and submission without duplicate requests', async () => {
     let finishSave!: (response: Response) => void;
     let finishSubmit!: (response: Response) => void;
     const fetchMock = vi.fn()
@@ -182,14 +184,38 @@ describe('AC1 — successful submission', () => {
     expect(btn).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     fireEvent.click(btn);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     expect(fetchMock).toHaveBeenCalledOnce();
+    // Independent customer-minimum answers must survive the pending save;
+    // rapid attempts must not create a second draft or omit a required answer.
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/event-requests/12');
+    expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      name: 'Forum 2026',
+      purpose: 'Partner briefing',
+      description: 'A half-day forum with keynotes and a panel.',
+      proposed_date: '2026-10-12T02:00:00.000Z',
+      expected_attendance: 180,
+      venue_requirements: 'Stage + loop',
+      preferred_layout: 'Theatre',
+      accessibility_needs: 'Hearing loop',
+      equipment_requirements: 'Lectern',
+      registration_needed: false,
+    });
     finishSave(draftResponse());
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(btn).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    fireEvent.click(btn);
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/event-requests/12/submit', {
+      method: 'PATCH', headers: { Authorization: 'Bearer test-token' },
+    });
     expect(onSuccess).not.toHaveBeenCalled();
     finishSubmit(new Response(null, { status: 204 }));
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(onSuccess).toHaveBeenCalledWith(12, 'Forum 2026');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -324,20 +350,6 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     ).toBeInTheDocument();
   });
 
-  test('[CONFLICT] [SG2-28:duplicate-save] disables the save button while the request is in flight', async () => {
-    let release!: (response: Response) => void;
-    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
-    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    const saving = await screen.findByRole('button', { name: 'Saving…' });
-    expect(saving).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
-
-    release(draftResponse());
-    expect(await screen.findByText(/Draft 12 saved/)).toBeInTheDocument();
-  });
-
   test('[CONFLICT] [SG2-28:duplicate-save] a second click while saving does not save twice', async () => {
     let release!: (response: Response) => void;
     const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { release = resolve; }));
@@ -345,10 +357,13 @@ describe('Save draft (SG2-28, no onSaveDraft override)', () => {
     render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
+    const saving = await screen.findByRole('button', { name: 'Saving…' });
+    expect(saving).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled();
+    fireEvent.click(saving);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     release(draftResponse());
-    await screen.findByText(/Draft 12 saved/);
+    expect(await screen.findByText(/Draft 12 saved/)).toBeInTheDocument();
   });
 
   test('[FAILURE] [SG2-28:AC4] shows the server validation details when the draft is rejected', async () => {
@@ -453,6 +468,7 @@ describe('Editing an existing draft (SG2-29)', () => {
     accessibility_needs: 'Hearing loop',
     equipment_requirements: 'Lectern',
     registration_needed: true,
+    category: 'seminar' as const,
   };
 
   function updateResponse(missing: string[] = []) {
@@ -587,6 +603,7 @@ describe('stored draft values (SG2-30 walkthrough fixes)', () => {
     accessibility_needs: 'None',
     equipment_requirements: 'Projector',
     registration_needed: false,
+    category: 'workshop' as const,
   };
 
   function renderStored(onSuccess = vi.fn()) {
@@ -1008,5 +1025,62 @@ describe('EventDetail requires an authenticated selected request', () => {
   test('[FAILURE] [SG2-26:AC2] coordinator cannot view organiser request details', () => {
     render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} eventStatus="submitted" />);
     expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
+  });
+});
+
+describe('the event category (SG2-70)', () => {
+  test('[NORMAL] [SG2-70:AC2] the organiser picks one of the seven categories and the latest choice is saved', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(draftResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
+    const group = screen.getByRole('group', { name: /Category/ });
+    expect(group).toHaveTextContent('Category (optional)');
+    expect(Array.from(group.querySelectorAll('button')).map((button) => button.textContent))
+      .toEqual(['Conference', 'Workshop', 'Seminar', 'Training', 'Networking', 'Social', 'Other']);
+    fireEvent.click(screen.getByRole('button', { name: 'Conference' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Training' }));
+    expect(screen.getByRole('button', { name: 'Conference' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Training' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText(/Draft 12 saved/);
+    expect(sentDraftBody(fetchMock).category).toBe('training');
+  });
+
+  test('[BOUNDARY] [SG2-70:AC2] the category is optional: a complete request submits without one, and none is sent', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) =>
+      url.endsWith('/submit') ? new Response(null, { status: 204 }) : draftResponse());
+    vi.stubGlobal('fetch', fetchMock);
+    const onSuccess = vi.fn();
+    render(<RequestForm onSaveDraft={undefined} onSuccess={onSuccess} />);
+    fillAllFields();
+    // fillAllFields picks Workshop; choosing it again clears the category.
+    fireEvent.click(screen.getByRole('button', { name: 'Workshop' }));
+    expect(screen.getByRole('button', { name: 'Workshop' })).toHaveAttribute('aria-pressed', 'false');
+    const submit = screen.getByRole('button', { name: /Submit request/i });
+    expect(submit).not.toBeDisabled();
+    fireEvent.click(submit);
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect('category' in sentDraftBody(fetchMock)).toBe(false);
+  });
+
+  test('[FAILURE] [SG2-70:AC2] a category the server refuses is shown in the save error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'Invalid event request details',
+      details: ['category must be one of: conference, workshop, seminar, training, networking, social, other.'],
+    }), { status: 400 })));
+    render(<RequestForm onSaveDraft={undefined} onSubmit={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Social' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText(/category must be one of/)).toBeInTheDocument();
+  });
+
+  test('[BOUNDARY] [SG2-70:AC2] a reopened draft shows its stored category, and none when it was never chosen', () => {
+    const { unmount } = render(<RequestForm eventId="7" accessToken="t" initialValues={{ category: 'social' }} />);
+    expect(screen.getByRole('button', { name: 'Social' })).toHaveAttribute('aria-pressed', 'true');
+    unmount();
+    render(<RequestForm eventId="7" accessToken="t" initialValues={{ category: null }} />);
+    for (const name of ['Conference', 'Workshop', 'Seminar', 'Training', 'Networking', 'Social', 'Other']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+    }
   });
 });

@@ -13,7 +13,13 @@ export type InboxOutcome<T> = { ok: true; value: T } | { ok: false; message: str
 const EVENT_KINDS = new Set(['venue_request_approved', 'venue_request_rejected', 'venue_booking_released',
   'equipment_reserved', 'venue_booking_clash', 'venue_unavailable', 'event_confirmed', 'event_submitted',
   'coordinator_assigned', 'clarification_requested', 'event_approved', 'event_rejected',
-  'event_returned_to_planning', 'safety_decision', 'outstanding_arrangements']);
+  'event_returned_to_planning', 'safety_decision', 'outstanding_arrangements',
+  // SG2-63 AC10: registration opened or closed on a confirmed event.
+  'registration_opened', 'registration_closed',
+  // SG2-83 AC4: Venue Staff hear of a cancelled or changed venue booking.
+  'venue_booking_cancelled', 'venue_change_requested',
+  // SG2-67: the organiser asked to cancel, and the event was cancelled.
+  'cancellation_requested', 'event_cancelled']);
 const HOLD_KINDS = new Set(['placed', 'warning', 'expired', 'expiry_changed']);
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const positiveId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0;

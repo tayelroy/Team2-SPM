@@ -30,17 +30,22 @@ export class MemoryDatabase {
   sessions = new Map<string, string>();
   venueHoldNow: () => number = Date.now;
   private sessionSequence = 0;
+  /** SG2-89: sign-in accounts a seed adds for one test, cleared on reset. */
+  private seededAccounts: { key: string; email: string; role: string }[] = [];
 
   constructor() { this.reset(); }
 
   reset() {
     this.sessions.clear();
     this.sessionSequence = 0;
+    this.seededAccounts = [];
     const draft = {
       name: 'Planning workshop', purpose: 'Team planning', description: 'A planning workshop.',
       proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 20,
       venue_requirements: 'A room with seating', preferred_layout: 'Classroom', accessibility_needs: 'None',
       equipment_requirements: 'Projector', registration_needed: false,
+      // SG2-70: every seeded event has a category, as every live one does.
+      category: 'workshop',
       organisation: 'Regression Organisation', status: 'draft', coordinator_id: null
     };
     const venue = {
@@ -188,6 +193,34 @@ export class MemoryDatabase {
     });
   }
 
+  /** SG2-89: two Leads and two coordinators. The signed-in Lead supervises
+   * 201 (awaiting the organiser's clarification) and 202 (planning) and once
+   * supervised 205 (completed, so no longer active); a second Lead, who can
+   * sign in, supervises 203; 204 waits unassigned in the queue both share. */
+  seedCoordinatorOversight() {
+    this.seededAccounts.push({ key: 'lead2', email: 'lead2@example.test', role: 'event_coordinator_lead' });
+    for (const [user_id, name, role] of [
+      ['user-lead2', 'Regression second lead', 'event_coordinator_lead'],
+      ['user-coordinator2', 'Regression second coordinator', 'event_coordinator']
+    ]) {
+      this.tables.users.push({ user_id, name, organisation: 'Regression Organisation', phone: null,
+        communication_preferences: [], department: 'Operations' });
+      this.tables.account_roles.push({ user_id, role });
+    }
+    const base = { ...this.tables.events[0], expected_attendance: 60 };
+    const rows: [number, string, string, string | null, string | null, string][] = [
+      [201, 'Clarification Forum', 'needs_clarification', 'user-coordinator', 'user-lead', '2030-07-01T02:00:00.000Z'],
+      [202, 'Planning Forum', 'planning', 'user-coordinator2', 'user-lead', '2030-07-02T02:00:00.000Z'],
+      [203, 'Other Lead Forum', 'approved', 'user-coordinator', 'user-lead2', '2030-07-03T02:00:00.000Z'],
+      [204, 'Queued Forum', 'unassigned', null, null, '2030-07-04T02:00:00.000Z'],
+      [205, 'Finished Forum', 'completed', 'user-coordinator', 'user-lead', '2030-05-01T02:00:00.000Z']
+    ];
+    for (const [event_id, name, status, coordinator_id, coordinator_assigned_by, proposed_date] of rows) {
+      this.tables.events.push({ ...base, event_id, name, status, coordinator_id, coordinator_assigned_by, proposed_date,
+        submitted_at: '2026-10-20T02:00:00.000Z' });
+    }
+  }
+
   /** SG2-90: events in every state a coordinator can act on, for each
    * assignment state they can meet. Status matters: review and decision also
    * guard on status, so each assignment guard needs an event that is otherwise
@@ -303,6 +336,33 @@ export class MemoryDatabase {
     }
   }
 
+  /** SG2-83: test equivalent of the venue_change_requested() trigger. The
+   * change and its reason go in the history, Venue Staff are told, and a
+   * Confirmed or Preparation event returns to Planning (AC4/AC7). */
+  recordVenueChange(request: Row) {
+    const event = this.tables.events.find(row => row.event_id === request.event_id)!;
+    const booking = this.tables.venue_bookings.find(row => row.booking_id === request.replaces_booking_id)!;
+    const name = (venueId: unknown) => this.tables.venues.find(row => row.venue_id === venueId)?.name;
+    const now = new Date().toISOString();
+    const log = (field: string, oldValue: string, newValue: string) => this.tables.event_audit_logs.push({
+      log_id: Math.max(0, ...this.tables.event_audit_logs.map(row => Number(row.log_id))) + 1, event_id: event.event_id,
+      actor_id: request.requested_by, field_name: field, old_value: oldValue, new_value: newValue, created_at: now });
+    const reason = request.change_reason ? ` — ${request.change_reason}` : '';
+    log('venue_booking', `Confirmed: ${name(booking.venue_id)} (booking ${booking.booking_id})`,
+      `Change requested: ${name(booking.venue_id)} (booking ${booking.booking_id}) to ${name(request.venue_id)} (request ${request.request_id})${reason}`);
+    for (const staff of this.tables.account_roles.filter(row => row.role === 'venue_staff' && row.user_id !== request.requested_by)) {
+      this.tables.notifications.push({ notification_id: Math.max(0, ...this.tables.notifications.map(row => Number(row.notification_id))) + 1,
+        recipient_id: staff.user_id, event_id: event.event_id, request_id: null, kind: 'venue_change_requested',
+        message: `A change is requested for ${event.name || 'Untitled event'}: ${name(booking.venue_id)} (booking ${booking.booking_id}) to `
+          + `${name(request.venue_id)}${request.change_reason ? `: ${request.change_reason}` : ''}. The current booking stays until the change is approved.`,
+        created_at: now });
+    }
+    if (event.status === 'confirmed' || event.status === 'preparation') {
+      log('status', String(event.status), 'planning');
+      Object.assign(event, { status: 'planning', confirmed_by: null, confirmed_at: null });
+    }
+  }
+
   /** SG2-79: on top of seedVenueRequest, event 91 holds Regression Hall from
    * 12:30 to 13:30 SGT on 15 Jun 2030, 30 minutes after booking #1 ends. */
   seedVenueClash() {
@@ -324,6 +384,15 @@ export class MemoryDatabase {
       ends_at: '2030-06-20T04:00:00.000Z', status: 'approved', layout: 'theatre', venue_requirements: 'A projector', notes: null,
       requested_by: 'user-coordinator', requested_at: '2030-01-01T00:00:00.000Z', decided_by: 'user-venue',
       decided_at: '2030-01-02T00:00:00.000Z', decision_reason: null, venue_booking_id: 21 });
+  }
+
+  /** SG2-83: on top of seedVenueRelease, Breakout Studio is free on 20 June,
+   * so one of event 91's two venues can be changed to it. */
+  seedVenueChange() {
+    this.seedVenueRelease();
+    this.tables.venues.push({ venue_id: 5, name: 'Breakout Studio', location: 'Level 3', capacity: 100, facilities: 'Projector, whiteboards',
+      operating_information: '08:00–22:00', accessibility_features: 'Step-free' });
+    this.tables.venue_layouts.push({ venue_id: 5, layout: 'theatre', other_description: null });
   }
 
   /** SG2-49: on top of seedVenueRequest, four pending requests from event 91's
@@ -384,7 +453,8 @@ export class MemoryDatabase {
   }
 
   private workItems(): Row[] {
-    const REVIEW_STATUSES = ['unassigned', 'submitted', 'under_review'];
+    // SG2-89 AC6: an event awaiting clarification stays in its coordinator's queue.
+    const REVIEW_STATUSES = ['unassigned', 'submitted', 'under_review', 'needs_clarification'];
     const ASSIGNED_STATUSES = ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'];
     const active = this.tables.events.filter(event => [...REVIEW_STATUSES, ...ASSIGNED_STATUSES].includes(String(event.status)));
     const items = active.filter(event => REVIEW_STATUSES.includes(String(event.status)) || event.coordinator_id !== null).map(event => ({
@@ -474,7 +544,7 @@ export class MemoryDatabase {
     },
     auth: {
       signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
-        const account = accounts.find(account => account.email === email && password === TEST_PASSWORD);
+        const account = [...accounts, ...this.seededAccounts].find(account => account.email === email && password === TEST_PASSWORD);
         if (!account) return { data: null, error: { message: 'Invalid credentials' } };
         const token = `regression-${account.key}-${++this.sessionSequence}`;
         this.sessions.set(token, `user-${account.key}`);
@@ -609,6 +679,7 @@ class MemoryQuery implements PromiseLike<QueryResult> {
         // SG2-48: the column defaults a new venue request takes.
         if (this.table === 'venue_booking_requests') { row.status ??= 'pending'; row.requested_at ??= new Date().toISOString(); }
         table.push(row);
+        if (this.table === 'venue_booking_requests' && row.replaces_booking_id) this.database.recordVenueChange(row);
         return row;
       });
     } else if (this.operation === 'update') {

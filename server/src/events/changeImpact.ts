@@ -45,7 +45,9 @@ export const RECHECK_KEYS = [
 ] as const;
 
 /** Registration settings stay editable on Confirmed and Preparation events
- * (SG2-63, SG2-66 AC6). */
+ * (SG2-66 AC6), and are never part of a change request. Capacity and times
+ * are the organiser's own setting (SG2-63 AC5); the coordinator can only say
+ * whether registration is needed. */
 export const REGISTRATION_SETTINGS = [
   'registration_needed',
   'registration_capacity',
@@ -282,8 +284,10 @@ export function assessChangeImpact(
  *   exception for at least that attendance).
  * - equipment_recheck: every live equipment request and every dated
  *   reservation covers the event start.
- * - registration_recheck: when registration is needed, it closes before the
- *   event starts and holds no more registrations than its capacity.
+ * - registration_recheck: when registration is needed and its closing time is
+ *   set, it closes before the event starts; it holds no more registrations
+ *   than its capacity. Unset settings are the organiser's to fill in and do
+ *   not block (SG2-94 AC6).
  * - safety_*_recheck (SG2-93): none here; settle_arrangement_recheck refuses a
  *   venue or equipment change while Venue Staff or Technical Support have not
  *   confirmed every flagged request again.
@@ -317,7 +321,7 @@ export function recheckBlockers(key: RecheckKey, event: ChangeImpactEventFacts, 
   } else if (key === 'registration_recheck' && event.registration_needed === true) {
     const closes = event.registration_closes_at ?? null;
     if (closes === null) {
-      blockers.push('Registration has no closing time.');
+      // SG2-94 AC6: no window yet, so nothing to check against the event.
     } else if (start === null) {
       blockers.push('Registration cannot be checked against the event, which has no date.');
     } else if (new Date(closes).getTime() >= new Date(start).getTime()) {

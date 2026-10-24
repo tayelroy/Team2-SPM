@@ -590,6 +590,7 @@ describe('fetchOwnEventDetail', () => {
       expected_attendance: 150,
       venue_requirements: 'Large auditorium with stage',
       preferred_layout: 'Theatre',
+      category: 'seminar',
       accessibility_needs: 'Wheelchair access',
       equipment_requirements: 'Dual projector and 4 microphones',
       registration_needed: true,
@@ -623,6 +624,7 @@ describe('fetchOwnEventDetail', () => {
       expectedAttendance: 150,
       venueRequirements: 'Large auditorium with stage',
       preferredLayout: 'Theatre',
+      category: 'seminar',
       accessibilityNeeds: 'Wheelchair access',
       equipmentRequirements: 'Dual projector and 4 microphones',
       registrationNeeded: true,
@@ -635,6 +637,9 @@ describe('fetchOwnEventDetail', () => {
       decidedAt: '2026-09-25T02:00:00.000Z',
       completedBy: null,
       completedAt: null,
+      cancellationRequestedAt: null,
+      cancellationReason: null,
+      cancelledAt: null,
       endsAt: null,
     };
 
@@ -671,6 +676,7 @@ describe('fetchOwnEventDetail', () => {
         expectedAttendance: null,
         venueRequirements: null,
         preferredLayout: null,
+        category: null,
         accessibilityNeeds: null,
         equipmentRequirements: null,
         registrationNeeded: false,
@@ -683,6 +689,9 @@ describe('fetchOwnEventDetail', () => {
         decidedAt: null,
         completedBy: null,
         completedAt: null,
+        cancellationRequestedAt: null,
+        cancellationReason: null,
+        cancelledAt: null,
         endsAt: null,
       },
     });
@@ -714,6 +723,7 @@ describe('fetchOwnEventDetail', () => {
         expectedAttendance: null,
         venueRequirements: null,
         preferredLayout: null,
+        category: null,
         accessibilityNeeds: null,
         equipmentRequirements: null,
         registrationNeeded: false,
@@ -726,6 +736,9 @@ describe('fetchOwnEventDetail', () => {
         decidedAt: null,
         completedBy: null,
         completedAt: null,
+        cancellationRequestedAt: null,
+        cancellationReason: null,
+        cancelledAt: null,
         endsAt: null,
       },
     });
@@ -1307,9 +1320,6 @@ describe('updateEventPlanning (SG2-39)', () => {
     equipment_requirements: 'Projector',
     accessibility_needs: 'Wheelchair ramp',
     registration_needed: true,
-    registration_capacity: 200,
-    registration_opens_at: '2026-10-01T00:00:00.000Z',
-    registration_closes_at: '2026-11-10T23:59:59.000Z',
     planning_notes: 'All catering set',
     confirm_impact: false,
   };
@@ -1730,6 +1740,11 @@ describe('assignCoordinator (SG2-33/34)', () => {
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok' },
       body: JSON.stringify({ coordinatorId: 'c1' }),
     });
+  });
+
+  test('[NORMAL] [SG2-89:AC6] a reassignment while awaiting clarification reports that status back unchanged', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ request: { status: 'needs_clarification' } })));
+    expect(await assignCoordinator(7, 'c2', 'tok')).toEqual({ ok: true, status: 'needs_clarification' });
   });
 
   test.each([
@@ -2182,5 +2197,27 @@ describe('the completion record on a detail read (SG2-100 AC4)', () => {
       expect(result.request.completedAt).toBeNull();
       expect(result.request.endsAt).toBeNull();
     }
+  });
+});
+
+describe('the cancellation record on a detail read (SG2-67 AC4)', () => {
+  test('[NORMAL] [SG2-67:AC4] the request time, reason and cancellation time are carried through, and non-strings read as unknown', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      request: {
+        event_id: 7, organiser_id: 'org-1', status: 'cancelled', can_manage: true,
+        cancellation_requested_at: '2026-10-21T01:00:00.000Z', cancellation_reason: 'Speaker withdrew',
+        cancelled_at: '2026-10-21T02:00:00.000Z',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const result = await fetchOwnEventDetail(7, 'test-token');
+    expect(result.ok && [result.request.cancellationRequestedAt, result.request.cancellationReason, result.request.cancelledAt])
+      .toEqual(['2026-10-21T01:00:00.000Z', 'Speaker withdrew', '2026-10-21T02:00:00.000Z']);
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      request: { event_id: 7, organiser_id: 'org-1', status: 'planning', can_manage: true, cancellation_reason: 5 },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+    const plain = await fetchOwnEventDetail(7, 'test-token');
+    expect(plain.ok && [plain.request.cancellationRequestedAt, plain.request.cancellationReason, plain.request.cancelledAt])
+      .toEqual([null, null, null]);
   });
 });

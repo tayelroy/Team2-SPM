@@ -230,6 +230,27 @@ access at once), the Lead for any submitted event, Venue Staff when it has a
 venue request or booking, Technical Support when it has an equipment request
 or reservation, and the Safety Officer from its safety check on.
 
+**Find an event (SG2-70).** `events.search` is granted to every internal role
+(Event Coordinator, Event Coordinator Lead, Venue Staff, Technical Support
+Staff, Safety Officer). Its results use the same relationship rule:
+`search_events()` returns only the events that `private.event_relationship_exists()`
+allows for the caller's acting role, so a coordinator finds only the events
+assigned to them, the Lead every submitted event, and so on. Drafts are never
+returned. The database checks the acting role itself, so an account that also
+holds an organiser role cannot search while acting as the organiser. Migration
+`202610200005_event_search.sql`; tests `supabase/tests/event_search.sql` and
+browser journeys `SG2-70-N01` and `SG2-70-N03`.
+
+**Find events to register for (SG2-59).** `events.registrable.read` is granted
+to Attendees only. `registrable_events()` and `registrable_event()` recheck that
+the acting role is `attendee`, so an account that also holds another role must
+act as the attendee. They return only confirmed events that take registration
+and whose registration is open or yet to open, and only the attendee-facing
+fields (name, host organisation, category, description, date and time,
+registration times, confirmed venues). Migration
+`202610220003_registrable_events.sql`; tests `supabase/tests/registrable_events.sql`
+and browser journeys `SG2-59-P01` and `SG2-59-N01`.
+
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
 `change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
 `202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.

@@ -37,6 +37,15 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandi
   // SG2-92 AC5: the Safety Officer recorded the event's operational safety check decision.
   safety_decision: 'Safety check',
   outstanding_arrangements: 'Outstanding arrangements',
+  // SG2-63 AC10: registration opened or closed, on schedule or closed early.
+  registration_opened: 'Registration open',
+  registration_closed: 'Registration closed',
+  // SG2-83 AC4: for Venue Staff, a coordinator cancelled or asked to change a venue booking.
+  venue_booking_cancelled: 'Venue booking cancelled',
+  venue_change_requested: 'Venue change requested',
+  // SG2-67: the organiser asked to cancel, and the coordinator cancelled.
+  cancellation_requested: 'Cancellation requested',
+  event_cancelled: 'Event cancelled',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstanding_arrangements', string> = {
   placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
@@ -54,6 +63,12 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandin
   event_returned_to_planning: color.silver,
   safety_decision: color.accent,
   outstanding_arrangements: color.silver,
+  registration_opened: color.accent,
+  venue_booking_cancelled: color.silver,
+  venue_change_requested: color.accent,
+  registration_closed: color.silver,
+  cancellation_requested: color.silver,
+  event_cancelled: color.silver,
 };
 
 const identity = (entry: InboxNotification) => `${entry.source}:${entry.notification_id}`;

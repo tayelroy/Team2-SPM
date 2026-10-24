@@ -1,4 +1,4 @@
-/** Venue bookings and releasing one (SG2-51). Mirrors server/src/venues/bookings.ts. */
+/** Venue bookings and releasing one (SG2-51, SG2-83). Mirrors server/src/venues/bookings.ts. */
 
 export interface VenueBooking {
   booking_id: number;
@@ -32,6 +32,10 @@ export interface Released {
   status: 'cancelled';
   cancelled_at: string;
   cancellation_reason: string;
+  /** SG2-83 AC2: the event's other bookings cancelled with it. */
+  also_released: number[];
+  /** SG2-83 AC7: the event was Confirmed or in Preparation and is back in Planning. */
+  returned_to_planning: boolean;
 }
 
 /** The longest release reason the server accepts. */
@@ -84,10 +88,12 @@ export function fetchVenueBookings(token: string | null | undefined, venueId: nu
   return call(`/api/venue-bookings?venue_id=${venueId}`, token, readBookings);
 }
 
-/** Releases a booking with a reason (AC1). */
-export function releaseBooking(token: string | null | undefined, bookingId: number, reason: string) {
+/** Releases a booking with a reason (AC1), and only the event's other
+ * bookings the coordinator chose as well (SG2-83 AC2). */
+export function releaseBooking(token: string | null | undefined, bookingId: number, reason: string, alsoCancel: number[] = []) {
   return call(`/api/venue-bookings/${bookingId}/release`, token, body =>
     typeof body?.booking_id === 'number' && body.status === 'cancelled' && typeof body.cancelled_at === 'string'
+      && Array.isArray(body.also_released) && typeof body.returned_to_planning === 'boolean'
       ? { released: body as unknown as Released } : null,
-  { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) });
+  { method: 'POST', body: JSON.stringify({ reason: reason.trim(), also_cancel: alsoCancel }) });
 }

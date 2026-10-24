@@ -7,7 +7,7 @@ test.use({ timezoneId: 'Asia/Singapore', trace: 'on', video: 'on' });
 type Draft = {
   name: string; purpose: string; description: string; proposed_date: string;
   expected_attendance: number; venue_requirements: string; preferred_layout: string; accessibility_needs: string | null;
-  equipment_requirements: string; registration_needed: boolean;
+  equipment_requirements: string; registration_needed: boolean; category: string;
 };
 type Entry = {
   log_id: number; event_id: number; actor_id: string; actor_name: string; actor_role: string;
@@ -17,11 +17,13 @@ const initial: Draft = {
   name: 'Draft History Workshop', purpose: 'Plan the first workshop', description: 'Initial workshop description',
   proposed_date: '2030-07-01T02:00:00.000Z', expected_attendance: 12, venue_requirements: 'Projector',
   preferred_layout: 'Classroom', accessibility_needs: 'Step-free entrance', equipment_requirements: 'Two microphones', registration_needed: false,
+  category: 'workshop',
 };
 const revised: Draft = {
   name: 'Revised Draft History Workshop', purpose: 'Plan the revised workshop', description: 'Revised workshop description',
   proposed_date: '2030-07-02T03:00:00.000Z', expected_attendance: 18, venue_requirements: 'Projector and stage',
   preferred_layout: 'Banquet rounds', accessibility_needs: null, equipment_requirements: 'Three microphones', registration_needed: true,
+  category: 'training',
 };
 
 async function nav(page: Page, name: string) {
@@ -62,6 +64,8 @@ async function fill(page: Page, values: Draft) {
   await page.getByLabel(/^Equipment requirements/).fill(values.equipment_requirements);
   // SG2-105: registration is an explicit yes or no.
   await page.getByRole('button', { name: values.registration_needed ? 'Registration needed' : 'No registration needed', exact: true }).click();
+  // SG2-70: the category chip is labelled with the capitalised value.
+  await page.getByRole('button', { name: values.category[0].toUpperCase() + values.category.slice(1), exact: true }).click();
 }
 async function save(page: Page, id?: number) {
   const response = page.waitForResponse(result => result.request().method() === (id ? 'PATCH' : 'POST')
@@ -120,10 +124,10 @@ test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/reset')).status()).toBe(204);
 });
 
-test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [SG2-40:AC1] [SG2-40:AC2] revising all ten saved draft fields records the exact organiser old and new values and reopens them intact', async ({ page }, info) => {
+test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [SG2-40:AC1] [SG2-40:AC2] [SG2-70:AC2] revising all eleven saved draft fields records the exact organiser old and new values and reopens them intact', async ({ page }, info) => {
   const issues = watchConsole(page);
   let id = 0;
-  await test.step('Create a real draft, leave the form and reopen its stored ten fields', async () => {
+  await test.step('Create a real draft, leave the form and reopen its stored eleven fields', async () => {
     await signIn(page);
     await page.setViewportSize({ width: 390, height: 900 });
     await nav(page, 'New request');
@@ -145,7 +149,7 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
     const saved = await save(page, id);
     expect(saved).toMatchObject({ ...revised, status: 'draft' });
     entries = await history(page, id);
-    expect(entries).toHaveLength(10);
+    expect(entries).toHaveLength(11);
     expect(new Set(entries.map(entry => entry.field_name))).toEqual(new Set(Object.keys(revised)));
     for (const entry of entries) {
       const key = entry.field_name as keyof Draft;
@@ -166,10 +170,11 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
     await expect(page.getByLabel(/^Accessibility needs/)).toHaveValue('');
     await expect(page.getByLabel(/^Preferred room layout/)).toHaveValue('Banquet rounds');
     await expect(page.getByRole('button', { name: 'Registration needed', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Training', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
   await test.step('The actual change-history drawer renders actor, Singapore time and old/new values at both widths', async () => {
     const drawer = await openHistory(page, revised.name);
-    await expect(drawer.getByTestId(/^audit-entry-/)).toHaveCount(10);
+    await expect(drawer.getByTestId(/^audit-entry-/)).toHaveCount(11);
     for (const entry of entries) {
       const row = drawer.getByTestId(`audit-entry-${entry.log_id}`);
       await expect(row).toContainText('Regression organiser'); await expect(row).toContainText('Event Organiser');
@@ -178,7 +183,8 @@ test('SG2-40-P02 | [NORMAL] [BOUNDARY] [SG2-29:AC1] [SG2-29:AC2] [SG2-31:AC3] [S
       // not the stored ISO instant or boolean text.
       const shown: Record<string, [string, string]> = {
         proposed_date: ['1 Jul 2030, 10:00 SGT', '2 Jul 2030, 11:00 SGT'],
-        registration_needed: ['No', 'Yes']
+        registration_needed: ['No', 'Yes'],
+        category: ['Workshop', 'Training']
       };
       await expect(row.getByTestId('diff-old')).toHaveText(shown[entry.field_name]?.[0] ?? entry.old_value ?? '(empty)');
       await expect(row.getByTestId('diff-new')).toHaveText(shown[entry.field_name]?.[1] ?? entry.new_value ?? '(empty)');

@@ -13,6 +13,8 @@ import ArrangementRechecks from '../components/ArrangementRechecks';
 import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import SafetyRereviewQueue from '../components/SafetyRereviewQueue';
+import RegistrationPanel from '../components/RegistrationPanel';
+import CancellationPanel from '../components/CancellationPanel';
 import { prefillFromEvent, type VenueSearchPrefill } from '../venues/searchPrefill';
 import { BookingRequestFit } from '../venues/VenueFit';
 import { BookingRequestConflicts } from '../venues/BookingConflicts';
@@ -299,6 +301,26 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
       {item.kind === 'event' && item.assigned_to_me && accessToken
         && ['planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
         <SafetyDecisionSummary eventId={item.event_id} accessToken={accessToken} status={currentStatus} canRework onReworked={onReload} />
+      )}
+      {/* SG2-63 AC1, AC2, AC4, AC8: who has registered, with contact details,
+          and the organiser's settings, read-only for the coordinator. */}
+      {item.kind === 'event' && item.assigned_to_me && accessToken && currentDetails.registration_needed === true
+        && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed', 'completed'].includes(currentStatus) && (
+        <RegistrationPanel eventId={item.event_id} accessToken={accessToken} />
+      )}
+      {/* SG2-67 AC1: the organiser's request to cancel, which only the assigned
+          coordinator carries out; a cancelled event then leaves the queue. */}
+      {item.kind === 'event' && item.assigned_to_me && accessToken && (
+        <CancellationPanel
+          eventId={item.event_id}
+          accessToken={accessToken}
+          mode="coordinator"
+          status={currentStatus}
+          requestedAt={typeof currentDetails.cancellation_requested_at === 'string' ? currentDetails.cancellation_requested_at : null}
+          reason={typeof currentDetails.cancellation_reason === 'string' ? currentDetails.cancellation_reason : null}
+          cancelledAt={null}
+          onChanged={onReload}
+        />
       )}
       {canDecide && <DecisionPanel eventId={item.event_id} accessToken={accessToken} onDecided={setStatus} />}
       {canClarify && accessToken && <ClarificationThread

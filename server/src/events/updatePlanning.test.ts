@@ -152,26 +152,6 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
         assert.deepEqual(res.errors, ['registration_needed must be true or false.']);
       }
     }
-
-    // registration_capacity: boolean, array, object
-    for (const badType of [true, [50], { cap: 50 }]) {
-      const res = validatePlanningUpdateInput({ registration_capacity: badType });
-      assert.equal(res.valid, false);
-      if (!res.valid) {
-        assert.deepEqual(res.errors, ['registration_capacity must be a whole number.']);
-      }
-    }
-
-    // registration dates: number, boolean, array, object
-    for (const field of ['registration_opens_at', 'registration_closes_at'] as const) {
-      for (const badType of [12345, false, ['2026-10-01'], {}]) {
-        const res = validatePlanningUpdateInput({ [field]: badType });
-        assert.equal(res.valid, false);
-        if (!res.valid) {
-          assert.deepEqual(res.errors, [`${field} must be an ISO 8601 date-time string.`]);
-        }
-      }
-    }
   });
 
   test('[BOUNDARY] [SG2-39:AC1] validates expected_attendance including boundaries', () => {
@@ -392,161 +372,6 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
     if (validFalse.valid) assert.equal(validFalse.values.registration_needed, false);
   });
 
-  test('[BOUNDARY] [SG2-39:AC4] validates registration_capacity including boundaries', () => {
-    assert.equal(validatePlanningUpdateInput({ registration_capacity: null }).valid, true);
-
-    const nonNum = validatePlanningUpdateInput({ registration_capacity: '100' });
-    assert.equal(nonNum.valid, false);
-    if (!nonNum.valid) {
-      assert.deepEqual(nonNum.errors, ['registration_capacity must be a whole number.']);
-    }
-
-    const floatCap = validatePlanningUpdateInput({ registration_capacity: 10.5 });
-    assert.equal(floatCap.valid, false);
-    if (!floatCap.valid) {
-      assert.deepEqual(floatCap.errors, ['registration_capacity must be a whole number.']);
-    }
-
-    // Boundary test lower: 0 and negative (invalid)
-    const zeroCap = validatePlanningUpdateInput({ registration_capacity: 0 });
-    assert.equal(zeroCap.valid, false);
-    if (!zeroCap.valid) {
-      assert.deepEqual(zeroCap.errors, ['registration_capacity must be a positive integer.']);
-    }
-
-    const negCap = validatePlanningUpdateInput({ registration_capacity: -1 });
-    assert.equal(negCap.valid, false);
-    if (!negCap.valid) {
-      assert.deepEqual(negCap.errors, ['registration_capacity must be a positive integer.']);
-    }
-
-    const negLargeCap = validatePlanningUpdateInput({ registration_capacity: -500 });
-    assert.equal(negLargeCap.valid, false);
-    if (!negLargeCap.valid) {
-      assert.deepEqual(negLargeCap.errors, ['registration_capacity must be a positive integer.']);
-    }
-
-    // Boundary test lower: 1 (valid minimum positive integer)
-    const minValidCap = validatePlanningUpdateInput({ registration_capacity: 1 });
-    assert.equal(minValidCap.valid, true);
-    if (minValidCap.valid) {
-      assert.equal(minValidCap.values.registration_capacity, 1);
-    }
-
-    // Boundary test lower: 2 (just above minimum)
-    const justAboveMinCap = validatePlanningUpdateInput({ registration_capacity: 2 });
-    assert.equal(justAboveMinCap.valid, true);
-    if (justAboveMinCap.valid) {
-      assert.equal(justAboveMinCap.values.registration_capacity, 2);
-    }
-
-    // Mid-range valid integer
-    const validCap = validatePlanningUpdateInput({ registration_capacity: 150 });
-    assert.equal(validCap.valid, true);
-    if (validCap.valid) {
-      assert.equal(validCap.values.registration_capacity, 150);
-    }
-
-    // Boundary test upper: MAX_ATTENDANCE - 1 (2147483646, valid)
-    const justBelowMaxCap = validatePlanningUpdateInput({ registration_capacity: 2_147_483_646 });
-    assert.equal(justBelowMaxCap.valid, true);
-    if (justBelowMaxCap.valid) {
-      assert.equal(justBelowMaxCap.values.registration_capacity, 2_147_483_646);
-    }
-
-    // Boundary test upper: MAX_ATTENDANCE (2147483647, valid maximum)
-    const maxValidCap = validatePlanningUpdateInput({ registration_capacity: 2_147_483_647 });
-    assert.equal(maxValidCap.valid, true);
-    if (maxValidCap.valid) {
-      assert.equal(maxValidCap.values.registration_capacity, 2_147_483_647);
-    }
-
-    // Boundary test upper: MAX_ATTENDANCE + 1 (2147483648, invalid)
-    const justOverMaxCap = validatePlanningUpdateInput({ registration_capacity: 2_147_483_648 });
-    assert.equal(justOverMaxCap.valid, false);
-    if (!justOverMaxCap.valid) {
-      assert.deepEqual(justOverMaxCap.errors, ['registration_capacity must be at most 2147483647.']);
-    }
-
-    // Extreme overflow
-    const overCap = validatePlanningUpdateInput({ registration_capacity: 3_000_000_000 });
-    assert.equal(overCap.valid, false);
-    if (!overCap.valid) {
-      assert.deepEqual(overCap.errors, ['registration_capacity must be at most 2147483647.']);
-    }
-  });
-
-  test('[BOUNDARY] [NORMAL] [FAILURE] [SG2-39:AC4] validates registration_opens_at and registration_closes_at', () => {
-    assert.equal(validatePlanningUpdateInput({ registration_opens_at: null, registration_closes_at: null }).valid, true);
-
-    // opens_at errors
-    const nonStringOpen = validatePlanningUpdateInput({ registration_opens_at: 12345 });
-    assert.equal(nonStringOpen.valid, false);
-    if (!nonStringOpen.valid) {
-      assert.deepEqual(nonStringOpen.errors, ['registration_opens_at must be an ISO 8601 date-time string.']);
-    }
-
-    const emptyOpen = validatePlanningUpdateInput({ registration_opens_at: '   ' });
-    assert.equal(emptyOpen.valid, false);
-    if (!emptyOpen.valid) {
-      assert.deepEqual(emptyOpen.errors, ['registration_opens_at must be an ISO 8601 date-time string.']);
-    }
-
-    const invalidOpen = validatePlanningUpdateInput({ registration_opens_at: 'not-a-date' });
-    assert.equal(invalidOpen.valid, false);
-    if (!invalidOpen.valid) {
-      assert.deepEqual(invalidOpen.errors, ['registration_opens_at must be a valid date and time.']);
-    }
-
-    // closes_at errors
-    const nonStringClose = validatePlanningUpdateInput({ registration_closes_at: 12345 });
-    assert.equal(nonStringClose.valid, false);
-    if (!nonStringClose.valid) {
-      assert.deepEqual(nonStringClose.errors, ['registration_closes_at must be an ISO 8601 date-time string.']);
-    }
-
-    const emptyClose = validatePlanningUpdateInput({ registration_closes_at: '   ' });
-    assert.equal(emptyClose.valid, false);
-    if (!emptyClose.valid) {
-      assert.deepEqual(emptyClose.errors, ['registration_closes_at must be an ISO 8601 date-time string.']);
-    }
-
-    const invalidClose = validatePlanningUpdateInput({ registration_closes_at: 'not-a-date' });
-    assert.equal(invalidClose.valid, false);
-    if (!invalidClose.valid) {
-      assert.deepEqual(invalidClose.errors, ['registration_closes_at must be a valid date and time.']);
-    }
-
-    // window: closes_at must be after opens_at
-    const equalDates = validatePlanningUpdateInput({
-      registration_opens_at: '2026-10-01T09:00:00Z',
-      registration_closes_at: '2026-10-01T09:00:00Z'
-    });
-    assert.equal(equalDates.valid, false);
-    if (!equalDates.valid) {
-      assert.deepEqual(equalDates.errors, ['registration_closes_at must be after registration_opens_at.']);
-    }
-
-    const invertedDates = validatePlanningUpdateInput({
-      registration_opens_at: '2026-10-15T09:00:00Z',
-      registration_closes_at: '2026-10-01T09:00:00Z'
-    });
-    assert.equal(invertedDates.valid, false);
-    if (!invertedDates.valid) {
-      assert.deepEqual(invertedDates.errors, ['registration_closes_at must be after registration_opens_at.']);
-    }
-
-    const validWindow = validatePlanningUpdateInput({
-      registration_opens_at: '2026-10-01T09:00:00Z',
-      registration_closes_at: '2026-10-15T09:00:00Z'
-    });
-    assert.equal(validWindow.valid, true);
-    if (validWindow.valid) {
-      assert.equal(validWindow.values.registration_opens_at, '2026-10-01T09:00:00.000Z');
-      assert.equal(validWindow.values.registration_closes_at, '2026-10-15T09:00:00.000Z');
-    }
-  });
-
   test('[NORMAL] [SG2-39:AC2] parses confirm_impact flag', () => {
     const withTrue = validatePlanningUpdateInput({ confirm_impact: true });
     assert.equal(withTrue.valid, true);
@@ -563,18 +388,11 @@ describe('validatePlanningUpdateInput (AC 4)', () => {
 });
 
 describe('detectArrangementImpact (AC 2)', () => {
-  test('[BOUNDARY] [SG2-39:AC2] one extra attendee or registration place triggers a recheck at the existing capacity', () => {
+  test('[BOUNDARY] [SG2-39:AC2] one extra attendee triggers a recheck at the existing attendance', () => {
     for (const [count, hasImpact, affected] of [
       [99, false, []], [100, false, []], [101, true, ['venue_recheck', 'equipment_recheck']]
     ] as const) {
       const impact = detectArrangementImpact(BASE_EVENT, { expected_attendance: count }, ARRANGED);
-      assert.equal(impact.has_impact, hasImpact);
-      assert.deepEqual(impact.affected_arrangements, affected);
-    }
-    for (const [count, hasImpact, affected] of [
-      [99, false, []], [100, false, []], [101, true, ['registration_recheck']]
-    ] as const) {
-      const impact = detectArrangementImpact(BASE_EVENT, { registration_capacity: count }, ARRANGED);
       assert.equal(impact.has_impact, hasImpact);
       assert.deepEqual(impact.affected_arrangements, affected);
     }
@@ -641,47 +459,21 @@ describe('detectArrangementImpact (AC 2)', () => {
     assert.equal(nullCurrent.has_impact, false);
   });
 
-  test('[BOUNDARY] [SG2-39:AC2] detects registration capacity increase', () => {
-    // Same or decreased capacity -> no impact
-    const same = detectArrangementImpact(BASE_EVENT, { registration_capacity: 100 }, ARRANGED);
-    assert.equal(same.has_impact, false);
-
-    const decreased = detectArrangementImpact(BASE_EVENT, { registration_capacity: 50 }, ARRANGED);
-    assert.equal(decreased.has_impact, false);
-
-    // Increased capacity -> registration_recheck
-    const increased = detectArrangementImpact(BASE_EVENT, { registration_capacity: 300 }, ARRANGED);
-    assert.equal(increased.has_impact, true);
-    assert.deepEqual(increased.affected_arrangements, ['registration_recheck']);
-    assert.deepEqual(increased.impact_notes, [
-      'Registration capacity increased from 100 to 300. Existing registration arrangements must be rechecked.'
-    ]);
-
-    // Current registration_capacity is null -> no impact
-    const nullCurrent = detectArrangementImpact(
-      { ...BASE_EVENT, registration_capacity: null },
-      { registration_capacity: 200 },
-      ARRANGED
-    );
-    assert.equal(nullCurrent.has_impact, false);
-  });
-
   test('[NORMAL] [SG2-39:AC2] [SG2-39:AC3] combines and deduplicates multiple impacts', () => {
     const multi = detectArrangementImpact(BASE_EVENT, {
       proposed_date: '2026-11-20T09:00:00.000Z',
-      expected_attendance: 200,
-      registration_capacity: 200
+      expected_attendance: 200
     }, ARRANGED);
 
     assert.equal(multi.has_impact, true);
-    assert.deepEqual(multi.affected_arrangements.sort(), ['equipment_recheck', 'registration_recheck', 'venue_recheck'].sort());
-    assert.equal(multi.impact_notes.length, 3);
+    assert.deepEqual(multi.affected_arrangements, ['venue_recheck', 'equipment_recheck']);
+    assert.equal(multi.impact_notes.length, 2);
   });
 
   test('[NORMAL] [SG2-39:AC2] an event with no venue request, equipment request or registration has nothing to recheck', () => {
     const impact = detectArrangementImpact(
       { ...BASE_EVENT, registration_needed: false },
-      { proposed_date: '2026-11-20T09:00:00.000Z', expected_attendance: 500, registration_capacity: 500 },
+      { proposed_date: '2026-11-20T09:00:00.000Z', expected_attendance: 500 },
       NOTHING_ARRANGED
     );
     assert.deepEqual(impact, { has_impact: false, affected_arrangements: [], impact_notes: [] });
@@ -701,7 +493,7 @@ describe('detectArrangementImpact (AC 2)', () => {
   });
 
   test('[BOUNDARY] [SG2-39:AC2] only the arrangement categories that exist are flagged', () => {
-    const update = { expected_attendance: 101, registration_capacity: 101 };
+    const update = { expected_attendance: 101 };
 
     const venueOnly = detectArrangementImpact({ ...BASE_EVENT, registration_needed: false }, update,
       { venue_requests: [{ status: 'pending', booked: false }], equipment_requests: [] });
@@ -717,13 +509,13 @@ describe('detectArrangementImpact (AC 2)', () => {
       'Expected attendance increased from 100 to 101. Existing equipment requests must be rechecked.'
     ]);
 
-    // Withdrawn requests are not arrangements; registration is still taken.
-    const registrationOnly = detectArrangementImpact(BASE_EVENT, update, {
+    // Withdrawn requests are not arrangements, and registration capacity is
+    // the organiser's (SG2-63), so taking registrations flags nothing here.
+    const withdrawnOnly = detectArrangementImpact(BASE_EVENT, update, {
       venue_requests: [{ status: 'cancelled', booked: false }],
       equipment_requests: [{ status: 'cancelled', shortfall: 0, placement_venue_id: 1, reserved: false }]
     });
-    assert.deepEqual(registrationOnly.affected_arrangements, ['registration_recheck']);
-    assert.equal(registrationOnly.impact_notes.length, 1);
+    assert.deepEqual(withdrawnOnly, { has_impact: false, affected_arrangements: [], impact_notes: [] });
   });
 });
 
@@ -731,11 +523,7 @@ describe('validatePlanningSchedule (AC 4)', () => {
   const NOW = Date.parse('2026-10-01T00:00:00.000Z');
 
   test('[NORMAL] [SG2-39:AC4] a consistent future schedule has no errors', () => {
-    assert.deepEqual(validatePlanningSchedule(BASE_EVENT, {
-      proposed_date: '2026-12-01T09:00:00.000Z',
-      registration_opens_at: '2026-10-02T00:00:00.000Z',
-      registration_closes_at: '2026-11-30T09:00:00.000Z'
-    }, NOW), []);
+    assert.deepEqual(validatePlanningSchedule(BASE_EVENT, { proposed_date: '2026-12-01T09:00:00.000Z' }, NOW), []);
   });
 
   test('[BOUNDARY] [SG2-39:AC4] a newly chosen proposed date must be strictly in the future', () => {
@@ -757,12 +545,10 @@ describe('validatePlanningSchedule (AC 4)', () => {
     assert.deepEqual(validatePlanningSchedule(held, { planning_notes: 'Wrap-up' }, NOW), []);
   });
 
-  test('[FAILURE] [SG2-39:AC4] registration cannot open or close at or after the start date being saved', () => {
-    assert.deepEqual(validatePlanningSchedule({ ...BASE_EVENT, registration_opens_at: null, registration_closes_at: null }, {
-      proposed_date: '2030-06-20T01:00:00.000Z',
-      registration_opens_at: '2030-06-20T01:00:00.000Z',
-      registration_closes_at: '2030-12-31T01:00:00.000Z'
-    }, NOW), [
+  test('[FAILURE] [SG2-39:AC4] [SG2-63:AC5] a new start date cannot fall at or before the organiser\'s registration times', () => {
+    assert.deepEqual(validatePlanningSchedule({ ...BASE_EVENT,
+      registration_opens_at: '2030-06-20T01:00:00.000Z', registration_closes_at: '2030-12-31T01:00:00.000Z'
+    }, { proposed_date: '2030-06-20T01:00:00.000Z' }, NOW), [
       'registration_opens_at must be before the event starts (proposed_date).',
       'registration_closes_at must be before the event starts (proposed_date).'
     ]);
@@ -770,17 +556,10 @@ describe('validatePlanningSchedule (AC 4)', () => {
     assert.deepEqual(validatePlanningSchedule(BASE_EVENT, { proposed_date: '2026-11-01T18:00:00.000Z' }, NOW), [
       'registration_closes_at must be before the event starts (proposed_date).'
     ]);
-    // One millisecond before the start is accepted.
-    assert.deepEqual(validatePlanningSchedule(BASE_EVENT, { registration_closes_at: '2026-11-15T08:59:59.999Z' }, NOW), []);
-  });
-
-  test('[FAILURE] [SG2-39:AC4] registration must close after it opens, against stored values', () => {
-    assert.deepEqual(validatePlanningSchedule(BASE_EVENT, { registration_closes_at: '2026-10-01T09:00:00.000Z' }, NOW), [
-      'registration_closes_at must be after registration_opens_at.'
-    ]);
+    // One millisecond after registration closes is accepted.
+    assert.deepEqual(validatePlanningSchedule(BASE_EVENT, { proposed_date: '2026-11-01T18:00:00.001Z' }, NOW), []);
     // Without any event date there is no start to compare the window with.
-    assert.deepEqual(validatePlanningSchedule({ ...BASE_EVENT, proposed_date: null },
-      { registration_closes_at: '2027-01-01T00:00:00.000Z' }, NOW), []);
+    assert.deepEqual(validatePlanningSchedule({ ...BASE_EVENT, proposed_date: null }, { planning_notes: 'Later' }, NOW), []);
   });
 });
 
@@ -838,7 +617,7 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
     const eventWithNulls: EventPlanningRecord = {
       ...BASE_EVENT,
       planning_notes: null,
-      registration_opens_at: null
+      proposed_date: null
     };
 
     const diffs = computePlanningDiffs(
@@ -847,7 +626,7 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
       eventWithNulls,
       {
         planning_notes: 'Initial notes now set',
-        registration_opens_at: '2026-10-05T09:00:00.000Z'
+        proposed_date: '2026-11-20T09:00:00.000Z'
       }
     );
 
@@ -855,9 +634,9 @@ describe('formatAuditValue & computePlanningDiffs (AC 1)', () => {
       {
         event_id: 10,
         actor_id: COORDINATOR_ID,
-        field_name: 'registration_opens_at',
+        field_name: 'proposed_date',
         old_value: null,
-        new_value: '2026-10-05T09:00:00.000Z'
+        new_value: '2026-11-20T09:00:00.000Z'
       },
       {
         event_id: 10,
@@ -966,26 +745,36 @@ function buildApp(options: HandlerHarnessOptions = {}) {
 }
 
 describe('createUpdateEventPlanningHandler business logic and AC verification', () => {
-  test('[NORMAL] [SG2-39:AC4] registration capacity and opening window can be updated while planning', async () => {
+  test('[FAILURE] [SG2-63:AC8] the coordinator cannot change registration capacity or times, alone or with other details, and nothing is read or written', async () => {
+    for (const body of [
+      { registration_capacity: 90 },
+      { registration_opens_at: '2026-10-02T09:00:00.000Z' },
+      { registration_closes_at: '2026-10-03T09:00:00.000Z' },
+      { planning_notes: 'Seats trimmed', registration_capacity: 90, registration_closes_at: null }
+    ]) {
+      let touched = false;
+      const app = buildApp({ fetchResult: { ok: true, event: { ...BASE_EVENT, status: 'planning' } },
+        captureFetchEventId: () => { touched = true; }, captureUpdateFields: () => { touched = true; } });
+      const response = await request(app).patch('/api/event-requests/10/planning').send(body);
+      assert.equal(response.status, 403);
+      assert.deepEqual(response.body, {
+        error: 'Registration capacity and opening and closing times are set by the Event Organiser.',
+        fields: Object.keys(body).filter(field => field !== 'planning_notes')
+      });
+      assert.equal(touched, false);
+    }
+  });
+
+  test('[BOUNDARY] [SG2-63:AC8] the coordinator still changes whether registration is needed, and a body that is not an object is refused as before', async () => {
     let saved: UpdatePlanningFieldsInput | undefined;
-    let history: InsertAuditLogInput[] | undefined;
     const app = buildApp({ fetchResult: { ok: true, event: { ...BASE_EVENT, status: 'planning' } },
-      captureUpdateFields: fields => { saved = fields; }, captureAuditEntries: entries => { history = entries; } });
-    const response = await request(app).patch('/api/event-requests/10/planning').send({
-      registration_capacity: 90, registration_opens_at: '2026-10-02T09:00:00.000Z', registration_closes_at: '2026-10-03T09:00:00.000Z'
-    });
+      captureUpdateFields: fields => { saved = fields; } });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({ registration_needed: false });
     assert.equal(response.status, 200);
-    assert.deepEqual(saved, { registration_capacity: 90,
-      registration_opens_at: '2026-10-02T09:00:00.000Z', registration_closes_at: '2026-10-03T09:00:00.000Z' });
-    assert.equal(response.body.event.status, 'planning');
-    assert.equal(response.body.event.registration_capacity, 90);
-    assert.equal(response.body.event.registration_opens_at, '2026-10-02T09:00:00.000Z');
-    assert.equal(response.body.event.registration_closes_at, '2026-10-03T09:00:00.000Z');
-    assert.deepEqual(history, [
-      { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'registration_capacity', old_value: '100', new_value: '90' },
-      { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'registration_opens_at', old_value: '2026-10-01T09:00:00.000Z', new_value: '2026-10-02T09:00:00.000Z' },
-      { event_id: 10, actor_id: COORDINATOR_ID, field_name: 'registration_closes_at', old_value: '2026-11-01T18:00:00.000Z', new_value: '2026-10-03T09:00:00.000Z' }
-    ]);
+    assert.deepEqual(saved, { registration_needed: false });
+    const list = await request(app).patch('/api/event-requests/10/planning').send([{ registration_capacity: 90 }]);
+    assert.equal(list.status, 400);
+    assert.deepEqual(list.body.details, ['Request body must be a JSON object.']);
   });
 
   test('[FAILURE] [SG2-25:AC3] [SG2-39:AC1] rejects unauthenticated requests with 401', async () => {
@@ -1081,15 +870,6 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.deepEqual(response.body, { error: 'Event requests are temporarily unavailable. Please try again later.' });
   });
 
-  test('[FAILURE] [SG2-39:AC1] returns 404 when event record is not found', async () => {
-    const response = await request(
-      buildApp({ fetchResult: { ok: false, reason: 'not_found', message: 'Event not found.' } })
-    )
-      .patch('/api/event-requests/10/planning')
-      .send({});
-    assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: 'Event request not found.' });
-  });
 
   test('[FAILURE] [SG2-39:AC1] returns 503 when fetching event record fails', async () => {
     const response = await request(
@@ -1174,28 +954,6 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
       assert.equal(updateCalled, false);
       assert.equal(auditCalled, false);
     }
-  });
-
-  test('[BOUNDARY] [SG2-39:AC4] cross-validates registration window against existing event dates with 400', async () => {
-    // Existing opens_at: 2026-10-01T09:00:00.000Z. Updating closes_at to 2026-09-15
-    const responseClose = await request(buildApp())
-      .patch('/api/event-requests/10/planning')
-      .send({ registration_closes_at: '2026-09-15T18:00:00.000Z' });
-    assert.equal(responseClose.status, 400);
-    assert.deepEqual(responseClose.body, {
-      error: 'Invalid planning details',
-      details: ['registration_closes_at must be after registration_opens_at.']
-    });
-
-    // Existing closes_at: 2026-11-01T18:00:00.000Z. Updating opens_at to 2026-11-10
-    const responseOpen = await request(buildApp())
-      .patch('/api/event-requests/10/planning')
-      .send({ registration_opens_at: '2026-11-10T09:00:00.000Z' });
-    assert.equal(responseOpen.status, 400);
-    assert.deepEqual(responseOpen.body, {
-      error: 'Invalid planning details',
-      details: ['registration_closes_at must be after registration_opens_at.']
-    });
   });
 
   test('[NORMAL] [SG2-39:AC2] [SG2-39:AC3] an attendance increase on an event with nothing arranged saves at once without rechecks', async () => {
@@ -1326,31 +1084,13 @@ describe('createUpdateEventPlanningHandler business logic and AC verification', 
     assert.equal(updated, false);
   });
 
-  test('[FAILURE] [SG2-39:AC4] a registration window closing after the stored event start is refused', async () => {
+  test('[FAILURE] [SG2-39:AC4] [SG2-63:AC5] the organiser\'s registration window is judged against a start date the coordinator moves', async () => {
     let updated = false;
     const response = await request(buildApp({
-      fetchResult: { ok: true, event: { ...BASE_EVENT, proposed_date: '2030-06-20T01:00:00.000Z', registration_needed: false,
-        registration_capacity: null, registration_opens_at: null, registration_closes_at: null } },
+      fetchResult: { ok: true, event: { ...BASE_EVENT, proposed_date: '2030-06-20T01:00:00.000Z',
+        registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z' } },
       captureUpdateFields: () => { updated = true; }
-    })).patch('/api/event-requests/10/planning').send({
-      registration_needed: true, registration_capacity: 50, registration_opens_at: '2030-06-01T01:00:00Z',
-      registration_closes_at: '2030-12-31T01:00:00Z', confirm_impact: true
-    });
-    assert.equal(response.status, 400);
-    assert.deepEqual(response.body, { error: 'Invalid planning details',
-      details: ['registration_closes_at must be before the event starts (proposed_date).'] });
-    assert.equal(updated, false);
-  });
-
-  test('[FAILURE] [SG2-39:AC4] a registration window is judged against a start date moved in the same request', async () => {
-    let updated = false;
-    const response = await request(buildApp({
-      fetchResult: { ok: true, event: { ...BASE_EVENT, proposed_date: '2030-06-20T01:00:00.000Z' } },
-      captureUpdateFields: () => { updated = true; }
-    })).patch('/api/event-requests/10/planning').send({
-      proposed_date: '2030-05-01T01:00:00Z', registration_opens_at: '2030-06-01T01:00:00Z',
-      registration_closes_at: '2030-06-10T01:00:00Z', confirm_impact: true
-    });
+    })).patch('/api/event-requests/10/planning').send({ proposed_date: '2030-05-01T01:00:00Z', confirm_impact: true });
     assert.equal(response.status, 400);
     assert.deepEqual(response.body.details, [
       'registration_opens_at must be before the event starts (proposed_date).',
@@ -1611,16 +1351,16 @@ describe('SG2-66 direct-edit lock and return to Planning on the planning path', 
 
   test('[NORMAL] [SG2-66:AC6] the refusal message names the stage and points to a change request', () => {
     assert.equal(changeRequestRequiredMessage('confirmed'),
-      'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.');
+      'This event is Confirmed, so its details can no longer be edited directly. Ask for the change through a change request instead; only whether registration is needed and planning notes can still be edited here.');
     assert.equal(changeRequestRequiredMessage('preparation'),
-      'This event is in Preparation, so its details can no longer be edited directly. Ask for the change through a change request instead; only registration settings can still be edited here.');
+      'This event is in Preparation, so its details can no longer be edited directly. Ask for the change through a change request instead; only whether registration is needed and planning notes can still be edited here.');
   });
 
   for (const status of ['confirmed', 'preparation'] as const) {
     test(`[CONFLICT] [SG2-66:AC6] a ${status} event refuses a direct change to its details with 409 and writes nothing`, async () => {
       const { app, writes, audits, notices, facts } = recording({ ...BASE_EVENT, status });
       const response = await request(app).patch('/api/event-requests/10/planning').send({
-        expected_attendance: 150, venue_requirements: 'Bigger hall', registration_capacity: 120,
+        expected_attendance: 150, venue_requirements: 'Bigger hall',
         planning_notes: 'Asked for more seats', confirm_impact: true
       });
       assert.equal(response.status, 409);
@@ -1647,14 +1387,12 @@ describe('SG2-66 direct-edit lock and return to Planning on the planning path', 
     assert.deepEqual(writes, []);
   });
 
-  test('[NORMAL] [SG2-66:AC6] registration settings on a confirmed event still save directly and keep it confirmed', async () => {
+  test('[NORMAL] [SG2-66:AC6] whether registration is needed on a confirmed event still saves directly and keeps it confirmed', async () => {
     const { app, writes, audits, notices } = recording({ ...BASE_EVENT, status: 'confirmed' });
-    const response = await request(app).patch('/api/event-requests/10/planning').send({
-      registration_capacity: 90, registration_closes_at: '2026-11-02T18:00:00.000Z'
-    });
+    const response = await request(app).patch('/api/event-requests/10/planning').send({ registration_needed: false });
     assert.equal(response.status, 200);
-    assert.deepEqual(writes, [{ registration_capacity: 90, registration_closes_at: '2026-11-02T18:00:00.000Z' }]);
-    assert.deepEqual(audits[0].map(entry => entry.field_name), ['registration_capacity', 'registration_closes_at']);
+    assert.deepEqual(writes, [{ registration_needed: false }]);
+    assert.deepEqual(audits[0].map(entry => entry.field_name), ['registration_needed']);
     assert.equal(response.body.event.status, 'confirmed');
     assert.deepEqual(notices, []);
   });
@@ -1672,9 +1410,8 @@ describe('SG2-66 direct-edit lock and return to Planning on the planning path', 
     const { app, writes, audits } = recording({ ...BASE_EVENT, status: 'confirmed' });
     const response = await request(app).patch('/api/event-requests/10/planning').send({
       expected_attendance: 100, proposed_date: '2026-11-15T17:00:00+08:00', venue_requirements: 'Large hall with projector',
-      accessibility_needs: 'Wheelchair access', equipment_requirements: 'Wireless mics', registration_needed: true,
-      registration_capacity: 100, registration_opens_at: '2026-10-01T09:00:00.000Z', registration_closes_at: '2026-11-01T18:00:00.000Z',
-      planning_notes: 'Initial planning notes'
+      accessibility_needs: 'Wheelchair access', equipment_requirements: 'Wireless mics',
+      registration_needed: true, planning_notes: 'Initial planning notes'
     });
     assert.equal(response.status, 200);
     assert.equal(writes.length, 1);
@@ -1698,23 +1435,6 @@ describe('SG2-66 direct-edit lock and return to Planning on the planning path', 
         message: 'Partner Forum is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.' }
     ]]);
   });
-
-  for (const status of ['confirmed', 'preparation'] as const) {
-    test(`[NORMAL] [SG2-66:AC7] a registration capacity rise on a ${status} event returns it to Planning, clears the confirmation and sends both notices`, async () => {
-      const { app, writes, audits, notices } = recording({ ...BASE_EVENT, status, name: null });
-      const response = await request(app).patch('/api/event-requests/10/planning')
-        .send({ registration_capacity: 120, confirm_impact: true });
-      assert.equal(response.status, 200);
-      assert.deepEqual(writes, [{ registration_capacity: 120, arrangements_recheck_needed: true,
-        outstanding_arrangements: ['registration_recheck'], status: 'planning', confirmed_by: null, confirmed_at: null }]);
-      assert.deepEqual(audits[0].map(entry => [entry.field_name, entry.old_value, entry.new_value]),
-        [['registration_capacity', '100', '120'], ['status', status, 'planning']]);
-      assert.deepEqual(notices[0].map(notice => [notice.recipient_id, notice.message]), [
-        ['org-user-1', 'Untitled event has moved back to Planning. Its arrangements are being rechecked before it can be confirmed again.'],
-        [COORDINATOR_ID, 'Untitled event is back in Planning. Recheck its outstanding arrangements before it goes through the safety check again.']
-      ]);
-    });
-  }
 
   for (const status of ['approved', 'planning']) {
     test(`[BOUNDARY] [SG2-66:AC7] an impact on an event already ${status === 'approved' ? 'approved' : 'in planning'} is no return to Planning and sends no notice`, async () => {

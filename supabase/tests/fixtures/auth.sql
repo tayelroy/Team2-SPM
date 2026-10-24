@@ -6,7 +6,8 @@ create role authenticated;
 create role service_role bypassrls;
 
 create schema auth;
-create table auth.users (id uuid primary key);
+-- email as in Supabase's auth.users; SG2-63's attendee list reads it.
+create table auth.users (id uuid primary key, email text);
 
 create function auth.uid() returns uuid
 language sql stable

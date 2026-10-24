@@ -157,3 +157,29 @@ describe('SafetyDecisionSummary: arrangements sent back to staff (SG2-93)', () =
     expect(screen.queryByRole('list', { name: 'Sent back to staff' })).toBeNull();
   });
 });
+
+describe('SafetyDecisionSummary withdrawn approval (SG2-94 AC3)', () => {
+  const WITHDRAWN = 'This approval was withdrawn because the event changed after it was approved. It must pass the safety check again.';
+
+  test.each(['planning', 'awaiting_safety_check'])('[NORMAL] [SG2-94:AC3] an approval the event has gone back from reads as withdrawn in %s', async (status) => {
+    decisions([APPROVED]);
+    renderSummary({ status, canRework: false });
+    const summary = await screen.findByTestId('safety-decision-summary');
+    expect(summary).toHaveTextContent('Approved');
+    expect(screen.getByTestId('safety-approval-withdrawn')).toHaveTextContent(WITHDRAWN);
+  });
+
+  test.each(['preparation', 'confirmed'])('[BOUNDARY] [SG2-94:AC3] an approval that still stands in %s is not marked withdrawn', async (status) => {
+    decisions([APPROVED]);
+    renderSummary({ status, canRework: false });
+    expect(await screen.findByTestId('safety-decision-summary')).toHaveTextContent('Approved');
+    expect(screen.queryByTestId('safety-approval-withdrawn')).toBeNull();
+  });
+
+  test('[BOUNDARY] [SG2-94:AC3] a later decision that is not an approval is never marked withdrawn', async () => {
+    decisions([EARLIER, APPROVED]);
+    renderSummary({ status: 'planning', canRework: false });
+    expect(await screen.findByTestId('safety-decision-summary')).toHaveTextContent('Changes requested');
+    expect(screen.queryByTestId('safety-approval-withdrawn')).toBeNull();
+  });
+});

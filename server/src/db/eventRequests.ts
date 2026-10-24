@@ -18,6 +18,10 @@ export interface EventRequestRecord extends DraftValues {
   /** Who marked the event completed and when (SG2-100 AC4). */
   completed_by?: string | null;
   completed_at?: string | null;
+  /** The organiser's request to cancel, and when it was carried out (SG2-67). */
+  cancellation_requested_at?: string | null;
+  cancellation_reason?: string | null;
+  cancelled_at?: string | null;
   /**
    * When the event finishes: the latest end of its confirmed venue bookings
    * (SG2-100 AC4). Null while it has none. Derived rather than stored, so it
@@ -88,6 +92,12 @@ export interface AssignStatusTransition {
   to: EventStatus;
 }
 
+/** Who coordinates an event and which Lead supervises it (SG2-89 AC1). */
+export interface CoordinatorAssignment {
+  coordinatorId: string | null;
+  assignedBy: string | null;
+}
+
 export type StartReviewResult =
   | { ok: true; request: EventRequestRecord; previous_status: 'submitted' | 'under_review' }
   | { ok: false; reason: 'not_found' | 'unavailable'; message: string };
@@ -104,7 +114,7 @@ export type DecideEventRequestResult =
 const RETURNED_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
   'proposed_date, expected_attendance, venue_requirements, preferred_layout, accessibility_needs, ' +
-  'equipment_requirements, registration_needed';
+  'equipment_requirements, registration_needed, category';
 
 /** Columns returned for list summary views (SG2-31). */
 const SUMMARY_COLUMNS =
@@ -114,12 +124,14 @@ const SUMMARY_COLUMNS =
 const DETAIL_COLUMNS =
   'event_id, organiser_id, organisation, status, name, purpose, description, ' +
   'proposed_date, expected_attendance, venue_requirements, preferred_layout, accessibility_needs, ' +
-  'equipment_requirements, registration_needed, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
+  'equipment_requirements, registration_needed, category, coordinator_id, coordinator:users!coordinator_id(name, phone), ' +
   // SG2-37: the organiser sees the outcome and, for a rejection, why.
   'decided_at, decision_reason, ' +
   // SG2-100 AC4: who marked the event completed and when, plus the bookings
   // the event's end time is derived from.
-  'completed_by, completed_at, venue_bookings!venue_bookings_event_id_fkey(ends_at, status)';
+  'completed_by, completed_at, venue_bookings!venue_bookings_event_id_fkey(ends_at, status), ' +
+  // SG2-67 AC1/AC4: the organiser's request to cancel, and the cancellation.
+  'cancellation_requested_at, cancellation_reason, cancelled_at';
 
 function extractCoordinatorName(row: Record<string, unknown>): string | null {
   if ('coordinator' in row && row.coordinator) {
@@ -698,11 +710,15 @@ export async function fetchEventRequestById(
  * event's life and the replacement has to be recordable — reassignment is
  * allowed in every live status, and must never move the event's own status
  * (see assignEventCoordinator).
+ *
+ * SG2-89 AC6: `needs_clarification` is live too. The Lead can reassign an
+ * event while it waits for the organiser's answer, and it stays waiting.
  */
 export const COORDINATOR_ASSIGNABLE_STATUSES = [
   'unassigned',
   'submitted',
   'under_review',
+  'needs_clarification',
   'approved',
   'planning',
   'awaiting_safety_check',
@@ -735,15 +751,23 @@ export const COORDINATOR_ASSIGNABLE_STATUSES = [
  * payload carries no `status` key at all, so no reassignment can rewind a
  * live event. `from` is a condition on the write rather than a pre-check,
  * so a row whose status moved on in between matches zero rows instead.
+ *
+ * SG2-89 AC1: `assignedBy` is the Lead who now supervises the event, written
+ * in the same update as the coordinator so the two can never disagree. It is
+ * null whenever the coordinator is cleared, as the database requires
+ * (events_assigner_needs_coordinator).
  */
 export async function assignEventCoordinator(
   admin: SupabaseClient,
   eventId: number,
-  coordinatorId: string | null,
+  { coordinatorId, assignedBy }: CoordinatorAssignment,
   expectedCurrent: string | null,
   statusTransition?: AssignStatusTransition
 ): Promise<AssignCoordinatorResult> {
-  const update: { coordinator_id: string | null; status?: EventStatus } = { coordinator_id: coordinatorId };
+  const update: { coordinator_id: string | null; coordinator_assigned_by: string | null; status?: EventStatus } = {
+    coordinator_id: coordinatorId,
+    coordinator_assigned_by: coordinatorId === null ? null : assignedBy
+  };
   if (statusTransition) update.status = statusTransition.to;
   const byEvent = admin.from('events').update(update).eq('event_id', eventId);
   const guarded = statusTransition

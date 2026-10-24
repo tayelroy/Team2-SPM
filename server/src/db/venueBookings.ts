@@ -108,27 +108,30 @@ export function createVenueBookingStore(admin: SupabaseClient): VenueBookingStor
   };
 }
 
-/** What release_venue_booking() reports (SG2-51). */
+/** What release_venue_bookings() reports (SG2-51, SG2-83). */
 export type ReleaseResult =
-  | { outcome: 'released'; booking_id: number; cancelled_at: string }
+  | { outcome: 'released'; booking_id: number; cancelled_at: string; also_released: number[]; returned_to_planning: boolean }
   | { outcome: 'inactive'; status: string }
-  | { outcome: 'missing' | 'invalid' | 'past' };
+  | { outcome: 'missing' | 'invalid' | 'past' | 'others_invalid' };
 
 export interface VenueBookingReleaseStore {
-  release(bookingId: number, reason: string): Promise<ReleaseResult>;
+  /** SG2-83 AC2: `also` names the event's other bookings to cancel with it. */
+  release(bookingId: number, reason: string, also: number[]): Promise<ReleaseResult>;
 }
 
 /**
  * Releases with the caller's own token, so the database records who released
- * the booking and checks they may. The release, its history entry and the
- * notifications commit together under the venue lock.
+ * the booking and checks they may (SG2-83 AC5: only the event's coordinator).
+ * The releases, their history entries and the notifications commit together
+ * under the venue locks.
  */
 export function createVenueBookingReleaseStore(token: string, makeClient = createUserScopedClient): VenueBookingReleaseStore {
   const client = makeClient(token);
   if (!client) throw new AccessError(503);
   return {
-    async release(bookingId, reason) {
-      const { data, error, status } = await client.rpc('release_venue_booking', { p_booking_id: bookingId, p_reason: reason });
+    async release(bookingId, reason, also) {
+      const { data, error, status } = await client.rpc('release_venue_bookings',
+        { p_booking_id: bookingId, p_also_cancel: also, p_reason: reason });
       if (error || data === null) throw new AccessError(status === 401 ? 401 : status === 403 || error?.code === '42501' ? 403 : 503);
       return data as ReleaseResult;
     }

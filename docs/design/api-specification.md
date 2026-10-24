@@ -246,6 +246,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - identity and status: `event_id, organiser_id, organisation, status`
   - details: `name, purpose, description, proposed_date, expected_attendance`
   - requirements: `venue_requirements, preferred_layout, accessibility_needs, equipment_requirements, registration_needed`
+  - kind: `category` (SG2-70)
 - **DetailRecord:** DraftRecord plus:
   - assignment: `coordinator_id, coordinator_name`
   - decision and completion: `decided_at, decision_reason, completed_by, completed_at`
@@ -260,6 +261,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - `proposed_date`: ISO date-time
   - `expected_attendance`: integer from 1 to 2147483647
   - `registration_needed`: boolean
+  - `category` (SG2-70): one of `conference`, `workshop`, `seminar`, `training`, `networking`, `social`, `other`
 - **201:** `{ request: DraftRecord, missingForSubmission: string[] }`. `status` is `draft`; `organiser_id` and `organisation` come from the caller.
 - **Errors:**
   - 400 `{ error: "Invalid event request details", details[] }`
@@ -289,14 +291,14 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 ### 4.4 PATCH /api/event-requests/:eventId
 - **Source:** `events/updateDraft.ts` (`createUpdateEventDraftHandler`), `db/eventRequests.ts` (`updateEventRequestDraft`), migration `202610170003_event_draft_change_history.sql` (`update_event_request_draft`).
 - **Permission:** `event_request.update` (EO).
-- **Body:** the same ten fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
+- **Body:** the same eleven fields as 4.1, as a **full replace**: omitted fields become null. Incomplete drafts remain valid; malformed values are rejected. Status, ownership and actor fields supplied in the HTTP body are ignored by the existing validator.
 - **200:** `{ request: DraftRecord, missingForSubmission }`. The DraftRecord shape is unchanged; this endpoint does not submit a request.
 - **Errors:**
   - 400 `{ error: "Invalid event request details", details[] }` for HTTP validation; a private RPC validation refusal returns the same error without details.
   - 404 `No event request found for this account.` for a missing event, wrong creator or changed organisation membership.
   - 409 `Only a draft or returned event request can be edited.` if the status is no longer editable, including a change after the initial lookup.
   - 503 generic service error if storage or audit insertion fails; private database errors are not exposed.
-- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the ten fields (`preferred_layout` added by migration `202610200001_event_preferred_layout.sql`, SG2-105). The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
+- **Atomic write:** the service-only RPC `update_event_request_draft(p_event_id integer, p_actor_id uuid, p_values jsonb)` rechecks the actor's current EO role, exact nonblank organisation membership, creator ownership and `draft` / `needs_clarification` status. It locks the event before changing the eleven fields (`preferred_layout` added by migration `202610200001_event_preferred_layout.sql`, SG2-105; `category` by `202610200005_event_search.sql`, SG2-70, which also refuses a category outside the list). The actor comes from the verified principal, never the body. Only `service_role` can execute; `PUBLIC`, `anon` and `authenticated` cannot call it directly.
 - **History:** the same transaction inserts one `event_audit_logs` row per actual changed field with verified actor, old/new values and a common save time. An audit failure rolls back the draft update. Unchanged saves, including equivalent timestamp offsets, add no history. Null remains null; numeric and boolean values are stored as text; dates use canonical UTC timestamp text. History reads still apply the existing owner/internal-field visibility rules.
 - **Internal result:** JSON object `{ outcome: "updated", request }` or `{ outcome: "not_found"|"not_editable"|"invalid" }`; the adapter maps these to the public response above. A successful earlier precheck cannot override a later locked refusal.
 - **Limits:** only the existing draft/clarification edit path is repaired. This adds no rejected-request rework policy and does not reconstruct edits made before the migration.
@@ -324,7 +326,7 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `Only a draft or rejected event request can be submitted.`
   - 503
 - **Rule:** only the creating EO; status must be `draft`, `rejected` or `needs_clarification`.
-- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked.
+- **Required to submit (SG2-105):** `name`, `purpose`, `description`, `proposed_date`, `expected_attendance`, `venue_requirements`, `preferred_layout`, `accessibility_needs`, `equipment_requirements` and `registration_needed`. Accessibility and equipment may be `"None"` but not blank; `registration_needed: false` is an answer. `missing[]` lists every one still blank and the request stays as it was. Requests already submitted are not rechecked. SG2-70's `category` is optional and not part of this list.
 - **Side effects:**
   - an `event_audit_logs` status row
   - `notifications` of kind `event_submitted`: to every ECL when the status is `unassigned`, otherwise to the coordinator
@@ -405,14 +407,14 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
 - **Body** (partial update):
   - `expected_attendance`, `proposed_date`
   - `venue_requirements`, `equipment_requirements`, `accessibility_needs`, `planning_notes`
-  - `registration_needed`, `registration_capacity`, `registration_opens_at`, `registration_closes_at`
+  - `registration_needed`
   - `confirm_impact`
+- **SG2-63 AC8:** `registration_capacity`, `registration_opens_at` and `registration_closes_at` are the organiser's (§4.13a); a body carrying any of them is refused 403 `{ error: "Registration capacity and opening and closing times are set by the Event Organiser.", fields[] }` before anything is read.
 - **Schedule rules:**
   - a changed date must be in the future
-  - registration must open before it closes
-  - registration must close before the event
+  - the stored registration opening and closing times must still be before the event
 - **200:** `{ event: PlanningRecord, arrangements_recheck_needed, outstanding_arrangements[] }`. The status becomes `planning` when it was `approved` or when an arrangement impact is confirmed.
-- **SG2-66 AC6:** on a `confirmed` or `preparation` event only registration settings and `planning_notes` may change; unchanged values are ignored.
+- **SG2-66 AC6:** on a `confirmed` or `preparation` event only `registration_needed` and `planning_notes` may change; unchanged values are ignored.
 - **Errors:**
   - 400 `{ error: "Invalid planning details", details[] }`
   - 403 `Only the assigned event coordinator can update planning details.`
@@ -424,16 +426,29 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 503
 - **Side effect:** one history row per audited field. `planning_notes` rows are internal-only. A move from `awaiting_safety_check`, `preparation` or `confirmed` back to `planning` clears `confirmed_by`/`confirmed_at` and sends `event_returned_to_planning` notices to the organiser and the coordinator (SG2-66 AC7; 503 if they cannot be stored).
 
+
+### 4.13a SG2-63 registration picture and settings
+- **Source:** `events/registrationRoutes.ts`, `events/registrationSettings.ts`, `db/registrations.ts`; migration `202610200004_event_registration_settings.sql`. See [Registrations](../registrations.md).
+- **GET /api/event-requests/:eventId/registrations** — permission `event_request.registrations.view` (EO, EC). An organiser of the event's organisation or its assigned coordinator; anyone else gets 404.
+  - **200:** `{ event_id, name, status, registration_needed, registration_capacity, registration_opens_at, registration_closes_at, window, registered_count, places_remaining, contact_details_visible, attendees[], venues[], capacity_warnings[], can_edit }`. `window` is SG2-58's `not_required | not_confirmed | not_yet_open | open | closed`. Each attendee has `registration_id, name, organisation, registered_at`, plus `email` and `phone` only when `contact_details_visible` (the creating organiser and the assigned coordinator).
+- **PATCH /api/event-requests/:eventId/registration-settings** — permission `event_request.registration_settings.update` (EO); the creating organiser only (403 otherwise).
+  - **Body:** any of `registration_capacity` (1–2147483647 or null), `registration_opens_at`, `registration_closes_at` (ISO date-time or null). Nothing else.
+  - **Rules:** closes after it opens; a new closing time is in the future; both before the event starts; capacity not below the registrations already held; none of the three cleared once the event is confirmed; allowed in any status but completed, cancelled or rejected, and only before the event starts. A capacity above a booked venue is allowed and returned in `capacity_warnings`.
+  - **200:** the registration picture as it now stands.
+- **POST /api/event-requests/:eventId/registration-settings/close** — same permission; closes open registration now.
+- **Errors:** 400 `{ error: "Invalid registration settings", details[] }`; 403; 404 `Event not found.`; 409 for a closed event (`status`), no registration, an event that has started, closing registration that is not open, or a registration arriving between the check and the write (`registered`); 503.
+- **Side effects:** one `event_audit_logs` row per changed setting; a `registration_opened` or `registration_closed` notice to the organiser and the assigned coordinator when a confirmed event's registration opens or closes, including on schedule (`process_registration_windows()`, every minute through pg_cron).
+
 ### 4.14 GET /api/event-requests/:eventId/arrangements
 - **Week 7:** New since W7 — SG2-57; #3 — SG2-82.
 - **Source:** `app.ts:233-237`; `events/getArrangements.ts`, `events/arrangementReadiness.ts`.
 - **Permission:** `event_request.arrangements.view` (EC).
-- **200:** `{ event_id, arrangements: [{ key: "venue"|"equipment"|"registration", label, state: "ready"|"outstanding"|"not_required", detail }], outstanding[], ready_for_confirmation, venue_requested }`
+- **200:** `{ event_id, arrangements: [{ key: "venue"|"equipment"|"registration"|"safety", label, state: "ready"|"outstanding"|"not_required", detail }], outstanding[], ready_for_confirmation, venue_requested }`
 - **Errors:**
   - 403 `Only the assigned event coordinator can view these arrangements.`
   - 404 `Event not found.`
   - 503
-- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding. SG2-81 additionally counts affected confirmed bookings as outstanding. Persisted `arrangements_recheck_needed` with `venue_recheck`, `equipment_recheck` or `registration_recheck` keeps the corresponding arrangement outstanding even when its booking/receipt data exists.
+- **Rule:** only the assigned EC. Since SG2-82, venue readiness covers **every** non-cancelled venue request: a pending, rejected or unbooked request is outstanding. SG2-81 additionally counts affected confirmed bookings as outstanding. Persisted `arrangements_recheck_needed` with `venue_recheck`, `equipment_recheck` or `registration_recheck` keeps the corresponding arrangement outstanding even when its booking/receipt data exists. SG2-94: registration with unset settings is `ready` (AC6), and a fourth item, `safety` ("Safety check"), is `ready` only for an event in Preparation or Confirmed whose latest safety decision is Approve, otherwise `outstanding` with the reason (AC4/AC5).
 
 ### 4.15 PATCH /api/event-requests/:eventId/confirm
 - **Week 7:** New since W7 — SG2-58; #3 — SG2-82.
@@ -446,11 +461,12 @@ The one exception is `confirm` (4.15), which runs an RPC as the caller.
   - 409 `{ error: "Only an event in Preparation can be confirmed.", code: "closed" }`
   - 409 `{ error: "Confirmation refused: arrangements are still outstanding.", code: "outstanding", outstanding[] }`
   - 401/403/503 mapped from the RPC
-- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610170002_confirmation_rechecks_and_disruptions.sql` (merges PR90 rechecks with PR92 disruption checks). Under `for update` the RPC:
+- **Data:** RPC `confirm_event(p_event_id)`, run as the caller. The latest definition is in `202610220001_safety_approval_gate.sql` (SG2-94). Under `for update` the RPC:
   - rechecks the caller's role and assignment
-  - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment or registration needs, and persisted venue/equipment/registration rechecks; refusal changes no event, booking, receipt, history or notification
+  - answers an event in `approved`, `planning`, `awaiting_safety_check` or `safety_rejected` with `outstanding` (the safety check included) and any other status but `preparation` with `closed`
+  - refuses affected bookings, pending/rejected/unbooked venue requests, unmet equipment needs, persisted venue/equipment/registration rechecks and a missing safety approval (`safety`, SG2-94 AC5); unset registration settings no longer block (AC6); refusal changes no event, booking, receipt, history or notification
   - writes the status, a history row and an `event_confirmed` notice
-- **Note:** no endpoint at this snapshot moves an event into `preparation`. That is the safety-check outcome (SG2-91..94, «planned»).
+- **Note:** the only way into `preparation` is the Safety Officer's Approve (`POST /api/event-requests/:eventId/safety-decision`); the `safety_approval_gate` trigger refuses any other move (SG2-94 AC1).
 
 ### 4.16 GET /api/event-requests/:eventId/confirmation
 - **Week 7:** New since W7 — SG2-58.
@@ -1074,6 +1090,33 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 
 ---
 
+## 9A. Event search (SG2-70)
+
+### 9A.1 GET /api/event-search
+- **Source:** `eventSearch/index.ts` (`createEventSearchRouter`), `db/eventSearch.ts`, migration `202610200005_event_search.sql` (`search_events`).
+- **Permission:** `events.search` (EC, VS, TSS, Lead, Safety Officer). `search_events` runs with the caller's JWT and acting role (SG2-104) and rechecks that role, so a role changed after sign-in, or an account acting as a non-internal role, is refused (403). Results are only the events that acting role may see (`private.event_relationship_exists()`; see docs/authorization.md).
+- **Query (all optional; blank leaves the filter out):** `q` (name or client organisation, case-insensitive, at most 255 characters), `from` and `to` (YYYY-MM-DD, inclusive, Singapore calendar days on `proposed_date`), `status` (any event status except `draft`), `venue` (venue id; an event booked, held or requested there), `category` (one of the list in 4.1), `coordinator` (account id, or `unassigned` for events with no coordinator). A repeated or malformed value is 400 naming it.
+- **200:** `{ events: [{ event_id, name, organisation, category, status, proposed_date, coordinator_id, coordinator_name, venues[] }], truncated, filters }`. At most 100 events, soonest first; `truncated` is true when more matched. Drafts are never returned. `filters` echoes what was applied (`query, date_from, date_to, status, venue_id, category, coordinator_id`) for the empty state.
+- **Errors:** 400 for a malformed filter, 401/403 for an unsigned or non-internal caller, 503 otherwise without database detail.
+
+### 9A.2 GET /api/event-search/options
+- **Permission:** as 9A.1 (`event_search_options`).
+- **200:** `{ venues: [{ venue_id, name }], coordinators: [{ user_id, name }] }`: venues not deleted, and every Event Coordinator account plus anyone still assigned to a submitted event after losing that role.
+
+## 9B. Events open for registration (SG2-59)
+
+### 9B.1 GET /api/registrable-events
+- **Source:** `registrableEvents/index.ts` (`createRegistrableEventsRouter`), `db/registrableEvents.ts`, migration `202610220003_registrable_events.sql` (`registrable_events`).
+- **Permission:** `events.registrable.read` (Attendee). `registrable_events` runs with the caller's JWT and acting role (SG2-104) and refuses (403) unless that role is `attendee`.
+- **Listed:** status `confirmed`, `registration_needed` true, both registration times set, `now < registration_closes_at` and the event not started. That covers registration open now and registration that opens later (team reading of AC1/AC2, 22 Oct 2026, so SG2-60 AC3 can say when it opens). Closed, unconfirmed and walk-in events are never returned. Soonest first.
+- **200:** `{ events: [{ event_id, name, organisation, category, description, proposed_date, registration_opens_at, registration_closes_at, venues: [{ name, location }] }] }`. Venues are the event's confirmed bookings. No other event field is returned (AC3).
+- **Errors:** 401/403 for an unsigned or non-attendee caller, 503 otherwise without database detail.
+
+### 9B.2 GET /api/registrable-events/:eventId
+- **Permission:** as 9B.1 (`registrable_event`).
+- **200:** `{ event }` with the same fields as one list item.
+- **Errors:** 400 for an id that is not a positive 32-bit integer; 404 `This event is not open for registration.` for any event the list would not show, whether it exists or not; 401/403/503 as 9B.1.
+
 ## 10. Health
 
 ### 10.1 GET /health and GET /api/health
@@ -1100,7 +1143,7 @@ No endpoint at this snapshot delivers these planned stories. They are listed so 
 |---|---|---|
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
-| #6 | SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`. SG2-93 (20 Oct 2026) added `GET /api/safety-rereviews` and `POST /api/safety-rereviews/:reviewId/confirm` (`safety_rereviews.read` / `.confirm`, Venue Staff and Technical Support), the `safety_*_recheck` keys on the SG2-66 settle route, and `rereviews` on the decisions read; see [safety-checks.md](../safety-checks.md). Still planned: treating only the latest Approve as the safety approval (SG2-94). |
+| #6 | SG2-93, SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; SG2-94 (22 Oct 2026) made the latest Approve the only way into Preparation and a condition of confirmation, with no new endpoint. SG2-93 (24 Oct 2026) added `GET /api/safety-rereviews` and `POST /api/safety-rereviews/:reviewId/confirm` (`safety_rereviews.read` / `.confirm`, Venue Staff and Technical Support), the `safety_*_recheck` keys on the SG2-66 settle route, and `rereviews` on the decisions read; see [safety-checks.md](../safety-checks.md). |
 
 ---
 

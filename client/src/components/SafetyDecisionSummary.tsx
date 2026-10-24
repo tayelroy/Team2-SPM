@@ -90,6 +90,9 @@ export interface SafetyDecisionSummaryProps {
   onReworked: () => void;
 }
 
+/** Statuses in which the latest Approve decision still stands (SG2-94). */
+const APPROVAL_STANDS: Record<string, true> = { preparation: true, confirmed: true, completed: true };
+
 /**
  * SG2-92 AC4–AC6: the latest safety check decision on an event, for its
  * assigned coordinator and its organiser. On a Safety Rejected event the
@@ -136,6 +139,9 @@ export default function SafetyDecisionSummary({ eventId, accessToken, status, ca
   const sentBack = latest?.decision === 'request_changes'
     ? rereviews.filter((rereview) => rereview.decision_id === latest.decision_id)
     : [];
+  // SG2-94 AC3: an approval only stands while the event stays past the check;
+  // any way back means what was approved changed and must be checked again.
+  const withdrawn = latest?.decision === 'approve' && APPROVAL_STANDS[status] !== true;
   if (loadError === null && !latest && !(showRework && decisions)) return null;
 
   return (
@@ -169,6 +175,11 @@ export default function SafetyDecisionSummary({ eventId, accessToken, status, ca
             </ul>
           ) : null}
         </>
+      ) : null}
+      {withdrawn ? (
+        <p className="organisation-detail-hint" data-testid="safety-approval-withdrawn">
+          This approval was withdrawn because the event changed after it was approved. It must pass the safety check again.
+        </p>
       ) : null}
       {showRework ? (
         <>
