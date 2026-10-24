@@ -1100,7 +1100,7 @@ No endpoint at this snapshot delivers these planned stories. They are listed so 
 |---|---|---|
 | #3 | SG2-83 change/cancel one venue | No change endpoint. Withdraw (7.5) covers pending and rejected requests; release (8.8) covers confirmed bookings. |
 | #5 | SG2-89 Lead oversight | No endpoint. |
-| #6 | SG2-93, SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`; see [safety-checks.md](../safety-checks.md). Still planned: flagging Request Changes arrangements (SG2-93) and treating only the latest Approve as the safety approval (SG2-94). |
+| #6 | SG2-94 safety check | SG2-91 (19 Oct 2026) added `GET /api/safety-checks` (`safety_checks.read`) and the automatic move into `awaiting_safety_check`. SG2-92 (19 Oct 2026) added `POST /api/event-requests/:eventId/safety-decision` (carrying the `safety_check_revision` the list showed; 409 `code: 'stale'` if the event changed), `GET /api/event-requests/:eventId/safety-decisions` and `POST /api/event-requests/:eventId/rework`. SG2-93 (20 Oct 2026) added `GET /api/safety-rereviews` and `POST /api/safety-rereviews/:reviewId/confirm` (`safety_rereviews.read` / `.confirm`, Venue Staff and Technical Support), the `safety_*_recheck` keys on the SG2-66 settle route, and `rereviews` on the decisions read; see [safety-checks.md](../safety-checks.md). Still planned: treating only the latest Approve as the safety approval (SG2-94). |
 
 ---
 

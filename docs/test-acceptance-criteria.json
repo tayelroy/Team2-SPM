@@ -808,6 +808,19 @@
         "AC5": "Tests cover an account holding two roles, for both permitted and refused actions",
         "AC6": "Reading an event's stage or change history requires a relationship to that event (its Organiser, its assigned Event Coordinator, a Lead, or a role that works on its venues, equipment or safety check); an Event Coordinator not assigned to the event is refused by ID, and a reassigned coordinator loses access immediately. Tests cover assigned, unrelated and reassigned coordinators"
       }
+    },
+    {
+      "id": "SG2-93",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-93",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Given a Request Changes decision, the event returns to Planning, and the arrangements the Safety Officer named are marked outstanding",
+        "AC2": "Affected venue bookings and equipment reservations are flagged for review again (e.g. a new layout or venue goes back to Venue Staff, changed equipment goes back to Technical Support Staff)",
+        "AC3": "Arrangements the Safety Officer didn't name stay unchanged",
+        "AC4": "Once the flagged arrangements are confirmed again, the event returns to Awaiting Safety Check",
+        "AC5": "The full history of safety decisions is kept on the event"
+      }
     }
   ]
 }

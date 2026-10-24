@@ -7846,5 +7846,147 @@
     "execution_evidence": "20 Oct2026; npm run test:e2e; /tmp/sg69-review-browser.log. In-app phone/desktop checks: /tmp/sg69-review-mobile-badge.png, /tmp/sg69-review-desktop-inbox.png.",
     "evidence": "e2e/notification-inbox.spec.ts; client/src/components/HoldNotifications.test.tsx",
     "layer": "Playwright browser + real fixture API"
+  },
+  {
+    "id": "SG2-93-P01",
+    "title": "Changes the Safety Officer asks for go back to Venue Staff and Technical Support, and the event returns to the check once they are confirmed again",
+    "type": "NORMAL",
+    "story": "SG2-93",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-93:AC1",
+      "SG2-93:AC2",
+      "SG2-93:AC3",
+      "SG2-93:AC4",
+      "SG2-93:AC5"
+    ],
+    "purpose": "Browser journey across the coordinator, Venue Staff, Technical Support and the Safety Officer after a Request Changes decision naming Venue, Equipment and technical, and Other.",
+    "preconditions": "Production React build on the isolated loopback Express fixture; /__e2e/reset then /__e2e/safety-decisions seed 921 Harbour Gala, 922 Riverside Fair and 923 Bayfront Talk awaiting their check at revision 1, each with Regression Hall approved and booked and 4 wireless microphones placed Stage left. No hosted Supabase.",
+    "steps": [
+      "Through the API, the Safety Officer requests changes on 921 naming Venue, Equipment and technical, and Other with 'Move the stage away from the east fire exit'.",
+      "Sign in as coordinator at 390px, open Harbour Gala from My assigned events, read 'Sent back to staff', and try 'Mark venue safety changes done'.",
+      "Sign in as venue at 1440px; under 'Safety changes to confirm', read the booking and choose 'Confirm again'.",
+      "Sign in as support; confirm the microphones again.",
+      "Sign in as coordinator; read 'Sent back to staff' and choose 'Mark other safety changes done'.",
+      "Sign in as safety and read the desk count; read the ledger."
+    ],
+    "data": "Event 921; reason 'Move the stage away from the east fire exit'; 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT)' and '4 × Wireless microphones'.",
+    "expected": "921 moves to planning with outstanding [safety_venue_recheck, safety_equipment_recheck, safety_other_recheck] and two open flags; 922 and 923 stay awaiting their check. The coordinator sees both items waiting for staff, with no horizontal overflow, and marking the venue done is refused naming 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) is waiting for Venue Staff to confirm it again.' Venue Staff see only the booking, with the reason, and confirm it ('Confirmed Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) again for Harbour Gala.'); Technical Support see the microphones placed at Regression Hall — Stage left and confirm them; no flagged item is left in the panel. 921 is still in planning with only safety_other_recheck. The coordinator sees both confirmed again by Regression venue / Regression support; marking Other done returns 921 to awaiting_safety_check, and the Safety Officer's desk shows 3 events. History: the two confirmations and the three settled keys, in order.",
+    "evidence": "e2e/safety-changes.spec.ts; e2e/support/safety-rereviews.ts",
+    "layer": "Playwright Chromium + isolated production app",
+    "status": "Not Executed",
+    "actual": "Not executed yet for this revision.",
+    "execution_evidence": null,
+    "execution_date": null,
+    "executed_by": null,
+    "review": null
+  },
+  {
+    "id": "SG2-93-N01",
+    "title": "Only the staff a change belongs to confirm it, once, and a change still with them cannot be marked done",
+    "type": "FAILURE / CONFLICT",
+    "story": "SG2-93",
+    "categories": [
+      "FAILURE",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-93:AC2",
+      "SG2-93:AC4"
+    ],
+    "purpose": "Role, ownership and once-only refusals of the staff routes and the settle route.",
+    "preconditions": "Same fixture as SG2-93-P01; 922 has changes requested naming Venue and Equipment and technical.",
+    "steps": [
+      "As coordinator, read the staff list.",
+      "As venue, confirm the equipment flag; as support, confirm the venue flag.",
+      "As coordinator, mark the equipment change done.",
+      "As support, confirm the equipment flag twice; as venue, confirm an unknown flag."
+    ],
+    "data": "Event 922; flags read from the ledger; review id 999999.",
+    "expected": "403 for the coordinator; 403 for each wrong staff role; the settle is 409 listing '4 × Wireless microphones is waiting for Technical Support to confirm it again.'; the first confirmation is 200 and the second 409 'This booking or equipment request has already been dealt with.' with resolution confirmed; the unknown flag is 404; 922 is in planning with only safety_venue_recheck outstanding.",
+    "evidence": "e2e/safety-changes.spec.ts",
+    "layer": "Playwright Chromium + isolated production app (API level)",
+    "status": "Not Executed",
+    "actual": "Not executed yet for this revision.",
+    "execution_evidence": null,
+    "execution_date": null,
+    "executed_by": null,
+    "review": null
+  },
+  {
+    "id": "SG2-93-INT01",
+    "title": "Native Request Changes sends the named venue back to Venue Staff, and the event returns to the check once it is confirmed again and Other is done",
+    "type": "NORMAL / CONFLICT / FAILURE",
+    "story": "SG2-93",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-93:AC1",
+      "SG2-93:AC2",
+      "SG2-93:AC3",
+      "SG2-93:AC4",
+      "SG2-93:AC5"
+    ],
+    "purpose": "Prove the real Express handlers, DB adapters, record_safety_decision's SG2-93 block, settle_arrangement_recheck, confirm_safety_rereview, safety_rereview_queue and event_safety_rereviews end to end, with SG2-91's triggers moving the event.",
+    "preconditions": "Disposable PostgreSQL with every migration and integration/seed.sql, PostgREST in front; synthetic loopback JWTs only.",
+    "steps": [
+      "Plan an event, add a confirmed booking and its approved request so SG2-91 puts it awaiting its check.",
+      "Request changes naming Venue and Other at the event's revision.",
+      "Read the staff list as Venue Staff, Technical Support and the coordinator.",
+      "Try to settle the venue change; confirm the flag as Technical Support, then as Venue Staff, then again.",
+      "Settle Other; read the decisions as the organiser and the history."
+    ],
+    "data": "Venue 'Integration Hall' booked 2090-07-10 09:00–13:00 SGT; reason 'Move the stage away from the fire exit'.",
+    "expected": "planning with [safety_venue_recheck, safety_other_recheck] and the booking still confirmed; Venue Staff see the flag with label, reason and the Safety Officer's name, Technical Support do not and the coordinator gets 403; settling the venue is 409 naming the waiting booking; Technical Support's confirmation is 403, Venue Staff's is 200 leaving [safety_other_recheck], a second is 409; settling Other returns the event to awaiting_safety_check; the organiser reads the flag confirmed by Integration venue staff; history has the confirmation and both settled keys.",
+    "evidence": "integration/api.test.ts; supabase/migrations/202610200004_safety_changes_requested.sql",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration",
+    "status": "Not Executed",
+    "actual": "Not executed yet for this revision.",
+    "execution_evidence": null,
+    "execution_date": null,
+    "executed_by": null,
+    "review": null
+  },
+  {
+    "id": "SG2-93-DB01",
+    "title": "Database contracts for sending safety changes back to staff and returning the event to the check",
+    "type": "NORMAL / BOUNDARY / CONFLICT / FAILURE",
+    "story": "SG2-93",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-93:AC1",
+      "SG2-93:AC2",
+      "SG2-93:AC3",
+      "SG2-93:AC4",
+      "SG2-93:AC5"
+    ],
+    "purpose": "Rolled-back SQL suite for migration 202610200004.",
+    "preconditions": "Disposable PostgreSQL with the auth fixture and every migration; one rolled-back transaction (CI database job).",
+    "steps": [
+      "Ready five events so SG2-91 puts them awaiting their check; request changes naming different arrangements.",
+      "Check keys, flags, untouched arrangements and that an unrelated arrangement write keeps the event in Planning.",
+      "Read the staff queue; refuse settling and wrong-role, wrong-acting-role, missing and repeated confirmations.",
+      "Confirm, withdraw and settle until each event returns to the check; flag again on a second decision; check grants and constraints."
+    ],
+    "data": "Synthetic users, venue, equipment and events inside the rolled-back transaction.",
+    "expected": "Every raise-exception assertion stays silent; anon and authenticated cannot read flags or call the functions.",
+    "evidence": "supabase/tests/safety_changes_requested.sql; supabase/migrations/202610200004_safety_changes_requested.sql",
+    "layer": "Rolled-back SQL against disposable PostgreSQL",
+    "status": "Not Executed",
+    "actual": "Not executed yet for this revision.",
+    "execution_evidence": null,
+    "execution_date": null,
+    "executed_by": null,
+    "review": null
   }
 ]
