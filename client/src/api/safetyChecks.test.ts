@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+  confirmSafetyRereview,
   fetchSafetyChecks,
   fetchSafetyDecisions,
+  fetchSafetyRereviews,
   recordSafetyDecision,
   reworkSafetyRejectedEvent,
   safetyArrangementList,
@@ -166,18 +168,24 @@ describe('recordSafetyDecision (SG2-92)', () => {
 });
 
 describe('fetchSafetyDecisions (SG2-92 AC6)', () => {
-  test('[NORMAL] [SG2-92:AC6] reads every decision on the event', async () => {
-    const fetch = respond(() => Response.json({ decisions: [decision] }));
-    expect(await fetchSafetyDecisions(12, 'token')).toEqual({ ok: true, decisions: [decision] });
+  test('[NORMAL] [SG2-92:AC6] [SG2-93:AC5] reads every decision on the event and what each sent back to staff', async () => {
+    const rereview = {
+      review_id: 3, decision_id: 9, arrangement: 'venue', label: 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT)',
+      flagged_at: '2030-06-01T00:00:00.000Z', resolution: null, resolved_by_name: null, resolved_at: null,
+    };
+    const fetch = respond(() => Response.json({ decisions: [decision], rereviews: [rereview] }));
+    expect(await fetchSafetyDecisions(12, 'token')).toEqual({ ok: true, decisions: [decision], rereviews: [rereview] });
     expect(fetch.mock.calls[0][0]).toBe('/api/event-requests/12/safety-decisions');
   });
 
-  test('[FAILURE] [SG2-92:AC6] a refused, unreachable or malformed read fails', async () => {
+  test('[FAILURE] [SG2-92:AC6] [SG2-93:AC5] a refused, unreachable or malformed read fails', async () => {
     respond(() => new Response(null, { status: 404 }));
     expect((await fetchSafetyDecisions(12, 't')).ok).toBe(false);
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
     expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
-    respond(() => Response.json({ decisions: {} }));
+    respond(() => Response.json({ decisions: {}, rereviews: [] }));
+    expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
+    respond(() => Response.json({ decisions: [decision] }));
     expect(await fetchSafetyDecisions(12, 't')).toEqual(UNAVAILABLE);
   });
 
@@ -211,5 +219,62 @@ describe('reworkSafetyRejectedEvent (SG2-92 AC4)', () => {
     expect(await reworkSafetyRejectedEvent(12, 't')).toEqual(UNAVAILABLE);
     respond(() => Response.json({}));
     expect(await reworkSafetyRejectedEvent(12, 't')).toEqual(UNAVAILABLE);
+  });
+});
+
+const QUEUE_ITEM = {
+  review_id: 3, arrangement: 'venue', event_id: 12, event_name: 'Open Day', proposed_date: '2030-07-10T02:00:00.000Z',
+  coordinator_name: 'Casey Coordinator', flagged_at: '2030-06-01T00:00:00.000Z',
+  label: 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT)', reason: 'Widen the aisles', decided_by_name: 'Sam Safety',
+  layout: 'theatre', placement_venue_name: null, placement_position: null,
+};
+
+describe('fetchSafetyRereviews (SG2-93 AC2)', () => {
+  test('[NORMAL] [SG2-93:AC2] reads the acting role\'s flags with the bearer token', async () => {
+    const fetch = respond(() => Response.json({ arrangement: 'venue', rereviews: [QUEUE_ITEM] }));
+    expect(await fetchSafetyRereviews('venue-token')).toEqual({ ok: true, arrangement: 'venue', rereviews: [QUEUE_ITEM] });
+    expect(fetch).toHaveBeenCalledWith('/api/safety-rereviews', { method: 'GET', headers: { Authorization: 'Bearer venue-token' } });
+    respond(() => Response.json({ arrangement: 'equipment', rereviews: [] }));
+    expect(await fetchSafetyRereviews('t')).toEqual({ ok: true, arrangement: 'equipment', rereviews: [] });
+  });
+
+  test('[FAILURE] [SG2-93:AC2] a refused, unreachable or malformed read fails', async () => {
+    respond(() => Response.json({ error: 'Access denied' }, { status: 403 }));
+    expect(await fetchSafetyRereviews('t')).toEqual({ ok: false, kind: 'unauthorized', message: 'Access denied' });
+    respond(() => new Response(null, { status: 418 }));
+    expect(await fetchSafetyRereviews('t')).toEqual({
+      ok: false, kind: 'error', message: 'Could not load the safety changes to confirm (HTTP 418).' });
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    expect(await fetchSafetyRereviews('t')).toEqual(UNAVAILABLE);
+    for (const body of [null, { arrangement: 'other', rereviews: [] }, { arrangement: 'venue', rereviews: {} }]) {
+      respond(() => Response.json(body));
+      expect(await fetchSafetyRereviews('t')).toEqual(UNAVAILABLE);
+    }
+  });
+});
+
+describe('confirmSafetyRereview (SG2-93 AC2/AC4)', () => {
+  test('[NORMAL] [SG2-93:AC4] posts the confirmation and returns where the event now stands', async () => {
+    const confirmed = { review_id: 3, event_id: 12, status: 'awaiting_safety_check', outstanding_arrangements: [] };
+    const fetch = respond(() => Response.json(confirmed));
+    expect(await confirmSafetyRereview(3, 'venue-token')).toEqual({ ok: true, confirmed });
+    expect(fetch).toHaveBeenCalledWith('/api/safety-rereviews/3/confirm', { method: 'POST', headers: { Authorization: 'Bearer venue-token' } });
+  });
+
+  test('[CONFLICT] [SG2-93:AC2] a flag already dealt with is a conflict in the server\'s words', async () => {
+    respond(() => Response.json({ error: 'This booking or equipment request has already been dealt with.', resolution: 'confirmed' }, { status: 409 }));
+    expect(await confirmSafetyRereview(3, 't')).toEqual({
+      ok: false, kind: 'conflict', message: 'This booking or equipment request has already been dealt with.' });
+  });
+
+  test('[FAILURE] [SG2-93:AC2] a missing flag, a network failure or a malformed reply is reported', async () => {
+    respond(() => Response.json({ error: 'That safety re-review was not found.' }, { status: 404 }));
+    expect(await confirmSafetyRereview(3, 't')).toEqual({ ok: false, kind: 'not_found', message: 'That safety re-review was not found.' });
+    respond(() => new Response(null, { status: 500 }));
+    expect(await confirmSafetyRereview(3, 't')).toEqual({ ok: false, kind: 'error', message: 'Could not confirm the change (HTTP 500).' });
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    expect(await confirmSafetyRereview(3, 't')).toEqual(UNAVAILABLE);
+    respond(() => Response.json({ review_id: 3 }));
+    expect(await confirmSafetyRereview(3, 't')).toEqual(UNAVAILABLE);
   });
 });

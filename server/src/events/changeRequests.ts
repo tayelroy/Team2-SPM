@@ -247,6 +247,14 @@ export function createChangeRequestHandlers({
           outstanding_arrangements: result.outstanding_arrangements
         });
         return;
+      case 'flagged':
+        // SG2-93 AC4: the requests the Safety Officer flagged are still with the staff.
+        res.status(409).json({
+          error: BLOCKED_MESSAGE,
+          blockers: result.waiting.map(item => `${item.label} is waiting for `
+            + `${item.arrangement === 'venue' ? 'Venue Staff' : 'Technical Support'} to confirm it again.`)
+        });
+        return;
       case 'not_outstanding':
         res.status(409).json({ error: NOT_WAITING_MESSAGE });
         return;

@@ -918,6 +918,19 @@
         "AC5": "Where there are several Event Coordinator Leads, each can see the whole unassigned queue (SG2-87)",
         "AC6": "Active events include those awaiting the Organiser's clarification: they stay in the assigned Event Coordinator's work queue (SG2-41) and in this overview, and the Lead can reassign them without changing their status"
       }
+    },
+    {
+      "id": "SG2-93",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-93",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-20",
+      "acceptanceCriteria": {
+        "AC1": "Given a Request Changes decision, the event returns to Planning, and the arrangements the Safety Officer named are marked outstanding",
+        "AC2": "Affected venue bookings and equipment reservations are flagged for review again (e.g. a new layout or venue goes back to Venue Staff, changed equipment goes back to Technical Support Staff)",
+        "AC3": "Arrangements the Safety Officer didn't name stay unchanged",
+        "AC4": "Once the flagged arrangements are confirmed again, the event returns to Awaiting Safety Check",
+        "AC5": "The full history of safety decisions is kept on the event"
+      }
     }
   ]
 }

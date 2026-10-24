@@ -51,6 +51,10 @@ const ARRANGEMENT_LABELS: Record<string, string> = {
   venue_recheck: 'Venue Suitability Recheck',
   equipment_recheck: 'Equipment Recheck',
   registration_recheck: 'Registration Capacity Recheck',
+  // SG2-93 AC1: arrangements a Safety Officer's Request changes left outstanding.
+  safety_venue_recheck: 'Venue Changes (Safety Check)',
+  safety_equipment_recheck: 'Equipment Changes (Safety Check)',
+  safety_other_recheck: 'Other Changes (Safety Check)',
 };
 
 /** Details a Confirmed or Preparation event no longer takes directly (SG2-66 AC6). */

@@ -60,7 +60,8 @@ describe('shared SG2-66 vocabulary', () => {
     assert.deepEqual([...SIGNIFICANT_CHANGE_FIELDS],
       ['proposed_date', 'expected_attendance', 'venue_requirements', 'accessibility_needs', 'equipment_requirements']);
     assert.deepEqual([...CHANGEABLE_FIELDS], [...SIGNIFICANT_CHANGE_FIELDS, 'name', 'purpose', 'description']);
-    assert.deepEqual([...RECHECK_KEYS], ['venue_recheck', 'equipment_recheck', 'registration_recheck']);
+    assert.deepEqual([...RECHECK_KEYS], ['venue_recheck', 'equipment_recheck', 'registration_recheck',
+      'safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck']);
     assert.deepEqual([...REGISTRATION_SETTINGS],
       ['registration_needed', 'registration_capacity', 'registration_opens_at', 'registration_closes_at']);
     assert.deepEqual(Object.keys(CHANGE_FIELD_LABELS), [...CHANGEABLE_FIELDS]);
@@ -232,6 +233,13 @@ describe('recheckBlockers (SG2-66 AC4)', () => {
   test('[FAILURE] [SG2-66:AC4] a closing time with no event date blocks the registration recheck', () => {
     assert.deepEqual(recheckBlockers('registration_recheck', { ...event, proposed_date: null }, facts),
       ['Registration cannot be checked against the event, which has no date.']);
+  });
+
+  test('[BOUNDARY] [SG2-93:AC4] a change the Safety Officer asked for has no SG2-66 blockers, even where the venue, equipment or registration would', () => {
+    const failing = { ...event, proposed_date: null };
+    for (const key of ['safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck'] as const) {
+      assert.deepEqual(recheckBlockers(key, failing, { ...facts, venues: [booking] }), [], key);
+    }
   });
 
   test('[BOUNDARY] [SG2-94:AC6] unset registration settings do not block the recheck; capacity is still checked once set', () => {
