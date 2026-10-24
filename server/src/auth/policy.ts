@@ -99,6 +99,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.safety_decision.record': ['safety_officer'],
   'event_request.safety_decisions.view': ['safety_officer', 'event_coordinator', 'event_organiser'],
   'event_request.safety_rework': ['event_coordinator'],
+  // SG2-93: Venue Staff and Technical Support read the bookings and equipment
+  // a Request Changes decision sent back to them, and confirm each again.
+  // The acting role picks the kind; confirm_safety_rereview() rechecks it.
+  'safety_rereviews.read': ['venue_staff', 'technical_support_staff'],
+  'safety_rereviews.confirm': ['venue_staff', 'technical_support_staff'],
   // SG2-38: see what stage an event has reached. SG2-100 adds the two Week 7
   // roles: the Lead assigns from the awaiting-assignment queue and the Safety
   // Officer answers a safety check, and neither can do so without seeing

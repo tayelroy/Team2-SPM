@@ -33,8 +33,16 @@ export const SIGNIFICANT_CHANGE_FIELDS = [
 export const CHANGEABLE_FIELDS = [...SIGNIFICANT_CHANGE_FIELDS, 'name', 'purpose', 'description'] as const;
 
 /** SG2-39's recheck vocabulary, already read by confirm_event and
- * arrangementReadiness. */
-export const RECHECK_KEYS = ['venue_recheck', 'equipment_recheck', 'registration_recheck'] as const;
+ * arrangementReadiness, and SG2-93's changes requested at the safety check
+ * (set by record_safety_decision). */
+export const RECHECK_KEYS = [
+  'venue_recheck',
+  'equipment_recheck',
+  'registration_recheck',
+  'safety_venue_recheck',
+  'safety_equipment_recheck',
+  'safety_other_recheck',
+] as const;
 
 /** Registration settings stay editable on Confirmed and Preparation events
  * (SG2-63, SG2-66 AC6). */
@@ -276,6 +284,9 @@ export function assessChangeImpact(
  *   reservation covers the event start.
  * - registration_recheck: when registration is needed, it closes before the
  *   event starts and holds no more registrations than its capacity.
+ * - safety_*_recheck (SG2-93): none here; settle_arrangement_recheck refuses a
+ *   venue or equipment change while Venue Staff or Technical Support have not
+ *   confirmed every flagged request again.
  */
 export function recheckBlockers(key: RecheckKey, event: ChangeImpactEventFacts, facts: ChangeImpactFacts): string[] {
   const start = event.proposed_date;
@@ -303,7 +314,7 @@ export function recheckBlockers(key: RecheckKey, event: ChangeImpactEventFacts, 
           + `which does not cover the event start of ${formatInstant(start)}.`);
       }
     }
-  } else if (event.registration_needed === true) {
+  } else if (key === 'registration_recheck' && event.registration_needed === true) {
     const closes = event.registration_closes_at ?? null;
     if (closes === null) {
       blockers.push('Registration has no closing time.');

@@ -45,6 +45,7 @@ import { createAssignmentQueueRouter } from './assignmentQueue';
 import { createChangeRequestHandlers } from './events/changeRequests';
 import { createSafetyChecksRouter } from './safetyChecks';
 import { createSafetyDecisionHandlers } from './events/safetyDecisionRoutes';
+import { createSafetyRereviewHandlers } from './events/safetyRereviewRoutes';
 
 export function createApp(
   databaseHealthCheck = checkDatabaseHealth,
@@ -112,7 +113,9 @@ export function createApp(
   // SG2-91: appended last to keep every positional argument in place.
   safetyChecksRouter = createSafetyChecksRouter(access),
   // SG2-92: appended last for the same reason.
-  safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal })
+  safetyDecisionHandlers = createSafetyDecisionHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-93: appended last for the same reason.
+  safetyRereviewHandlers = createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal })
 ) {
   const app = express();
 
@@ -158,6 +161,12 @@ export function createApp(
   app.use('/api/assignment-queue', assignmentQueueRouter);
   // SG2-91: the Safety Officer's list of events awaiting a safety check.
   app.use('/api/safety-checks', safetyChecksRouter);
+  // SG2-93: the bookings and equipment a Request Changes safety decision sent
+  // back to Venue Staff or Technical Support, each confirmed again in turn.
+  const safetyRereviews = access.protectedRouter();
+  safetyRereviews.get('/', access.requirePermission('safety_rereviews.read'), safetyRereviewHandlers.queue);
+  safetyRereviews.post('/:reviewId/confirm', access.requirePermission('safety_rereviews.confirm'), safetyRereviewHandlers.confirm);
+  app.use('/api/safety-rereviews', safetyRereviews);
 
   // Only Technical Support Staff hold the 'users.role.update' permission
   // (see auth/policy.ts) — requireAuth (via protectedRouter) verifies the
