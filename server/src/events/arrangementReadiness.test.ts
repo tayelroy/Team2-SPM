@@ -44,11 +44,11 @@ describe('computeArrangementReadiness (SG2-57)', () => {
   });
 
   test('[NORMAL] [SG2-93:AC1] [SG2-93:AC3] changes the Safety Officer asked for make only those arrangements outstanding, and say so', () => {
-    const result = computeArrangementReadiness(baseInput({ arrangements_recheck_needed: true,
-      outstanding_arrangements: ['safety_venue_recheck', 'safety_other_recheck', 'venue_recheck'] }));
-    assert.deepEqual(result.outstanding, ['venue']);
+    const result = computeArrangementReadiness(baseInput({ status: 'planning', latest_safety_decision: 'request_changes',
+      arrangements_recheck_needed: true, outstanding_arrangements: ['safety_venue_recheck', 'safety_other_recheck', 'venue_recheck'] }));
+    assert.deepEqual(result.outstanding, ['venue', 'safety']);
     assert.equal(result.arrangements[0].detail, '1 venue booking approved. The Safety Officer asked for changes.');
-    assert.deepEqual(result.arrangements.slice(1).map(item => item.state), ['ready', 'ready']);
+    assert.deepEqual(result.arrangements.slice(1, 3).map(item => [item.key, item.state]), [['equipment', 'ready'], ['registration', 'ready']]);
     assert.equal(result.ready_for_confirmation, false);
   });
 
