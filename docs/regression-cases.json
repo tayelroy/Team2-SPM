@@ -8960,11 +8960,11 @@
     "expected": "921 moves to planning with outstanding [safety_venue_recheck, safety_equipment_recheck, safety_other_recheck] and two open flags; 922 and 923 stay awaiting their check. The coordinator sees both items waiting for staff, with no horizontal overflow, and marking the venue done is refused naming 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) is waiting for Venue Staff to confirm it again.' Venue Staff see only the booking, with the reason, and confirm it ('Confirmed Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) again for Harbour Gala.'); Technical Support see the microphones placed at Regression Hall — Stage left and confirm them; no flagged item is left in the panel. 921 is still in planning with only safety_other_recheck. The coordinator sees both confirmed again by Regression venue / Regression support; marking Other done returns 921 to awaiting_safety_check, and the Safety Officer's desk shows 3 events. History: the two confirmations and the three settled keys, in order.",
     "evidence": "e2e/safety-changes.spec.ts; e2e/support/safety-rereviews.ts",
     "layer": "Playwright Chromium + isolated production app",
-    "status": "Not Executed",
-    "actual": "Not executed yet for this revision.",
-    "execution_evidence": null,
-    "execution_date": null,
-    "executed_by": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production build and reset loopback fixture; assertions checked the visible and stored results above.",
+    "execution_evidence": "24 Oct 2026; feature/SG2-93-safety-changes-requested at 6f4b1d4 (origin/main adf51ff merged in); npm run test:e2e locally in Chromium: 157/157 passed including this journey, regression gate passed. No hosted Supabase.",
+    "execution_date": "24 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
     "review": null
   },
   {
@@ -8992,11 +8992,11 @@
     "expected": "403 for the coordinator; 403 for each wrong staff role; the settle is 409 listing '4 × Wireless microphones is waiting for Technical Support to confirm it again.'; the first confirmation is 200 and the second 409 'This booking or equipment request has already been dealt with.' with resolution confirmed; the unknown flag is 404; 922 is in planning with only safety_venue_recheck outstanding.",
     "evidence": "e2e/safety-changes.spec.ts",
     "layer": "Playwright Chromium + isolated production app (API level)",
-    "status": "Not Executed",
-    "actual": "Not executed yet for this revision.",
-    "execution_evidence": null,
-    "execution_date": null,
-    "executed_by": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production build and reset loopback fixture.",
+    "execution_evidence": "24 Oct 2026; feature/SG2-93-safety-changes-requested at 6f4b1d4 (origin/main adf51ff merged in); npm run test:e2e locally in Chromium: 157/157 passed including this journey, regression gate passed. No hosted Supabase.",
+    "execution_date": "24 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
     "review": null
   },
   {
@@ -9029,11 +9029,11 @@
     "expected": "planning with [safety_venue_recheck, safety_other_recheck] and the booking still confirmed; Venue Staff see the flag with label, reason and the Safety Officer's name, Technical Support do not and the coordinator gets 403; settling the venue is 409 naming the waiting booking; Technical Support's confirmation is 403, Venue Staff's is 200 leaving [safety_other_recheck], a second is 409; settling Other returns the event to awaiting_safety_check; the organiser reads the flag confirmed by Integration venue staff; history has the confirmation and both settled keys.",
     "evidence": "integration/api.test.ts; supabase/migrations/202610240001_safety_changes_requested.sql",
     "layer": "Real local public API/PostgREST/PostgreSQL integration",
-    "status": "Not Executed",
-    "actual": "Not executed yet for this revision.",
-    "execution_evidence": null,
-    "execution_date": null,
-    "executed_by": null,
+    "status": "Pass",
+    "actual": "Passed: 24/24 integration tests.",
+    "execution_evidence": "24 Oct 2026; feature/SG2-93-safety-changes-requested at 6f4b1d4 (origin/main adf51ff merged in); npm run test:integration locally: 24/24 passed on disposable PostgreSQL with every migration and PostgREST.",
+    "execution_date": "24 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
     "review": null
   },
   {
@@ -9066,11 +9066,11 @@
     "expected": "Every raise-exception assertion stays silent; anon and authenticated cannot read flags or call the functions.",
     "evidence": "supabase/tests/safety_changes_requested.sql; supabase/migrations/202610240001_safety_changes_requested.sql",
     "layer": "Rolled-back SQL against disposable PostgreSQL",
-    "status": "Not Executed",
-    "actual": "Not executed yet for this revision.",
-    "execution_evidence": null,
-    "execution_date": null,
-    "executed_by": null,
+    "status": "Pass",
+    "actual": "Passed in the disposable PostgreSQL 17 replay of the CI job.",
+    "execution_evidence": "24 Oct 2026; feature/SG2-93-safety-changes-requested at 6f4b1d4 (origin/main adf51ff merged in); replay of CI's database-tests job on disposable postgres:17 (auth fixture, every migration, release readiness and its tests, every SQL suite, the concurrency scripts and the upgrade replay) passed.",
+    "execution_date": "24 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
     "review": null
   }
 ]
