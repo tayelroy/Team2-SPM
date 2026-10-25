@@ -43,6 +43,21 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.equal(input.equipment_requests[0].reserved, true);
   });
 
+  test('[NORMAL] [SG2-93:AC1] [SG2-93:AC3] changes the Safety Officer asked for make only those arrangements outstanding, and say so', () => {
+    const result = computeArrangementReadiness(baseInput({ status: 'planning', latest_safety_decision: 'request_changes',
+      arrangements_recheck_needed: true, outstanding_arrangements: ['safety_venue_recheck', 'safety_other_recheck', 'venue_recheck'] }));
+    assert.deepEqual(result.outstanding, ['venue', 'safety']);
+    assert.equal(result.arrangements[0].detail, '1 venue booking approved. The Safety Officer asked for changes.');
+    assert.deepEqual(result.arrangements.slice(1, 3).map(item => [item.key, item.state]), [['equipment', 'ready'], ['registration', 'ready']]);
+    assert.equal(result.ready_for_confirmation, false);
+  });
+
+  test('[BOUNDARY] [SG2-93:AC4] a safety change no longer flagged as needing a recheck leaves the arrangement ready', () => {
+    const result = computeArrangementReadiness(baseInput({ arrangements_recheck_needed: false,
+      outstanding_arrangements: ['safety_equipment_recheck'] }));
+    assert.deepEqual([result.outstanding, result.ready_for_confirmation], [[], true]);
+  });
+
   test('[BOUNDARY] [SG2-39:AC2] false, null, absent, empty or unknown recheck metadata preserves ordinary readiness', () => {
     for (const metadata of [
       {}, { arrangements_recheck_needed: false, outstanding_arrangements: ['venue_recheck'] },

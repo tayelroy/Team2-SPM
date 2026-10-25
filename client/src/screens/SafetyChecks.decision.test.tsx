@@ -35,7 +35,7 @@ function lists(...sets: SafetyCheckEvent[][]) {
   return fetch;
 }
 function history(decisions: SafetyDecision[] = []) {
-  return vi.spyOn(api, 'fetchSafetyDecisions').mockResolvedValue({ ok: true, decisions });
+  return vi.spyOn(api, 'fetchSafetyDecisions').mockResolvedValue({ ok: true, decisions, rereviews: [] });
 }
 const recorded = (decision: SafetyDecision['decision']): RecordSafetyDecisionResult => ({
   ok: true,
@@ -81,7 +81,7 @@ describe('the decision history on each review (SG2-92 AC6)', () => {
     render(<SafetyChecks accessToken="t" />);
     expect((await galaDecision()).getByRole('status')).toHaveTextContent('Loading earlier decisions…');
     cleanup();
-    await act(async () => resolveHistory({ ok: true, decisions: [EARLIER] }));
+    await act(async () => resolveHistory({ ok: true, decisions: [EARLIER], rereviews: [] }));
     expect(screen.queryByRole('list', { name: 'Earlier safety decisions' })).toBeNull();
   });
 });

@@ -81,6 +81,30 @@ describe('ArrangementRechecks (work queue)', () => {
     expect(onSettled).not.toHaveBeenCalled();
   });
 
+  test('[CONFLICT] [SG2-93:AC4] safety changes are marked done on their own buttons; venue ones wait for Venue Staff', async () => {
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage: {
+      ...stage, outstanding_arrangements: ['safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck'],
+    } });
+    const settle = vi.spyOn(changeRequestsApi, 'settleRecheck').mockResolvedValue({
+      ok: false,
+      kind: 'blocked',
+      message: 'This arrangement still needs attention before it can be marked rechecked.',
+      blockers: ['Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) is waiting for Venue Staff to confirm it again.'],
+    });
+    renderBanner();
+
+    const banner = await screen.findByTestId('arrangements-recheck-banner');
+    expect(within(banner).getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Mark venue safety changes done',
+      'Mark equipment safety changes done',
+      'Mark other safety changes done',
+    ]);
+    fireEvent.click(within(banner).getByRole('button', { name: 'Mark venue safety changes done' }));
+    expect(settle).toHaveBeenCalledWith(661, 'safety_venue_recheck', 'coordinator-token');
+    expect(within(await screen.findByTestId('recheck-blockers')).getAllByRole('listitem').map((item) => item.textContent))
+      .toEqual(['Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) is waiting for Venue Staff to confirm it again.']);
+  });
+
   test.each([
     ['nothing needs rechecking', { ok: true as const, stage: { ...stage, arrangements_recheck_needed: false, outstanding_arrangements: [] } }],
     ['the stage cannot be read', { ok: false as const, kind: 'unavailable' as const, message: 'Could not reach the server. Please try again.' }],

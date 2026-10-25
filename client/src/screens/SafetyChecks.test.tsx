@@ -25,7 +25,7 @@ function api(...replies: (() => Response)[]) {
   for (const reply of replies) list.mockImplementationOnce(() => Promise.resolve(reply()));
   list.mockImplementation(() => Promise.resolve(replies.at(-1)!()));
   vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (url.endsWith('/safety-decisions')
-    ? Promise.resolve(Response.json({ decisions: [] }))
+    ? Promise.resolve(Response.json({ decisions: [], rereviews: [] }))
     : list(url, init))));
   return list;
 }

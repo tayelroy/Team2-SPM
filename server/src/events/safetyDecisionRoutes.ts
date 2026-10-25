@@ -13,6 +13,7 @@ import {
   type RecordSafetyDecisionResult,
   type ReworkSafetyRejectedEventResult
 } from '../db/safetyDecisions';
+import { listEventSafetyRereviews, type ListEventSafetyRereviewsResult } from '../db/safetyRereviews';
 import { validateSafetyDecision } from './safetyDecisions';
 
 const UNAVAILABLE_MESSAGE = 'Safety checks are temporarily unavailable. Please try again later.';
@@ -28,6 +29,7 @@ export interface SafetyDecisionDependencies {
   listDecisions?: (admin: SupabaseClient, eventId: number) => Promise<ListSafetyDecisionsResult>;
   recordDecision?: (admin: SupabaseClient, input: RecordSafetyDecisionInput) => Promise<RecordSafetyDecisionResult>;
   rework?: (admin: SupabaseClient, eventId: number, actorId: string) => Promise<ReworkSafetyRejectedEventResult>;
+  listRereviews?: (admin: SupabaseClient, eventId: number) => Promise<ListEventSafetyRereviewsResult>;
 }
 
 /**
@@ -63,7 +65,9 @@ function prelude(req: Request, res: Response, deps: Required<Pick<SafetyDecision
  *   Approve / Reject / Request Changes on the revision they reviewed
  *   (AC1–AC6, one database transaction; a stale review is refused);
  * - GET  /api/event-requests/:eventId/safety-decisions — every decision, newest
- *   first, for the Safety Officer, the assigned coordinator or the organiser;
+ *   first, and (SG2-93) every booking or equipment request a Request Changes
+ *   sent back to staff, for the Safety Officer, the assigned coordinator or
+ *   the organiser;
  * - POST /api/event-requests/:eventId/rework — the assigned coordinator takes a
  *   Safety Rejected event back to Planning (AC4).
  */
@@ -73,7 +77,8 @@ export function createSafetyDecisionHandlers({
   fetchEvent = fetchSafetyDecisionEvent,
   listDecisions = listSafetyDecisions,
   recordDecision = recordSafetyDecision,
-  rework = reworkSafetyRejectedEvent
+  rework = reworkSafetyRejectedEvent,
+  listRereviews = listEventSafetyRereviews
 }: SafetyDecisionDependencies): { record: RequestHandler; decisions: RequestHandler; rework: RequestHandler } {
   const deps = { getPrincipal, getAdminClient };
 
@@ -141,12 +146,14 @@ export function createSafetyDecisionHandlers({
       res.status(404).json({ error: NOT_FOUND_MESSAGE });
       return;
     }
-    const history = await listDecisions(admin, eventId);
-    if (!history.ok) {
+    const [history, flags] = await Promise.all([listDecisions(admin, eventId), listRereviews(admin, eventId)]);
+    if (!history.ok || !flags.ok) {
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
-    res.status(200).json({ decisions: history.decisions });
+    // SG2-93 AC5: the bookings and equipment each Request Changes sent back,
+    // and how each was resolved.
+    res.status(200).json({ decisions: history.decisions, rereviews: flags.rereviews });
   };
 
   const reworkEvent: RequestHandler = async (req, res) => {

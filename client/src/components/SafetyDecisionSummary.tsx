@@ -6,6 +6,7 @@ import {
   SAFETY_DECISION_OUTCOMES,
   type SafetyDecision,
   type SafetyDecisionKind,
+  type SafetyRereview,
 } from '../api/safetyChecks';
 import { color } from '../theme';
 import { Badge } from '../ui';
@@ -16,6 +17,12 @@ const TONE: Record<SafetyDecisionKind, { bg: string; fg: string }> = {
   approve: { bg: 'rgba(0,130,124,0.35)', fg: color.mist },
   reject: { bg: 'rgba(112,119,119,0.35)', fg: color.silver },
   request_changes: { bg: 'rgba(255, 180, 0, 0.2)', fg: '#fde047' },
+};
+
+/** Who confirms each kind of flagged arrangement again (SG2-93 AC2). */
+const REREVIEW_STAFF: Record<SafetyRereview['arrangement'], string> = {
+  venue: 'Venue Staff',
+  equipment: 'Technical Support',
 };
 
 /**
@@ -94,6 +101,7 @@ const APPROVAL_STANDS: Record<string, true> = { preparation: true, confirmed: tr
  */
 export default function SafetyDecisionSummary({ eventId, accessToken, status, canRework, onReworked }: SafetyDecisionSummaryProps) {
   const [decisions, setDecisions] = useState<SafetyDecision[] | null>(null);
+  const [rereviews, setRereviews] = useState<SafetyRereview[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [reworking, setReworking] = useState(false);
@@ -102,11 +110,14 @@ export default function SafetyDecisionSummary({ eventId, accessToken, status, ca
   useEffect(() => {
     let cancelled = false;
     setDecisions(null);
+    setRereviews([]);
     setLoadError(null);
     void fetchSafetyDecisions(eventId, accessToken).then((result) => {
       if (cancelled) return;
-      if (result.ok) setDecisions(result.decisions);
-      else setLoadError(result.message);
+      if (result.ok) {
+        setDecisions(result.decisions);
+        setRereviews(result.rereviews);
+      } else setLoadError(result.message);
     });
     return () => {
       cancelled = true;
@@ -124,6 +135,10 @@ export default function SafetyDecisionSummary({ eventId, accessToken, status, ca
 
   const showRework = canRework && status === 'safety_rejected';
   const latest = decisions?.[0];
+  // SG2-93 AC2/AC5: what the latest Request changes sent back to staff, and where each stands.
+  const sentBack = latest?.decision === 'request_changes'
+    ? rereviews.filter((rereview) => rereview.decision_id === latest.decision_id)
+    : [];
   // SG2-94 AC3: an approval only stands while the event stays past the check;
   // any way back means what was approved changed and must be checked again.
   const withdrawn = latest?.decision === 'approve' && APPROVAL_STANDS[status] !== true;
@@ -144,7 +159,22 @@ export default function SafetyDecisionSummary({ eventId, accessToken, status, ca
           </button>
         </div>
       ) : latest ? (
-        <SafetyDecisionDetails decision={latest} />
+        <>
+          <SafetyDecisionDetails decision={latest} />
+          {sentBack.length > 0 ? (
+            <ul className="safety-history" aria-label="Sent back to staff">
+              {sentBack.map((rereview) => (
+                <li key={rereview.review_id}>
+                  {rereview.resolution === 'confirmed'
+                    ? `${rereview.label}: confirmed again by ${rereview.resolved_by_name ?? REREVIEW_STAFF[rereview.arrangement]}`
+                    : rereview.resolution === 'withdrawn'
+                      ? `${rereview.label}: withdrawn`
+                      : `${rereview.label}: waiting for ${REREVIEW_STAFF[rereview.arrangement]} to confirm it again`}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
       ) : null}
       {withdrawn ? (
         <p className="organisation-detail-hint" data-testid="safety-approval-withdrawn">
