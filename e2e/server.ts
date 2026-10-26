@@ -284,6 +284,21 @@ app.post('/__e2e/reset', (_req, res) => {
   res.status(204).end();
 });
 app.get('/__e2e/ready', (_req, res) => res.json({ ready: true, storage: 'in-memory' }));
+// SG2-96: the whole Week 7 journey needs the database's safety-check hand-off.
+app.post('/__e2e/safety-handoff', (_req, res) => {
+  database.safetyHandoff = true;
+  res.sendStatus(204);
+});
+app.get('/__e2e/journey-ledger', (req, res) => {
+  const ids = database.tables.events.filter(row => row.name === req.query.name).map(row => row.event_id);
+  const mine = (row: Record<string, unknown>) => ids.includes(row.event_id);
+  res.json({
+    events: database.tables.events.filter(mine), audit: database.tables.event_audit_logs.filter(mine),
+    notifications: database.tables.notifications.filter(mine), decisions: (database.tables.event_safety_decisions ?? []).filter(mine),
+    venue_requests: database.tables.venue_booking_requests.filter(mine), bookings: database.tables.venue_bookings.filter(mine),
+    equipment_requests: database.tables.equipment_requests.filter(mine), reservations: database.tables.equipment_reservations.filter(mine),
+  });
+});
 app.post('/__e2e/work-queue', (_req, res) => {
   database.seedWorkQueue();
   res.status(204).end();
@@ -471,9 +486,17 @@ app.post('/__e2e/venue-change', (_req, res) => {
   database.seedVenueChange();
   res.status(204).end();
 });
-// SG2-104: the venue account also holds the Event Coordinator role.
-app.post('/__e2e/multi-role', (_req, res) => {
-  database.tables.account_roles.push({ user_id: 'user-venue', role: 'event_coordinator' });
+// SG2-104: the default preserves the original Venue Staff + Coordinator case.
+// SG2-96 also checks the other shared staging-account combinations on phones.
+app.post('/__e2e/multi-role', (req, res) => {
+  const combinations: Record<string, { user_id: string; role: string }> = {
+    'venue-coordinator': { user_id: 'user-venue', role: 'event_coordinator' },
+    'coordinator-attendee': { user_id: 'user-coordinator', role: 'attendee' },
+    'organiser-coordinator': { user_id: 'user-organiser', role: 'event_coordinator' },
+  };
+  const combination = combinations[String(req.body?.combination ?? 'venue-coordinator')];
+  if (!combination) { res.status(400).json({ error: 'Unknown multi-role fixture combination.' }); return; }
+  database.tables.account_roles.push(combination);
   res.status(204).end();
 });
 app.post('/__e2e/venue-clash', (_req, res) => {

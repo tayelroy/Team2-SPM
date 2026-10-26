@@ -1,45 +1,44 @@
-# C4 model notes (SG2-95)
+# C4 model notes (SG2-95, updated for SG2-96)
 
-Source: [`connectsphere.dsl`](connectsphere.dsl) (moved from `docs/context-diagram.dsl`). As of PR90 head 61416cc (16 Oct 2026).
-Orange (`#f5a623`, tag `Week 7`) = built for the Week 7 changes. Grey dashed (`#DDDDDD`, tag `Planned`) = not built; the label names the Jira story.
+Source: [`c4-model.drawio`](c4-model.drawio), seven pages, as of main b7e2b1a (26 Oct 2026). Until 26 Oct the model was the Structurizr file `connectsphere.dsl`; SG2-96 moved it to draw.io so the team edits the diagrams by hand.
+
+Colours on every page: orange (`#F5A623`) = built for the Week 7 changes; green (`#B6D7A8`, green arrows) = built for the 15 Oct 2026 clarifications; grey dashed (`#DDDDDD`) = not built, with the Jira story in the label. Each page has its own key.
 
 ## Views
 
-| View | Shows |
+| Page | Shows |
 |---|---|
-| `C1_Context` | 7 roles → ConnectSphere, with what each does today |
-| `C2_Containers` | Web App, API, and the Supabase project (Auth, RLS, SECURITY DEFINER RPCs, tables, pg_cron job) |
-| `C3_API_Components` (1/4) | Request pipeline: `requireAuth`/`requirePermission`, `auth/policy`, auth routes |
-| `C3_API_Components_Events` (2/4) | Event handlers, coordinator assignment, notifications/profile/work queue, safety check «planned» |
-| `C3_API_Components_Venues` (3/4) | Venue catalogue, setup/safety details, unavailability, holds, pg_cron hold job |
-| `C3_API_Components_Bookings` (4/4) | Venue requests/bookings, clashes, equipment, built venue replacement, general venue change «planned» |
+| C1 System Context | The 7 roles and ConnectSphere, with what each role does today. One account may hold several roles (SG2-104). |
+| C2 Containers | Web App, API, and the Supabase project: Auth, RLS, SECURITY DEFINER RPCs and triggers, tables, and the three pg_cron jobs |
+| C3 Components (1/5) | Request pipeline: `requireAuth`/`requirePermission` with the acting role (`X-Acting-Role`), `auth/policy`, auth routes |
+| C3 Components (2/5) | Event handlers, coordinator assignment and oversight, notifications/profile/work queue, safety check review, change requests and impact |
+| C3 Components (3/5) | Venue catalogue (including soft delete), setup/safety details, unavailability, holds (including expiry changes), scheduled jobs |
+| C3 Components (4/5) | Venue requests and bookings, clashes, equipment, venue replacement, change or cancel one venue |
+| C3 Components (5/5) | Event search, cancellation, registration settings and windows, attendee registration and waiting list «planned» |
 
-C3 is split over four views so each page stays readable at A4 landscape. Pages 2–4 leave out the middleware's `account_roles` read, which page 1 shows. With that edge in, the smetana layout pushes elements into the title.
+C3 is split over five pages so each one stays readable at A4 landscape. Pages 2–5 leave out the middleware's `account_roles` read, which page 1 shows.
 
-## Render
+## Editing and rendering
 
-```sh
-bash ~/.cache/sg2-95-tools/structurizr-cli/structurizr.sh export -w docs/design/connectsphere.dsl -f plantuml/c4plantuml -o /tmp/sg2-95-render/c4
-cd /tmp/sg2-95-render/c4
-java -Djava.awt.headless=true -jar ~/.cache/sg2-95-tools/plantuml.jar -Playout=smetana -tsvg *.puml
-java -Djava.awt.headless=true -jar ~/.cache/sg2-95-tools/plantuml.jar -Playout=smetana -tpng *.puml
-```
+- Open the file in [app.diagrams.net](https://app.diagrams.net) (File → Open from → Device, or straight from GitHub) or the draw.io desktop app. Each C4 element was placed from draw.io's C4 shape library, so *Edit Data* (Ctrl/Cmd+M) shows its `c4Name`, `c4Type`, `c4Technology` and `c4Description`; the label reads those fields.
+- To add an element, copy one of the same kind on the page (it keeps the colours and the data fields) or use *More Shapes → C4*. Colour a Week 7 or 15 Oct change as in the key.
+- Save as uncompressed XML (File → Properties → untick *Compressed*) so pull-request diffs stay readable.
+- Update the snapshot in each page title when the content changes.
+- `node docs/design/render.mjs [outDir]` writes the Drive PDFs: C1, C2 and C3 (five pages) as separate files, as before. It needs the repo's Playwright Chromium and network access for the draw.io viewer, or `DRAWIO_VIEWER=<path to viewer-static.min.js>` to work offline.
 
-On headless macOS validation runs, `-Djava.awt.headless=true` avoids Java AWT startup failure. The source renderer can use the same option through `JAVA_TOOL_OPTIONS=-Djava.awt.headless=true`; point `PLANTUML_JAR` and `STRUCTURIZR_CLI` at the available tool files. This update was validated with official temporary PlantUML 1.2026.8 and Structurizr CLI 2025.11.09 releases, without a global install.
-
-The Structurizr export cannot write `!pragma layout smetana` into its `.puml` files. `-Playout=smetana` applies the same pragma from the command line. Without it, PlantUML depends on Graphviz. In an environment without Graphviz it can draw an error image and **still exit 0**; inspect the output as well as the exit code. The commands require the existing PlantUML JAR and Structurizr CLI at the shown paths; if absent, rendering is unavailable until those tools are provisioned.
-
-## Roles (C1/C2) — source: `ROLES`/`PERMISSIONS` in `server/src/auth/policy.ts`, `client/src/screens/Dashboard.tsx`
+## Roles (C1/C2) — source: `ROLES`/`PERMISSIONS` in `server/src/auth/policy.ts`
 
 | Role | What it does at this snapshot |
 |---|---|
-| Event Organiser | Creates, edits, submits and deletes own drafts. Views own organisation's requests, stage, history and confirmation. Clarifications. Own notifications. No longer approves capacity exceptions (SG2-66 AC5). |
-| Event Coordinator | Reviews, decides and plans assigned requests. Clarifications. Venue search and suitability. Requests venues and withdraws a request (SG2-82). Views and releases bookings. Sees clashes and conflicts. Requests equipment. Views arrangements. Confirms and completes events. Work queue. Notifications. |
-| Event Coordinator Lead «Week 7» | Unassigned queue (`event_request.queue.view`, SG2-87). Lists assignable coordinators and assigns or reassigns one (`event_request.assign_coordinator`, SG2-97). Stage and history. Notifications (SG2-68). Oversight «planned» SG2-89. |
-| Safety Officer «Week 7» | Placeholder desk (`SafetyDashboard`). API grants only `event_request.stage.view`, `event_request.history.view`, `equipment_requirements.read` and profile. Safety check «planned» SG2-91/92/93/94. |
-| Venue Staff | Venue CRUD and layouts. Setup/turnaround and safety details (SG2-77). Blocks and temporary unavailability (SG2-80). Holds (SG2-84/85). Decides venue requests. Bookings by venue and release. Clashes and conflicts. The only role that approves capacity exceptions (SG2-66 AC5): discovers pending requests and booked venues whose attendance was raised through Capacity exceptions. Work queue. Notifications. |
-| Technical Support Staff | Equipment records, availability and reservations. Requirement arrangements. `PATCH /api/users/:userId/role`. Reads venue availability, operations and holds. No longer approves capacity exceptions (SG2-66 AC5). Work queue. Notifications. |
-| Attendee | Profile only. Dashboard and `AttendeeEvent` use mock data (`client/src/mock`). |
+| Event Organiser | Creates, edits, submits and deletes own drafts. Sets registration capacity and window (SG2-63) and sees who registered. Asks to cancel (SG2-67). Views own requests, stage, history, safety decisions and confirmation. Clarifications. Own notifications. |
+| Event Coordinator | Reviews, decides and plans assigned events. Clarifications. Venue search and suitability. Requests several venues per event (SG2-82), withdraws a request, changes or cancels one venue (SG2-83). Requests equipment. Views arrangements. Reworks a safety-rejected event (SG2-92). Confirms, completes and cancels events (SG2-58/67). Work queue. Notifications and reminder frequency (SG2-69). |
+| Event Coordinator Lead «Week 7» | Unassigned queue (SG2-87). Assigns or reassigns a coordinator (SG2-97/88). Oversight of assignments and active events (`event_request.oversight.view`, SG2-89). Stage and history. Notifications (SG2-68). |
+| Safety Officer «Week 7» | Safety check queue (`safety_checks.read`, SG2-91) and decisions: approve, reject or request changes (`event_request.safety_decision.record`, SG2-92/93). Reads venue setup and safety details (`venues.operations.read`, 202610160002), equipment placement, stage and history. Event search. |
+| Venue Staff | Venue CRUD, layouts and soft delete (SG2-106). Setup/turnaround and safety details (SG2-77). Temporary unavailability (SG2-80). Holds and their expiry (SG2-84/85, 15 Oct). Decides venue requests. Bookings by venue and release. Clashes and conflicts. Approves capacity exceptions (SG2-66 AC5). Confirms flagged venue requests again after a safety Request Changes (SG2-93). Work queue. Notifications. |
+| Technical Support Staff | Equipment records, availability and reservations. Requirement arrangements. Changes user roles (`PATCH /api/users/:userId/role`). Confirms flagged equipment again after a safety Request Changes (SG2-93). Work queue. Notifications. |
+| Attendee | Finds confirmed events open for registration (`events.registrable.read`, SG2-59). Profile and inbox. Registering, the waiting list and withdrawing are «planned» (SG2-60/61/62). |
+
+Every role has `profile.read`/`profile.update` and `notifications.inbox`. A person may hold several of these roles and picks the acting role in the header (SG2-104).
 
 ## Containers
 
@@ -47,47 +46,69 @@ The Structurizr export cannot write `!pragma layout smetana` into its `.puml` fi
 |---|---|
 | Web Application | `client/src` (React + Vite). Built into `server/public`, see `server/vercel.json` and README "Deployment" |
 | API Application | `server/src/app.ts`. Vercel function `server/api/index.js` (`/api/*`, `/health/*` routes in `server/vercel.json`) |
-| Supabase Auth | `server/src/auth/login.ts` (`signInWithPassword`), `auth/supabase.ts` (`auth.getUser`). No signup route (`app.ts` comment) |
+| Supabase Auth | `server/src/auth/login.ts` (`signInWithPassword`), `auth/supabase.ts` (`auth.getUser`). No signup route |
 | Row Level Security | `create policy …` across `supabase/migrations/*.sql`, e.g. `202610070002_legacy_table_rls.sql`, `202610050003_venue_operations.sql` |
-| SECURITY DEFINER RPCs & triggers | Functions marked `security definer` in migrations: `decide_venue_booking_request`, `withdraw_venue_booking_request`, `release_venue_booking`, `create_venue_hold`, `change_venue_hold`, `process_venue_hold_deadlines`, `confirm_event`, `manage_equipment_requirements`, `manage_equipment_reservations`, `check_equipment_availability`, `list_venue_unavailability`, and the triggers `venue_unavailability_flag_bookings`, `venue_bookings_refresh_clashes`, `venue_operations_refresh_clashes` |
-| Postgres tables | `create table` in `supabase/migrations/*.sql` (full ER: `data-model.puml`) |
-| Hold-deadline job «Week 7» | `cron.schedule('venue-hold-deadlines','* * * * *', …process_venue_hold_deadlines())` in `202610050001_venue_holds.sql`. Warning lead time: `venue_hold_settings.warning_lead_seconds`, default 86400 |
+| SECURITY DEFINER RPCs & triggers | Functions marked `security definer` in the migrations, e.g. `decide_venue_booking_request`, `create_venue_hold`, `change_venue_hold_expiry`, `delete_venue`, `refresh_safety_check_status`, `record_safety_decision`, `confirm_safety_rereview`, `confirm_event`, `cancel_event`, `apply_accepted_event_change`, and triggers such as `venue_unavailability_flag_bookings`, `venue_bookings_refresh_clashes` and the safety-check refresh triggers |
+| Postgres tables | `create table` in `supabase/migrations/*.sql` (ER: `data-model.drawio`, as of 16 Oct) |
+| Scheduled jobs «Week 7» | pg_cron: `venue-hold-deadlines` every minute (`202610050001_venue_holds.sql`, SG2-85); `registration-windows` every minute (SG2-63); `sg2-69-arrangement-reminders` hourly (SG2-69) |
 
 ## API components (C3)
 
-| Component | Source | Story |
+| Component | Source (under `server/src/`) | Story |
 |---|---|---|
-| requireAuth / requirePermission | `server/src/auth/index.ts`, `auth/supabase.ts` | — |
-| Permission policy | `server/src/auth/policy.ts` | SG2-86 roles |
-| Auth & role routes | `auth/login.ts`, `logout.ts`, `roles.ts`, `/api/auth/me` in `auth/index.ts` | — |
-| Event request handlers | `server/src/events/*.ts` (routes in `app.ts`) | — |
-| Coordinator assignment «Week 7» | `assignmentQueue/index.ts`, `events/listAssignable.ts`, `events/assignCoordinator.ts` | SG2-87, SG2-97 |
-| Venue catalogue & search | `venues/index.ts`, `layouts.ts`, `availability.ts`, `search.ts`, `suitabilityRoutes.ts` | — |
+| requireAuth / requirePermission | `auth/index.ts`, `auth/supabase.ts`, `auth/actingRole.ts` | SG2-104 acting role |
+| Permission policy | `auth/policy.ts` | SG2-86 roles |
+| Auth & role routes | `auth/login.ts`, `logout.ts`, `roles.ts`, `/api/auth/me` | — |
+| Event request handlers | `events/*.ts` (routes in `app.ts`) | — |
+| Coordinator assignment & oversight «Week 7» | `assignmentQueue/index.ts`, `events/listAssignable.ts`, `events/assignCoordinator.ts`, `coordinatorOverview/index.ts` | SG2-87/88/89/97 |
+| Venue catalogue & search | `venues/index.ts`, `layouts.ts`, `availability.ts`, `search.ts`, `suitabilityRoutes.ts` | delete: SG2-106 |
 | Venue setup & safety details «Week 7» | `venues/operations.ts`, `db/venueOperations.ts` | SG2-77 |
 | Venue unavailability «Week 7» | `venues/blocks.ts`, `db/venueBlocks.ts` | SG2-80 |
-| Tentative venue holds «Week 7» | `venues/holds.ts`, `db/venueHolds.ts` | SG2-84/85 |
-| Venue requests & bookings | `venues/bookingRequests.ts`, `conflicts.ts`, `bookings.ts` | withdraw: SG2-82 |
+| Tentative venue holds «Week 7» | `venues/holds.ts`, `db/venueHolds.ts` | SG2-84/85; expiry change 15 Oct |
+| Venue requests & bookings | `venues/bookingRequests.ts`, `conflicts.ts`, `bookings.ts` | SG2-82 |
 | Venue clashes «Week 7» | `venues/clashes.ts`, `db/venueClashes.ts` | SG2-79 |
-| Equipment | `equipment/index.ts`, `requirements.ts`, `availability.ts`, `reservations.ts` | — |
-| Notifications, profile, work queue | `notifications/index.ts`, `profile/index.ts`, `workQueue/index.ts` | SG2-68 notices |
-| User-scoped DB adapters | `db/user-client.ts` + store modules that call it | — |
-| Service-role DB adapters | `db/supabase.ts` (`getSupabaseAdminClient`), used by `events/*`, `assignmentQueue`, `workQueue`, `profile`, `auth/roles.ts`, `venues/bookingRequests.ts`, `conflicts.ts`, `bookings.ts`, `clashes.ts`, `suitabilityRoutes.ts` | — |
-| Safety check review «planned» | none. Only the statuses `awaiting_safety_check`/`safety_rejected`/`preparation` exist (`202610090001_event_status_flow.sql`, `events/fields.ts`) | SG2-91/92/93/94 |
-| Venue replacement «Week 7» | Existing `venues/bookingRequests.ts` routes, `db/venueBookings.ts`, `db/venueDisruptions.ts`; `202610170001_venue_replacement.sql` | SG2-81 |
-| Change/cancel one venue «planned» | No general change flow; separate from SG2-81 replacement | SG2-83 |
+| Equipment | `equipment/*.ts` | SG2-53/56 |
+| Notifications, profile, work queue | `notifications/`, `profile/`, `workQueue/` | SG2-68/69 |
+| Safety check review «Week 7» | `safetyChecks/index.ts`, `events/safetyDecisionRoutes.ts`, `events/safetyRereviewRoutes.ts` | SG2-91/92/93/94 |
+| Venue replacement «Week 7» | existing `venues/bookingRequests.ts` routes, `db/venueBookings.ts`, `db/venueDisruptions.ts` | SG2-81 |
+| Change/cancel one venue «Week 7» | `venues/bookingRequests.ts`, `venues/bookings.ts` | SG2-83 |
+| Search, cancellation & registration settings | `eventSearch/`, `events/cancellation.ts`, `events/registrationRoutes.ts`, `registrableEvents/` | SG2-70, 67, 63, 59 |
+| Change requests & impact «15 Oct» | `events/changeRequests.ts`, `changeRequests/mockChangeRequests.ts` | SG2-66 built; raising and deciding SG2-64/65 planned |
+| Attendee registration & waiting list «planned» | not built | SG2-60/61/62 |
+| User-scoped DB adapters | `db/user-client.ts` + the store modules that call it | — |
+| Service-role DB adapters | `db/supabase.ts` (`getSupabaseAdminClient`) + `db/eventRequests.ts`, `assignmentQueue.ts`, `workQueue.ts`, `users.ts`, `accountRoles.ts`, `auditLogs.ts`, `eventNotifications.ts` | — |
 
-## Replacement and confirmation contracts
+## Replacement, safety and confirmation contracts
 
-- SG2-81 extends existing booking routes; the C3 replacement component groups this responsibility and is not a separate service or a new HTTP endpoint. An assigned Coordinator sends `replaces_booking_id` on the existing booking-request POST for an affected confirmed booking of the same event. Pending replacement requests reserve nothing.
-- The existing Venue Staff decision RPC atomically creates the replacement booking and releases the original booking, cancels its old request, records history and sends release/approval notices. The event's date, time, attendance and requirements are retained.
-- In `202610170001_venue_replacement.sql`, each newly inserted disruption flag raises a `venue_unavailable` notice to the current Coordinator. Preparation/Confirmed events return to Planning, lose the confirmation stamp, gain status history and notify the Organiser (deduplicated if the same recipient). Earlier flags are not retrospectively announced.
-- `202610170002_confirmation_rechecks_and_disruptions.sql` is the final `confirm_event` definition: it retains both SG2-81 affected-booking refusal and PR90 persisted venue/equipment/registration recheck gates. `202610160005_event_confirmation_record_repair.sql` repairs the confirmation columns without replacing this RPC. UI readiness follows the same persisted flags and affected-booking count.
-- `61416cc` supports `venue_unavailable` throughout the client notification contract and drawer. No Safety decision route is added by these changes.
+- SG2-81 extends the existing booking routes; the replacement component groups this responsibility and is not a separate service or endpoint. An assigned Coordinator sends `replaces_booking_id` on the booking-request POST for an affected confirmed booking of the same event. Pending replacement requests reserve nothing.
+- The Venue Staff decision RPC atomically creates the replacement booking, releases the original booking, cancels its old request, records history and sends the notices. The event's date, time, attendance and requirements stay.
+- A new disruption flag notifies the current Coordinator; Preparation/Confirmed events return to Planning, lose the confirmation stamp and notify the Organiser (`202610170001_venue_replacement.sql`).
+- The database moves an approved or planning event into `awaiting_safety_check` once every venue is booked and every equipment request is reserved with no shortfall, and back to `planning` if an arrangement is later added, released or disrupted (SG2-91). Only an Approve decision moves it into Preparation (`safety_approval_gate`, SG2-94), and `confirm_event` needs that approval to still stand.
+- 15 Oct clarification: an event in Preparation or Confirmed is read-only; an accepted significant change returns it to Planning (`apply_accepted_event_change`, SG2-66), where every check, the safety check included, runs again.
 
 ## Where the code differs from the brief
 
-- **SG2-88:** Jira is now Done (fresh export 16 Oct 2026). The Lead assigns and reassigns through `PATCH /api/event-requests/:eventId/coordinator`; SG2-97 supplies the permission and SG2-87 the unassigned queue. The diagrams show this as built.
-- **SG2-77:** the migration says the safety details are "for the Safety Officer", but `venues.operations.read` does not grant `safety_officer`. The Safety Officer cannot read them at this snapshot.
-- The Safety Officer has no `notifications.read`. `AppShell.tsx` shows the notifications drawer only to the Coordinator, Venue Staff, Technical Support Staff, Organiser and Lead.
-- Notifications are in-app only: the `notifications` and `venue_hold_notifications` tables. Neither the server nor the migrations send email.
-- Removed the old "Planned" tags on Event Coordinator and Technical Support Staff. Both are built. Attendee is still a prototype.
+- **Change requests:** the impact check and the return to Planning are built (SG2-66), but the change requests come from an in-memory source (`changeRequests/mockChangeRequests.ts`) until SG2-64/65 are built.
+- **Attendee:** finding events is built; registering, the waiting list (first come, first served, 15 Oct) and withdrawing are not (SG2-60/61/62). `AttendeeEvent.tsx` still shows mock facts.
+- The Safety Officer has `notifications.inbox` but not `notifications.read`: the header inbox works, `GET /api/notifications` does not.
+- Notifications are in-app only (`notifications`, `venue_hold_notifications`). Neither the server nor the migrations send email.
+
+## Extensibility: adding a role or a status (SG2-96 NFR)
+
+The policy is data, so a new role or status is added in a fixed set of places; the tests below fail until every place agrees.
+
+**A new role**
+
+1. Database: add the role to the `account_roles_role_check` constraint and a row in `public.roles` (pattern: `202610050004_week7_roles.sql`). Accounts get it through `account_roles` (one row per role held, SG2-104).
+2. API: add it to `ROLES` in `server/src/auth/policy.ts` and grant it the permissions it needs in `PERMISSIONS`; everything not granted is denied. `requireAuth` and the acting-role header then work unchanged.
+3. Database checks: SECURITY DEFINER functions that check a role by name (for example `confirm_safety_rereview`) need the new role only if it performs that action.
+4. Client: add it to `ROLES` in `client/src/mock/types.ts`, its navigation in `mock/viewModel.ts` (`navFor`, `primaryActionFor`) and its heading in `mock/data.ts` (`HEAD`).
+5. Tests: `server/src/authorization.test.ts` lists the supported roles and each role's exact permission set, so it fails until the new role and its grants are added there. Add a demo account to the README table.
+
+**A new event status**
+
+1. Database: `alter type public.event_status add value …` in a migration, plus any trigger or RPC that moves events into or out of it.
+2. API: add it to `EVENT_STATUSES` and `STATUS_TRANSITIONS` in `server/src/events/fields.ts`, and map it to a stage in `server/src/events/stageCalculator.ts`.
+3. Client: add its label and badge in `client/src/mock/viewModel.ts` (`statusLabel`, `badgeStyle`) and the status lists in `client/src/api/eventRequests.ts`.
+4. Tests: `server/src/events/fields.test.ts` walks every value of `EVENT_STATUSES` and `supabase/tests/event_status_flow.sql` asserts the exact enum values in order, so both fail until they list the new status; add its stage to `server/src/stageCalculator.test.ts`.
+5. Diagrams: add the state and its transitions to `event-status-model.drawio`.

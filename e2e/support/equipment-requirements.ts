@@ -1,6 +1,7 @@
 import { AccessError } from '../../server/src/auth/policy';
 import type { ArrangementValues, EquipmentRequirement, EquipmentRequirementsStore, RequirementValues, RequirementsView } from '../../server/src/db/equipmentRequirements';
 import type { MemoryDatabase } from './memory-database';
+import { refreshSafetyCheckStatus } from './safety-handoff';
 
 /** Browser storage fixture only. PostgreSQL policy/race suites separately
  * verify the actual guarded RPC, locks and constraints. */
@@ -43,6 +44,7 @@ export function createMemoryRequirementsStore(database: MemoryDatabase, token: s
             database.tables.equipment_requests.push(record);
           } else Object.assign(record!, requirement, reset, { version: Number(record!.version) + 1 });
         }
+        refreshSafetyCheckStatus(database, eventId, principal.userId);
       }
       const requests: EquipmentRequirement[] = database.tables.equipment_requests.filter(row => row.event_id === eventId)
         .sort((left, right) => Number(left.request_id) - Number(right.request_id)).map(row => ({

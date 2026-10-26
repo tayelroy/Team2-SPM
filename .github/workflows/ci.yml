@@ -309,6 +309,8 @@ jobs:
               process.exit(1);
             }
           '
+      - name: Verify regression evidence generation
+        run: node --test .github/scripts/regression-evidence.test.mjs
       - name: Collect backend coverage
         if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.browser-smoke.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
@@ -332,5 +334,17 @@ jobs:
           path: |
             server/coverage/
             client/coverage/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record tested commit and CI run evidence
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+          EXPECTED_TESTED_SHA: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
+        run: node .github/scripts/regression-evidence.mjs
+      - name: Upload immutable regression evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/regression-evidence-${{ github.run_id }}-${{ github.run_attempt }}/
           if-no-files-found: error
           retention-days: 14

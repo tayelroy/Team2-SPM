@@ -3642,7 +3642,7 @@
     "title": "a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop",
     "type": "Positive",
     "story": "SG2-100",
-    "purpose": "Verify AC2, AC3 and AC5: submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status. SG2-38: the My events Action column agrees with the stage (Awaiting coordinator assignment, then With coordinator), the locked Your options notice names the stage, and at 390px the stepper scrolls its current step into view inside the track and shows the swipe hint without scrolling the page.",
+    "purpose": "Verify SG2-100 AC1, AC2 and AC5 (live Jira numbering): submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status. SG2-38: the My events Action column agrees with the stage (Awaiting coordinator assignment, then With coordinator), the locked Your options notice names the stage, and at 390px the stepper scrolls its current step into view inside the track and shows the swipe hint without scrolling the page.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
     "steps": [
       "Sign in as organiser and submit the seeded draft; open My events, read the row's Action text, then open it and read the stage badge and waiting-on card at 390x844 and 1440x900.",
@@ -3663,11 +3663,9 @@
       "BOUNDARY"
     ],
     "mapped_acs": [
+      "SG2-100:AC1",
       "SG2-100:AC2",
-      "SG2-100:AC3",
       "SG2-100:AC5",
-      "SG2-100:AC13",
-      "SG2-100:AC9",
       "SG2-38:AC1",
       "SG2-38:AC2",
       "SG2-31:AC4"
@@ -3708,10 +3706,8 @@
       "BOUNDARY"
     ],
     "mapped_acs": [
-      "SG2-100:AC6",
-      "SG2-100:AC7",
-      "SG2-100:AC8",
-      "SG2-100:AC9"
+      "SG2-100:AC4",
+      "SG2-100:AC5"
     ]
   },
   {
@@ -5517,7 +5513,7 @@
       "NORMAL"
     ],
     "mapped_acs": [
-      "SG2-100:AC6"
+      "SG2-100:AC4"
     ],
     "status": "Pass",
     "actual": "The explicit foreign-key selector regression passed in the 1,420-test server suite; the changed adapter file has 100% coverage.",
@@ -6196,7 +6192,7 @@
       "FAILURE"
     ],
     "mapped_acs": [
-      "SG2-100:AC3",
+      "SG2-100:AC1",
       "SG2-33:AC1",
       "SG2-34:AC1"
     ],
@@ -9070,6 +9066,135 @@
     "actual": "Passed in the disposable PostgreSQL 17 replay of the CI job.",
     "execution_evidence": "24 Oct 2026; feature/SG2-93-safety-changes-requested at 6f4b1d4 (origin/main adf51ff merged in); replay of CI's database-tests job on disposable postgres:17 (auth fixture, every migration, release readiness and its tests, every SQL suite, the concurrency scripts and the upgrade replay) passed.",
     "execution_date": "24 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SG2-96-INT01",
+    "title": "The full Week 7 journey runs end to end on the native stack: submit, Lead assigns, two venues and equipment confirmed, safety check, Preparation, Confirmed",
+    "type": "NORMAL / FAILURE",
+    "story": "SG2-96",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-30:AC1",
+      "SG2-87:AC1",
+      "SG2-88:AC1",
+      "SG2-37:AC1",
+      "SG2-82:AC1",
+      "SG2-49:AC1",
+      "SG2-53:AC6",
+      "SG2-55:AC1",
+      "SG2-91:AC1",
+      "SG2-92:AC3",
+      "SG2-94:AC5",
+      "SG2-58:AC1",
+      "SG2-100:AC1",
+      "SG2-100:AC2"
+    ],
+    "purpose": "SG2-96 checklist item 1, database layer: one test drives the whole Week 7 flow through the real Express handlers, production database adapters, PostgREST and PostgreSQL with every migration, so the database's own hand-off into the safety check (refresh_safety_check_status) and the safety approval gate run for real. SG2-96-E2E01 runs the same journey through the browser screens.",
+    "preconditions": "Disposable PostgreSQL with every migration and integration/seed.sql, PostgREST in front; synthetic loopback JWTs for organiser, Lead, coordinator, venue staff, technical support and Safety Officer; real role reads from account_roles.",
+    "steps": [
+      "Organiser creates a complete request with registration settings and submits it; it is unassigned.",
+      "Lead finds it in GET /api/assignment-queue and assigns the coordinator; it is submitted.",
+      "Coordinator starts review and approves; it is approved.",
+      "Coordinator requests two venues and one equipment item; technical support places the equipment with no shortfall and reserves it; the event stays approved while venue requests are pending.",
+      "Venue staff approve both venue requests; the database moves the event to awaiting_safety_check.",
+      "Coordinator tries to confirm early (409); Safety Officer reads GET /api/safety-checks and approves with the current revision; the event moves to preparation.",
+      "Coordinator confirms; organiser reads the confirmation with both venues and the projector."
+    ],
+    "data": "Two venues 'Week 7 flow auditorium' and 'Week 7 flow breakout' (capacity 300, classroom); equipment 'Week 7 flow projector' (10); event 'Week 7 flow conference' on 2090-06-15 10:00-12:00 SGT; registration capacity 136.",
+    "expected": "Audit status sequence unassigned, submitted, under_review, approved, awaiting_safety_check, preparation, confirmed; early confirmation 409; organiser notices coordinator_assigned, event_approved, safety_decision and event_confirmed; confirmation lists both venues and the projector; all fixture rows removed afterwards.",
+    "evidence": "integration/api.test.ts (last test); supabase/migrations/202610190004_safety_check_queue.sql; supabase/migrations/202610220001_safety_approval_gate.sql",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration",
+    "status": "Pass",
+    "actual": "Passed: 25/25 integration tests.",
+    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; integration/api.test.ts against a fresh disposable PostgreSQL 16 with every migration, release_readiness.sql and integration/seed.sql behind PostgREST 12.2.12: 25/25 passed. CI runs it in the database-tests job (npm run test:integration).",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null,
+    "relatedCases": [
+      "SG2-96-E2E01"
+    ]
+  },
+  {
+    "id": "SG2-96-E2E01",
+    "title": "The Week 7 journey runs in the browser from submission to a confirmed event",
+    "type": "NORMAL / CONFLICT",
+    "story": "SG2-96",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-30:AC1",
+      "SG2-88:AC1",
+      "SG2-37:AC1",
+      "SG2-48:AC1",
+      "SG2-53:AC1",
+      "SG2-55:AC1",
+      "SG2-49:AC1",
+      "SG2-91:AC1",
+      "SG2-92:AC3",
+      "SG2-94:AC5",
+      "SG2-58:AC1",
+      "SG2-100:AC1"
+    ],
+    "purpose": "SG2-96 checklist item 1, browser layer: six people complete the Week 7 journey through their own screens in one case. The fixture's mirror of refresh_safety_check_status (e2e/support/safety-handoff.ts) moves the event into the safety check when its last arrangement is confirmed, as the database trigger does. SG2-96-INT01 proves the same journey against PostgreSQL.",
+    "preconditions": "Production React build and real Express handlers on loopback; in-memory fixture reset, the safety-check hand-off turned on (/__e2e/safety-handoff) and a theatre layout recorded for Regression Hall; one browser page at 1440x1000.",
+    "steps": [
+      "Organiser fills and submits a complete request 'Week 7 journey' for 15 Jun 2030 17:00-19:00 SGT; stage Awaiting Assignment.",
+      "Lead assigns Regression coordinator from Assign coordinators.",
+      "Coordinator opens it from Awaiting review and approves it.",
+      "Coordinator searches the event's two hours, requests Regression Hall, and adds a requirement for 2 wireless microphones.",
+      "Technical Support set shortfall 0 and a placement, then reserve the microphones for the event's two hours; the event is still approved because the venue is pending.",
+      "Venue Staff approve the hall; the event moves to awaiting_safety_check by itself.",
+      "Coordinator opens the event: no Confirm action yet.",
+      "Safety Officer sees the hall and 2 x Wireless microphones on the event and approves it; it moves to preparation.",
+      "Coordinator confirms; organiser opens the event and sees Confirmed with the hall and microphones."
+    ],
+    "data": "Event 'Week 7 journey' (40 people, theatre, workshop); Regression Hall (capacity 100); Wireless microphones (20 held); fixture accounts organiser, lead, coordinator, support, venue, safety.",
+    "expected": "Status history unassigned, submitted, under_review, approved, awaiting_safety_check, preparation, confirmed; one approve safety decision; the organiser is told of the assignment, approval, safety decision and confirmation; no page errors.",
+    "evidence": "e2e/week7-journey.spec.ts; e2e/support/safety-handoff.ts; supabase/migrations/202610190004_safety_check_queue.sql",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed (14 s).",
+    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; local production build, Playwright Chromium, e2e/week7-journey.spec.ts: 1 passed.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "relatedCases": [
+      "SG2-96-INT01"
+    ],
+    "review": null
+  },
+  {
+    "id": "SG2-71-B01",
+    "title": "Every role's pages fit a 320px phone without sideways scrolling",
+    "type": "BOUNDARY",
+    "story": "SG2-71",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-71:AC1",
+      "SG2-71:AC2"
+    ],
+    "purpose": "SG2-96 walkthrough finding: the other phone cases use 390px. At 320px a grid track with a fixed 300-320px minimum made the organiser's request form and the attendee's registrations and event pages scroll sideways. The grids now use minmax(min(100%, ...), 1fr); this case visits every navigation page of all seven roles at 320x568.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory fixture before each role's sign-in; one browser page at 320x568.",
+    "steps": [
+      "For each of organiser, coordinator, Lead, venue staff, technical support, Safety Officer and attendee: reset the fixture, sign in, read the header navigation.",
+      "Open each navigation page in turn, wait until it is the current page and its heading shows, and compare the document's scroll width with the viewport width."
+    ],
+    "data": "Fixture accounts organiser, coordinator, lead, venue, support, safety and attendee @example.test.",
+    "expected": "No page is wider than the 320px viewport; the organiser's New request page is among those visited; no page errors.",
+    "evidence": "e2e/small-phone.spec.ts; client/src/screens/RequestForm.tsx; client/src/screens/Dashboard.tsx; client/src/screens/AttendeeEvent.tsx",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Failed before the grid fix (organiser New request 8px too wide); passed after it.",
+    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; local production build, Playwright Chromium: failed on the unfixed build, passed after rebuilding with the fix.",
+    "execution_date": "26 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   }

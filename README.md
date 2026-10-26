@@ -109,6 +109,16 @@ Coordinator, Venue Staff and Attendee. Technical Support Staff, Event
 Coordinator Lead and Safety Officer have one listed demo account each.
 The Lead and Safety Officer accounts were provisioned in staging on
 15 October 2026; schema migrations define roles but do not create Auth users.
+
+Three of the numbered accounts hold two roles each (SG2-104), for testing
+the **Acting as** role switcher in the header:
+
+| Account | Roles |
+| --- | --- |
+| `event.organiser3@connectsphere.test` | Event Organiser + Event Coordinator |
+| `event.coordinator3@connectsphere.test` | Event Coordinator + Attendee |
+| `venue.staff3@connectsphere.test` | Venue Staff + Event Coordinator |
+
 From the landing page, click **Open app**, then sign in.
 What you see afterward — the nav, the dashboard, which buttons even appear
 — is scoped to your role, and the backend checks the same permission

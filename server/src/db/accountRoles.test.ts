@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAccountRole, changeAccountRoles, deleteAccountRole, getHeldRoles, getAccountRoles, listCoordinators } from './accountRoles';
+import { createAccountRole, changeAccountRoles, deleteAccountRole, getHeldRoles, getAccountRoles, listCoordinators, COORDINATOR_ID_BATCH } from './accountRoles';
 
 function fakeAdmin(options: {
   insert?: (row: any) => Promise<{ error: { message: string } | null }>;
@@ -252,6 +252,48 @@ describe('listCoordinators', () => {
   test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] surfaces a profile lookup error', async () => {
     const admin = fakeListAdmin({ data: [{ user_id: 'a' }], error: null }, { data: null, error: { message: 'users down' } });
     assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'users down' });
+  });
+
+  // SG2-96 capacity review: 600 coordinator ids in one `in` filter made a URL
+  // the database gateway refused, so the Lead's queue answered 503.
+  function batchedAdmin(count: number, failBatch?: number) {
+    const ids = Array.from({ length: count }, (_, index) => `coordinator-${String(index).padStart(3, '0')}`);
+    const asked: string[][] = [];
+    const admin = {
+      from(table: string) {
+        if (table === 'account_roles') {
+          return { select: () => ({ eq: async () => ({ data: ids.map(user_id => ({ user_id })), error: null }) }) };
+        }
+        return {
+          select: () => ({
+            in: async (_column: string, batch: string[]) => {
+              asked.push(batch);
+              return asked.length === failBatch
+                ? { data: null, error: { message: 'batch down' } }
+                : { data: batch.map(user_id => ({ user_id, name: `Name ${user_id}` })), error: null };
+            }
+          })
+        };
+      }
+    } as unknown as SupabaseClient;
+    return { admin, asked };
+  }
+
+  test('[BOUNDARY] [SG2-33:AC1] [SG2-34:AC1] reads a large coordinator list in batches of 100 and returns every coordinator once', async () => {
+    const { admin, asked } = batchedAdmin(205);
+    const result = await listCoordinators(admin);
+    assert.equal(COORDINATOR_ID_BATCH, 100);
+    assert.deepEqual(asked.map(batch => batch.length), [100, 100, 5]);
+    assert.equal(new Set(asked.flat()).size, 205);
+    assert.ok(result.ok);
+    assert.equal(result.coordinators.length, 205);
+    assert.deepEqual(result.coordinators[0], { user_id: 'coordinator-000', name: 'Name coordinator-000' });
+    assert.deepEqual(result.coordinators[204], { user_id: 'coordinator-204', name: 'Name coordinator-204' });
+  });
+
+  test('[FAILURE] [SG2-33:AC1] [SG2-34:AC1] fails the whole list when one batch fails, rather than showing part of it', async () => {
+    const { admin } = batchedAdmin(150, 2);
+    assert.deepEqual(await listCoordinators(admin), { ok: false, error: 'batch down' });
   });
 
   // SG2-86: adding the Event Coordinator Lead role does not widen who is

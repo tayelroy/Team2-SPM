@@ -2502,7 +2502,7 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
   expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
 });
 
-test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2-100:AC13] [SG2-38:AC1] [SG2-38:AC2] [SG2-31:AC4] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
+test('SG2-100-P01 | [SG2-100:AC1] [SG2-100:AC2] [SG2-100:AC5] [SG2-38:AC1] [SG2-38:AC2] [SG2-31:AC4] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
   await signIn(page, 'organiser');
   // AC2: submission with no coordinator lands in unassigned, not submitted.
   expect((await request.patch('/api/event-requests/1/submit', { headers: await authHeaders(page) })).status()).toBe(200);
@@ -2587,7 +2587,7 @@ test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2
 
 // SG2-100 AC4: the coordinator closes out a held event from their own work
 // queue — the screen they already use for every event assigned to them.
-test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [SG2-100:AC9] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ page, request }) => {
+test('SG2-100-P02 | [SG2-100:AC4] [SG2-100:AC5] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ page, request }) => {
   expect((await request.post('/__e2e/lifecycle')).status()).toBe(204);
   await signIn(page, 'coordinator');
   const assigned = page.getByRole('region', { name: 'My assigned events' });

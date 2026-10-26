@@ -321,7 +321,7 @@ describe('computeArrangementReadiness (SG2-57)', () => {
     assert.match(result.arrangements.find(a => a.key === 'registration')!.detail, /not set yet.*Recheck required after planning changes/);
   });
 
-  test('[NORMAL] [SG2-57:AC2] [SG2-94:AC4] every outstanding item is listed in order, the safety check last', () => {
+  test('[NORMAL] [SG2-57:AC2] [SG2-94:AC4] [SG2-100:AC3] every outstanding item is listed in order, the safety check last', () => {
     const result = computeArrangementReadiness(
       baseInput({
         status: 'planning',

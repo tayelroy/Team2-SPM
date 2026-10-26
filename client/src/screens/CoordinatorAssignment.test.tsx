@@ -70,7 +70,7 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     );
   });
 
-  test('[NORMAL] [SG2-34:AC1] [SG2-100:AC3] reassigns a request to a different coordinator (SG2-34)', async () => {
+  test('[NORMAL] [SG2-34:AC1] [SG2-100:AC1] reassigns a request to a different coordinator (SG2-34)', async () => {
     api();
     render(<CoordinatorAssignment accessToken="tok" />);
     await screen.findByRole('heading', { name: 'Partner Forum' });
@@ -86,7 +86,7 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
     expect(screen.getByText('Under Review', { exact: true })).toBeVisible();
   });
 
-  test('[NORMAL] [BOUNDARY] [SG2-100:AC3] first assignment displays the recorded Submitted status only after the save succeeds', async () => {
+  test('[NORMAL] [BOUNDARY] [SG2-100:AC1] first assignment displays the recorded Submitted status only after the save succeeds', async () => {
     let finish!: (response: Response) => void;
     api(() => Response.json({ requests: [{ ...REQUESTS[0], status: 'unassigned' }], coordinators: COORDINATORS }),
       () => new Promise<Response>(resolve => { finish = resolve; }));
@@ -105,7 +105,7 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
   });
 
   test.each(['under_review', 'planning', 'awaiting_safety_check', 'preparation', 'confirmed'])(
-    '[BOUNDARY] [SG2-100:AC3] reassignment displays the server-recorded advanced status %s without assuming Submitted', async status => {
+    '[BOUNDARY] [SG2-100:AC1] reassignment displays the server-recorded advanced status %s without assuming Submitted', async status => {
       api(() => Response.json({ requests: [REQUESTS[1]], coordinators: COORDINATORS }),
         () => Response.json({ request: { event_id: 8, status, coordinator_id: 'c2' } }));
       render(<CoordinatorAssignment accessToken="tok" />);
@@ -119,7 +119,7 @@ describe('CoordinatorAssignment (SG2-33/34)', () => {
       expect(screen.getByText('Coordinator: Raj Coordinator')).toBeVisible();
     });
 
-  test.each([409, 503])('[CONFLICT] [FAILURE] [SG2-100:AC3] a refused assignment %i never changes the unassigned status or coordinator', async status => {
+  test.each([409, 503])('[CONFLICT] [FAILURE] [SG2-100:AC1] a refused assignment %i never changes the unassigned status or coordinator', async status => {
     api(() => Response.json({ requests: [{ ...REQUESTS[0], status: 'unassigned' }], coordinators: COORDINATORS }),
       () => Response.json({ error: 'This assignment was not saved.', request: { status: 'submitted' } }, { status }));
     render(<CoordinatorAssignment accessToken="tok" />);

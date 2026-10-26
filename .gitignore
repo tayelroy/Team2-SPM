@@ -43,3 +43,9 @@ lerna-debug.log*
 
 # Local agent instructions (personal, not shared with the team)
 AGENTS.md
+
+# SG2-96: staging walkthrough screenshots show real staging data
+output/staging-walkthrough/
+
+# Machine-local agent bookkeeping
+.codex-runtime/

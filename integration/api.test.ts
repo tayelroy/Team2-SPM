@@ -1470,3 +1470,157 @@ test('[CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-69:AC7] [SG2-104:AC2] native not
     assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
   }
 });
+
+// SG2-96: one event through the whole Week 7 flow on the production wiring.
+// Every step is an API call by the role that owns it, with that role's own JWT.
+// No status is written directly: the move into Awaiting Safety Check is
+// refresh_safety_check_status() reacting to the last arrangement. This test
+// stays last in the file because it configures the production Supabase
+// clients, which cache at module level.
+test('[NORMAL] [FAILURE] [SG2-30:AC1] [SG2-87:AC1] [SG2-88:AC1] [SG2-37:AC1] [SG2-82:AC1] [SG2-49:AC1] [SG2-53:AC6] [SG2-55:AC1] [SG2-91:AC1] [SG2-92:AC3] [SG2-94:AC5] [SG2-58:AC1] [SG2-100:AC1] [SG2-100:AC2] native Week 7 flow: submit, Lead assigns, two venues and equipment confirmed, safety check, Preparation, Confirmed', async () => {
+  const originalConfig = { ...dbConfig };
+  const originalFetch = globalThis.fetch;
+  const gateway = 'https://week7-flow.supabase.test';
+  const actors = ['organiser', 'lead', 'coordinator', 'venue', 'support', 'safety'] as const;
+  const tokens = Object.fromEntries(actors.map(who => [who, jwt('authenticated', ids[who])])) as Record<typeof actors[number], string>;
+  const serviceKey = jwt('service_role');
+  const flowAccess = createAuthorization({ resolvePrincipal: async token => {
+    const who = actors.find(name => tokens[name] === token);
+    if (!who) throw new AccessError(401);
+    const held = await getHeldRoles(database, ids[who]);
+    if (!held.ok) throw new AccessError(403);
+    return { userId: ids[who], roles: held.roles as Role[] };
+  } });
+  const as = (who: typeof actors[number]) => ({ Authorization: `Bearer ${tokens[who]}` });
+  const venueIds: number[] = [];
+  let equipmentId: number | undefined;
+  let eventId: number | undefined;
+  let transport: ReturnType<typeof mock.method> | undefined;
+  try {
+    for (const name of ['Week 7 flow auditorium', 'Week 7 flow breakout']) {
+      const created = await database.from('venues').insert({ name, location: 'Local fixture', capacity: 300,
+        facilities: 'Seating, projector', accessibility_features: 'Step-free', operating_information: '08:00-22:00' }).select('venue_id').single();
+      assert.equal(created.error, null);
+      venueIds.push(created.data!.venue_id);
+      assert.equal((await database.from('venue_layouts').insert({ venue_id: created.data!.venue_id, layout: 'classroom' })).error, null);
+    }
+    const equipment = await database.from('equipment').insert({ name: 'Week 7 flow projector', quantity_total: 10 }).select('equipment_id').single();
+    assert.equal(equipment.error, null);
+    equipmentId = equipment.data!.equipment_id;
+
+    // The production adapters, with every Supabase URL mapped to the disposable PostgREST.
+    Object.assign(dbConfig, { supabaseUrl: gateway, supabaseAnonKey: jwt('anon'), supabaseServiceRoleKey: serviceKey });
+    transport = mock.method(globalThis, 'fetch', async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const original = new Request(input, init);
+      const url = new URL(original.url);
+      if (url.hostname.endsWith('.supabase.test')) {
+        const bearer = original.headers.get('authorization');
+        assert.ok([serviceKey, ...Object.values(tokens)].some(token => bearer === `Bearer ${token}`), 'Only the flow callers or the service role reach the database.');
+        url.pathname = url.pathname.slice('/rest/v1'.length);
+        url.protocol = rest.protocol;
+        url.host = rest.host;
+      } else assert.equal(url.origin, rest.origin, 'Only disposable loopback database traffic is accepted.');
+      return originalFetch(new Request(url, original));
+    });
+    const flow = request(createApp(undefined, flowAccess));
+    const status = async () => (await stored(eventId!)).status;
+    const period = { starts_at: '2090-06-15T02:00:00.000Z', ends_at: '2090-06-15T04:00:00.000Z' };
+
+    // 1. The organiser submits a complete request; it waits for the Lead, unassigned.
+    const created = await flow.post('/api/event-requests').set(as('organiser')).send({ ...values, name: 'Week 7 flow conference' });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    eventId = created.body.request.event_id as number;
+    const registration = await flow.patch(`/api/event-requests/${eventId}/registration-settings`).set(as('organiser')).send({
+      registration_capacity: 136, registration_opens_at: '2089-10-01T13:30:00Z', registration_closes_at: '2089-10-02T13:30:00Z' });
+    assert.equal(registration.status, 200, JSON.stringify(registration.body));
+    const submitted = await flow.patch(`/api/event-requests/${eventId}/submit`).set(as('organiser')).send({});
+    assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+    assert.equal(await status(), 'unassigned');
+
+    // 2. The Lead finds it in the unassigned queue and assigns a coordinator.
+    const queue = await flow.get('/api/assignment-queue').set(as('lead'));
+    assert.equal(queue.status, 200, JSON.stringify(queue.body));
+    assert.ok(JSON.stringify(queue.body).includes('"Week 7 flow conference"'), 'The submitted event is in the Lead queue.');
+    const assigned = await flow.patch(`/api/event-requests/${eventId}/coordinator`).set(as('lead')).send({ coordinatorId: ids.coordinator });
+    assert.equal(assigned.status, 200, JSON.stringify(assigned.body));
+    assert.equal(await status(), 'submitted');
+
+    // 3. The coordinator reviews and approves it.
+    assert.equal((await flow.patch(`/api/event-requests/${eventId}/review`).set(as('coordinator')).send({})).status, 200);
+    const approved = await flow.patch(`/api/event-requests/${eventId}/decision`).set(as('coordinator')).send({ decision: 'approved' });
+    assert.equal(approved.status, 200, JSON.stringify(approved.body));
+    assert.equal(await status(), 'approved');
+
+    // 4. Two venues and the equipment are requested; support places and reserves the equipment.
+    const venueRequests: number[] = [];
+    for (const venueId of venueIds) {
+      const requested: { status: number; body: unknown } = await flow.post('/api/venue-booking-requests').set(as('coordinator')).send({ event_id: eventId, venue_id: venueId, layout: 'classroom', ...period });
+      assert.equal(requested.status, 201, JSON.stringify(requested.body));
+    }
+    const asked = await database.from('venue_booking_requests').select('request_id,venue_id').eq('event_id', eventId).order('request_id');
+    assert.equal(asked.error, null);
+    venueRequests.push(...asked.data!.map(row => row.request_id as number));
+    assert.deepEqual(asked.data!.map(row => row.venue_id), venueIds);
+    const needed = await flow.post('/api/equipment-requests').set(as('coordinator')).send({ event_id: eventId, equipment_id: equipmentId, quantity: 2 });
+    assert.equal(needed.status, 201, JSON.stringify(needed.body));
+    const row = await database.from('equipment_requests').select('request_id,version').eq('event_id', eventId).single();
+    assert.equal(row.error, null);
+    const equipmentRequestId = row.data!.request_id as number;
+    const version = row.data!.version as number;
+    const placed = await flow.patch(`/api/equipment-requests/${equipmentRequestId}/arrangement`).set(as('support')).send({ event_id: eventId, version,
+      arrangement_notes: 'Ceiling projector on the main stage.', shortfall: 0, placement_venue_id: venueIds[0], placement_position: 'Main stage' });
+    assert.equal(placed.status, 200, JSON.stringify(placed.body));
+    const reserved = await flow.post(`/api/equipment-requests/${equipmentRequestId}/reservation`).set(as('support')).send({ event_id: eventId,
+      version: (await database.from('equipment_requests').select('version').eq('request_id', equipmentRequestId).single()).data!.version, ...period });
+    assert.ok([200, 201].includes(reserved.status), JSON.stringify(reserved.body));
+    assert.equal(await status(), 'approved', 'Venues are still pending, so the event is not ready for its safety check.');
+
+    // 5. Venue Staff approve both venues; the last approval makes every arrangement
+    //    ready, and the database moves the event into Awaiting Safety Check by itself.
+    const firstDecision = await flow.post(`/api/venue-booking-requests/${venueRequests[0]}/decision`).set(as('venue')).send({ decision: 'approve' });
+    assert.equal(firstDecision.status, 200, JSON.stringify(firstDecision.body));
+    assert.equal(await status(), 'approved', 'One venue is still pending.');
+    const secondDecision = await flow.post(`/api/venue-booking-requests/${venueRequests[1]}/decision`).set(as('venue')).send({ decision: 'approve' });
+    assert.equal(secondDecision.status, 200, JSON.stringify(secondDecision.body));
+    assert.equal(await status(), 'awaiting_safety_check');
+
+    // [FAILURE] Confirmation is refused while the safety check is outstanding.
+    const early = await flow.patch(`/api/event-requests/${eventId}/confirm`).set(as('coordinator')).send({});
+    assert.equal(early.status, 409, JSON.stringify(early.body));
+    assert.equal(await status(), 'awaiting_safety_check');
+
+    // 6. The Safety Officer finds it on the list and approves it; the event moves into Preparation.
+    const checks = await flow.get('/api/safety-checks').set(as('safety'));
+    assert.equal(checks.status, 200, JSON.stringify(checks.body));
+    const listed = checks.body.events.find((row: { event_id: number }) => row.event_id === eventId);
+    assert.ok(listed, 'The event is on the Safety Officer list.');
+    const decided = await flow.post(`/api/event-requests/${eventId}/safety-decision`).set(as('safety'))
+      .send({ decision: 'approve', reason: 'Exits and aisles are clear.', safety_check_revision: listed.safety_check_revision });
+    assert.equal(decided.status, 201, JSON.stringify(decided.body));
+    assert.equal(await status(), 'preparation');
+
+    // 7. The coordinator confirms it; the organiser sees the confirmed arrangements.
+    const confirmed = await flow.patch(`/api/event-requests/${eventId}/confirm`).set(as('coordinator')).send({});
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.body));
+    assert.equal(await status(), 'confirmed');
+    const summary = await flow.get(`/api/event-requests/${eventId}/confirmation`).set(as('organiser'));
+    assert.equal(summary.status, 200, JSON.stringify(summary.body));
+    const shown = JSON.stringify(summary.body);
+    for (const name of ['Week 7 flow auditorium', 'Week 7 flow breakout', 'Week 7 flow projector']) assert.ok(shown.includes(name), `confirmation shows ${name}`);
+
+    // The history holds each step in order, and the organiser was told along the way.
+    const steps = await database.from('event_audit_logs').select('old_value,new_value').eq('event_id', eventId).eq('field_name', 'status').order('log_id');
+    assert.equal(steps.error, null);
+    assert.deepEqual(steps.data!.map(row => row.new_value), ['unassigned', 'submitted', 'under_review', 'approved', 'awaiting_safety_check', 'preparation', 'confirmed']);
+    const told = await database.from('notifications').select('kind').eq('event_id', eventId).eq('recipient_id', ids.organiser);
+    assert.equal(told.error, null);
+    const kinds = new Set(told.data!.map(row => row.kind));
+    for (const kind of ['coordinator_assigned', 'event_approved', 'safety_decision', 'event_confirmed']) assert.ok(kinds.has(kind), `organiser told: ${kind}`);
+  } finally {
+    transport?.mock.restore();
+    Object.assign(dbConfig, originalConfig);
+    if (eventId !== undefined) assert.equal((await database.from('events').delete().eq('event_id', eventId)).error, null);
+    if (equipmentId !== undefined) assert.equal((await database.from('equipment').delete().eq('equipment_id', equipmentId)).error, null);
+    if (venueIds.length) assert.equal((await database.from('venues').delete().in('venue_id', venueIds)).error, null);
+  }
+});
