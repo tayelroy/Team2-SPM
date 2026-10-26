@@ -27,6 +27,7 @@ import RequestForm from './screens/RequestForm';
 import SafetyChecks from './screens/SafetyChecks';
 import EventSearch from './screens/EventSearch';
 import FindEvents from './screens/FindEvents';
+import MyRegistrations from './screens/MyRegistrations';
 import Venues from './screens/Venues';
 import VenueSearch from './screens/VenueSearch';
 import VenueHolds from './screens/VenueHolds';
@@ -296,7 +297,9 @@ export default function App() {
     // SG2-70: find an event across the system.
     findEvent: <EventSearch key={session!.accessToken} accessToken={session!.accessToken} />,
     // SG2-59: an attendee finds events open for registration.
-    findEvents: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />
+    findEvents: <FindEvents key={session!.accessToken} accessToken={session!.accessToken} />,
+    // SG2-62: an attendee sees and withdraws their registrations.
+    myRegistrations: <MyRegistrations key={session!.accessToken} accessToken={session!.accessToken} />
   }[screen];
 
   return (
