@@ -9441,5 +9441,115 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-104-R01",
+    "title": "Native staging selector reads only the selected role and preserves current-role no-op",
+    "story": "SG2-104",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC1"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "Native browser SELECT with Event Organiser first and Event Coordinator selected second; a real change-event counter begins at zero.",
+    "steps": [
+      "Read current and held roles; request the current role while Profile holds focus; choose Organiser, then Coordinator."
+    ],
+    "expected": "Only the selected role is reported; both held labels are returned; no-op preserves focus and dispatches zero changes; two actual selections dispatch exactly two changes.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "id": "SG2-104-R02",
+    "title": "Native staging adapter refuses unheld roles without changing selection",
+    "story": "SG2-104",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "The same genuine native SELECT and zero change-event counter.",
+    "steps": [
+      "Request Technical Support Staff, which is absent from the held-role options."
+    ],
+    "expected": "The request is rejected before a change event; Event Coordinator remains selected and the counter remains zero.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "id": "SG2-104-R03",
+    "title": "Single-role staging headers remain readable and cannot switch roles",
+    "story": "SG2-104",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC4"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "A single-role Safety Officer header with the existing Your role label and Profile button.",
+    "steps": [
+      "Read current/held roles; request Safety Officer again; request unheld Event Coordinator."
+    ],
+    "expected": "The role remains Safety Officer; a no-op preserves Profile focus, the unheld role is rejected, and no switcher is fabricated.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "id": "SG2-104-R04",
+    "title": "The staging adapter supports every custom multi-role account pair",
+    "story": "SG2-104",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC1",
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "Immutable production React build with reset in-memory API fixture, all three supported multi-role combinations and example.test accounts.",
+    "steps": [
+      "Enumerate roles with the menu initially closed and open; visit My Profile and request the existing role; choose each held role; request unheld Safety Officer."
+    ],
+    "expected": "Both held roles are read accurately; enumeration closes the menu; current-role no-op preserves the page, focus and permissions; each held role reaches its own navigation; unheld choices leave the current role and closed menu intact.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
   }
 ]

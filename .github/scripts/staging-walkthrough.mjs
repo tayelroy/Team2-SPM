@@ -13,6 +13,9 @@
 import { chromium, expect } from '@playwright/test';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import roleControls from './acting-role-control.cjs';
+
+const { getCurrentRole: currentRole, getHeldRoles, selectActingRole, roleControlKind } = roleControls;
 
 const base = (process.env.STAGING_URL || 'https://team2-spm-server.vercel.app').replace(/\/$/, '');
 const password = process.env.SPM_STAGING_PASSWORD;
@@ -37,13 +40,6 @@ const roleNavigation = {
   'Safety Officer': 'Safety checks',
   Attendee: 'Find events',
 };
-
-async function currentRole(page) {
-  const banner = page.getByRole('banner');
-  const switcher = banner.getByRole('combobox', { name: 'Acting as', exact: true });
-  const control = await switcher.count() ? switcher : banner.getByLabel('Your role', { exact: true });
-  return (await control.innerText()).trim();
-}
 
 async function settle(page) {
   // Role permissions arrive separately from the page. Wait for them before
@@ -72,6 +68,7 @@ for (const account of accounts) {
   const dir = join(out, account);
   mkdirSync(dir, { recursive: true });
   const started = Date.now();
+  let authenticated = false;
   try {
     await page.goto(`${base}/`);
     await page.getByRole('button', { name: 'Open app', exact: true }).click();
@@ -79,34 +76,36 @@ for (const account of accounts) {
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.getByRole('banner').waitFor({ timeout: 20_000 });
+    authenticated = true;
     await settle(page);
   } catch {
-    await page.screenshot({ path: join(dir, 'sign-in-failed.png') });
-    const shown = (await page.locator('body').innerText().catch(() => '')).match(/Too many sign-in attempts[^\n]*|Invalid[^\n]*/)?.[0];
-    failures.push(`${account}: sign-in failed${shown ? ` (${shown})` : ''}`);
+    await page.screenshot({ path: join(dir, authenticated ? 'post-login-not-ready.png' : 'sign-in-failed.png') });
+    if (authenticated) failures.push(`${account}: signed-in page did not reach healthy role navigation`);
+    else {
+      const shown = (await page.locator('body').innerText().catch(() => '')).match(/Too many sign-in attempts[^\n]*|Invalid[^\n]*/)?.[0];
+      failures.push(`${account}: sign-in failed${shown ? ` (${shown})` : ''}`);
+    }
     await context.close();
     continue;
   }
   report.push({ account, screen: 'sign in', ms: Date.now() - started });
   const switcher = page.getByRole('combobox', { name: 'Acting as', exact: true });
   const listbox = page.getByRole('listbox', { name: 'Available roles', exact: true });
-  let roles = [null];
-  if (await switcher.count()) {
-    await switcher.click();
-    await expect(listbox).toBeVisible();
-    roles = (await listbox.getByRole('option').allTextContents()).map(label => label.trim());
-    expect(roles.length, 'A multi-role switcher lists at least two held roles').toBeGreaterThan(1);
-    await switcher.press('Escape');
-    await expect(listbox).toHaveCount(0);
+  let kind, roles;
+  try {
+    kind = await roleControlKind(page);
+    roles = await getHeldRoles(page);
+    expect(roles.length, 'A multi-role switcher lists at least two held roles').toBeGreaterThan(kind === 'single' ? 0 : 1);
+  } catch {
+    failures.push(`${account}: signed-in role controls did not expose the held roles`);
+    await page.screenshot({ path: join(dir, 'role-controls-not-ready.png') });
+    await context.close();
+    continue;
   }
   for (const role of roles) {
     try {
-      if (role && await currentRole(page) !== role) {
-        await switcher.click();
-        await listbox.getByRole('option', { name: role, exact: true }).click();
-        await expect(switcher).toHaveText(role);
-        await expect(listbox).toHaveCount(0);
-      }
+      await selectActingRole(page, role);
+      expect(await currentRole(page)).toBe(role);
       await settle(page);
     } catch {
       failures.push(`${account} › ${role ?? 'single role'}: role did not reach a healthy, fully loaded page`);
@@ -117,14 +116,21 @@ for (const account of accounts) {
       .map(label => label.trim()).filter(Boolean);
     for (const [width, height] of viewports) {
       await page.setViewportSize({ width, height });
-      if (role) {
-        const file = join(dir, `${slug(role)}-${width}-00-role-menu.png`);
+      if (kind !== 'single') {
+        const native = kind === 'native';
+        const screen = native ? 'Role selector (native, closed)' : 'Role menu';
+        const file = join(dir, `${slug(role)}-${width}-00-${native ? 'role-selector' : 'role-menu'}.png`);
         try {
           await page.evaluate(() => window.scrollTo(0, 0));
-          await switcher.click();
-          await expect(switcher).toHaveAttribute('aria-expanded', 'true');
-          await expect(listbox.getByRole('option', { name: role, exact: true })).toHaveAttribute('aria-selected', 'true');
-          const bounds = await page.locator('.role-switcher-menu').evaluate(element => {
+          if (native) {
+            expect(await currentRole(page)).toBe(role);
+            expect(await getHeldRoles(page)).toEqual(roles);
+          } else {
+            await switcher.click();
+            await expect(switcher).toHaveAttribute('aria-expanded', 'true');
+            await expect(listbox.getByRole('option', { name: role, exact: true })).toHaveAttribute('aria-selected', 'true');
+          }
+          const bounds = await (native ? switcher : page.locator('.role-switcher-menu')).evaluate(element => {
             const box = element.getBoundingClientRect();
             return { left: box.left, right: box.right, top: box.top, bottom: box.bottom,
               width: innerWidth, height: innerHeight, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth };
@@ -135,14 +141,16 @@ for (const account of accounts) {
           expect(bounds.bottom).toBeLessThanOrEqual(bounds.height);
           expect(bounds.sideways).toBe(0);
           await page.screenshot({ path: file });
-          report.push({ account, role, width, screen: 'Role menu', sideways: bounds.sideways, file });
+          report.push({ account, role, width, screen, roleControl: kind, sideways: bounds.sideways, file });
         } catch {
-          failures.push(`${account} › ${role} › role menu at ${width}px did not fit or expose the held roles`);
+          failures.push(`${account} › ${role} › ${screen} at ${width}px did not fit or expose the held roles`);
           await page.screenshot({ path: file });
-          report.push({ account, role, width, screen: 'Role menu', failure: 'menu-not-ready', file });
+          report.push({ account, role, width, screen, roleControl: kind, failure: 'menu-not-ready', file });
         } finally {
-          await switcher.press('Escape');
-          await expect(listbox).toHaveCount(0);
+          if (!native) {
+            await switcher.press('Escape');
+            await expect(listbox).toHaveCount(0);
+          }
         }
       }
       for (const [index, label] of labels.entries()) {
