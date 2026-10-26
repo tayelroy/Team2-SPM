@@ -1,8 +1,8 @@
 # Model notes: sources for the class and data-model diagrams
 
-Revision note: the original 14 Oct design described main `1d1e336`. This revision describes PR90 head `61416cc`, including merged PR92; it does not claim that PR90 is merged or that every Done criterion has passed hosted acceptance. Jira status was refreshed on 16 Oct 2026.
+Revision note: the original 14 Oct design described main `1d1e336`. The data-model snapshot describes PR90 head `61416cc`, including merged PR92; that historical snapshot does not establish hosted acceptance. Jira status was refreshed on 16 Oct 2026; later implementation updates are identified below.
 
-The class diagram is as of main b7e2b1a (26 Oct 2026, SG2-96); the data model is still as of PR90 head 61416cc (16 Oct 2026), and the tables and columns added since are listed below. Migrations live in `supabase/migrations/` and are applied in filename order. "W7" marks a Week 7 change; "15 Oct" a change from the 15 Oct 2026 clarification session.
+The class diagram uses the main b7e2b1a baseline (26 Oct 2026, SG2-96), with SG2-60 registration and SG2-64 change-request labels updated after merging main a9eb363; its layout is unchanged. The data model is still as of PR90 head 61416cc (16 Oct 2026), and the tables and columns added since are listed below. Migrations live in `supabase/migrations/` and are applied in filename order. "W7" marks a Week 7 change; "15 Oct" a change from the 15 Oct 2026 clarification session.
 
 ## Files
 
@@ -56,6 +56,8 @@ The data model has four pages, not two or three. With 13 venue tables on one pag
 | `notifications.read_at`; `notification_reminder_settings`, `notification_reminder_receipts` | 202610200003_notifications_inbox_reminders | 15 Oct SG2-69 |
 | `events.preferred_layout` | 202610200001_event_preferred_layout | SG2-105 |
 | `events.registration_announced`; `registrations.registered_at` | 202610200004_event_registration_settings | SG2-63 |
+| `registrations.contact_phone`, `needs`; active-registration uniqueness; `register_for_event()` | 202610230001_event_registration | SG2-60 |
+| `event_change_requests`; `raise_event_change_request()`; `change_requested` notice | 202610260001_event_change_requests | SG2-64 |
 | `events.category` and search | 202610200005_event_search | SG2-70 |
 | equipment release on cancellation | 202610210001_equipment_release | SG2-56 |
 | change or cancel one venue (`change_reason`) | 202610210002_venue_booking_change_cancel | W7 SG2-83 |
@@ -81,8 +83,9 @@ pg_cron: `venue-hold-deadlines` runs `process_venue_hold_deadlines()` every minu
 | Notification, NotificationKind | `notifications` and its final `notifications_kind_check` (202610170001), including `venue_unavailable` |
 | SafetyDecision, SafetyRereview (W7) | `event_safety_decisions` (202610190005, revision 202610190006), `safety_rereviews` (202610240001); `record_safety_decision`, `rework_safety_rejected_event`, `confirm_safety_rereview`, `safety_check_queue`; routes in `server/src/safetyChecks/` and `server/src/events/safetyDecisionRoutes.ts`, `safetyRereviewRoutes.ts` |
 | ReminderSettings, ReminderReceipt (15 Oct) | `notification_reminder_settings`, `notification_reminder_receipts` (202610200003); `send_outstanding_arrangement_reminders()` hourly (SG2-69) |
-| ChangeRequest («planned» SG2-64/65) | No table: change requests come from `server/src/changeRequests/mockChangeRequests.ts`. The impact check and `apply_accepted_event_change()` (202610190003, SG2-66) are built |
-| AttendeeRegistration, WaitingListEntry («planned» SG2-60/61/62) | No table yet; `registrations` holds rows from the older schema and the SG2-63 settings |
+| ChangeRequest (SG2-64 built; remaining SG2-65 workflow planned) | `event_change_requests`, `raise_event_change_request()` (202610260001); `server/src/db/changeRequests.ts` persists raise/view and SG2-66 acceptance. The impact check and `apply_accepted_event_change()` (202610190003, SG2-66) are built; the remaining decision/refusal workflow is SG2-65 |
+| Registration (SG2-60/63 built) | `registrations`, including `contact_phone`, `needs`, active-registration uniqueness and `register_for_event()` (202610230001); registration picture and settings remain SG2-63 |
+| AttendeeRegistration («planned» SG2-62), WaitingListEntry («planned» SG2-61) | Future own-registration/withdrawal and waiting-list workflows; registration submission already writes `registrations` through SG2-60 |
 | Venue, VenueLayout | `venues`, `venue_layouts` |
 | VenueOperations, VenueOperationHistory (W7) | `venue_operations`, `venue_operation_history`; `venue_preparation_gap()` in 202610120002 (SG2-78) |
 | VenueUnavailability, VenueBookingDisruption (W7) | `venue_unavailability`, `venue_booking_disruptions` (202610100001) |

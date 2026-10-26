@@ -143,3 +143,7 @@ psql -d <disposable db> -v ON_ERROR_STOP=1 -v scale=1 -f integration/capacity-se
 CAPACITY_REST_URL=http://127.0.0.1:<port> CAPACITY_JWT_SECRET=<secret> \
   npx tsx ../integration/capacity-check.ts --samples 30 --users 575 --seconds 60 --think 10000
 ```
+
+## Integrated branch verification for the PR
+
+At `739f285` (including main `a9eb363`), the full local regression passed: 1,874 server and 1,914 client tests at 100% coverage, 163 browser cases and 26 native integration cases. The complete PostgreSQL migration, contract, concurrency and upgrade checks passed. Manual responsive review covered 92 views at 390/1440 px plus eight registration/change-request form and success screenshots, without layout defects. These verify functionality and responsive presentation; they do not substitute for the unaided participant protocol or deployed response-time benchmark. See [`regression-evidence-2026-10-26.md`](regression-evidence-2026-10-26.md#verification-after-merging-main-a9eb363).

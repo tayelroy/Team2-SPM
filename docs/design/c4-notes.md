@@ -1,6 +1,6 @@
 # C4 model notes (SG2-95, updated for SG2-96)
 
-Source: [`c4-model.drawio`](c4-model.drawio), seven pages, as of main b7e2b1a (26 Oct 2026). Until 26 Oct the model was the Structurizr file `connectsphere.dsl`; SG2-96 moved it to draw.io so the team edits the diagrams by hand.
+Source: [`c4-model.drawio`](c4-model.drawio), seven pages. The 26 Oct 2026 b7e2b1a baseline now includes the SG2-60 registration and SG2-64 change-request implementation labels from merged main a9eb363; the layout is unchanged. Until 26 Oct the model was the Structurizr file `connectsphere.dsl`; SG2-96 moved it to draw.io so the team edits the diagrams by hand.
 
 Colours on every page: orange (`#F5A623`) = built for the Week 7 changes; green (`#B6D7A8`, green arrows) = built for the 15 Oct 2026 clarifications; grey dashed (`#DDDDDD`) = not built, with the Jira story in the label. Each page has its own key.
 
@@ -14,7 +14,7 @@ Colours on every page: orange (`#F5A623`) = built for the Week 7 changes; green 
 | C3 Components (2/5) | Event handlers, coordinator assignment and oversight, notifications/profile/work queue, safety check review, change requests and impact |
 | C3 Components (3/5) | Venue catalogue (including soft delete), setup/safety details, unavailability, holds (including expiry changes), scheduled jobs |
 | C3 Components (4/5) | Venue requests and bookings, clashes, equipment, venue replacement, change or cancel one venue |
-| C3 Components (5/5) | Event search, cancellation, registration settings and windows, attendee registration and waiting list «planned» |
+| C3 Components (5/5) | Event search, cancellation, registration settings and windows, attendee registration (SG2-60); waiting list and registration management «planned» (SG2-61/62) |
 
 C3 is split over five pages so each one stays readable at A4 landscape. Pages 2–5 leave out the middleware's `account_roles` read, which page 1 shows.
 
@@ -30,13 +30,13 @@ C3 is split over five pages so each one stays readable at A4 landscape. Pages 2�
 
 | Role | What it does at this snapshot |
 |---|---|
-| Event Organiser | Creates, edits, submits and deletes own drafts. Sets registration capacity and window (SG2-63) and sees who registered. Asks to cancel (SG2-67). Views own requests, stage, history, safety decisions and confirmation. Clarifications. Own notifications. |
+| Event Organiser | Creates, edits, submits and deletes own drafts. Sets registration capacity and window (SG2-63) and sees who registered. Raises and views persisted change requests (SG2-64). Asks to cancel (SG2-67). Views own requests, stage, history, safety decisions and confirmation. Clarifications. Own notifications. |
 | Event Coordinator | Reviews, decides and plans assigned events. Clarifications. Venue search and suitability. Requests several venues per event (SG2-82), withdraws a request, changes or cancels one venue (SG2-83). Requests equipment. Views arrangements. Reworks a safety-rejected event (SG2-92). Confirms, completes and cancels events (SG2-58/67). Work queue. Notifications and reminder frequency (SG2-69). |
 | Event Coordinator Lead «Week 7» | Unassigned queue (SG2-87). Assigns or reassigns a coordinator (SG2-97/88). Oversight of assignments and active events (`event_request.oversight.view`, SG2-89). Stage and history. Notifications (SG2-68). |
 | Safety Officer «Week 7» | Safety check queue (`safety_checks.read`, SG2-91) and decisions: approve, reject or request changes (`event_request.safety_decision.record`, SG2-92/93). Reads venue setup and safety details (`venues.operations.read`, 202610160002), equipment placement, stage and history. Event search. |
 | Venue Staff | Venue CRUD, layouts and soft delete (SG2-106). Setup/turnaround and safety details (SG2-77). Temporary unavailability (SG2-80). Holds and their expiry (SG2-84/85, 15 Oct). Decides venue requests. Bookings by venue and release. Clashes and conflicts. Approves capacity exceptions (SG2-66 AC5). Confirms flagged venue requests again after a safety Request Changes (SG2-93). Work queue. Notifications. |
 | Technical Support Staff | Equipment records, availability and reservations. Requirement arrangements. Changes user roles (`PATCH /api/users/:userId/role`). Confirms flagged equipment again after a safety Request Changes (SG2-93). Work queue. Notifications. |
-| Attendee | Finds confirmed events open for registration (`events.registrable.read`, SG2-59). Profile and inbox. Registering, the waiting list and withdrawing are «planned» (SG2-60/61/62). |
+| Attendee | Finds confirmed events open for registration (`events.registrable.read`, SG2-59), registers with phone and needs and receives confirmation (SG2-60). Profile and inbox. Waiting-list handling and own-registration management/withdrawal remain «planned» (SG2-61/62). |
 
 Every role has `profile.read`/`profile.update` and `notifications.inbox`. A person may hold several of these roles and picks the acting role in the header (SG2-104).
 
@@ -73,8 +73,9 @@ Every role has `profile.read`/`profile.update` and `notifications.inbox`. A pers
 | Venue replacement «Week 7» | existing `venues/bookingRequests.ts` routes, `db/venueBookings.ts`, `db/venueDisruptions.ts` | SG2-81 |
 | Change/cancel one venue «Week 7» | `venues/bookingRequests.ts`, `venues/bookings.ts` | SG2-83 |
 | Search, cancellation & registration settings | `eventSearch/`, `events/cancellation.ts`, `events/registrationRoutes.ts`, `registrableEvents/` | SG2-70, 67, 63, 59 |
-| Change requests & impact «15 Oct» | `events/changeRequests.ts`, `changeRequests/mockChangeRequests.ts` | SG2-66 built; raising and deciding SG2-64/65 planned |
-| Attendee registration & waiting list «planned» | not built | SG2-60/61/62 |
+| Change requests & impact «15 Oct» | `events/changeRequests.ts`, `db/changeRequests.ts`, `event_change_requests`; `raise_event_change_request()` and `apply_accepted_event_change()` | SG2-64 raise/view/persistence and SG2-66 impact/acceptance built; remaining decision/refusal workflow SG2-65 planned |
+| Attendee registration | `registrableEvents/registration.ts`, `db/registrations.ts`, `register_for_event()` | SG2-60 built |
+| Waiting list & registration management «planned» | not built | SG2-61/62; attendee change notices SG2-102 |
 | User-scoped DB adapters | `db/user-client.ts` + the store modules that call it | — |
 | Service-role DB adapters | `db/supabase.ts` (`getSupabaseAdminClient`) + `db/eventRequests.ts`, `assignmentQueue.ts`, `workQueue.ts`, `users.ts`, `accountRoles.ts`, `auditLogs.ts`, `eventNotifications.ts` | — |
 
@@ -88,8 +89,8 @@ Every role has `profile.read`/`profile.update` and `notifications.inbox`. A pers
 
 ## Where the code differs from the brief
 
-- **Change requests:** the impact check and the return to Planning are built (SG2-66), but the change requests come from an in-memory source (`changeRequests/mockChangeRequests.ts`) until SG2-64/65 are built.
-- **Attendee:** finding events is built; registering, the waiting list (first come, first served, 15 Oct) and withdrawing are not (SG2-60/61/62). `AttendeeEvent.tsx` still shows mock facts.
+- **Change requests:** SG2-64 now persists raised requests in `event_change_requests`, exposes them to the organiser and assigned coordinator and notifies the coordinator. Impact checking, acceptance and return to Planning are built (SG2-66); the remaining decision/refusal workflow is SG2-65.
+- **Attendee:** finding and registering for events are built (SG2-59/60). The waiting list (first come, first served, 15 Oct) and own-registration/withdrawal workflow remain SG2-61/62. Prototype attendee screens are not evidence that those remaining workflows are implemented.
 - The Safety Officer has `notifications.inbox` but not `notifications.read`: the header inbox works, `GET /api/notifications` does not.
 - Notifications are in-app only (`notifications`, `venue_hold_notifications`). Neither the server nor the migrations send email.
 

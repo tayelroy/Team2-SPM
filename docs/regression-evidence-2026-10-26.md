@@ -2,9 +2,9 @@
 
 SG2-96 requires the full Week 7 journey and regression results after the Week 7 stories merge, with a date, tested commit and hosted CI run link for the Managing Changes guide.
 
-**Release status: pre-merge remediation verified; post-merge regression and hosted sign-off pending.** The multi-role phone header was repaired and checked locally before merging main a9eb363, which adds SG2-60 registration submission and SG2-64 organiser change requests. The final combined commit, its regression results and passing hosted CI run, the deployed retest and an unaided human walkthrough remain outstanding. Prior baseline results must not be presented as verification of the combined tree.
+**Release status: integrated local regression verified; hosted sign-off pending.** The multi-role phone header was repaired, main a9eb363 was integrated, and the full combined regression passes. The passing hosted CI run for the published revision, deployed retest, hosted migration evidence and unaided human walkthrough remain outstanding. Historical baseline results are separated from the integrated-tree verification below.
 
-**Revisions:** SG2-96's pre-merge baseline was committed as `eef4121` on `feature/SG2-96-week7-release-checks`, based on main [`b7e2b1a`](https://github.com/tayelroy/Team2-SPM/tree/b7e2b1a) (PR #113, SG2-93). Main `a9eb363` includes PR #112 (SG2-60) and PR #114 (SG2-64) and has since been merged into the branch. The final tested combined commit is not recorded yet.
+**Revisions:** SG2-96's pre-merge baseline was committed as `eef4121` on `feature/SG2-96-week7-release-checks`, based on main [`b7e2b1a`](https://github.com/tayelroy/Team2-SPM/tree/b7e2b1a) (PR #113, SG2-93). Main `a9eb363` includes PR #112 (SG2-60) and PR #114 (SG2-64). The integrated application was tested at **`739f285aae0cb4b70fab17c7edf4df172c840bba`**; the following commit only updates design/release evidence. The published revision still requires its own hosted CI run.
 
 **Date:** 26 Oct 2026 (Asia/Singapore).
 
@@ -48,18 +48,33 @@ Session-only report and screenshots: `/tmp/sg2-96-validation-staging/report.json
 - **Pre-merge full regression after remediation: passed.** `npm run ci:full` exited 0: server **1,844 / 1,844**, client **1,890 / 1,890**, both at **100%** statements/branches/functions/lines, and browser **159 / 159** in **186.5 s**, with zero failures, skips or flaky cases. The expanded phone case and full Week 7 journey passed, as did the required SG2-26 gate, 22 inventory/policy checks, 19 reviewer checks and 13 regression-gate tests. Browser run started **26 Oct 2026, 07:01:53.907 UTC** (15:01 SGT).
 - The five new CI-evidence tests passed. Pre-merge inventory contained **235 executable files, 3,197 methods and 1,372 SQL assertions**. Log: `/tmp/sg2-96-ci-full-final.log`; browser JSON/JUnit, HTML report and coverage were generated in the usual report directories. These counts and database baseline results describe the pre-merge tree only.
 
-## Verification after merging main a9eb363 — pending
+## Verification after merging main a9eb363
 
-The main merge adds real registration writes (SG2-60) and persisted organiser change requests (SG2-64), including their migrations, API/component tests, browser cases and database checks. Both sets of regression scenarios are retained alongside SG2-96's cases in `docs/regression-cases.json`. The combined inventory must be regenerated and the full build, coverage, browser, native integration and database/upgrade checks rerun against the merged commit. Record their actual counts and results here when complete; do not reuse the pre-merge totals above.
+The main merge adds real registration writes (SG2-60) and persisted organiser change requests (SG2-64), including their migrations, API/component tests, browser cases and database checks. Both sets of scenarios are retained alongside SG2-96's cases: **248 unique regression cases**. The regenerated inventory contains **244 executable files, 3,251 methods and 1,413 SQL assertions**.
 
-The PR remains a draft until the applicable DoD gates are met. No hosted database changes were authorised by the commit/PR request; the hosted rehearsal, rollback, apply and release-readiness gate remain pending rather than implied by the successful disposable-database checks.
+| Integrated check | Result on 739f285 |
+|---|---|
+| `npm run ci:full` | Passed, exit 0 |
+| Production build | Passed without warnings; React runtime 141.74 kB and app 382.44 kB in separate chunks |
+| Server / client | **1,874 / 1,874** and **1,914 / 1,914** passed; **100%** statements, branches, functions and lines in both |
+| Browser regression | **163 / 163** passed in **168.2 s**, with zero failures, skips or flaky cases; full Week 7 journey, registration, change requests, expanded phone case and mandatory SG2-26 gate passed |
+| Native API integration | **26 / 26** passed against PostgreSQL/PostgREST |
+| Database / concurrency / upgrades | **73 migrations**, **48 SQL suites**, **12 concurrency scripts**, **27 readiness checks**, legacy fixtures and two upgrade SQL checks passed |
+| CI evidence generator | **5 / 5** passed |
+| Exact DoD widths | **92 page views** across all seven roles and three multi-role pairs at **390 / 1440 px**, plus eight registration/change-request form and success screenshots; no overflow, page errors or visual regressions |
+
+The browser run started **26 Oct 2026, 07:47:34.049 UTC** (15:47 SGT). An initial run overlapped the database checks and stalled in one existing test worker; it was interrupted. That file passed **43 / 43** in isolation, and the complete clean rerun passed without changing application or test source. No linter is configured; build/TypeScript success is not an independent lint result.
+
+Final session logs: `/tmp/sg2-96-ci-full-merged-rerun.log`, `/tmp/sg2-96-integration-merged.log`, `/tmp/sg2-96-database-regression-merged.log` and `/tmp/sg2-96-evidence-tests-merged.log`. Responsive screenshots/report: `/tmp/sg2-96-merged-responsive-390-1440/`. These temporary files do not replace the retained hosted artifacts.
+
+The PR remains a draft until the applicable DoD gates are met. Hosted rehearsal, rollback, apply and release readiness are pending; successful disposable-database checks do not establish those hosted results.
 
 Session-only repaired walkthrough evidence: `/tmp/sg2-96-remediation-walkthrough-verified/report.json`; visual proof: `/tmp/sg2-96-repaired-phone.jpg`. An intermediate repeated local walkthrough hit the normal sign-in rate limit; resetting only the disposable fixture allowed a clean run. Shared staging rate limits were not changed.
 
 ## Release checks still required
 
 1. Retest staging after the fixed commit is deployed, including the three multi-role accounts; a local fix does not repair the current deployment.
-2. Complete the post-merge regression and record the final tested commit SHA, successful hosted CI run URL and retained artifacts. The full regression must cover that final commit, including SG2-60 and SG2-64.
+2. Record the published revision's successful hosted CI run URL and retained artifacts. The local combined application is verified above; hosted evidence must cover the published revision, including SG2-60 and SG2-64.
 3. Complete the unaided human task walkthrough and the browser response-time protocol in [`nfr-capacity-review.md`](nfr-capacity-review.md), including the now-implemented SG2-60 registration submission. Browsing an event does not satisfy the registration-action check.
 4. Rehearse and apply `202610260002_event_lookup_indexes.sql` to the shared environment using [`release-readiness.md`](release-readiness.md). This validation applied it only to disposable local databases.
 
