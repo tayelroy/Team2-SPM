@@ -1,15 +1,17 @@
 # Model notes: sources for the class and data-model diagrams
 
-Revision note: the original 14 Oct design described main `1d1e336`. This revision describes PR90 head `61416cc`, including merged PR92; it does not claim that PR90 is merged or that every Done criterion has passed hosted acceptance. Jira status was refreshed on 16 Oct 2026.
+Revision note: the original 14 Oct design described main `1d1e336`. The data-model snapshot describes PR90 head `61416cc`, including merged PR92; that historical snapshot does not establish hosted acceptance. Jira status was refreshed on 16 Oct 2026; later implementation updates are identified below.
 
-As of PR90 head 61416cc (16 Oct 2026). Migrations live in `supabase/migrations/` and are applied in filename order. "W7" marks a Week 7 change.
+The class diagram uses the main b7e2b1a baseline (26 Oct 2026, SG2-96), with SG2-60 registration and SG2-64 change-request labels updated after merging main a9eb363; its layout is unchanged. The data model is still as of PR90 head 61416cc (16 Oct 2026), and the tables and columns added since are listed below. Migrations live in `supabase/migrations/` and are applied in filename order. "W7" marks a Week 7 change; "15 Oct" a change from the 15 Oct 2026 clarification session.
 
 ## Files
 
-| File | Diagram blocks |
+Both are draw.io files, edited in app.diagrams.net (see `c4-notes.md` for how to edit and render them).
+
+| File | Pages |
 |---|---|
-| `class-diagram.puml` | `class-events-people`, `class-venues-bookings`, `class-equipment` |
-| `data-model.puml` | `er-events-people`, `er-venues-availability`, `er-requests-holds`, `er-equipment-notifications` |
+| `class-diagram.drawio` | Class (1/3) events, people & coordination; (2/3) venues, availability & bookings; (3/3) equipment |
+| `data-model.drawio` | Data (1/4) events & people; (2/4) venues, availability & bookings; (3/4) venue requests, capacity exceptions & holds; (4/4) equipment & notifications |
 
 The data model has four pages, not two or three. With 13 venue tables on one page the text was too small to read on A4 landscape.
 
@@ -42,11 +44,33 @@ The data model has four pages, not two or three. With 13 venue tables on one pag
 | equipment_reservations | 202609080000 | starts_at, ends_at: 202610120001; request_id, reserved_at: 202610140001 | 4 |
 | notifications | 202610060001 | kind list widened: 202610100002, 202610140001 (+ equipment_reservation_id), W7 202610140003 (`venue_booking_clash`), 202610150001, 202610160001, 202610170001 (`venue_unavailable`) | 4 |
 
+### Added after 16 Oct (in the class diagram; not yet drawn in the data model)
+
+| Table or column | Migration | Story |
+|---|---|---|
+| `account_roles` keyed by (user_id, role): one row per role held | 202610180001_account_multi_roles; acting-role functions 202610200002 | 15 Oct SG2-104 |
+| `venues.deleted_at`, `deleted_by`; `venue_holds.expiry_revision`; `delete_venue()`, `change_venue_hold_expiry()` | 202610170007_venue_delete_hold_expiry; past holds 202610190001 | 15 Oct SG2-106 |
+| `events.expected_crowd_movement`, `awaiting_safety_check_since`, `safety_check_revision`; `refresh_safety_check_status()` | 202610190004_safety_check_queue | W7 SG2-91 |
+| `event_safety_decisions` | 202610190005_safety_decisions; revision 202610190006; gate 202610220001 | W7 SG2-92/94 |
+| `safety_rereviews` | 202610240001_safety_changes_requested | W7 SG2-93 |
+| `notifications.read_at`; `notification_reminder_settings`, `notification_reminder_receipts` | 202610200003_notifications_inbox_reminders | 15 Oct SG2-69 |
+| `events.preferred_layout` | 202610200001_event_preferred_layout | SG2-105 |
+| `events.registration_announced`; `registrations.registered_at` | 202610200004_event_registration_settings | SG2-63 |
+| `registrations.contact_phone`, `needs`; active-registration uniqueness; `register_for_event()` | 202610230001_event_registration | SG2-60 |
+| `event_change_requests`; `raise_event_change_request()`; `change_requested` notice | 202610260001_event_change_requests | SG2-64 |
+| `events.category` and search | 202610200005_event_search | SG2-70 |
+| equipment release on cancellation | 202610210001_equipment_release | SG2-56 |
+| change or cancel one venue (`change_reason`) | 202610210002_venue_booking_change_cancel | W7 SG2-83 |
+| `events.cancellation_requested_*`, `cancelled_*`; `cancel_event()` | 202610220002_event_cancellation | SG2-67 |
+| registrable events | 202610220003_registrable_events | SG2-59 |
+| `events.coordinator_assigned_by` | 202610220004_coordinator_oversight | W7 SG2-89 |
+| `apply_accepted_event_change()` | 202610190003_event_change_impact | 15 Oct SG2-66 |
+
 Enums: `event_status` comes from 202609080000. `needs_clarification` was added in 202609300001, and the four W7 values in 202610090001. `venue_layout` comes from 202609220001_venue_layouts.
 
 Views (listed in the legends, not drawn as tables): `internal_work_items` (202609220001, last redefined in 202610160003 (planning details)), `venue_booking_occupancy` (202610050001, then 202610100002), and `venue_affected_bookings` (202610100001).
 
-pg_cron: the `venue-hold-deadlines` job runs `process_venue_hold_deadlines()` every minute (202610050001).
+pg_cron: `venue-hold-deadlines` runs `process_venue_hold_deadlines()` every minute (202610050001); `registration-windows` every minute (SG2-63); `sg2-69-arrangement-reminders` hourly (SG2-69).
 
 ## Class diagram → sources
 
@@ -57,7 +81,11 @@ pg_cron: the `venue-hold-deadlines` job runs `process_venue_hold_deadlines()` ev
 | CoordinatorAssignment (W7) | Not a table: it is `events.coordinator_id`. Sources: `server/src/events/assignCoordinator.ts`, `assignEventCoordinator` and `COORDINATOR_ASSIGNABLE_STATUSES` in `server/src/db/eventRequests.ts`, `fetchUnassignedQueue` in `server/src/db/assignmentQueue.ts`, and permissions `event_request.assign_coordinator` and `event_request.queue.view` in `policy.ts` |
 | EventAuditLog, Clarification, Registration | `event_audit_logs`, `event_clarifications`, `registrations` |
 | Notification, NotificationKind | `notifications` and its final `notifications_kind_check` (202610170001), including `venue_unavailable` |
-| SafetyCheck («planned» SG2-91/92/93/94) | No table, RPC or route. The statuses that exist and their intended use come from `fields.ts` comments and `server/src/events/stageCalculator.ts` |
+| SafetyDecision, SafetyRereview (W7) | `event_safety_decisions` (202610190005, revision 202610190006), `safety_rereviews` (202610240001); `record_safety_decision`, `rework_safety_rejected_event`, `confirm_safety_rereview`, `safety_check_queue`; routes in `server/src/safetyChecks/` and `server/src/events/safetyDecisionRoutes.ts`, `safetyRereviewRoutes.ts` |
+| ReminderSettings, ReminderReceipt (15 Oct) | `notification_reminder_settings`, `notification_reminder_receipts` (202610200003); `send_outstanding_arrangement_reminders()` hourly (SG2-69) |
+| ChangeRequest (SG2-64 built; remaining SG2-65 workflow planned) | `event_change_requests`, `raise_event_change_request()` (202610260001); `server/src/db/changeRequests.ts` persists raise/view and SG2-66 acceptance. The impact check and `apply_accepted_event_change()` (202610190003, SG2-66) are built; the remaining decision/refusal workflow is SG2-65 |
+| Registration (SG2-60/63 built) | `registrations`, including `contact_phone`, `needs`, active-registration uniqueness and `register_for_event()` (202610230001); registration picture and settings remain SG2-63 |
+| AttendeeRegistration («planned» SG2-62), WaitingListEntry («planned» SG2-61) | Future own-registration/withdrawal and waiting-list workflows; registration submission already writes `registrations` through SG2-60 |
 | Venue, VenueLayout | `venues`, `venue_layouts` |
 | VenueOperations, VenueOperationHistory (W7) | `venue_operations`, `venue_operation_history`; `venue_preparation_gap()` in 202610120002 (SG2-78) |
 | VenueUnavailability, VenueBookingDisruption (W7) | `venue_unavailability`, `venue_booking_disruptions` (202610100001) |
@@ -67,15 +95,15 @@ pg_cron: the `venue-hold-deadlines` job runs `process_venue_hold_deadlines()` ev
 | BookingClash (W7) | `venue_booking_clashes`; `refresh_venue_booking_clashes()` (202610140003) |
 | VenueHold, VenueHoldNotification, VenueHoldSettings (W7) | `venue_holds`, `venue_hold_notifications`, `venue_hold_settings`; `create_venue_hold` (202610050001, redefined in 202610120002), `change_venue_hold` (202610050001, redefined in 202610120002, 202610160001, 202610170004 and 202610190002) and `process_venue_hold_deadlines` (202610050001) |
 | Replacement (SG2-81) | No separate table/class: `VenueBookingRequest.replacesBookingId` points to the old `VenueBooking`; approval calls internal `release_replaced_booking` in the decision transaction (202610170001) |
-| ChangeOneVenue («planned» SG2-83) | General one-venue change/cancellation is separate from implemented affected-booking replacement |
+| ChangeOneVenue (W7 SG2-83) | No table: `venue_booking_requests.change_reason` and the change/cancel routes (202610210002); separate from the SG2-81 affected-booking replacement |
 | Equipment, EquipmentRequest, EquipmentReservation | `equipment`, `equipment_requests`, `equipment_reservations`; `check_equipment_availability`, `manage_equipment_requirements` and `manage_equipment_reservations` |
 
 ## Where code and brief differ
 
 - **Event to VenueBooking.** `venue_bookings.event_id` can be null (`on delete set null`), so the relationship is drawn as Event 0..1 to * VenueBooking. `events.venue_booking_id` (integer) is an older single-venue pointer. The RPCs set it to the first booking (`coalesce`, SG2-82), and no server code reads it.
 - **Hold notices.** These are stored in their own table, `venue_hold_notifications`, not in `notifications`, and they go only to the event's coordinator.
-- **Safety Officer and venue safety details.** The Safety Officer cannot read the SG2-77 safety details. `venues.operations.read` and the `venue_operations_read` RLS policy allow only venue_staff, event_coordinator and technical_support_staff.
+- **Safety Officer and venue safety details.** Fixed since 16 Oct: `venues.operations.read` and the RLS policy include the Safety Officer (202610160002, 202610170005).
 - **Assignment by the Lead (SG2-88 is Done in the 16 Oct Jira snapshot).** The Lead can already assign and reassign a coordinator through `PATCH /api/event-requests/:eventId/coordinator`, for any status in `COORDINATOR_ASSIGNABLE_STATUSES`.
-- **Changing one venue (SG2-83 is To Do).** One venue of a multi-venue event can already be dropped, through `release_venue_booking` (SG2-51) and `withdraw_venue_booking_request` (SG2-82).
+- **Changing one venue (SG2-83).** Built since 16 Oct (202610210002): the coordinator changes or cancels one venue of a multi-venue event; a new venue goes through the normal request and approval.
 - **Notification kinds.** The database check and server/client contracts now include `venue_unavailable` alongside the previous eleven kinds (`202610170001`; `server/src/db/notifications.ts`, `client/src/api/notificationsApi.ts`).
 - **Affected-booking lifecycle.** `venue_disruption_notify` writes notices for new flags, returns Preparation/Confirmed to Planning, clears confirmation stamps and records status history while retaining event details. Approval releases the original booking atomically; unrelated persisted planning rechecks still block confirmation (202610170002).
