@@ -110,8 +110,8 @@ const REFUSED_ROLES: Role[] = [
 for (const role of REFUSED_ROLES) {
   test(`[FAILURE] [SG2-62:AC1] [SG2-62:AC2] ${role} cannot list or withdraw registrations, even with a forged role header`, async () => {
     const { app, asked, listed } = fixture(role);
-    for (const call of [request(app).get('/api/my-registrations'), request(app).post(path)]) {
-      const response = await call.set(auth).set('X-Role', 'attendee');
+    for (const call of [() => request(app).get('/api/my-registrations'), () => request(app).post(path)]) {
+      const response = await call().set(auth).set('X-Role', 'attendee');
       assert.deepEqual([response.status, response.body], [403, { error: 'Access denied' }]);
     }
     assert.deepEqual([asked, listed()], [[], 0]);
@@ -129,8 +129,8 @@ test('[FAILURE] [SG2-62:AC1] [SG2-62:AC2] unsigned credentials cannot list or wi
 // (other-roles-refused); this covers the route's handling of that refusal.
 test('[CONFLICT] [SG2-62:AC2] when the database refuses an account whose role changed after sign-in, the route answers 403', async () => {
   const { app } = fixture('attendee', async () => { throw new AccessError(403); }, async () => { throw new AccessError(403); });
-  for (const call of [request(app).get('/api/my-registrations'), request(app).post(path)]) {
-    const response = await call.set(auth);
+  for (const call of [() => request(app).get('/api/my-registrations'), () => request(app).post(path)]) {
+    const response = await call().set(auth);
     assert.deepEqual([response.status, response.body], [403, { error: 'Access denied' }]);
   }
 });
@@ -138,8 +138,8 @@ test('[CONFLICT] [SG2-62:AC2] when the database refuses an account whose role ch
 test('[FAILURE] [SG2-62:AC1] [SG2-62:AC2] an unavailable database or unexpected failure answers 503 without detail', async () => {
   for (const failure of [new AccessError(503), new Error('connection string leaked')]) {
     const { app } = fixture('attendee', async () => { throw failure; }, async () => { throw failure; });
-    for (const call of [request(app).get('/api/my-registrations'), request(app).post(path)]) {
-      const response = await call.set(auth);
+    for (const call of [() => request(app).get('/api/my-registrations'), () => request(app).post(path)]) {
+      const response = await call().set(auth);
       assert.deepEqual([response.status, response.body], [503, { error: 'Your registrations are temporarily unavailable. Please try again.' }]);
     }
   }

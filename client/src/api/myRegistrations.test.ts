@@ -83,6 +83,8 @@ test('[FAILURE] [SG2-62:AC4] each refusal keeps the server\'s message, and anyth
     Response.json({ withdrawal: { registration_id: 7 } }),
     Response.json({ error: 'down' }, { status: 503 }),
     new Response('not json', { status: 409 }),
+    // A refusal reason counts only on a 409.
+    Response.json({ error: 'Refused', reason: 'started' }, { status: 400 }),
   ]) {
     respond(response);
     expect(await withdrawRegistration(7, 't')).toEqual({ ok: false, kind: 'unavailable' });
