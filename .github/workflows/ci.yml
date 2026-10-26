@@ -79,7 +79,8 @@ jobs:
     name: Test browser regression
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Reserve time for browser provisioning, the regression suite and result uploads.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,7 +92,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+        timeout-minutes: 12
       - name: Run browser journeys against the real application with isolated storage
+        timeout-minutes: 10
         run: npm run test:regression
       - name: Upload browser results and failure evidence
         if: ${{ !cancelled() }}

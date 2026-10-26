@@ -12,6 +12,18 @@ SG2-96 requires the full Week 7 journey and regression results after the Week 7 
 
 **Hosted CI evidence: pending.** After the final changes are committed, **Build and test** generates a `regression-evidence-<run ID>-<attempt>` artifact with the exact checked-out SHA, UTC date, real run-attempt link and every required job result. Copy that verified record here and into the Managing Changes guide before its 14-day retention expires; see [`ci.md`](ci.md#regression-evidence-sg2-96). Do not substitute the base commit's run for the final branch.
 
+## Design evidence attached to the PR
+
+The updated design models and notes are attached to [PR #115's design-evidence comment](https://github.com/tayelroy/Team2-SPM/pull/115#issuecomment-6411646334). The comment includes a source/manifest/patch ZIP, five native-size PDFs and previews: seven C4 pages, three class pages, four data-model pages, one status page and five sequence pages. All 20 pages were rendered and visually checked. The source tree in the implementation diff is restored to main; the reviewed design updates remain available in those attachments and the ignored local `output/sg2-96-design-evidence/` directory.
+
+## First hosted CI attempt and bounded retry
+
+[CI run 40289474412](https://github.com/tayelroy/Team2-SPM/actions/runs/40289474412) verified application coverage, database policies and browser smoke on published `51fb262`, but the browser-regression job reached its 15-minute job limit. Browser/OS dependency installation consumed **10 m 18 s**, leaving **4 m 46 s** for regression execution; the visible log reached 150 passing cases before cancellation. This run is not a passing full-regression record.
+
+The browser job now reserves **25 minutes** overall, with **12 minutes** for installation and **10 minutes** for regression execution, leaving time for setup and report uploads. Assertions, required cases and failure gates are unchanged; the five evidence, 13 regression-gate and 19 reviewer-tool tests passed after the configuration change. The new published revision still requires a successful hosted run.
+
+The first automated AI security review stopped before inference because the original diff required **21 chunks**, above the configured limit of 20. Moving the design evidence to the comment, including the CI-budget fix and its evidence updates, reduces the implementation diff to **nine chunks** without changing the scanner's configuration. Its new review result must be checked separately from the application CI result.
+
 ## Local baseline rerun
 
 These results precede both the fixes prompted by the signed-in staging inspection and the later merge of main a9eb363.

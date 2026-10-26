@@ -1,15 +1,13 @@
 // Renders the design sources in this folder to the PDFs kept in the team's
-// Google Drive design folder (SG2-95). The diagrams are draw.io files, edited
-// by hand in app.diagrams.net (or the draw.io desktop app); this script only
-// turns each page into a PDF page.
+// Google Drive design folder (SG2-95). Diagrams are code; the PDFs are output.
 //
-//   node docs/design/render.mjs [outDir]
+//   PLANTUML_JAR=… STRUCTURIZR_CLI=…/structurizr.sh node docs/design/render.mjs [outDir]
 //
-// Needs the repo's Playwright Chromium and network access for the draw.io
-// viewer and `npx marked`. To render the diagrams offline, set DRAWIO_VIEWER to
-// a local copy of viewer-static.min.js.
+// Needs Java (PlantUML, Structurizr CLI), the repo's Playwright Chromium, and
+// network access for `npx marked`. Graphviz is not needed: non-sequence
+// diagrams use `!pragma layout smetana`.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,39 +15,35 @@ import { chromium } from 'playwright';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = process.argv[2] ?? join(tmpdir(), 'connectsphere-design');
-const viewerUrl = 'https://viewer.diagrams.net/js/viewer-static.min.js';
+const jar = process.env.PLANTUML_JAR;
+const structurizr = process.env.STRUCTURIZR_CLI;
+if (!jar || !structurizr) throw new Error('Set PLANTUML_JAR and STRUCTURIZR_CLI.');
 mkdirSync(outDir, { recursive: true });
+const work = mkdtempSync(join(tmpdir(), 'design-render-'));
 
-/** Every page of a draw.io file, in file order, as SVG drawn by the draw.io viewer. */
-async function drawio(page, file) {
-  const xml = readFileSync(join(here, file), 'utf8');
-  const pages = (xml.match(/<diagram\b/g) ?? []).length;
-  const svgs = [];
-  for (let index = 0; index < pages; index++) {
-    await page.setContent(`<!doctype html><meta charset="utf-8"><div id="diagram"></div><script src="${viewerUrl}"></script>`);
-    await page.waitForFunction(() => typeof globalThis.GraphViewer !== 'undefined');
-    svgs.push(await page.evaluate(({ xml, index }) => new Promise(resolve => {
-      const container = document.getElementById('diagram');
-      container.setAttribute('data-mxgraph', JSON.stringify({ xml, page: index, toolbar: '', nav: false, lightbox: false }));
-      globalThis.GraphViewer.createViewerForElement(container, viewer =>
-        resolve(new XMLSerializer().serializeToString(viewer.graph.getSvg('#ffffff', 1, 10))));
-    }), { xml, index }));
-  }
-  if (!svgs.length) throw new Error(`${file}: no pages`);
-  return svgs;
+/** Every diagram in a PlantUML file, as SVG, in file order. */
+function plantuml(source) {
+  // Structurizr's export cannot carry `!pragma layout smetana`, so set it here.
+  const svg = execFileSync('java', ['-jar', jar, '-tsvg', '-Playout=smetana', '-pipe', '-pipedelimitor', '@@SPLIT@@', '-failfast2'],
+    { input: readFileSync(source), maxBuffer: 1 << 28 }).toString();
+  return svg.split('@@SPLIT@@').map(part => part.trim()).filter(part => part.startsWith('<'));
 }
+
+execFileSync('bash', [structurizr, 'export', '-w', join(here, 'connectsphere.dsl'), '-f', 'plantuml/c4plantuml', '-o', work], { stdio: 'ignore' });
+const c4 = Object.fromEntries(readdirSync(work).filter(f => f.endsWith('.puml'))
+  .map(f => [f.replace(/^structurizr-|\.puml$/g, ''), plantuml(join(work, f))]));
 
 const markdown = file => execFileSync('npx', ['-y', 'marked@14', '--gfm', '-i', join(here, file)], { maxBuffer: 1 << 26 }).toString();
 
-// PDF name -> draw.io file and, where a file feeds several PDFs, its pages (0-based).
 const diagrams = {
-  'C4_Level1_System_Context.pdf': ['c4-model.drawio', [0]],
-  'C4_Level2_Container_Diagram.pdf': ['c4-model.drawio', [1]],
-  'C4_Level3_Component_Diagram.pdf': ['c4-model.drawio', [2, 3, 4, 5, 6]],
-  'Class_Diagram.pdf': ['class-diagram.drawio'],
-  'Data_Model.pdf': ['data-model.drawio'],
-  'Sequence_Diagrams.pdf': ['sequence-diagrams.drawio'],
-  'Event_Status_Model.pdf': ['event-status-model.drawio'],
+  'C4_Level1_System_Context.pdf': c4.C1_Context,
+  'C4_Level2_Container_Diagram.pdf': c4.C2_Containers,
+  'C4_Level3_Component_Diagram.pdf': ['C3_API_Components', 'C3_API_Components_Events', 'C3_API_Components_Venues', 'C3_API_Components_Bookings']
+    .flatMap(view => c4[view] ?? []),
+  'Class_Diagram.pdf': plantuml(join(here, 'class-diagram.puml')),
+  'Data_Model.pdf': plantuml(join(here, 'data-model.puml')),
+  'Sequence_Diagrams.pdf': plantuml(join(here, 'sequence-diagrams.puml')),
+  'Event_Status_Model.pdf': plantuml(join(here, 'event-status-model.puml')),
 };
 const documents = {
   'API_Specification.pdf': markdown('api-specification.md'),
@@ -58,20 +52,14 @@ const documents = {
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
-if (process.env.DRAWIO_VIEWER) {
-  await page.route(viewerUrl, route => route.fulfill({ path: process.env.DRAWIO_VIEWER, contentType: 'application/javascript' }));
-}
-const rendered = {};
-for (const [name, [file, pages]] of Object.entries(diagrams)) {
-  rendered[file] ??= await drawio(page, file);
-  const svgs = pages ? pages.map(index => rendered[file][index]) : rendered[file];
-  if (svgs.some(svg => !svg)) throw new Error(`${name}: ${file} has fewer pages than expected`);
-  await page.setContent(`<!doctype html><meta charset="utf-8"><style>
+for (const [name, svgs] of Object.entries(diagrams)) {
+  if (!svgs?.length) throw new Error(`${name}: no diagrams rendered`);
+  await page.setContent(`<!doctype html><style>
     section{page-break-after:always;height:184mm;display:flex;align-items:center;justify-content:center}
     section:last-child{page-break-after:auto} svg{max-width:100%;max-height:100%;width:auto;height:auto}
-  </style>${svgs.map(svg => `<section>${svg}</section>`).join('')}`);
-  // The viewer fixes width/height in pixels; let CSS scale each diagram to the page.
-  await page.evaluate(() => document.querySelectorAll('section > svg').forEach(svg => {
+  </style>${svgs.map(svg => `<section>${svg.replace(/<\?xml[^>]*>/, '')}</section>`).join('')}`);
+  // PlantUML fixes width/height in pixels; let CSS scale each diagram to the page.
+  await page.evaluate(() => document.querySelectorAll('svg').forEach(svg => {
     if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${parseFloat(svg.getAttribute('width'))} ${parseFloat(svg.getAttribute('height'))}`);
     svg.removeAttribute('width'); svg.removeAttribute('height'); svg.removeAttribute('style');
   }));

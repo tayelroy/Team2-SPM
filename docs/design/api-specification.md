@@ -5,7 +5,7 @@ SG2-95. This spec covers every HTTP endpoint that `server/src/app.ts` mounts at 
 - **Ground truth:** `server/src/app.ts` (mounts), the routers it mounts (`server/src/{auth,events,venues,equipment,notifications,profile,workQueue,assignmentQueue}/*.ts`), `server/src/auth/policy.ts` (`PERMISSIONS`), the `server/src/db/*` adapters, and the RPCs in `supabase/migrations/*.sql`.
 - **Revision scope:** The baseline PR90 head `61416cc` includes merged PR92 (`64b1da6`). Subsequent SG2-46 facility matching, SG2-47 capacity discovery and SG2-40 atomic draft-history corrections are described below. Capacity discovery adds one GET endpoint; SG2-81 still uses existing request and decision routes. Original catalogue line numbers locate the baseline; source filenames and current contracts identify later changes. Safety routes remain planned. This specification describes the local capacity and draft-history revision, not a claim of hosted acceptance or peer approval.
 - **Endpoint count:** 74 method + path pairs, from 71 route registrations. Three registrations each serve two paths: the work queue and the two health checks.
-- **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `c4-model.drawio` (C3 API components), `sequence-diagrams.drawio`, `data-model.drawio`, `class-diagram.drawio`, `event-status-model.drawio`.
+- **Related design artefacts:** [architectural-decisions.md](architectural-decisions.md), `connectsphere.dsl` (C3 API components), `sequence-diagrams.puml`, `data-model.puml`, `class-diagram.puml`, `event-status-model.puml`.
 
 ## Contents
 1. [Conventions](#1-conventions)

@@ -46,6 +46,7 @@ AGENTS.md
 
 # SG2-96: staging walkthrough screenshots show real staging data
 output/staging-walkthrough/
+output/sg2-96-design-evidence/
 
 # Machine-local agent bookkeeping
 .codex-runtime/

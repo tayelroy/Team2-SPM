@@ -10,15 +10,15 @@ SG2-95. This document has three parts:
 
 Every statement cites the code or doc it comes from, and the code wins over the docs. Points that were reasoned out rather than read in the code are marked **[inference]**.
 
-The companion artefacts in `docs/design/` are listed below. Since 26 Oct 2026 (SG2-96) the diagrams are draw.io files, edited by hand in [app.diagrams.net](https://app.diagrams.net) (File → Open from → Device, or the GitHub integration); `render.mjs` turns their pages into the Drive PDFs.
+The companion artefacts in `docs/design/` are:
 
 | File | Contents |
 |---|---|
-| `c4-model.drawio` | C4 L1–L3 (seven pages) |
-| `class-diagram.drawio` | domain classes (three pages) |
-| `data-model.drawio` | ER model (four pages) |
-| `sequence-diagrams.drawio` | five Week 7 flows |
-| `event-status-model.drawio` | event status state machine |
+| `connectsphere.dsl` | C4 L1–L3 |
+| `class-diagram.puml` | domain classes |
+| `data-model.puml` | ER model |
+| `sequence-diagrams.puml` | five Week 7 flows |
+| `event-status-model.puml` | event status state machine |
 | [`api-specification.md`](api-specification.md) | every endpoint |
 
 ---
@@ -255,8 +255,8 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 
 | Artefact | What changed |
 |---|---|
-| C4 (`c4-model.drawio`) | The C3 API components gain a venue-operations router and a clashes router. Supabase gains the `venue_preparation_gap` function and the clash-refresh triggers. |
-| Class (`class-diagram.drawio`) | Venue gains setup, turnaround and safety attributes, from table `venue_operations`. New class BookingClash. |
+| C4 (`connectsphere.dsl`) | The C3 API components gain a venue-operations router and a clashes router. Supabase gains the `venue_preparation_gap` function and the clash-refresh triggers. |
+| Class (`class-diagram.puml`) | Venue gains setup, turnaround and safety attributes, from table `venue_operations`. New class BookingClash. |
 | Data model (`data-model.puml`) | New tables: `venue_operations` and `venue_operation_history` (`202610050003`), `venue_booking_clashes` (`202610140003`). |
 | Sequence (`sequence-diagrams.puml`) | Diagram 1 shows availability, then the booking decision with the gap applied, then clash flags. |
 | API | New: `GET`/`PUT /api/venues/:venueId/operations` and `GET /api/venue-clashes`. Changed: availability (adds `setup` and `turnaround` entries), search, `POST /api/venue-booking-requests`, `…/conflicts`, `…/decision`, `POST /api/venue-holds`, `…/convert`. Notification kind `venue_booking_clash`. |
@@ -368,7 +368,7 @@ The guide itself is not in the repo, so the headings follow the SG2-95 brief.
 | Class | AccountRole gains `event_coordinator_lead`. A coordinator assignment links Event → User (coordinator) and is recorded as history. |
 | Data model | `account_roles` check constraint and `roles` rows (`202610050004_week7_roles.sql`). Status `unassigned` (`202610090001`), backfill (`202610090002`), `events.submitted_at` (`202610090004`). |
 | Sequence | Diagram 4 shows the Lead picking from the unassigned queue, then assigning, then the SG2-68 notices. |
-| State (`event-status-model.drawio`) | Adds `unassigned`; transitions `draft → unassigned → submitted`. |
+| State (`event-status-model.puml`) | Adds `unassigned`; transitions `draft → unassigned → submitted`. |
 | API | New: `GET /api/assignment-queue`. Changed: `GET /api/event-requests/assignable` and `PATCH …/coordinator` (TSS → ECL; first assignment moves `unassigned → submitted`), `PATCH …/submit` (target `unassigned`), `PATCH …/planning` (409 once reassigned), `…/history` and `…/stage` (ECL added), `GET /api/notifications` (ECL added), `GET /api/work-queue` (no unassigned items for EC). |
 
 ### Change #6 — Operational safety check by a Safety Officer
