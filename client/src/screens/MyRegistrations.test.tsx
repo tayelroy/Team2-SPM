@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import MyRegistrations from './MyRegistrations';
 
@@ -162,6 +162,44 @@ test('[CONFLICT] [SG2-62:AC2] a double click on confirm sends one withdrawal', a
   finish(Response.json({ error: 'You have already withdrawn from this event.', reason: 'withdrawn' }, { status: 409 }));
   expect(await screen.findByRole('alert')).toHaveTextContent('You have already withdrawn from this event.');
   expect(withdrawals(fetch)).toBe(1);
+});
+
+test('[BOUNDARY] [SG2-62:AC2] an unnamed event with no registration time can still be withdrawn from', async () => {
+  const unnamed = { ...active, registered_at: null, event: { ...event, name: ' ' } };
+  serve({
+    '/api/my-registrations': () => Response.json({ registrations: [unnamed] }),
+    '/api/my-registrations/7/withdrawal': () => Response.json({ withdrawal: { registration_id: 7, event_id: 591, withdrawn_at: withdrawn.withdrawn_at } }),
+  });
+  render(<MyRegistrations accessToken="attendee-token" />);
+  const card = await screen.findByRole('article', { name: 'Untitled event' });
+  expect(card).toHaveTextContent('RegisteredTo be announced');
+  fireEvent.click(within(card).getByRole('button', { name: 'Withdraw' }));
+  fireEvent.click(within(screen.getByRole('group', { name: 'Withdraw from Untitled event' })).getByRole('button', { name: 'Confirm withdrawal' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('You have withdrawn from Untitled event.');
+});
+
+test('[CONFLICT] [SG2-62:AC2] two presses before the screen updates send one withdrawal', async () => {
+  const fetch = serve({
+    '/api/my-registrations': () => Response.json({ registrations: [active] }),
+    '/api/my-registrations/7/withdrawal': () => Response.json({ error: 'You have already withdrawn from this event.', reason: 'withdrawn' }, { status: 409 }),
+  });
+  render(<MyRegistrations accessToken="attendee-token" />);
+  fireEvent.click(within(await screen.findByRole('article', { name: 'Harbour Lecture' })).getByRole('button', { name: 'Withdraw' }));
+  const button = screen.getByRole('button', { name: 'Confirm withdrawal' });
+  // Both presses land in one render, before the button is disabled; the ref guard stops the second.
+  await act(async () => { button.click(); button.click(); });
+  expect(await screen.findByRole('alert')).toHaveTextContent('You have already withdrawn from this event.');
+  expect(withdrawals(fetch)).toBe(1);
+});
+
+test('[BOUNDARY] [SG2-62:AC1] leaving the screen before the list arrives changes nothing', async () => {
+  let answer: (response: Response) => void = () => undefined;
+  serve({ '/api/my-registrations': () => new Promise<Response>((resolve) => { answer = resolve; }) as unknown as Response });
+  const { unmount } = render(<MyRegistrations accessToken="attendee-token" />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your registrations…');
+  unmount();
+  await act(async () => { answer(Response.json({ registrations: [active] })); });
+  expect(screen.queryByRole('article')).not.toBeInTheDocument();
 });
 
 test('[FAILURE] [SG2-62:AC1] an outage offers a retry, and a non-attendee is told why', async () => {

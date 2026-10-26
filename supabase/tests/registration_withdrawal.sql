@@ -19,8 +19,9 @@ insert into public.account_roles(user_id,role) values
  ('e6200000-0000-4000-8000-000000000005','attendee'),
  ('e6200000-0000-4000-8000-000000000005','event_organiser'),
  ('e6200000-0000-4000-8000-000000000006','attendee');
-insert into public.venues(venue_id,name,location,capacity) values (96251,'Wd Hall','Level 3',100);
+insert into public.venues(venue_id,name,location,capacity) values (96251,'Wd Hall','Level 3',100),(96252,'Wd Annex','Level 4',50);
 
+-- 96202 is also held (not confirmed) at Wd Annex, which an attendee must not see.
 -- 96201 Closed forum: registration closed yesterday, starts in 5 days, capacity 1 (full: A holds it).
 -- 96202 Open forum: open, capacity 10, no coordinator, 20 Jul 2030 19:00 SGT at Wd Hall.
 -- 96203 Started forum: started an hour ago.
@@ -52,7 +53,8 @@ insert into public.events(event_id,organiser_id,coordinator_id,organisation,name
 update public.events set status = 'completed', completed_by = 'e6200000-0000-4000-8000-000000000001', completed_at = now()
  where event_id = 96204;
 insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status) values
- (96251,96202,'2030-07-20 10:00+00','2030-07-20 14:00+00','confirmed');
+ (96251,96202,'2030-07-20 10:00+00','2030-07-20 14:00+00','confirmed'),
+ (96252,96202,'2030-07-20 10:00+00','2030-07-20 14:00+00','held');
 insert into public.registrations(registration_id,event_id,attendee_id,status,registered_at,contact_phone,needs,withdrawn_at) values
  (962001,96201,'e6200000-0000-4000-8000-000000000003','registered',now()-interval '4 days','91234567','Vegetarian',null),
  (962002,96202,'e6200000-0000-4000-8000-000000000003','registered',now()-interval '3 hours','91234567',null,null),

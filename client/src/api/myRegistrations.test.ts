@@ -35,14 +35,16 @@ test('[BOUNDARY] [SG2-62:AC1] rows the screen cannot show are skipped and missin
   respond(Response.json({ registrations: [
     { registration_id: 8, event_id: 592, standing: 'withdrawn', can_withdraw: 'yes', event: { venues: [{ location: 'Annex' }, 3] } },
     { ...row, standing: 'lost' }, { ...row, registration_id: '7' }, { ...row, event: null }, 'row',
+    { ...row, registration_id: 9, event: { ...row.event, venues: 'Regression Hall' } },
   ] }));
   const result = await fetchMyRegistrations('t');
-  expect(result).toEqual({ ok: true, registrations: [{
+  expect(result.ok && result.registrations[1]).toMatchObject({ registrationId: 9, event: { venues: [] } });
+  expect(result.ok && result.registrations.slice(0, 1)).toEqual([{
     registrationId: 8, eventId: 592, standing: 'withdrawn', canWithdraw: false, registeredAt: null, withdrawnAt: null,
     contactPhone: null, needs: null,
     event: { name: '', organisation: null, category: null, description: null, proposedDate: null, registrationClosesAt: null,
       venues: [{ name: 'Unnamed venue', location: 'Annex' }] },
-  }] });
+  }]);
 });
 
 test('[FAILURE] [SG2-62:AC1] refusals, outages and malformed answers are told apart', async () => {
@@ -80,6 +82,7 @@ test('[FAILURE] [SG2-62:AC4] each refusal keeps the server\'s message, and anyth
     Response.json({ reason: 'started' }, { status: 409 }),
     Response.json({ withdrawal: { registration_id: 7 } }),
     Response.json({ error: 'down' }, { status: 503 }),
+    new Response('not json', { status: 409 }),
   ]) {
     respond(response);
     expect(await withdrawRegistration(7, 't')).toEqual({ ok: false, kind: 'unavailable' });
