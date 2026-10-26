@@ -236,7 +236,7 @@ test('SG2-40-N02 | [BOUNDARY] [CONFLICT] [FAILURE] [SG2-29:AC1] [SG2-40:AC2] [SG
   });
 });
 
-test('SG2-40-P03 | [NORMAL] [SG2-36:AC1] [SG2-36:AC2] [SG2-36:AC3] [SG2-40:AC1] [SG2-40:AC2] an explicit clarification revision records the organiser field changes while retaining the coordinator conversation and review history', async ({ page, request }, info) => {
+test('SG2-40-P03 | [NORMAL] [SG2-36:AC1] [SG2-36:AC3] [SG2-40:AC1] [SG2-40:AC2] [SG2-64:AC5] a request returned for clarification is answered and resubmitted without direct edits, retaining the coordinator conversation and review history', async ({ page, request }, info) => {
   const issues = watchConsole(page);
   await test.step('The coordinator explicitly returns the reviewed event for clarification', async () => {
     expect((await request.post('/__e2e/under-review')).status()).toBe(204);
@@ -248,37 +248,38 @@ test('SG2-40-P03 | [NORMAL] [SG2-36:AC1] [SG2-36:AC2] [SG2-36:AC3] [SG2-40:AC1] 
     await expect(page.getByText('needs clarification', { exact: true })).toBeVisible();
     await signOut(page);
   });
-  await test.step('The organiser answers and saves the returned event with two audited field changes', async () => {
+  await test.step('The organiser answers in the thread and cannot edit the returned event directly', async () => {
     await signIn(page);
     await nav(page, 'My events');
     await page.getByRole('button', { name: 'View Decision Forum', exact: true }).click();
     const thread = page.getByRole('region', { name: 'Clarification conversation' });
     await thread.getByLabel('Answer your coordinator').fill('Attendance is now 34 and the session includes a demonstration.');
     await thread.getByRole('button', { name: 'Send', exact: true }).click();
-    await editDraft(page, 'Decision Forum');
-    await page.getByLabel(/^Expected attendance/).fill('34');
-    await page.getByLabel(/^Description/).fill('Revised session with a demonstration.');
-    expect((await save(page, 52)).status).toBe('needs_clarification');
+    // SG2-64 AC5: no Edit on the event page or in My drafts, and the server refuses a direct save.
+    await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Resubmit for review', exact: true })).toBeVisible();
+    const direct = await page.request.patch('/api/event-requests/52', {
+      headers: await headers(page), data: { name: 'Decision Forum', expected_attendance: 34 },
+    });
+    expect(direct.status()).toBe(409);
+    await nav(page, 'My drafts');
+    const drafts = page.getByRole('region', { name: 'My draft requests', exact: true });
+    await expect(drafts.getByText(/ask for any change there, then resubmit/)).toBeVisible();
+    await expect(drafts.locator('div').filter({ has: page.getByRole('heading', { name: 'Decision Forum', exact: true }) })
+      .getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
     const entries = await history(page, 52);
-    expect(entries.filter(entry => entry.field_name !== 'status').map(entry => [entry.field_name, entry.old_value, entry.new_value]).sort()).toEqual([
-      ['description', 'A planning workshop.', 'Revised session with a demonstration.'], ['expected_attendance', '20', '34'],
-    ]);
-    for (const entry of entries.filter(entry => entry.field_name !== 'status')) {
-      expect(entry).toMatchObject({ actor_id: 'user-organiser', actor_name: 'Regression organiser', actor_role: 'Event Organiser' });
-    }
+    expect(entries.filter(entry => entry.field_name !== 'status')).toEqual([]);
     expect(entries).toContainEqual(expect.objectContaining({ actor_id: 'user-coordinator', field_name: 'status', old_value: 'under_review', new_value: 'needs_clarification' }));
     const drawer = await openHistory(page, 'Decision Forum');
-    await expect(drawer.getByTestId(/^audit-entry-/)).toHaveCount(3);
     await page.setViewportSize({ width: 1440, height: 900 });
     await screenshot(page, info, 'clarification-revision-retained-history-1440', drawer);
     await page.getByRole('button', { name: 'Close change history', exact: true }).click();
   });
   await test.step('Resubmission adds only its real status transition and retains both conversation messages', async () => {
-    await editDraft(page, 'Decision Forum');
-    await page.getByRole('button', { name: 'Submit request', exact: true }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Decision Forum has been submitted for review.' })).toBeVisible();
+    await page.getByRole('button', { name: 'Resubmit for review', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Resubmit for review', exact: true })).toHaveCount(0);
     const entries = await history(page, 52);
-    expect(entries.filter(entry => entry.field_name !== 'status')).toHaveLength(2);
+    expect(entries.filter(entry => entry.field_name !== 'status')).toEqual([]);
     expect(entries).toContainEqual(expect.objectContaining({ actor_id: 'user-organiser', field_name: 'status', old_value: 'needs_clarification', new_value: 'submitted' }));
     const messages = page.getByRole('region', { name: 'Clarification conversation' }).getByRole('list', { name: 'Messages' });
     await expect(messages.getByRole('listitem')).toHaveCount(2);

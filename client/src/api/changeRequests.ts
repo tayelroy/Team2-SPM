@@ -1,10 +1,8 @@
 /**
+ * SG2-64: the event organiser asks for a change after submitting and sees
+ * their outstanding requests.
  * SG2-66: what a change to an event would break, accepting it, and settling
  * the rechecks it leaves outstanding.
- *
- * The change requests themselves are sample data served by the server as a
- * stand-in for SG2-64 (submitting a change request) and SG2-65 (deciding on
- * one) until those ship. The impact, acceptance and recheck settling are real.
  */
 
 export type RecheckKey = 'venue_recheck' | 'equipment_recheck' | 'registration_recheck';
@@ -58,7 +56,6 @@ export interface ChangeRequest {
 }
 
 export interface ChangeRequestList {
-  source: string;
   event: { event_id: number; status: string };
   can_accept: boolean;
   change_requests: ChangeRequest[];
@@ -96,6 +93,22 @@ export type ChangeRequestFailure = {
 
 export type FetchChangeRequestsResult = { ok: true; list: ChangeRequestList } | ChangeRequestFailure;
 
+/** SG2-64 AC1: one field (what), its new value (to what) and why. */
+export interface NewChangeRequest {
+  field: string;
+  to: string | number;
+  reason: string;
+}
+
+/** A request as its organiser sees it: no impact assessment (SG2-64 AC3). */
+export type OwnChangeRequest = Pick<ChangeRequest, 'id' | 'requested_at' | 'reason' | 'status' | 'changes'>;
+
+export type RaiseChangeRequestResult =
+  | { ok: true; request: OwnChangeRequest; coordinatorNotified: boolean }
+  | ChangeRequestFailure;
+
+export type FetchOwnChangeRequestsResult = { ok: true; requests: OwnChangeRequest[] } | ChangeRequestFailure;
+
 export type AcceptChangeRequestResult = { ok: true; change: AcceptedChange } | ChangeRequestFailure;
 
 export type SettleRecheckResult =
@@ -124,10 +137,21 @@ type Body = Record<string, unknown> | null;
 
 const NETWORK_FAILURE: ChangeRequestFailure = { ok: false, kind: 'unavailable', message: UNAVAILABLE };
 
-async function send(url: string, method: 'GET' | 'POST', token: string): Promise<{ response: Response; body: Body } | null> {
+async function send(
+  url: string,
+  method: 'GET' | 'POST',
+  token: string,
+  payload?: unknown,
+): Promise<{ response: Response; body: Body } | null> {
   let response: Response;
   try {
-    response = await fetch(url, { method, headers: { Authorization: `Bearer ${token}` } });
+    response = await fetch(url, payload === undefined
+      ? { method, headers: { Authorization: `Bearer ${token}` } }
+      : {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
   } catch {
     return null;
   }
@@ -159,6 +183,50 @@ export async function fetchChangeRequests(eventId: number | string, token: strin
   if (!response.ok) return failure(response.status, body, 'Could not load change requests');
   if (!body || !Array.isArray(body.change_requests)) return NETWORK_FAILURE;
   return { ok: true, list: body as unknown as ChangeRequestList };
+}
+
+/** SG2-64: the organiser's refusals name the organiser, not the coordinator. */
+function organiserFailure(status: number, body: Body, fallback: string): ChangeRequestFailure {
+  const result = failure(status, body, fallback);
+  return typeof body?.error !== 'string' && result.kind === 'unauthorized'
+    ? { ...result, message: 'Only the organiser who created this event can do this. Sign in again if your session has expired.' }
+    : result;
+}
+
+/**
+ * Raises a change request on the organiser's own submitted event (SG2-64
+ * AC1). The server checks ownership and status and notifies the assigned
+ * coordinator (AC2). Maps to `POST /api/event-requests/:eventId/change-requests`.
+ */
+export async function raiseChangeRequest(
+  eventId: number | string,
+  change: NewChangeRequest,
+  token: string,
+): Promise<RaiseChangeRequestResult> {
+  const reply = await send(`/api/event-requests/${eventId}/change-requests`, 'POST', token, change);
+  if (!reply) return NETWORK_FAILURE;
+  const { response, body } = reply;
+  if (!response.ok) return organiserFailure(response.status, body, 'Could not send the change request');
+  const request = body?.change_request as OwnChangeRequest | undefined;
+  if (!request || typeof request.id !== 'string' || !Array.isArray(request.changes)
+      || typeof body?.coordinator_notified !== 'boolean') {
+    return NETWORK_FAILURE;
+  }
+  return { ok: true, request, coordinatorNotified: body.coordinator_notified };
+}
+
+/**
+ * The organiser's outstanding change requests on their own event (SG2-64
+ * AC3). Same route as the coordinator's list; the server answers the
+ * organiser without the impact assessment.
+ */
+export async function fetchOwnChangeRequests(eventId: number | string, token: string): Promise<FetchOwnChangeRequestsResult> {
+  const reply = await send(`/api/event-requests/${eventId}/change-requests`, 'GET', token);
+  if (!reply) return NETWORK_FAILURE;
+  const { response, body } = reply;
+  if (!response.ok) return organiserFailure(response.status, body, 'Could not load your change requests');
+  if (!body || !Array.isArray(body.change_requests)) return NETWORK_FAILURE;
+  return { ok: true, requests: body.change_requests as OwnChangeRequest[] };
 }
 
 /**

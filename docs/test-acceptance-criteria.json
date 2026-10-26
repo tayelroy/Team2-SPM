@@ -918,6 +918,21 @@
         "AC5": "Where there are several Event Coordinator Leads, each can see the whole unassigned queue (SG2-87)",
         "AC6": "Active events include those awaiting the Organiser's clarification: they stay in the assigned Event Coordinator's work queue (SG2-41) and in this overview, and the Lead can reassign them without changing their status"
       }
+    },
+    {
+      "id": "SG2-64",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-64",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-24",
+      "source": "Live SG2-64 Jira description (updated 15 Oct 2026), bullet order, read through the Atlassian connector.",
+      "acceptanceCriteria": {
+        "AC1": "Can raise a change request after an event has been submitted, including while it is Under Review, Approved, Planning or Confirmed, stating what should change, to what, and why",
+        "AC2": "The request reaches the assigned Coordinator",
+        "AC3": "The outstanding request is visible on the event to both of us",
+        "AC4": "Change requests cannot be raised against a cancelled, rejected or completed event",
+        "AC5": "While a request is returned for clarification, the Event Organiser cannot edit it directly (refused on the server side); they answer in the clarification thread and ask for any change to the request through a change request (replaces SG2-36 AC2 and the clarification exception in SG2-30 AC3)",
+        "AC6": "A rejected request is revised through the Coordinator, and the Event Organiser resubmits it when the Coordinator decides a new submission is needed; direct Organiser changes to submitted fields remain refused"
+      }
     }
   ]
 }

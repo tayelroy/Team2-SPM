@@ -225,7 +225,7 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     assert.doesNotMatch(response.text, /SENTINEL/);
   });
 
-  test('[NORMAL] [SG2-36:AC2] amends a request returned for clarification', async () => {
+  test('[CONFLICT] [SG2-64:AC5] refuses to edit a request returned for clarification', async () => {
     let updated = false;
     const response = await request(
       buildApp({
@@ -235,8 +235,23 @@ describe('PATCH /api/event-requests/:eventId (SG2-29)', () => {
     )
       .patch('/api/event-requests/7')
       .send(COMPLETE_BODY);
-    assert.equal(response.status, 200);
-    assert.equal(updated, true);
+    assert.equal(response.status, 409);
+    assert.match(response.body.error, /change request/);
+    assert.equal(updated, false);
+  });
+
+  test('[CONFLICT] [SG2-64:AC6] refuses to edit a rejected request directly', async () => {
+    let updated = false;
+    const response = await request(
+      buildApp({
+        fetchResult: { ok: true, request: { ...DRAFT_REQUEST, status: 'rejected' } },
+        captureUpdate: () => (updated = true)
+      })
+    )
+      .patch('/api/event-requests/7')
+      .send(COMPLETE_BODY);
+    assert.equal(response.status, 409);
+    assert.equal(updated, false);
   });
 
   test('[CONFLICT] [SG2-30:AC3] returns 409 when the request has already been submitted', async () => {

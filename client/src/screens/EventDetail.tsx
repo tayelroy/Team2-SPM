@@ -4,6 +4,7 @@ import {
   completeEvent,
   fetchOwnEventDetail,
   getEventStage,
+  submitEventRequest,
   type EventRequestDetail,
   type EventStageResult
 } from '../api/eventRequests';
@@ -19,6 +20,7 @@ import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import RegistrationPanel from '../components/RegistrationPanel';
 import CancellationPanel from '../components/CancellationPanel';
+import OrganiserChangeRequests from '../components/OrganiserChangeRequests';
 import type { Role, Screen } from '../mock/types';
 import { badgeStyle, lockedRequestNotice, statusLabel } from '../mock/viewModel';
 import { color, radius } from '../theme';
@@ -78,6 +80,8 @@ export default function EventDetail({
   // one request rather than two.
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [resubmitting, setResubmitting] = useState(false);
+  const [resubmitError, setResubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthorizedRole || !selectedEventId || !accessToken) {
@@ -239,6 +243,12 @@ export default function EventDetail({
       const needsClarification = detail.status.toLowerCase() === 'needs_clarification';
       const isTerminal = ['cancelled', 'completed', 'rejected'].includes(detail.status.toLowerCase());
       const isLocked = isTerminal || !detail.waitingOnMe;
+      // SG2-64 AC5: a request returned for clarification is answered in the
+      // thread and changed through a change request, never edited directly.
+      const canEditRequest = !isLocked && !needsClarification;
+      // SG2-64 AC1/AC4: change requests on any submitted, still-open event.
+      const canRequestChange = isOrganiser && detail.canManage && Boolean(accessToken)
+        && !['draft', 'cancelled', 'rejected', 'completed'].includes(detail.status.toLowerCase());
 
       const session = loadSession();
       const resolvedUserId = currentUserId ?? session?.user?.userId;
@@ -276,6 +286,17 @@ export default function EventDetail({
           setCompleteError(result.message);
         }
         setCompleting(false);
+      };
+
+      // SG2-36/SG2-64 AC5: once the question is answered, the organiser sends
+      // the request back to review as it stands.
+      const resubmit = async () => {
+        setResubmitting(true);
+        setResubmitError(null);
+        const result = await submitEventRequest(detail.eventId, accessToken!);
+        setResubmitting(false);
+        if (result.ok) setReloadKey((key) => key + 1);
+        else setResubmitError(result.kind === 'error' ? result.message : 'Could not resubmit the request. Please try again.');
       };
 
       const facts = [
@@ -422,6 +443,11 @@ export default function EventDetail({
               onAccepted={() => setReloadKey((value) => value + 1)}
             />
           )}
+          {/* SG2-64 AC1/AC3: the creating organiser asks for a change and sees
+              what is still waiting on the coordinator. */}
+          {canRequestChange && (
+            <OrganiserChangeRequests eventId={detail.eventId} accessToken={accessToken!} />
+          )}
           {/* SG2-92 AC4–AC6: the latest safety decision for the creating
               organiser and the assigned coordinator, who can rework a Safety
               Rejected event back to Planning. */}
@@ -470,8 +496,11 @@ export default function EventDetail({
                 {needsClarification && isOrganiser ? (
                   <div className="organisation-detail-notice" role="status" aria-label="Your coordinator has a question">
                     <strong>Your coordinator has a question</strong>
-                    <p>Answer it in the conversation above, then edit the request if anything needs changing and resubmit it.</p>
+                    <p>Answer it in the conversation above. Ask for any change to the request through a change request, then resubmit it for review.</p>
                   </div>
+                ) : null}
+                {resubmitError ? (
+                  <p role="alert" className="organisation-detail-notice">{resubmitError}</p>
                 ) : null}
                 {completeError ? (
                   <p role="alert" className="organisation-detail-notice">{completeError}</p>
@@ -482,8 +511,18 @@ export default function EventDetail({
                   </p>
                 ) : null}
                 <div className="organisation-detail-actions">
-                  {!isLocked && isOrganiser ? (
+                  {canEditRequest && isOrganiser ? (
                     <button className="organisation-button organisation-button-primary" type="button" onClick={() => onNavigate('drafts')}>Edit request</button>
+                  ) : null}
+                  {needsClarification && isOrganiser && accessToken ? (
+                    <button
+                      className="organisation-button organisation-button-primary"
+                      type="button"
+                      onClick={() => void resubmit()}
+                      disabled={resubmitting}
+                    >
+                      {resubmitting ? 'Resubmitting…' : 'Resubmit for review'}
+                    </button>
                   ) : null}
                   {canEditPlanning ? (
                     <button
@@ -525,9 +564,11 @@ export default function EventDetail({
                   ? 'Contact the request creator if this event needs updating.'
                   : isRejected
                     ? 'The rejection reason and change history remain available.'
-                    : isLocked
-                      ? 'Your coordinator will be in touch if clarification is needed.'
-                      : 'You can edit and resubmit this request while it is with you.'}
+                    : needsClarification
+                      ? 'Answer your coordinator, then resubmit the request for review.'
+                      : isLocked
+                        ? 'Your coordinator will be in touch if clarification is needed.'
+                        : 'You can edit and submit this request while it is a draft.'}
             </p>
           </footer>
           {canEditPlanning && (

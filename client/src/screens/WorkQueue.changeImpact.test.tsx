@@ -82,7 +82,6 @@ describe('work queue change impact (SG2-66)', () => {
 
   test.each([
     ['not assigned to them', { assigned_to_me: false }],
-    ['still under review', { status: 'under_review' }],
     ['completed', { status: 'completed' }],
   ])('[BOUNDARY] [SG2-66:AC1] an event %s shows no change requests or rechecks', async (_label, override) => {
     serveQueue({ ...showcase, ...override });
@@ -90,4 +89,12 @@ describe('work queue change impact (SG2-66)', () => {
     expect(within(pane).queryByTestId('change-requests-panel')).not.toBeInTheDocument();
     expect(within(pane).queryByTestId('arrangement-rechecks-stub')).not.toBeInTheDocument();
   });
+
+  test.each(['under_review', 'needs_clarification'])(
+    '[BOUNDARY] [SG2-64:AC2] [SG2-64:AC3] an event %s shows the organiser’s change requests but no rechecks', async (status) => {
+      serveQueue({ ...showcase, status });
+      const pane = await openShowcase();
+      expect(within(pane).getByTestId('change-requests-panel')).toBeInTheDocument();
+      expect(within(pane).queryByTestId('arrangement-rechecks-stub')).not.toBeInTheDocument();
+    });
 });

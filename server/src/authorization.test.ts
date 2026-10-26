@@ -441,14 +441,14 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] [SG2-64:AC1] [SG2-64:AC3] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
       'event_request.update', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
       'event_request.confirmation.view', 'event_request.safety_decisions.view',
       'event_request.registrations.view', 'event_request.registration_settings.update',
-      'event_request.cancellation.request',
+      'event_request.cancellation.request', 'event_request.change_request.raise', 'event_request.change_request.view',
       'venues.suitability.view', 'notifications.read', 'notifications.inbox', 'profile.read', 'profile.update'
     ],
     event_coordinator: [

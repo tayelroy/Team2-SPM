@@ -19,7 +19,9 @@ const EVENT_KINDS = new Set(['venue_request_approved', 'venue_request_rejected',
   // SG2-83 AC4: Venue Staff hear of a cancelled or changed venue booking.
   'venue_booking_cancelled', 'venue_change_requested',
   // SG2-67: the organiser asked to cancel, and the event was cancelled.
-  'cancellation_requested', 'event_cancelled']);
+  'cancellation_requested', 'event_cancelled',
+  // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
+  'change_requested']);
 const HOLD_KINDS = new Set(['placed', 'warning', 'expired', 'expiry_changed']);
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const positiveId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0;

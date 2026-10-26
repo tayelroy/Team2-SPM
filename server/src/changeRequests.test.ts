@@ -123,6 +123,8 @@ describe('change request routes behind the app (SG2-66)', () => {
   test('[FAILURE] [SG2-66:AC1] [SG2-66:AC4] every role but the Event Coordinator is refused with 403', async () => {
     for (const role of ['event_organiser', 'venue_staff', 'technical_support_staff', 'attendee', 'event_coordinator_lead', 'safety_officer'] as const) {
       for (const [method, path] of routes) {
+        // SG2-64 AC3: the organiser may read the list (their own requests only).
+        if (role === 'event_organiser' && method === 'get') continue;
         const res = await request(appAs(role))[method](path).set('Authorization', 'Bearer token');
         assert.equal(res.status, 403, `${role} ${path}`);
         assert.deepEqual(res.body, { error: 'Access denied' });
@@ -186,7 +188,6 @@ describe('GET /api/event-requests/:eventId/change-requests (SG2-66 AC1-AC3)', ()
   test('[NORMAL] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] lists each sample request with its significance and impact', async () => {
     const res = await request(harness().app).get('/events/12/change-requests');
     assert.equal(res.status, 200);
-    assert.equal(res.body.source, 'mock');
     assert.deepEqual(res.body.event, { event_id: 12, status: 'confirmed' });
     assert.equal(res.body.can_accept, true);
     const [attendance, date, description] = res.body.change_requests;
@@ -206,8 +207,8 @@ describe('GET /api/event-requests/:eventId/change-requests (SG2-66 AC1-AC3)', ()
 
   test('[FAILURE] [SG2-66:AC1] no principal, a non-coordinator and malformed ids are refused before any read', async () => {
     assert.equal((await request(harness({ principal: null }).app).get('/events/12/change-requests')).status, 401);
-    const organiser = await request(harness({ principal: { userId: COORDINATOR, role: 'event_organiser' } }).app).get('/events/12/change-requests');
-    assert.deepEqual([organiser.status, organiser.body], [403, { error: 'Access denied' }]);
+    const staff = await request(harness({ principal: { userId: COORDINATOR, role: 'venue_staff' } }).app).get('/events/12/change-requests');
+    assert.deepEqual([staff.status, staff.body], [403, { error: 'Access denied' }]);
     for (const id of ['abc', '0', '01', '2147483648']) {
       const res = await request(harness().app).get(`/events/${id}/change-requests`);
       assert.deepEqual([res.status, res.body], [400, { error: 'eventId must be a positive integer.' }], id);

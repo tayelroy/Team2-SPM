@@ -12,10 +12,12 @@ import { missingForSubmission, validateDraftInput, type DraftValues } from './fi
 
 const UNAVAILABLE_MESSAGE = 'Event requests are temporarily unavailable. Please try again later.';
 
-/** Statuses an organiser may still edit their own request in. `draft` is the
- * original case (SG2-29); `needs_clarification` is SG2-36's, where the
- * coordinator has asked a question and expects an amended resubmission. */
-const EDITABLE_STATUSES = new Set(['draft', 'needs_clarification']);
+/** Statuses an organiser may still edit their own request in: only `draft`
+ * (SG2-29). SG2-64 AC5 replaced SG2-36 AC2: while a request is returned for
+ * clarification the organiser answers in the thread and asks for any change
+ * through a change request, so direct edits are refused here. */
+const EDITABLE_STATUSES = new Set(['draft']);
+const NOT_EDITABLE_MESSAGE = 'Only a draft can be edited. Ask for a change to a submitted request through a change request.';
 
 export interface UpdateEventDraftDependencies {
   /** Reads the verified caller established by requireAuth. */
@@ -37,7 +39,7 @@ export interface UpdateEventDraftDependencies {
 /**
  * PATCH /api/event-requests/:eventId — updates a draft's own fields
  * (SG2-29). Only the request's own organiser may edit it, only while it is
- * a draft or needs_clarification request — mirrors submitEventRequestHandler / createDeleteEventDraftHandler's
+ * a draft — mirrors submitEventRequestHandler / createDeleteEventDraftHandler's
  * fetch-then-check shape, reusing fetchManageableEventRequest so a request
  * belonging to someone else is indistinguishable from one that doesn't
  * exist at all. `updateEventRequestDraft` atomically rechecks ownership, membership and
@@ -94,7 +96,7 @@ export function createUpdateEventDraftHandler({
     }
 
     if (!EDITABLE_STATUSES.has(existing.request.status)) {
-      res.status(409).json({ error: 'Only a draft or returned event request can be edited.' });
+      res.status(409).json({ error: NOT_EDITABLE_MESSAGE });
       return;
     }
 
@@ -105,7 +107,7 @@ export function createUpdateEventDraftHandler({
         return;
       }
       if (updated.reason === 'not_editable') {
-        res.status(409).json({ error: 'Only a draft or returned event request can be edited.' });
+        res.status(409).json({ error: NOT_EDITABLE_MESSAGE });
         return;
       }
       if (updated.reason === 'invalid') {

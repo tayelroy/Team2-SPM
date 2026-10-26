@@ -288,6 +288,13 @@ export function createApp(
   );
   // SG2-66 AC1-AC4/AC7: the assigned coordinator sees what each change
   // request would break, accepts one, and settles the rechecks it leaves.
+  // SG2-64 AC1-AC4: the owning organiser raises a change request and sees
+  // their outstanding ones on the same list route.
+  eventRequests.post(
+    '/:eventId/change-requests',
+    access.requirePermission('event_request.change_request.raise'),
+    changeRequestHandlers.raise
+  );
   eventRequests.get(
     '/:eventId/change-requests',
     access.requirePermission('event_request.change_request.view'),

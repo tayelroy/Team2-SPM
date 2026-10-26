@@ -193,7 +193,8 @@ uploaded as the `browser-regression` artifact.
 - [Event cancellation](docs/event-cancellation.md) — SG2-67 organiser request, coordinator cancellation, venue and equipment release, attendee notices and migration
 - [Internal work queue](docs/work-queue.md) — SG2-41 role queues, selected-record details, Supabase migration and verification
 - [Clarification exchange](docs/clarifications.md) — SG2-36 returning a request with a question, API, migration and verification
-- [Change impact](docs/change-impact.md) — SG2-66 what an accepted change breaks, returning to Planning, settling rechecks, and the sample change requests standing in for SG2-64/SG2-65
+- [Change requests](docs/change-requests.md) — SG2-64 the organiser asks for a change after submitting, API, migration, no direct edits while returned for clarification, and verification
+- [Change impact](docs/change-impact.md) — SG2-66 what an accepted change breaks, returning to Planning, settling rechecks, and where change requests come from
 - [Safety checks](docs/safety-checks.md) — SG2-92 the Safety Officer's Approve / Reject / Request Changes decision on SG2-91's list, refused when the event changed since it was reviewed, its notices and history, and reworking a rejection; SG2-94 the approval as the only way into Preparation and a condition of confirmation, withdrawn by a significant accepted change
 - [Registrations](docs/registrations.md) — SG2-63 who has registered and how many places remain, contact details for the creating organiser and the coordinator, and the organiser's capacity, opening and closing times, closing early and reopening, with history and notices
 

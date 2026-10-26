@@ -88,26 +88,15 @@ test('[CONFLICT] [SG2-32:AC2] [SG2-36:AC2] lists only requests the organiser can
   expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
 });
 
-test('[NORMAL] [SG2-36:AC2] a request returned with a question can be edited but not deleted', async () => {
+test('[CONFLICT] [SG2-64:AC5] a request returned with a question can be neither edited nor deleted here', async () => {
   const RETURNED = { event_id: 11, status: 'needs_clarification', name: 'Returned Forum' };
   api([RETURNED]);
   render(<DraftRequests accessToken="test-token" onEdit={noop} />);
   expect(await screen.findByRole('heading', { name: 'Returned Forum' })).toBeInTheDocument();
-  expect(screen.getByText(/Your coordinator has a question/)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
-  // It is no longer a draft, so the server would refuse a delete anyway.
+  expect(screen.getByText(/Answer it on the event page, ask for any change there, then resubmit/)).toBeInTheDocument();
+  // AC5: changes go through a change request; it is no longer a draft, so no delete either.
+  expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
-});
-
-test('[NORMAL] [SG2-36:AC2] editing a returned request opens it for amendment', async () => {
-  const RETURNED = { event_id: 11, status: 'needs_clarification', name: 'Returned Forum' };
-  const RETURNED_FULL = { ...DRAFT_FULL_RECORD, event_id: 11, status: 'needs_clarification', name: 'Returned Forum' };
-  api([RETURNED], { 11: RETURNED_FULL });
-  const onEdit = vi.fn();
-  render(<DraftRequests accessToken="test-token" onEdit={onEdit} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
-  await act(async () => {});
-  expect(onEdit).toHaveBeenCalledWith(RETURNED_FULL);
 });
 
 test('[NORMAL] [SG2-29:AC2] Edit fetches the full record (not just the list summary) before handing it to onEdit', async () => {

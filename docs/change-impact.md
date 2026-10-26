@@ -15,15 +15,11 @@ The other SG2-66 rules are documented with the features they change:
   see [registrations](registrations.md)), and AC7 on that path: [work queue](work-queue.md) and
   [notifications](notifications.md).
 
-## Change requests are sample data (stand-in for SG2-64 / SG2-65)
+## Where change requests come from (SG2-64)
 
-Submitting a change request (SG2-64) and deciding on one (SG2-65) belong to Ye Zhan and
-are not built yet. Until they ship, the change requests come from an in-memory mock,
-`server/src/changeRequests/mockChangeRequests.ts`. Everything else in this document is
-real: the impact assessment, acceptance, the return to Planning, the notices, the history
-and settling rechecks. The client labels the panel as sample data.
-
-The mock sits behind one interface:
+Organisers raise change requests through SG2-64 (see [change requests](change-requests.md)),
+stored in `event_change_requests`. Deciding on one with a refusal is SG2-65. The handlers
+read them through one interface:
 
 ```ts
 interface ChangeRequestSource {
@@ -33,10 +29,12 @@ interface ChangeRequestSource {
 }
 ```
 
-SG2-64/65 replace it by passing a database-backed `source` to
-`createChangeRequestHandlers` (`server/src/events/changeRequests.ts`); no SG2-66 logic
-changes. Per process, the mock seeds three requests per event on first read and then
-freezes them (accepted ones are hidden):
+The production `source` is `createDatabaseChangeRequestSource`
+(`server/src/db/changeRequests.ts`); accepting marks the request `accepted`. The in-memory
+mock in `server/src/changeRequests/mockChangeRequests.ts` is now only a test fixture: the
+unit tests and the e2e change-impact and safety-approval journeys opt their events in to it
+(`e2e/support/change-requests.ts`), so their ids stay stable. Per process, it seeds three
+requests per event on first read and then freezes them (accepted ones are hidden):
 
 | id | change | significant |
 | --- | --- | --- |
@@ -44,8 +42,6 @@ freezes them (accepted ones are hidden):
 | `mock-<id>-date` (only when the event has a date) | proposed date + 7 days | yes |
 | `mock-<id>-description` | description + " (updated agenda)" | no |
 
-Because the mock lives in memory, a server restart forgets accepted requests, and
-serverless instances do not share it. That is acceptable for a stand-in only.
 
 ## Significant changes (AC1)
 
