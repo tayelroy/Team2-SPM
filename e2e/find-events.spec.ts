@@ -62,8 +62,9 @@ test('SG2-59-P01 | [NORMAL] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] an attendee f
     await expect(detail.getByText(internal)).toHaveCount(0);
   }
   const body = await (await page.request.get('/api/registrable-events/591', { headers: await auth(page, 'attendee') })).json();
+  // SG2-60 added 'registered': whether this attendee already holds a place.
   expect(Object.keys(body.event).sort()).toEqual(['category', 'description', 'event_id', 'name', 'organisation', 'proposed_date',
-    'registration_closes_at', 'registration_opens_at', 'venues']);
+    'registered', 'registration_closes_at', 'registration_opens_at', 'venues']);
 
   await page.setViewportSize({ width: 390, height: 900 });
   await expect(detail).toBeVisible();

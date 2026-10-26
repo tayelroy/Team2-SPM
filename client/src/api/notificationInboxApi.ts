@@ -20,6 +20,8 @@ const EVENT_KINDS = new Set(['venue_request_approved', 'venue_request_rejected',
   'venue_booking_cancelled', 'venue_change_requested',
   // SG2-67: the organiser asked to cancel, and the event was cancelled.
   'cancellation_requested', 'event_cancelled',
+  // SG2-60: an attendee's registration is confirmed.
+  'registration_confirmed',
   // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
   'change_requested']);
 const HOLD_KINDS = new Set(['placed', 'warning', 'expired', 'expiry_changed']);

@@ -68,6 +68,7 @@ test('[NORMAL] [SG2-69:AC2] [SG2-66:AC7] event_returned_to_planning keeps its la
 test('[NORMAL] [SG2-69:AC2] [SG2-92:AC5] safety_decision keeps its label, message and SGT timestamp', () => expectLabelledNotification('safety_decision', 'Safety check'));
 test('[NORMAL] [SG2-69:AC2] [SG2-63:AC10] registration_opened keeps its label, message and SGT timestamp', () => expectLabelledNotification('registration_opened', 'Registration open'));
 test('[NORMAL] [SG2-69:AC2] [SG2-63:AC10] registration_closed keeps its label, message and SGT timestamp', () => expectLabelledNotification('registration_closed', 'Registration closed'));
+test('[NORMAL] [SG2-69:AC2] [SG2-60:AC1] registration_confirmed keeps its label, message and SGT timestamp', () => expectLabelledNotification('registration_confirmed', 'Registration confirmed'));
 test('[NORMAL] [SG2-69:AC2] [SG2-69:AC5] outstanding_arrangements keeps its label, message and SGT timestamp', () => expectLabelledNotification('outstanding_arrangements', 'Outstanding arrangements'));
 test('[NORMAL] [SG2-69:AC2] [SG2-84:AC6] placed keeps its label, message and SGT timestamp', () => expectLabelledNotification('placed', 'Tentative hold placed'));
 test('[NORMAL] [SG2-69:AC2] [SG2-85:AC4] warning keeps its label, message and SGT timestamp', () => expectLabelledNotification('warning', 'Hold expiring soon'));

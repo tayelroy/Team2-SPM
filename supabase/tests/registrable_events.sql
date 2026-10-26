@@ -100,9 +100,10 @@ begin
  end if;
 
  -- AC3: exactly the attendee-facing fields, and none of the planning values.
+ -- SG2-60 added 'registered': whether the caller already holds a place.
  detail := public.registrable_event(95901);
  if (select array_agg(k order by k) from jsonb_object_keys(detail) k) <> array['category','description','event_id','name',
-     'organisation','proposed_date','registration_closes_at','registration_opens_at','venues'] then
+     'organisation','proposed_date','registered','registration_closes_at','registration_opens_at','venues'] then
   raise exception '[SG2-59:detail-fields-only] [SG2-59:AC3] [NORMAL] The detail must hold only the attendee-facing fields: %', detail;
  end if;
  if detail::text ~ '(Secret planning note|Internal purpose text|Big room|Ramp for the speaker|lapel|e5900000|confirmed"|"120"|: 120|: 100)' then

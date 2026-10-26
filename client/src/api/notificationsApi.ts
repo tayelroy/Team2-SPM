@@ -9,7 +9,7 @@ export interface Notification {
     | 'venue_unavailable' | 'event_confirmed' | 'event_submitted' | 'coordinator_assigned' | 'clarification_requested' | 'event_approved' | 'event_rejected'
     | 'event_returned_to_planning' | 'safety_decision' | 'outstanding_arrangements' | 'registration_opened'
     | 'registration_closed' | 'venue_booking_cancelled' | 'venue_change_requested'
-    | 'cancellation_requested' | 'event_cancelled' | 'change_requested';
+    | 'cancellation_requested' | 'event_cancelled' | 'registration_confirmed' | 'change_requested';
   message: string;
   created_at: string;
 }
@@ -28,6 +28,8 @@ const KINDS: Record<Notification['kind'], true> = {
   // SG2-83 AC4: Venue Staff hear of a cancelled or changed venue booking.
   venue_booking_cancelled: true, venue_change_requested: true,
   cancellation_requested: true, event_cancelled: true,
+  // SG2-60: an attendee's registration is confirmed.
+  registration_confirmed: true,
   // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
   change_requested: true
 };

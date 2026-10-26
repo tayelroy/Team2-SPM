@@ -46,6 +46,8 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandi
   // SG2-67: the organiser asked to cancel, and the coordinator cancelled.
   cancellation_requested: 'Cancellation requested',
   event_cancelled: 'Event cancelled',
+  // SG2-60: the attendee's place is held.
+  registration_confirmed: 'Registration confirmed',
   // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
   change_requested: 'Change requested',
 };
@@ -71,6 +73,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandin
   registration_closed: color.silver,
   cancellation_requested: color.silver,
   event_cancelled: color.silver,
+  registration_confirmed: color.accent,
   change_requested: color.accent,
 };
 

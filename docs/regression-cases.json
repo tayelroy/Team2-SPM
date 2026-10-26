@@ -8737,8 +8737,8 @@
     "review": null,
     "status": "Pass",
     "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
-    "execution_evidence": "22 Oct 2026; feature/SG2-59-find-registrable-events on origin/main 9850b8e; npm run test:e2e locally in Chromium: 152/152 passed, required SG2-26 gate passed; npm run ci green (1786 server / 1823 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
-    "execution_date": "22 Oct 2026",
+    "execution_evidence": "23 Oct 2026; feature/SG2-60-register-for-event at 0776b1e on origin/main adf51ff; npm run test:e2e locally in Chromium: 157/157 passed, required SG2-26 gate passed; npm run ci green (1841 server / 1885 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "23 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
       "Sign in as attendee at 1440px and open Find events.",
@@ -8748,7 +8748,7 @@
       "At 390px check the detail and the list have no horizontal overflow; go back to the list."
     ],
     "data": "Harbour Lecture (591): confirmed, 20 Jul 2030 19:00 SGT, registration open until 19 Jul 2030 10:00 SGT, Regression Hall (Level 1) booked, planning note 'Brief security on the VIP entrance'. Bayfront Workshop (592): confirmed, registration opens 1 Jun 2030 08:00 SGT, no venue. Closed Briefing (593), Planning Forum (594), Walk-in Social (595), Planning workshop (1, draft).",
-    "expected": "Bayfront Workshop then Harbour Lecture. Bayfront: 'Opening soon', 'Opens 1 Jun 2030, 8:00 am', venue 'To be announced'. Harbour: 'Registration open', 'Closes 19 Jul 2030, 10:00 am', 20 Jul 2030 7:00 pm, Regression Hall. Detail shows the description, Seminar, Harbour Foundation and 'Regression Hall, Level 1' and none of the internal values; the API returns exactly category, description, event_id, name, organisation, proposed_date, registration_closes_at, registration_opens_at, venues. No overflow at 390px; no console errors.",
+    "expected": "Bayfront Workshop then Harbour Lecture. Bayfront: 'Opening soon', 'Opens 1 Jun 2030, 8:00 am', venue 'To be announced'. Harbour: 'Registration open', 'Closes 19 Jul 2030, 10:00 am', 20 Jul 2030 7:00 pm, Regression Hall. Detail shows the description, Seminar, Harbour Foundation and 'Regression Hall, Level 1' and none of the internal values; the API returns exactly category, description, event_id, name, organisation, proposed_date, registered (SG2-60), registration_closes_at, registration_opens_at, venues. No overflow at 390px; no console errors.",
     "evidence": "e2e/find-events.spec.ts; e2e/support/registrable-events.ts",
     "layer": "Playwright Chromium + isolated production app"
   },
@@ -9076,6 +9076,76 @@
     "execution_date": "24 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
+  },
+  {
+    "id": "SG2-60-P01",
+    "title": "An attendee registers with their phone and needs, is confirmed with the event information, and cannot register twice",
+    "type": "NORMAL",
+    "story": "SG2-60",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-60:AC1",
+      "SG2-60:AC2",
+      "SG2-60:AC4"
+    ],
+    "method_id": "SG2-60:an-attendee-registers-with-their-phone-and-needs-is-confirmed-with-the-event-information-and",
+    "purpose": "Catch a registration that does not hold a place, loses the phone or needs given, gives no confirmation with the date, time and venue, sends no inbox notice, lets the same attendee register twice, or hides the details from the coordinator.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/event-registration seed (SG2-59's events plus Small Recital) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "23 Oct 2026; feature/SG2-60-register-for-event at 0776b1e on origin/main adf51ff; npm run test:e2e locally in Chromium: 157/157 passed, required SG2-26 gate passed; npm run ci green (1841 server / 1885 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "23 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee at 390px, open Find events, open Harbour Lecture.",
+      "Check the contact phone is filled in from the profile; enter needs 'Step-free access'; check the 16/500 counter and no horizontal overflow; press Register.",
+      "Read the confirmation (When, Where, notifications line) and that the Register button is gone; read the ledger's registration and notice.",
+      "Go back to the list; check Harbour Lecture is marked Registered; reopen it and read the already-registered message; POST the same registration again through the API.",
+      "At 1440px open the notifications panel and read the Registration confirmed notice.",
+      "As the assigned coordinator, GET /api/event-requests/591/registrations and read the attendee's phone and needs."
+    ],
+    "data": "Harbour Lecture (591): confirmed, registration open until 19 Jul 2030 10:00 SGT, capacity 80, 20 Jul 2030 19:00 SGT at Regression Hall. Attendee profile phone '+65 9123 4567'.",
+    "expected": "'You are registered. Your place is held.' with 'When 20 Jul 2030, 7:00 pm', 'Where Regression Hall' and 'A confirmation is in your notifications.'; one registered row (+65 9123 4567, Step-free access) and one notice 'You are registered for Harbour Lecture on 20 Jul 2030 19:00 SGT at Regression Hall.'; the list shows Registered; the detail says 'You are already registered for this event.'; the repeat POST answers 409 duplicate and stores nothing; the panel shows Registration confirmed; the coordinator reads phone +65 9123 4567 and needs Step-free access.",
+    "evidence": "e2e/event-registration.spec.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-60-N01",
+    "title": "A full, not yet open or closed event, invalid details and other roles are refused, and nothing is stored",
+    "type": "FAILURE",
+    "story": "SG2-60",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-60:AC1",
+      "SG2-60:AC3",
+      "SG2-60:AC4"
+    ],
+    "method_id": "SG2-60:a-full-not-yet-open-or-closed-event-invalid-details-and-other-roles-are-refused-and-nothing-is",
+    "purpose": "Catch registration past capacity (counting a cancelled place as held), before opening or after closing, with a missing phone or over-long needs, or by a non-attendee role.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/event-registration seed (SG2-59's events plus Small Recital) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "23 Oct 2026; feature/SG2-60-register-for-event at 0776b1e on origin/main adf51ff; npm run test:e2e locally in Chromium: 157/157 passed, required SG2-26 gate passed; npm run ci green (1841 server / 1885 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
+    "execution_date": "23 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee; open Small Recital and press Register.",
+      "Open Bayfront Workshop and read the Registration section.",
+      "Open Harbour Lecture, clear the phone, enter 501 characters of needs and press Register.",
+      "As attendee, POST registrations to 592 (opens later), 593 (closed), 594 (planning) and 591 with phone '9123 456' and with 501 characters of needs.",
+      "As organiser, coordinator and Lead, POST a registration to 591.",
+      "Read the ledger."
+    ],
+    "data": "Small Recital (596): confirmed, open, capacity 1 held by Recital Guest; the attendee's own earlier registration is cancelled. Bayfront Workshop (592) opens 1 Jun 2030 08:00 SGT. Closed Briefing (593) closed in 2020. Planning Forum (594) is in planning.",
+    "expected": "Small Recital: alert 'This event is full.' and no Register button. Bayfront: 'Registration opens 1 Jun 2030, 8:00 am. Come back then to register.' and no Register button. Harbour: 'Enter a contact phone number.' and 'Keep accessibility or dietary needs to 500 characters.'. API: 592 409 'Registration opens 01 Jun 2030 08:00 SGT.', 593 409 'Registration for this event has closed.', 594 404, both bad bodies 400 'Check your registration details.'; other roles 403. The attendee holds no active registration and no confirmation was sent.",
+    "evidence": "e2e/event-registration.spec.ts",
+    "layer": "Playwright Chromium + isolated production app"
   },
   {
     "id": "SG2-64-P01",

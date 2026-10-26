@@ -34,9 +34,9 @@ const OVERVIEW: RegistrationOverview = {
   },
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', email: 'ana@attendee.test', phone: '+65 6000 0001',
-      registered_at: '2030-06-02T01:00:00.000Z' },
+      needs: 'Step-free access', registered_at: '2030-06-02T01:00:00.000Z' },
     { registration_id: 4, name: 'Ben Attendee', organisation: null, email: 'ben@attendee.test', phone: null,
-      registered_at: '2030-06-03T01:00:00.000Z' }
+      needs: null, registered_at: '2030-06-03T01:00:00.000Z' }
   ],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 2 }]
 };
@@ -48,9 +48,9 @@ const OWNER_VIEW = {
   registered_count: 2, places_remaining: 1, contact_details_visible: true,
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
-      email: 'ana@attendee.test', phone: '+65 6000 0001' },
+      email: 'ana@attendee.test', phone: '+65 6000 0001', needs: 'Step-free access' },
     { registration_id: 4, name: 'Ben Attendee', organisation: null, registered_at: '2030-06-03T01:00:00.000Z',
-      email: 'ben@attendee.test', phone: null }
+      email: 'ben@attendee.test', phone: null, needs: null }
   ],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 2 }],
   capacity_warnings: ['A capacity of 3 is more than Main hall holds (2).'],
@@ -138,13 +138,13 @@ function harness(principal: Principal | null, overrides: Partial<RegistrationDep
 const as = (userId: string, role: Principal['role'] = 'event_organiser'): Principal => ({ userId, role });
 
 describe('GET /api/event-requests/:eventId/registrations (SG2-63)', () => {
-  test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC7] the creating organiser sees the numbers, the attendees with contact details, the warning and can edit', async () => {
+  test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC7] [SG2-60:AC4] the creating organiser sees the numbers, the attendees with contact details and needs, the warning and can edit', async () => {
     const res = await request(harness(as(OWNER)).app).get('/events/12/registrations');
     assert.equal(res.status, 200);
     assert.deepEqual(res.body, OWNER_VIEW);
   });
 
-  test('[NORMAL] [SG2-63:AC3] [SG2-63:AC4] [SG2-63:AC8] an organisation colleague sees the picture without contact details and cannot edit', async () => {
+  test('[NORMAL] [SG2-63:AC3] [SG2-63:AC4] [SG2-63:AC8] [SG2-60:AC4] an organisation colleague sees the picture without contact details or needs and cannot edit', async () => {
     const res = await request(harness(as(COLLEAGUE)).app).get('/events/12/registrations');
     assert.equal(res.status, 200);
     assert.deepEqual(res.body, { ...OWNER_VIEW, contact_details_visible: false, can_edit: false, attendees: [

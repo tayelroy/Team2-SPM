@@ -1117,6 +1117,14 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **200:** `{ event }` with the same fields as one list item.
 - **Errors:** 400 for an id that is not a positive 32-bit integer; 404 `This event is not open for registration.` for any event the list would not show, whether it exists or not; 401/403/503 as 9B.1.
 
+### 9B.3 POST /api/registrable-events/:eventId/registrations (SG2-60)
+- **Source:** `registrableEvents/index.ts`, `registrableEvents/registration.ts` (`readRegistration`), `db/registrableEvents.ts` (`register`), migration `202610230001_event_registration.sql` (`register_for_event`).
+- **Permission:** `events.register` (Attendee). `register_for_event` runs with the caller's JWT, rechecks the acting role with `lock_acting_role()` (403 otherwise) and registers only the caller.
+- **Body:** `{ contact_phone: string, needs?: string | null }`. `contact_phone` is required: a Singapore number of 8 digits, optionally `+65`, `()-.` and spaces ignored, at most 40 characters. `needs` (accessibility or dietary) is optional, at most 500 characters; blank is none. Both are trimmed. Any other field is refused.
+- **201:** `{ registration: { registration_id, event_id, registered_at, contact_phone, needs } }`. The place is held and a `registration_confirmed` notification is sent to the attendee.
+- **Errors:** 400 for a bad event id (as 9B.2), or `{ error: 'Check your registration details.', errors: [...] }` for the body, checked before the database is asked (the database's own refusal has no `errors`); 404 `This event is not open for registration.` for any event SG2-59 would not list as registrable (not confirmed, no registration, unset times or date, missing); 409 `{ error, reason }` with `reason` `duplicate` (`You are already registered for this event.`), `closed` (`Registration for this event has closed.`, with `registration_closes_at`; also once the event has started), `not_open` (`Registration opens 01 Jun 2030 08:00 SGT.`, with `registration_opens_at`) or `full` (`This event is full.`); 401/403/503 as 9B.1. Checked in that order, under the event row lock.
+- **9B.1/9B.2** also return `registered`: whether the caller already holds an active registration.
+
 ## 10. Health
 
 ### 10.1 GET /health and GET /api/health

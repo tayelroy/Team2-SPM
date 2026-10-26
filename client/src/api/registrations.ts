@@ -9,6 +9,8 @@ export interface RegisteredAttendee {
   /** Only for the creating organiser and the assigned coordinator (AC4). */
   email?: string | null;
   phone?: string | null;
+  /** SG2-60: accessibility or dietary needs given at registration, with the contact details. */
+  needs?: string | null;
 }
 
 export interface RegistrationView {
@@ -51,7 +53,8 @@ function isAttendee(value: unknown): value is RegisteredAttendee {
   const row = value as Record<string, unknown>;
   return typeof row.registration_id === 'number' && isText(row.name) && isTextOrNull(row.organisation)
     && isText(row.registered_at) && (row.email === undefined || isTextOrNull(row.email))
-    && (row.phone === undefined || isTextOrNull(row.phone));
+    && (row.phone === undefined || isTextOrNull(row.phone))
+    && (row.needs === undefined || isTextOrNull(row.needs));
 }
 
 /** The server's answer, checked field by field; null when it is not one. */
