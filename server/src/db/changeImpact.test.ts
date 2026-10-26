@@ -237,6 +237,21 @@ describe('settleArrangementRecheck RPC adapter (SG2-66 AC4)', () => {
     }
   });
 
+  test('[CONFLICT] [SG2-93:AC4] a safety change still waiting for staff is returned with what is waiting', async () => {
+    const waiting = [{ arrangement: 'venue', label: 'Hall (20 Jun 2030 10:00 – 14:00 SGT)' }, { arrangement: 'equipment', label: '4 × Speakers' }];
+    assert.deepEqual(await settleArrangementRecheck(rpcClient({ outcome: 'flagged', waiting }), 7, 'c', 'safety_venue_recheck'),
+      { outcome: 'flagged', waiting });
+    assert.deepEqual(await settleArrangementRecheck(rpcClient({ ...SETTLED, outstanding_arrangements: ['safety_other_recheck'] }), 7, 'c',
+      'safety_venue_recheck'), { ...SETTLED, outstanding_arrangements: ['safety_other_recheck'] });
+  });
+
+  test('[FAILURE] [SG2-93:AC4] a waiting list that is empty or names something else is unavailable', async () => {
+    for (const waiting of [[], undefined, [{ arrangement: 'other', label: 'Stage' }], [{ arrangement: 'venue', label: 7 }]]) {
+      assert.deepEqual(await settleArrangementRecheck(rpcClient({ outcome: 'flagged', waiting }), 7, 'c', 'safety_venue_recheck'),
+        { outcome: 'unavailable' }, JSON.stringify(waiting));
+    }
+  });
+
   test('[FAILURE] [SG2-66:AC4] errors and malformed responses are unavailable', async () => {
     assert.deepEqual(await settleArrangementRecheck(rpcClient(null, { message: 'down' }), 7, 'c', 'venue_recheck'), { outcome: 'unavailable' });
     for (const data of [undefined, 3, { outcome: 'other' }, { ...SETTLED, arrangements_recheck_needed: null },

@@ -309,7 +309,8 @@ describe('POST /api/event-requests/:eventId/rechecks/:key/settle (SG2-66 AC4)', 
 
   test('[FAILURE] [SG2-66:AC4] an unknown key is 400 and a key that is not outstanding is 409', async () => {
     const bad = await request(harness({ event: outstanding }).app).post('/events/12/rechecks/safety_recheck/settle');
-    assert.deepEqual([bad.status, bad.body], [400, { error: 'key must be one of venue_recheck, equipment_recheck, registration_recheck.' }]);
+    assert.deepEqual([bad.status, bad.body], [400, { error: 'key must be one of venue_recheck, equipment_recheck, registration_recheck, '
+      + 'safety_venue_recheck, safety_equipment_recheck, safety_other_recheck.' }]);
     const { app, settled } = harness({ event: outstanding });
     const absent = await request(app).post('/events/12/rechecks/equipment_recheck/settle');
     assert.deepEqual([absent.status, absent.body], [409, { error: 'That arrangement is not waiting for a recheck.' }]);
@@ -341,5 +342,32 @@ describe('POST /api/event-requests/:eventId/rechecks/:key/settle (SG2-66 AC4)', 
     const facts = await request(harness({ event: outstanding, fetchFacts: async () => ({ ok: false, reason: 'unavailable' }) }).app)
       .post('/events/12/rechecks/venue_recheck/settle');
     assert.deepEqual([facts.status, facts.body], [503, UNAVAILABLE]);
+  });
+
+  // SG2-93 AC4: a change the Safety Officer asked for is checked by the
+  // database, which knows which flagged requests staff have not confirmed.
+  const safety = { outstanding_arrangements: ['safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck'],
+    arrangements_recheck_needed: true, expected_attendance: 151, registration_needed: true, registration_closes_at: null };
+
+  test('[CONFLICT] [SG2-93:AC4] a venue or equipment change is refused while staff have not confirmed the flagged requests again, naming each', async () => {
+    const result: SettleArrangementRecheckResult = { outcome: 'flagged', waiting: [
+      { arrangement: 'venue', label: 'The Kelp Room (20 Jun 2030 10:00 – 14:00 SGT)' },
+      { arrangement: 'equipment', label: '4 × Wireless microphones' }
+    ] };
+    const res = await request(harness({ event: safety, settleRecheck: async () => result }).app)
+      .post('/events/12/rechecks/safety_venue_recheck/settle');
+    assert.deepEqual([res.status, res.body], [409, { error: 'This arrangement still needs attention before it can be marked rechecked.', blockers: [
+      'The Kelp Room (20 Jun 2030 10:00 – 14:00 SGT) is waiting for Venue Staff to confirm it again.',
+      '4 × Wireless microphones is waiting for Technical Support to confirm it again.'
+    ] }]);
+  });
+
+  test('[NORMAL] [SG2-93:AC4] a safety change is settled by the database alone, whatever SG2-66 would say about the venue or registration', async () => {
+    for (const key of ['safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck']) {
+      const { app, settled } = harness({ event: safety });
+      const res = await request(app).post(`/events/12/rechecks/${key}/settle`);
+      assert.equal(res.status, 200, key);
+      assert.deepEqual(settled, [[12, COORDINATOR, key]], key);
+    }
   });
 });

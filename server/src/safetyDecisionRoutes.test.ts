@@ -13,6 +13,7 @@ import type {
   ReworkSafetyRejectedEventResult,
   SafetyDecisionRecord
 } from './db/safetyDecisions';
+import type { SafetyRereview } from './db/safetyRereviews';
 import { createSafetyDecisionHandlers, type SafetyDecisionDependencies } from './events/safetyDecisionRoutes';
 
 const SAFETY = 'safety-1';
@@ -25,6 +26,11 @@ const REVIEWED = 4;
 const STORED: SafetyDecisionRecord = {
   decision_id: 9, event_id: 12, decision: 'request_changes', reason: 'Move the stage', arrangements: ['venue'],
   decided_by: SAFETY, decided_by_name: 'Sam Safety', decided_at: '2030-06-01T00:00:00.000Z'
+};
+/** SG2-93: the booking that decision sent back to Venue Staff, still open. */
+const FLAG: SafetyRereview = {
+  review_id: 31, decision_id: 9, arrangement: 'venue', label: 'Harbour Hall (20 Jun 2030 10:00 – 14:00 SGT)',
+  flagged_at: '2030-06-01T00:00:00.000Z', resolution: null, resolved_by_name: null, resolved_at: null
 };
 
 const originalConfig = { ...dbConfig };
@@ -81,6 +87,7 @@ function harness(overrides: Partial<SafetyDecisionDependencies> & { principal?: 
     getAdminClient: () => ADMIN,
     fetchEvent: async () => ({ ok: true, event: { event_id: 12, status: 'planning', organiser_id: ORGANISER, coordinator_id: COORDINATOR } }),
     listDecisions: async () => ({ ok: true, decisions: [STORED] }),
+    listRereviews: async () => ({ ok: true, rereviews: [FLAG] }),
     recordDecision: async (_admin, input): Promise<RecordSafetyDecisionResult> => {
       recorded.push(input);
       return { outcome: 'ok', decision_id: 9, decision: input.decision, previous_status: 'awaiting_safety_check',
@@ -167,15 +174,15 @@ describe('POST /api/event-requests/:eventId/safety-decision (SG2-92)', () => {
   });
 });
 
-describe('GET /api/event-requests/:eventId/safety-decisions (SG2-92 AC6)', () => {
-  test('[NORMAL] [SG2-92:AC6] the Safety Officer, the assigned coordinator and the organiser read every decision', async () => {
+describe('GET /api/event-requests/:eventId/safety-decisions (SG2-92 AC6, SG2-93 AC5)', () => {
+  test('[NORMAL] [SG2-92:AC6] [SG2-93:AC5] the Safety Officer, the assigned coordinator and the organiser read every decision and what each sent back to staff', async () => {
     for (const principal of [
       { userId: 'any-safety', role: 'safety_officer' as const },
       { userId: COORDINATOR, role: 'event_coordinator' as const },
       { userId: ORGANISER, role: 'event_organiser' as const }
     ]) {
       const res = await request(harness({ principal }).app).get('/events/12/safety-decisions');
-      assert.deepEqual([res.status, res.body], [200, { decisions: [STORED] }], principal.role);
+      assert.deepEqual([res.status, res.body], [200, { decisions: [STORED], rereviews: [FLAG] }], principal.role);
     }
   });
 
@@ -189,11 +196,13 @@ describe('GET /api/event-requests/:eventId/safety-decisions (SG2-92 AC6)', () =>
     assert.deepEqual([missing.status, missing.body], notFound);
   });
 
-  test('[FAILURE] [SG2-92:AC6] a failed event or history read is 503', async () => {
+  test('[FAILURE] [SG2-92:AC6] [SG2-93:AC5] a failed event, history or flag read is 503', async () => {
     const event = await request(harness({ fetchEvent: async () => ({ ok: false, reason: 'unavailable' }) }).app).get('/events/12/safety-decisions');
     assert.deepEqual([event.status, event.body], [503, UNAVAILABLE]);
     const history = await request(harness({ listDecisions: async () => ({ ok: false }) }).app).get('/events/12/safety-decisions');
     assert.deepEqual([history.status, history.body], [503, UNAVAILABLE]);
+    const flags = await request(harness({ listRereviews: async () => ({ ok: false }) }).app).get('/events/12/safety-decisions');
+    assert.deepEqual([flags.status, flags.body], [503, UNAVAILABLE]);
   });
 });
 

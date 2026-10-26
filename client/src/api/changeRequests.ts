@@ -5,7 +5,14 @@
  * the rechecks it leaves outstanding.
  */
 
-export type RecheckKey = 'venue_recheck' | 'equipment_recheck' | 'registration_recheck';
+/** SG2-93 adds the arrangements a Safety Officer's Request changes left outstanding. */
+export type RecheckKey =
+  | 'venue_recheck'
+  | 'equipment_recheck'
+  | 'registration_recheck'
+  | 'safety_venue_recheck'
+  | 'safety_equipment_recheck'
+  | 'safety_other_recheck';
 
 /** AC1 revalidate, AC2 capacity_check, AC3 period_recheck. */
 export type ImpactReasonCode = 'revalidate' | 'capacity_check' | 'period_recheck';

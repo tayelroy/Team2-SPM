@@ -269,14 +269,21 @@ function computeSafety(input: ArrangementReadinessInput): ArrangementStatus {
 export function computeArrangementReadiness(
   input: ArrangementReadinessInput
 ): ArrangementReadinessResult {
+  const rechecks = input.arrangements_recheck_needed === true ? input.outstanding_arrangements ?? [] : [];
   const arrangements: ArrangementStatus[] = [
     computeVenue(input.venue_requests, input.affected_bookings ?? 0),
     computeEquipment(input.equipment_requests),
     computeRegistration(input)
-  ].map(arrangement => input.arrangements_recheck_needed === true
-    && input.outstanding_arrangements?.includes(`${arrangement.key}_recheck`)
-    ? { ...arrangement, state: 'outstanding' as const, detail: `${arrangement.detail} Recheck required after planning changes.` }
-    : arrangement);
+  ].map((arrangement) => {
+    // SG2-93: changes the Safety Officer asked for come first; staff must
+    // confirm the flagged requests again before the event can go back.
+    if (rechecks.includes(`safety_${arrangement.key}_recheck`)) {
+      return { ...arrangement, state: 'outstanding' as const, detail: `${arrangement.detail} The Safety Officer asked for changes.` };
+    }
+    return rechecks.includes(`${arrangement.key}_recheck`)
+      ? { ...arrangement, state: 'outstanding' as const, detail: `${arrangement.detail} Recheck required after planning changes.` }
+      : arrangement;
+  });
   arrangements.push(computeSafety(input));
 
   const outstanding = arrangements

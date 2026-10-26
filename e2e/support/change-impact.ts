@@ -14,6 +14,7 @@ import {
   type RecheckKey
 } from '../../server/src/events/changeImpact';
 import type { MemoryDatabase } from './memory-database';
+import { returnWhenSettled, waitingOn } from './safety-rereviews';
 import { latestSafetyDecision } from './safety-decisions';
 
 type Row = Record<string, unknown>;
@@ -114,9 +115,13 @@ export function createMemoryChangeImpact(database: MemoryDatabase) {
     if (!event || event.coordinator_id !== actorId) return { outcome: 'stale' };
     const current = (event.outstanding_arrangements ?? []) as RecheckKey[];
     if (!current.includes(key)) return { outcome: 'not_outstanding' };
+    // SG2-93 AC4: a safety venue or equipment change waits for the staff.
+    const waiting = waitingOn(database, eventId, key);
+    if (waiting.length > 0) return { outcome: 'flagged', waiting };
     const remaining = current.filter(item => item !== key);
     Object.assign(event, { outstanding_arrangements: remaining, arrangements_recheck_needed: remaining.length > 0 });
     audit(eventId, actorId, 'arrangement_recheck', null, `${key} settled`);
+    if (key.startsWith('safety_')) returnWhenSettled(database, event, actorId);
     return { outcome: 'ok', arrangements_recheck_needed: remaining.length > 0, outstanding_arrangements: remaining };
   };
 

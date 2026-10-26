@@ -107,6 +107,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.safety_decision.record': ['safety_officer'],
   'event_request.safety_decisions.view': ['safety_officer', 'event_coordinator', 'event_organiser'],
   'event_request.safety_rework': ['event_coordinator'],
+  // SG2-93: Venue Staff and Technical Support read the bookings and equipment
+  // a Request Changes decision sent back to them, and confirm each again.
+  // The acting role picks the kind; confirm_safety_rereview() rechecks it.
+  'safety_rereviews.read': ['venue_staff', 'technical_support_staff'],
+  'safety_rereviews.confirm': ['venue_staff', 'technical_support_staff'],
   // SG2-63: the registration picture for an organiser of the event's
   // organisation or its assigned coordinator (per-row, 404 otherwise), and the
   // creating organiser's registration settings (per-row; the coordinator can

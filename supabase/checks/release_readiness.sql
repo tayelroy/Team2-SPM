@@ -48,7 +48,11 @@ begin
     ('venue_holds'), ('venue_hold_settings'), ('venue_hold_notifications'),
     ('venue_booking_disruptions'), ('venue_booking_clashes'), ('venue_booking_occupancy'),
     ('equipment'), ('equipment_requests'), ('equipment_reservations'),
-    ('event_clarifications'), ('notifications'), ('notification_reminder_settings'), ('notification_reminder_receipts')
+    ('event_clarifications'), ('notifications'), ('notification_reminder_settings'), ('notification_reminder_receipts'),
+    -- SG2-93: arrangements a Request Changes decision sent back to staff.
+    ('safety_rereviews'),
+    -- SG2-64: change requests raised after submission.
+    ('event_change_requests')
   ), relation_checks as (
     select 'relation public.' || name as name, to_regclass('public.' || name) is not null as passed
     from required_relations
@@ -95,7 +99,12 @@ begin
     ('public.event_safety_approved(public.events)'), ('public.safety_approval_gate()'),
     -- SG2-59: attendees find events they can register for.
     ('public.registrable_events()'), ('public.registrable_event(integer)'),
-    ('private.registrable_events_json(integer)')
+    ('private.registrable_events_json(integer)'),
+    -- SG2-93: Request Changes sends the named arrangements back to staff.
+    ('public.confirm_safety_rereview(bigint,uuid,text)'), ('public.safety_rereview_queue(text)'),
+    ('public.event_safety_rereviews(integer)'), ('public.safety_rereview_close_from_request()'),
+    -- SG2-64: the organiser raises a change request after submitting.
+    ('public.raise_event_change_request(integer,uuid,text,jsonb,text)')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions

@@ -938,6 +938,28 @@ describe('EventDetail coordinator planning integration (SG2-39)', () => {
     expect(screen.getByText('custom_arrangement')).toBeInTheDocument();
   });
 
+  test('[NORMAL] [SG2-93:AC1] names the arrangements a Safety Officer\'s Request changes left outstanding', async () => {
+    vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({
+      ok: true,
+      request: { ...baseDetail, canManage: true },
+    });
+    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({
+      ok: true,
+      stage: {
+        ...baseStage,
+        arrangements_recheck_needed: true,
+        outstanding_arrangements: ['safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck'],
+      },
+    });
+
+    render(<EventDetail role="Event Organiser" selectedEventId={101} accessToken="test-token" onNavigate={vi.fn()} />);
+
+    const tags = await screen.findByTestId('outstanding-arrangements-tags');
+    expect(tags).toHaveTextContent('Venue Changes (Safety Check)');
+    expect(tags).toHaveTextContent('Equipment Changes (Safety Check)');
+    expect(tags).toHaveTextContent('Other Changes (Safety Check)');
+  });
+
   test('[NORMAL] [SG2-39:AC1] resolves coordinator identity from loadSession when currentUserId prop is omitted', async () => {
     sessionStorage.setItem(
       'connectsphere.session',

@@ -32,6 +32,7 @@ import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisio
 import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createSafetyChecksStore } from '../server/src/db/safetyChecks';
 import { createNotificationsRouter } from '../server/src/notifications';
+import { createSafetyRereviewHandlers } from '../server/src/events/safetyRereviewRoutes';
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
 import { createRegistrableEventsStore } from '../server/src/db/registrableEvents';
@@ -186,20 +187,43 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-37:AC2] [SG2-30:AC1] a rejected request
   assert.equal((await stored(id)).status, 'submitted');
 });
 
-test('[BOUNDARY] [NORMAL] [SG2-36:AC2] clarification-needed requests remain editable and resubmit to the existing coordinator with their history', async () => {
+test('[NORMAL] [CONFLICT] [SG2-64:AC1] [SG2-64:AC2] [SG2-64:AC3] [SG2-64:AC5] a request returned for clarification refuses direct edits, takes a native change request that notifies the coordinator, and resubmits to the existing coordinator with its history', async () => {
   const id = await draft();
   assert.equal((await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({})).status, 200);
   assert.equal((await api.patch(`/api/event-requests/${id}/coordinator`).set(auth('lead')).send({ coordinatorId: ids.coordinator })).status, 200);
   assert.equal((await api.patch(`/api/event-requests/${id}/review`).set(auth('coordinator')).send({})).status, 200);
   const question = await api.post(`/api/event-requests/${id}/clarifications`).set(auth('coordinator')).send({ message: 'Please amend the seating requirement.' });
   assert.equal(question.status, 201);
-  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...values, venue_requirements: 'Theatre seating' })).status, 200);
+  const before = await stored(id);
+  // The real database source and raise_event_change_request through PostgREST.
+  const nativeArgs = [...args] as Parameters<typeof createApp>;
+  nativeArgs[35] = createChangeRequestHandlers(dependencies);
+  const native = request(createApp(...nativeArgs));
+  // SG2-64 AC5: no direct edit while returned for clarification.
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...values, venue_requirements: 'Theatre seating' })).status, 409);
+  // AC1/AC2: the change goes through raise_event_change_request, which stores the value as it was and notifies the coordinator.
+  const raised = await native.post(`/api/event-requests/${id}/change-requests`).set(auth('organiser'))
+    .send({ field: 'venue_requirements', to: 'Theatre seating', reason: 'The coordinator asked about seating.' });
+  assert.equal(raised.status, 201, JSON.stringify(raised.body));
+  assert.equal(raised.body.coordinator_notified, true);
+  assert.deepEqual(raised.body.change_request.changes, [{ field: 'venue_requirements', label: 'Venue requirements',
+    from: before.venue_requirements, to: 'Theatre seating' }]);
+  const notices = await database.from('notifications').select('recipient_id').eq('event_id', id).eq('kind', 'change_requested');
+  assert.equal(notices.error, null);
+  assert.deepEqual(notices.data, [{ recipient_id: ids.coordinator }]);
+  // AC3: both parties see it outstanding; a coordinator not assigned to it learns nothing.
+  for (const who of ['organiser', 'coordinator']) {
+    const listed = await native.get(`/api/event-requests/${id}/change-requests`).set(auth(who));
+    assert.equal(listed.status, 200, JSON.stringify(listed.body));
+    assert.deepEqual(listed.body.change_requests.map((request: { id: string }) => request.id), [raised.body.change_request.id]);
+  }
+  assert.equal((await native.get(`/api/event-requests/${id}/change-requests`).set(auth('other'))).status, 404);
   const resubmit = await api.patch(`/api/event-requests/${id}/submit`).set(auth('organiser')).send({});
   assert.equal(resubmit.status, 200, JSON.stringify(resubmit.body));
   assert.equal(resubmit.body.request.status, 'submitted');
   const row = await stored(id);
   assert.equal(row.coordinator_id, ids.coordinator);
-  assert.equal(row.venue_requirements, 'Theatre seating');
+  assert.equal(row.venue_requirements, before.venue_requirements);
   const history = await database.from('event_audit_logs').select('field_name,old_value,new_value').eq('event_id', id);
   assert.equal(history.error, null);
   assert.ok(history.data!.some(entry => entry.field_name === 'status' && entry.old_value === 'needs_clarification' && entry.new_value === 'submitted'));
@@ -378,8 +402,11 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-
   const list = `/api/event-requests/${id}/change-requests`;
   const settle = (key: string) => changes.post(`/api/event-requests/${id}/rechecks/${key}/settle`).set(auth('coordinator'));
 
-  // Only the assigned coordinator opens the requests; anyone else learns nothing.
-  assert.equal((await changes.get(list).set(auth('organiser'))).status, 403);
+  // Only the assigned coordinator sees the impact; the creating organiser sees
+  // their own requests without it (SG2-64 AC3), and anyone else learns nothing.
+  const own = await changes.get(list).set(auth('organiser'));
+  assert.equal(own.status, 200, JSON.stringify(own.body));
+  assert.equal('can_accept' in own.body, false);
   assert.equal((await changes.get(list).set(auth('other'))).status, 404);
   const opened = await changes.get(list).set(auth('coordinator'));
   assert.equal(opened.status, 200, JSON.stringify(opened.body));
@@ -529,6 +556,72 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-92:AC1] [SG2-92:AC2] [SG2-92:AC3] [SG2-
   const reworked = await safety.post(`/api/event-requests/${rejected}/rework`).set(auth('coordinator'));
   assert.deepEqual([reworked.status, reworked.body], [200, { event_id: rejected, status: 'planning' }]);
   assert.equal((await stored(rejected)).status, 'planning');
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-93:AC1] [SG2-93:AC2] [SG2-93:AC3] [SG2-93:AC4] [SG2-93:AC5] native Request Changes sends the named venue back to Venue Staff, and the event returns to the check once it is confirmed again and Other is done', async () => {
+  const id = await planned();
+  const venue = await database.from('venues').insert({ name: 'Integration Hall', capacity: 200 }).select('venue_id').single();
+  assert.equal(venue.error, null);
+  const period = { event_id: id, venue_id: venue.data!.venue_id, starts_at: '2090-07-10T01:00:00Z', ends_at: '2090-07-10T05:00:00Z' };
+  const booking = await database.from('venue_bookings').insert({ ...period, status: 'confirmed' }).select('booking_id').single();
+  assert.equal(booking.error, null);
+  // The approved request backed by its booking completes the arrangements, so
+  // SG2-91's trigger puts the event on the Safety Officer's list.
+  assert.equal((await database.from('venue_booking_requests').insert({ ...period, status: 'approved',
+    venue_booking_id: booking.data!.booking_id }).select('request_id').single()).error, null);
+  const before = await stored(id);
+  assert.equal(before.status, 'awaiting_safety_check');
+
+  const changeArgs = [...args] as Parameters<typeof createApp>;
+  changeArgs[35] = createChangeRequestHandlers({ ...dependencies, source: createMockChangeRequestSource(() => new Date('2090-07-01T00:00:00Z')) });
+  changeArgs[37] = createSafetyDecisionHandlers(dependencies);
+  changeArgs[43] = createSafetyRereviewHandlers(dependencies);
+  const app = request(createApp(...changeArgs));
+
+  // AC1/AC3: only the named arrangements are outstanding, and the booking is untouched.
+  const decided = await app.post(`/api/event-requests/${id}/safety-decision`).set(auth('safety')).send({
+    decision: 'request_changes', reason: 'Move the stage away from the fire exit', arrangements: ['venue', 'other'],
+    safety_check_revision: before.safety_check_revision });
+  assert.equal(decided.status, 201, JSON.stringify(decided.body));
+  let event = await stored(id);
+  assert.deepEqual([event.status, event.arrangements_recheck_needed, event.outstanding_arrangements],
+    ['planning', true, ['safety_venue_recheck', 'safety_other_recheck']]);
+  assert.equal((await database.from('venue_bookings').select('status').eq('booking_id', booking.data!.booking_id).single()).data!.status, 'confirmed');
+
+  // AC2: Venue Staff see it with the reason; Technical Support and the coordinator do not.
+  const label = 'Integration Hall (10 Jul 2090 09:00 – 13:00 SGT)';
+  const queue = await app.get('/api/safety-rereviews').set(auth('venue'));
+  assert.equal(queue.status, 200, JSON.stringify(queue.body));
+  const flag = queue.body.rereviews.find((item: { event_id: number }) => item.event_id === id);
+  assert.deepEqual([flag.label, flag.reason, flag.decided_by_name], [label, 'Move the stage away from the fire exit', 'Integration safety officer']);
+  assert.equal((await app.get('/api/safety-rereviews').set(auth('support'))).body.rereviews
+    .some((item: { event_id: number }) => item.event_id === id), false);
+  assert.equal((await app.get('/api/safety-rereviews').set(auth('coordinator'))).status, 403);
+
+  // AC4: the venue cannot be marked done before Venue Staff confirm it again.
+  const early = await app.post(`/api/event-requests/${id}/rechecks/safety_venue_recheck/settle`).set(auth('coordinator'));
+  assert.deepEqual([early.status, early.body.blockers], [409, [`${label} is waiting for Venue Staff to confirm it again.`]]);
+  assert.equal((await app.post(`/api/safety-rereviews/${flag.review_id}/confirm`).set(auth('support'))).status, 403);
+  const confirmed = await app.post(`/api/safety-rereviews/${flag.review_id}/confirm`).set(auth('venue'));
+  assert.deepEqual([confirmed.status, confirmed.body], [200, { review_id: flag.review_id, event_id: id, status: 'planning',
+    outstanding_arrangements: ['safety_other_recheck'] }]);
+  assert.equal((await app.post(`/api/safety-rereviews/${flag.review_id}/confirm`).set(auth('venue'))).status, 409);
+  const done = await app.post(`/api/event-requests/${id}/rechecks/safety_other_recheck/settle`).set(auth('coordinator'));
+  assert.deepEqual([done.status, done.body.outstanding_arrangements], [200, []]);
+  event = await stored(id);
+  assert.equal(event.status, 'awaiting_safety_check');
+
+  // AC5: the decision and how its flag was resolved are kept for the organiser to read.
+  const history = await app.get(`/api/event-requests/${id}/safety-decisions`).set(auth('organiser'));
+  assert.deepEqual(history.body.rereviews.map((row: { label: string; resolution: string; resolved_by_name: string }) =>
+    [row.label, row.resolution, row.resolved_by_name]), [[label, 'confirmed', 'Integration venue staff']]);
+  const audit = await database.from('event_audit_logs').select('field_name,new_value').eq('event_id', id)
+    .in('field_name', ['safety_rereview', 'arrangement_recheck']).order('log_id');
+  assert.deepEqual(audit.data, [
+    { field_name: 'safety_rereview', new_value: `Venue Staff confirmed ${label} again` },
+    { field_name: 'arrangement_recheck', new_value: 'safety_venue_recheck settled' },
+    { field_name: 'arrangement_recheck', new_value: 'safety_other_recheck settled' }
+  ]);
 });
 
 test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] native attendee browsing lists only confirmed events taking registration, with attendee-facing fields, and refuses other roles', async () => {
@@ -868,7 +961,7 @@ test('[NORMAL] [FAILURE] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] native capacity 
 });
 
 
-test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-40:AC2] [SG2-40:AC3] native draft saves commit exact field history and preserve owner-only access', async () => {
+test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-40:AC1] [SG2-40:AC2] [SG2-40:AC3] [SG2-64:AC5] native draft saves commit exact field history and preserve owner-only access', async () => {
   const id = await draft({} as typeof values);
   const edited = { ...values, name: 'Audited draft', accessibility_needs: 'Step-free access' };
   const result = await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...edited, actor_id: ids.other });
@@ -892,12 +985,15 @@ test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-36:AC2] [SG2-40:AC1] [SG2-
   }
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(edited)).status, 200);
   assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 11);
-  assert.equal((await database.from('events').update({ status: 'needs_clarification' }).eq('event_id', id)).error, null);
   const cleared = { ...edited, description: null, registration_needed: false };
   assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(cleared)).status, 200);
   const changed = (await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history;
   assert.equal(changed.length, 13);
   assert.deepEqual(changed.filter((row: { old_value: unknown }) => row.old_value !== null).map((row: { field_name: string; new_value: string | null }) => [row.field_name, row.new_value]).sort(), [['description', null], ['registration_needed', 'false']]);
+  // SG2-64 AC5: once returned for clarification, a direct save is refused and records nothing.
+  assert.equal((await database.from('events').update({ status: 'needs_clarification' }).eq('event_id', id)).error, null);
+  assert.equal((await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send(edited)).status, 409);
+  assert.equal((await api.get(`/api/event-requests/${id}/history`).set(auth('organiser'))).body.history.length, 13);
   assert.equal((await database.from('account_roles').update({ role: 'event_organiser' }).eq('user_id', ids.other)).error, null);
   assert.equal((await database.from('users').update({ organisation: 'Integration organisation' }).eq('user_id', ids.other)).error, null);
   try {

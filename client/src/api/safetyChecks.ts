@@ -2,6 +2,8 @@
  * SG2-91: the Safety Officer's list of events awaiting a safety check.
  * SG2-92: the decision on each, the event's decision history, and the
  * coordinator's rework after a rejection. Mirrors server/src/events/safetyDecisions.ts.
+ * SG2-93: the venue bookings and equipment a Request changes sent back to
+ * Venue Staff and Technical Support. Mirrors server/src/events/safetyRereviewRoutes.ts.
  */
 
 /** A venue an event awaiting its safety check is booked into (SG2-91 AC3). */
@@ -170,9 +172,56 @@ export type SafetyCheckFailure = {
   status?: string;
 };
 
+/** Which staff confirm a flagged arrangement again (SG2-93 AC2). */
+export type SafetyRereviewArrangement = 'venue' | 'equipment';
+
+/** One venue booking or equipment request a Request changes sent back to staff (SG2-93 AC2/AC5). */
+export interface SafetyRereview {
+  review_id: number;
+  decision_id: number;
+  arrangement: SafetyRereviewArrangement;
+  /** e.g. 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT)' or '4 × Wireless microphones'. */
+  label: string;
+  flagged_at: string;
+  resolution: 'confirmed' | 'withdrawn' | null;
+  resolved_by_name: string | null;
+  resolved_at: string | null;
+}
+
+/** An open flag on the acting staff member's list (SG2-93 AC2). */
+export interface SafetyRereviewQueueItem {
+  review_id: number;
+  arrangement: SafetyRereviewArrangement;
+  event_id: number;
+  event_name: string | null;
+  proposed_date: string | null;
+  coordinator_name: string | null;
+  flagged_at: string;
+  label: string;
+  reason: string | null;
+  decided_by_name: string | null;
+  layout: string | null;
+  placement_venue_name: string | null;
+  placement_position: string | null;
+}
+
+export interface ConfirmedSafetyRereview {
+  review_id: number;
+  event_id: number;
+  /** The event's status afterwards: 'awaiting_safety_check' once nothing is outstanding (AC4). */
+  status: string;
+  outstanding_arrangements: string[];
+}
+
 export type RecordSafetyDecisionResult = { ok: true; recorded: RecordedSafetyDecision } | SafetyCheckFailure;
-export type FetchSafetyDecisionsResult = { ok: true; decisions: SafetyDecision[] } | SafetyCheckFailure;
+export type FetchSafetyDecisionsResult =
+  | { ok: true; decisions: SafetyDecision[]; rereviews: SafetyRereview[] }
+  | SafetyCheckFailure;
 export type ReworkSafetyRejectedResult = { ok: true; status: string } | SafetyCheckFailure;
+export type FetchSafetyRereviewsResult =
+  | { ok: true; arrangement: SafetyRereviewArrangement; rereviews: SafetyRereviewQueueItem[] }
+  | SafetyCheckFailure;
+export type ConfirmSafetyRereviewResult = { ok: true; confirmed: ConfirmedSafetyRereview } | SafetyCheckFailure;
 
 const UNAVAILABLE = 'Could not reach the server. Please try again.';
 
@@ -284,16 +333,17 @@ export async function recordSafetyDecision(
 }
 
 /**
- * Every safety decision recorded for an event, newest first (AC6). Maps to
- * `GET /api/event-requests/:eventId/safety-decisions`.
+ * Every safety decision recorded for an event, newest first (SG2-92 AC6), and
+ * the venue bookings and equipment each Request changes sent back to staff,
+ * newest first (SG2-93 AC5). Maps to `GET /api/event-requests/:eventId/safety-decisions`.
  */
 export async function fetchSafetyDecisions(eventId: number | string, token: string): Promise<FetchSafetyDecisionsResult> {
   const reply = await send(`/api/event-requests/${eventId}/safety-decisions`, 'GET', token);
   if (!reply) return NETWORK_FAILURE;
   const { response, body } = reply;
   if (!response.ok) return failure(response.status, body, 'Could not load the safety decisions');
-  if (!body || !Array.isArray(body.decisions)) return NETWORK_FAILURE;
-  return { ok: true, decisions: body.decisions as SafetyDecision[] };
+  if (!body || !Array.isArray(body.decisions) || !Array.isArray(body.rereviews)) return NETWORK_FAILURE;
+  return { ok: true, decisions: body.decisions as SafetyDecision[], rereviews: body.rereviews as SafetyRereview[] };
 }
 
 /**
@@ -307,4 +357,33 @@ export async function reworkSafetyRejectedEvent(eventId: number | string, token:
   if (!response.ok) return failure(response.status, body, 'Could not rework the event');
   if (!body || typeof body.status !== 'string') return NETWORK_FAILURE;
   return { ok: true, status: body.status };
+}
+
+/**
+ * The open flags Venue Staff (venue bookings) or Technical Support (equipment)
+ * must confirm again after a Request changes (SG2-93 AC2). Maps to `GET /api/safety-rereviews`.
+ */
+export async function fetchSafetyRereviews(token: string): Promise<FetchSafetyRereviewsResult> {
+  const reply = await send('/api/safety-rereviews', 'GET', token);
+  if (!reply) return NETWORK_FAILURE;
+  const { response, body } = reply;
+  if (!response.ok) return failure(response.status, body, 'Could not load the safety changes to confirm');
+  if (!body || (body.arrangement !== 'venue' && body.arrangement !== 'equipment') || !Array.isArray(body.rereviews)) {
+    return NETWORK_FAILURE;
+  }
+  return { ok: true, arrangement: body.arrangement, rereviews: body.rereviews as SafetyRereviewQueueItem[] };
+}
+
+/**
+ * Staff confirm a flagged booking or equipment request again (SG2-93 AC2/AC4);
+ * the last one returns the event to Awaiting Safety Check. Maps to
+ * `POST /api/safety-rereviews/:reviewId/confirm`.
+ */
+export async function confirmSafetyRereview(reviewId: number, token: string): Promise<ConfirmSafetyRereviewResult> {
+  const reply = await send(`/api/safety-rereviews/${reviewId}/confirm`, 'POST', token);
+  if (!reply) return NETWORK_FAILURE;
+  const { response, body } = reply;
+  if (!response.ok) return failure(response.status, body, 'Could not confirm the change');
+  if (!body || typeof body.status !== 'string') return NETWORK_FAILURE;
+  return { ok: true, confirmed: body as unknown as ConfirmedSafetyRereview };
 }
