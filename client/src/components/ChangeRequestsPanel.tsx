@@ -10,7 +10,7 @@ import {
 } from '../api/changeRequests';
 import { statusLabel } from '../mock/viewModel';
 import { color, radius, rule, surface } from '../theme';
-import { Badge, Eyebrow, GhostButton, GradientButton, Notice, NoticeMark } from '../ui';
+import { Badge, Eyebrow, GhostButton, GradientButton } from '../ui';
 import { formatSgtTimestamp, humanizeFieldValue } from './EventAuditDrawer';
 
 export interface ChangeRequestsPanelProps {
@@ -58,8 +58,8 @@ const RECHECK_NAMES: Record<RecheckKey, string> = {
 
 /**
  * SG2-66 AC1–AC4: the assigned coordinator sees what each change request
- * would break before accepting it. The requests are sample data standing in
- * for SG2-64 until it ships; the impact and the acceptance are real.
+ * would break before accepting it. The requests are the ones organisers
+ * raised (SG2-64); the impact is always recomputed by the server.
  */
 export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }: ChangeRequestsPanelProps) {
   const [list, setList] = useState<ChangeRequestList | null>(null);
@@ -104,13 +104,6 @@ export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }
       style={{ display: 'grid', gap: '16px', minWidth: 0, overflowWrap: 'anywhere' }}
     >
       <h3 style={{ margin: 0 }}>Change requests</h3>
-      <Notice data-testid="change-requests-sample-note">
-        <NoticeMark size={18} />
-        <span style={{ color: color.mist, fontSize: '13px' }}>
-          These are sample change requests standing in for SG2-64 until submitting change requests ships.
-          Accepting one still applies its changes to this event and its arrangements.
-        </span>
-      </Notice>
       {loadError !== null ? (
         <div style={{ display: 'grid', gap: '10px', justifyItems: 'start' }}>
           <p role="alert" style={{ margin: 0 }}>{loadError}</p>

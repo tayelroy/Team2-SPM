@@ -132,6 +132,16 @@ Coordinator) reads a confirmed event's arrangements; the handler then requires
 the event's creating organiser or its assigned coordinator and answers 404 to
 everyone else — see [event confirmation](event-confirmation.md).
 
+SG2-64 adds `event_request.change_request.raise`, held only by
+`event_organiser`, and gives the Event Organiser `event_request.change_request.view`
+too (already held by `event_coordinator` for SG2-66). The organiser who created
+the event raises a change request and lists their outstanding ones; ownership is
+checked by the handler and again by `raise_event_change_request`, which also
+rechecks the stored role in `account_roles`. Anyone else's event gets 404. The
+coordinator still needs the event's assignment. `event_change_requests` has RLS
+forced with no client grants, so no caller reads it directly — see
+[change requests](change-requests.md).
+
 SG2-68 adds the Event Coordinator Lead to `notifications.read` (already held by
 Event Coordinator, Venue Staff, Technical Support Staff and Event Organiser),
 so the Lead reads their own notices — "an event was submitted and is waiting

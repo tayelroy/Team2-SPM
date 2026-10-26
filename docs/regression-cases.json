@@ -2431,40 +2431,42 @@
   },
   {
     "id": "SG2-36-P01",
-    "title": "a question goes to the organiser, who answers and resubmits for review",
+    "title": "a question goes to the organiser, who answers, asks for the change through a change request and resubmits for review",
     "story": "SG2-36",
     "categories": [
       "NORMAL"
     ],
     "mapped_acs": [
       "SG2-36:AC1",
-      "SG2-36:AC2",
-      "SG2-36:AC3"
+      "SG2-36:AC3",
+      "SG2-64:AC1",
+      "SG2-64:AC5"
     ],
-    "method_id": "SG2-36:a-question-goes-to-the-organiser-who-answers-and-resubmits-for-review",
-    "purpose": "Verify the whole clarification round trip through the real application routes: ask, see, answer, amend, resubmit, review again.",
+    "method_id": "SG2-36:a-question-goes-to-the-organiser-who-answers-asks-for-the-change-through-a-change-request-and",
+    "purpose": "Verify the whole clarification round trip through the real application routes: ask, see, answer, ask for the change through a change request instead of editing (SG2-64 AC5 replaces SG2-36 AC2), resubmit, review again.",
     "preconditions": "Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.",
     "steps": [
       "Seed event 52 under review by the signed-in coordinator; open it from Awaiting review.",
       "Send a question from the Clarification panel; verify the status becomes needs clarification and the decision panel disappears.",
       "Sign in as the organiser; open the event from My events; verify the 'Your coordinator has a question' notice and the question text.",
-      "Answer in the thread, then Edit request → My drafts → Edit; change the purpose and submit.",
+      "Answer in the thread; verify there is no Edit request; in Change requests choose Event date and time, enter 22 June 2030 10:00 and the reason 'The forum can move to 22 June.', then Ask for this change and Resubmit for review.",
       "Sign in as the coordinator again; open the request from Awaiting review."
     ],
     "data": "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; question and answer texts fixed in the spec.",
-    "expected": "Status needs_clarification after the question; organiser notice and question visible; answer appended; event 52 stored as submitted after resubmission; the coordinator sees it under review with both messages (2 list items) and the decision panel back.",
-    "evidence": "e2e/regression.spec.ts:850",
+    "expected": "Status needs_clarification after the question; organiser notice and question visible; answer appended; no Edit request; 'Your change request was sent to your coordinator.'; event 52 stored as submitted after resubmission; the coordinator sees it under review with both messages (2 list items), the decision panel back and the change request in the Change requests panel.",
+    "evidence": "e2e/regression.spec.ts:868",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Passed in the 30-journey Chromium run.",
-    "execution_date": "2 Oct 2026",
+    "actual": "Passed in Chromium. Before the AC5 update it failed waiting for Edit request, which SG2-64 removed.",
+    "execution_date": "26 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "2 Oct 2026; feature/SG2-36-ask-for-clarification working tree after merging origin/main (#50, #52); npm run test:e2e 30/30 and server 855/855 + client 690/690 at 100% coverage; disposable PostgreSQL 17 replay of all migrations and eight database suites. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
     "review": {
-      "date": "2026-10-02",
+      "date": "2026-10-26",
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
-    }
+    },
+    "previous_execution": "2 Oct 2026 (feature/SG2-36-ask-for-clarification): passed with the organiser amending the purpose through Edit request before SG2-64 AC5 removed direct edits."
   },
   {
     "id": "SG2-36-N01",
@@ -6673,7 +6675,8 @@
     "historical_source_method_ids": [
       "TC-6086a521446b"
     ],
-    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
+    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed.",
+    "revision_note": "25 Oct 2026 (SG2-64 AC5): a request returned for clarification can no longer be edited directly (409); the organiser answers, asks for any change through a change request and resubmits. SG2-40-P03 (e2e/draft-history.spec.ts:239) now verifies that refusal and the retained history, and passed in the SG2-64 run."
   },
   {
     "id": "REG-EQUIPMENT-SUMMARY-AND-READINESS-REFRESH",
@@ -7005,7 +7008,8 @@
     "execution_evidence": "19 Oct 2026; feature/SG2-66-change-impact working tree; npm run test:e2e.",
     "execution_date": "19 Oct 2026",
     "executed_by": "Claude (automated local verification)",
-    "review": null
+    "review": null,
+    "revision_note": "25 Oct 2026 (SG2-64 AC3): the creating organiser may now GET the list (200, without can_accept or impact); another organisation's organiser gets 404. Accepting is still the coordinator's alone. The test (e2e/change-impact.spec.ts:110, now SG2-66:only-the-assigned-coordinator-sees-the-impact-or-accepts-change-requests-and-nothing-outstanding) was updated and passed in the SG2-64 run."
   },
   {
     "id": "SG2-66-INT01",
@@ -9142,5 +9146,173 @@
     "expected": "Small Recital: alert 'This event is full.' and no Register button. Bayfront: 'Registration opens 1 Jun 2030, 8:00 am. Come back then to register.' and no Register button. Harbour: 'Enter a contact phone number.' and 'Keep accessibility or dietary needs to 500 characters.'. API: 592 409 'Registration opens 01 Jun 2030 08:00 SGT.', 593 409 'Registration for this event has closed.', 594 404, both bad bodies 400 'Check your registration details.'; other roles 403. The attendee holds no active registration and no confirmation was sent.",
     "evidence": "e2e/event-registration.spec.ts",
     "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-64-P01",
+    "title": "the organiser asks for a change on a submitted event; it reaches the assigned coordinator and both see it outstanding",
+    "story": "SG2-64",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-64:AC1",
+      "SG2-64:AC2",
+      "SG2-64:AC3"
+    ],
+    "method_id": "SG2-64:the-organiser-asks-for-a-change-on-a-submitted-event-it-reaches-the-assigned-coordinator-and",
+    "purpose": "Verify that the creating organiser states what should change, to what and why on an event under review (laid out cleanly at 390px and 1440px), that the assigned coordinator is notified and sees the request, and that the organiser sees it outstanding.",
+    "preconditions": "Reset loopback memory fixture with /__e2e/under-review; production app build. No hosted Supabase. Raising goes through e2e/support/change-requests.ts, the loopback mirror of raise_event_change_request.",
+    "steps": [
+      "Sign in as organiser@example.test at 390px; open Decision Forum (event 52, under review).",
+      "In Change requests choose Expected attendance, enter 34 and the reason 'Two partner teams have joined.'; click Ask for this change.",
+      "Check the section at 390px and 1440px.",
+      "As coordinator@example.test: GET /api/notifications and GET /api/event-requests/52/change-requests; as the organiser: GET /api/notifications.",
+      "Sign in as the coordinator; open Decision Forum from Awaiting review."
+    ],
+    "data": [
+      "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; expected attendance 20."
+    ],
+    "expected": [
+      "'Your change request was sent to your coordinator.' and the outstanding list reads 'Expected attendance: 20 → 34. Reason: Two partner teams have joined.'",
+      "No horizontal overflow at either width.",
+      "The coordinator has a change_requested notice 'Decision Forum has a change request waiting for your decision.'; the organiser has none; the list holds one significant request from 20 to 34.",
+      "The coordinator's Change requests panel shows the reason."
+    ],
+    "evidence": "e2e/change-requests.spec.ts:41",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed in Chromium. It failed while the work queue showed change requests only from Approved onwards, which led to showing them while under review or returned for clarification too. The native integration test (integration/api.test.ts:190) raises the same kind of request through the real raise_event_change_request.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-26",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-64-N01",
+    "title": "closed events, other accounts, the current value and a missing reason are refused and nothing is stored",
+    "story": "SG2-64",
+    "categories": [
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-64:AC1",
+      "SG2-64:AC3",
+      "SG2-64:AC4"
+    ],
+    "method_id": "SG2-64:closed-events-other-accounts-the-current-value-and-a-missing-reason-are-refused-and-nothing-is",
+    "purpose": "Verify the raise route refuses every case it must, through the real application routes.",
+    "preconditions": "Same fixture as SG2-64-P01.",
+    "steps": [
+      "As the organiser, POST a change request for draft event 1.",
+      "On event 52, POST the current attendance (20), then a blank reason.",
+      "As organiser2 (another organisation) and as the coordinator, POST on event 52; as organiser2, GET its list.",
+      "As the organiser, GET event 52's list."
+    ],
+    "data": [
+      "Event 1 (draft) and event 52, both user-organiser's; organiser2 in Other Organisation."
+    ],
+    "expected": [
+      "409 with status 'draft'; 409 unchanged; 400; 404 and 403; 404; the organiser's list is empty."
+    ],
+    "evidence": "e2e/change-requests.spec.ts:79",
+    "layer": "Playwright Chromium + isolated production app (API level)",
+    "status": "Pass",
+    "actual": "Passed in Chromium.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-26",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-64-C01",
+    "title": "a request returned for clarification or rejected cannot be edited directly; it is answered and resubmitted as it stands",
+    "story": "SG2-64",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-64:AC5",
+      "SG2-64:AC6"
+    ],
+    "method_id": "SG2-36:a-request-returned-for-clarification-is-answered-and-resubmitted-without-direct-edits-retaining",
+    "purpose": "Verify that direct organiser edits are refused on the server while a request is returned for clarification and after rejection, that the UI offers no Edit, and that resubmitting records only the status change.",
+    "preconditions": "Browser: reset loopback memory fixture with /__e2e/under-review. Unit: Express handler with fixture data.",
+    "steps": [
+      "Coordinator returns Decision Forum with a question; organiser answers in the thread.",
+      "Check Event detail and My drafts for Edit; PATCH /api/event-requests/52 directly.",
+      "Click Resubmit for review and read the history.",
+      "Unit: PATCH a needs_clarification and a rejected request."
+    ],
+    "data": [
+      "Event 52 (Decision Forum)."
+    ],
+    "expected": [
+      "No Edit request or Edit; Resubmit for review shown; the direct PATCH is 409; no field history.",
+      "After resubmitting only the needs_clarification → submitted status entry is added and both messages remain.",
+      "Unit: 409 naming a change request for needs_clarification, 409 for rejected, and no update in either."
+    ],
+    "evidence": "e2e/draft-history.spec.ts:239; server/src/updateEventRequestDraft.test.ts; client/src/screens/EventDetail.changeRequests.test.tsx; client/src/screens/DraftRequests.test.tsx; integration/api.test.ts:190",
+    "layer": "Playwright browser + fixture API; Express handler; React screen; native PostgreSQL through PostgREST",
+    "status": "Pass",
+    "actual": "Passed in Chromium, in the native integration run and in the server and client suites.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-26",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-64-DB01",
+    "title": "raise_event_change_request stores what, from, to and why for the owning organiser on an open event, notifies the coordinator, and nobody reads the table directly",
+    "story": "SG2-64",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-64:AC1",
+      "SG2-64:AC2",
+      "SG2-64:AC3",
+      "SG2-64:AC4"
+    ],
+    "purpose": "Verify the database function and table enforce the request rules and access whoever calls them.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
+    "steps": [
+      "Raise an attendance change on event 96401 (under review); read the stored row, the event and the notices.",
+      "Raise on one event per open status (10) and per closed status (draft, cancelled, rejected, completed).",
+      "Raise as another organiser and as the coordinator; raise the current value and the same instant in +08:00; raise a new date.",
+      "Insert a 1000- and a 1001-character reason, a blank reason, an unknown field and an unknown status.",
+      "As an authenticated organiser and as anon: read and insert the table and call the function."
+    ],
+    "data": "Synthetic 964xx events; e6400000 fixture identities for one coordinator and two organisers in Acme Corp.",
+    "expected": "ok with the trimmed reason, from 120 and to 180, pending, the event unchanged, and the coordinator's 'Partner Dinner has a change request waiting for your decision.' (none for the organiser); every open status ok with no notice where no coordinator is assigned; every closed status closed and nothing stored; not_found for the other organiser and the coordinator; unchanged for both same values; ok for the new date; 1000 accepted and 1001, blank, unknown field and unknown status rejected (check_violation); every direct access refused (42501).",
+    "evidence": "supabase/tests/event_change_requests.sql; .github/workflows/ci.yml; docs/change-requests.md",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay as five grouped assertions. Sabotage runs (a select grant and policy for authenticated; completed dropped from the closed statuses) made it fail, naming the case.",
+    "status": "Pass",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-26",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

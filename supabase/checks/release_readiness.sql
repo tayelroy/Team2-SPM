@@ -50,7 +50,9 @@ begin
     ('equipment'), ('equipment_requests'), ('equipment_reservations'),
     ('event_clarifications'), ('notifications'), ('notification_reminder_settings'), ('notification_reminder_receipts'),
     -- SG2-93: arrangements a Request Changes decision sent back to staff.
-    ('safety_rereviews')
+    ('safety_rereviews'),
+    -- SG2-64: change requests raised after submission.
+    ('event_change_requests')
   ), relation_checks as (
     select 'relation public.' || name as name, to_regclass('public.' || name) is not null as passed
     from required_relations
@@ -102,7 +104,9 @@ begin
     ('public.register_for_event(integer,text,text)'),
     -- SG2-93: Request Changes sends the named arrangements back to staff.
     ('public.confirm_safety_rereview(bigint,uuid,text)'), ('public.safety_rereview_queue(text)'),
-    ('public.event_safety_rereviews(integer)'), ('public.safety_rereview_close_from_request()')
+    ('public.event_safety_rereviews(integer)'), ('public.safety_rereview_close_from_request()'),
+    -- SG2-64: the organiser raises a change request after submitting.
+    ('public.raise_event_change_request(integer,uuid,text,jsonb,text)')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions

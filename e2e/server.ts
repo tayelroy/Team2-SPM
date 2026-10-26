@@ -65,6 +65,7 @@ import { createMemoryNotificationInbox, seedNotificationInbox } from './support/
 import { createChangeRequestHandlers } from '../server/src/events/changeRequests';
 import { createMockChangeRequestSource } from '../server/src/changeRequests/mockChangeRequests';
 import { createMemoryChangeImpact, seedChangeImpact } from './support/change-impact';
+import { createMemoryChangeRequests } from './support/change-requests';
 import { createSafetyChecksRouter } from '../server/src/safetyChecks';
 import { createMemorySafetyChecksStore, seedSafetyChecks } from './support/safety-checks';
 import { createSafetyDecisionHandlers } from '../server/src/events/safetyDecisionRoutes';
@@ -88,8 +89,9 @@ const venueHolds = new VenueHoldFixture(database);
 const getClient = () => database.client;
 const access = createAuthorization({ resolvePrincipal: token => database.principal(token) });
 const eventDependencies = { getPrincipal: access.getPrincipal, getAdminClient: getClient };
-// SG2-66: the SG2-64/SG2-65 stand-in, reset with the database.
-const changeRequests = createMockChangeRequestSource();
+// SG2-64: raised change requests over the in-memory tables; SG2-66's sample
+// requests only on the events its fixture opts in. Reset with the database.
+const changeRequests = createMemoryChangeRequests(database, createMockChangeRequestSource());
 const availability = access.protectedRouter();
 availability.get('/availability', access.requirePermission('venues.availability.view'), createAllVenuesAvailabilityHandler(undefined, getClient));
 availability.get('/:venueId/availability', access.requirePermission('venues.availability.view'), createAvailabilityHandler(undefined, getClient));
@@ -249,7 +251,9 @@ const app = createApp(
   createGetEventConfirmationHandler(eventDependencies),
   // SG2-66: impact reads go through the in-memory client; acceptance and
   // settling mirror their SQL functions over the in-memory tables.
-  createChangeRequestHandlers({ ...eventDependencies, source: changeRequests, ...createMemoryChangeImpact(database) }),
+  createChangeRequestHandlers({
+    ...eventDependencies, source: changeRequests.source, raise: changeRequests.raise, ...createMemoryChangeImpact(database)
+  }),
   // SG2-91: the Safety Officer's list mirrors safety_check_queue over the
   // in-memory tables.
   createSafetyChecksRouter(access, token => createMemorySafetyChecksStore(database, token)),
@@ -302,6 +306,7 @@ app.post('/__e2e/event-confirmation', (_req, res) => {
 // SG2-66: a Confirmed event whose sample attendance change outgrows its venue.
 app.post('/__e2e/change-impact', (_req, res) => {
   seedChangeImpact(database);
+  changeRequests.useSamplesFor(661);
   res.status(204).end();
 });
 app.get('/__e2e/change-impact-ledger', (_req, res) => res.json({
@@ -332,6 +337,8 @@ app.get('/__e2e/safety-decisions-ledger', (_req, res) => {
 // SG2-94: one event awaiting its check, and one approved event in Preparation.
 app.post('/__e2e/safety-approval', (_req, res) => {
   seedSafetyApprovalGate(database);
+  changeRequests.useSamplesFor(941);
+  changeRequests.useSamplesFor(942);
   res.status(204).end();
 });
 app.get('/__e2e/safety-approval-ledger', (_req, res) => {
