@@ -16,14 +16,14 @@ const OVERVIEW = {
   },
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', email: 'ana@attendee.test', phone: '+65 6000 0001',
-      registered_at: '2030-06-02T01:00:00+00:00' },
-    { registration_id: 4, name: 'Ben Attendee', organisation: null, email: null, phone: null, registered_at: '2030-06-03T01:00:00+00:00' }
+      needs: 'Step-free access', registered_at: '2030-06-02T01:00:00+00:00' },
+    { registration_id: 4, name: 'Ben Attendee', organisation: null, email: null, phone: null, needs: null, registered_at: '2030-06-03T01:00:00+00:00' }
   ],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 100 }, { venue_id: 8, name: 'Lawn', capacity: null }]
 };
 
 describe('fetchRegistrationOverview (SG2-63)', () => {
-  test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] one RPC reads the event, its active registrations and its booked venues, typed', async () => {
+  test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] [SG2-60:AC4] one RPC reads the event, its active registrations with their needs and its booked venues, typed', async () => {
     const calls: unknown[] = [];
     assert.deepEqual(await fetchRegistrationOverview(rpcClient(OVERVIEW, null, calls), 12), { ok: true, overview: OVERVIEW });
     assert.deepEqual(calls, [['event_registration_overview', { p_event_id: 12 }]]);

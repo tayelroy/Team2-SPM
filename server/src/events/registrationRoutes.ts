@@ -82,8 +82,9 @@ function view(overview: RegistrationOverview, access: { owner: boolean; contactD
     registered_count: attendees.length,
     places_remaining: placesRemaining(capacity, attendees.length),
     contact_details_visible: access.contactDetails,
-    attendees: attendees.map(({ email, phone, ...attendee }) =>
-      (access.contactDetails ? { ...attendee, email, phone } : attendee)),
+    // SG2-60: the needs an attendee gave are kept with their contact details.
+    attendees: attendees.map(({ email, phone, needs, ...attendee }) =>
+      (access.contactDetails ? { ...attendee, email, phone, needs } : attendee)),
     venues,
     capacity_warnings: capacityWarnings(capacity, venues),
     // AC5, AC8: only the organiser who created it, before it starts.

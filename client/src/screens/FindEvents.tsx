@@ -1,17 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { categoryLabel } from '../api/eventRequests';
+import { fetchProfile } from '../api/profile';
 import {
   fetchRegistrableEvent,
   fetchRegistrableEvents,
+  registerForEvent,
   type RegistrableEvent,
 } from '../api/registrableEvents';
 import { color } from '../theme';
-import { Badge, Card, Fact, GhostButton, Notice } from '../ui';
+import { Badge, Card, Fact, Field, GhostButton, GradientButton, Notice, TextField } from '../ui';
 import { formatSgt } from '../venues/searchApi';
 
 const NOT_ANNOUNCED = 'To be announced';
 const UNAVAILABLE = 'Events are temporarily unavailable. Please try again.';
 const UNAUTHORIZED = 'Only attendees can browse events here. Sign in again if your role has changed.';
+/** SG2-60 AC4: SG2-27's phone rule, and the longest needs note. */
+const SINGAPORE_PHONE = /^(?:\+65)?[0-9]{8}$/;
+const MAX_PHONE_LENGTH = 40;
+export const MAX_NEEDS_LENGTH = 500;
 
 type ListState =
   | { kind: 'loading' }
@@ -40,6 +46,21 @@ export function registrationState(event: RegistrableEvent, now: number): { label
   };
 }
 
+/**
+ * SG2-60 AC4: what is wrong with the details before they are sent; the server
+ * checks the same rules again. Empty when they can be sent.
+ */
+export function registrationProblems(phone: string, needs: string): string[] {
+  const problems: string[] = [];
+  const trimmed = phone.trim();
+  if (trimmed === '') problems.push('Enter a contact phone number.');
+  else if (trimmed.length > MAX_PHONE_LENGTH || !SINGAPORE_PHONE.test(trimmed.replace(/[()\-.\s]/g, ''))) {
+    problems.push('Enter a Singapore phone number with 8 digits, optionally starting with +65.');
+  }
+  if (needs.trim().length > MAX_NEEDS_LENGTH) problems.push(`Keep accessibility or dietary needs to ${MAX_NEEDS_LENGTH} characters.`);
+  return problems;
+}
+
 function venueNames(event: RegistrableEvent): string {
   return event.venues.length ? event.venues.map((venue) => venue.name).join(', ') : NOT_ANNOUNCED;
 }
@@ -50,6 +71,123 @@ function StateBadge({ event }: { event: RegistrableEvent }) {
     <Badge bg={state.open ? color.teal : 'rgba(112,119,119,0.35)'} fg={state.open ? color.abyss : color.silver}>
       {state.label}
     </Badge>
+  );
+}
+
+type Registering =
+  | { kind: 'form'; problems: string[]; message: string | null }
+  | { kind: 'sending' }
+  /** The place is held: just now, or it already was (AC2). */
+  | { kind: 'registered'; message: string }
+  /** Refused for good on this screen: full, closed, or no longer open (AC1, AC3). */
+  | { kind: 'refused'; message: string };
+
+const REGISTERED = 'You are registered. Your place is held.';
+
+/**
+ * SG2-60: register for an open event with a contact phone (filled in from the
+ * profile) and any accessibility or dietary needs (AC4). Confirms the place
+ * with the event's date, time and venue (AC1); an event already registered
+ * for shows that instead of the form (AC2); one not yet open says when it
+ * opens (AC3).
+ */
+function RegisterSection({ event, accessToken }: { event: RegistrableEvent; accessToken: string }) {
+  const [phone, setPhone] = useState('');
+  const [needs, setNeeds] = useState('');
+  const [state, setState] = useState<Registering>(
+    event.registered ? { kind: 'registered', message: 'You are already registered for this event.' } : { kind: 'form', problems: [], message: null });
+  const sending = useRef(false);
+  const opening = registrationState(event, Date.now());
+  const showForm = opening.open && !event.registered;
+
+  useEffect(() => {
+    if (!showForm) return;
+    let cancelled = false;
+    // A profile phone saves typing; without one the attendee enters it.
+    fetchProfile().then((result) => {
+      if (!cancelled && result.ok && result.profile.phone) setPhone((current) => current || result.profile.phone!);
+    });
+    return () => { cancelled = true; };
+  }, [showForm]);
+
+  async function submit() {
+    if (sending.current) return;
+    const problems = registrationProblems(phone, needs);
+    if (problems.length) {
+      setState({ kind: 'form', problems, message: null });
+      return;
+    }
+    sending.current = true;
+    setState({ kind: 'sending' });
+    const result = await registerForEvent(event.eventId, { contactPhone: phone, needs }, accessToken);
+    sending.current = false;
+    if (result.ok) setState({ kind: 'registered', message: REGISTERED });
+    else if (result.kind === 'duplicate') setState({ kind: 'registered', message: result.message });
+    else if (result.kind === 'full' || result.kind === 'closed' || result.kind === 'not_open') setState({ kind: 'refused', message: result.message });
+    else if (result.kind === 'not_found') setState({ kind: 'refused', message: 'This event is no longer open for registration.' });
+    else if (result.kind === 'invalid') setState({ kind: 'form', problems: result.errors, message: result.message });
+    else setState({ kind: 'form', problems: [], message: result.kind === 'unauthorized' ? UNAUTHORIZED : 'Registration could not be completed. Please try again.' });
+  }
+
+  const heading = <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 500 }}>Registration</h3>;
+  if (state.kind === 'registered') {
+    return (
+      <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {heading}
+        <Notice role="status">
+          <p style={{ margin: 0, fontSize: '16px', color: color.mist }}>{state.message}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '16px' }}>
+            <Fact label="When" value={event.proposedDate ? formatSgt(event.proposedDate) : NOT_ANNOUNCED} />
+            <Fact label="Where" value={venueNames(event)} />
+          </div>
+          <p style={{ margin: 0, color: color.silver }}>A confirmation is in your notifications.</p>
+        </Notice>
+      </section>
+    );
+  }
+  if (state.kind === 'refused') {
+    return (
+      <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {heading}
+        <Notice><p role="alert" style={{ margin: 0 }}>{state.message}</p></Notice>
+      </section>
+    );
+  }
+  if (!opening.open) {
+    return (
+      <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {heading}
+        <p style={{ margin: 0, color: color.silver }}>Registration opens {formatSgt(event.registrationOpensAt!)}. Come back then to register.</p>
+      </section>
+    );
+  }
+
+  const problems = state.kind === 'form' ? state.problems : [];
+  const message = state.kind === 'form' ? state.message : null;
+  return (
+    <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {heading}
+      <p style={{ margin: 0, color: color.silver }}>Your name and email come from your account.</p>
+      <Field label="Contact phone" type="tel" value={phone} onChange={setPhone}
+        hint="Required. A Singapore number with 8 digits, optionally starting with +65." />
+      <TextField label="Accessibility or dietary needs (optional)" value={needs} onChange={setNeeds} rows={3} />
+      <span style={{ fontSize: '12px', color: needs.trim().length > MAX_NEEDS_LENGTH ? color.accent : color.slate }}>
+        {needs.trim().length}/{MAX_NEEDS_LENGTH} characters
+      </span>
+      {message || problems.length ? (
+        <div role="alert" style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: color.mist }}>
+          {message ? <p style={{ margin: 0 }}>{message}</p> : null}
+          {problems.length ? (
+            <ul style={{ margin: 0, paddingLeft: '20px' }}>{problems.map((problem) => <li key={problem}>{problem}</li>)}</ul>
+          ) : null}
+        </div>
+      ) : null}
+      <div>
+        <GradientButton onClick={() => void submit()} disabled={state.kind === 'sending'}>
+          {state.kind === 'sending' ? 'Registering…' : 'Register'}
+        </GradientButton>
+      </div>
+    </section>
   );
 }
 
@@ -110,6 +248,7 @@ function EventDetails({ eventId, accessToken, onBack }: { eventId: number; acces
             <p style={{ margin: 0, color: color.silver }}>The venue will be announced.</p>
           )}
         </section>
+        <RegisterSection event={event} accessToken={accessToken} />
       </article>
     </Card>
   );
@@ -119,7 +258,8 @@ function EventDetails({ eventId, accessToken, onBack }: { eventId: number; acces
  * SG2-59: an attendee finds the confirmed events whose registration is open or
  * opens later, with name, date, time and venue (AC1). The server leaves out
  * every other event (AC2) and returns attendee-facing details only, so opening
- * one shows no internal planning information (AC3).
+ * one shows no internal planning information (AC3). SG2-60: an open event's
+ * details let the attendee register.
  */
 export default function FindEvents({ accessToken }: { accessToken: string }) {
   const [list, setList] = useState<ListState>({ kind: 'loading' });
@@ -141,7 +281,9 @@ export default function FindEvents({ accessToken }: { accessToken: string }) {
   if (selected !== null) {
     return (
       <section aria-label="Event details" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <EventDetails eventId={selected} accessToken={accessToken} onBack={() => setSelected(null)} />
+        <EventDetails eventId={selected} accessToken={accessToken}
+          // SG2-60: back to a fresh list, which shows any place just taken.
+          onBack={() => { setSelected(null); setAttempt((count) => count + 1); }} />
       </section>
     );
   }
@@ -175,6 +317,7 @@ export default function FindEvents({ accessToken }: { accessToken: string }) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                     <h3 id={titleId} style={{ margin: 0, fontSize: '22px', fontWeight: 500, overflowWrap: 'anywhere' }}>{title}</h3>
                     <StateBadge event={event} />
+                    {event.registered ? <Badge bg={color.teal} fg={color.abyss}>Registered</Badge> : null}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '16px' }}>
                     <Fact label="Date and time" value={event.proposedDate ? formatSgt(event.proposedDate) : NOT_ANNOUNCED} />

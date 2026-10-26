@@ -251,6 +251,15 @@ registration times, confirmed venues). Migration
 `202610220003_registrable_events.sql`; tests `supabase/tests/registrable_events.sql`
 and browser journeys `SG2-59-P01` and `SG2-59-N01`.
 
+**Register for an event (SG2-60).** `events.register` is granted to Attendees
+only. `register_for_event()` runs with the caller's JWT and rechecks with
+`lock_acting_role()` that the acting role is `attendee`; it registers only the
+caller (`auth.uid()`), so no attendee can register someone else. The
+registration's phone and needs are shown only to those who see SG2-63's
+contact details. Migration `202610230001_event_registration.sql`; tests
+`supabase/tests/event_registration.sql` (non-attendee-refused, grants) and
+browser journey `SG2-60-N01`.
+
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
 `change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
 `202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.

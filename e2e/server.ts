@@ -77,7 +77,7 @@ import { createMemoryEventSearchStore, seedEventSearch } from './support/event-s
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
 import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
-import { createMemoryRegistrableEventsStore, seedRegistrableEvents } from './support/registrable-events';
+import { createMemoryRegistrableEventsStore, seedEventRegistration, seedRegistrableEvents } from './support/registrable-events';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -367,6 +367,19 @@ app.get('/__e2e/event-confirmation-ledger', (_req, res) => {
 app.post('/__e2e/registrable-events', (_req, res) => {
   seedRegistrableEvents(database);
   res.status(204).end();
+});
+// SG2-60: SG2-59's events plus one whose only place is taken.
+app.post('/__e2e/event-registration', (_req, res) => {
+  seedRegistrableEvents(database);
+  seedEventRegistration(database);
+  res.status(204).end();
+});
+// SG2-60: the registrations and confirmations the loopback app now holds.
+app.get('/__e2e/event-registration-ledger', (_req, res) => {
+  res.json({
+    registrations: database.tables.registrations.filter(row => [591, 592, 596].includes(Number(row.event_id))),
+    notifications: database.tables.notifications.filter(row => row.kind === 'registration_confirmed'),
+  });
 });
 // SG2-70: events across organisations to search for, plus a draft that is never found.
 app.post('/__e2e/event-search', (_req, res) => {

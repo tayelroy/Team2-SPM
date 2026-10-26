@@ -622,7 +622,7 @@ test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] native attendee 
     const detail = await attendee.get(`/api/registrable-events/${listed}`).set(auth('other'));
     assert.equal(detail.status, 200, JSON.stringify(detail.body));
     assert.deepEqual(Object.keys(detail.body.event).sort(), ['category', 'description', 'event_id', 'name', 'organisation',
-      'proposed_date', 'registration_closes_at', 'registration_opens_at', 'venues']);
+      'proposed_date', 'registered', 'registration_closes_at', 'registration_opens_at', 'venues']);
     assert.equal(detail.body.event.name, 'Integration workshop');
     assert.doesNotMatch(JSON.stringify(detail.body), /Integration internal note|Exercise actual storage|confirmed/);
     assert.equal((await attendee.get(`/api/registrable-events/${unconfirmed}`).set(auth('other'))).status, 404);
@@ -635,6 +635,52 @@ test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] native attendee 
     createRegistrableEventsStore(token, () => createClient(rest.origin, jwt('authenticated', ids[token]),
       { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: loopbackFetch } })))));
   assert.equal((await forged.get('/api/registrable-events').set(auth('organiser'))).status, 403);
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-60:AC1] [SG2-60:AC2] [SG2-60:AC4] native registration holds one place per attendee with the details given, confirms it, refuses a full event and other roles', async () => {
+  const id = await planned();
+  await setRegistration(id);
+  assert.equal((await database.from('events').update({ status: 'confirmed', registration_opens_at: '2026-01-01T00:00:00Z',
+    registration_capacity: 1 }).eq('event_id', id)).error, null);
+  // Registering runs register_for_event() with the caller's own JWT, as in production.
+  const attendeeArgs = [...args] as Parameters<typeof createApp>;
+  attendeeArgs[40] = createRegistrableEventsRouter(access, token => createRegistrableEventsStore(token, () =>
+    createClient(rest.origin, jwt('authenticated', ids[token]), { auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: loopbackFetch } })));
+  const attendee = request(createApp(...attendeeArgs));
+  const path = `/api/registrable-events/${id}/registrations`;
+  assert.equal((await attendee.post(path).set(auth('other')).send({ contact_phone: '91234567' })).status, 403);
+  assert.equal((await database.from('account_roles').update({ role: 'attendee' }).in('user_id', [ids.other, ids.support])).error, null);
+  try {
+    const held = await attendee.post(path).set(auth('other')).send({ contact_phone: ' +65 9123 4567 ', needs: 'Step-free access' });
+    assert.equal(held.status, 201, JSON.stringify(held.body));
+    assert.deepEqual([held.body.registration.event_id, held.body.registration.contact_phone, held.body.registration.needs],
+      [id, '+65 9123 4567', 'Step-free access']);
+    const again = await attendee.post(path).set(auth('other')).send({ contact_phone: '91234567' });
+    assert.deepEqual([again.status, again.body.reason], [409, 'duplicate']);
+    const full = await attendee.post(path).set(auth('support')).send({ contact_phone: '91234567' });
+    assert.deepEqual([full.status, full.body], [409, { error: 'This event is full.', reason: 'full' }]);
+    assert.equal((await attendee.get(`/api/registrable-events/${id}`).set(auth('other'))).body.event.registered, true);
+    assert.equal((await attendee.get(`/api/registrable-events/${id}`).set(auth('support'))).body.event.registered, false);
+  } finally {
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
+    assert.equal((await database.from('account_roles').update({ role: 'technical_support_staff' }).eq('user_id', ids.support)).error, null);
+  }
+  const rows = await database.from('registrations').select('attendee_id,status,contact_phone,needs').eq('event_id', id);
+  assert.deepEqual(rows.data, [{ attendee_id: ids.other, status: 'registered', contact_phone: '+65 9123 4567', needs: 'Step-free access' }]);
+  const notices = await database.from('notifications').select('recipient_id,kind,message').eq('event_id', id).eq('kind', 'registration_confirmed');
+  assert.deepEqual(notices.data, [{ recipient_id: ids.other, kind: 'registration_confirmed',
+    message: 'You are registered for Integration workshop on 15 Jun 2090 10:00 SGT.' }]);
+  // The coordinator sees the phone and needs given.
+  const picture = await api.get(`/api/event-requests/${id}/registrations`).set(auth('coordinator'));
+  assert.deepEqual(picture.body.attendees.map((row: { phone: string; needs: string }) => [row.phone, row.needs]),
+    [['+65 9123 4567', 'Step-free access']]);
+  // The database refuses a caller whose stored role is not attendee even if the route let it through.
+  const permissive = createAuthorization({ resolvePrincipal: async token => ({ userId: ids[token], roles: ['attendee'] as Role[] }) });
+  const forged = request(express().use(express.json()).use('/api/registrable-events', createRegistrableEventsRouter(permissive, token =>
+    createRegistrableEventsStore(token, () => createClient(rest.origin, jwt('authenticated', ids[token]),
+      { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: loopbackFetch } })))));
+  assert.equal((await forged.post(path).set(auth('organiser')).send({ contact_phone: '91234567' })).status, 403);
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC8] [SG2-63:AC9] [SG2-63:AC10] native registration settings: the organiser changes them with history, closes and reopens with notices, and the coordinator reads the picture', async () => {
