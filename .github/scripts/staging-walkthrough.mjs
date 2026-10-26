@@ -14,8 +14,10 @@ import { chromium, expect } from '@playwright/test';
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import roleControls from './acting-role-control.cjs';
+import pageReadiness from './staging-page-readiness.cjs';
 
 const { getCurrentRole: currentRole, getHeldRoles, selectActingRole, roleControlKind } = roleControls;
+const { waitForStagingContent } = pageReadiness;
 
 const base = (process.env.STAGING_URL || 'https://team2-spm-server.vercel.app').replace(/\/$/, '');
 const password = process.env.SPM_STAGING_PASSWORD;
@@ -49,13 +51,9 @@ async function settle(page) {
   expect(roleNavigation[role], 'The signed-in role must have a known navigation contract').toBeDefined();
   await expect(page.getByRole('banner').getByRole('navigation').getByRole('button', { name: roleNavigation[role], exact: true })).toBeVisible();
   await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
-  await page.waitForLoadState('networkidle', { timeout: 20_000 });
-  // Match complete loading messages, not venue content such as "Loading bay".
-  // A timeout must fail the view rather than produce a successful screenshot.
-  await expect(page.getByText(/^(?:Loading\b[^\n]*|Searching venues|Checking for clashing bookings)(?:…|\.{3})$/))
-    .toHaveCount(0, { timeout: 15_000 });
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Notifications (unavailable)', exact: true })).toHaveCount(0);
+  // One observable-content budget replaces the old 20s network-idle barrier
+  // followed by 15s for loading messages. Errors and unfinished pages still fail.
+  await waitForStagingContent(page);
 }
 
 const browser = await chromium.launch();
@@ -183,7 +181,7 @@ for (const account of accounts) {
 await browser.close();
 
 mkdirSync(out, { recursive: true });
-writeFileSync(join(out, 'report.json'), JSON.stringify({ base, measurement: 'navigation-to-settled-page (includes network-idle wait; not a performance acceptance result)', failures, report }, null, 1));
+writeFileSync(join(out, 'report.json'), JSON.stringify({ base, measurement: 'navigation-to-observed-ready-content (includes UI readiness waits; not a performance acceptance result)', failures, report }, null, 1));
 const slow = report.filter(row => row.ms > 2000);
 const pages = report.filter(row => row.file).length;
 const summary = [

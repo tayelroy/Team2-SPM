@@ -160,6 +160,88 @@ test.each(['permissions', 'catalogue'] as const)('[CONFLICT] [SG2-42:AC1] loads 
   expect(screen.getByRole('button', { name: 'Add venue' })).toBeInTheDocument();
 });
 
+const detailReader = { ...staff, permissions: [...staff.permissions, 'venues.layouts.read', 'venues.operations.read'] };
+const recordedOperations = { setup_minutes: 30, turnaround_minutes: 45,
+  emergency_access: 'Two clear exits', known_restrictions: 'No open flames', updated_at: null };
+
+test.each(['layouts', 'operations'] as const)('[CONFLICT] [SG2-43:AC2] [SG2-77:AC3] starts layout and operational detail reads together and keeps the catalogue loading while %s is pending', async (slower) => {
+  const layouts = deferred(); const operations = deferred();
+  const fetch = vi.fn(async (url: string) => {
+    if (url === '/api/auth/me') return Response.json(detailReader);
+    if (url === '/api/venues') return Response.json({ venues: [venue] });
+    if (url === '/api/venues/1/layouts') return layouts.promise;
+    if (url === '/api/venues/1/operations') return operations.promise;
+    throw new Error(`Unexpected read: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetch);
+  render(<Venues accessToken="test-token" />);
+  // In particular, operations must start before the unresolved layout response.
+  await waitFor(() => expect(fetch.mock.calls.map(([url]) => url).sort()).toEqual([
+    '/api/auth/me', '/api/venues', '/api/venues/1/layouts', '/api/venues/1/operations',
+  ].sort()));
+  await act(async () => {
+    if (slower === 'layouts') operations.resolve(Response.json({ operations: recordedOperations }));
+    else layouts.resolve(Response.json({ layouts: [{ layout: 'classroom', other_description: null }] }));
+  });
+  expect(screen.getByRole('status')).toHaveTextContent('Loading venue catalogue');
+  expect(screen.queryByRole('heading', { name: 'Atrium Hall' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add venue' })).not.toBeInTheDocument();
+  await act(async () => {
+    if (slower === 'layouts') layouts.resolve(Response.json({ layouts: [{ layout: 'classroom', other_description: null }] }));
+    else operations.resolve(Response.json({ operations: recordedOperations }));
+  });
+  expect(screen.getByRole('heading', { name: 'Atrium Hall' })).toBeInTheDocument();
+  expect(screen.getByText('Classroom')).toBeInTheDocument();
+  expect(screen.getByText('30 min setup · 45 min turnaround')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Add venue' })).toBeInTheDocument();
+});
+
+test.each(['layouts', 'operations'] as const)('[FAILURE] [SG2-43:AC2] [SG2-77:AC3] a failed %s read preserves the other venue details and its existing fallback', async (failed) => {
+  const fetch = vi.fn(async (url: string) => {
+    if (url === '/api/auth/me') return Response.json(detailReader);
+    if (url === '/api/venues') return Response.json({ venues: [venue] });
+    if (url === `/api/venues/1/${failed}`) return Response.json({}, { status: 503 });
+    if (url === '/api/venues/1/layouts') return Response.json({ layouts: [{ layout: 'classroom', other_description: null }] });
+    if (url === '/api/venues/1/operations') return Response.json({ operations: recordedOperations });
+    throw new Error(`Unexpected read: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetch);
+  render(<Venues accessToken="test-token" />);
+  await screen.findByRole('heading', { name: 'Atrium Hall' });
+  expect(screen.getByText('Supported layouts').nextSibling).toHaveTextContent(failed === 'layouts' ? 'NA' : 'Classroom');
+  expect(screen.getByText('Setup and turnaround').nextSibling).toHaveTextContent(failed === 'operations' ? 'Unavailable' : '30 min setup · 45 min turnaround');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('[CONFLICT] [SG2-43:AC2] [SG2-77:AC3] leaving while both venue detail reads are pending aborts both and ignores their late success or failure', async () => {
+  const layouts = deferred(); const operations = deferred();
+  const fetch = vi.fn(async (url: string, _init?: RequestInit) => {
+    if (url === '/api/auth/me') return Response.json(detailReader);
+    if (url === '/api/venues') return Response.json({ venues: [venue] });
+    if (url === '/api/venues/1/layouts') return layouts.promise;
+    if (url === '/api/venues/1/operations') return operations.promise;
+    throw new Error(`Unexpected read: ${url}`);
+  });
+  vi.stubGlobal('fetch', fetch);
+  const { rerender } = render(<Venues accessToken="test-token" />);
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+  const layoutSignal = fetch.mock.calls.find(([url]) => url.endsWith('/layouts'))![1]!.signal!;
+  const operationSignal = fetch.mock.calls.find(([url]) => url.endsWith('/operations'))![1]!.signal!;
+  expect(operationSignal).toBe(layoutSignal);
+  expect(layoutSignal.aborted).toBe(false);
+  rerender(<Venues accessToken={null} />);
+  expect(layoutSignal.aborted).toBe(true);
+  expect(operationSignal.aborted).toBe(true);
+  await act(async () => {
+    layouts.resolve(Response.json({ layouts: [{ layout: 'classroom', other_description: null }] }));
+    operations.reject(new Error('Aborted operation read'));
+  });
+  expect(screen.getByText(/Sign in with your account/)).toBeInTheDocument();
+  expect(screen.queryByText('Atrium Hall')).not.toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
 test.each([401, 403])('[FAILURE] [SG2-42:AC3] a %s catalogue response hides data even when permissions allow reading', async (status) => {
   const fetch = api();
   fetch.mockResolvedValueOnce(Response.json(staff))

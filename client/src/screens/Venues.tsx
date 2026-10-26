@@ -57,17 +57,18 @@ function VenueCatalogue({ token }: { token: string | null }) {
           venueRequest(token!, controller.signal),
         ]);
         if (controller.signal.aborted) return;
-        // Fetched alongside the catalogue, under the same loading state, so no
-        // per-card "Loading…" flicker appears once the page is shown.
-        const layouts = can(identity, 'venues.layouts.read')
-          ? await Promise.all((data.venues as Venue[]).map((venue: Venue) =>
-              fetchVenueLayouts(token!, controller.signal, venue.venue_id).catch(() => [] as VenueLayout[])))
-          : [];
-        // SG2-77: same approach for setup/turnaround times and safety details.
-        const operations = can(identity, 'venues.operations.read')
-          ? await Promise.all((data.venues as Venue[]).map((venue: Venue) =>
-              fetchVenueOperations(token!, controller.signal, venue.venue_id).catch(() => null)))
-          : [];
+        // These independent detail reads share the loading state and abort
+        // signal, but neither waits for the other wave to finish.
+        const [layouts, operations] = await Promise.all([
+          can(identity, 'venues.layouts.read')
+            ? Promise.all((data.venues as Venue[]).map((venue: Venue) =>
+                fetchVenueLayouts(token!, controller.signal, venue.venue_id).catch(() => [] as VenueLayout[])))
+            : [],
+          can(identity, 'venues.operations.read')
+            ? Promise.all((data.venues as Venue[]).map((venue: Venue) =>
+                fetchVenueOperations(token!, controller.signal, venue.venue_id).catch(() => null)))
+            : [],
+        ]);
         if (controller.signal.aborted) return;
         setAccess(identity);
         setVenues(data.venues);
