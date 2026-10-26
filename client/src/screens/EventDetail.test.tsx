@@ -1293,7 +1293,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     );
   }
 
-  test('[NORMAL] [SG2-100:AC6] a completed event shows who closed it out and when, and offers the action no more', async () => {
+  test('[NORMAL] [SG2-100:AC4] a completed event shows who closed it out and when, and offers the action no more', async () => {
     showEvent({
       status: 'completed',
       completedBy: 'coord-1',
@@ -1308,7 +1308,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] an end time exactly now counts as finished; one millisecond later does not', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] an end time exactly now counts as finished; one millisecond later does not', async () => {
     showEvent({ endsAt: NOW.toISOString() });
     renderAsCoordinator();
     expect(await screen.findByRole('button', { name: 'Mark as Completed' })).toBeVisible();
@@ -1321,7 +1321,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] an event with no confirmed booking is not offered as finished', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] an event with no confirmed booking is not offered as finished', async () => {
     // Null `endsAt` means nothing says when the event ends, which must read
     // as "not finished" rather than as finished.
     showEvent({ endsAt: null });
@@ -1330,7 +1330,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] the action appears in preparation and confirmed, and in no other status', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] the action appears in preparation and confirmed, and in no other status', async () => {
     for (const status of ['confirmed', 'preparation']) {
       cleanup();
       vi.restoreAllMocks();
@@ -1349,7 +1349,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     }
   });
 
-  test('[CONFLICT] [NORMAL] [SG2-100:AC6] rapid clicking sends exactly one request and disables the button', async () => {
+  test('[CONFLICT] [NORMAL] [SG2-100:AC4] rapid clicking sends exactly one request and disables the button', async () => {
     showEvent();
     let release!: (value: eventRequestsApi.CompleteEventOutcome) => void;
     const complete = vi.spyOn(eventRequestsApi, 'completeEvent').mockReturnValue(
@@ -1374,14 +1374,14 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     });
   });
 
-  test('[FAILURE] [SG2-100:AC6] a coordinator the event is not assigned to never sees the action', async () => {
+  test('[FAILURE] [SG2-100:AC4] a coordinator the event is not assigned to never sees the action', async () => {
     showEvent();
     renderAsCoordinator('coord-other');
     await screen.findByRole('heading', { name: 'Partner Forum' });
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
   });
 
-  test('[FAILURE] [SG2-100:AC6] a refused completion is reported verbatim and the button comes back', async () => {
+  test('[FAILURE] [SG2-100:AC4] a refused completion is reported verbatim and the button comes back', async () => {
     showEvent();
     vi.spyOn(eventRequestsApi, 'completeEvent').mockResolvedValue({
       ok: false,
@@ -1398,7 +1398,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(screen.getByRole('button', { name: 'Mark as Completed' })).toBeEnabled();
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] with no injected clock the real one decides, so a long-past event is still offered', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] with no injected clock the real one decides, so a long-past event is still offered', async () => {
     // The only test that leaves `now` at its default. The end time is years
     // in the past, so the assertion does not depend on when it runs.
     showEvent({ endsAt: '2020-01-01T00:00:00.000Z' });
@@ -1414,7 +1414,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(await screen.findByRole('button', { name: 'Mark as Completed' })).toBeVisible();
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] a completed event with no recorded actor shows a dash, not a blank', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] a completed event with no recorded actor shows a dash, not a blank', async () => {
     showEvent({
       status: 'completed',
       completedBy: null,
@@ -1425,7 +1425,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(screen.getByText('Completed by').closest('div')).toHaveTextContent('—');
   });
 
-  test('[FAILURE] [SG2-100:AC6] a session that expires while the page is open takes the whole detail away, action included', async () => {
+  test('[FAILURE] [SG2-100:AC4] a session that expires while the page is open takes the whole detail away, action included', async () => {
     showEvent();
     const complete = vi.spyOn(eventRequestsApi, 'completeEvent');
     const props = {
@@ -1445,7 +1445,7 @@ describe('marking an event completed (SG2-100 AC4)', () => {
     expect(complete).not.toHaveBeenCalled();
   });
 
-  test('[FAILURE] [SG2-100:AC6] with no access token nothing is sent', async () => {
+  test('[FAILURE] [SG2-100:AC4] with no access token nothing is sent', async () => {
     showEvent();
     const complete = vi.spyOn(eventRequestsApi, 'completeEvent');
     render(

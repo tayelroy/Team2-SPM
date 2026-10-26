@@ -226,6 +226,8 @@ input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
   /* The header scrolls away on a phone instead of covering a fifth of the screen. */
   .app-header { position: relative !important; }
   .app-nav-item { padding: 8px 0 6px !important; }
+  /* Several held roles need their own row; keep Profile and Notifications reachable. */
+  .app-header-controls > .app-role-switcher { order: -1; flex-basis: 100%; }
   /* Status filters scroll sideways in one row instead of pushing the list off-screen. */
   .events-filter { flex-wrap: nowrap !important; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
   .events-filter > * { flex-shrink: 0; }

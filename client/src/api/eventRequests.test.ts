@@ -1730,7 +1730,7 @@ describe('fetchAssignable (SG2-33/34)', () => {
 });
 
 describe('assignCoordinator (SG2-33/34)', () => {
-  test('[NORMAL] [SG2-33:AC1] [SG2-100:AC3] patches the coordinator endpoint with the chosen coordinator', async () => {
+  test('[NORMAL] [SG2-33:AC1] [SG2-100:AC1] patches the coordinator endpoint with the chosen coordinator', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ request: { status: 'submitted' } }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1750,7 +1750,7 @@ describe('assignCoordinator (SG2-33/34)', () => {
   test.each([
     null, {}, { request: null }, { request: {} }, { request: { status: 42 } },
     { request: { status: 'unknown_status' } }, { request: { status: 'completed' } },
-  ])('[BOUNDARY] [FAILURE] [SG2-100:AC3] an absent or invalid assignment status does not invent a lifecycle change (%j)', async body => {
+  ])('[BOUNDARY] [FAILURE] [SG2-100:AC1] an absent or invalid assignment status does not invent a lifecycle change (%j)', async body => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(body)));
     expect(await assignCoordinator(7, 'c1', 'tok')).toEqual({ ok: true });
   });
@@ -2101,7 +2101,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     );
   }
 
-  test('[NORMAL] [SG2-100:AC6] sends a bodyless PATCH with the bearer token', async () => {
+  test('[NORMAL] [SG2-100:AC4] sends a bodyless PATCH with the bearer token', async () => {
     const fetchMock = respond(200, { request: { event_id: 7, status: 'completed' } });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -2112,7 +2112,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     });
   });
 
-  test('[CONFLICT] [SG2-100:AC6] the server owns the clock, so its 409 is surfaced verbatim', async () => {
+  test('[CONFLICT] [SG2-100:AC4] the server owns the clock, so its 409 is surfaced verbatim', async () => {
     vi.stubGlobal('fetch', respond(409, { error: 'This event has not finished yet.' }));
     await expect(completeEvent(7, 'test-token')).resolves.toEqual({
       ok: false,
@@ -2120,7 +2120,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     });
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] a 404 or 400 without a readable error falls back to a neutral message', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] a 404 or 400 without a readable error falls back to a neutral message', async () => {
     for (const status of [400, 404]) {
       vi.stubGlobal('fetch', respond(status, { nothing: true }));
       await expect(completeEvent(7, 'test-token')).resolves.toEqual({
@@ -2130,7 +2130,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     }
   });
 
-  test('[FAILURE] [SG2-100:AC6] 401 and 403 both say who may do this', async () => {
+  test('[FAILURE] [SG2-100:AC4] 401 and 403 both say who may do this', async () => {
     for (const status of [401, 403]) {
       vi.stubGlobal('fetch', respond(status));
       await expect(completeEvent(7, 'test-token')).resolves.toEqual({
@@ -2140,7 +2140,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     }
   });
 
-  test('[FAILURE] [SG2-100:AC6] a transport failure or a 503 is reported as retryable', async () => {
+  test('[FAILURE] [SG2-100:AC4] a transport failure or a 503 is reported as retryable', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     await expect(completeEvent(7, 'test-token')).resolves.toEqual({
       ok: false,
@@ -2154,7 +2154,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     });
   });
 
-  test('[FAILURE] [SG2-100:AC6] an unreadable error body does not throw', async () => {
+  test('[FAILURE] [SG2-100:AC4] an unreadable error body does not throw', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('not json', { status: 409 })));
     await expect(completeEvent(7, 'test-token')).resolves.toEqual({
       ok: false,
@@ -2164,7 +2164,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
 });
 
 describe('the completion record on a detail read (SG2-100 AC4)', () => {
-  test('[NORMAL] [SG2-100:AC6] completed_by, completed_at and ends_at are carried through', async () => {
+  test('[NORMAL] [SG2-100:AC4] completed_by, completed_at and ends_at are carried through', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       request: {
         event_id: 7, organiser_id: 'org-1', status: 'completed', can_manage: false,
@@ -2182,7 +2182,7 @@ describe('the completion record on a detail read (SG2-100 AC4)', () => {
     }
   });
 
-  test('[FAILURE] [SG2-100:AC6] a non-string or absent value reads as unknown, never as a guess', async () => {
+  test('[FAILURE] [SG2-100:AC4] a non-string or absent value reads as unknown, never as a guess', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       request: {
         event_id: 7, organiser_id: 'org-1', status: 'confirmed', can_manage: false,

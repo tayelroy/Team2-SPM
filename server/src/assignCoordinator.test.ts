@@ -340,7 +340,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     });
   });
 
-  test('[NORMAL] [SG2-100:AC3] [SG2-40:AC1] [SG2-40:AC2] assigning a request awaiting assignment also moves it into review and records unassigned → submitted with the assignment', async () => {
+  test('[NORMAL] [SG2-100:AC1] [SG2-40:AC1] [SG2-40:AC2] assigning a request awaiting assignment also moves it into review and records unassigned → submitted with the assignment', async () => {
     const transitions: (AssignStatusTransition | undefined)[] = [];
     const writes: [number, string | null, string | null][] = [];
     const audits: InsertAuditLogInput[][] = [];
@@ -370,7 +370,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     ]]);
   });
 
-  test('[CONFLICT] [SG2-100:AC3] reassigning a live event carries no status move, so the event is never rewound', async () => {
+  test('[CONFLICT] [SG2-100:AC1] reassigning a live event carries no status move, so the event is never rewound', async () => {
     for (const status of ['under_review', 'approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed']) {
       const transitions: (AssignStatusTransition | undefined)[] = [];
       const response = await request(
@@ -392,7 +392,7 @@ describe('PATCH /api/event-requests/:eventId/coordinator records the assignment 
     }
   });
 
-  test('[BOUNDARY] [SG2-100:AC3] an unrecorded first assignment is undone status and all', async () => {
+  test('[BOUNDARY] [SG2-100:AC1] an unrecorded first assignment is undone status and all', async () => {
     const transitions: (AssignStatusTransition | undefined)[] = [];
     const writes: [number, string | null, string | null][] = [];
     const response = await request(

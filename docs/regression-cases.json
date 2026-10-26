@@ -13,7 +13,7 @@
       "Sign in as venue and technical support staff; open each pending request and verify its identity, event, time window and stored facts.",
       "Verify staff cannot read coordinator event details through the queue endpoint and collect browser errors."
     ],
-    "data": "Events 41–44; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
+    "data": "Events 41\u201344; pending venue/equipment requests 11; decided requests 12; coordinator, venue and support fixture accounts.",
     "expected": "Coordinator counts 0 before seeding and 1 after refresh and return; zero buttons in Awaiting review; exactly Partner Innovation Summit in My assigned events; exact venue/support detail records; readable desktop/mobile layout; focused selected detail; no runtime errors.",
     "evidence": "e2e/regression.spec.ts; client/src/screens/WorkQueue.test.tsx; docs/work-queue.md",
     "layer": "Playwright browser + fixture API",
@@ -248,7 +248,7 @@
       "Rename it Updated Browser Hall and change capacity to 125.",
       "Reload, search for Updated Browser, and read the venue API."
     ],
-    "data": "North Wing; capacity 100 then 125; Projector; Lift; 09:00–18:00",
+    "data": "North Wing; capacity 100 then 125; Projector; Lift; 09:00\u201318:00",
     "expected": "Created/edited venue appears; search excludes the seeded Regression Hall; API returns all expected updated fields. Data survives page reload in the running memory fixture, not a database restart.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -392,7 +392,7 @@
       "Verify the error and repeat that invalid request through the fixture API.",
       "Change to 255 characters and submit; read the venue count."
     ],
-    "data": "Name = 界 repeated 256 then 255 times; other fields valid",
+    "data": "Name = \u754c repeated 256 then 255 times; other fields valid",
     "expected": "256 shows a 255-limit message and API 400; 255 creates the venue; fixture count is three, showing exactly one addition.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -711,7 +711,7 @@
       "Read the ledger; sign in as coordinator and open the notifications."
     ],
     "data": "Harbour Lecture (631), confirmed for 20 Jul 2030, organiser 'organiser', coordinator 'coordinator', Regression Hall (capacity 100) booked; capacity 80, open since 1 Oct 2026, closing 19 Jul 2030 10:00 SGT; registered: Regression attendee (attendee@example.test) and Guest Attendee (no phone); one cancelled.",
-    "expected": "Registration is open, 2 registered, 78 remaining, both attendees listed with the email link and 'No phone on record'. The warning 'A capacity of 150 is more than Regression Hall holds (100).' shows while typing and after saving; 148 remain. Closing shows 'Registration has closed.'; reopening shows open and 18 Jul 2030, 18:00 SGT. History: capacity 80→150 and two closing-time changes, all by the organiser. Notices: closed early, then now open, each to the organiser and the coordinator; the coordinator's bell shows both. No console errors.",
+    "expected": "Registration is open, 2 registered, 78 remaining, both attendees listed with the email link and 'No phone on record'. The warning 'A capacity of 150 is more than Regression Hall holds (100).' shows while typing and after saving; 148 remain. Closing shows 'Registration has closed.'; reopening shows open and 18 Jul 2030, 18:00 SGT. History: capacity 80\u2192150 and two closing-time changes, all by the organiser. Notices: closed early, then now open, each to the organiser and the coordinator; the coordinator's bell shows both. No console errors.",
     "evidence": "e2e/registrations.spec.ts; e2e/support/registrations.ts",
     "layer": "Playwright Chromium + isolated production app"
   },
@@ -853,7 +853,7 @@
     "steps": [
       "Run supabase/tests/event_registration_settings.sql."
     ],
-    "data": "Events 96301–96308 covering planning, confirmed open, cancelled, no registration, started, not yet open, past closing and unconfirmed-in-window.",
+    "data": "Events 96301\u201396308 covering planning, confirmed open, cancelled, no registration, started, not yet open, past closing and unconfirmed-in-window.",
     "expected": "Every assertion passes, including capacity coming down to the registered count but not below it; no notice for unconfirmed events; each opening or closing is announced once.",
     "evidence": "supabase/tests/event_registration_settings.sql",
     "layer": "PostgreSQL",
@@ -1070,7 +1070,7 @@
       "Move to July 2030 and inspect 1 and 2 July."
     ],
     "data": "Regression Hall; block 2030-06-30T16:00Z to 2030-07-01T04:00Z, Equipment failure, note Air conditioning failed",
-    "expected": "30 June is free and does not list the block; 1 July is unavailable and lists Regression Hall · Air conditioning failed; 2 July is free.",
+    "expected": "30 June is free and does not list the block; 1 July is unavailable and lists Regression Hall \u00b7 Air conditioning failed; 2 July is free.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "categories": [
@@ -1281,7 +1281,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1321,7 +1321,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1404,7 +1404,7 @@
       "Check My drafts and reload."
     ],
     "data": "Synthetic colleagues, unrelated organisation and missing-membership accounts",
-    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+    "expected": "Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller\u2019s own requests.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -1424,7 +1424,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller’s own requests.",
+        "actual": "Current browser assertions passed. Both colleagues see the same organisation events; shared detail is view-only; My drafts contains only the caller\u2019s own requests.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation and follow-up changes; Node 22.22.2; playwright test --config=/tmp/team2-fable-followup/playwright.config.ts; installed Chrome; 18/18 passed; /tmp/team2-fable-followup/browser.log; /tmp/team2-fable-followup/regression.json. Loopback memory fixture; video disabled. Required SG2-26 gate passed against this report: /tmp/team2-fable-followup/report-gate.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1451,7 +1451,7 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as an organiser in another organisation.",
-      "Inspect My events and request another organisation’s event directly.",
+      "Inspect My events and request another organisation\u2019s event directly.",
       "Compare with a nonexistent event.",
       "Sign in with no organisation and inspect list and detail."
     ],
@@ -1525,7 +1525,7 @@
     "previous_executions": [
       {
         "status": "Pass",
-        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case’s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
+        "actual": "Auth fixture, all five migrations and all three SQL suites passed in a fresh local database, including this case\u2019s assertions and ROLLBACK. PGlite validates PostgreSQL semantics but is not the native CI container or deployed Supabase.",
         "execution_evidence": "22 Sep 2026; 2aee8b8aa09e7ddcdb295804fde308799fbec856 + local revalidation changes; PGlite 0.3.12 / PostgreSQL 17.5; existing package /tmp/sg2-26-database-check; /tmp/team2-sql-revalidation.log.",
         "execution_date": "22 Sep 2026"
       }
@@ -1644,12 +1644,12 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context in Singapore time (timezoneId Asia/Singapore); signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as Venue Staff, open Catalogue and choose Block Regression Hall.",
-      "Block 20 June 2030 09:00–17:00 with reason Renovation and note Carpet replacement.",
+      "Block 20 June 2030 09:00\u201317:00 with reason Renovation and note Carpet replacement.",
       "Open Venue Availability for June 2030 and inspect 20 and 21 June.",
       "Return to the block screen, remove the block, and re-check the API and calendar."
     ],
     "data": "Seeded Regression Hall with its existing Scheduled maintenance block; 20 June 2030",
-    "expected": "The new block is listed; on the June calendar 20 June is unavailable and lists Regression Hall · Carpet replacement, and 21 June is free. After removal only the seeded maintenance block remains in the API and on the calendar.",
+    "expected": "The new block is listed; on the June calendar 20 June is unavailable and lists Regression Hall \u00b7 Carpet replacement, and 21 June is free. After removal only the seeded maintenance block remains in the API and on the calendar.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -1783,16 +1783,16 @@
     "title": "staff mark a booked venue unavailable; the booking is flagged, kept and the venue leaves search",
     "type": "Positive",
     "story": "SG2-80",
-    "purpose": "Verify AC1–AC6: a period over a confirmed booking is accepted with a reason and note, the booking is flagged but kept, the recorder and time are shown, and the venue is unavailable on the calendar and absent from search.",
+    "purpose": "Verify AC1\u2013AC6: a period over a confirmed booking is accepted with a reason and note, the booking is flagged but kept, the recorder and time are shown, and the venue is unavailable on the calendar and absent from search.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "As coordinator, search 15 June 2030 05:00–06:00 UTC and confirm Regression Hall is returned.",
-      "As Venue Staff, block Regression Hall 14–16 June 2030 with reason Equipment failure and note Air conditioning failed.",
+      "As coordinator, search 15 June 2030 05:00\u201306:00 UTC and confirm Regression Hall is returned.",
+      "As Venue Staff, block Regression Hall 14\u201316 June 2030 with reason Equipment failure and note Air conditioning failed.",
       "Check the status message, the listed reason, note, recorder and the affected-events list, and the blocks API.",
       "As coordinator, open Venue Availability for June 2030 and repeat the search."
     ],
-    "data": "Seeded confirmed booking #1 for event 1 (Planning workshop, draft) on 15 June 2030 02:00–04:00 UTC; Regression venue and Regression coordinator accounts",
-    "expected": "The block is saved (201) and one booked event is reported as flagged and not cancelled; event 1 keeps its name and status; the period is recorded by Regression venue with a time; the calendar shows the period and 'confirmed · event 1 · affected by venue unavailability'; search no longer returns Regression Hall.",
+    "data": "Seeded confirmed booking #1 for event 1 (Planning workshop, draft) on 15 June 2030 02:00\u201304:00 UTC; Regression venue and Regression coordinator accounts",
+    "expected": "The block is saved (201) and one booked event is reported as flagged and not cancelled; event 1 keeps its name and status; the period is recorded by Regression venue with a time; the calendar shows the period and 'confirmed \u00b7 event 1 \u00b7 affected by venue unavailability'; search no longer returns Regression Hall.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "categories": [
@@ -1825,7 +1825,7 @@
       "Post a valid period that also supplies created_by_name and created_at.",
       "As coordinator and technical support, try to create a period; list the blocks as Venue Staff."
     ],
-    "data": "Regression Hall; 1 July 2030 09:00–17:00 UTC; fixture roles",
+    "data": "Regression Hall; 1 July 2030 09:00\u201317:00 UTC; fixture roles",
     "expected": "The screen shows the validation alert and saves nothing; the API returns 400 for each invalid body; the valid post returns 201 recorded by Regression venue with the server's time; other roles receive 403; only the seeded block and the valid post remain.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1872,16 +1872,16 @@
     "title": "an old block is kept and still closes the venue, a block over a booking is accepted, and removing the old block reopens it",
     "type": "Positive",
     "story": "SG2-98",
-    "purpose": "Verify AC1–AC3: a block recorded before SG2-80 is listed as an unavailability record with no recorder and still keeps the venue out of search; a new block over a confirmed booking is accepted and flags it; removing the old block makes the venue searchable again.",
+    "purpose": "Verify AC1\u2013AC3: a block recorded before SG2-80 is listed as an unavailability record with no recorder and still keeps the venue out of search; a new block over a confirmed booking is accepted and flags it; removing the old block makes the venue searchable again.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Seed the old-style block Roof repair on Regression Hall for 18 June 2030 (UTC), filed under other with no recorder or time.",
       "As Venue Staff, open the block screen and check the old block is listed.",
-      "Block 15 June 2030 09:00–13:00 Singapore time over confirmed booking #1 with reason Maintenance and note Projector swap.",
-      "As coordinator, search 18 June 2030 05:00–06:00 UTC.",
+      "Block 15 June 2030 09:00\u201313:00 Singapore time over confirmed booking #1 with reason Maintenance and note Projector swap.",
+      "As coordinator, search 18 June 2030 05:00\u201306:00 UTC.",
       "As Venue Staff, remove Roof repair; as coordinator, repeat the search."
     ],
-    "data": "Old-style block #98 (Roof repair); seeded confirmed booking #1 for event 1 (Planning workshop) on 15 June 2030 02:00–04:00 UTC; Regression venue and Regression coordinator accounts",
+    "data": "Old-style block #98 (Roof repair); seeded confirmed booking #1 for event 1 (Planning workshop) on 15 June 2030 02:00\u201304:00 UTC; Regression venue and Regression coordinator accounts",
     "expected": "Roof repair shows as Other with 'Added before the recorder and time were tracked'; the new block is saved and one booked event is reported as flagged and not cancelled; search leaves out Regression Hall while the old block exists and returns it after the block is removed.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1912,7 +1912,7 @@
       "As coordinator, technical support and organiser, delete block #98; then delete it without signing in.",
       "List the blocks as Venue Staff."
     ],
-    "data": "Old-style block #98 (Roof repair); confirmed booking #1 on 15 June 2030 02:00–04:00 UTC; fixture roles",
+    "data": "Old-style block #98 (Roof repair); confirmed booking #1 on 15 June 2030 02:00\u201304:00 UTC; fixture roles",
     "expected": "Both invalid periods return 400; other roles receive 403 and the anonymous call 401; only Scheduled maintenance and Roof repair remain.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -1943,7 +1943,7 @@
       "As Venue Staff, list the old blocks, try to place a hold inside one, and block a period over a confirmed booking.",
       "As coordinator, then Venue Staff, remove an old block and place the hold again; roll back."
     ],
-    "data": "Venues 9801 and 9802; old blocks 98201–98203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
+    "data": "Venues 9801 and 9802; old blocks 98201\u201398203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
     "expected": "All three old blocks keep their period and reason, are filed under other with no recorder or time; booking 98301 is flagged and stays confirmed, 98302 is not flagged; the hold is refused while the old block exists and created after Venue Staff remove it; the coordinator removes nothing; a new block over a booking is accepted and flags it.",
     "evidence": "supabase/tests/venue_block_upgrade.sql",
     "layer": "Disposable PostgreSQL SQL assertions",
@@ -1958,7 +1958,7 @@
     "title": "an approved event opens a pre-filled venue search that leaves out busy venues",
     "type": "Positive",
     "story": "SG2-46",
-    "purpose": "Verify AC1–AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
+    "purpose": "Verify AC1\u2013AC4: criteria pre-fill from an approved event, only free venues meeting every criterion are returned, accessibility is not matched when no needs are given, and an empty result states the criteria.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Sign in as coordinator, seed a request under review, approve it and choose Find venues for this event.",
@@ -2012,7 +2012,7 @@
         "status": "Pass",
         "case_id": "SG2-46:ac3-an-event-without-accessibility-needs-says-accessibility-is-not-used-to-match",
         "layer": "Rendered public React component with controlled HTTP responses; local verification only",
-        "actual": "16 Oct 2026 local copy follow-up: the event has no accessibility needs, the initial Accessibility field is empty and its initial search omits the accessibility parameter. The exact hint says “No accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.” After manually entering ramp and searching, the request includes accessibility=ramp, the field retains ramp, the searched criteria display Accessibility: ramp, and the same truthful hint remains. Existing method title and ID were preserved; no new declarations.",
+        "actual": "16 Oct 2026 local copy follow-up: the event has no accessibility needs, the initial Accessibility field is empty and its initial search omits the accessibility parameter. The exact hint says \u201cNo accessibility needs were specified for this event. Add Accessibility keywords if you want to narrow the matches.\u201d After manually entering ramp and searching, the request includes accessibility=ramp, the field retains ramp, the searched criteria display Accessibility: ramp, and the same truthful hint remains. Existing method title and ID were preserved; no new declarations.",
         "execution_evidence": "Before the one-string change, the strengthened existing case failed on the obsolete hint (/tmp/spm-accessibility-hint-red.log). Afterward all 26 VenueSearch tests passed (/tmp/spm-accessibility-hint-focused.log); full client 1433/1433 across 70 files passed with 100% statements/branches/functions/lines on every app file, including VenueSearch.tsx (/tmp/spm-accessibility-hint-full-client.log; /tmp/spm-accessibility-hint-full-coverage/coverage-summary.json); client TypeScript passed (/tmp/spm-accessibility-hint-typecheck.log). This local follow-up does not claim a new CI pass or hosted retest.",
         "execution_date": "16 Oct 2026"
       }
@@ -2278,7 +2278,7 @@
       "Same-coordinator reassignment returns 200 and the coordinator's planning update still returns 200",
       "While assigned away the planning update returns 403",
       "After the event is handed back the planning update returns 200",
-      "History holds exactly two coordinator entries, newest first: second coordinator → Regression coordinator, then Regression coordinator → second coordinator"
+      "History holds exactly two coordinator entries, newest first: second coordinator \u2192 Regression coordinator, then Regression coordinator \u2192 second coordinator"
     ],
     "evidence": "e2e/regression.spec.ts:738",
     "layer": "Playwright fixture API",
@@ -2787,7 +2787,7 @@
       "Frontend: mock getEventHistory to resolve with pre-ordered mock entries and render EventAuditDrawer with isOpen=true.",
       "Check each entry's actor name, humanized field label, SGT-formatted timestamp and old-to-new diff values, including null old/new values rendered as (empty)."
     ],
-    "data": "Three mock audit entries for event 42: expected_attendance 100→250, venue_requirements null→'Auditorium with stage lighting', accessibility_needs 'Wheelchair ramp'→null",
+    "data": "Three mock audit entries for event 42: expected_attendance 100\u2192250, venue_requirements null\u2192'Auditorium with stage lighting', accessibility_needs 'Wheelchair ramp'\u2192null",
     "expected": "Entries render newest-first with correct actor names, humanized field labels, SGT timestamps and old/new diffs; null values render as (empty).",
     "evidence": "server/src/db/auditLogs.test.ts; server/src/events/getHistory.test.ts; client/src/components/EventAuditDrawer.test.tsx",
     "layer": "Backend API/unit tests; Frontend component tests",
@@ -2863,7 +2863,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2899,7 +2899,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2930,7 +2930,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2954,20 +2954,20 @@
     ],
     "purpose": "Prove recipient isolation, default 24-hour warning, exact deadline expiry and recorded history.",
     "steps": [
-      "Place holds on two coordinators’ events and sign in as the first coordinator.",
+      "Place holds on two coordinators\u2019 events and sign in as the first coordinator.",
       "Verify assigned holds and placement notification; no warning one millisecond before the 24-hour threshold.",
       "At the threshold receive one warning; at exact expiry receive Expired status and one expiry notice.",
       "Open the existing event history and inspect its System/Automatic expiry entry.",
       "Sign in as staff; refuse overdue conversion and place a new request for the freed period."
     ],
-    "expected": "Another coordinator’s holds/notices stay hidden; warnings and expiry are idempotent; expired holds are unapprovable; history records the transition; a new request succeeds.",
+    "expected": "Another coordinator\u2019s holds/notices stay hidden; warnings and expiry are idempotent; expired holds are unapprovable; history records the transition; a new request succeeds.",
     "execution_date": "5 Oct 2026",
     "execution_evidence": "Local: installed Chrome; temporary /tmp/sg2-holds-playwright.config.ts (video disabled, repository browser config unchanged); /tmp/spm-holds-final-browser.log and /tmp/spm-holds-final-gate.log. e2e tsc, all 13 report-gate checks and required SG2-26 report gate pass. 1440px/390px hold layout and full-height desktop/mobile notification portal inspected; screenshots /tmp/sg2-holds-qa. No hosted Supabase is claimed.",
     "executed_by": "Codex (automated local verification)"
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -2999,7 +2999,7 @@
   },
   {
     "preconditions": "Production React build and real Express API on loopback with reset disposable identity/storage, fixed clock and fresh browser context. No hosted Supabase.",
-    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1–3 June 2030 clock boundaries and 5 June hold period.",
+    "data": "Venue/coordinator/support/organiser/attendee fixture accounts; events 81/82; venues 1/2; 1\u20133 June 2030 clock boundaries and 5 June hold period.",
     "evidence": "e2e/regression.spec.ts; e2e/support/venue-holds.ts; docs/test-case-inventory.json; docs/venue-holds.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -3109,7 +3109,7 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
       "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
-      "Open the request form on Regression Hall, check the default layout and the venue requirements shown, and request 09:00–12:00 on 20 June 2030.",
+      "Open the request form on Regression Hall, check the default layout and the venue requirements shown, and request 09:00\u201312:00 on 20 June 2030.",
       "Check the event's venue requests and read the venue's availability and the venue search for that period through the API.",
       "Sign in as venue staff and open the Regression Hall request from the work queue."
     ],
@@ -3150,7 +3150,7 @@
     "steps": [
       "Seed the venue request fixture, sign in as coordinator and open venue search from Venue Request Forum.",
       "Clear the attendance and search again so both venues are listed.",
-      "Request Regression Hall, then Quiet Room, for 09:00–12:00 on 20 June 2030."
+      "Request Regression Hall, then Quiet Room, for 09:00\u201312:00 on 20 June 2030."
     ],
     "data": "Event 91; Regression Hall (theatre) and Quiet Room (boardroom)",
     "expected": "Both requests are accepted and the event's venue requests list both venues as Pending, Quiet Room with its Boardroom layout.",
@@ -3185,8 +3185,8 @@
     "purpose": "Verify AC4 and AC1: a second request for the same venue over an overlapping period is refused, only a layout the venue offers can be requested, and only the event's coordinator can request.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context; signed-in browser clock fixed at 22 September 2026. No hosted Supabase.",
     "steps": [
-      "Seed the venue request fixture, sign in as coordinator and request Regression Hall 09:00–12:00 on 20 June 2030.",
-      "Request Regression Hall again for 11:00–14:00 the same day.",
+      "Seed the venue request fixture, sign in as coordinator and request Regression Hall 09:00\u201312:00 on 20 June 2030.",
+      "Request Regression Hall again for 11:00\u201314:00 the same day.",
       "Through the API, request a banquet layout, an event the coordinator does not coordinate, and an empty period.",
       "Sign in as venue staff, organiser and attendee and try to request through the API; then try without credentials."
     ],
@@ -3294,7 +3294,7 @@
     "title": "a new Week 7 role signs in, sees its own role and is denied ungranted operations",
     "type": "Positive / role isolation / responsive",
     "story": "SG2-86",
-    "purpose": "Prove Event Coordinator Lead and Safety Officer — the two Week 7 customer-change roles — work end to end: sign-in resolves the role, the role is shown to the user, internal profile fields are visible, and operations the role was not granted are refused server-side.",
+    "purpose": "Prove Event Coordinator Lead and Safety Officer \u2014 the two Week 7 customer-change roles \u2014 work end to end: sign-in resolves the role, the role is shown to the user, internal profile fields are visible, and operations the role was not granted are refused server-side.",
     "preconditions": "Built React app and Express API on loopback with disposable identity/storage providers, fresh browser context and fixed clock. No hosted Supabase.",
     "steps": [
       "Sign in as the Safety Officer fixture account.",
@@ -3322,7 +3322,7 @@
     "mapped_acs": [
       "SG2-86:AC2"
     ],
-    "purpose": "Guard the browser walkthrough bug where the Event Coordinator Lead and Safety Officer dashboards listed prototype events (E-205 'Product Launch — Tideline' with organiser copy), a click on one opened the Attendee event page, and the menu offered All events, which only says it is for Event Organisers. Each desk must show only real data for that role and the menu only the screens its server permissions allow.",
+    "purpose": "Guard the browser walkthrough bug where the Event Coordinator Lead and Safety Officer dashboards listed prototype events (E-205 'Product Launch \u2014 Tideline' with organiser copy), a click on one opened the Attendee event page, and the menu offered All events, which only says it is for Event Organisers. Each desk must show only real data for that role and the menu only the screens its server permissions allow.",
     "preconditions": "Reset loopback memory fixture; production app build. No hosted Supabase. Fixture accounts safety@example.test (safety_officer) and lead@example.test (event_coordinator_lead).",
     "steps": [
       "Sign in as safety@example.test",
@@ -3331,7 +3331,7 @@
       "Click Open unassigned queue"
     ],
     "data": [
-      "Prototype event name 'Product Launch — Tideline' (must not appear)"
+      "Prototype event name 'Product Launch \u2014 Tideline' (must not appear)"
     ],
     "expected": [
       "Safety desk heading, a live '0 events are awaiting a safety check.' count (SG2-91 replaced the earlier 'No safety checks yet' placeholder), a menu of exactly [Dashboard, Safety checks, Find an event] (SG2-70 added Find an event) and no prototype event",
@@ -3534,8 +3534,8 @@
       "Read Regression Hall's availability for 20 June 2030 through the API and return to the work queue.",
       "Sign in as the coordinator, open the notifications drawer, then open venue search from Venue Request Forum."
     ],
-    "data": "Event 91 (approved, 80 guests, \"A projector\"); request 101 for Regression Hall, 20 Jun 2030 09:00–12:00 SGT",
-    "expected": "The request shows approved with the confirmation; availability shows a confirmed booking for event 91 over the requested period; the request leaves the queue; the coordinator's drawer shows \"Venue request approved — Regression Hall was approved for Venue Request Forum.\" and the request list shows who approved it and when.",
+    "data": "Event 91 (approved, 80 guests, \"A projector\"); request 101 for Regression Hall, 20 Jun 2030 09:00\u201312:00 SGT",
+    "expected": "The request shows approved with the confirmation; availability shows a confirmed booking for event 91 over the requested period; the request leaves the queue; the coordinator's drawer shows \"Venue request approved \u2014 Regression Hall was approved for Venue Request Forum.\" and the request list shows who approved it and when.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -3573,7 +3573,7 @@
       "Sign in as the coordinator, open the notifications drawer, then open venue search from Venue Request Forum.",
       "Read Regression Hall's availability for 21 June 2030 through the API."
     ],
-    "data": "Event 91; request 102 for Regression Hall, 21 Jun 2030 09:00–12:00 SGT; reason \"The floor is being resurfaced that week.\"",
+    "data": "Event 91; request 102 for Regression Hall, 21 Jun 2030 09:00\u201312:00 SGT; reason \"The floor is being resurfaced that week.\"",
     "expected": "The request shows rejected with the confirmation; the coordinator's drawer shows \"Venue request rejected\" with the reason; the request list shows Rejected, who rejected it, when, and the reason; availability for that day is empty.",
     "evidence": "e2e/regression.spec.ts",
     "layer": "Playwright browser + fixture API",
@@ -3644,7 +3644,7 @@
     "title": "a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop",
     "type": "Positive",
     "story": "SG2-100",
-    "purpose": "Verify AC2, AC3 and AC5: submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status. SG2-38: the My events Action column agrees with the stage (Awaiting coordinator assignment, then With coordinator), the locked Your options notice names the stage, and at 390px the stepper scrolls its current step into view inside the track and shows the swipe hint without scrolling the page.",
+    "purpose": "Verify SG2-100 AC1, AC2 and AC5 (live Jira numbering): submission with no coordinator lands in unassigned, the Event Coordinator Lead's assignment moves it to submitted, the coordinator opening it moves it to under_review, and the stage tracker's badge and waiting-on card show the right persona and action at each status. SG2-38: the My events Action column agrees with the stage (Awaiting coordinator assignment, then With coordinator), the locked Your options notice names the stage, and at 390px the stepper scrolls its current step into view inside the track and shows the swipe hint without scrolling the page.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture before each case; fresh browser context. No hosted Supabase.",
     "steps": [
       "Sign in as organiser and submit the seeded draft; open My events, read the row's Action text, then open it and read the stage badge and waiting-on card at 390x844 and 1440x900.",
@@ -3665,11 +3665,9 @@
       "BOUNDARY"
     ],
     "mapped_acs": [
+      "SG2-100:AC1",
       "SG2-100:AC2",
-      "SG2-100:AC3",
       "SG2-100:AC5",
-      "SG2-100:AC13",
-      "SG2-100:AC9",
       "SG2-38:AC1",
       "SG2-38:AC2",
       "SG2-31:AC4"
@@ -3710,10 +3708,8 @@
       "BOUNDARY"
     ],
     "mapped_acs": [
-      "SG2-100:AC6",
-      "SG2-100:AC7",
-      "SG2-100:AC8",
-      "SG2-100:AC9"
+      "SG2-100:AC4",
+      "SG2-100:AC5"
     ]
   },
   {
@@ -4223,7 +4219,7 @@
     ],
     "purpose": "Catch a cancellation that takes the event's other venue with it, ticks it by default, leaves the period occupied, loses who cancelled and why, or does not tell Venue Staff, or a screen that scrolls sideways at 390px or 1440px.",
     "steps": [
-      "Seed event 91 with bookings #21 (Regression Hall) and #22 (Quiet Room) on 20 Jun 2030, 10:00–12:00 SGT.",
+      "Seed event 91 with bookings #21 (Regression Hall) and #22 (Quiet Room) on 20 Jun 2030, 10:00\u201312:00 SGT.",
       "Sign in as the coordinator and open Find venues for Venue Request Forum.",
       "Release #22; check Regression Hall is offered unticked; give 'Breakout sessions dropped' and confirm.",
       "Read both bookings and each venue's availability for the period; check the layout at 1440px and 390px.",
@@ -4396,7 +4392,7 @@
     "purpose": "Missing period prompts both dates, proposed start10:00/end blank; selected period yieldspeak 17 / remaining 3 / shortfall 7;1 undated warning;no horizontal overflow.",
     "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
     "steps": [
-      "At 390px use undated/missing-period fixture; check default, then select 10:00–14:00 Singapore time."
+      "At 390px use undated/missing-period fixture; check default, then select 10:00\u201314:00 Singapore time."
     ],
     "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
     "expected": "Missing period prompts both dates, proposed start10:00/end blank; selected period yieldspeak 17 / remaining 3 / shortfall 7;1 undated warning;no horizontal overflow.",
@@ -4427,13 +4423,13 @@
     "title": "equal endpoints are refused and reservations ending at the chosen start do not overlap",
     "type": "BOUNDARY",
     "story": "SG2-54",
-    "purpose": "Equal range shows an alert and removes the old result; range 14:00–15:00 haspeak 0 / remaining 20 / shortfall 0.",
+    "purpose": "Equal range shows an alert and removes the old result; range 14:00\u201315:00 haspeak 0 / remaining 20 / shortfall 0.",
     "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
     "steps": [
       "Check default; submit equal 14:00 dates, verify 400 from the public API; correct the end to 15:00."
     ],
     "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
-    "expected": "Equal range shows an alert and removes the old result; range 14:00–15:00 haspeak 0 / remaining 20 / shortfall 0.",
+    "expected": "Equal range shows an alert and removes the old result; range 14:00\u201315:00 haspeak 0 / remaining 20 / shortfall 0.",
     "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
     "layer": "Playwright browser + fixture API",
     "categories": [
@@ -4461,13 +4457,13 @@
     "title": "refreshing a confirmed event reflects a newly committed quantity without recording an arrangement shortfall",
     "type": "CONFLICT",
     "story": "SG2-54",
-    "purpose": "Availability reads remain enabled with arrangement editing off; request periodselected; peak 14→18 / remaining 6→2 / shortfall 4→8; manual shortfall remains null and version remains 1.",
+    "purpose": "Availability reads remain enabled with arrangement editing off; request periodselected; peak 14\u219218 / remaining 6\u21922 / shortfall 4\u21928; manual shortfall remains null and version remains 1.",
     "preconditions": "Production React build and real Express API on loopback; fresh browser context and reset disposable identity/storage, event 54 and request 1; no hosted Supabase.",
     "steps": [
-      "Open confirmed fixture with explicit request period; check; another event raises reservation 14→18; refresh."
+      "Open confirmed fixture with explicit request period; check; another event raises reservation 14\u219218; refresh."
     ],
     "data": "Event 54; microphone20 / requested 10; concurrent 8+6 and adjacent 14 reservations; own 2 and cancelled 99 excluded; optional undated 3; maintenance held 5, requested 3 and damaged held 7, requested 2.",
-    "expected": "Availability reads remain enabled with arrangement editing off; request periodselected; peak 14→18 / remaining 6→2 / shortfall 4→8; manual shortfall remains null and version remains 1.",
+    "expected": "Availability reads remain enabled with arrangement editing off; request periodselected; peak 14\u219218 / remaining 6\u21922 / shortfall 4\u21928; manual shortfall remains null and version remains 1.",
     "evidence": "e2e/equipment-availability.spec.ts; docs/equipment-availability.md",
     "layer": "Playwright browser + fixture API",
     "categories": [
@@ -4592,7 +4588,7 @@
   {
     "story": "SG2-55",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
-    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00\u201314:00 Singapore time.",
     "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -4619,7 +4615,7 @@
     ],
     "purpose": "Prove the support reservation, reduced overlapping stock, continued physical arrangement and coordinator acknowledgement form one usable workflow.",
     "steps": [
-      "At 1440px, sign in as Technical Support and open Equipment Reservation Forum; review quantity 12 and suggested 10:00–14:00 Singapore dates, then reserve.",
+      "At 1440px, sign in as Technical Support and open Equipment Reservation Forum; review quantity 12 and suggested 10:00\u201314:00 Singapore dates, then reserve.",
       "Read the receipt and fixture ledger; reject an arrangement API edit with shortfall 1 and verify the whole ledger is unchanged; query availability for the overlapping request.",
       "Reload the page, reopen the reserved request, verify shortfall is disabled at zero, save placement at venue 1, Stage left, clear of the exit., and read the updated request.",
       "Sign in as its coordinator, check equipment readiness, open the event receipt and read the equipment reservation notification.",
@@ -4630,7 +4626,7 @@
   {
     "story": "SG2-55",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
-    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00\u201314:00 Singapore time.",
     "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -4657,16 +4653,16 @@
     ],
     "purpose": "Require an explicit valid duration when suggested dates are incomplete, with a usable mobile form and exact persisted dates.",
     "steps": [
-      "Reset fixtures with missing dates and open the support form at 390×844.",
+      "Reset fixtures with missing dates and open the support form at 390\u00d7844.",
       "Verify proposed start 10:00 and blank end; submit end 10:00 and inspect the validation message and ledger.",
       "Change end to 14:00, reserve, inspect quantity 12 and stored period, then check horizontal overflow."
     ],
-    "expected": "No duration is invented. Equal endpoints show the end-after-start error and create no receipt. A corrected period creates quantity 12 with 02:00–06:00 UTC dates. The 390px view has no horizontal overflow."
+    "expected": "No duration is invented. Equal endpoints show the end-after-start error and create no receipt. A corrected period creates quantity 12 with 02:00\u201306:00 UTC dates. The 390px view has no horizontal overflow."
   },
   {
     "story": "SG2-55",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
-    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00\u201314:00 Singapore time.",
     "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -4702,7 +4698,7 @@
   {
     "story": "SG2-55",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
-    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00\u201314:00 Singapore time.",
     "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -4737,7 +4733,7 @@
   {
     "story": "SG2-55",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures, fresh browser context and fixed test clock; no hosted Supabase.",
-    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00–14:00 Singapore time.",
+    "data": "Support/coordinator fixture accounts; Equipment Reservation Forum event 55, request 551 for 12 microphones; Overlapping Equipment Forum event 551, request 552 for 10; held quantity 20; 20 Jun 2030, 10:00\u201314:00 Singapore time.",
     "evidence": "e2e/equipment-reservations.spec.ts; docs/equipment-reservations.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -4774,7 +4770,7 @@
   {
     "story": "SG2-58",
     "preconditions": "Built React application and real Express routes on loopback with reset disposable identity/storage fixtures and an in-memory mirror of confirm_event; fresh browser context; no hosted Supabase.",
-    "data": "Coordinator/organiser fixture accounts; Confirmation Forum event 581 in Preparation with Regression Hall and Quiet Room bookings approved and confirmed (20 Jun 2030, 10:00–14:00 Singapore time), 12 Wireless microphones reserved and placed with no shortfall, registration for 120 open from 1 Jan 2026 08:00 to 20 Jun 2030 00:00 Singapore time.",
+    "data": "Coordinator/organiser fixture accounts; Confirmation Forum event 581 in Preparation with Regression Hall and Quiet Room bookings approved and confirmed (20 Jun 2030, 10:00\u201314:00 Singapore time), 12 Wireless microphones reserved and placed with no shortfall, registration for 120 open from 1 Jan 2026 08:00 to 20 Jun 2030 00:00 Singapore time.",
     "evidence": "e2e/event-confirmation.spec.ts; docs/event-confirmation.md",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
@@ -4799,7 +4795,7 @@
       "Sign in as the organiser, open notifications, then open the event from My events and read the Confirmed arrangements section and the confirmation API.",
       "Check horizontal overflow and collected browser/console errors."
     ],
-    "expected": "The panel reads Ready for confirmation with equipment reserved and placed. The status becomes confirmed with confirmed_by user-coordinator and a confirmed_at time, one status audit row preparation → confirmed and one event_confirmed notice to user-organiser reading 'Your event Confirmation Forum is confirmed.'. The organiser inbox shows 'Event confirmed'; the section lists both venues at 20 Jun 2030, 10:00 SGT – 14:00 SGT, '12 × Wireless microphones', capacity 120, opening and closing times and 'Registration is open. Attendees can register now.'; the API reports window open. No overflow or browser errors."
+    "expected": "The panel reads Ready for confirmation with equipment reserved and placed. The status becomes confirmed with confirmed_by user-coordinator and a confirmed_at time, one status audit row preparation \u2192 confirmed and one event_confirmed notice to user-organiser reading 'Your event Confirmation Forum is confirmed.'. The organiser inbox shows 'Event confirmed'; the section lists both venues at 20 Jun 2030, 10:00 SGT \u2013 14:00 SGT, '12 \u00d7 Wireless microphones', capacity 120, opening and closing times and 'Registration is open. Attendees can register now.'; the API reports window open. No overflow or browser errors."
   },
   {
     "story": "SG2-58",
@@ -4882,7 +4878,7 @@
     ],
     "purpose": "Show that not-required arrangements never block confirmation and that the coordinator and organiser views are usable on a phone.",
     "steps": [
-      "At 390×844, sign in as the coordinator and open Simple Forum; read the equipment and registration states and check overflow.",
+      "At 390\u00d7844, sign in as the coordinator and open Simple Forum; read the equipment and registration states and check overflow.",
       "Confirm the event; read the status message, overflow and ledger.",
       "Sign in as the organiser, open the event and read the Confirmed arrangements section; check overflow."
     ],
@@ -4911,7 +4907,7 @@
     "purpose": "Ensure repeated submissions cannot confirm twice or notify the organiser twice.",
     "steps": [
       "Sign in as the coordinator and open Confirmation Forum; hold the confirm request at the network layer.",
-      "Click Confirm event twice in one task; observe the disabled Confirming… button, release the request and count requests.",
+      "Click Confirm event twice in one task; observe the disabled Confirming\u2026 button, release the request and count requests.",
       "Replay the confirmation through the API and read the ledger."
     ],
     "expected": "Exactly one confirm request is sent and the success message appears. The replay returns HTTP 409 { error: 'Only an event in Preparation can be confirmed.', code: 'closed' }. The ledger holds one audit row and one notification."
@@ -4943,7 +4939,7 @@
       "As the coordinator, confirm the colleague's event 584.",
       "As the organiser, read 581's confirmation before it is confirmed; confirm it as the coordinator; read it as another organiser, as venue staff and as the coordinator; read the ledger."
     ],
-    "expected": "Unsigned is 401 and every other role 403. The colleague's event is 404 'No event in preparation is assigned to this account.' and stays in preparation. Before confirmation the organiser gets 404; afterwards another organiser gets 404, venue staff 403, and the coordinator 200 with 12 × Wireless microphones. One notification exists."
+    "expected": "Unsigned is 401 and every other role 403. The colleague's event is 404 'No event in preparation is assigned to this account.' and stays in preparation. Before confirmation the organiser gets 404; afterwards another organiser gets 404, venue staff 403, and the coordinator 200 with 12 \u00d7 Wireless microphones. One notification exists."
   },
   {
     "story": "SG2-68",
@@ -5109,7 +5105,7 @@
     ],
     "purpose": "Prove a hold converted to a booking notifies the organiser.",
     "steps": [
-      "As venue staff place a hold for event 81 on Regression Hall (5 Jun 2030, 10:00–12:00 SGT) and convert it; read the organiser's and the coordinator's ledger rows."
+      "As venue staff place a hold for event 81 on Regression Hall (5 Jun 2030, 10:00\u201312:00 SGT) and convert it; read the organiser's and the coordinator's ledger rows."
     ],
     "expected": "The organiser has one venue_request_approved notice for request 1: 'Regression Hall was approved for Tentative Hold Forum.'; the coordinator has none in this table."
   },
@@ -5163,7 +5159,7 @@
     ],
     "purpose": "Show the notices are readable on a phone and a desktop.",
     "steps": [
-      "For the Lead and the organiser, at 390×844 and 1440×1000: sign in, check horizontal overflow, open the bell, read each notice and its time, measure the drawer and check overflow again."
+      "For the Lead and the organiser, at 390\u00d7844 and 1440\u00d71000: sign in, check horizontal overflow, open the bell, read each notice and its time, measure the drawer and check overflow again."
     ],
     "expected": "Each bell shows its notices with label, message and Singapore time; the drawer lies within the viewport and the page never scrolls horizontally."
   },
@@ -5519,7 +5515,7 @@
       "NORMAL"
     ],
     "mapped_acs": [
-      "SG2-100:AC6"
+      "SG2-100:AC4"
     ],
     "status": "Pass",
     "actual": "The explicit foreign-key selector regression passed in the 1,420-test server suite; the changed adapter file has 100% coverage.",
@@ -6198,7 +6194,7 @@
       "FAILURE"
     ],
     "mapped_acs": [
-      "SG2-100:AC3",
+      "SG2-100:AC1",
       "SG2-33:AC1",
       "SG2-34:AC1"
     ],
@@ -6222,7 +6218,7 @@
       "Read confirmed, completed, cancelled, rejected, on-hold and failed-safety stages with no next actor; verify actual stage description instead of a universal planning-completed claim.",
       "Check case/padding variants in public normalization and preserve existing draft/explicit clarification amendment behavior."
     ],
-    "data": "Synthetic rejected event106, dashboard events70–72, case/padding status variants, null-next-actor stage responses.",
+    "data": "Synthetic rejected event106, dashboard events70\u201372, case/padding status variants, null-next-actor stage responses.",
     "expected": "Rejected own requests direct proposed revisions through the coordinator, are not directly editable and do not inflate organiser action counts. Rejection is not described as permanently final: Week4 revised resubmission eligibility remains, subject to later Week9 coordinator-led post-submission changes. Stage fallback displays actual outcome text; history/reason access and explicit clarification flow remain.",
     "evidence": "client/src/screens/EventDetail.test.tsx; client/src/screens/Dashboard.test.tsx; client/src/components/EventStageTracker.test.tsx; client/src/mock/viewModel.test.ts; client/src/api/eventRequests.test.ts",
     "layer": "Composed rendered React screens/components and public exported API normalization/view-model contracts",
@@ -6265,7 +6261,7 @@
       "Attempt confirmation on otherwise-ready fixtures with each known active recheck and all three.",
       "Exercise inactive/null/empty/unknown marker compatibility and stale-deployed-function release diagnostics."
     ],
-    "data": "Synthetic event attendance136→137, coordinator registration capacity 137 refused; venue_recheck/equipment_recheck/registration_recheck; false/null flags, duplicates, unknown markers, JSON null/object arrays.",
+    "data": "Synthetic event attendance136\u2192137, coordinator registration capacity 137 refused; venue_recheck/equipment_recheck/registration_recheck; false/null flags, duplicates, unknown markers, JSON null/object arrays.",
     "expected": "Only known active impacts mark their category Outstanding and prevent confirmation. Rechecks retain booking/reservation facts and remain persisted. Refused confirmation changes no event, history, notification, booking or receipt. Inactive/unknown legacy metadata preserves ordinary readiness.",
     "evidence": "server/src/events/arrangementReadiness.test.ts; server/src/getEventArrangements.test.ts; integration/api.test.ts; supabase/tests/event_confirmation.sql; .github/scripts/release-readiness.test.mjs",
     "layer": "Native Express/Supabase/PostgREST/PostgreSQL, public read-model/API tests and rollback SQL",
@@ -6400,11 +6396,11 @@
     "title": "Venue unavailability warnings remain readable alongside the existing inbox",
     "type": "Positive / conflict / failure / public API and rendered role inbox",
     "story": "SG2-81",
-    "purpose": "Accept the exact venue_unavailable contract emitted by venue replacement without discarding all of a recipient’s notifications.",
+    "purpose": "Accept the exact venue_unavailable contract emitted by venue replacement without discarding all of a recipient\u2019s notifications.",
     "preconditions": "Signed-in Coordinator or Organiser, real browser notification parser; response includes a new venue warning and an older approval.",
     "steps": [
       "Load the mixed inbox through the public notification API.",
-      "Open each role’s application notification drawer.",
+      "Open each role\u2019s application notification drawer.",
       "Check warning label, original message/time, existing notice and authenticated no-store request.",
       "Check malformed near-miss, inherited and unknown kind names remain refused.",
       "Verify protected server route forwards exact recipient-specific records."
@@ -6480,7 +6476,7 @@
     "purpose": "Originally repaired the missing normal-navigation approval workflow for the roles SG2-47 AC3 authorised (Organiser, Technical Support), retaining creator isolation and separate Venue Staff booking decisions. SG2-66 AC5 (19 Oct 2026) replaces that approver list: discovery and approval are Venue Staff only, legacy non-Venue-Staff approvals no longer count toward a booking, and SG2-66 AC2 adds booked requests whose live event's attendance now exceeds the venue. Journeys SG2-47-P03/P04/N02 were rewritten to match.",
     "preconditions": "Local React/Express and controlled identity/storage for unit/browser layers; separate disposable PostgreSQL/PostgREST for native integration. Hosted acceptance and independent peer review are separate pending gates.",
     "steps": [
-      "Open Capacity exceptions as Venue Staff; inspect pending and booked ('Booked — attendance raised') cards and select a request.",
+      "Open Capacity exceptions as Venue Staff; inspect pending and booked ('Booked \u2014 attendance raised') cards and select a request.",
       "Verify Organiser, Technical Support, coordinator and Lead have no navigation and receive 403 from the list and approval API; check empty/null-capacity handling, malformed responses and retry states.",
       "Approve through the existing action and inspect the real receipt; refresh to remove covered requests.",
       "Verify missing facilities, decided requests without a live booking and covering Venue Staff grants are excluded; a legacy Technical Support grant does not cover; read beyond 1,000 candidates and fail safely on a later-page error.",
@@ -6587,7 +6583,7 @@
       "Inject an audit insert failure inside a disposable rollback test and verify both event and history remain unchanged. Serialize concurrent native saves and verify the old/new chain; submission closes editing.",
       "Verify direct authenticated/anonymous RPC execution is refused, missing/broadened/revoked RPC deployment contracts fail readiness, and clarification conversation/review history remains intact."
     ],
-    "data": "Nine draft fields; attendance null→12; nullable description; registration true→false; equivalent +08:00/UTC date; owner/colleague/attendee identities; concurrent A/B names; transaction-local failing audit trigger.",
+    "data": "Nine draft fields; attendance null\u219212; nullable description; registration true\u2192false; equivalent +08:00/UTC date; owner/colleague/attendee identities; concurrent A/B names; transaction-local failing audit trigger.",
     "expected": "Each actual changed field has one committed row identifying the real actor, old/new values and save time. No-op/refused saves add no rows. Failed audit insertion rolls back all saved values. Only the creator with current membership can edit draft/clarification states; no direct client RPC execution. Existing history privacy and public response shape remain.",
     "evidence": "server/src/{db/eventRequests.test.ts,updateEventRequestDraft.test.ts}; integration/api.test.ts; supabase/tests/event_draft_audit.sql; .github/scripts/release-readiness.test.mjs; e2e/draft-history.spec.ts; client/src/components/EventAuditDrawer.test.tsx",
     "layer": "HTTP/adapter fixtures; real API/PostgREST/PostgreSQL; rollback SQL; structural readiness; React/Express browser with resettable memory RPC fixture",
@@ -6688,15 +6684,15 @@
     "steps": [
       "Open exact request4 showing quantity2/baseline notes, amend that same pending request to quantity1/new notes, then use only Support Refresh equipment requirements.",
       "Verify parent summary and matching child both show the authoritative request4 quantity1/new notes; unrelated microphone request3 remains quantity3.",
-      "Refresh Coordinator equipment after removing placement, restoring placement, then removing and restoring it again; inspect Outstanding→Ready and Ready→Outstanding without navigating away.",
+      "Refresh Coordinator equipment after removing placement, restoring placement, then removing and restoring it again; inspect Outstanding\u2192Ready and Ready\u2192Outstanding without navigating away.",
       "Exercise changed request/event identity, stale/aborted responses, failed refresh and retry, explicit versus mutation refresh, current observer replacement and unsaved planning drafts."
     ],
-    "data": "Pending request4 quantity2→1 with amended notes; request3 microphone quantity3; valid and absent placement; rejected/aborted responses and event/request identity changes.",
+    "data": "Pending request4 quantity2\u21921 with amended notes; request3 microphone quantity3; valid and absent placement; rejected/aborted responses and event/request identity changes.",
     "expected": "Only the matching current request updates its parent summary. Successful current child refresh updates readiness in both directions; failed/obsolete requests cannot claim success or replace a later event. Unsaved planning drafts and unrelated request records remain intact.",
     "evidence": "client/src/components/EquipmentRequirements.test.tsx; client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
     "layer": "React public component seams with controlled HTTP; actual hosted Coordinator/Support UI retests",
     "status": "Pass",
-    "actual": "Seven new and two revised method declarations. Local focused126 and full client1,427/1,427 passed; all four coverage metrics100%. Exact c04 CI38839394116 passed all eight jobs (tested merge has the same full Git tree as c04). Actual hosted c04 request4 refresh quantity2→1/new notes passed with request3 unchanged; readiness refresh passed both directions and final microphone placement was restored. These successful equipment checkpoints predate the later, separate converted-hold release venue-readiness defect.",
+    "actual": "Seven new and two revised method declarations. Local focused126 and full client1,427/1,427 passed; all four coverage metrics100%. Exact c04 CI38839394116 passed all eight jobs (tested merge has the same full Git tree as c04). Actual hosted c04 request4 refresh quantity2\u21921/new notes passed with request3 unchanged; readiness refresh passed both directions and final microphone placement was restored. These successful equipment checkpoints predate the later, separate converted-hold release venue-readiness defect.",
     "execution_evidence": "16 Oct 2026: c04b2212df1a002b3ceb36e6b2216412ec0f142d, CI38839394116; ignored verification/c04b221-ci-proof/full-ci-evidence.json; equipment-request4-summary-c04-matched.txt/.png; equipment-readiness-c04-refresh-ready.txt/.png; equipment-readiness-c04-refresh-outstanding.txt/.png; equipment-readiness-c04-final-restored.txt/.png. Actual request4 readback and placement restoration are scoped evidence, not all Done acceptance.",
     "execution_date": "16 Oct 2026",
     "executed_by": "Codex (automated tests and authorised hosted QA; not independent peer review)",
@@ -6871,7 +6867,7 @@
       "Exercise a failed search, failed request/booking revalidation and recovery; an invalid period does not reload arrangements.",
       "Resolve an aborted superseded search late, and leave event10 for event20: stale results cannot trigger obsolete reads or cross event/token scopes."
     ],
-    "data": "Local Meridian Forum event10, Rooftop Terrace venue3, request41 Pending→Approved, booking42 Confirmed. Initial whole-day15Jun2030SGT search; edited attendance100/layoutBanquet/locationLevel/facilitiesbar/accessibilitylift preserved. Delayed read, search503, request503, booking403, invalid end14Jun23:00, superseding attendance181, then event20/new-token. Hosted before-fix counterexample: event25 request24 was approved into booking20 while search remained open; search excluded the room but lower panels still said Pending/0of1/No booked venues.",
+    "data": "Local Meridian Forum event10, Rooftop Terrace venue3, request41 Pending\u2192Approved, booking42 Confirmed. Initial whole-day15Jun2030SGT search; edited attendance100/layoutBanquet/locationLevel/facilitiesbar/accessibilitylift preserved. Delayed read, search503, request503, booking403, invalid end14Jun23:00, superseding attendance181, then event20/new-token. Hosted before-fix counterexample: event25 request24 was approved into booking20 while search remained open; search excluded the room but lower panels still said Pending/0of1/No booked venues.",
     "expected": "A successful current search revalidates only its current event request and booking panels, including the derived venue readiness summary. Loading/error states replace invalidated old results; failures never claim approval or readiness. Invalid/failed searches do not spuriously reload panels. Aborted late responses cannot roll back results or refresh an obsolete context. All requests remain reads, and the criteria remain entered.",
     "evidence": "client/src/screens/VenueSearch.tsx; client/src/screens/VenueSearch.test.tsx; client/src/venues/VenueBookings.tsx",
     "layer": "Rendered public React component integration with controlled HTTP fetch results; full client coverage. Actual hosted post-fix retest and future CI are separate gates.",
@@ -6915,12 +6911,12 @@
       "Refuse Coordinator403 and invalidnegative400 saves without history; run simultaneous Staff17/18 saves and require a coherent serialized old/new chain, final actor and metadata.",
       "In rollback SQL exercise failed and rolled-back writes; preserve old records. Reproduce the old trigger failure, install170006 twice over legacy populated data and compare exact values, metadata and old history; rerun operations RLS, venue-clash and release-readiness suites."
     ],
-    "data": "Native setup10, turnaround15→16→17/18; emergency_access null→Use the signed east exit→null; SQL probe97704 with Signed east exit→null→Signed west exit; upgrade preservation fixture97790. Synthetic fixed local JWTs only.",
+    "data": "Native setup10, turnaround15\u219216\u219217/18; emergency_access null\u2192Use the signed east exit\u2192null; SQL probe97704 with Signed east exit\u2192null\u2192Signed west exit; upgrade preservation fixture97790. Synthetic fixed local JWTs only.",
     "expected": "Exactly one audit row per actual changed field, zero additional field history on unchanged saves, and no false insertion-attempt rows. Real Staff actor/timestamp and nullable transitions are retained. Invalid/forbidden/rolled-back writes do not add history. Upgrade/replay preserves existing records and does not rewrite ambiguous old history; role security and venue clashes remain unchanged.",
     "evidence": "supabase/migrations/202610170006_venue_operations_persisted_audit.sql; supabase/tests/venue_operations.sql; integration/api.test.ts",
     "layer": "Real local public API/PostgREST/PostgreSQL integration + rollback SQL + explicit upgrade/replay verification",
     "status": "Pass (local automated)",
-    "actual": "Before the fix, new real API case failed: turnaround15→16 added false null→setup10 and null→turnaround16 plus the actual15→16 transition (13 existing native cases passed). After170006 all14 native API cases passed; operations SQL and venue-clash SQL passed;17 readiness regressions passed. The old SQL suite failed at upsert-only-actual-transition before migration, and exact historical row/value/metadata preservation passed after two installs. Integration TypeScript compilation passed. No production TypeScript/React code changed; prior coverage is not represented as a new run.",
+    "actual": "Before the fix, new real API case failed: turnaround15\u219216 added false null\u2192setup10 and null\u2192turnaround16 plus the actual15\u219216 transition (13 existing native cases passed). After170006 all14 native API cases passed; operations SQL and venue-clash SQL passed;17 readiness regressions passed. The old SQL suite failed at upsert-only-actual-transition before migration, and exact historical row/value/metadata preservation passed after two installs. Integration TypeScript compilation passed. No production TypeScript/React code changed; prior coverage is not represented as a new run.",
     "execution_evidence": "Ignored output/staging-e2e-2026-10-16/verification/venue-operations-persisted-audit/ contains red/green logs, upgrade runner and source/case handoff. Current local source is uncommitted; new pushed CI and hosted retest remain separate gates.",
     "execution_date": "16 Oct 2026",
     "executed_by": "Codex local automated verification; not human peer review",
@@ -7130,7 +7126,7 @@
     ],
     "purpose": "Keep a venue protected during a held period, allow deletion when it ends even if expiry is later, and preserve history.",
     "preconditions": "Production React build with real Express handlers on loopback and reset disposable in-memory providers; synthetic Venue Staff. Native SQL separately verifies database behavior.",
-    "data": "Quiet Room (venue 2), event 81; held period 1 Jun 2030 01:00Z–02:30Z; expiry 3 Jun 2030 02:00Z.",
+    "data": "Quiet Room (venue 2), event 81; held period 1 Jun 2030 01:00Z\u201302:30Z; expiry 3 Jun 2030 02:00Z.",
     "steps": [
       "Place the hold through the API at fixture time 02:00Z; delete returns 409 with exactly its hold blocker.",
       "Advance the fixture clock to exactly 02:30Z, before expiry.",
@@ -7178,7 +7174,7 @@
       "The planning drawer saves and closes; the desk says '2 events are awaiting a safety check.'",
       "The desk shows a card for Harbour Lecture (with Regression Hall) then Studio Talk; clicking Studio Talk opens its safety check on its own, and Show all returns both events",
       "The list heading reads '2 events awaiting a safety check'; the cards are Harbour Lecture then Studio Talk; Riverside Gala is not listed",
-      "Harbour Lecture shows 80, the accessibility need, the entered crowd movement, 'Regression Hall · Level 1', 100, Theatre, the step-free access, emergency access and restriction, '4 × Wireless microphones', 'Regression Hall — Either side of the stage' and the cable ramps note",
+      "Harbour Lecture shows 80, the accessibility need, the entered crowd movement, 'Regression Hall \u00b7 Level 1', 100, Theatre, the step-free access, emergency access and restriction, '4 \u00d7 Wireless microphones', 'Regression Hall \u2014 Either side of the stage' and the cable ramps note",
       "Studio Talk shows '20 (below expected attendance of 80)', 'No equipment requested.' and 'Not recorded' for its emergency access and restrictions",
       "Neither width scrolls sideways"
     ],
@@ -7249,7 +7245,7 @@
       "Read the ledger, then sign in as organiser and open the notifications."
     ],
     "data": "Events 921/922/923; reason texts as above; arrangements venue and other.",
-    "expected": "The desk says 3 events are awaiting a safety check; the list shows Harbour Gala, Riverside Fair, Bayfront Talk in that order. Riverside Fair shows 'Regression Hall · Level 1', '4 × Wireless microphones' and no earlier decisions; Reject without a reason is refused before anything is sent. Each recorded decision re-reads the list without the event and confirms who was told; after the third the list says no events await a check. Statuses become preparation, safety_rejected and planning; three decisions are stored with the Safety Officer as decider; history has Approved / Rejected: <reason> / Changes requested (Venue, Other): <reason>; organiser and coordinator each get one exact notice per decision; the organiser sees three 'Safety check' notices.",
+    "expected": "The desk says 3 events are awaiting a safety check; the list shows Harbour Gala, Riverside Fair, Bayfront Talk in that order. Riverside Fair shows 'Regression Hall \u00b7 Level 1', '4 \u00d7 Wireless microphones' and no earlier decisions; Reject without a reason is refused before anything is sent. Each recorded decision re-reads the list without the event and confirms who was told; after the third the list says no events await a check. Statuses become preparation, safety_rejected and planning; three decisions are stored with the Safety Officer as decider; history has Approved / Rejected: <reason> / Changes requested (Venue, Other): <reason>; organiser and coordinator each get one exact notice per decision; the organiser sees three 'Safety check' notices.",
     "evidence": "e2e/safety-decisions.spec.ts; e2e/support/safety-decisions.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -7278,7 +7274,7 @@
       "Read the latest safety decision, then choose Rework arrangements."
     ],
     "data": "Event 922; reason 'Crowd flow blocks the east fire exit'.",
-    "expected": "The summary shows Rejected, the reason and the Safety Officer; no horizontal overflow at 390px. Rework moves the event to planning, removes the button, and the history has awaiting_safety_check→safety_rejected then safety_rejected→planning.",
+    "expected": "The summary shows Rejected, the reason and the Safety Officer; no horizontal overflow at 390px. Rework moves the event to planning, removes the button, and the history has awaiting_safety_check\u2192safety_rejected then safety_rejected\u2192planning.",
     "evidence": "e2e/safety-decisions.spec.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -7339,7 +7335,7 @@
       "Approve Harbour Gala from the open review; read the message, the re-read event and the ledger.",
       "Approve it again; then, through the API, approve 922 with revision 0."
     ],
-    "data": "Event 921 (attendance 80 → 450, revision 1 → 2); event 922 at revision 1.",
+    "data": "Event 921 (attendance 80 \u2192 450, revision 1 \u2192 2); event 922 at revision 1.",
     "expected": "The first approval shows 'This event changed after you opened it. Refresh the safety checks and review it again.', the list is re-read and Harbour Gala shows 450; 921 is still awaiting a check with no decision or notice stored. The second approval goes through and 921 moves to preparation. The API answers 409 {code: 'stale', revision: 1} for 922.",
     "evidence": "e2e/safety-decisions.spec.ts; e2e/support/safety-decisions.ts",
     "layer": "Playwright Chromium + isolated production app",
@@ -7455,7 +7451,7 @@
       "Reload and reopen; assert unread1, original read timestamp unchanged, no other-organisation notice, no page/console errors or horizontal overflow."
     ],
     "data": "Reminder Forum event691; event notice1, read eventnotice2, holdnotice1; another recipient eventnotice90.",
-    "expected": "Exact three-row order; event691 summary then authorised coordinator workflow; badge2→1; only own event:1 changed; reload retains state.",
+    "expected": "Exact three-row order; event691 summary then authorised coordinator workflow; badge2\u21921; only own event:1 changed; reload retains state.",
     "evidence": "e2e/notification-inbox.spec.ts; docs/notification-inbox.md",
     "layer": "Playwright browser + fixture API",
     "previous_executions": [
@@ -7499,12 +7495,12 @@
     "purpose": "Verify counts and clear-all cover unloaded rows and tied-time pagination.",
     "preconditions": "Built production React app and real Express handlers on loopback; reset isolated identity/storage providers. No hosted account or data.",
     "steps": [
-      "Seed54 own rows with53 unread, including51 earlier tied-time rows, plus another person’s unread row.",
+      "Seed54 own rows with53 unread, including51 earlier tied-time rows, plus another person\u2019s unread row.",
       "Sign in at390px. Badge53 exceeds first50. Load older; assert earliest row3 appears and53 unread rows are visible.",
       "Mark all read, inspect54 own read timestamps and unchanged other recipient state, reload and retain badge0; verify no horizontal overflow."
     ],
-    "data": "54 ownrows, 53 unread, tiedtime earlierIDs3–53 and repeated sourceID1.",
-    "expected": "Badge53→0 and54 ownrows read; other person unread; no lost/duplicate cursor pages or overflow.",
+    "data": "54 ownrows, 53 unread, tiedtime earlierIDs3\u201353 and repeated sourceID1.",
+    "expected": "Badge53\u21920 and54 ownrows read; other person unread; no lost/duplicate cursor pages or overflow.",
     "evidence": "e2e/notification-inbox.spec.ts",
     "layer": "Playwright browser + fixture API",
     "previous_executions": [
@@ -8302,7 +8298,7 @@
     ],
     "data": "Harbour; 2030-11-01 to 2030-11-01; Conference; Regression Hall",
     "expected": [
-      "No events match, listing: Name or organisation contains “Harbour”, Date 1 Nov 2030 – 1 Nov 2030, Venue: Regression Hall, Category: Conference; no sideways scroll at 390px",
+      "No events match, listing: Name or organisation contains \u201cHarbour\u201d, Date 1 Nov 2030 \u2013 1 Nov 2030, Venue: Regression Hall, Category: Conference; no sideways scroll at 390px",
       "Harbour Gala is found",
       "Venue Staff's 2 events are listed again and the search text is empty"
     ],
@@ -8372,7 +8368,7 @@
       "Update the cancelled event again and confirm event 95602; try a direct release and the release function as an authenticated caller, and store a blank reason."
     ],
     "data": "Synthetic 956xx events, equipment, reservations and requests; d5600000 fixture identities.",
-    "expected": "Both of 95601's reservations show released_at, the coordinator and 'Event cancelled'; two 'equipment_reservation' history entries read 'Reserved: …' then 'Released: … — Event cancelled'; no other event changes; later updates add nothing; direct writes and the function are refused; a blank reason fails its check.",
+    "expected": "Both of 95601's reservations show released_at, the coordinator and 'Event cancelled'; two 'equipment_reservation' history entries read 'Reserved: \u2026' then 'Released: \u2026 \u2014 Event cancelled'; no other event changes; later updates add nothing; direct writes and the function are refused; a blank reason fails its check.",
     "evidence": "supabase/tests/equipment_release.sql; .github/workflows/ci.yml; docs/equipment-reservations.md",
     "layer": "Disposable PostgreSQL SQL assertions",
     "actual": "Passed in the disposable PostgreSQL 17 replay.",
@@ -8468,7 +8464,7 @@
       "Choose Confirm event and read the ledger."
     ],
     "data": "Event 941; safety and coordinator accounts.",
-    "expected": "The Safety Officer sees \"Approved for Lantern Forum. The organiser and the coordinator have been notified.\" and the event is in preparation. Safety check reads Ready (\"Approved by the Safety Officer.\") and the badge Ready for confirmation; confirming says \"Event confirmed. The Event Organiser has been notified.\"; the event is confirmed by the coordinator, one approve decision by the Safety Officer is stored, and the status history is awaiting_safety_check → preparation → confirmed.",
+    "expected": "The Safety Officer sees \"Approved for Lantern Forum. The organiser and the coordinator have been notified.\" and the event is in preparation. Safety check reads Ready (\"Approved by the Safety Officer.\") and the badge Ready for confirmation; confirming says \"Event confirmed. The Event Organiser has been notified.\"; the event is confirmed by the coordinator, one approve decision by the Safety Officer is stored, and the status history is awaiting_safety_check \u2192 preparation \u2192 confirmed.",
     "evidence": "e2e/safety-approval.spec.ts; e2e/support/safety-approval.ts; e2e/support/event-confirmation.ts; e2e/support/change-impact.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -8497,7 +8493,7 @@
       "Sign in again, reopen Beacon Forum, read both panels, then send PATCH /api/event-requests/942/confirm."
     ],
     "data": "Event 942; change request mock-942-attendance (expected attendance to 120).",
-    "expected": "Before: Safety check Ready, Latest safety decision Approved with no withdrawal hint. After accepting: the event is in planning with its confirmation cleared; history is expected_attendance, change_request, status, then safety_approval \"Approved\" → \"Withdrawn: the accepted change request mock-942-attendance changed what was approved, so the event must pass the safety check again\"; the Approve stays on record. Reopened: Safety check Outstanding with \"The approval was withdrawn after the event changed. It must pass the safety check again once its arrangements are in place.\", the badge Arrangements outstanding, the hint \"This approval was withdrawn because the event changed after it was approved. It must pass the safety check again.\"; confirming answers 409 outstanding ending in safety and the event stays in planning.",
+    "expected": "Before: Safety check Ready, Latest safety decision Approved with no withdrawal hint. After accepting: the event is in planning with its confirmation cleared; history is expected_attendance, change_request, status, then safety_approval \"Approved\" \u2192 \"Withdrawn: the accepted change request mock-942-attendance changed what was approved, so the event must pass the safety check again\"; the Approve stays on record. Reopened: Safety check Outstanding with \"The approval was withdrawn after the event changed. It must pass the safety check again once its arrangements are in place.\", the badge Arrangements outstanding, the hint \"This approval was withdrawn because the event changed after it was approved. It must pass the safety check again.\"; confirming answers 409 outstanding ending in safety and the event stays in planning.",
     "evidence": "e2e/safety-approval.spec.ts; e2e/support/safety-approval.ts; e2e/support/event-confirmation.ts; e2e/support/change-impact.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -8565,7 +8561,7 @@
       "Confirm an approved event after moving it through every other status.",
       "Hold the event row while an accepted significant change withdraws the approval, and confirm from a second session."
     ],
-    "data": "Synthetic 958xx–959xx events; confirmation race events 95880–95885.",
+    "data": "Synthetic 958xx\u2013959xx events; confirmation race events 95880\u201395885.",
     "expected": "The registration event confirms and keeps its unset settings for the organiser. The second is refused with [\"venue\",\"equipment\",\"registration\",\"safety\"] in that order. Approved, Planning, Awaiting Safety Check and Safety Rejected answer outstanding [\"safety\"]; every other status is closed; nothing is written. The waiting confirmation sees the withdrawn approval and is refused with [\"safety\"], the event is back in awaiting_safety_check and no event_confirmed notice exists.",
     "evidence": "supabase/tests/event_confirmation.sql; .github/scripts/test-event-confirmation-concurrency.mjs; .github/scripts/release-readiness.test.mjs",
     "layer": "Disposable PostgreSQL SQL assertions and multi-session script",
@@ -8595,7 +8591,7 @@
       "Confirm an event on an approval, accept its attendance change request, settle every recheck and read readiness."
     ],
     "data": "integration/api.test.ts fixtures.",
-    "expected": "Readiness lists [\"safety\"] while the event awaits its check and [\"venue\",\"equipment\",\"safety\"] after the impact. Accepting the change returns the Confirmed event to Planning with the history row safety_approval \"Approved\" → \"Withdrawn: the accepted change request … so the event must pass the safety check again\"; after the rechecks settle the event is awaiting_safety_check and readiness lists [\"safety\"].",
+    "expected": "Readiness lists [\"safety\"] while the event awaits its check and [\"venue\",\"equipment\",\"safety\"] after the impact. Accepting the change returns the Confirmed event to Planning with the history row safety_approval \"Approved\" \u2192 \"Withdrawn: the accepted change request \u2026 so the event must pass the safety check again\"; after the rechecks settle the event is awaiting_safety_check and readiness lists [\"safety\"].",
     "evidence": "integration/api.test.ts",
     "layer": "Express + PostgREST + PostgreSQL integration",
     "status": "Pass",
@@ -8960,8 +8956,8 @@
       "Sign in as coordinator; read 'Sent back to staff' and choose 'Mark other safety changes done'.",
       "Sign in as safety and read the desk count; read the ledger."
     ],
-    "data": "Event 921; reason 'Move the stage away from the east fire exit'; 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT)' and '4 × Wireless microphones'.",
-    "expected": "921 moves to planning with outstanding [safety_venue_recheck, safety_equipment_recheck, safety_other_recheck] and two open flags; 922 and 923 stay awaiting their check. The coordinator sees both items waiting for staff, with no horizontal overflow, and marking the venue done is refused naming 'Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) is waiting for Venue Staff to confirm it again.' Venue Staff see only the booking, with the reason, and confirm it ('Confirmed Regression Hall (10 Jul 2030 10:00 – 14:00 SGT) again for Harbour Gala.'); Technical Support see the microphones placed at Regression Hall — Stage left and confirm them; no flagged item is left in the panel. 921 is still in planning with only safety_other_recheck. The coordinator sees both confirmed again by Regression venue / Regression support; marking Other done returns 921 to awaiting_safety_check, and the Safety Officer's desk shows 3 events. History: the two confirmations and the three settled keys, in order.",
+    "data": "Event 921; reason 'Move the stage away from the east fire exit'; 'Regression Hall (10 Jul 2030 10:00 \u2013 14:00 SGT)' and '4 \u00d7 Wireless microphones'.",
+    "expected": "921 moves to planning with outstanding [safety_venue_recheck, safety_equipment_recheck, safety_other_recheck] and two open flags; 922 and 923 stay awaiting their check. The coordinator sees both items waiting for staff, with no horizontal overflow, and marking the venue done is refused naming 'Regression Hall (10 Jul 2030 10:00 \u2013 14:00 SGT) is waiting for Venue Staff to confirm it again.' Venue Staff see only the booking, with the reason, and confirm it ('Confirmed Regression Hall (10 Jul 2030 10:00 \u2013 14:00 SGT) again for Harbour Gala.'); Technical Support see the microphones placed at Regression Hall \u2014 Stage left and confirm them; no flagged item is left in the panel. 921 is still in planning with only safety_other_recheck. The coordinator sees both confirmed again by Regression venue / Regression support; marking Other done returns 921 to awaiting_safety_check, and the Safety Officer's desk shows 3 events. History: the two confirmations and the three settled keys, in order.",
     "evidence": "e2e/safety-changes.spec.ts; e2e/support/safety-rereviews.ts",
     "layer": "Playwright Chromium + isolated production app",
     "status": "Pass",
@@ -8993,7 +8989,7 @@
       "As support, confirm the equipment flag twice; as venue, confirm an unknown flag."
     ],
     "data": "Event 922; flags read from the ledger; review id 999999.",
-    "expected": "403 for the coordinator; 403 for each wrong staff role; the settle is 409 listing '4 × Wireless microphones is waiting for Technical Support to confirm it again.'; the first confirmation is 200 and the second 409 'This booking or equipment request has already been dealt with.' with resolution confirmed; the unknown flag is 404; 922 is in planning with only safety_venue_recheck outstanding.",
+    "expected": "403 for the coordinator; 403 for each wrong staff role; the settle is 409 listing '4 \u00d7 Wireless microphones is waiting for Technical Support to confirm it again.'; the first confirmation is 200 and the second 409 'This booking or equipment request has already been dealt with.' with resolution confirmed; the unknown flag is 404; 922 is in planning with only safety_venue_recheck outstanding.",
     "evidence": "e2e/safety-changes.spec.ts",
     "layer": "Playwright Chromium + isolated production app (API level)",
     "status": "Pass",
@@ -9029,7 +9025,7 @@
       "Try to settle the venue change; confirm the flag as Technical Support, then as Venue Staff, then again.",
       "Settle Other; read the decisions as the organiser and the history."
     ],
-    "data": "Venue 'Integration Hall' booked 2090-07-10 09:00–13:00 SGT; reason 'Move the stage away from the fire exit'.",
+    "data": "Venue 'Integration Hall' booked 2090-07-10 09:00\u201313:00 SGT; reason 'Move the stage away from the fire exit'.",
     "expected": "planning with [safety_venue_recheck, safety_other_recheck] and the booking still confirmed; Venue Staff see the flag with label, reason and the Safety Officer's name, Technical Support do not and the coordinator gets 403; settling the venue is 409 naming the waiting booking; Technical Support's confirmation is 403, Venue Staff's is 200 leaving [safety_other_recheck], a second is 409; settling Other returns the event to awaiting_safety_check; the organiser reads the flag confirmed by Integration venue staff; history has the confirmation and both settled keys.",
     "evidence": "integration/api.test.ts; supabase/migrations/202610240001_safety_changes_requested.sql",
     "layer": "Real local public API/PostgREST/PostgreSQL integration",
@@ -9074,6 +9070,135 @@
     "actual": "Passed in the disposable PostgreSQL 17 replay of the CI job.",
     "execution_evidence": "24 Oct 2026; feature/SG2-93-safety-changes-requested at 6f4b1d4 (origin/main adf51ff merged in); replay of CI's database-tests job on disposable postgres:17 (auth fixture, every migration, release readiness and its tests, every SQL suite, the concurrency scripts and the upgrade replay) passed.",
     "execution_date": "24 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null
+  },
+  {
+    "id": "SG2-96-INT01",
+    "title": "The full Week 7 journey runs end to end on the native stack: submit, Lead assigns, two venues and equipment confirmed, safety check, Preparation, Confirmed",
+    "type": "NORMAL / FAILURE",
+    "story": "SG2-96",
+    "categories": [
+      "NORMAL",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-30:AC1",
+      "SG2-87:AC1",
+      "SG2-88:AC1",
+      "SG2-37:AC1",
+      "SG2-82:AC1",
+      "SG2-49:AC1",
+      "SG2-53:AC6",
+      "SG2-55:AC1",
+      "SG2-91:AC1",
+      "SG2-92:AC3",
+      "SG2-94:AC5",
+      "SG2-58:AC1",
+      "SG2-100:AC1",
+      "SG2-100:AC2"
+    ],
+    "purpose": "SG2-96 checklist item 1, database layer: one test drives the whole Week 7 flow through the real Express handlers, production database adapters, PostgREST and PostgreSQL with every migration, so the database's own hand-off into the safety check (refresh_safety_check_status) and the safety approval gate run for real. SG2-96-E2E01 runs the same journey through the browser screens.",
+    "preconditions": "Disposable PostgreSQL with every migration and integration/seed.sql, PostgREST in front; synthetic loopback JWTs for organiser, Lead, coordinator, venue staff, technical support and Safety Officer; real role reads from account_roles.",
+    "steps": [
+      "Organiser creates a complete request with registration settings and submits it; it is unassigned.",
+      "Lead finds it in GET /api/assignment-queue and assigns the coordinator; it is submitted.",
+      "Coordinator starts review and approves; it is approved.",
+      "Coordinator requests two venues and one equipment item; technical support places the equipment with no shortfall and reserves it; the event stays approved while venue requests are pending.",
+      "Venue staff approve both venue requests; the database moves the event to awaiting_safety_check.",
+      "Coordinator tries to confirm early (409); Safety Officer reads GET /api/safety-checks and approves with the current revision; the event moves to preparation.",
+      "Coordinator confirms; organiser reads the confirmation with both venues and the projector."
+    ],
+    "data": "Two venues 'Week 7 flow auditorium' and 'Week 7 flow breakout' (capacity 300, classroom); equipment 'Week 7 flow projector' (10); event 'Week 7 flow conference' on 2090-06-15 10:00-12:00 SGT; registration capacity 136.",
+    "expected": "Audit status sequence unassigned, submitted, under_review, approved, awaiting_safety_check, preparation, confirmed; early confirmation 409; organiser notices coordinator_assigned, event_approved, safety_decision and event_confirmed; confirmation lists both venues and the projector; all fixture rows removed afterwards.",
+    "evidence": "integration/api.test.ts (last test); supabase/migrations/202610190004_safety_check_queue.sql; supabase/migrations/202610220001_safety_approval_gate.sql",
+    "layer": "Real local public API/PostgREST/PostgreSQL integration",
+    "status": "Pass",
+    "actual": "Passed: 25/25 integration tests.",
+    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; integration/api.test.ts against a fresh disposable PostgreSQL 16 with every migration, release_readiness.sql and integration/seed.sql behind PostgREST 12.2.12: 25/25 passed. CI runs it in the database-tests job (npm run test:integration).",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "review": null,
+    "relatedCases": [
+      "SG2-96-E2E01"
+    ]
+  },
+  {
+    "id": "SG2-96-E2E01",
+    "title": "The Week 7 journey runs in the browser from submission to a confirmed event",
+    "type": "NORMAL / CONFLICT",
+    "story": "SG2-96",
+    "categories": [
+      "NORMAL",
+      "CONFLICT"
+    ],
+    "mapped_acs": [
+      "SG2-30:AC1",
+      "SG2-88:AC1",
+      "SG2-37:AC1",
+      "SG2-48:AC1",
+      "SG2-53:AC1",
+      "SG2-55:AC1",
+      "SG2-49:AC1",
+      "SG2-91:AC1",
+      "SG2-92:AC3",
+      "SG2-94:AC5",
+      "SG2-58:AC1",
+      "SG2-100:AC1"
+    ],
+    "purpose": "SG2-96 checklist item 1, browser layer: six people complete the Week 7 journey through their own screens in one case. The fixture's mirror of refresh_safety_check_status (e2e/support/safety-handoff.ts) moves the event into the safety check when its last arrangement is confirmed, as the database trigger does. SG2-96-INT01 proves the same journey against PostgreSQL.",
+    "preconditions": "Production React build and real Express handlers on loopback; in-memory fixture reset, the safety-check hand-off turned on (/__e2e/safety-handoff) and a theatre layout recorded for Regression Hall; one browser page at 1440x1000.",
+    "steps": [
+      "Organiser fills and submits a complete request 'Week 7 journey' for 15 Jun 2030 17:00-19:00 SGT; stage Awaiting Assignment.",
+      "Lead assigns Regression coordinator from Assign coordinators.",
+      "Coordinator opens it from Awaiting review and approves it.",
+      "Coordinator searches the event's two hours, requests Regression Hall, and adds a requirement for 2 wireless microphones.",
+      "Technical Support set shortfall 0 and a placement, then reserve the microphones for the event's two hours; the event is still approved because the venue is pending.",
+      "Venue Staff approve the hall; the event moves to awaiting_safety_check by itself.",
+      "Coordinator opens the event: no Confirm action yet.",
+      "Safety Officer sees the hall and 2 x Wireless microphones on the event and approves it; it moves to preparation.",
+      "Coordinator confirms; organiser opens the event and sees Confirmed with the hall and microphones."
+    ],
+    "data": "Event 'Week 7 journey' (40 people, theatre, workshop); Regression Hall (capacity 100); Wireless microphones (20 held); fixture accounts organiser, lead, coordinator, support, venue, safety.",
+    "expected": "Status history unassigned, submitted, under_review, approved, awaiting_safety_check, preparation, confirmed; one approve safety decision; the organiser is told of the assignment, approval, safety decision and confirmation; no page errors.",
+    "evidence": "e2e/week7-journey.spec.ts; e2e/support/safety-handoff.ts; supabase/migrations/202610190004_safety_check_queue.sql",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Passed (14 s).",
+    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; local production build, Playwright Chromium, e2e/week7-journey.spec.ts: 1 passed.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Claude (automated local verification)",
+    "relatedCases": [
+      "SG2-96-INT01"
+    ],
+    "review": null
+  },
+  {
+    "id": "SG2-71-B01",
+    "title": "Every role's pages fit a 320px phone without sideways scrolling",
+    "type": "BOUNDARY",
+    "story": "SG2-71",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-71:AC1",
+      "SG2-71:AC2"
+    ],
+    "purpose": "SG2-96 walkthrough finding: the other phone cases use 390px. At 320px a grid track with a fixed 300-320px minimum made the organiser's request form and the attendee's registrations and event pages scroll sideways. The grids now use minmax(min(100%, ...), 1fr); this case visits every navigation page of all seven roles at 320x568.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory fixture before each role's sign-in; one browser page at 320x568.",
+    "steps": [
+      "For each of organiser, coordinator, Lead, venue staff, technical support, Safety Officer and attendee: reset the fixture, sign in, read the header navigation.",
+      "Open each navigation page in turn, wait until it is the current page and its heading shows, and compare the document's scroll width with the viewport width."
+    ],
+    "data": "Fixture accounts organiser, coordinator, lead, venue, support, safety and attendee @example.test.",
+    "expected": "No page is wider than the 320px viewport; the organiser's New request page is among those visited; no page errors.",
+    "evidence": "e2e/small-phone.spec.ts; client/src/screens/RequestForm.tsx; client/src/screens/Dashboard.tsx; client/src/screens/AttendeeEvent.tsx",
+    "layer": "Playwright browser + fixture API",
+    "status": "Pass",
+    "actual": "Failed before the grid fix (organiser New request 8px too wide); passed after it.",
+    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; local production build, Playwright Chromium: failed on the unfixed build, passed after rebuilding with the fix.",
+    "execution_date": "26 Oct 2026",
     "executed_by": "Claude (automated local verification)",
     "review": null
   },
@@ -9173,7 +9298,7 @@
       "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; expected attendance 20."
     ],
     "expected": [
-      "'Your change request was sent to your coordinator.' and the outstanding list reads 'Expected attendance: 20 → 34. Reason: Two partner teams have joined.'",
+      "'Your change request was sent to your coordinator.' and the outstanding list reads 'Expected attendance: 20 \u2192 34. Reason: Two partner teams have joined.'",
       "No horizontal overflow at either width.",
       "The coordinator has a change_requested notice 'Decision Forum has a change request waiting for your decision.'; the organiser has none; the list holds one significant request from 20 to 34.",
       "The coordinator's Change requests panel shows the reason."
@@ -9259,7 +9384,7 @@
     ],
     "expected": [
       "No Edit request or Edit; Resubmit for review shown; the direct PATCH is 409; no field history.",
-      "After resubmitting only the needs_clarification → submitted status entry is added and both messages remain.",
+      "After resubmitting only the needs_clarification \u2192 submitted status entry is added and both messages remain.",
       "Unit: 409 naming a change request for needs_clarification, 409 for rejected, and no update in either."
     ],
     "evidence": "e2e/draft-history.spec.ts:239; server/src/updateEventRequestDraft.test.ts; client/src/screens/EventDetail.changeRequests.test.tsx; client/src/screens/DraftRequests.test.tsx; integration/api.test.ts:190",

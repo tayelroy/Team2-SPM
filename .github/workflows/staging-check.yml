@@ -1,0 +1,61 @@
+# SG2-96: signed-in, read-only walkthrough of the deployed staging site.
+# Separate from ci.yml on purpose: it tests what is deployed, not the PR's
+# code, so it does not block merging. It needs the repository secret
+# SPM_STAGING_PASSWORD (Settings → Secrets and variables → Actions) and skips
+# itself until that secret exists. Secrets are never given to pull requests
+# from forks, so those runs skip too.
+name: Staging check
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: Staging site to check
+        required: false
+        default: https://team2-spm-server.vercel.app
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run at a time: the site allows 10 sign-ins per 15 minutes.
+  group: staging-check
+  cancel-in-progress: false
+
+jobs:
+  staging-walkthrough:
+    name: Staging walkthrough (all roles, 320–1440 px)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPM_STAGING_PASSWORD: ${{ secrets.SPM_STAGING_PASSWORD }}
+      STAGING_URL: ${{ inputs.staging_url || 'https://team2-spm-server.vercel.app' }}
+    steps:
+      - name: Skip without the staging password
+        if: ${{ env.SPM_STAGING_PASSWORD == '' }}
+        run: echo "SPM_STAGING_PASSWORD is not set for this run; skipping the staging walkthrough." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@v4
+        if: ${{ env.SPM_STAGING_PASSWORD != '' }}
+      - uses: actions/setup-node@v4
+        if: ${{ env.SPM_STAGING_PASSWORD != '' }}
+        with:
+          node-version: 22
+          cache: npm
+      - if: ${{ env.SPM_STAGING_PASSWORD != '' }}
+        run: npm ci
+      - if: ${{ env.SPM_STAGING_PASSWORD != '' }}
+        run: npx playwright install --with-deps chromium
+      - name: Walk every role's pages on staging
+        if: ${{ env.SPM_STAGING_PASSWORD != '' }}
+        run: node .github/scripts/staging-walkthrough.mjs
+      - name: Upload screenshots and report
+        if: ${{ always() && env.SPM_STAGING_PASSWORD != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-walkthrough
+          path: output/staging-walkthrough/
+          retention-days: 14

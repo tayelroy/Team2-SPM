@@ -258,7 +258,7 @@ export default function AppShell({
             })}
           </nav>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div className="app-header-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', maxWidth: '100%' }}>
             {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released.
                 SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
                 neither has hold notices. */}
@@ -300,11 +300,11 @@ export default function AppShell({
             </button>}
 
             {roles.length > 1 && onSwitchRole && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: color.mist, fontSize: '12px' }}>
+              <label className="app-role-switcher" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', color: color.mist, fontSize: '12px', minWidth: 0 }}>
                 Acting as
                 <select aria-label="Acting as" value={role} onChange={event => onSwitchRole(event.target.value as Role)}
                   style={{ background: color.kelp, border: rule.control, borderRadius: radius.sm, color: color.mist,
-                    fontSize: '12px', letterSpacing: '0.06em', padding: '8px 10px' }}>
+                    fontSize: '12px', letterSpacing: '0.06em', padding: '8px 10px', maxWidth: '100%' }}>
                   {roles.map(held => <option key={held} value={held}>{held}</option>)}
                 </select>
               </label>
