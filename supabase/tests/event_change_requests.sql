@@ -31,181 +31,135 @@ insert into public.events (event_id, organiser_id, coordinator_id, organisation,
   (96402, 'e6400000-0000-4000-8000-000000000002', 'e6400000-0000-4000-8000-000000000001',
     'Acme Corp', 'Draft event', 'draft', 50, null);
 
--- 1. Raising a request stores what, from, to and why (AC1) and names the
--- coordinator it is for (AC2):
+-- 1. Raising a request stores what, from, to and why (AC1), leaves the event
+-- as it is, and notifies the assigned coordinator but not the organiser (AC2):
 do $$
 declare result jsonb;
 begin
   result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000002',
     'expected_attendance', '180'::jsonb, '  More guests confirmed.  ');
-  if result ->> 'outcome' <> 'ok' or (result ->> 'coordinator_notified')::boolean is not true then
-    raise exception '[SG2-64:raise-stores-request] [SG2-64:AC1] [SG2-64:AC2] [NORMAL] Raising must succeed and notify the coordinator, got %', result;
-  end if;
-  if not exists (select 1 from public.notifications
-      where recipient_id = 'e6400000-0000-4000-8000-000000000001' and event_id = 96401
-        and kind = 'change_requested'
-        and message = 'Partner Dinner has a change request waiting for your decision.') then
-    raise exception '[SG2-64:coordinator-notified] [SG2-64:AC2] [NORMAL] The assigned coordinator must get a change_requested notice';
-  end if;
-  if exists (select 1 from public.notifications
-      where recipient_id = 'e6400000-0000-4000-8000-000000000002' and kind = 'change_requested') then
-    raise exception '[SG2-64:organiser-not-notified] [SG2-64:AC2] [NORMAL] The organiser must not be told about their own request';
-  end if;
-  if not exists (select 1 from public.event_change_requests
-      where event_id = 96401 and field = 'expected_attendance' and from_value = '120'::jsonb
-        and to_value = '180'::jsonb and reason = 'More guests confirmed.' and status = 'pending'
-        and requested_by = 'e6400000-0000-4000-8000-000000000002') then
-    raise exception '[SG2-64:raise-stores-fields] [SG2-64:AC1] [NORMAL] The stored request must keep field, current value, new value, trimmed reason and pending status';
-  end if;
-  if (select expected_attendance from public.events where event_id = 96401) <> 120 then
-    raise exception '[SG2-64:raise-leaves-event] [SG2-64:AC1] [NORMAL] Raising a request must not change the event itself';
+  if result ->> 'outcome' <> 'ok' or (result ->> 'coordinator_notified')::boolean is not true
+      or not exists (select 1 from public.event_change_requests
+        where event_id = 96401 and field = 'expected_attendance' and from_value = '120'::jsonb
+          and to_value = '180'::jsonb and reason = 'More guests confirmed.' and status = 'pending'
+          and requested_by = 'e6400000-0000-4000-8000-000000000002')
+      or (select expected_attendance from public.events where event_id = 96401) <> 120
+      or not exists (select 1 from public.notifications
+        where recipient_id = 'e6400000-0000-4000-8000-000000000001' and event_id = 96401
+          and kind = 'change_requested'
+          and message = 'Partner Dinner has a change request waiting for your decision.')
+      or exists (select 1 from public.notifications
+        where recipient_id = 'e6400000-0000-4000-8000-000000000002' and kind = 'change_requested') then
+    raise exception '[SG2-64:raise-stores-request] [SG2-64:AC1] [SG2-64:AC2] [NORMAL] Raising must store field, value as it was, new value, trimmed reason and pending status, leave the event unchanged and notify only the coordinator, got %', result;
   end if;
 end $$;
 
--- 2. Every submitted status accepts a request; draft, cancelled, rejected and
--- completed refuse one (AC1/AC4). One event per status, seeded as the service
--- role would leave it (status gates such as SG2-92's apply to updates):
+-- 2. Every submitted status accepts a request, kept without a notice while no
+-- coordinator is assigned; draft, cancelled, rejected and completed refuse one
+-- and store nothing (AC1/AC2/AC4). One event per status, seeded as the
+-- service role would leave it (status gates such as SG2-92's apply to updates):
 do $$
 declare
-  open_status text;
-  closed_status text;
+  probe record;
   seq integer := 0;
   result jsonb;
 begin
-  foreach open_status in array array['submitted', 'unassigned', 'under_review', 'needs_clarification',
-      'approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'] loop
-    seq := seq + 1;
-    insert into public.events (event_id, organiser_id, organisation, name, status)
-      values (96410 + seq, 'e6400000-0000-4000-8000-000000000002', 'Acme Corp', open_status,
-        open_status::public.event_status);
-    result := public.raise_event_change_request(96410 + seq, 'e6400000-0000-4000-8000-000000000002',
-      'description', to_jsonb('Agenda for ' || open_status), 'Agenda changed.');
-    if result ->> 'outcome' <> 'ok' then
-      raise exception '[SG2-64:open-statuses] [SG2-64:AC1] [BOUNDARY] A % event must accept a change request, got %', open_status, result;
-    end if;
-    -- These events have no coordinator yet: the request waits for one.
-    if (result ->> 'coordinator_notified')::boolean is not false then
-      raise exception '[SG2-64:no-coordinator-yet] [SG2-64:AC2] [BOUNDARY] An event with no coordinator must store the request without a notice, got %', result;
-    end if;
-  end loop;
-  foreach closed_status in array array['draft', 'cancelled', 'rejected', 'completed'] loop
+  for probe in select * from (values
+      ('submitted', true), ('unassigned', true), ('under_review', true), ('needs_clarification', true),
+      ('approved', true), ('planning', true), ('awaiting_safety_check', true), ('safety_rejected', true),
+      ('preparation', true), ('confirmed', true),
+      ('draft', false), ('cancelled', false), ('rejected', false), ('completed', false)) v(status, open) loop
     seq := seq + 1;
     -- A rejected event carries its decision reason and a completed one who
     -- completed it and when.
     insert into public.events (event_id, organiser_id, organisation, name, status, decision_reason,
         completed_by, completed_at)
-      values (96410 + seq, 'e6400000-0000-4000-8000-000000000002', 'Acme Corp', closed_status,
-        closed_status::public.event_status, 'Seeded decision',
-        case when closed_status = 'completed' then 'e6400000-0000-4000-8000-000000000001'::uuid end,
-        case when closed_status = 'completed' then now() end);
+      values (96410 + seq, 'e6400000-0000-4000-8000-000000000002', 'Acme Corp', probe.status,
+        probe.status::public.event_status, 'Seeded decision',
+        case when probe.status = 'completed' then 'e6400000-0000-4000-8000-000000000001'::uuid end,
+        case when probe.status = 'completed' then now() end);
     result := public.raise_event_change_request(96410 + seq, 'e6400000-0000-4000-8000-000000000002',
-      'description', '"Too late"'::jsonb, 'Agenda changed.');
-    if result ->> 'outcome' <> 'closed' or result ->> 'status' <> closed_status then
-      raise exception '[SG2-64:closed-statuses] [SG2-64:AC4] [BOUNDARY] A % event must refuse a change request, got %', closed_status, result;
+      'description', to_jsonb('Agenda for ' || probe.status), 'Agenda changed.');
+    if (probe.open and (result ->> 'outcome' <> 'ok' or (result ->> 'coordinator_notified')::boolean is not false))
+        or (not probe.open and (result ->> 'outcome' <> 'closed' or result ->> 'status' <> probe.status
+          or exists (select 1 from public.event_change_requests where event_id = 96410 + seq))) then
+      raise exception '[SG2-64:status-boundaries] [SG2-64:AC1] [SG2-64:AC2] [SG2-64:AC4] [BOUNDARY] A % event must % a change request, got %', probe.status, case when probe.open then 'accept' else 'refuse' end, result;
     end if;
   end loop;
-  if exists (select 1 from public.event_change_requests where to_value = '"Too late"'::jsonb) then
-    raise exception '[SG2-64:closed-not-stored] [SG2-64:AC4] [BOUNDARY] A refused request must not be stored';
-  end if;
 end $$;
 
--- 3. Only the owning organiser may raise one, and only a real change:
+-- 3. Only the owning organiser may raise one, and only a real change; the same
+-- instant written in another time zone is no change, a new date is:
 do $$
-declare result jsonb;
+declare
+  probe record;
+  result jsonb;
 begin
-  result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000003',
-    'name', '"Hijacked"'::jsonb, 'Not my event.');
-  if result ->> 'outcome' <> 'not_found' then
-    raise exception '[SG2-64:other-organiser] [SG2-64:AC1] [CONFLICT] Another organiser must get not_found, got %', result;
-  end if;
-  result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000001',
-    'name', '"Coordinator edit"'::jsonb, 'Not an organiser.');
-  if result ->> 'outcome' <> 'not_found' then
-    raise exception '[SG2-64:coordinator-raise] [SG2-64:AC1] [CONFLICT] A coordinator must get not_found, got %', result;
-  end if;
-  result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000002',
-    'expected_attendance', '120'::jsonb, 'Same number.');
-  if result ->> 'outcome' <> 'unchanged' then
-    raise exception '[SG2-64:unchanged-value] [SG2-64:AC1] [CONFLICT] Asking for the current value must be unchanged, got %', result;
-  end if;
-  -- The same instant written another way is still no change.
-  result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000002',
-    'proposed_date', '"2026-11-20T18:00:00.000+08:00"'::jsonb, 'Same time.');
-  if result ->> 'outcome' <> 'unchanged' then
-    raise exception '[SG2-64:unchanged-date] [SG2-64:AC1] [CONFLICT] The same instant in another time zone must be unchanged, got %', result;
-  end if;
-  result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000002',
-    'proposed_date', '"2026-11-27T10:00:00.000Z"'::jsonb, 'Speaker moved a week.');
-  if result ->> 'outcome' <> 'ok' then
-    raise exception '[SG2-64:date-change] [SG2-64:AC1] [NORMAL] A new date must be accepted, got %', result;
-  end if;
+  for probe in select * from (values
+      ('e6400000-0000-4000-8000-000000000003', 'name', '"Hijacked"', 'not_found'),
+      ('e6400000-0000-4000-8000-000000000001', 'name', '"Coordinator edit"', 'not_found'),
+      ('e6400000-0000-4000-8000-000000000002', 'expected_attendance', '120', 'unchanged'),
+      ('e6400000-0000-4000-8000-000000000002', 'proposed_date', '"2026-11-20T18:00:00.000+08:00"', 'unchanged'),
+      ('e6400000-0000-4000-8000-000000000002', 'proposed_date', '"2026-11-27T10:00:00.000Z"', 'ok')) v(actor, field, value, expected) loop
+    result := public.raise_event_change_request(96401, probe.actor::uuid, probe.field, probe.value::jsonb, 'Why');
+    if result ->> 'outcome' is distinct from probe.expected then
+      raise exception '[SG2-64:owner-and-real-change] [SG2-64:AC1] [CONFLICT] [NORMAL] % by % must be %, got %', probe.field, probe.actor, probe.expected, result;
+    end if;
+  end loop;
 end $$;
 
--- 4. The table rejects malformed rows even from the service role:
+-- 4. The table keeps a reason of 1 to 1000 characters, a changeable field and
+-- a known status even when the service role writes it directly:
 do $$
+declare
+  probe record;
+  refused boolean;
 begin
   insert into public.event_change_requests (event_id, requested_by, field, to_value, reason)
     values (96401, 'e6400000-0000-4000-8000-000000000002', 'name', '"Ok"'::jsonb, repeat('r', 1000));
-  begin
-    insert into public.event_change_requests (event_id, requested_by, field, to_value, reason)
-      values (96401, 'e6400000-0000-4000-8000-000000000002', 'name', '"Ok"'::jsonb, repeat('r', 1001));
-    raise exception '[SG2-64:reason-limit] [SG2-64:AC1] [BOUNDARY] A 1001-character reason should have been rejected';
-  exception when check_violation then null;
-  end;
-  begin
-    insert into public.event_change_requests (event_id, requested_by, field, to_value, reason)
-      values (96401, 'e6400000-0000-4000-8000-000000000002', 'name', '"Ok"'::jsonb, '   ');
-    raise exception '[SG2-64:reason-required] [SG2-64:AC1] [BOUNDARY] A blank reason should have been rejected';
-  exception when check_violation then null;
-  end;
-  begin
-    insert into public.event_change_requests (event_id, requested_by, field, to_value, reason)
-      values (96401, 'e6400000-0000-4000-8000-000000000002', 'status', '"approved"'::jsonb, 'Sneaky');
-    raise exception '[SG2-64:field-whitelist] [SG2-64:AC1] [FAILURE] A field outside the changeable list should have been rejected';
-  exception when check_violation then null;
-  end;
-  begin
-    insert into public.event_change_requests (event_id, requested_by, field, to_value, reason, status)
-      values (96401, 'e6400000-0000-4000-8000-000000000002', 'name', '"Ok"'::jsonb, 'Why', 'approved');
-    raise exception '[SG2-64:status-known] [FAILURE] An unknown request status should have been rejected';
-  exception when check_violation then null;
-  end;
+  for probe in select * from (values
+      ('1001-character reason', 'name', repeat('r', 1001), 'pending'),
+      ('blank reason', 'name', '   ', 'pending'),
+      ('field outside the changeable list', 'status', 'Sneaky', 'pending'),
+      ('unknown status', 'name', 'Why', 'approved')) v(label, field, reason, status) loop
+    begin
+      insert into public.event_change_requests (event_id, requested_by, field, to_value, reason, status)
+        values (96401, 'e6400000-0000-4000-8000-000000000002', probe.field, '"Ok"'::jsonb, probe.reason, probe.status);
+      refused := false;
+    exception when check_violation then refused := true;
+    end;
+    if not refused then
+      raise exception '[SG2-64:table-constraints] [SG2-64:AC1] [BOUNDARY] [FAILURE] A % should have been rejected (a 1000-character reason is accepted)', probe.label;
+    end if;
+  end loop;
 end $$;
 
 -- 5. No signed-in or anonymous caller reads, writes or raises directly; the
--- API decides who sees a request (AC3):
-set local role authenticated;
-select set_config('request.jwt.claim.sub', 'e6400000-0000-4000-8000-000000000002', true);
-select set_config('request.jwt.claims', '{"sub":"e6400000-0000-4000-8000-000000000002","role":"authenticated"}', true);
+-- API decides who sees a request (AC3). SET ROLE is checked against the
+-- session user, so this block can switch to each role in turn:
 do $$
+declare
+  probe record;
+  refused boolean;
 begin
-  begin
-    perform * from public.event_change_requests;
-    raise exception '[SG2-64:direct-read] [SG2-64:AC3] [FAILURE] An organiser must not read change requests directly';
-  exception when insufficient_privilege then null;
-  end;
-  begin
-    insert into public.event_change_requests (event_id, requested_by, field, to_value, reason)
-      values (96401, 'e6400000-0000-4000-8000-000000000002', 'name', '"Direct"'::jsonb, 'Bypass');
-    raise exception '[SG2-64:direct-insert] [FAILURE] An organiser must not insert change requests directly';
-  exception when insufficient_privilege then null;
-  end;
-  begin
-    perform public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000002',
-      'name', '"Direct"'::jsonb, 'Bypass');
-    raise exception '[SG2-64:direct-raise] [FAILURE] An organiser must not call raise_event_change_request directly';
-  exception when insufficient_privilege then null;
-  end;
-end $$;
-
-set local role anon;
-do $$
-begin
-  begin
-    perform * from public.event_change_requests;
-    raise exception '[SG2-64:anonymous-read] [SG2-64:AC3] [FAILURE] An anonymous caller must not read change requests';
-  exception when insufficient_privilege then null;
-  end;
+  for probe in select * from (values
+      ('authenticated', 'select * from public.event_change_requests'),
+      ('authenticated', 'insert into public.event_change_requests (event_id, requested_by, field, to_value, reason)'
+        || ' values (96401, ''e6400000-0000-4000-8000-000000000002'', ''name'', ''"Direct"'', ''Bypass'')'),
+      ('authenticated', 'select public.raise_event_change_request(96401, ''e6400000-0000-4000-8000-000000000002'','
+        || ' ''name'', ''"Direct"''::jsonb, ''Bypass'')'),
+      ('anon', 'select * from public.event_change_requests')) v(caller, statement) loop
+    execute format('set local role %I', probe.caller);
+    begin
+      execute probe.statement;
+      refused := false;
+    exception when insufficient_privilege then refused := true;
+    end;
+    reset role;
+    if not refused then
+      raise exception '[SG2-64:no-direct-access] [SG2-64:AC3] [FAILURE] % must not run: %', probe.caller, probe.statement;
+    end if;
+  end loop;
 end $$;
 
 rollback;

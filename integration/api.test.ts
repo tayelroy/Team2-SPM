@@ -961,7 +961,7 @@ test('[NORMAL] [FAILURE] [SG2-47:AC3] [SG2-47:AC5] [SG2-66:AC5] native capacity 
 });
 
 
-test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-40:AC1] [SG2-40:AC2] [SG2-40:AC3] [SG2-64:AC5] native draft saves commit exact field history and preserve owner-only access', async () => {
+test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-29:AC1] [SG2-40:AC1] [SG2-40:AC2] [SG2-40:AC3] native draft saves commit exact field history and preserve owner-only access', async () => {
   const id = await draft({} as typeof values);
   const edited = { ...values, name: 'Audited draft', accessibility_needs: 'Step-free access' };
   const result = await api.patch(`/api/event-requests/${id}`).set(auth('organiser')).send({ ...edited, actor_id: ids.other });

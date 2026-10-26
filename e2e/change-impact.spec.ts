@@ -107,7 +107,7 @@ test('SG2-66-P01 | [NORMAL] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] 
   expect(errors).toEqual(['Failed to load resource: the server responded with a status of 409 (Conflict)']);
 });
 
-test('SG2-66-F01 | [FAILURE] [SG2-66:AC1] [SG2-66:AC4] [SG2-64:AC3] only the assigned coordinator sees the impact or accepts change requests, and nothing outstanding cannot be settled', async ({ page }) => {
+test('SG2-66-F01 | [FAILURE] [SG2-66:AC1] [SG2-66:AC4] only the assigned coordinator sees the impact or accepts change requests, and nothing outstanding cannot be settled', async ({ page }) => {
   const organiser = await auth(page, 'organiser');
   // SG2-64 AC3: the creating organiser sees their requests, without the impact assessment.
   const own = await page.request.get('/api/event-requests/661/change-requests', { headers: organiser });

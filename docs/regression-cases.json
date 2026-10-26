@@ -2460,7 +2460,7 @@
     "actual": "Passed in Chromium. Before the AC5 update it failed waiting for Edit request, which SG2-64 removed.",
     "execution_date": "26 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 7a2c10f merged with main b7e2b1a (SG2-93); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,839/1,839 and client 1,899/1,899 at 100% coverage, 159/159 browser tests with the regression gate, and 8/8 smoke. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-26",
       "by": "YE ZHAN",
@@ -9114,7 +9114,7 @@
     "actual": "Passed in Chromium. It failed while the work queue showed change requests only from Approved onwards, which led to showing them while under review or returned for clarification too. The native integration test (integration/api.test.ts:190) raises the same kind of request through the real raise_event_change_request.",
     "execution_date": "26 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 7a2c10f merged with main b7e2b1a (SG2-93); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,839/1,839 and client 1,899/1,899 at 100% coverage, 159/159 browser tests with the regression gate, and 8/8 smoke. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-26",
       "by": "YE ZHAN",
@@ -9156,7 +9156,7 @@
     "actual": "Passed in Chromium.",
     "execution_date": "26 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 7a2c10f merged with main b7e2b1a (SG2-93); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,839/1,839 and client 1,899/1,899 at 100% coverage, 159/159 browser tests with the regression gate, and 8/8 smoke. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-26",
       "by": "YE ZHAN",
@@ -9198,7 +9198,7 @@
     "actual": "Passed in Chromium, in the native integration run and in the server and client suites.",
     "execution_date": "26 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 7a2c10f merged with main b7e2b1a (SG2-93); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,839/1,839 and client 1,899/1,899 at 100% coverage, 159/159 browser tests with the regression gate, and 8/8 smoke. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-26",
       "by": "YE ZHAN",
@@ -9234,11 +9234,11 @@
     "expected": "ok with the trimmed reason, from 120 and to 180, pending, the event unchanged, and the coordinator's 'Partner Dinner has a change request waiting for your decision.' (none for the organiser); every open status ok with no notice where no coordinator is assigned; every closed status closed and nothing stored; not_found for the other organiser and the coordinator; unchanged for both same values; ok for the new date; 1000 accepted and 1001, blank, unknown field and unknown status rejected (check_violation); every direct access refused (42501).",
     "evidence": "supabase/tests/event_change_requests.sql; .github/workflows/ci.yml; docs/change-requests.md",
     "layer": "Disposable PostgreSQL SQL assertions",
-    "actual": "Passed in the disposable PostgreSQL 17 replay. Sabotage runs (a select grant and policy for authenticated; completed dropped from the closed statuses) made the suite fail.",
+    "actual": "Passed in the disposable PostgreSQL 17 replay as five grouped assertions. Sabotage runs (a select grant and policy for authenticated; completed dropped from the closed statuses) made it fail, naming the case.",
     "status": "Pass",
     "execution_date": "26 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 7a2c10f merged with main b7e2b1a (SG2-93); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,839/1,839 and client 1,899/1,899 at 100% coverage, 159/159 browser tests with the regression gate, and 8/8 smoke. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-64-change-request at 6c0e77a (7a2c10f merged with main b7e2b1a) plus the SG2-64 test consolidation (75 SG2-64 test methods and SQL assertions merged into 25, every assertion kept); local replay of every CI job: database job (59 steps), release readiness (ready; 27/27), legacy upgrade, native integration 24/24, inventory and script self-tests in node:20, server 1,848/1,848 and client 1,896/1,896 at 100% coverage, 159/159 browser tests with the regression gate, and smoke 8/8 (SMOKE-PLANNING-01 timed out setting up the browser while the machine slept, then passed on rerun). Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-26",
       "by": "YE ZHAN",
