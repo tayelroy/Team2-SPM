@@ -865,7 +865,7 @@ async function signOut(page: Page) {
   await expect(page.getByRole('button', { name: 'Open app', exact: true })).toBeVisible();
 }
 
-test('SG2-36-P01 | [SG2-36:AC1] [SG2-36:AC2] [SG2-36:AC3] [NORMAL] a question goes to the organiser, who answers and resubmits for review', async ({ page, request }) => {
+test('SG2-36-P01 | [SG2-36:AC1] [SG2-36:AC3] [SG2-64:AC1] [SG2-64:AC5] [NORMAL] a question goes to the organiser, who answers, asks for the change through a change request and resubmits for review', async ({ page, request }) => {
   // AC1: the reviewing coordinator returns the request with a question.
   await signIn(page, 'coordinator');
   expect((await request.post('/__e2e/under-review')).ok()).toBeTruthy();
@@ -891,13 +891,16 @@ test('SG2-36-P01 | [SG2-36:AC1] [SG2-36:AC2] [SG2-36:AC3] [NORMAL] a question go
   await organiserThread.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(organiserThread.getByText('It can move to 22 June if needed.')).toBeVisible();
 
-  // AC2: the organiser amends and resubmits from My drafts.
-  await page.getByRole('button', { name: 'Edit request', exact: true }).click();
-  await page.getByRole('region', { name: 'My draft requests' }).locator('div')
-    .filter({ hasText: /^Your coordinator has a question/ })
-    .getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByLabel(/^Purpose/).fill('Decide whether the forum proceeds (date flexible)');
-  await page.getByRole('button', { name: 'Submit request', exact: true }).click();
+  // SG2-64 AC5 (replacing SG2-36 AC2): no direct edit; the change goes
+  // through a change request and the request is resubmitted as it stands.
+  await expect(page.getByRole('button', { name: 'Edit request', exact: true })).toHaveCount(0);
+  const changes = page.getByRole('region', { name: 'Change requests', exact: true });
+  await changes.getByLabel('What should change').selectOption('proposed_date');
+  await changes.getByLabel('New event date and time').fill('2030-06-22T10:00');
+  await changes.getByLabel('Why it should change').fill('The forum can move to 22 June.');
+  await changes.getByRole('button', { name: 'Ask for this change', exact: true }).click();
+  await expect(changes.getByRole('status')).toHaveText('Your change request was sent to your coordinator.');
+  await page.getByRole('button', { name: 'Resubmit for review', exact: true }).click();
   await expect.poll(async () => (await eventRecords(page)).find(r => r.event_id === 52)?.status).toBe('submitted');
   await signOut(page);
 
@@ -911,6 +914,8 @@ test('SG2-36-P01 | [SG2-36:AC1] [SG2-36:AC2] [SG2-36:AC3] [NORMAL] a question go
   await expect(history).toContainText('Is 15 June firm, or could it move a week?');
   await expect(history).toContainText('It can move to 22 June if needed.');
   await expect(page.getByRole('region', { name: 'Decide this request' })).toBeVisible();
+  // SG2-64 AC2/AC3: the change request reached the reviewing coordinator.
+  await expect(page.getByTestId('change-requests-panel')).toContainText('The forum can move to 22 June.');
 });
 
 test('SG2-36-N01 | [SG2-36:AC3] [CONFLICT] only the two parties to the request can read or join the exchange', async ({ page, request }) => {

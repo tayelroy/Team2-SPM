@@ -2,9 +2,9 @@
 
 SG2-96 requires the full Week 7 journey and regression results after the Week 7 stories merge, with a date, tested commit and hosted CI run link for the Managing Changes guide.
 
-**Release status: local remediation verified; hosted sign-off pending.** The multi-role phone header has been repaired and checked locally. The final SG2-96 commit, its passing hosted CI run, the deployed retest and an unaided human walkthrough remain outstanding. A local run against an uncommitted tree is not immutable release evidence.
+**Release status: pre-merge remediation verified; post-merge regression and hosted sign-off pending.** The multi-role phone header was repaired and checked locally before merging main a9eb363, which adds SG2-60 registration submission and SG2-64 organiser change requests. The final combined commit, its regression results and passing hosted CI run, the deployed retest and an unaided human walkthrough remain outstanding. Prior baseline results must not be presented as verification of the combined tree.
 
-**Revision:** main [`b7e2b1a`](https://github.com/tayelroy/Team2-SPM/tree/b7e2b1a) (PR #113, the last Week 7 story, SG2-93), plus the SG2-96 working tree. No final branch commit is recorded yet.
+**Revisions:** SG2-96's pre-merge baseline was committed as `eef4121` on `feature/SG2-96-week7-release-checks`, based on main [`b7e2b1a`](https://github.com/tayelroy/Team2-SPM/tree/b7e2b1a) (PR #113, SG2-93). Main `a9eb363` includes PR #112 (SG2-60) and PR #114 (SG2-64) and has since been merged into the branch. The final tested combined commit is not recorded yet.
 
 **Date:** 26 Oct 2026 (Asia/Singapore).
 
@@ -14,7 +14,7 @@ SG2-96 requires the full Week 7 journey and regression results after the Week 7 
 
 ## Local baseline rerun
 
-These results precede the fixes prompted by the signed-in staging inspection.
+These results precede both the fixes prompted by the signed-in staging inspection and the later merge of main a9eb363.
 
 | Suite | Command or scope | Result |
 |---|---|---|
@@ -45,20 +45,26 @@ Session-only report and screenshots: `/tmp/sg2-96-validation-staging/report.json
 - SG2-71-B01 now covers all three multi-role combinations, both held roles and 320/375 px widths. It checks control bounds, role-specific navigation and actual Profile/Notifications interactions, in addition to the original seven-role page checks. The expanded case reproduced **62 px** of overflow before the fix and passes after it.
 - The repaired walkthrough waits for permissions, checks representative role-specific navigation and fails unfinished/error pages instead of ignoring loading timeouts. It avoids dispatching an artificial same-role selection change.
 - A local production-build walkthrough opened **172 page views** across six fixture accounts covering all seven roles and three multi-role combinations at **320, 375, 768 and 1440 px**, with **zero overflow, console/page or readiness failures**. A manual 320 px visual check confirmed that the header controls fit. This verifies branch code; it does not change the deployed staging site.
-- **Final full regression after remediation: passed.** `npm run ci:full` exited 0: server **1,844 / 1,844**, client **1,890 / 1,890**, both at **100%** statements/branches/functions/lines, and browser **159 / 159** in **186.5 s**, with zero failures, skips or flaky cases. The expanded phone case and full Week 7 journey passed, as did the required SG2-26 gate, 22 inventory/policy checks, 19 reviewer checks and 13 regression-gate tests. Browser run started **26 Oct 2026, 07:01:53.907 UTC** (15:01 SGT).
-- The five new CI-evidence tests pass. Inventory contains **235 executable files, 3,197 methods and 1,372 SQL assertions**. Final log: `/tmp/sg2-96-ci-full-final.log`; browser JSON/JUnit, HTML report and coverage are generated in the usual report directories. Database code did not change during this remediation, so the successful integration/database baseline above remains the relevant database verification.
+- **Pre-merge full regression after remediation: passed.** `npm run ci:full` exited 0: server **1,844 / 1,844**, client **1,890 / 1,890**, both at **100%** statements/branches/functions/lines, and browser **159 / 159** in **186.5 s**, with zero failures, skips or flaky cases. The expanded phone case and full Week 7 journey passed, as did the required SG2-26 gate, 22 inventory/policy checks, 19 reviewer checks and 13 regression-gate tests. Browser run started **26 Oct 2026, 07:01:53.907 UTC** (15:01 SGT).
+- The five new CI-evidence tests passed. Pre-merge inventory contained **235 executable files, 3,197 methods and 1,372 SQL assertions**. Log: `/tmp/sg2-96-ci-full-final.log`; browser JSON/JUnit, HTML report and coverage were generated in the usual report directories. These counts and database baseline results describe the pre-merge tree only.
+
+## Verification after merging main a9eb363 — pending
+
+The main merge adds real registration writes (SG2-60) and persisted organiser change requests (SG2-64), including their migrations, API/component tests, browser cases and database checks. Both sets of regression scenarios are retained alongside SG2-96's cases in `docs/regression-cases.json`. The combined inventory must be regenerated and the full build, coverage, browser, native integration and database/upgrade checks rerun against the merged commit. Record their actual counts and results here when complete; do not reuse the pre-merge totals above.
+
+The PR remains a draft until the applicable DoD gates are met. No hosted database changes were authorised by the commit/PR request; the hosted rehearsal, rollback, apply and release-readiness gate remain pending rather than implied by the successful disposable-database checks.
 
 Session-only repaired walkthrough evidence: `/tmp/sg2-96-remediation-walkthrough-verified/report.json`; visual proof: `/tmp/sg2-96-repaired-phone.jpg`. An intermediate repeated local walkthrough hit the normal sign-in rate limit; resetting only the disposable fixture allowed a clean run. Shared staging rate limits were not changed.
 
 ## Release checks still required
 
 1. Retest staging after the fixed commit is deployed, including the three multi-role accounts; a local fix does not repair the current deployment.
-2. Record the final tested commit SHA, successful hosted CI run URL and retained artifacts. The full regression must cover that final commit.
-3. Complete the unaided human task walkthrough and the browser response-time protocol in [`nfr-capacity-review.md`](nfr-capacity-review.md). Registration submission remains an unimplemented SG2-60 dependency; browsing an event does not satisfy that check.
+2. Complete the post-merge regression and record the final tested commit SHA, successful hosted CI run URL and retained artifacts. The full regression must cover that final commit, including SG2-60 and SG2-64.
+3. Complete the unaided human task walkthrough and the browser response-time protocol in [`nfr-capacity-review.md`](nfr-capacity-review.md), including the now-implemented SG2-60 registration submission. Browsing an event does not satisfy the registration-action check.
 4. Rehearse and apply `202610260002_event_lookup_indexes.sql` to the shared environment using [`release-readiness.md`](release-readiness.md). This validation applied it only to disposable local databases.
 
 ## Earlier run retained for context
 
-The original 26 Oct Linux run used Node 22, PostgreSQL 16.15 and PostgREST 12.2.12. It recorded 1,844 server tests, 1,890 client tests, 100% coverage, 25 integration cases and 158 browser cases; adding SG2-96-E2E01 then produced a 159-case browser pass. That run stripped unreachable Google Fonts links from built output. The macOS rerun above provides the later baseline; the earlier counts and timings are not final evidence for subsequent fixes.
+The original 26 Oct Linux run used Node 22, PostgreSQL 16.15 and PostgREST 12.2.12. It recorded 1,844 server tests, 1,890 client tests, 100% coverage, 25 integration cases and 158 browser cases; adding SG2-96-E2E01 then produced a 159-case browser pass. That run stripped unreachable Google Fonts links from built output. The macOS reruns above provide later pre-merge baselines; none of those counts or timings is final evidence for the subsequent main merge.
 
 See [`nfr-capacity-review.md`](nfr-capacity-review.md) for capacity assumptions, performance scope and the human walkthrough protocol, and [`requirements-alignment.md`](requirements-alignment.md) for implemented scope.

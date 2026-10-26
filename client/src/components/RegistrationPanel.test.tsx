@@ -10,7 +10,7 @@ const OWNER_VIEW: RegistrationView = {
   registered_count: 2, places_remaining: 1, contact_details_visible: true,
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
-      email: 'ana@attendee.test', phone: '+65 6000 0001' },
+      email: 'ana@attendee.test', phone: '+65 6000 0001', needs: 'Step-free access' },
     { registration_id: 4, name: 'Ben Attendee', organisation: null, registered_at: '2030-06-03T01:00:00.000Z', email: null, phone: null },
   ],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 2 }, { venue_id: 8, name: 'Lawn', capacity: null }],
@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe('RegistrationPanel picture (SG2-63)', () => {
-  test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC7] the creating organiser sees the numbers, the warning and each attendee with contact details', async () => {
+  test('[NORMAL] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC7] [SG2-60:AC4] the creating organiser sees the numbers, the warning and each attendee with contact details and needs', async () => {
     const fetch = serve(() => Response.json(OWNER_VIEW));
     render(<RegistrationPanel eventId={12} accessToken="token" />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading registrations…');
@@ -46,7 +46,7 @@ describe('RegistrationPanel picture (SG2-63)', () => {
     expect(panel().getByText('10 Jun 2030, 09:00 SGT')).toBeVisible();
     expect(within(panel().getAllByRole('list', { name: 'Capacity warnings' })[0]).getByText('A capacity of 3 is more than Main hall holds (2).')).toBeVisible();
     const attendees = within(panel().getByRole('list', { name: 'Registered attendees' })).getAllByRole('listitem');
-    expect(attendees[0]).toHaveTextContent('Ana AttendeeGuests Ltdana@attendee.test+65 6000 0001Registered 2 Jun 2030, 09:00 SGT');
+    expect(attendees[0]).toHaveTextContent('Ana AttendeeGuests Ltdana@attendee.test+65 6000 0001Needs: Step-free accessRegistered 2 Jun 2030, 09:00 SGT');
     expect(within(attendees[0]).getByRole('link', { name: 'ana@attendee.test' })).toHaveAttribute('href', 'mailto:ana@attendee.test');
     expect(attendees[1]).toHaveTextContent('Ben AttendeeNo email on recordNo phone on record');
     expect(fetch).toHaveBeenCalledWith('/api/event-requests/12/registrations', expect.objectContaining({ headers: { Authorization: 'Bearer token' } }));

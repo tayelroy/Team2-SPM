@@ -1,12 +1,12 @@
 # Non-functional checks and year-3 capacity review (SG2-96)
 
-Evidence recorded on 26 Oct 2026 against main b7e2b1a plus the SG2-96 working tree. The customer left performance benchmarks to the team (SG2-96), so the targets below are the team's. The capacity measurements are from the original local Linux run; the later macOS regression and signed-in staging checks are recorded separately below. A final commit and its hosted CI run remain required for release evidence.
+Evidence recorded on 26 Oct 2026. The capacity measurements and local remediation results below describe the SG2-96 baseline committed as eef4121, based on main b7e2b1a. Main a9eb363, which implements registration submission (SG2-60) and organiser change requests (SG2-64), has since been merged into the branch; post-merge regression is pending. The customer left performance benchmarks to the team (SG2-96), so the targets below are the team's. The capacity measurements are from the original local Linux run; the later macOS regression and signed-in staging checks are recorded separately below. The final merged commit and its hosted CI run remain required for release evidence.
 
 | Requirement (Week 1 brief §8) | Team target | Result |
 |---|---|---|
-| Performance: common operations complete within a reasonable time | View an event, search venues, open a venue calendar, check equipment and register within **2 s** | **API evidence only.** Recorded single-user endpoint p95 values were at most 64 ms at year-3 volume and 129 ms at twice that. Browser-to-visible-result timing remains to be measured; registration submission is not implemented (SG2-60). |
-| Scalability: three years of growth | Year-3 data volumes and peak concurrent users below stay within the 2 s target | **Documented capacity review completed.** The local API workload recorded p95 78 ms and no errors at the assumed year-3 peak. This is not a hosted capacity result; twice the users produced some actions above 2 s. |
-| Usability: every role completes its common activities without training | An unaided participant completes each role's main task; pages fit supported screen widths | **Human acceptance pending.** Automated task coverage passes. After the header fix, the branch passed 172 page views across seven roles and all three multi-role combinations at 320–1440 px, with no overflow. Deployed staging still needs the fixed commit and a retest. |
+| Performance: common operations complete within a reasonable time | View an event, search venues, open a venue calendar, check equipment and register within **2 s** | **Prior API evidence only.** Recorded single-user endpoint p95 values were at most 64 ms at year-3 volume and 129 ms at twice that. Browser-to-visible-result timing remains to be measured. Registration submission is now implemented by SG2-60 but was absent from that benchmark and must be measured. |
+| Scalability: three years of growth | Year-3 data volumes and peak concurrent users below stay within the 2 s target | **Prior capacity review recorded.** The local API workload recorded p95 78 ms and no errors at the assumed year-3 peak. This is not a hosted or post-merge capacity result; twice the users produced some actions above 2 s. Registration writes and persisted change requests were not part of that workload. |
+| Usability: every role completes its common activities without training | An unaided participant completes each role's main task; pages fit supported screen widths | **Human acceptance pending.** Pre-merge automated task coverage passed. After the header fix, the branch passed 172 page views across seven roles and all three multi-role combinations at 320–1440 px, with no overflow. The combined main merge and deployed staging still require verification. |
 | Maintainability: processes evolve | The design notes show how to add a role or a status | **Documented.** See [`design/c4-notes.md`](design/c4-notes.md#extensibility-adding-a-role-or-a-status-sg2-96-nfr). |
 
 ## Year-3 assumptions
@@ -52,7 +52,7 @@ The brief gives one figure: about 500 staff today, and growth in "events, users,
 | Lead queue / oversight, work queue, inbox, history | ≤ 15 | ≤ 22 | ≤ 14 | ≤ 23 |
 | Raise an event request (write) | 10 | 16 | 10 | 11 |
 
-"Before" is main b7e2b1a; "after" adds the index migration below. Submitting a registration is not built yet (SG2-60). The attendee list and event-page reads measure browsing only and do not satisfy the registration-action target.
+"Before" is main b7e2b1a; "after" adds the index migration below. Registration submission (SG2-60) was absent from this historical benchmark and is now implemented in merged main a9eb363. The attendee list and event-page reads measure browsing only and do not satisfy the registration-action target. Extend and rerun the capacity workload for registration writes and the newly persisted SG2-64 change requests before attributing these figures to those operations.
 
 ### Concurrent users (after the fixes)
 
@@ -86,9 +86,9 @@ Every action stays under 130 ms at p95: event search 129, Lead queue 48, safety 
 
 ## Automated task coverage and visual inspection
 
-The original local inspection used the production build with the browser test fixture's single-role accounts. Each of the seven roles opened every page in its navigation at 320, 375, 768 and 1440 px: 140 screenshots, no console errors, and after fix 3 no sideways scrolling. Contact sheets of every role at phone size, and a sample at tablet and desktop, were also checked by eye. One thing they showed: the attendee's My registrations and Event page still display the prototype's sample data (J. Halloran, Northbridge Investor Forum, a Withdraw button) until SG2-60/62 are built. The subsequent staging inspection below covered real-data layouts and multi-role accounts and found additional defects.
+The original local inspection used the production build with the browser test fixture's single-role accounts. Each of the seven roles opened every page in its navigation at 320, 375, 768 and 1440 px: 140 screenshots, no console errors, and after fix 3 no sideways scrolling. Contact sheets of every role at phone size, and a sample at tablet and desktop, were also checked by eye. That pre-merge inspection found prototype sample data on the attendee's My registrations and Event pages (J. Halloran, Northbridge Investor Forum, a Withdraw button). SG2-60 has since added registration submission through the event-finding flow; SG2-62's own-registration/withdrawal workflow remains separate. The subsequent staging inspection below covered real-data layouts and multi-role accounts and found additional defects.
 
-The macOS baseline passed all 159 browser cases in 187.7 s; the final full rerun after the header and regression fixes passed all 159 in **186.5 s**, including the expanded SG2-71-B01 and the full Week 7 journey. The cases below exercise the implemented main tasks. Scripted navigation does not establish that a person can discover and complete a task without guidance.
+The macOS baseline passed all 159 browser cases in 187.7 s; the pre-merge rerun after the header and regression fixes passed all 159 in **186.5 s**, including the expanded SG2-71-B01 and the full Week 7 journey. Those results do not verify the later merge of main a9eb363. The cases below cover the implemented main tasks, including the newly merged SG2-60 registration cases; the combined post-merge run is pending. Scripted navigation does not establish that a person can discover and complete a task without guidance.
 
 | Role | Main task | Case |
 |---|---|---|
@@ -98,13 +98,13 @@ The macOS baseline passed all 159 browser cases in 187.7 s; the final full rerun
 | Venue Staff | Decide a venue booking request | SG2-49-P01 |
 | Technical Support Staff | Reserve equipment | SG2-55-P01 |
 | Safety Officer | Review and decide a safety check | SG2-91-P01, SG2-92-P01 |
-| Attendee | Find an event open for registration | SG2-59-P01 |
+| Attendee | Find an event and register with phone and needs | SG2-59-P01, SG2-60-P01, SG2-60-N01 |
 
 The whole Week 7 journey (submit, Lead assigns, venue and equipment confirmed, safety check, Preparation, Confirmed) also runs as one browser case, SG2-96-E2E01 (`e2e/week7-journey.spec.ts`), through six people's screens. Against PostgreSQL itself it runs as SG2-96-INT01, where the database's own triggers start the safety check.
 
 ### Local remediation verification
 
-After fixing the multi-role header, the production build passed the stricter local walkthrough: **172 page views**, six fixture accounts covering all seven roles, all three multi-role combinations, and 320/375/768/1440 px widths. No overflow, console/page or readiness failures were recorded. The expanded SG2-71-B01 checks both held roles and verifies that the selector, Profile menu and Notifications remain usable at 320/375 px. Manual inspection confirmed the 320 px layout; see [`regression-evidence-2026-10-26.md`](regression-evidence-2026-10-26.md#verification-after-remediation).
+Before merging main a9eb363, the header-fixed production build passed the stricter local walkthrough: **172 page views**, six fixture accounts covering all seven roles, all three multi-role combinations, and 320/375/768/1440 px widths. No overflow, console/page or readiness failures were recorded. The expanded SG2-71-B01 checks both held roles and verifies that the selector, Profile menu and Notifications remain usable at 320/375 px. Manual inspection confirmed the 320 px layout; see [`regression-evidence-2026-10-26.md`](regression-evidence-2026-10-26.md#verification-after-remediation). Post-merge verification remains pending.
 
 The walkthrough now waits for role permissions and representative navigation, and reports loading timeouts or error pages as failures. Its navigation timings remain diagnostic, even when under 2 s; they are not the 30-sample deployed browser benchmark below. These are local branch results, not a passing retest of the unchanged staging deployment or an unaided participant result.
 
@@ -120,13 +120,13 @@ Use the staging demo accounts and disposable test records with a participant unf
 | Venue Staff | Review and approve the supplied suitable venue request | Booking is confirmed and the request shows the decision | Pending |
 | Technical Support Staff | Arrange and reserve the supplied equipment requirement | Placement, quantity and reservation are visible | Pending |
 | Safety Officer | Review the supplied event's venues and equipment and record approval | Event moves to Preparation and the decision is visible | Pending |
-| Attendee | Find the supplied event that is open for registration and inspect its details | Correct event and registration availability are identified | Pending; registration submission remains outside implemented scope (SG2-60) |
+| Attendee | Find the supplied event that is open for registration, inspect its details and register with the supplied phone and needs | Registration confirmation and event information are visible; another submission is prevented | Pending |
 
-For each attempt record participant code, date, tested commit/deployment, role, device/viewport, starting record, success or failure, elapsed time, assistance, errors and observations. Accept the usability target only when every implemented main task succeeds without assistance. Record the absent registration task as an outstanding scope dependency rather than an achieved result.
+For each attempt record participant code, date, tested commit/deployment, role, device/viewport, starting record, success or failure, elapsed time, assistance, errors and observations. Accept the usability target only when every implemented main task succeeds without assistance. Registration submission is part of this protocol now that SG2-60 is merged; waiting-list and withdrawal tasks remain separate SG2-61/62 scope.
 
 ## Browser response-time protocol — pending
 
-On an identified deployed commit and documented seed dataset, time each action from its initiating click to the expected visible result: open event detail, search available venues, open the venue calendar and check equipment availability. Use three warm-ups and 30 measured samples per action, record browser/network conditions, failures, p50, p95 and maximum, and compare with the team's 2 s target. Measure registration submission when SG2-60 exists. Keep these measurements separate from the local API capacity table and from navigation-script timings that include settling waits.
+On an identified deployed commit and documented seed dataset, time each action from its initiating click to the expected visible result: open event detail, search available venues, open the venue calendar, check equipment availability and submit a registration. Use distinct eligible attendee/event pairs for registration samples so duplicate guards do not replace successful submissions. Use three warm-ups and 30 measured samples per action, record browser/network conditions, failures, p50, p95 and maximum, and compare with the team's 2 s target. Keep these measurements separate from the local API capacity table and from navigation-script timings that include settling waits.
 
 ## Staging
 

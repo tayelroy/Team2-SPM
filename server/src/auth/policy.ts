@@ -92,7 +92,11 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // break, accepts it, and marks each outstanding recheck settled. Which
   // event is enforced per-row by the assignment (404 otherwise), not by this
   // grant.
-  'event_request.change_request.view': ['event_coordinator'],
+  // SG2-64 AC1/AC3: the organiser who owns the event raises a change request
+  // and sees their outstanding ones (ownership enforced by the handler and
+  // raise_event_change_request).
+  'event_request.change_request.raise': ['event_organiser'],
+  'event_request.change_request.view': ['event_coordinator', 'event_organiser'],
   'event_request.change_request.accept': ['event_coordinator'],
   'event_request.rechecks.settle': ['event_coordinator'],
   // SG2-92: the Safety Officer records Approve / Reject / Request Changes on
@@ -233,6 +237,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-59 AC1-AC3: only attendees browse the events they can register for;
   // registrable_events() and registrable_event() recheck the acting role.
   'events.registrable.read': ['attendee'],
+  // SG2-60: only attendees register; register_for_event() rechecks the acting role.
+  'events.register': ['attendee'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

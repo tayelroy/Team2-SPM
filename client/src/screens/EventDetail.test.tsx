@@ -1061,8 +1061,10 @@ describe('EventDetail clarification exchange (SG2-36)', () => {
     const thread = screen.getByRole('region', { name: 'Clarification conversation' });
     expect(await within(thread).findByText('Is the date firm?')).toBeVisible();
     expect(within(thread).getByLabelText('Answer your coordinator')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit request' }));
-    expect(onNavigate).toHaveBeenCalledWith('drafts');
+    // SG2-64 AC5: no direct edit; the request goes back to review as it stands.
+    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resubmit for review' })).toBeVisible();
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   test('[NORMAL] [SG2-36:AC2] the organiser answers in the thread', async () => {

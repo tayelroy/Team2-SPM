@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// SG2-66: change requests are sample data standing in for SG2-64/SG2-65; the
-// impact, the acceptance, the return to Planning, the notices and the
-// rechecks are real.
+// SG2-66: the fixture opts Harbour Showcase in to the sample change requests
+// so their ids stay stable (SG2-64's raised requests are covered in
+// change-requests.spec.ts); the impact, the acceptance, the return to
+// Planning, the notices and the rechecks are real.
 
 async function signIn(page: Page, account: string) {
   await page.goto('/'); await page.evaluate(() => sessionStorage.clear()); await page.reload();
@@ -43,7 +44,6 @@ test('SG2-66-P01 | [NORMAL] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] 
 
   // AC1-AC3: the sample requests and what each would break.
   const panel = page.getByTestId('change-requests-panel');
-  await expect(panel).toContainText('sample change requests');
   const attendance = panel.getByTestId('change-request-mock-661-attendance');
   await expect(attendance).toContainText('Expected attendance');
   await expect(attendance).toContainText('Significant change');
@@ -107,9 +107,16 @@ test('SG2-66-P01 | [NORMAL] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] [SG2-66:AC4] 
   expect(errors).toEqual(['Failed to load resource: the server responded with a status of 409 (Conflict)']);
 });
 
-test('SG2-66-F01 | [FAILURE] [SG2-66:AC1] [SG2-66:AC4] only the assigned coordinator sees or accepts change requests, and nothing outstanding cannot be settled', async ({ page }) => {
+test('SG2-66-F01 | [FAILURE] [SG2-66:AC1] [SG2-66:AC4] only the assigned coordinator sees the impact or accepts change requests, and nothing outstanding cannot be settled', async ({ page }) => {
   const organiser = await auth(page, 'organiser');
-  expect((await page.request.get('/api/event-requests/661/change-requests', { headers: organiser })).status()).toBe(403);
+  // SG2-64 AC3: the creating organiser sees their requests, without the impact assessment.
+  const own = await page.request.get('/api/event-requests/661/change-requests', { headers: organiser });
+  expect(own.status()).toBe(200);
+  const listed = await own.json();
+  expect(listed.change_requests.length).toBeGreaterThan(0);
+  expect(listed).not.toHaveProperty('can_accept');
+  expect(listed.change_requests.some((request: Record<string, unknown>) => 'impact' in request)).toBe(false);
+  expect((await page.request.get('/api/event-requests/661/change-requests', { headers: await auth(page, 'organiser2') })).status()).toBe(404);
   expect((await page.request.post('/api/event-requests/661/change-requests/mock-661-attendance/accept', { headers: organiser })).status()).toBe(403);
   const coordinator = await auth(page, 'coordinator');
   expect((await page.request.get('/api/event-requests/1/change-requests', { headers: coordinator })).status()).toBe(404);

@@ -725,6 +725,10 @@ describe('the request form', () => {
       if (url === '/api/event-requests/42/clarifications' && init?.method === 'GET') {
         return Response.json({ clarifications: [], status: 'submitted' });
       }
+      // SG2-64: a submitted event offers its organiser change requests.
+      if (url === '/api/event-requests/42/change-requests' && init?.method === 'GET') {
+        return Response.json({ event: { event_id: 42, status: 'submitted' }, change_requests: [] });
+      }
       throw new Error(`Unexpected request: ${init?.method} ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -759,6 +763,7 @@ describe('the request form', () => {
       '/api/event-requests/42',
       '/api/event-requests/42/stage',
       '/api/event-requests/42/clarifications',
+      '/api/event-requests/42/change-requests',
     ]);
     expect(fetchMock.mock.calls[2][1]?.headers).toEqual({ Authorization: 'Bearer test-access-token' });
     // 08:00 on 12 Oct in Singapore is midnight UTC.

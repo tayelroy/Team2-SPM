@@ -180,9 +180,9 @@ test('[NORMAL] [SG2-24:AC1] [SG2-25:AC2] production adapter verifies Auth then r
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
   // SG2-27: every role, including attendee, holds the profile grants.
-  // SG2-59: attendees also browse the events they can register for.
+  // SG2-59/SG2-60: attendees also browse the events they can register for, and register.
   assert.deepEqual(res.body, { userId, role: 'attendee', roles: ['attendee'],
-    permissions: ['notifications.inbox', 'events.registrable.read', 'profile.read', 'profile.update'] });
+    permissions: ['notifications.inbox', 'events.registrable.read', 'events.register', 'profile.read', 'profile.update'] });
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
@@ -441,14 +441,14 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] [SG2-93:AC2] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] [SG2-60:AC1] [SG2-93:AC2] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
       'event_request.update', 'event_request.clarify', 'event_request.stage.view', 'event_request.history.view',
       'event_request.confirmation.view', 'event_request.safety_decisions.view',
       'event_request.registrations.view', 'event_request.registration_settings.update',
-      'event_request.cancellation.request',
+      'event_request.cancellation.request', 'event_request.change_request.raise', 'event_request.change_request.view',
       'venues.suitability.view', 'notifications.read', 'notifications.inbox', 'profile.read', 'profile.update'
     ],
     event_coordinator: [
@@ -478,7 +478,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'events.search',
       'safety_rereviews.read', 'safety_rereviews.confirm', 'profile.read', 'profile.update'
     ],
-    attendee: ['notifications.inbox', 'events.registrable.read', 'profile.read', 'profile.update']
+    attendee: ['notifications.inbox', 'events.registrable.read', 'events.register', 'profile.read', 'profile.update']
   };
   for (const [role, expected] of Object.entries(EXPECTED)) {
     assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);

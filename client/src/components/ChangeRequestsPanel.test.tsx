@@ -77,7 +77,7 @@ const noArrangements: ChangeRequest = {
 };
 
 function listOf(requests: ChangeRequest[], canAccept = true): ChangeRequestList {
-  return { source: 'mock', event: { event_id: 12, status: 'confirmed' }, can_accept: canAccept, change_requests: requests };
+  return { event: { event_id: 12, status: 'confirmed' }, can_accept: canAccept, change_requests: requests };
 }
 
 function mockList(list: ChangeRequestList) {
@@ -90,14 +90,10 @@ function renderPanel(onAccepted = vi.fn()) {
 }
 
 describe('ChangeRequestsPanel', () => {
-  test('[NORMAL] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] lists sample change requests with their changes, marker and affected arrangements', async () => {
+  test('[NORMAL] [SG2-66:AC1] [SG2-66:AC2] [SG2-66:AC3] lists change requests with their changes, marker and affected arrangements', async () => {
     const fetch = mockList(listOf([attendance, dateChange, description]));
     renderPanel();
 
-    const panel = screen.getByTestId('change-requests-panel');
-    expect(within(panel).getByTestId('change-requests-sample-note')).toHaveTextContent(
-      'These are sample change requests standing in for SG2-64 until submitting change requests ships.',
-    );
     expect(screen.getByRole('status')).toHaveTextContent('Loading change requests…');
     const card = await screen.findByTestId('change-request-mock-12-attendance');
     expect(fetch).toHaveBeenCalledWith(12, 'coordinator-token');

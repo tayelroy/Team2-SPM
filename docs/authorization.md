@@ -132,6 +132,16 @@ Coordinator) reads a confirmed event's arrangements; the handler then requires
 the event's creating organiser or its assigned coordinator and answers 404 to
 everyone else — see [event confirmation](event-confirmation.md).
 
+SG2-64 adds `event_request.change_request.raise`, held only by
+`event_organiser`, and gives the Event Organiser `event_request.change_request.view`
+too (already held by `event_coordinator` for SG2-66). The organiser who created
+the event raises a change request and lists their outstanding ones; ownership is
+checked by the handler and again by `raise_event_change_request`, which also
+rechecks the stored role in `account_roles`. Anyone else's event gets 404. The
+coordinator still needs the event's assignment. `event_change_requests` has RLS
+forced with no client grants, so no caller reads it directly — see
+[change requests](change-requests.md).
+
 SG2-68 adds the Event Coordinator Lead to `notifications.read` (already held by
 Event Coordinator, Venue Staff, Technical Support Staff and Event Organiser),
 so the Lead reads their own notices — "an event was submitted and is waiting
@@ -250,6 +260,15 @@ fields (name, host organisation, category, description, date and time,
 registration times, confirmed venues). Migration
 `202610220003_registrable_events.sql`; tests `supabase/tests/registrable_events.sql`
 and browser journeys `SG2-59-P01` and `SG2-59-N01`.
+
+**Register for an event (SG2-60).** `events.register` is granted to Attendees
+only. `register_for_event()` runs with the caller's JWT and rechecks with
+`lock_acting_role()` that the acting role is `attendee`; it registers only the
+caller (`auth.uid()`), so no attendee can register someone else. The
+registration's phone and needs are shown only to those who see SG2-63's
+contact details. Migration `202610230001_event_registration.sql`; tests
+`supabase/tests/event_registration.sql` (non-attendee-refused, grants) and
+browser journey `SG2-60-N01`.
 
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
 `change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),

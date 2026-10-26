@@ -14,7 +14,6 @@ function respond(response: () => Response) {
 const UNAVAILABLE = { ok: false, kind: 'unavailable', message: 'Could not reach the server. Please try again.' };
 
 const list = {
-  source: 'mock',
   event: { event_id: 12, status: 'confirmed' },
   can_accept: true,
   change_requests: [{

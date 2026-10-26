@@ -291,10 +291,16 @@ function ItemDetail({ item, accessToken, onFindVenues, onReload, role }: {
           outcome moves the status and arrangements, so the item is re-read. */}
       {item.kind === 'event' && item.assigned_to_me && accessToken
         && ['approved', 'planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(currentStatus) && (
-        <>
-          <ArrangementRechecks eventId={item.event_id} accessToken={accessToken} onSettled={onReload} />
-          <ChangeRequestsPanel eventId={item.event_id} accessToken={accessToken} onAccepted={onReload} />
-        </>
+        <ArrangementRechecks eventId={item.event_id} accessToken={accessToken} onSettled={onReload} />
+      )}
+      {/* SG2-64 AC2/AC3: a change can be asked for while the event is still
+          under review or returned for clarification, so the assigned
+          coordinator sees it from then on; the panel says when it cannot be
+          accepted yet (SG2-65 decides those). */}
+      {item.kind === 'event' && item.assigned_to_me && accessToken
+        && ['under_review', 'needs_clarification', 'approved', 'planning', 'awaiting_safety_check', 'safety_rejected',
+          'preparation', 'confirmed'].includes(currentStatus) && (
+        <ChangeRequestsPanel eventId={item.event_id} accessToken={accessToken} onAccepted={onReload} />
       )}
       {/* SG2-92 AC4–AC6: the latest safety decision, and reworking a Safety
           Rejected event back to Planning, for the assigned coordinator. */}

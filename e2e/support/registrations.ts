@@ -32,7 +32,10 @@ export function createMemoryRegistrations(database: MemoryDatabase) {
         const user = users.find(candidate => candidate.user_id === row.attendee_id)!;
         const account = accounts.find(candidate => `user-${candidate.key}` === row.attendee_id);
         return { registration_id: Number(row.registration_id), name: String(user.name), organisation: (user.organisation as string | null) ?? null,
-          email: account?.email ?? null, phone: (user.phone as string | null) ?? null, registered_at: String(row.registered_at) };
+          email: account?.email ?? null,
+          // SG2-60: the phone given at registration, else the profile phone, and the needs given.
+          phone: (row.contact_phone as string | null | undefined) ?? (user.phone as string | null) ?? null,
+          needs: (row.needs as string | null | undefined) ?? null, registered_at: String(row.registered_at) };
       });
     const venueIds = new Set(database.tables.venue_booking_requests
       .filter(row => row.event_id === eventId && ['pending', 'approved'].includes(String(row.status))).map(row => row.venue_id));

@@ -1,10 +1,10 @@
 # Release 1 requirements alignment (SG2-96)
 
-Read on 26 Oct 2026 against main b7e2b1a plus the SG2-96 branch. Sources: the Week 4 Project Instructions (the 20 core features), the Week 7 Customer Changes (#1–#6), the clarification sessions 1–3 and the Week 9 answers, and live Jira statuses on 26 Oct. Evidence IDs are scenarios in [`regression-cases.json`](regression-cases.json); the 26 Oct regression run is recorded in [`regression-evidence-2026-10-26.md`](regression-evidence-2026-10-26.md).
+Reviewed on 26 Oct 2026, then updated when main a9eb363 (SG2-60 and SG2-64) was merged into `feature/SG2-96-week7-release-checks`. Sources: the Week 4 Project Instructions (the 20 core features), the Week 7 Customer Changes (#1–#6), the clarification sessions 1–3 and the Week 9 answers, live Jira descriptions read on 26 Oct, and the merged implementation. Implementation status below does not assert a later Jira status change. Evidence IDs are scenarios in [`regression-cases.json`](regression-cases.json); results and the pending post-merge verification are recorded in [`regression-evidence-2026-10-26.md`](regression-evidence-2026-10-26.md).
 
-**Summary.** 17 of the 20 core features and all six Week 7 changes are built and covered. Three core features are partly built; their remaining stories are To Do in Jira: attendee registration (SG2-60/61/62), event change requests (SG2-64/65) and attendee notices about event changes (SG2-102).
+**Summary.** 17 of the 20 core features and all six Week 7 changes are built and have automated coverage. Three core features remain partly built. Attendee registration submission (SG2-60) and organiser change requests (SG2-64) are now implemented on merged main; waiting-list handling and registration management (SG2-61/62), the remaining change-decision workflow (SG2-65), and attendee event-change notices (SG2-102) remain outside the implemented scope. The combined branch still requires its post-merge regression and hosted sign-off.
 
-**Delivery trace.** All 102 merged pull requests were checked on 26 Oct. Every Done story has merged code: SG2-29 (drafts) arrived with SG2-28's PR #18 and SG2-30's #75. The 10 closed-but-unmerged PRs are earlier attempts later re-opened and merged (SG2-23, 27, 30, 43), two CI-only experiments, a revert and a stand-up log. Two Sprint 4 PRs are open: #112 (SG2-60) and #114 (SG2-64).
+**Delivery trace.** The earlier b7e2b1a review checked 102 merged pull requests. SG2-29 (drafts) arrived with SG2-28's PR #18 and SG2-30's #75; the 10 closed-but-unmerged PRs were earlier attempts later re-opened and merged (SG2-23, 27, 30, 43), two CI-only experiments, a revert and a stand-up log. Since that review, PR #112 (SG2-60, merge 78d1a52) and PR #114 (SG2-64, merge a9eb363) have merged into main and are included in this branch.
 
 ## Core features (Week 4 Project Instructions)
 
@@ -27,9 +27,9 @@ Read on 26 Oct 2026 against main b7e2b1a plus the SG2-96 branch. Sources: the We
 | 15 | Equipment Request Management | SG2-53, 57 | Built | SG2-53-C01, REG-EQUIPMENT-SUMMARY-AND-READINESS-REFRESH |
 | 16 | Equipment Availability Checking | SG2-52, 54 | Built | SG2-52-C01, SG2-54-P01 |
 | 17 | Equipment Reservation | SG2-55, 56 | Built | SG2-55-C01, SG2-56-DB01 |
-| 18 | Attendee Registration | SG2-59, 63 built; **SG2-60 in review (PR #112)**; **SG2-61, 62 To Do** | **Partly built** | SG2-59-P01, SG2-63-P01. Registering, refusal when full with the first-come-first-served waiting list (15 Oct), and seeing and withdrawing a registration are not built. The attendee's My registrations and Event page still show the prototype's sample data until then. |
-| 19 | Event Change Requests | SG2-66 built; **SG2-64 in review (PR #114)**; **SG2-65 To Do** | **Partly built** | SG2-66-F01, SG2-66-DB01. The impact check, the confirmed-event lock and the return to Planning are built, but change requests come from an in-memory source (`server/src/changeRequests/mockChangeRequests.ts`), so an organiser cannot raise one and a coordinator cannot decide one. |
-| 20 | Notification System | SG2-68, 69 built; **SG2-102 To Do** | **Mostly built** | SG2-68-F01, SG2-69-API01. In-app notices and reminders are built; notices to registered attendees about event changes wait on SG2-102 (and on registration itself). |
+| 18 | Attendee Registration | SG2-59, 60, 63 built; **SG2-61, 62 pending** | **Partly built** | SG2-59-P01, SG2-60-P01, SG2-60-N01, SG2-63-P01. An attendee can register with contact details and needs, receive confirmation and cannot register twice; see [`registrations.md`](registrations.md). Waiting-list handling (15 Oct) and the remaining own-registration/withdrawal workflow are SG2-61/62. |
+| 19 | Event Change Requests | SG2-64, 66 built; **SG2-65 pending** | **Partly built** | SG2-64-P01, SG2-64-N01, SG2-64-C01, SG2-64-DB01, SG2-66-F01, SG2-66-DB01. Organisers raise persisted requests and the assigned coordinator is notified; both can view them. Impact checking, accepting through SG2-66, the confirmed-event lock and return to Planning are built. The remaining decision/refusal workflow belongs to SG2-65; see [`change-requests.md`](change-requests.md). |
+| 20 | Notification System | SG2-68, 69 built; **SG2-102 pending** | **Mostly built** | SG2-68-F01, SG2-69-API01. In-app notices and reminders are built, including SG2-64's coordinator change-request notice. Notices to registered attendees about event changes remain SG2-102. |
 
 ## Week 7 customer changes
 
@@ -51,7 +51,7 @@ Read on 26 Oct 2026 against main b7e2b1a plus the SG2-96 branch. Sources: the We
 | Once Preparation or Confirmed, details are read-only; an accepted significant change returns the event to Planning and every check runs again (15 Oct; Week 9) | Built: SG2-66, SG2-94 AC3 |
 | Reminders about outstanding arrangements (15 Oct) | Built: SG2-69 |
 | Waiting list, first come first served (15 Oct) | **To Do**: SG2-61 |
-| Organisers cannot edit after submission; edits go through the coordinator (Week 9) | Direct edits are refused (SG2-37/39); the change-request route is **To Do** (SG2-64/65) |
+| Organisers cannot edit after submission; edits go through the coordinator (Week 9) | Built for raising and viewing persisted change requests and refusing direct submitted-request edits, including clarification (SG2-64); impact/acceptance is SG2-66. The remaining decision/refusal workflow is SG2-65. |
 | A failed safety check sends the event back to planning (Week 9) | Built in two steps: Reject records the reason and moves the event to `safety_rejected`; the coordinator's rework (SG2-92 AC4) returns it to Planning. Request Changes returns it to Planning directly (SG2-93). Worth confirming with the customer that the two-step Reject is acceptable. |
 | The Safety Officer approves rather than enters data, and the system records comments (Week 9) | Built: decisions keep the reason and who decided (SG2-92) |
 | Several Leads, each seeing every unassigned event; the Lead can reassign (Week 9) | Built: SG2-87/88 |
