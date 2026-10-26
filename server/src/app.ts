@@ -50,6 +50,7 @@ import { createSafetyRereviewHandlers } from './events/safetyRereviewRoutes';
 import { createEventSearchRouter } from './eventSearch';
 import { createRegistrationHandlers } from './events/registrationRoutes';
 import { createRegistrableEventsRouter } from './registrableEvents';
+import { createMyRegistrationsRouter } from './myRegistrations';
 import { createCoordinatorOverviewRouter } from './coordinatorOverview';
 
 export function createApp(
@@ -130,7 +131,9 @@ export function createApp(
   // SG2-89: appended last for the same reason.
   coordinatorOverviewRouter = createCoordinatorOverviewRouter(access),
   // SG2-93: appended last for the same reason.
-  safetyRereviewHandlers = createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal })
+  safetyRereviewHandlers = createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal }),
+  // SG2-62: appended last for the same reason.
+  myRegistrationsRouter = createMyRegistrationsRouter(access)
 ) {
   const app = express();
 
@@ -180,6 +183,8 @@ export function createApp(
   app.use('/api/event-search', eventSearchRouter);
   // SG2-59: attendees find the events they can register for.
   app.use('/api/registrable-events', registrableEventsRouter);
+  // SG2-62: attendees see and withdraw their own registrations.
+  app.use('/api/my-registrations', myRegistrationsRouter);
   // SG2-89: the Event Coordinator Lead's overview of the events they supervise.
   app.use('/api/coordinator-overview', coordinatorOverviewRouter);
   // SG2-93: the bookings and equipment a Request Changes safety decision sent

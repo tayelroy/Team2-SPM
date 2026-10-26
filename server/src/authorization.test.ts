@@ -182,7 +182,7 @@ test('[NORMAL] [SG2-24:AC1] [SG2-25:AC2] production adapter verifies Auth then r
   // SG2-27: every role, including attendee, holds the profile grants.
   // SG2-59/SG2-60: attendees also browse the events they can register for, and register.
   assert.deepEqual(res.body, { userId, role: 'attendee', roles: ['attendee'],
-    permissions: ['notifications.inbox', 'events.registrable.read', 'events.register', 'profile.read', 'profile.update'] });
+    permissions: ['notifications.inbox', 'events.registrable.read', 'events.register', 'registrations.mine.read', 'registrations.withdraw', 'profile.read', 'profile.update'] });
   assert.equal(fetchMock.mock.callCount(), 2);
   assert.doesNotMatch(res.text, /test-token|SENTINEL|metadata/);
 });
@@ -478,7 +478,7 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'events.search',
       'safety_rereviews.read', 'safety_rereviews.confirm', 'profile.read', 'profile.update'
     ],
-    attendee: ['notifications.inbox', 'events.registrable.read', 'events.register', 'profile.read', 'profile.update']
+    attendee: ['notifications.inbox', 'events.registrable.read', 'events.register', 'registrations.mine.read', 'registrations.withdraw', 'profile.read', 'profile.update']
   };
   for (const [role, expected] of Object.entries(EXPECTED)) {
     assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);
