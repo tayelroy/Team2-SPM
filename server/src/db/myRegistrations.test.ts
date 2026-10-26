@@ -39,7 +39,8 @@ test('[BOUNDARY] [SG2-62:AC1] details the database left out are null or empty, e
     { registration_id: 9, event_id: 43, standing: 'lost', event: {} },
     { registration_id: '10', event_id: 44, standing: 'registered', event: {} },
     { registration_id: 11, event_id: 45, standing: 'registered' },
-    'not a row'
+    'not a row',
+    { registration_id: 12, event_id: 46, standing: 'event_started', can_withdraw: false, event: { name: 'No venues', venues: 'Hall' } }
   ] })).list();
   assert.deepEqual(sparse, {
     registration_id: 8, event_id: 42, standing: 'withdrawn', can_withdraw: false, registered_at: null, withdrawn_at: null,
@@ -47,7 +48,7 @@ test('[BOUNDARY] [SG2-62:AC1] details the database left out are null or empty, e
     event: { name: '', organisation: null, category: null, description: null, proposed_date: null, registration_closes_at: null,
       venues: [{ name: 'Unnamed venue', location: 'Annex' }] }
   });
-  assert.deepEqual(rest, []);
+  assert.deepEqual(rest.map(row => [row.registration_id, row.standing, row.event.name, row.event.venues]), [[12, 'event_started', 'No venues', []]]);
 });
 
 test('[NORMAL] [SG2-62:AC2] a withdrawal goes through withdraw_registration and returns what was withdrawn', async () => {
