@@ -1125,6 +1125,19 @@ Request, conflict, suitability and listing reads use the service-role client. Th
 - **Errors:** 400 for a bad event id (as 9B.2), or `{ error: 'Check your registration details.', errors: [...] }` for the body, checked before the database is asked (the database's own refusal has no `errors`); 404 `This event is not open for registration.` for any event SG2-59 would not list as registrable (not confirmed, no registration, unset times or date, missing); 409 `{ error, reason }` with `reason` `duplicate` (`You are already registered for this event.`), `closed` (`Registration for this event has closed.`, with `registration_closes_at`; also once the event has started), `not_open` (`Registration opens 01 Jun 2030 08:00 SGT.`, with `registration_opens_at`) or `full` (`This event is full.`); 401/403/503 as 9B.1. Checked in that order, under the event row lock.
 - **9B.1/9B.2** also return `registered`: whether the caller already holds an active registration.
 
+### 9B.4 GET /api/my-registrations (SG2-62)
+- **Source:** `myRegistrations/index.ts`, `db/myRegistrations.ts` (`list`), migration `202610260003_registration_withdrawal.sql` (`my_registrations`).
+- **Permission:** `registrations.mine.read` (Attendee). `my_registrations` runs with the caller's JWT, rechecks the acting role with `acting_role()` (403 otherwise) and reads only the caller's registrations.
+- **200:** `{ registrations: [{ registration_id, event_id, standing, can_withdraw, registered_at, withdrawn_at, contact_phone, needs, event: { name, organisation, category, description, proposed_date, registration_closes_at, venues: [{ name, location }] } }] }`. `standing` is `registered`, `withdrawn`, `event_cancelled`, `event_completed` or `event_started`; `can_withdraw` is true only for `registered`. Active ones for events yet to start come first, then by date. Events stay listed after registration closes.
+- **Errors:** 401/403; 503 `Your registrations are temporarily unavailable. Please try again.`
+
+### 9B.5 POST /api/my-registrations/:registrationId/withdrawal (SG2-62)
+- **Source:** `myRegistrations/index.ts`, `db/myRegistrations.ts` (`withdraw`), migration `202610260003_registration_withdrawal.sql` (`withdraw_registration`).
+- **Permission:** `registrations.withdraw` (Attendee). `withdraw_registration` runs with the caller's JWT, rechecks the acting role with `lock_acting_role()` and withdraws only the caller's own registration. It locks the event row first, as 9B.3 does.
+- **Body:** none.
+- **200:** `{ withdrawal: { registration_id, event_id, withdrawn_at } }`. The registration is stored as `cancelled` with `withdrawn_at`, giving its place back, and the organiser and the assigned coordinator are each sent a `registration_withdrawn` notification.
+- **Errors:** 400 `registrationId must be a positive integer.`; 404 `This registration was not found.` for one that is not the caller's or does not exist; 409 `{ error, reason }` with `reason` `withdrawn` (`You have already withdrawn from this event.`), `cancelled` (`This event has been cancelled.`) or `started` (`This event started 20 Jul 2030 19:00 SGT, so you can no longer withdraw.`, with `proposed_date`; also for a completed event); 401/403/503 as 9B.4. Checked in that order. Registration having closed does not stop a withdrawal.
+
 ## 10. Health
 
 ### 10.1 GET /health and GET /api/health
