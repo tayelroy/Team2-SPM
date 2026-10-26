@@ -4,7 +4,7 @@
 //
 // Signs in through the visible form as accounts that together hold all seven
 // roles, switches through every role an account holds, and opens every page
-// in that role's navigation at 320, 375, 768 and 1440 px. It clicks only the
+// in that role's navigation at 320, 375, 390, 768 and 1440 px. It clicks only the
 // sign-in form, the role switcher and navigation, so it changes no records.
 // Fails on a failed sign-in, unfinished/error page or a page wider than the screen;
 // navigation-to-settled-page times above 2 s are diagnostic warnings, not an
@@ -23,7 +23,7 @@ if (!password) {
 // Six sign-ins cover all seven roles (sign-in allows 10 attempts per 15 minutes).
 const accounts = (process.env.STAGING_ACCOUNTS || 'event.organiser3,event.coordinator3,venue.staff3,technical.support1,event.coordinator.lead1,safety.officer1')
   .split(',').map(account => account.trim()).filter(Boolean);
-const viewports = [[320, 568], [375, 812], [768, 1024], [1440, 900]];
+const viewports = [[320, 568], [375, 812], [390, 844], [768, 1024], [1440, 900]];
 const out = process.env.STAGING_OUTPUT_DIR || join('output', 'staging-walkthrough');
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 const report = [];
@@ -38,11 +38,18 @@ const roleNavigation = {
   Attendee: 'Find events',
 };
 
+async function currentRole(page) {
+  const banner = page.getByRole('banner');
+  const switcher = banner.getByRole('combobox', { name: 'Acting as', exact: true });
+  const control = await switcher.count() ? switcher : banner.getByLabel('Your role', { exact: true });
+  return (await control.innerText()).trim();
+}
+
 async function settle(page) {
   // Role permissions arrive separately from the page. Wait for them before
   // enumerating navigation, otherwise gated entries can be silently missed.
   await expect(page.getByRole('banner').getByRole('navigation')).toHaveAttribute('aria-busy', 'false', { timeout: 20_000 });
-  const role = (await page.getByRole('banner').getByLabel('Your role', { exact: true }).innerText()).trim();
+  const role = await currentRole(page);
   expect(roleNavigation[role], 'The signed-in role must have a known navigation contract').toBeDefined();
   await expect(page.getByRole('banner').getByRole('navigation').getByRole('button', { name: roleNavigation[role], exact: true })).toBeVisible();
   await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible();
@@ -81,13 +88,25 @@ for (const account of accounts) {
     continue;
   }
   report.push({ account, screen: 'sign in', ms: Date.now() - started });
-  const switcher = page.getByLabel('Acting as');
-  const roles = (await switcher.count()) ? await switcher.locator('option').allTextContents() : [null];
+  const switcher = page.getByRole('combobox', { name: 'Acting as', exact: true });
+  const listbox = page.getByRole('listbox', { name: 'Available roles', exact: true });
+  let roles = [null];
+  if (await switcher.count()) {
+    await switcher.click();
+    await expect(listbox).toBeVisible();
+    roles = (await listbox.getByRole('option').allTextContents()).map(label => label.trim());
+    expect(roles.length, 'A multi-role switcher lists at least two held roles').toBeGreaterThan(1);
+    await switcher.press('Escape');
+    await expect(listbox).toHaveCount(0);
+  }
   for (const role of roles) {
     try {
-      // Selecting an already-current option programmatically dispatches an
-      // artificial change; native users do not generate that event.
-      if (role && await switcher.inputValue() !== role) await switcher.selectOption({ label: role });
+      if (role && await currentRole(page) !== role) {
+        await switcher.click();
+        await listbox.getByRole('option', { name: role, exact: true }).click();
+        await expect(switcher).toHaveText(role);
+        await expect(listbox).toHaveCount(0);
+      }
       await settle(page);
     } catch {
       failures.push(`${account} › ${role ?? 'single role'}: role did not reach a healthy, fully loaded page`);
@@ -98,6 +117,34 @@ for (const account of accounts) {
       .map(label => label.trim()).filter(Boolean);
     for (const [width, height] of viewports) {
       await page.setViewportSize({ width, height });
+      if (role) {
+        const file = join(dir, `${slug(role)}-${width}-00-role-menu.png`);
+        try {
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await switcher.click();
+          await expect(switcher).toHaveAttribute('aria-expanded', 'true');
+          await expect(listbox.getByRole('option', { name: role, exact: true })).toHaveAttribute('aria-selected', 'true');
+          const bounds = await page.locator('.role-switcher-menu').evaluate(element => {
+            const box = element.getBoundingClientRect();
+            return { left: box.left, right: box.right, top: box.top, bottom: box.bottom,
+              width: innerWidth, height: innerHeight, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+          });
+          expect(bounds.left).toBeGreaterThanOrEqual(0);
+          expect(bounds.right).toBeLessThanOrEqual(bounds.width);
+          expect(bounds.top).toBeGreaterThanOrEqual(0);
+          expect(bounds.bottom).toBeLessThanOrEqual(bounds.height);
+          expect(bounds.sideways).toBe(0);
+          await page.screenshot({ path: file });
+          report.push({ account, role, width, screen: 'Role menu', sideways: bounds.sideways, file });
+        } catch {
+          failures.push(`${account} › ${role} › role menu at ${width}px did not fit or expose the held roles`);
+          await page.screenshot({ path: file });
+          report.push({ account, role, width, screen: 'Role menu', failure: 'menu-not-ready', file });
+        } finally {
+          await switcher.press('Escape');
+          await expect(listbox).toHaveCount(0);
+        }
+      }
       for (const [index, label] of labels.entries()) {
         const t0 = Date.now();
         const file = join(dir, `${slug(role || 'role')}-${width}-${String(index + 1).padStart(2, '0')}-${slug(label)}.png`);
@@ -133,7 +180,7 @@ const slow = report.filter(row => row.ms > 2000);
 const pages = report.filter(row => row.file).length;
 const summary = [
   `### Staging walkthrough: ${base}`,
-  `${pages} page views across ${accounts.length} accounts at ${viewports.map(([w]) => w).join(', ')} px.`,
+  `${pages} page and menu views across ${accounts.length} accounts at ${viewports.map(([w]) => w).join(', ')} px.`,
   failures.length ? `**${failures.length} failure(s):**\n${failures.map(f => `- ${f}`).join('\n')}` : '**No failures.**',
   slow.length ? `Navigation / sign-in above 2 s (diagnostic only; includes settling waits):\n${slow.map(r => `- ${r.account} › ${r.role ?? ''} › ${r.screen} at ${r.width ?? 1440}px: ${r.ms} ms`).join('\n')}` : 'Every measured navigation settled within 2 s (includes settling waits; not a performance acceptance result).',
 ].join('\n\n');

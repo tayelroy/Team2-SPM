@@ -9185,21 +9185,23 @@
       "SG2-71:AC1",
       "SG2-71:AC2"
     ],
-    "purpose": "SG2-96 walkthrough finding: the other phone cases use 390px. At 320px a grid track with a fixed 300-320px minimum made the organiser's request form and the attendee's registrations and event pages scroll sideways. The grids now use minmax(min(100%, ...), 1fr); this case visits every navigation page of all seven roles at 320x568.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory fixture before each role's sign-in; one browser page at 320x568.",
+    "purpose": "SG2-96 responsive regression: visit every navigation page of all seven roles at 320x568, then exercise the styled open role menu and header controls for all three multi-role combinations at 320, 375, 390, 768 and 1440px. Covers the original fixed-grid overflow, duplicate header role label and the native unstyled role menu reported during the hosted walkthrough.",
+    "preconditions": "Stable production React build and real Express handlers on loopback; reset in-memory fixture before each role's sign-in. Single-role pages use 320x568; multi-role controls use the five explicit phone, tablet and desktop viewports. No shared hosted data.",
     "steps": [
       "For each of organiser, coordinator, Lead, venue staff, technical support, Safety Officer and attendee: reset the fixture, sign in, read the header navigation.",
-      "Open each navigation page in turn, wait until it is the current page and its heading shows, and compare the document's scroll width with the viewport width."
+      "Open each navigation page in turn, wait until it is the current page and its heading shows, and compare the document's scroll width with the viewport width.",
+      "Seed Venue Staff + Coordinator, Coordinator + Attendee and Organiser + Coordinator accounts. For both held roles at each viewport, open the styled role menu, verify its options/current selection and viewport bounds, then choose the role and verify its own navigation.",
+      "Exercise the profile and notifications controls, keyboard role selection, cancellation, outside dismissal and selecting the already-current role without clearing navigation. Reload after a role change and verify the held role persists."
     ],
     "data": "Fixture accounts organiser, coordinator, lead, venue, support, safety and attendee @example.test.",
-    "expected": "No page is wider than the 320px viewport; the organiser's New request page is among those visited; no page errors.",
-    "evidence": "e2e/small-phone.spec.ts; client/src/screens/RequestForm.tsx; client/src/screens/Dashboard.tsx; client/src/screens/AttendeeEvent.tsx",
+    "expected": "Every single-role page fits 320px; the organiser's New request page is visited. The custom role menu, its held-role options, Profile and Notifications fit all five multi-role viewports, including a wrapped tablet header. Role choice and reload preserve the correct permissions; cancellation and choosing the current role leave navigation usable; no page errors.",
+    "evidence": "e2e/small-phone.spec.ts; client/src/components/RoleSwitcher.tsx; client/src/screens/AppShell.tsx; client/src/index.css; client/src/screens/RequestForm.tsx; client/src/screens/Dashboard.tsx; client/src/screens/AttendeeEvent.tsx",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Failed before the grid fix (organiser New request 8px too wide); passed after it.",
-    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; local production build, Playwright Chromium: failed on the unfixed build, passed after rebuilding with the fix.",
+    "actual": "Original grid overflow failed before its fix and passed after it. The styled role-menu follow-up passed all seven single-role pages and all three multi-role pairs, including open-menu bounds at 320/375/390/768/1440px, keyboard interaction, header controls and reload persistence.",
+    "execution_evidence": "Original 26 Oct 2026 grid verification on main b7e2b1a retained. Follow-up: feature/SG2-96-role-switcher based on main 3b4ae4b; immutable local production build; full Chromium regression started 2026-10-26T14:14:26.581Z and passed 163/163 in 179.34s, no skips/flaky/unexpected/runner errors, required gate passed. Separate local walkthrough adapter passed 90 page/menu views at five widths with no failures or overflow; manual menu review at 390/768/1440px. No hosted business-record writes.",
     "execution_date": "26 Oct 2026",
-    "executed_by": "Claude (automated local verification)",
+    "executed_by": "Automated local verification",
     "review": null
   },
   {

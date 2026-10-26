@@ -228,7 +228,9 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
       authenticatedBannerVisible = true;
       info.annotations.push({ type: 'hosted-flag', description: 'authenticated-banner-visible' });
       phase('role-identity');
-      await expect(page.getByLabel('Your role', { exact: true })).toHaveText(account.label);
+      const switcher = page.getByRole('combobox', { name: 'Acting as', exact: true });
+      if (await switcher.count()) await expect(switcher).toHaveText(account.label);
+      else await expect(page.getByLabel('Your role', { exact: true })).toHaveText(account.label);
       info.annotations.push({ type: 'hosted-flag', description: 'role-identity-matched' });
       phase('permissions-ready');
       await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');
