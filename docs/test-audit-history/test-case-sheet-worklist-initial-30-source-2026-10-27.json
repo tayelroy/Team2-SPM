@@ -1,0 +1,360 @@
+{
+  "status": "HISTORICAL_SUPERSEDED_NOT_APPLIED",
+  "scope": "Actual intermediate30source-candidate worklist,26matched retirement rows. The available artifact is not a33-row plan.",
+  "supersededBy": "docs/test-case-sheet-cleanup-plan-2026-10-27.json",
+  "sourceCandidateIds": [
+    "SG2-87:s-sees-unassigned-queue-in-the-navigation-s",
+    "SG2-89:s-sees-coordinator-overview-in-the-navigation-s",
+    "SG2-97:s-sees-assign-coordinators-in-the-navigation-s",
+    "SG2-91:s-sees-safety-checks-in-the-navigation-s",
+    "SG2-52:s-has-no-obsolete-equipment-preview-menu",
+    "SG2-52:s-is-not-offered-equipment-maintenance-in-the-menu",
+    "SG2-91:an-approved-or-planning-event-whose-arrangements-are-in-place-can-move-to-awaiting-safety-check",
+    "SG2-27:event-organiser-and-attendee-are-external",
+    "SG2-30:submit-button-is-disabled-when-the-form-is-empty",
+    "SG2-30:submit-button-becomes-enabled-when-all-required-fields-are-filled",
+    "SG2-30:inline-error-appears-for-a-touched-field-left-blank",
+    "SG2-40:renders-dialog-with-accessible-title-and-header-when-isopen-is-true",
+    "SG2-20:the-summary-line-carries-date-attendance-and-venue",
+    "SG2-20:a-shortfall-asks-for-the-conflict-to-be-resolved",
+    "SG2-20:items-that-arrived-reserved-are-already-settled",
+    "SG2-20:numbers-run-to-the-end-of-the-month-and-then-stop",
+    "SG2-27:event-coordinator-venue-staff-and-technical-support-staff-are-internal",
+    "SG2-86:event-coordinator-lead-and-safety-officer-are-internal",
+    "SG2-68:an-approval-tells-the-organiser-after-the-history-row",
+    "SG2-68:a-submission-waiting-for-a-coordinator-tells-every-event-coordinator-lead-after-the-history-row",
+    "SG2-68:a-reassignment-also-tells-the-coordinator-taken-off-the-event",
+    "SG2-68:an-assignment-that-cannot-be-recorded-sends-no-notice",
+    "SG2-89:the-lead-who-assigns-the-coordinator-becomes-the-supervising-lead-in-the-same-write",
+    "SG2-27:returns-the-callers-own-profile-including-department-for-an-internal-role",
+    "SG2-27:omits-department-for-an-external-role",
+    "SG2-27:updates-name-phone-and-communication-preferences",
+    "SG2-86:get-api-profile-for-role-includes-department-matching-the-other-internal-roles",
+    "SG2-100:every-event-statuses-member-has-a-status-transitions-entry",
+    "SG2-100:fourteen-statuses",
+    "SG2-53:closed-event-update"
+  ],
+  "sourceReplacementIds": [
+    "SG2-100:all-14-statuses",
+    "SG2-100:cancelled-accepts-no-outgoing-transition-proving-it-is-terminal-alongside-completed",
+    "SG2-100:completed-accepts-no-outgoing-transition-to-any-status-proving-it-is-terminal",
+    "SG2-20:a-coordinator-gets-the-decision-they-owe-on-each-event",
+    "SG2-20:lays-out-a-5x7-grid-with-three-leading-blanks",
+    "SG2-20:offers-a-reserve-action-on-available-stock",
+    "SG2-27:role-may-read-and-update-their-own-profile",
+    "SG2-30:calls-the-submit-endpoint-with-the-correct-method-url-and-token",
+    "SG2-30:shows-a-count-of-empty-required-fields-after-first-interaction",
+    "SG2-30:submits-a-complete-draft-owned-by-the-caller-and-records-draft-unassigned-with-the-organiser-as",
+    "SG2-33:a-first-assignment-that-cannot-be-recorded-is-undone-back-to-unassigned",
+    "SG2-33:assigns-a-coordinator-to-a-request-with-none-yet-sg2-33",
+    "SG2-34:a-reassignment-keeps-the-previous-coordinator-in-the-history-row",
+    "SG2-37:approves-a-request-under-review-recording-the-deciding-coordinator-and-the-under-review-approved",
+    "SG2-40:calls-onclose-when-close-button-is-clicked",
+    "SG2-53:decided-arrangement-closed",
+    "SG2-55:confirmed-reserved-arrangement-closed",
+    "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+    "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+    "SG2-86:the-internal-role-list-holds-exactly-the-five-internal-roles",
+    "SG2-91:only-approved-and-planning-events-enter-the-safety-check"
+  ],
+  "matchedRetirementRows": [
+    {
+      "id": "SG2-87:s-sees-unassigned-queue-in-the-navigation-s",
+      "rows": [
+        2769
+      ]
+    },
+    {
+      "id": "SG2-89:s-sees-coordinator-overview-in-the-navigation-s",
+      "rows": []
+    },
+    {
+      "id": "SG2-97:s-sees-assign-coordinators-in-the-navigation-s",
+      "rows": [
+        1717
+      ]
+    },
+    {
+      "id": "SG2-91:s-sees-safety-checks-in-the-navigation-s",
+      "rows": []
+    },
+    {
+      "id": "SG2-52:s-has-no-obsolete-equipment-preview-menu",
+      "rows": [
+        1606
+      ]
+    },
+    {
+      "id": "SG2-52:s-is-not-offered-equipment-maintenance-in-the-menu",
+      "rows": [
+        1607
+      ]
+    },
+    {
+      "id": "SG2-91:an-approved-or-planning-event-whose-arrangements-are-in-place-can-move-to-awaiting-safety-check",
+      "rows": []
+    },
+    {
+      "id": "SG2-27:event-organiser-and-attendee-are-external",
+      "rows": [
+        1114
+      ]
+    },
+    {
+      "id": "SG2-30:submit-button-is-disabled-when-the-form-is-empty",
+      "rows": [
+        428
+      ]
+    },
+    {
+      "id": "SG2-30:submit-button-becomes-enabled-when-all-required-fields-are-filled",
+      "rows": [
+        430
+      ]
+    },
+    {
+      "id": "SG2-30:inline-error-appears-for-a-touched-field-left-blank",
+      "rows": [
+        432
+      ]
+    },
+    {
+      "id": "SG2-40:renders-dialog-with-accessible-title-and-header-when-isopen-is-true",
+      "rows": [
+        241
+      ]
+    },
+    {
+      "id": "SG2-20:the-summary-line-carries-date-attendance-and-venue",
+      "rows": [
+        287
+      ]
+    },
+    {
+      "id": "SG2-20:a-shortfall-asks-for-the-conflict-to-be-resolved",
+      "rows": [
+        298
+      ]
+    },
+    {
+      "id": "SG2-20:items-that-arrived-reserved-are-already-settled",
+      "rows": [
+        299
+      ]
+    },
+    {
+      "id": "SG2-20:numbers-run-to-the-end-of-the-month-and-then-stop",
+      "rows": [
+        295
+      ]
+    },
+    {
+      "id": "SG2-27:event-coordinator-venue-staff-and-technical-support-staff-are-internal",
+      "rows": [
+        1113
+      ]
+    },
+    {
+      "id": "SG2-86:event-coordinator-lead-and-safety-officer-are-internal",
+      "rows": [
+        1820
+      ]
+    },
+    {
+      "id": "SG2-68:an-approval-tells-the-organiser-after-the-history-row",
+      "rows": [
+        2504
+      ]
+    },
+    {
+      "id": "SG2-68:a-submission-waiting-for-a-coordinator-tells-every-event-coordinator-lead-after-the-history-row",
+      "rows": [
+        2511
+      ]
+    },
+    {
+      "id": "SG2-68:a-reassignment-also-tells-the-coordinator-taken-off-the-event",
+      "rows": [
+        2484
+      ]
+    },
+    {
+      "id": "SG2-68:an-assignment-that-cannot-be-recorded-sends-no-notice",
+      "rows": [
+        2488
+      ]
+    },
+    {
+      "id": "SG2-89:the-lead-who-assigns-the-coordinator-becomes-the-supervising-lead-in-the-same-write",
+      "rows": []
+    },
+    {
+      "id": "SG2-27:returns-the-callers-own-profile-including-department-for-an-internal-role",
+      "rows": [
+        1078
+      ]
+    },
+    {
+      "id": "SG2-27:omits-department-for-an-external-role",
+      "rows": [
+        1079
+      ]
+    },
+    {
+      "id": "SG2-27:updates-name-phone-and-communication-preferences",
+      "rows": [
+        1084
+      ]
+    },
+    {
+      "id": "SG2-86:get-api-profile-for-role-includes-department-matching-the-other-internal-roles",
+      "rows": [
+        1819
+      ]
+    },
+    {
+      "id": "SG2-100:every-event-statuses-member-has-a-status-transitions-entry",
+      "rows": [
+        2627
+      ]
+    },
+    {
+      "id": "SG2-100:fourteen-statuses",
+      "rows": [
+        2641
+      ]
+    },
+    {
+      "id": "SG2-53:closed-event-update",
+      "rows": [
+        2015
+      ]
+    }
+  ],
+  "reviewedRetainedRows": [
+    {
+      "id": "SG2-100:all-14-statuses",
+      "rows": [
+        2640
+      ]
+    },
+    {
+      "id": "SG2-100:cancelled-accepts-no-outgoing-transition-proving-it-is-terminal-alongside-completed",
+      "rows": [
+        2628
+      ]
+    },
+    {
+      "id": "SG2-100:completed-accepts-no-outgoing-transition-to-any-status-proving-it-is-terminal",
+      "rows": [
+        2623
+      ]
+    },
+    {
+      "id": "SG2-20:a-coordinator-gets-the-decision-they-owe-on-each-event",
+      "rows": [
+        284
+      ]
+    },
+    {
+      "id": "SG2-20:lays-out-a-5x7-grid-with-three-leading-blanks",
+      "rows": [
+        294
+      ]
+    },
+    {
+      "id": "SG2-20:offers-a-reserve-action-on-available-stock",
+      "rows": [
+        297
+      ]
+    },
+    {
+      "id": "SG2-27:role-may-read-and-update-their-own-profile",
+      "rows": [
+        1093
+      ]
+    },
+    {
+      "id": "SG2-30:calls-the-submit-endpoint-with-the-correct-method-url-and-token",
+      "rows": [
+        434
+      ]
+    },
+    {
+      "id": "SG2-30:shows-a-count-of-empty-required-fields-after-first-interaction",
+      "rows": [
+        431
+      ]
+    },
+    {
+      "id": "SG2-30:submits-a-complete-draft-owned-by-the-caller-and-records-draft-unassigned-with-the-organiser-as",
+      "rows": [
+        2929
+      ]
+    },
+    {
+      "id": "SG2-33:a-first-assignment-that-cannot-be-recorded-is-undone-back-to-unassigned",
+      "rows": [
+        661
+      ]
+    },
+    {
+      "id": "SG2-33:assigns-a-coordinator-to-a-request-with-none-yet-sg2-33",
+      "rows": [
+        640
+      ]
+    },
+    {
+      "id": "SG2-34:a-reassignment-keeps-the-previous-coordinator-in-the-history-row",
+      "rows": [
+        655
+      ]
+    },
+    {
+      "id": "SG2-37:approves-a-request-under-review-recording-the-deciding-coordinator-and-the-under-review-approved",
+      "rows": [
+        2885
+      ]
+    },
+    {
+      "id": "SG2-40:calls-onclose-when-close-button-is-clicked",
+      "rows": [
+        242
+      ]
+    },
+    {
+      "id": "SG2-53:decided-arrangement-closed",
+      "rows": [
+        2014
+      ]
+    },
+    {
+      "id": "SG2-55:confirmed-reserved-arrangement-closed",
+      "rows": [
+        2206
+      ]
+    },
+    {
+      "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+      "rows": [
+        2768
+      ]
+    },
+    {
+      "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+      "rows": [
+        2767
+      ]
+    },
+    {
+      "id": "SG2-86:the-internal-role-list-holds-exactly-the-five-internal-roles",
+      "rows": [
+        1789
+      ]
+    },
+    {
+      "id": "SG2-91:only-approved-and-planning-events-enter-the-safety-check",
+      "rows": []
+    }
+  ]
+}

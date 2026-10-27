@@ -1,0 +1,4505 @@
+{
+  "status": "HISTORICAL_SUPERSEDED",
+  "originalPath": "docs/test-redundancy-audit.json",
+  "preservedFromCommit": "4cfd985f2e9c60896e5db1a4c0523822c577664a",
+  "supersededBy": [
+    "docs/test-redundancy-audit.json",
+    "docs/test-redundancy-review-2026-10-27.json"
+  ],
+  "originalArtifact": {
+    "schemaVersion": 1,
+    "scope": "Every current test declaration and tagged SQL assertion across all represented stories; redundancy review, not a claim of new hosted execution or human sign-off.",
+    "baselineRef": "8511052a9756c69210556d978268d65dc90c9eec",
+    "methodology": [
+      "Enumerated source declarations, fixtures, calls, assertion expressions and story/category mappings across all 224 test modules and 46 SQL suites.",
+      "Checked same-file assertion subsets, exact fixture parity, cross-file SQL privilege predicates and closest browser/integration overlaps.",
+      "Removed only proved subsets or identical schema guards. Distinct roles, failure injections, public layers, race cases and boundary inputs remain.",
+      "This is a complete structural screen with focused semantic proofs for candidates, not a mathematical proof that no further refactoring is possible."
+    ],
+    "currentCounts": {
+      "executableMethodDeclarations": 3085,
+      "taggedSqlInventoryEntries": 1329,
+      "totalInventoryEntries": 4414
+    },
+    "allRepresentedStoriesRetainAllFourCategories": true,
+    "coverageVerification": "PASS: full post-change npm run ci rerun; frontend and backend each have 100% statement, branch, line and function coverage with existing per-file thresholds unchanged. One earlier run had an unreproduced ECONNRESET in the unchanged work-queue test; no retries or test/application changes were introduced.",
+    "additionalRemovalCount": 9,
+    "stories": [
+      {
+        "story": "SG2-20",
+        "methodDeclarations": 88,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/HealthCheck.test.tsx",
+          "client/src/hooks/useInertiaScroll.test.tsx",
+          "client/src/hooks/useParticleOrb.test.tsx",
+          "client/src/main.test.tsx",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/Login.test.tsx",
+          "client/src/ui.test.tsx",
+          "server/src/app.test.ts",
+          "server/src/db/client-config.test.ts",
+          "server/src/db/supabase.test.ts",
+          "server/src/index.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-22",
+        "methodDeclarations": 51,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/regression-gate.test.mjs",
+          ".github/scripts/release-readiness.test.mjs",
+          ".github/scripts/security-review.test.mjs",
+          ".github/scripts/test-inventory.test.mjs"
+        ]
+      },
+      {
+        "story": "SG2-23",
+        "methodDeclarations": 61,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/App.test.tsx",
+          "client/src/auth/session.test.ts",
+          "client/src/screens/Login.test.tsx",
+          "e2e/regression.spec.ts",
+          "e2e/smoke.spec.ts",
+          "hosted-e2e/roles.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/login.test.ts",
+          "server/src/logout.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-24",
+        "methodDeclarations": 25,
+        "sqlChecks": 17,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/accountRoles.test.ts",
+          "server/src/db/users.test.ts",
+          "server/src/roles.test.ts",
+          "supabase/tests/account_roles.sql"
+        ]
+      },
+      {
+        "story": "SG2-25",
+        "methodDeclarations": 100,
+        "sqlChecks": 32,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/workQueue.test.ts",
+          "client/src/auth/access.test.ts",
+          "client/src/screens/EventsTable.test.tsx",
+          "client/src/screens/RequestForm.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/capacity-exceptions.spec.ts",
+          "e2e/draft-history.spec.ts",
+          "e2e/regression.spec.ts",
+          "hosted-e2e/policy.test.mjs",
+          "server/src/authorization.test.ts",
+          "server/src/confirmEvent.test.ts",
+          "server/src/db/eventCancellation.test.ts",
+          "server/src/db/eventConfirmation.test.ts",
+          "server/src/db/user-client.test.ts",
+          "server/src/db/venueBlocks.test.ts",
+          "server/src/decideEventRequest.test.ts",
+          "server/src/deleteEventRequestDraft.test.ts",
+          "server/src/eventCancellation.test.ts",
+          "server/src/eventRequests.test.ts",
+          "server/src/events/getHistory.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/getEventArrangements.test.ts",
+          "server/src/getEventStage.test.ts",
+          "server/src/getEventStageAuth.test.ts",
+          "server/src/listEventRequests.test.ts",
+          "server/src/organisationEventRequests.test.ts",
+          "server/src/profile.test.ts",
+          "server/src/reviewEventRequest.test.ts",
+          "server/src/roles.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "server/src/updateEventRequestDraft.test.ts",
+          "server/src/venue-blocks.test.ts",
+          "server/src/venue-layouts.test.ts",
+          "server/src/venue-operations.test.ts",
+          "server/src/venue-search.test.ts",
+          "server/src/venues.test.ts",
+          "server/src/workQueue.test.ts",
+          "supabase/tests/event_draft_audit.sql",
+          "supabase/tests/legacy_table_rls.sql"
+        ]
+      },
+      {
+        "story": "SG2-26",
+        "methodDeclarations": 63,
+        "sqlChecks": 27,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/DraftRequests.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/EventsTable.test.tsx",
+          "client/src/screens/RequestForm.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/getEventStage.test.ts",
+          "server/src/listEventRequests.test.ts",
+          "server/src/organisationEventRequests.test.ts",
+          "supabase/tests/event_draft_audit.sql",
+          "supabase/tests/event_organisation_isolation.sql"
+        ]
+      },
+      {
+        "story": "SG2-27",
+        "methodDeclarations": 71,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/profile.test.ts",
+          "client/src/screens/Profile.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/profile.test.ts",
+          "server/src/profile.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-28",
+        "methodDeclarations": 70,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/RequestForm.test.tsx",
+          "e2e/regression.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/eventRequests.test.ts",
+          "server/src/organisationEventRequests.test.ts",
+          "server/src/updateEventRequestDraft.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-29",
+        "methodDeclarations": 66,
+        "sqlChecks": 4,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/DraftRequests.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/RequestForm.test.tsx",
+          "e2e/draft-history.spec.ts",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/organisationEventRequests.test.ts",
+          "server/src/updateEventRequestDraft.test.ts",
+          "supabase/tests/event_draft_audit.sql",
+          "supabase/tests/internal_work_queue.sql"
+        ]
+      },
+      {
+        "story": "SG2-30",
+        "methodDeclarations": 72,
+        "sqlChecks": 1,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/RequestForm.test.tsx",
+          "e2e/regression.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/eventRequests.test.ts",
+          "server/src/organisationEventRequests.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "server/src/updateEventRequestDraft.test.ts",
+          "supabase/tests/event_draft_audit.sql"
+        ]
+      },
+      {
+        "story": "SG2-31",
+        "methodDeclarations": 55,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/EventsTable.test.tsx",
+          "e2e/draft-history.spec.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/eventRequests.test.ts",
+          "server/src/listEventRequests.test.ts",
+          "server/src/organisationEventRequests.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-32",
+        "methodDeclarations": 34,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/DraftRequests.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/deleteEventRequestDraft.test.ts",
+          "server/src/organisationEventRequests.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-33",
+        "methodDeclarations": 70,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/CoordinatorAssignment.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/db/accountRoles.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/listAssignable.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-34",
+        "methodDeclarations": 47,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/screens/CoordinatorAssignment.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/db/accountRoles.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/listAssignable.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-35",
+        "methodDeclarations": 30,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/workQueue.test.ts",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/db/workQueue.test.ts",
+          "server/src/reviewEventRequest.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-36",
+        "methodDeclarations": 85,
+        "sqlChecks": 23,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/ClarificationThread.test.tsx",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/DraftRequests.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/draft-history.spec.ts",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/clarifications.test.ts",
+          "server/src/db/clarifications.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/stageCalculator.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "server/src/updateEventRequestDraft.test.ts",
+          "supabase/tests/event_clarifications.sql",
+          "supabase/tests/event_draft_audit.sql"
+        ]
+      },
+      {
+        "story": "SG2-37",
+        "methodDeclarations": 43,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/workQueue.test.ts",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/decideEventRequest.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-38",
+        "methodDeclarations": 71,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/EventStageTracker.test.tsx",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/EventsTable.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/eventPlanning.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/getEventStage.test.ts",
+          "server/src/getEventStageAuth.test.ts",
+          "server/src/stageCalculator.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-39",
+        "methodDeclarations": 148,
+        "sqlChecks": 17,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/EventPlanningDrawer.test.tsx",
+          "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/auditLogs.test.ts",
+          "server/src/db/eventArrangements.test.ts",
+          "server/src/db/eventPlanning.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/getEventArrangements.test.ts",
+          "supabase/tests/event_confirmation.sql",
+          "supabase/tests/event_planning_and_audit.sql",
+          "supabase/tests/internal_work_queue.sql",
+          "supabase/tests/venue_replacement.sql"
+        ]
+      },
+      {
+        "story": "SG2-40",
+        "methodDeclarations": 97,
+        "sqlChecks": 37,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/draft-history.spec.ts",
+          "hosted-e2e/roles.spec.ts",
+          "integration/api.test.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/db/accountRoles.test.ts",
+          "server/src/db/auditLogs.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/decideEventRequest.test.ts",
+          "server/src/events/getHistory.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/reviewEventRequest.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "server/src/updateEventRequestDraft.test.ts",
+          "supabase/tests/event_draft_audit.sql",
+          "supabase/tests/event_history_internal_fields.sql",
+          "supabase/tests/event_planning_and_audit.sql",
+          "supabase/tests/event_preferred_layout.sql"
+        ]
+      },
+      {
+        "story": "SG2-41",
+        "methodDeclarations": 30,
+        "sqlChecks": 25,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/workQueue.test.ts",
+          "client/src/components/EquipmentRequirements.test.tsx",
+          "client/src/screens/EventPlanningDrawer.test.tsx",
+          "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/regression.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/workQueue.test.ts",
+          "server/src/workQueue.test.ts",
+          "supabase/tests/internal_work_queue.sql"
+        ]
+      },
+      {
+        "story": "SG2-42",
+        "methodDeclarations": 38,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/venues/Venues.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/venues.test.ts",
+          "server/src/venue-layouts.test.ts",
+          "server/src/venues.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-43",
+        "methodDeclarations": 35,
+        "sqlChecks": 22,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/venues/VenueLayouts.test.tsx",
+          "client/src/venues/layoutsApi.test.ts",
+          "server/src/db/venueLayouts.test.ts",
+          "server/src/venue-layouts.test.ts",
+          "server/src/venue-search.test.ts",
+          "supabase/tests/venue_layouts.sql"
+        ]
+      },
+      {
+        "story": "SG2-44",
+        "methodDeclarations": 71,
+        "sqlChecks": 21,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/screens/AvailabilityCalendar.test.tsx",
+          "client/src/venues/availability.test.ts",
+          "client/src/venues/calendarView.test.ts",
+          "client/src/venues/searchApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/user-client.test.ts",
+          "server/src/venue-availability.test.ts",
+          "supabase/tests/venue_availability.sql"
+        ]
+      },
+      {
+        "story": "SG2-45",
+        "methodDeclarations": 37,
+        "sqlChecks": 12,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/venues/VenueBlocks.test.tsx",
+          "client/src/venues/blocksApi.test.ts",
+          "client/src/venues/searchApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBlocks.test.ts",
+          "server/src/venue-blocks.test.ts",
+          "server/src/venue-search.test.ts",
+          "supabase/tests/venue_blocks.sql"
+        ]
+      },
+      {
+        "story": "SG2-46",
+        "methodDeclarations": 51,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/screens/VenueSearch.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "client/src/venues/searchApi.test.ts",
+          "client/src/venues/searchPrefill.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/venue-search.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-47",
+        "methodDeclarations": 86,
+        "sqlChecks": 12,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/screens/CapacityExceptions.test.tsx",
+          "client/src/screens/RequestForm.test.tsx",
+          "client/src/screens/VenueSearch.test.tsx",
+          "client/src/venues/VenueDecision.test.tsx",
+          "client/src/venues/VenueFit.test.tsx",
+          "client/src/venues/capacityExceptionsApi.test.ts",
+          "client/src/venues/suitabilityApi.test.ts",
+          "e2e/capacity-exceptions.spec.ts",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/venueSuitability.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "server/src/venue-suitability-routes.test.ts",
+          "server/src/venue-suitability.test.ts",
+          "supabase/tests/venue_capacity_exceptions.sql"
+        ]
+      },
+      {
+        "story": "SG2-48",
+        "methodDeclarations": 45,
+        "sqlChecks": 14,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/screens/VenueSearch.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "client/src/venues/VenueRequests.test.tsx",
+          "client/src/venues/requestsApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBookingRequests.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "supabase/tests/venue_booking_requests.sql"
+        ]
+      },
+      {
+        "story": "SG2-49",
+        "methodDeclarations": 40,
+        "sqlChecks": 32,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "client/src/venues/VenueDecision.test.tsx",
+          "client/src/venues/VenueFit.test.tsx",
+          "client/src/venues/VenueRequests.test.tsx",
+          "client/src/venues/requestsApi.test.ts",
+          "e2e/capacity-exceptions.spec.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBookingDecisions.test.ts",
+          "server/src/db/venueBookingRequests.test.ts",
+          "server/src/notifications.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "supabase/tests/venue_booking_decisions.sql"
+        ]
+      },
+      {
+        "story": "SG2-50",
+        "methodDeclarations": 30,
+        "sqlChecks": 11,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/venues/BookingConflicts.test.tsx",
+          "client/src/venues/VenueDecision.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBookingRequests.test.ts",
+          "server/src/db/venueConflicts.test.ts",
+          "server/src/venue-conflicts.test.ts",
+          "supabase/tests/venue_double_booking.sql"
+        ]
+      },
+      {
+        "story": "SG2-51",
+        "methodDeclarations": 32,
+        "sqlChecks": 29,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/venues/VenueBookings.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBookings.test.ts",
+          "server/src/notifications.test.ts",
+          "server/src/venue-bookings.test.ts",
+          "supabase/tests/venue_booking_release.sql",
+          "supabase/tests/venue_hold_booking_upgrade.sql",
+          "supabase/tests/venue_holds.sql"
+        ]
+      },
+      {
+        "story": "SG2-52",
+        "methodDeclarations": 56,
+        "sqlChecks": 23,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/equipment.test.ts",
+          "client/src/screens/EquipmentDesk.test.tsx",
+          "client/src/screens/EquipmentForm.test.tsx",
+          "e2e/equipment.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/equipment.test.ts",
+          "server/src/equipment.test.ts",
+          "supabase/tests/equipment_records.sql"
+        ]
+      },
+      {
+        "story": "SG2-53",
+        "methodDeclarations": 66,
+        "sqlChecks": 42,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/equipmentRequirements.test.ts",
+          "client/src/components/EquipmentRequirements.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/equipment-requirements.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/equipmentRequirements.test.ts",
+          "server/src/equipmentRequirements.test.ts",
+          "supabase/tests/equipment_requirements.sql"
+        ]
+      },
+      {
+        "story": "SG2-54",
+        "methodDeclarations": 38,
+        "sqlChecks": 32,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/equipmentAvailability.test.ts",
+          "client/src/components/EquipmentAvailability.test.tsx",
+          "client/src/components/EquipmentRequirements.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/equipment-availability.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/equipmentAvailability.test.ts",
+          "server/src/equipmentAvailability.test.ts",
+          "supabase/tests/equipment_availability.sql",
+          "supabase/tests/equipment_reservations.sql"
+        ]
+      },
+      {
+        "story": "SG2-55",
+        "methodDeclarations": 70,
+        "sqlChecks": 47,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/equipmentReservations.test.ts",
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/EquipmentRequirements.test.tsx",
+          "client/src/components/EquipmentReservations.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/equipment-reservations.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/equipmentReservations.test.ts",
+          "server/src/db/eventArrangements.test.ts",
+          "server/src/equipmentReservations.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "supabase/tests/equipment_reservations.sql"
+        ]
+      },
+      {
+        "story": "SG2-56",
+        "methodDeclarations": 1,
+        "sqlChecks": 12,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "supabase/tests/equipment_release.sql"
+        ]
+      },
+      {
+        "story": "SG2-57",
+        "methodDeclarations": 60,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/EquipmentRequirements.test.tsx",
+          "client/src/components/EventArrangements.test.tsx",
+          "client/src/components/EventArrangementsPanel.test.tsx",
+          "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+          "hosted-e2e/roles.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventArrangements.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/getEventArrangements.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-58",
+        "methodDeclarations": 87,
+        "sqlChecks": 48,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/eventConfirmation.test.ts",
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/ConfirmedArrangements.test.tsx",
+          "client/src/components/EventArrangementsPanel.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/event-confirmation.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/confirmEvent.test.ts",
+          "server/src/db/eventArrangements.test.ts",
+          "server/src/db/eventConfirmation.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/events/registrationWindow.test.ts",
+          "server/src/getEventConfirmation.test.ts",
+          "supabase/tests/event_confirmation.sql",
+          "supabase/tests/venue_holds.sql",
+          "supabase/tests/venue_replacement.sql"
+        ]
+      },
+      {
+        "story": "SG2-59",
+        "methodDeclarations": 36,
+        "sqlChecks": 13,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/registrableEvents.test.ts",
+          "client/src/screens/FindEvents.test.tsx",
+          "e2e/find-events.spec.ts",
+          "integration/api.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/registrableEvents.test.ts",
+          "server/src/registrableEvents.test.ts",
+          "supabase/tests/registrable_events.sql"
+        ]
+      },
+      {
+        "story": "SG2-63",
+        "methodDeclarations": 86,
+        "sqlChecks": 37,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/api/registrations.test.ts",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/components/RegistrationPanel.test.tsx",
+          "client/src/screens/EventDetail.registration.test.tsx",
+          "client/src/screens/EventPlanningDrawer.test.tsx",
+          "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+          "client/src/screens/WorkQueue.registration.test.tsx",
+          "e2e/registrations.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/registrations.test.ts",
+          "server/src/events/registrationSettings.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/registrationRoutes.test.ts",
+          "supabase/tests/event_registration_settings.sql"
+        ]
+      },
+      {
+        "story": "SG2-66",
+        "methodDeclarations": 135,
+        "sqlChecks": 33,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/changeRequests.test.ts",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/ArrangementRechecks.test.tsx",
+          "client/src/components/ChangeRequestsPanel.test.tsx",
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/CapacityExceptions.test.tsx",
+          "client/src/screens/EventDetail.changeImpact.test.tsx",
+          "client/src/screens/EventPlanningDrawer.test.tsx",
+          "client/src/screens/WorkQueue.changeImpact.test.tsx",
+          "client/src/venues/VenueFit.test.tsx",
+          "client/src/venues/capacityExceptionsApi.test.ts",
+          "e2e/capacity-exceptions.spec.ts",
+          "e2e/change-impact.spec.ts",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/changeRequests.test.ts",
+          "server/src/db/changeImpact.test.ts",
+          "server/src/db/eventNotifications.test.ts",
+          "server/src/db/venueSuitability.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/events/changeImpact.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "server/src/venue-suitability-routes.test.ts",
+          "server/src/venue-suitability.test.ts",
+          "supabase/tests/event_change_impact.sql",
+          "supabase/tests/venue_booking_decisions.sql",
+          "supabase/tests/venue_capacity_exceptions.sql",
+          "supabase/tests/venue_holds.sql"
+        ]
+      },
+      {
+        "story": "SG2-67",
+        "methodDeclarations": 38,
+        "sqlChecks": 30,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventCancellation.test.ts",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/CancellationPanel.test.tsx",
+          "client/src/screens/EventDetail.cancellation.test.tsx",
+          "client/src/screens/WorkQueue.cancellation.test.tsx",
+          "server/src/authorization.test.ts",
+          "server/src/db/eventCancellation.test.ts",
+          "server/src/eventCancellation.test.ts",
+          "supabase/tests/event_cancellation.sql"
+        ]
+      },
+      {
+        "story": "SG2-68",
+        "methodDeclarations": 51,
+        "sqlChecks": 27,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/HoldNotifications.test.tsx",
+          "e2e/event-notifications.spec.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/clarifications.test.ts",
+          "server/src/db/eventNotifications.test.ts",
+          "server/src/decideEventRequest.test.ts",
+          "server/src/notifications.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "supabase/tests/event_notifications.sql",
+          "supabase/tests/venue_booking_decisions.sql"
+        ]
+      },
+      {
+        "story": "SG2-69",
+        "methodDeclarations": 102,
+        "sqlChecks": 82,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/App.test.tsx",
+          "client/src/api/notificationInboxApi.test.ts",
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/NotificationEvent.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/notification-inbox.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/notificationInbox.test.ts",
+          "server/src/notificationInbox.test.ts",
+          "supabase/tests/notification_inbox_reminders.sql"
+        ]
+      },
+      {
+        "story": "SG2-70",
+        "methodDeclarations": 70,
+        "sqlChecks": 58,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventSearch.test.ts",
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/EventSearch.test.tsx",
+          "client/src/screens/RequestForm.test.tsx",
+          "e2e/draft-history.spec.ts",
+          "e2e/regression.spec.ts",
+          "server/src/app.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/db/eventSearch.test.ts",
+          "server/src/eventSearch.test.ts",
+          "server/src/events/fields.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "supabase/tests/event_search.sql",
+          "supabase/tests/venue_hold_booking_upgrade.sql"
+        ]
+      },
+      {
+        "story": "SG2-71",
+        "methodDeclarations": 9,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/hooks/useParticleOrb.test.tsx",
+          "client/src/screens/AvailabilityCalendar.test.tsx",
+          "client/src/screens/Landing.test.tsx"
+        ]
+      },
+      {
+        "story": "SG2-77",
+        "methodDeclarations": 42,
+        "sqlChecks": 40,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/venues/VenueOperations.test.tsx",
+          "client/src/venues/operationsApi.test.ts",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/venueOperations.test.ts",
+          "server/src/venue-operations.test.ts",
+          "supabase/tests/venue_operations.sql"
+        ]
+      },
+      {
+        "story": "SG2-78",
+        "methodDeclarations": 17,
+        "sqlChecks": 11,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/venues/availability.test.ts",
+          "client/src/venues/calendarView.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/venue-setup-turnaround.test.ts",
+          "supabase/tests/venue_setup_turnaround.sql"
+        ]
+      },
+      {
+        "story": "SG2-79",
+        "methodDeclarations": 20,
+        "sqlChecks": 12,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/venues/BookingClashes.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueClashes.test.ts",
+          "server/src/venue-clashes.test.ts",
+          "supabase/tests/venue_booking_clashes.sql"
+        ]
+      },
+      {
+        "story": "SG2-80",
+        "methodDeclarations": 23,
+        "sqlChecks": 27,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/venues/VenueBlocks.test.tsx",
+          "client/src/venues/blocksApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBlocks.test.ts",
+          "server/src/venue-availability.test.ts",
+          "server/src/venue-blocks.test.ts",
+          "server/src/venue-search.test.ts",
+          "supabase/tests/venue_temporary_unavailability.sql"
+        ]
+      },
+      {
+        "story": "SG2-81",
+        "methodDeclarations": 40,
+        "sqlChecks": 44,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/VenueSearch.test.tsx",
+          "client/src/venues/VenueBookings.test.tsx",
+          "client/src/venues/VenueRequests.test.tsx",
+          "client/src/venues/requestsApi.test.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventArrangements.test.ts",
+          "server/src/db/venueBookingRequests.test.ts",
+          "server/src/db/venueBookings.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/events/fields.test.ts",
+          "server/src/getEventArrangements.test.ts",
+          "server/src/notifications.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "server/src/venue-bookings.test.ts",
+          "supabase/tests/venue_replacement.sql"
+        ]
+      },
+      {
+        "story": "SG2-82",
+        "methodDeclarations": 33,
+        "sqlChecks": 27,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/screens/VenueSearch.test.tsx",
+          "client/src/venues/VenueRequests.test.tsx",
+          "client/src/venues/requestsApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/venueBookingRequests.test.ts",
+          "server/src/db/venueBookingWithdrawals.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "supabase/tests/event_confirmation.sql",
+          "supabase/tests/venue_multiple_bookings.sql"
+        ]
+      },
+      {
+        "story": "SG2-83",
+        "methodDeclarations": 26,
+        "sqlChecks": 46,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/screens/VenueSearch.test.tsx",
+          "client/src/venues/VenueBookings.test.tsx",
+          "client/src/venues/VenueRequests.test.tsx",
+          "e2e/event-confirmation.spec.ts",
+          "e2e/regression.spec.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/venueBookingRequests.test.ts",
+          "server/src/db/venueBookings.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "server/src/venue-bookings.test.ts",
+          "supabase/tests/account_multi_roles.sql",
+          "supabase/tests/venue_booking_change_cancel.sql",
+          "supabase/tests/venue_booking_release.sql",
+          "supabase/tests/venue_replacement.sql"
+        ]
+      },
+      {
+        "story": "SG2-84",
+        "methodDeclarations": 56,
+        "sqlChecks": 57,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/AvailabilityCalendar.test.tsx",
+          "client/src/screens/VenueHolds.test.tsx",
+          "client/src/venues/availability.test.ts",
+          "client/src/venues/calendarView.test.ts",
+          "client/src/venues/holdNotificationsApi.test.ts",
+          "client/src/venues/holdsApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueHolds.test.ts",
+          "server/src/venue-availability.test.ts",
+          "server/src/venue-holds.test.ts",
+          "server/src/venue-search.test.ts",
+          "supabase/tests/venue_hold_booking_upgrade.sql",
+          "supabase/tests/venue_holds.sql",
+          "supabase/tests/venue_replacement.sql"
+        ]
+      },
+      {
+        "story": "SG2-85",
+        "methodDeclarations": 19,
+        "sqlChecks": 19,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/VenueHolds.test.tsx",
+          "client/src/venues/holdNotificationsApi.test.ts",
+          "client/src/venues/holdsApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueHolds.test.ts",
+          "server/src/venue-holds.test.ts",
+          "supabase/tests/venue_holds.sql"
+        ]
+      },
+      {
+        "story": "SG2-86",
+        "methodDeclarations": 58,
+        "sqlChecks": 13,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/Profile.test.tsx",
+          "e2e/regression.spec.ts",
+          "hosted-e2e/roles.spec.ts",
+          "integration/api.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/clarifications.test.ts",
+          "server/src/db/accountRoles.test.ts",
+          "server/src/db/venueOperations.test.ts",
+          "server/src/decideEventRequest.test.ts",
+          "server/src/deleteEventRequestDraft.test.ts",
+          "server/src/profile.test.ts",
+          "server/src/reviewEventRequest.test.ts",
+          "server/src/roles.test.ts",
+          "server/src/venue-bookings.test.ts",
+          "server/src/venue-clashes.test.ts",
+          "server/src/venue-conflicts.test.ts",
+          "server/src/venue-operations.test.ts",
+          "supabase/tests/account_roles.sql",
+          "supabase/tests/venue_operations.sql"
+        ]
+      },
+      {
+        "story": "SG2-87",
+        "methodDeclarations": 35,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/assignmentQueue.test.ts",
+          "client/src/screens/AssignmentQueue.test.tsx",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/EventsTable.test.tsx",
+          "e2e/regression.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/assignmentQueue.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/assignmentQueue.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/db/workQueue.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-88",
+        "methodDeclarations": 6,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/screens/AssignmentQueue.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/assignmentQueue.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-90",
+        "methodDeclarations": 9,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "e2e/regression.spec.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventPlanning.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/getEventArrangements.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-91",
+        "methodDeclarations": 48,
+        "sqlChecks": 46,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/safetyChecks.test.ts",
+          "client/src/screens/Dashboard.test.tsx",
+          "client/src/screens/EventPlanningDrawer.test.tsx",
+          "client/src/screens/SafetyChecks.test.tsx",
+          "e2e/regression.spec.ts",
+          "hosted-e2e/roles.spec.ts",
+          "server/src/app.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/safetyChecks.test.ts",
+          "server/src/events/fields.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/safetyChecks.test.ts",
+          "server/src/venue-booking-requests.test.ts",
+          "supabase/tests/safety_approval_gate.sql",
+          "supabase/tests/safety_check_queue.sql",
+          "supabase/tests/venue_hold_booking_upgrade.sql"
+        ]
+      },
+      {
+        "story": "SG2-92",
+        "methodDeclarations": 94,
+        "sqlChecks": 46,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/notificationsApi.test.ts",
+          "client/src/api/safetyChecks.test.ts",
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/components/SafetyDecisionSummary.test.tsx",
+          "client/src/screens/EventDetail.safety.test.tsx",
+          "client/src/screens/SafetyChecks.decision.test.tsx",
+          "client/src/screens/WorkQueue.safety.test.tsx",
+          "e2e/safety-decisions.spec.ts",
+          "integration/api.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/eventNotifications.test.ts",
+          "server/src/db/safetyDecisions.test.ts",
+          "server/src/events/fields.test.ts",
+          "server/src/events/safetyDecisions.test.ts",
+          "server/src/safetyDecisionRoutes.test.ts",
+          "server/src/stageCalculator.test.ts",
+          "supabase/tests/safety_decisions.sql"
+        ]
+      },
+      {
+        "story": "SG2-94",
+        "methodDeclarations": 29,
+        "sqlChecks": 31,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/api/eventConfirmation.test.ts",
+          "client/src/components/EventArrangementsPanel.test.tsx",
+          "client/src/components/SafetyDecisionSummary.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/event-confirmation.spec.ts",
+          "e2e/safety-approval.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/eventConfirmation.test.ts",
+          "server/src/db/safetyDecisions.test.ts",
+          "server/src/events/arrangementReadiness.test.ts",
+          "server/src/events/changeImpact.test.ts",
+          "server/src/getEventArrangements.test.ts",
+          "supabase/tests/event_confirmation.sql",
+          "supabase/tests/safety_approval_gate.sql",
+          "supabase/tests/venue_booking_change_cancel.sql"
+        ]
+      },
+      {
+        "story": "SG2-97",
+        "methodDeclarations": 17,
+        "sqlChecks": 0,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/App.test.tsx",
+          "client/src/api/eventRequests.test.ts",
+          "client/src/screens/CoordinatorAssignment.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/events/getHistory.test.ts",
+          "server/src/listAssignable.test.ts"
+        ]
+      },
+      {
+        "story": "SG2-98",
+        "methodDeclarations": 11,
+        "sqlChecks": 14,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/venues/VenueBlocks.test.tsx",
+          "client/src/venues/blocksApi.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/venueBlocks.test.ts",
+          "server/src/venue-blocks.test.ts",
+          "server/src/venue-search.test.ts",
+          "supabase/tests/venue_block_upgrade.sql"
+        ]
+      },
+      {
+        "story": "SG2-100",
+        "methodDeclarations": 107,
+        "sqlChecks": 11,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/components/EventStageTracker.test.tsx",
+          "client/src/mock/viewModel.test.ts",
+          "client/src/screens/CoordinatorAssignment.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "e2e/regression.spec.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/authorization.test.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/events/complete.test.ts",
+          "server/src/events/fields.test.ts",
+          "server/src/events/getHistory.test.ts",
+          "server/src/events/updatePlanning.test.ts",
+          "server/src/stageCalculator.test.ts",
+          "supabase/tests/event_status_flow.sql"
+        ]
+      },
+      {
+        "story": "SG2-104",
+        "methodDeclarations": 34,
+        "sqlChecks": 80,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          ".github/scripts/release-readiness.test.mjs",
+          "client/src/App.test.tsx",
+          "client/src/auth/actingRole.test.ts",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/Profile.test.tsx",
+          "client/src/screens/RoleSwitcher.test.tsx",
+          "e2e/notification-inbox.spec.ts",
+          "e2e/regression.spec.ts",
+          "integration/api.test.ts",
+          "server/src/assignCoordinator.test.ts",
+          "server/src/db/accountRoles.test.ts",
+          "server/src/events/getHistory.test.ts",
+          "server/src/getEventStage.test.ts",
+          "server/src/multiRoles.test.ts",
+          "server/src/notificationInbox.test.ts",
+          "server/src/roles.test.ts",
+          "supabase/tests/account_multi_roles.sql",
+          "supabase/tests/account_roles.sql",
+          "supabase/tests/event_change_impact.sql",
+          "supabase/tests/event_history_internal_fields.sql",
+          "supabase/tests/event_notifications.sql",
+          "supabase/tests/event_planning_and_audit.sql",
+          "supabase/tests/notification_inbox_reminders.sql"
+        ]
+      },
+      {
+        "story": "SG2-105",
+        "methodDeclarations": 34,
+        "sqlChecks": 12,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/api/eventRequests.test.ts",
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/screens/EventDetail.test.tsx",
+          "client/src/screens/RequestForm.test.tsx",
+          "client/src/screens/WorkQueue.test.tsx",
+          "client/src/venues/searchPrefill.test.ts",
+          "e2e/regression.spec.ts",
+          "server/src/db/eventRequests.test.ts",
+          "server/src/eventRequests.test.ts",
+          "server/src/events/fields.test.ts",
+          "server/src/submitEventRequest.test.ts",
+          "server/src/updateEventRequestDraft.test.ts",
+          "supabase/tests/event_preferred_layout.sql"
+        ]
+      },
+      {
+        "story": "SG2-106",
+        "methodDeclarations": 36,
+        "sqlChecks": 31,
+        "categories": [
+          "BOUNDARY",
+          "CONFLICT",
+          "FAILURE",
+          "NORMAL"
+        ],
+        "allFourCategories": true,
+        "files": [
+          "client/src/components/EventAuditDrawer.test.tsx",
+          "client/src/components/HoldNotifications.test.tsx",
+          "client/src/screens/VenueHolds.test.tsx",
+          "client/src/venues/VenueDelete.test.tsx",
+          "client/src/venues/holdNotificationsApi.test.ts",
+          "client/src/venues/holdsApi.test.ts",
+          "e2e/smoke.spec.ts",
+          "integration/api.test.ts",
+          "server/src/db/venueHolds.test.ts",
+          "server/src/db/venueSuitability.test.ts",
+          "server/src/db/venues.test.ts",
+          "server/src/venue-availability.test.ts",
+          "server/src/venue-delete-hold-expiry.test.ts",
+          "server/src/venue-search.test.ts",
+          "supabase/tests/venue_delete_hold_expiry.sql"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "file": "client/src/App.test.tsx",
+        "reviewed": 54,
+        "retained": 54,
+        "stories": [
+          "SG2-104",
+          "SG2-20",
+          "SG2-23",
+          "SG2-24",
+          "SG2-26",
+          "SG2-27",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-41",
+          "SG2-42",
+          "SG2-44",
+          "SG2-46",
+          "SG2-47",
+          "SG2-52",
+          "SG2-53",
+          "SG2-55",
+          "SG2-59",
+          "SG2-66",
+          "SG2-69",
+          "SG2-84",
+          "SG2-86",
+          "SG2-87",
+          "SG2-91",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "client/src/HealthCheck.test.tsx",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "client/src/api/assignmentQueue.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-87"
+        ]
+      },
+      {
+        "file": "client/src/api/changeRequests.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/api/equipment.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "client/src/api/equipmentAvailability.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-54"
+        ]
+      },
+      {
+        "file": "client/src/api/equipmentRequirements.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-53"
+        ]
+      },
+      {
+        "file": "client/src/api/equipmentReservations.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-55"
+        ]
+      },
+      {
+        "file": "client/src/api/eventCancellation.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "client/src/api/eventConfirmation.test.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-58",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "client/src/api/eventRequests.test.ts",
+        "reviewed": 136,
+        "retained": 136,
+        "stories": [
+          "SG2-100",
+          "SG2-105",
+          "SG2-26",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-31",
+          "SG2-32",
+          "SG2-33",
+          "SG2-36",
+          "SG2-38",
+          "SG2-39",
+          "SG2-40",
+          "SG2-57",
+          "SG2-66",
+          "SG2-67",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "client/src/api/eventSearch.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "client/src/api/notificationInboxApi.test.ts",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-69"
+        ]
+      },
+      {
+        "file": "client/src/api/notificationsApi.test.ts",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-49",
+          "SG2-55",
+          "SG2-58",
+          "SG2-63",
+          "SG2-66",
+          "SG2-68",
+          "SG2-69",
+          "SG2-81",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/api/profile.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-27"
+        ]
+      },
+      {
+        "file": "client/src/api/registrableEvents.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-59"
+        ]
+      },
+      {
+        "file": "client/src/api/registrations.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "client/src/api/safetyChecks.test.ts",
+        "reviewed": 18,
+        "retained": 18,
+        "stories": [
+          "SG2-91",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/api/workQueue.test.ts",
+        "reviewed": 15,
+        "retained": 15,
+        "stories": [
+          "SG2-25",
+          "SG2-35",
+          "SG2-37",
+          "SG2-41"
+        ]
+      },
+      {
+        "file": "client/src/auth/access.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-25"
+        ]
+      },
+      {
+        "file": "client/src/auth/actingRole.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-104"
+        ]
+      },
+      {
+        "file": "client/src/auth/session.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-23"
+        ]
+      },
+      {
+        "file": "client/src/components/ArrangementRechecks.test.tsx",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/components/CancellationPanel.test.tsx",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "client/src/components/ChangeRequestsPanel.test.tsx",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/components/ClarificationThread.test.tsx",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-36"
+        ]
+      },
+      {
+        "file": "client/src/components/ConfirmedArrangements.test.tsx",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-58"
+        ]
+      },
+      {
+        "file": "client/src/components/EquipmentAvailability.test.tsx",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-54"
+        ]
+      },
+      {
+        "file": "client/src/components/EquipmentRequirements.test.tsx",
+        "reviewed": 30,
+        "retained": 30,
+        "stories": [
+          "SG2-41",
+          "SG2-53",
+          "SG2-54",
+          "SG2-55",
+          "SG2-57"
+        ]
+      },
+      {
+        "file": "client/src/components/EquipmentReservations.test.tsx",
+        "reviewed": 22,
+        "retained": 22,
+        "stories": [
+          "SG2-55"
+        ]
+      },
+      {
+        "file": "client/src/components/EventArrangements.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-57"
+        ]
+      },
+      {
+        "file": "client/src/components/EventArrangementsPanel.test.tsx",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-57",
+          "SG2-58",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "client/src/components/EventAuditDrawer.test.tsx",
+        "reviewed": 31,
+        "retained": 31,
+        "stories": [
+          "SG2-100",
+          "SG2-105",
+          "SG2-106",
+          "SG2-40",
+          "SG2-56",
+          "SG2-66",
+          "SG2-70",
+          "SG2-85",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/components/EventStageTracker.test.tsx",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-100",
+          "SG2-38"
+        ]
+      },
+      {
+        "file": "client/src/components/HoldNotifications.test.tsx",
+        "reviewed": 52,
+        "retained": 52,
+        "stories": [
+          "SG2-104",
+          "SG2-106",
+          "SG2-49",
+          "SG2-51",
+          "SG2-55",
+          "SG2-58",
+          "SG2-63",
+          "SG2-66",
+          "SG2-68",
+          "SG2-69",
+          "SG2-79",
+          "SG2-81",
+          "SG2-84",
+          "SG2-85",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/components/RegistrationPanel.test.tsx",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "client/src/components/SafetyDecisionSummary.test.tsx",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-92",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "client/src/hooks/useInertiaScroll.test.tsx",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "client/src/hooks/useParticleOrb.test.tsx",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-20",
+          "SG2-71"
+        ]
+      },
+      {
+        "file": "client/src/main.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "client/src/mock/viewModel.test.ts",
+        "reviewed": 49,
+        "retained": 47,
+        "stories": [
+          "SG2-100",
+          "SG2-20",
+          "SG2-31",
+          "SG2-37",
+          "SG2-38",
+          "SG2-70",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "client/src/screens/AssignmentQueue.test.tsx",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-87",
+          "SG2-88"
+        ]
+      },
+      {
+        "file": "client/src/screens/AvailabilityCalendar.test.tsx",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-44",
+          "SG2-71",
+          "SG2-84"
+        ]
+      },
+      {
+        "file": "client/src/screens/CapacityExceptions.test.tsx",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-47",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/screens/CoordinatorAssignment.test.tsx",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-100",
+          "SG2-33",
+          "SG2-34",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "client/src/screens/Dashboard.test.tsx",
+        "reviewed": 18,
+        "retained": 18,
+        "stories": [
+          "SG2-20",
+          "SG2-26",
+          "SG2-31",
+          "SG2-36",
+          "SG2-37",
+          "SG2-38",
+          "SG2-86",
+          "SG2-87",
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "client/src/screens/DraftRequests.test.tsx",
+        "reviewed": 15,
+        "retained": 15,
+        "stories": [
+          "SG2-26",
+          "SG2-29",
+          "SG2-32",
+          "SG2-36"
+        ]
+      },
+      {
+        "file": "client/src/screens/EquipmentDesk.test.tsx",
+        "reviewed": 15,
+        "retained": 15,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "client/src/screens/EquipmentForm.test.tsx",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventDetail.cancellation.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventDetail.changeImpact.test.tsx",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventDetail.registration.test.tsx",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventDetail.safety.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventDetail.test.tsx",
+        "reviewed": 55,
+        "retained": 54,
+        "stories": [
+          "SG2-100",
+          "SG2-105",
+          "SG2-26",
+          "SG2-29",
+          "SG2-31",
+          "SG2-33",
+          "SG2-36",
+          "SG2-37",
+          "SG2-38",
+          "SG2-39",
+          "SG2-40",
+          "SG2-53",
+          "SG2-58",
+          "SG2-70",
+          "SG2-87"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventPlanningDrawer.test.tsx",
+        "reviewed": 41,
+        "retained": 41,
+        "stories": [
+          "SG2-39",
+          "SG2-41",
+          "SG2-63",
+          "SG2-66",
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventSearch.test.tsx",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "client/src/screens/EventsTable.test.tsx",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-25",
+          "SG2-26",
+          "SG2-31",
+          "SG2-38",
+          "SG2-87"
+        ]
+      },
+      {
+        "file": "client/src/screens/FindEvents.test.tsx",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-59"
+        ]
+      },
+      {
+        "file": "client/src/screens/Landing.test.tsx",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-71"
+        ]
+      },
+      {
+        "file": "client/src/screens/Login.test.tsx",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-20",
+          "SG2-23"
+        ]
+      },
+      {
+        "file": "client/src/screens/NotificationEvent.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-69"
+        ]
+      },
+      {
+        "file": "client/src/screens/Profile.test.tsx",
+        "reviewed": 15,
+        "retained": 14,
+        "stories": [
+          "SG2-104",
+          "SG2-27",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "client/src/screens/RequestForm.test.tsx",
+        "reviewed": 60,
+        "retained": 59,
+        "stories": [
+          "SG2-105",
+          "SG2-25",
+          "SG2-26",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-47",
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "client/src/screens/RoleSwitcher.test.tsx",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-104"
+        ]
+      },
+      {
+        "file": "client/src/screens/SafetyChecks.decision.test.tsx",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/screens/SafetyChecks.test.tsx",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "client/src/screens/VenueHolds.test.tsx",
+        "reviewed": 23,
+        "retained": 23,
+        "stories": [
+          "SG2-106",
+          "SG2-84",
+          "SG2-85"
+        ]
+      },
+      {
+        "file": "client/src/screens/VenueSearch.test.tsx",
+        "reviewed": 27,
+        "retained": 27,
+        "stories": [
+          "SG2-46",
+          "SG2-47",
+          "SG2-48",
+          "SG2-81",
+          "SG2-82",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "client/src/screens/WorkQueue.cancellation.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "client/src/screens/WorkQueue.changeImpact.test.tsx",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-39",
+          "SG2-41",
+          "SG2-53",
+          "SG2-57",
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "client/src/screens/WorkQueue.registration.test.tsx",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "client/src/screens/WorkQueue.safety.test.tsx",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "client/src/screens/WorkQueue.test.tsx",
+        "reviewed": 54,
+        "retained": 54,
+        "stories": [
+          "SG2-100",
+          "SG2-105",
+          "SG2-25",
+          "SG2-35",
+          "SG2-36",
+          "SG2-37",
+          "SG2-39",
+          "SG2-40",
+          "SG2-41",
+          "SG2-46",
+          "SG2-48",
+          "SG2-49",
+          "SG2-53",
+          "SG2-54",
+          "SG2-55",
+          "SG2-58",
+          "SG2-69",
+          "SG2-94",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "client/src/ui.test.tsx",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "client/src/venues/BookingClashes.test.tsx",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-79"
+        ]
+      },
+      {
+        "file": "client/src/venues/BookingConflicts.test.tsx",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-50"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueBlocks.test.tsx",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-45",
+          "SG2-80",
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueBookings.test.tsx",
+        "reviewed": 22,
+        "retained": 22,
+        "stories": [
+          "SG2-51",
+          "SG2-81",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueDecision.test.tsx",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-47",
+          "SG2-49",
+          "SG2-50"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueDelete.test.tsx",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-106"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueFit.test.tsx",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-47",
+          "SG2-49",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueLayouts.test.tsx",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-43"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueOperations.test.tsx",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-77"
+        ]
+      },
+      {
+        "file": "client/src/venues/VenueRequests.test.tsx",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-48",
+          "SG2-49",
+          "SG2-81",
+          "SG2-82",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "client/src/venues/Venues.test.tsx",
+        "reviewed": 19,
+        "retained": 19,
+        "stories": [
+          "SG2-42"
+        ]
+      },
+      {
+        "file": "client/src/venues/availability.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-44",
+          "SG2-78",
+          "SG2-84"
+        ]
+      },
+      {
+        "file": "client/src/venues/blocksApi.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-45",
+          "SG2-80",
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "client/src/venues/calendarView.test.ts",
+        "reviewed": 15,
+        "retained": 15,
+        "stories": [
+          "SG2-44",
+          "SG2-78",
+          "SG2-84"
+        ]
+      },
+      {
+        "file": "client/src/venues/capacityExceptionsApi.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-47",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "client/src/venues/holdNotificationsApi.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-106",
+          "SG2-84",
+          "SG2-85"
+        ]
+      },
+      {
+        "file": "client/src/venues/holdsApi.test.ts",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-106",
+          "SG2-84",
+          "SG2-85"
+        ]
+      },
+      {
+        "file": "client/src/venues/layoutsApi.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-43"
+        ]
+      },
+      {
+        "file": "client/src/venues/operationsApi.test.ts",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-77"
+        ]
+      },
+      {
+        "file": "client/src/venues/requestsApi.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-48",
+          "SG2-49",
+          "SG2-81",
+          "SG2-82"
+        ]
+      },
+      {
+        "file": "client/src/venues/searchApi.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-44",
+          "SG2-45",
+          "SG2-46"
+        ]
+      },
+      {
+        "file": "client/src/venues/searchPrefill.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-105",
+          "SG2-46"
+        ]
+      },
+      {
+        "file": "client/src/venues/suitabilityApi.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-47"
+        ]
+      },
+      {
+        "file": "server/src/app.test.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-20",
+          "SG2-70",
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "server/src/assignCoordinator.test.ts",
+        "reviewed": 40,
+        "retained": 40,
+        "stories": [
+          "SG2-100",
+          "SG2-104",
+          "SG2-33",
+          "SG2-34",
+          "SG2-40",
+          "SG2-68",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "server/src/assignmentQueue.test.ts",
+        "reviewed": 6,
+        "retained": 5,
+        "stories": [
+          "SG2-87",
+          "SG2-88"
+        ]
+      },
+      {
+        "file": "server/src/authorization.test.ts",
+        "reviewed": 35,
+        "retained": 35,
+        "stories": [
+          "SG2-100",
+          "SG2-23",
+          "SG2-24",
+          "SG2-25",
+          "SG2-52",
+          "SG2-53",
+          "SG2-54",
+          "SG2-55",
+          "SG2-58",
+          "SG2-59",
+          "SG2-63",
+          "SG2-66",
+          "SG2-67",
+          "SG2-68",
+          "SG2-70",
+          "SG2-77",
+          "SG2-82",
+          "SG2-83",
+          "SG2-86",
+          "SG2-87",
+          "SG2-91",
+          "SG2-92",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "server/src/changeRequests.test.ts",
+        "reviewed": 22,
+        "retained": 22,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "server/src/clarifications.test.ts",
+        "reviewed": 35,
+        "retained": 35,
+        "stories": [
+          "SG2-36",
+          "SG2-68",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/confirmEvent.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-25",
+          "SG2-58"
+        ]
+      },
+      {
+        "file": "server/src/db/accountRoles.test.ts",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-104",
+          "SG2-24",
+          "SG2-33",
+          "SG2-34",
+          "SG2-40",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/db/assignmentQueue.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-87"
+        ]
+      },
+      {
+        "file": "server/src/db/auditLogs.test.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-39",
+          "SG2-40"
+        ]
+      },
+      {
+        "file": "server/src/db/changeImpact.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "server/src/db/clarifications.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-36"
+        ]
+      },
+      {
+        "file": "server/src/db/client-config.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "server/src/db/equipment.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "server/src/db/equipmentAvailability.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-54"
+        ]
+      },
+      {
+        "file": "server/src/db/equipmentRequirements.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-53"
+        ]
+      },
+      {
+        "file": "server/src/db/equipmentReservations.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-55"
+        ]
+      },
+      {
+        "file": "server/src/db/eventArrangements.test.ts",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-39",
+          "SG2-55",
+          "SG2-57",
+          "SG2-58",
+          "SG2-81"
+        ]
+      },
+      {
+        "file": "server/src/db/eventCancellation.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-25",
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "server/src/db/eventConfirmation.test.ts",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-25",
+          "SG2-58",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "server/src/db/eventNotifications.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-66",
+          "SG2-68",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "server/src/db/eventPlanning.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-38",
+          "SG2-39",
+          "SG2-90"
+        ]
+      },
+      {
+        "file": "server/src/db/eventRequests.test.ts",
+        "reviewed": 81,
+        "retained": 81,
+        "stories": [
+          "SG2-100",
+          "SG2-105",
+          "SG2-26",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-31",
+          "SG2-32",
+          "SG2-33",
+          "SG2-34",
+          "SG2-35",
+          "SG2-36",
+          "SG2-37",
+          "SG2-38",
+          "SG2-40",
+          "SG2-70",
+          "SG2-87"
+        ]
+      },
+      {
+        "file": "server/src/db/eventSearch.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "server/src/db/notificationInbox.test.ts",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-69"
+        ]
+      },
+      {
+        "file": "server/src/db/profile.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-27"
+        ]
+      },
+      {
+        "file": "server/src/db/registrableEvents.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-59"
+        ]
+      },
+      {
+        "file": "server/src/db/registrations.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "server/src/db/safetyChecks.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "server/src/db/safetyDecisions.test.ts",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-92",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "server/src/db/supabase.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "server/src/db/user-client.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-25",
+          "SG2-44"
+        ]
+      },
+      {
+        "file": "server/src/db/users.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-24"
+        ]
+      },
+      {
+        "file": "server/src/db/venueBlocks.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-25",
+          "SG2-45",
+          "SG2-80",
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "server/src/db/venueBookingDecisions.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-49"
+        ]
+      },
+      {
+        "file": "server/src/db/venueBookingRequests.test.ts",
+        "reviewed": 19,
+        "retained": 19,
+        "stories": [
+          "SG2-48",
+          "SG2-49",
+          "SG2-50",
+          "SG2-57",
+          "SG2-81",
+          "SG2-82",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "server/src/db/venueBookingWithdrawals.test.ts",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-82"
+        ]
+      },
+      {
+        "file": "server/src/db/venueBookings.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-51",
+          "SG2-81",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "server/src/db/venueClashes.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-79"
+        ]
+      },
+      {
+        "file": "server/src/db/venueConflicts.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-50"
+        ]
+      },
+      {
+        "file": "server/src/db/venueHolds.test.ts",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-106",
+          "SG2-84",
+          "SG2-85"
+        ]
+      },
+      {
+        "file": "server/src/db/venueLayouts.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-43"
+        ]
+      },
+      {
+        "file": "server/src/db/venueOperations.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-77",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/db/venueSuitability.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-106",
+          "SG2-47",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "server/src/db/venues.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-106",
+          "SG2-42"
+        ]
+      },
+      {
+        "file": "server/src/db/workQueue.test.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-35",
+          "SG2-41",
+          "SG2-87"
+        ]
+      },
+      {
+        "file": "server/src/decideEventRequest.test.ts",
+        "reviewed": 25,
+        "retained": 25,
+        "stories": [
+          "SG2-25",
+          "SG2-37",
+          "SG2-40",
+          "SG2-68",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/deleteEventRequestDraft.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-25",
+          "SG2-32",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/equipment.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "server/src/equipmentAvailability.test.ts",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-54"
+        ]
+      },
+      {
+        "file": "server/src/equipmentRequirements.test.ts",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-53"
+        ]
+      },
+      {
+        "file": "server/src/equipmentReservations.test.ts",
+        "reviewed": 15,
+        "retained": 15,
+        "stories": [
+          "SG2-55"
+        ]
+      },
+      {
+        "file": "server/src/eventCancellation.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-25",
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "server/src/eventRequests.test.ts",
+        "reviewed": 33,
+        "retained": 33,
+        "stories": [
+          "SG2-105",
+          "SG2-25",
+          "SG2-28",
+          "SG2-30",
+          "SG2-31"
+        ]
+      },
+      {
+        "file": "server/src/eventSearch.test.ts",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "server/src/events/arrangementReadiness.test.ts",
+        "reviewed": 31,
+        "retained": 31,
+        "stories": [
+          "SG2-39",
+          "SG2-57",
+          "SG2-58",
+          "SG2-66",
+          "SG2-81",
+          "SG2-82",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "server/src/events/changeImpact.test.ts",
+        "reviewed": 17,
+        "retained": 17,
+        "stories": [
+          "SG2-66",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "server/src/events/complete.test.ts",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-100"
+        ]
+      },
+      {
+        "file": "server/src/events/fields.test.ts",
+        "reviewed": 22,
+        "retained": 22,
+        "stories": [
+          "SG2-100",
+          "SG2-105",
+          "SG2-70",
+          "SG2-81",
+          "SG2-91",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "server/src/events/getHistory.test.ts",
+        "reviewed": 31,
+        "retained": 31,
+        "stories": [
+          "SG2-100",
+          "SG2-104",
+          "SG2-25",
+          "SG2-40",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "server/src/events/registrationSettings.test.ts",
+        "reviewed": 17,
+        "retained": 17,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "server/src/events/registrationWindow.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-58"
+        ]
+      },
+      {
+        "file": "server/src/events/safetyDecisions.test.ts",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "server/src/events/updatePlanning.test.ts",
+        "reviewed": 69,
+        "retained": 68,
+        "stories": [
+          "SG2-100",
+          "SG2-25",
+          "SG2-38",
+          "SG2-39",
+          "SG2-40",
+          "SG2-55",
+          "SG2-63",
+          "SG2-66",
+          "SG2-90",
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "server/src/getEventArrangements.test.ts",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-25",
+          "SG2-39",
+          "SG2-57",
+          "SG2-81",
+          "SG2-90",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "server/src/getEventConfirmation.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-58"
+        ]
+      },
+      {
+        "file": "server/src/getEventStage.test.ts",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-104",
+          "SG2-25",
+          "SG2-26",
+          "SG2-38"
+        ]
+      },
+      {
+        "file": "server/src/getEventStageAuth.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-25",
+          "SG2-38"
+        ]
+      },
+      {
+        "file": "server/src/index.test.ts",
+        "reviewed": 1,
+        "retained": 1,
+        "stories": [
+          "SG2-20"
+        ]
+      },
+      {
+        "file": "server/src/listAssignable.test.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-33",
+          "SG2-34",
+          "SG2-97"
+        ]
+      },
+      {
+        "file": "server/src/listEventRequests.test.ts",
+        "reviewed": 21,
+        "retained": 21,
+        "stories": [
+          "SG2-25",
+          "SG2-26",
+          "SG2-31"
+        ]
+      },
+      {
+        "file": "server/src/login.test.ts",
+        "reviewed": 18,
+        "retained": 18,
+        "stories": [
+          "SG2-23"
+        ]
+      },
+      {
+        "file": "server/src/logout.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-23"
+        ]
+      },
+      {
+        "file": "server/src/multiRoles.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-104"
+        ]
+      },
+      {
+        "file": "server/src/notificationInbox.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-104",
+          "SG2-69"
+        ]
+      },
+      {
+        "file": "server/src/notifications.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-49",
+          "SG2-51",
+          "SG2-68",
+          "SG2-81"
+        ]
+      },
+      {
+        "file": "server/src/organisationEventRequests.test.ts",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-25",
+          "SG2-26",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-31",
+          "SG2-32"
+        ]
+      },
+      {
+        "file": "server/src/profile.test.ts",
+        "reviewed": 39,
+        "retained": 39,
+        "stories": [
+          "SG2-25",
+          "SG2-27",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/registrableEvents.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-59"
+        ]
+      },
+      {
+        "file": "server/src/registrationRoutes.test.ts",
+        "reviewed": 19,
+        "retained": 19,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "server/src/reviewEventRequest.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-25",
+          "SG2-35",
+          "SG2-40",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/roles.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-104",
+          "SG2-24",
+          "SG2-25",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/safetyChecks.test.ts",
+        "reviewed": 7,
+        "retained": 7,
+        "stories": [
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "server/src/safetyDecisionRoutes.test.ts",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "server/src/stageCalculator.test.ts",
+        "reviewed": 23,
+        "retained": 23,
+        "stories": [
+          "SG2-100",
+          "SG2-36",
+          "SG2-38",
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "server/src/submitEventRequest.test.ts",
+        "reviewed": 31,
+        "retained": 31,
+        "stories": [
+          "SG2-105",
+          "SG2-25",
+          "SG2-28",
+          "SG2-30",
+          "SG2-36",
+          "SG2-40",
+          "SG2-68",
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "server/src/updateEventRequestDraft.test.ts",
+        "reviewed": 19,
+        "retained": 19,
+        "stories": [
+          "SG2-105",
+          "SG2-25",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-36",
+          "SG2-40"
+        ]
+      },
+      {
+        "file": "server/src/venue-availability.test.ts",
+        "reviewed": 36,
+        "retained": 36,
+        "stories": [
+          "SG2-106",
+          "SG2-44",
+          "SG2-80",
+          "SG2-84"
+        ]
+      },
+      {
+        "file": "server/src/venue-blocks.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-25",
+          "SG2-45",
+          "SG2-80",
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "server/src/venue-booking-requests.test.ts",
+        "reviewed": 43,
+        "retained": 43,
+        "stories": [
+          "SG2-47",
+          "SG2-48",
+          "SG2-49",
+          "SG2-66",
+          "SG2-81",
+          "SG2-82",
+          "SG2-83",
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "server/src/venue-bookings.test.ts",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-51",
+          "SG2-81",
+          "SG2-83",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/venue-clashes.test.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-79",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/venue-conflicts.test.ts",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-50",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/venue-delete-hold-expiry.test.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-106"
+        ]
+      },
+      {
+        "file": "server/src/venue-holds.test.ts",
+        "reviewed": 10,
+        "retained": 10,
+        "stories": [
+          "SG2-84",
+          "SG2-85"
+        ]
+      },
+      {
+        "file": "server/src/venue-layouts.test.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-25",
+          "SG2-42",
+          "SG2-43"
+        ]
+      },
+      {
+        "file": "server/src/venue-operations.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-25",
+          "SG2-77",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "server/src/venue-search.test.ts",
+        "reviewed": 21,
+        "retained": 21,
+        "stories": [
+          "SG2-106",
+          "SG2-25",
+          "SG2-43",
+          "SG2-45",
+          "SG2-46",
+          "SG2-80",
+          "SG2-84",
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "server/src/venue-setup-turnaround.test.ts",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-78"
+        ]
+      },
+      {
+        "file": "server/src/venue-suitability-routes.test.ts",
+        "reviewed": 24,
+        "retained": 24,
+        "stories": [
+          "SG2-47",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "server/src/venue-suitability.test.ts",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-47",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "server/src/venues.test.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-25",
+          "SG2-42"
+        ]
+      },
+      {
+        "file": "server/src/workQueue.test.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-25",
+          "SG2-41"
+        ]
+      },
+      {
+        "file": "e2e/capacity-exceptions.spec.ts",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-25",
+          "SG2-47",
+          "SG2-49",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "e2e/change-impact.spec.ts",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "e2e/draft-history.spec.ts",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-25",
+          "SG2-29",
+          "SG2-31",
+          "SG2-36",
+          "SG2-40",
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "e2e/equipment-availability.spec.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-54"
+        ]
+      },
+      {
+        "file": "e2e/equipment-requirements.spec.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-53"
+        ]
+      },
+      {
+        "file": "e2e/equipment-reservations.spec.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-55"
+        ]
+      },
+      {
+        "file": "e2e/equipment.spec.ts",
+        "reviewed": 5,
+        "retained": 5,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "e2e/event-confirmation.spec.ts",
+        "reviewed": 6,
+        "retained": 6,
+        "stories": [
+          "SG2-58",
+          "SG2-83",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "e2e/event-notifications.spec.ts",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-68"
+        ]
+      },
+      {
+        "file": "e2e/find-events.spec.ts",
+        "reviewed": 2,
+        "retained": 2,
+        "stories": [
+          "SG2-59"
+        ]
+      },
+      {
+        "file": "e2e/notification-inbox.spec.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-104",
+          "SG2-69"
+        ]
+      },
+      {
+        "file": "e2e/registrations.spec.ts",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "e2e/regression.spec.ts",
+        "reviewed": 81,
+        "retained": 81,
+        "stories": [
+          "SG2-100",
+          "SG2-104",
+          "SG2-105",
+          "SG2-23",
+          "SG2-24",
+          "SG2-25",
+          "SG2-26",
+          "SG2-27",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-31",
+          "SG2-32",
+          "SG2-33",
+          "SG2-34",
+          "SG2-35",
+          "SG2-36",
+          "SG2-37",
+          "SG2-38",
+          "SG2-41",
+          "SG2-42",
+          "SG2-44",
+          "SG2-45",
+          "SG2-46",
+          "SG2-47",
+          "SG2-48",
+          "SG2-49",
+          "SG2-50",
+          "SG2-51",
+          "SG2-66",
+          "SG2-70",
+          "SG2-77",
+          "SG2-78",
+          "SG2-79",
+          "SG2-80",
+          "SG2-82",
+          "SG2-83",
+          "SG2-84",
+          "SG2-85",
+          "SG2-86",
+          "SG2-87",
+          "SG2-88",
+          "SG2-90",
+          "SG2-91",
+          "SG2-97",
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "e2e/safety-approval.spec.ts",
+        "reviewed": 3,
+        "retained": 3,
+        "stories": [
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "e2e/safety-decisions.spec.ts",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "e2e/smoke.spec.ts",
+        "reviewed": 8,
+        "retained": 8,
+        "stories": [
+          "SG2-106",
+          "SG2-23",
+          "SG2-28",
+          "SG2-30",
+          "SG2-39",
+          "SG2-41",
+          "SG2-63",
+          "SG2-69",
+          "SG2-87",
+          "SG2-90"
+        ]
+      },
+      {
+        "file": "integration/api.test.ts",
+        "reviewed": 23,
+        "retained": 23,
+        "stories": [
+          "SG2-104",
+          "SG2-106",
+          "SG2-28",
+          "SG2-29",
+          "SG2-30",
+          "SG2-36",
+          "SG2-37",
+          "SG2-39",
+          "SG2-40",
+          "SG2-41",
+          "SG2-47",
+          "SG2-57",
+          "SG2-59",
+          "SG2-63",
+          "SG2-66",
+          "SG2-69",
+          "SG2-77",
+          "SG2-81",
+          "SG2-86",
+          "SG2-87",
+          "SG2-90",
+          "SG2-92",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "supabase/tests/account_multi_roles.sql",
+        "reviewed": 61,
+        "retained": 61,
+        "stories": [
+          "SG2-104",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "supabase/tests/account_roles.sql",
+        "reviewed": 26,
+        "retained": 26,
+        "stories": [
+          "SG2-104",
+          "SG2-24",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "supabase/tests/equipment_availability.sql",
+        "reviewed": 32,
+        "retained": 31,
+        "stories": [
+          "SG2-54"
+        ]
+      },
+      {
+        "file": "supabase/tests/equipment_records.sql",
+        "reviewed": 23,
+        "retained": 23,
+        "stories": [
+          "SG2-52"
+        ]
+      },
+      {
+        "file": "supabase/tests/equipment_release.sql",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-56"
+        ]
+      },
+      {
+        "file": "supabase/tests/equipment_requirements.sql",
+        "reviewed": 42,
+        "retained": 42,
+        "stories": [
+          "SG2-53"
+        ]
+      },
+      {
+        "file": "supabase/tests/equipment_reservations.sql",
+        "reviewed": 47,
+        "retained": 47,
+        "stories": [
+          "SG2-55"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_cancellation.sql",
+        "reviewed": 30,
+        "retained": 30,
+        "stories": [
+          "SG2-67"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_change_impact.sql",
+        "reviewed": 26,
+        "retained": 26,
+        "stories": [
+          "SG2-104",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_clarifications.sql",
+        "reviewed": 22,
+        "retained": 22,
+        "stories": [
+          "SG2-36"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_confirmation.sql",
+        "reviewed": 47,
+        "retained": 47,
+        "stories": [
+          "SG2-39",
+          "SG2-58",
+          "SG2-82",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_draft_audit.sql",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-25",
+          "SG2-26",
+          "SG2-29",
+          "SG2-30",
+          "SG2-36",
+          "SG2-40"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_history_internal_fields.sql",
+        "reviewed": 4,
+        "retained": 4,
+        "stories": [
+          "SG2-104",
+          "SG2-40"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_notifications.sql",
+        "reviewed": 26,
+        "retained": 26,
+        "stories": [
+          "SG2-104",
+          "SG2-68"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_organisation_isolation.sql",
+        "reviewed": 24,
+        "retained": 24,
+        "stories": [
+          "SG2-26"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_planning_and_audit.sql",
+        "reviewed": 26,
+        "retained": 26,
+        "stories": [
+          "SG2-104",
+          "SG2-39",
+          "SG2-40"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_preferred_layout.sql",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-105",
+          "SG2-40"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_registration_settings.sql",
+        "reviewed": 37,
+        "retained": 37,
+        "stories": [
+          "SG2-63"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_search.sql",
+        "reviewed": 57,
+        "retained": 57,
+        "stories": [
+          "SG2-70"
+        ]
+      },
+      {
+        "file": "supabase/tests/event_status_flow.sql",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-100"
+        ]
+      },
+      {
+        "file": "supabase/tests/internal_work_queue.sql",
+        "reviewed": 28,
+        "retained": 28,
+        "stories": [
+          "SG2-29",
+          "SG2-39",
+          "SG2-41"
+        ]
+      },
+      {
+        "file": "supabase/tests/legacy_table_rls.sql",
+        "reviewed": 30,
+        "retained": 30,
+        "stories": [
+          "SG2-25"
+        ]
+      },
+      {
+        "file": "supabase/tests/notification_inbox_reminders.sql",
+        "reviewed": 82,
+        "retained": 82,
+        "stories": [
+          "SG2-104",
+          "SG2-69"
+        ]
+      },
+      {
+        "file": "supabase/tests/registrable_events.sql",
+        "reviewed": 13,
+        "retained": 13,
+        "stories": [
+          "SG2-59"
+        ]
+      },
+      {
+        "file": "supabase/tests/safety_approval_gate.sql",
+        "reviewed": 26,
+        "retained": 26,
+        "stories": [
+          "SG2-91",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "supabase/tests/safety_check_queue.sql",
+        "reviewed": 44,
+        "retained": 44,
+        "stories": [
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "supabase/tests/safety_decisions.sql",
+        "reviewed": 46,
+        "retained": 46,
+        "stories": [
+          "SG2-92"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_availability.sql",
+        "reviewed": 21,
+        "retained": 21,
+        "stories": [
+          "SG2-44"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_block_upgrade.sql",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-98"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_blocks.sql",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-45"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_booking_change_cancel.sql",
+        "reviewed": 41,
+        "retained": 41,
+        "stories": [
+          "SG2-83",
+          "SG2-94"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_booking_clashes.sql",
+        "reviewed": 12,
+        "retained": 12,
+        "stories": [
+          "SG2-79"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_booking_decisions.sql",
+        "reviewed": 34,
+        "retained": 34,
+        "stories": [
+          "SG2-49",
+          "SG2-66",
+          "SG2-68"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_booking_release.sql",
+        "reviewed": 20,
+        "retained": 20,
+        "stories": [
+          "SG2-51",
+          "SG2-83"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_booking_requests.sql",
+        "reviewed": 14,
+        "retained": 14,
+        "stories": [
+          "SG2-48"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_capacity_exceptions.sql",
+        "reviewed": 16,
+        "retained": 16,
+        "stories": [
+          "SG2-47",
+          "SG2-66"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_delete_hold_expiry.sql",
+        "reviewed": 31,
+        "retained": 31,
+        "stories": [
+          "SG2-106"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_double_booking.sql",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-50"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_hold_booking_upgrade.sql",
+        "reviewed": 9,
+        "retained": 9,
+        "stories": [
+          "SG2-51",
+          "SG2-70",
+          "SG2-84",
+          "SG2-91"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_holds.sql",
+        "reviewed": 77,
+        "retained": 77,
+        "stories": [
+          "SG2-51",
+          "SG2-58",
+          "SG2-66",
+          "SG2-84",
+          "SG2-85"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_layouts.sql",
+        "reviewed": 22,
+        "retained": 22,
+        "stories": [
+          "SG2-43"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_multiple_bookings.sql",
+        "reviewed": 26,
+        "retained": 26,
+        "stories": [
+          "SG2-82"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_operations.sql",
+        "reviewed": 40,
+        "retained": 40,
+        "stories": [
+          "SG2-77",
+          "SG2-86"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_replacement.sql",
+        "reviewed": 44,
+        "retained": 44,
+        "stories": [
+          "SG2-39",
+          "SG2-58",
+          "SG2-81",
+          "SG2-83",
+          "SG2-84"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_setup_turnaround.sql",
+        "reviewed": 11,
+        "retained": 11,
+        "stories": [
+          "SG2-78"
+        ]
+      },
+      {
+        "file": "supabase/tests/venue_temporary_unavailability.sql",
+        "reviewed": 27,
+        "retained": 27,
+        "stories": [
+          "SG2-80"
+        ]
+      },
+      {
+        "file": ".github/scripts/regression-gate.test.mjs",
+        "stories": [
+          "SG2-22"
+        ],
+        "decision": "Distinct fault/provider/report/schema/role fixtures and public boundaries retained; identical empty-integration fixture subset removed only from the inventory suite.",
+        "reviewed": 10,
+        "retained": 10
+      },
+      {
+        "file": ".github/scripts/release-readiness.test.mjs",
+        "stories": [
+          "SG2-104",
+          "SG2-22",
+          "SG2-23",
+          "SG2-25",
+          "SG2-39",
+          "SG2-40",
+          "SG2-58",
+          "SG2-68",
+          "SG2-69",
+          "SG2-77",
+          "SG2-81",
+          "SG2-94"
+        ],
+        "decision": "Distinct fault/provider/report/schema/role fixtures and public boundaries retained; identical empty-integration fixture subset removed only from the inventory suite.",
+        "reviewed": 27,
+        "retained": 27
+      },
+      {
+        "file": ".github/scripts/security-review.test.mjs",
+        "stories": [
+          "SG2-22"
+        ],
+        "decision": "Distinct fault/provider/report/schema/role fixtures and public boundaries retained; identical empty-integration fixture subset removed only from the inventory suite.",
+        "reviewed": 19,
+        "retained": 19
+      },
+      {
+        "file": ".github/scripts/test-inventory.test.mjs",
+        "stories": [
+          "SG2-22"
+        ],
+        "decision": "Distinct fault/provider/report/schema/role fixtures and public boundaries retained; identical empty-integration fixture subset removed only from the inventory suite.",
+        "reviewed": 19,
+        "retained": 18
+      },
+      {
+        "file": "hosted-e2e/policy.test.mjs",
+        "stories": [
+          "SG2-25"
+        ],
+        "decision": "Distinct fault/provider/report/schema/role fixtures and public boundaries retained; identical empty-integration fixture subset removed only from the inventory suite.",
+        "reviewed": 4,
+        "retained": 4
+      },
+      {
+        "file": "hosted-e2e/roles.spec.ts",
+        "stories": [
+          "SG2-23",
+          "SG2-40",
+          "SG2-57",
+          "SG2-86",
+          "SG2-91"
+        ],
+        "decision": "Distinct fault/provider/report/schema/role fixtures and public boundaries retained; identical empty-integration fixture subset removed only from the inventory suite.",
+        "reviewed": 7,
+        "retained": 7
+      }
+    ]
+  }
+}

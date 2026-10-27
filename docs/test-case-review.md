@@ -1,3 +1,15 @@
+# Test necessity review — 27 October 2026
+
+The current review covers all 4,794 method/SQL source entries at main `fc638140853b809d5668052f5a427e3771a1487b` and all 4,254 current worksheet records. The prepared source at `a49f5217d995af03bfcb14787d19ae8fe6c9e8e0` contains 3,149 method declarations and 1,418 SQL assertion/tag entries: 190 declarations and 37 SQL entries retired, with no new declarations. Twelve native concurrency suites are assessed separately; SQL tags and log sites are not independent runner tests.
+
+The [full case index](test-redundancy-audit.json) maps every baseline entry to its live consumer and prepared source, updated contract, consolidation or retirement. The [change record](test-redundancy-review-2026-10-27.json) gives exact retirement reasons, retained equivalents, assertion/fixture changes and validation limits. The [worksheet plan](test-case-sheet-cleanup-plan-2026-10-27.json) records the original snapshot and the later user-authorized Excel batches. All 719 missing existing method/SQL checks and four existing native concurrency records were added; 372 stale or duplicate definitions were retired and 863 retained definitions corrected, all with exact readback verification. The final active register has 4,605 unique entries matching every current source identity and all 54 native scenario sites. The original sheet is preserved in a same-workbook history tab; retained-row DoD metadata corrections are complete. Evidence Detail and its images/anchors were not changed. PR Review Evidence was separately reconciled with closed PRs through #119.
+
+Final local verification passed `npm run ci`: 1,857 backend cases, 1,771 frontend cases, 19 reviewer-tool cases and 17 inventory-tool cases; all four per-file coverage thresholds remain 100%. All 183 browser cases passed, including the unchanged owner/Coordinator registration workflows. Disposable PostgreSQL passed 52 suites/checks, all 12 native concurrency scripts and 17 readiness cases; native HTTP/PostgREST integration passed 27/27. Inputs were checked unchanged. Four effect guards were restored after real StrictMode browser failures; meaningful current-view tests detect their removal. One earlier local socket-reset failure is preserved separately from the final passing run.
+
+This is not independent teammate sign-off or a claim of complete business correctness. The existing normal-accept/refuse transaction race is recorded in the change record. Formal category metadata already lacked SG2-20 BOUNDARY/CONFLICT and SG2-27 CONFLICT at baseline; no story/category pairs were lost and no artificial tests/tags were added. Fresh GitHub CI, preview evidence and structured human review remain required before merge under DoD v2.1. There is no configured linter.
+
+## Earlier review and execution records — historical
+
 # Test case review — 7 October 2026
 
 Review owner: Lim Jun Wei. Source, traceability and execution evidence were checked automatically on his behalf. This record does not represent independent teammate approval. The previous dated review is preserved below.
