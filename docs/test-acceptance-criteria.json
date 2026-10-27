@@ -1009,6 +1009,20 @@
       }
     },
     {
+      "id": "SG2-62",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-62",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "source": "Live Jira SG2-62 description read through the Jira API on 26 October 2026. AC6 (waiting-list promotion) is delivered with SG2-61's waiting list, so it is not listed here (Marcus, 26 October 2026).",
+      "acceptanceCriteria": {
+        "AC1": "Can see my registrations with the event details and where each stands",
+        "AC2": "Can withdraw my active registration at any time before the event's current start time, after confirming, even if registration has already closed",
+        "AC3": "Withdrawing returns the place to the event's available capacity",
+        "AC4": "At or after the event's start time, withdrawal is refused and I am told that the event has started",
+        "AC5": "When a withdrawal frees a place, the Event Organiser and the assigned Event Coordinator are notified"
+      }
+    },
+    {
       "id": "SG2-89",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-89",
       "originalPullRequests": [],

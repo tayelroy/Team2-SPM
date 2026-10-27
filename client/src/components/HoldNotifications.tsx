@@ -50,6 +50,8 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandi
   registration_confirmed: 'Registration confirmed',
   // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
   change_requested: 'Change requested',
+  // SG2-62 AC5: an attendee gave their place back.
+  registration_withdrawn: 'Attendee withdrew',
   // SG2-65 AC1/AC2: the coordinator's decision on the organiser's change.
   change_accepted: 'Change accepted',
   change_refused: 'Change refused',
@@ -78,6 +80,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandin
   event_cancelled: color.silver,
   registration_confirmed: color.accent,
   change_requested: color.accent,
+  registration_withdrawn: color.silver,
   change_accepted: color.accent,
   change_refused: color.silver,
 };

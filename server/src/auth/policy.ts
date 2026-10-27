@@ -241,6 +241,10 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'events.registrable.read': ['attendee'],
   // SG2-60: only attendees register; register_for_event() rechecks the acting role.
   'events.register': ['attendee'],
+  // SG2-62: only attendees see and withdraw their own registrations;
+  // my_registrations() and withdraw_registration() recheck the acting role.
+  'registrations.mine.read': ['attendee'],
+  'registrations.withdraw': ['attendee'],
   // SG2-27: every signed-in account manages its own profile.
   'profile.read': [...ROLES],
   'profile.update': [...ROLES]

@@ -102,3 +102,9 @@ test('[NORMAL] [SG2-60:AC1] an attendee inbox holding a registration confirmatio
   respond({ notifications: [confirmed], unread_count: 1, next_cursor: null });
   expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [confirmed], unread_count: 1, next_cursor: null } });
 });
+
+test('[NORMAL] [SG2-62:AC5] an organiser inbox holding an attendee withdrawal loads', async () => {
+  const withdrew = { ...entry, kind: 'registration_withdrawn', message: 'Ana withdrew from Forum. 9 of 10 places now remain.' };
+  respond({ notifications: [withdrew], unread_count: 1, next_cursor: null });
+  expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [withdrew], unread_count: 1, next_cursor: null } });
+});

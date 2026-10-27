@@ -10,6 +10,7 @@ export interface Notification {
     | 'event_returned_to_planning' | 'safety_decision' | 'outstanding_arrangements' | 'registration_opened'
     | 'registration_closed' | 'venue_booking_cancelled' | 'venue_change_requested'
     | 'cancellation_requested' | 'event_cancelled' | 'registration_confirmed' | 'change_requested'
+    | 'registration_withdrawn'
     | 'change_accepted' | 'change_refused';
   message: string;
   created_at: string;
@@ -33,6 +34,8 @@ const KINDS: Record<Notification['kind'], true> = {
   registration_confirmed: true,
   // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
   change_requested: true,
+  // SG2-62 AC5: an attendee withdrew, giving a place back.
+  registration_withdrawn: true,
   // SG2-65 AC1/AC2: the coordinator accepted or refused the organiser's change.
   change_accepted: true, change_refused: true
 };

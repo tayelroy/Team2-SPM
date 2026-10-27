@@ -132,9 +132,11 @@ export const NAV: Record<Role, readonly NavEntry[]> = {
     ['findEvent', 'Find an event', 'events.search'],
   ],
   Attendee: [
-    ['dashboard', 'My registrations'],
+    ['dashboard', 'Dashboard'],
     // SG2-59: the confirmed events open, or opening, for registration.
     ['findEvents', 'Find events', 'events.registrable.read'],
+    // SG2-62: the attendee's own registrations, which they can withdraw.
+    ['myRegistrations', 'My registrations', 'registrations.mine.read'],
     ['attendee', 'Event page'],
   ],
   // SG2-86: only screens the role can use. Each functional item is gated on
@@ -189,7 +191,8 @@ export const HEAD: Record<
   },
   Attendee: {
     eyebrow: 'Attendee · J. Halloran',
-    title: 'My registrations',
+    // SG2-62: 'My registrations' is now the real list in the menu.
+    title: 'Attendee home',
     blurb:
       "Events you can register for and the ones you're already on the list for.",
   },
@@ -229,6 +232,7 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   search: 'Find venues',
   findEvent: 'Find an event',
   findEvents: 'Find events',
+  myRegistrations: 'My registrations',
 };
 
 export const PAGE_BLURB: Record<ContentScreen, string> = {
@@ -265,6 +269,8 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
     'Search the submitted events you work on by name or client organisation, and narrow by date, state, venue, category or coordinator.',
   findEvents:
     'Confirmed events you can register for now, or soon. Open one to read its details.',
+  myRegistrations:
+    'Every event you registered for and where each stands. Withdraw before an event starts to give your place back.',
 };
 
 /** Headline figures on the Attendee's prototype dashboard. */

@@ -79,6 +79,8 @@ import { createRegistrationHandlers } from '../server/src/events/registrationRou
 import { createMemoryRegistrations, seedRegistrations } from './support/registrations';
 import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
 import { createMemoryRegistrableEventsStore, seedEventRegistration, seedRegistrableEvents } from './support/registrable-events';
+import { createMyRegistrationsRouter } from '../server/src/myRegistrations';
+import { createMemoryMyRegistrationsStore, seedMyRegistrations } from './support/my-registrations';
 
 // Application configuration may load a developer's .env during imports. Clear
 // database configuration before serving any request, including health routes.
@@ -274,7 +276,9 @@ const app = createApp(
   // SG2-89: the Lead's overview, against the in-memory client.
   createCoordinatorOverviewRouter(access, { getAdminClient: getClient }),
   // SG2-93: the staff side, mirroring the SQL functions in memory.
-  createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal, getAdminClient: getClient, ...createMemorySafetyRereviews(database) })
+  createSafetyRereviewHandlers({ getPrincipal: access.getPrincipal, getAdminClient: getClient, ...createMemorySafetyRereviews(database) }),
+  // SG2-62: the attendee's registrations mirror my_registrations and withdraw_registration in memory.
+  createMyRegistrationsRouter(access, token => createMemoryMyRegistrationsStore(database, token))
 );
 
 // Reset exists exclusively in this loopback test process. Fixtures are not
@@ -395,6 +399,20 @@ app.post('/__e2e/event-registration', (_req, res) => {
   seedRegistrableEvents(database);
   seedEventRegistration(database);
   res.status(204).end();
+});
+// SG2-62: SG2-60's events plus registrations the attendee can and cannot withdraw.
+app.post('/__e2e/my-registrations', (_req, res) => {
+  seedRegistrableEvents(database);
+  seedEventRegistration(database);
+  seedMyRegistrations(database);
+  res.status(204).end();
+});
+// SG2-62: the attendee's registrations and the withdrawal notices.
+app.get('/__e2e/my-registrations-ledger', (_req, res) => {
+  res.json({
+    registrations: database.tables.registrations.filter(row => [593, 597, 598, 599].includes(Number(row.event_id))),
+    notifications: database.tables.notifications.filter(row => row.kind === 'registration_withdrawn'),
+  });
 });
 // SG2-60: the registrations and confirmations the loopback app now holds.
 app.get('/__e2e/event-registration-ledger', (_req, res) => {
