@@ -259,3 +259,31 @@ a successful regression command. This is inherited by the required **Build and
 test** aggregate through **Test browser regression**. No layout checks are required.
 The separate **Test database policies** job must also pass its organisation SQL
 suite. Preview deployment readiness does not substitute for either check.
+
+## Regression evidence (SG2-96)
+
+After every required regression job succeeds, **Build and test** runs
+`.github/scripts/regression-evidence.mjs`. It records the checked-out commit,
+UTC date, GitHub run-attempt link and each required job's result in JSON and
+Markdown, and adds the Markdown to the job summary. The checked-out SHA must
+match the revision used by the test jobs; missing or unsuccessful jobs and
+tracked checkout changes prevent a passing evidence record.
+
+Download the **regression-evidence-<run ID>-<attempt>** artifact from that run.
+It is retained for 14 days. Copy its date, tested commit and run link into the
+Managing Changes guide before expiry. A local test run or an uncommitted
+working tree cannot supply this hosted evidence; the final committed branch
+still needs a passing GitHub run.
+
+## Staging check (SG2-96)
+
+[`staging-check.yml`](../.github/workflows/staging-check.yml) signs in to the deployed staging site and walks every role's pages read-only at 320, 375, 768 and 1440 px. It runs [`.github/scripts/staging-walkthrough.mjs`](../.github/scripts/staging-walkthrough.mjs):
+
+- **When:** on every pull request, on pushes to `main`, and by hand (Actions → Staging check → Run workflow, optionally with another staging URL).
+- **What it tests:** the *deployed* site, not the pull request's code. It is a separate workflow and does not block merging.
+- **Accounts:** six (`event.organiser3`, `event.coordinator3`, `venue.staff3`, `technical.support1`, `event.coordinator.lead1`, `safety.officer1`), which between them hold all seven roles. One run uses six of sign-in's 10 attempts per 15 minutes. Runs never overlap, but consecutive runs or manual sign-ins can still share that window; a rate-limited run fails explicitly and must be rerun after the window resets.
+- **Password:** the shared test password comes from the repository secret `SPM_STAGING_PASSWORD` (Settings → Secrets and variables → Actions). Without it the job skips itself, and pull requests from forks never receive it.
+- **Read-only:** it clicks only the sign-in form, the **Acting as** switcher and navigation, so it changes no staging records.
+- **Readiness:** waits for role permissions before collecting navigation, and requires loading messages to disappear. It does not silently accept a loading timeout or an error alert.
+- **Fails on:** a failed sign-in, an unfinished or error page, a console or page error, or a page wider than the screen. Navigation/sign-in times above 2 s are diagnostic warnings: they include network-idle settling waits and do not establish the NFR's end-user performance result.
+- **Results:** screenshots and `report.json` are uploaded as the `staging-walkthrough` artifact for 14 days. They show real staging data, so they are not committed (`output/staging-walkthrough/` is ignored).

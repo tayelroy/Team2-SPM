@@ -113,6 +113,11 @@ it names.
   installs its own confirmation definition. Apply `170001` and `170002` together
   on an existing deployment so there is no intermediate recheck bypass. The gate
   also checks the replacement link, its FK, helper functions and notification kind.
+- The per-event lookup indexes on `venue_bookings`, `venue_booking_requests`,
+  `equipment_requests` and `equipment_reservations`
+  (`202610260002_event_lookup_indexes.sql`, SG2-96). Without them the safety
+  check queue and the attendee event list slow down as data grows; see
+  [`nfr-capacity-review.md`](nfr-capacity-review.md).
 
 Notification schema drift can produce a partial success: submission changes the
 event state and writes history before its notice insert fails. The UI then

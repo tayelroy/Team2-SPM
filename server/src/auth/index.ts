@@ -17,6 +17,7 @@ export function createAuthorization({
   permissions = PERMISSIONS
 }: AuthorizationOptions = {}) {
   const principals = new WeakMap<Request, Principal>();
+  const verifiedHeaders = new WeakMap<Request, string>();
   // Copy the policy to isolate it from changes to the caller's arrays.
   const policy = Object.fromEntries(Object.entries(permissions).map(([action, roles]) => [action, [...roles]]));
 
@@ -27,18 +28,32 @@ export function createAuthorization({
 
   const requireAuth: RequestHandler = async (req, res, next) => {
     res.set('Cache-Control', 'no-store');
-    principals.delete(req);
     let acting: { principal: Principal; role: Role };
+    let headerSnapshot: string;
     try {
       const authorization = headerValues(req, 'authorization');
-      const match = /^Bearer ([A-Za-z0-9._~+/-]+=*)$/i.exec(authorization[0] ?? '');
-      if (authorization.length !== 1 || !match) throw new AccessError(401);
-      const resolved = await resolvePrincipal(match[1]);
-      // SG2-104: every role the account holds, then the one this request acts as.
-      const roles = heldRolesOf(resolved);
-      const role = selectActingRole(roles, headerValues(req, ACTING_ROLE_HEADER));
-      acting = { principal: Object.freeze({ userId: resolved.userId, role, roles }), role };
+      const requestedRole = headerValues(req, ACTING_ROLE_HEADER);
+      // Sibling protected routers share one verified identity only within this
+      // factory and HTTP request. Keep every raw header value so duplicates or
+      // middleware changes cannot reuse a principal verified for other headers.
+      headerSnapshot = JSON.stringify([authorization, requestedRole]);
+      const verified = principals.get(req);
+      if (verified && verifiedHeaders.get(req) === headerSnapshot) {
+        acting = { principal: verified, role: verified.role };
+      } else {
+        principals.delete(req);
+        verifiedHeaders.delete(req);
+        const match = /^Bearer ([A-Za-z0-9._~+/-]+=*)$/i.exec(authorization[0] ?? '');
+        if (authorization.length !== 1 || !match) throw new AccessError(401);
+        const resolved = await resolvePrincipal(match[1]);
+        // SG2-104: every role the account holds, then the one this request acts as.
+        const roles = heldRolesOf(resolved);
+        const role = selectActingRole(roles, requestedRole);
+        acting = { principal: Object.freeze({ userId: resolved.userId, role, roles }), role };
+      }
     } catch (error) {
+      principals.delete(req);
+      verifiedHeaders.delete(req);
       if (error instanceof ActingRoleError) {
         res.status(error.status).json({ error: error.message, code: error.code });
         return;
@@ -49,6 +64,7 @@ export function createAuthorization({
       return;
     }
     principals.set(req, acting.principal);
+    verifiedHeaders.set(req, headerSnapshot);
     // The rest of the request, including its database calls, acts as this role.
     runAsActingRole(acting.role, next);
   };

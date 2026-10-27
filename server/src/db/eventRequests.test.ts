@@ -733,7 +733,7 @@ function fakeSubmitEventClient(
 }
 
 describe('submitEventRequest', () => {
-  test('[NORMAL] [SG2-30:AC1] [SG2-100:AC2] [SG2-87:AC1] [SG2-87:AC3] an unheld request (no coordinator) updates to unassigned in a single call, stamping the submission time', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-100:AC1] [SG2-87:AC1] [SG2-87:AC3] an unheld request (no coordinator) updates to unassigned in a single call, stamping the submission time', async () => {
     let calls: SubmitCall[] = [];
     const result = await submitEventRequest(
       fakeSubmitEventClient(
@@ -752,7 +752,7 @@ describe('submitEventRequest', () => {
     assert.deepEqual(calls[0].coordinatorFilter, ['is', null]);
   });
 
-  test('[NORMAL] [SG2-36:AC2] [SG2-100:AC2] [SG2-87:AC3] a held request (already assigned) updates to submitted instead, never touching unassigned rows, with the same submission time', async () => {
+  test('[NORMAL] [SG2-36:AC2] [SG2-100:AC1] [SG2-87:AC3] a held request (already assigned) updates to submitted instead, never touching unassigned rows, with the same submission time', async () => {
     let calls: SubmitCall[] = [];
     const result = await submitEventRequest(
       fakeSubmitEventClient(
@@ -807,7 +807,7 @@ describe('submitEventRequest', () => {
     });
   }
 
-  test('[CONFLICT] [SG2-100:AC2] reports unavailable, not a lost update, when the coordinator is cleared between the two statements', async () => {
+  test('[CONFLICT] [SG2-100:AC1] reports unavailable, not a lost update, when the coordinator is cleared between the two statements', async () => {
     // A held request: the `unheld` attempt's `coordinator_id is null` filter
     // matches nothing, because the request was still held when it ran. The
     // Lead then clears the coordinator before the `held` attempt runs, so
@@ -1310,7 +1310,7 @@ describe('assignEventCoordinator', () => {
 });
 
 describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
-  test('[NORMAL] [SG2-100:AC3] writes submitted alongside the coordinator and guards on unassigned', async () => {
+  test('[NORMAL] [SG2-100:AC1] writes submitted alongside the coordinator and guards on unassigned', async () => {
     let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
     const result = await assignEventCoordinator(
       fakeAssignClient(
@@ -1339,7 +1339,7 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
     ]);
   });
 
-  test('[CONFLICT] [SG2-100:AC3] a reassignment on a live event never carries a status key', async () => {
+  test('[CONFLICT] [SG2-100:AC1] a reassignment on a live event never carries a status key', async () => {
     for (const status of ['approved', 'planning', 'awaiting_safety_check', 'preparation', 'confirmed']) {
       let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
       const result = await assignEventCoordinator(
@@ -1363,7 +1363,7 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
     }
   });
 
-  test('[BOUNDARY] [SG2-100:AC3] the undo of a first assignment puts unassigned back', async () => {
+  test('[BOUNDARY] [SG2-100:AC1] the undo of a first assignment puts unassigned back', async () => {
     let captured: { row: Record<string, unknown>; filters: [string, string, unknown][] } | undefined;
     const result = await assignEventCoordinator(
       fakeAssignClient(
@@ -1384,7 +1384,7 @@ describe('assignEventCoordinator status transition (SG2-100 Unit 2)', () => {
     ]);
   });
 
-  test('[FAILURE] [SG2-100:AC3] reports not_assignable when the guarded status move matches nothing', async () => {
+  test('[FAILURE] [SG2-100:AC1] reports not_assignable when the guarded status move matches nothing', async () => {
     const result = await assignEventCoordinator(
       fakeAssignClient({ data: [], error: null }),
       7,
@@ -1600,7 +1600,7 @@ const NOW = new Date('2026-11-05T12:00:00.000Z');
 const COMPLETABLE = ['preparation', 'confirmed'];
 
 describe('completeEvent (SG2-100 AC4)', () => {
-  test('[NORMAL] [SG2-100:AC6] [SG2-100:AC13] writes the completion with both guards repeated on the update', async () => {
+  test('[NORMAL] [SG2-100:AC4] writes the completion with both guards repeated on the update', async () => {
     let calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
     const result = await completeEvent(
       fakeCompleteClient({
@@ -1647,7 +1647,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     ]);
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] an end time exactly now counts as passed; one millisecond later does not', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] an end time exactly now counts as passed; one millisecond later does not', async () => {
     async function at(endsAt: string) {
       return completeEvent(
         fakeCompleteClient({
@@ -1667,7 +1667,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     if (!justAfter.ok) assert.equal(justAfter.reason, 'not_finished');
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] an event with no confirmed booking fails closed as not finished', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] an event with no confirmed booking fails closed as not finished', async () => {
     for (const bookingResult of [{ data: [], error: null }, { data: null, error: null }, { data: [{ ends_at: null }], error: null }]) {
       const result = await completeEvent(
         fakeCompleteClient({
@@ -1686,7 +1686,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
   });
 
   for (const data of [[], null]) {
-    test(`[FAILURE] [SG2-100:AC6] the ownership and status read is scoped to the coordinator and the completable statuses, matching ${JSON.stringify(data)} rows`, async () => {
+    test(`[FAILURE] [SG2-100:AC4] the ownership and status read is scoped to the coordinator and the completable statuses, matching ${JSON.stringify(data)} rows`, async () => {
       let calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
       const result = await completeEvent(
         fakeCompleteClient({ eventResult: { data, error: null }, capture: (c) => (calls = c) }),
@@ -1711,7 +1711,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     });
   }
 
-  test('[CONFLICT] [SG2-100:AC6] a completion that loses the race to the update reports not_found', async () => {
+  test('[CONFLICT] [SG2-100:AC4] a completion that loses the race to the update reports not_found', async () => {
     for (const data of [[], null]) {
       const result = await completeEvent(
         fakeCompleteClient({
@@ -1728,7 +1728,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     }
   });
 
-  test('[CONFLICT] [SG2-100:AC8] a status that moved between the read and the write is pinned out, never recorded as a stale previous_status', async () => {
+  test('[CONFLICT] [SG2-100:AC4] a status that moved between the read and the write is pinned out, never recorded as a stale previous_status', async () => {
     let calls: { table: string; op: string; row?: Record<string, unknown>; filters: [string, string, unknown][] }[] = [];
     // The pre-read saw `preparation`; by the time the guarded update runs the
     // row has moved to `confirmed` (another request completed the same
@@ -1758,7 +1758,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     ]);
   });
 
-  test('[FAILURE] [SG2-100:AC6] every failing query is reported as unavailable with its own message', async () => {
+  test('[FAILURE] [SG2-100:AC4] every failing query is reported as unavailable with its own message', async () => {
     const eventFailure = await completeEvent(
       fakeCompleteClient({ eventResult: { data: null, error: { message: 'events down' } } }),
       7, 'coord-1', NOW
@@ -1785,7 +1785,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
     assert.deepEqual(updateFailure, { ok: false, reason: 'unavailable', message: 'update down' });
   });
 
-  test('[BOUNDARY] [SG2-100:AC8] a row that comes back without a readable status reports an empty previous value rather than guessing', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] a row that comes back without a readable status reports an empty previous value rather than guessing', async () => {
     const result = await completeEvent(
       fakeCompleteClient({
         eventResult: { data: [{ event_id: 7, status: null }], error: null },
@@ -1803,7 +1803,7 @@ describe('completeEvent (SG2-100 AC4)', () => {
 
 
 describe('the event end time on a detail read (SG2-100 AC4)', () => {
-  test('[NORMAL] [SG2-100:AC6] detail reads explicitly embed bookings by event rather than the legacy event booking pointer', async () => {
+  test('[NORMAL] [SG2-100:AC4] detail reads explicitly embed bookings by event rather than the legacy event booking pointer', async () => {
     const client = createClient('https://fixture.example.test', 'synthetic-test-key', {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { fetch: async (input) => {
@@ -1833,7 +1833,7 @@ describe('the event end time on a detail read (SG2-100 AC4)', () => {
     return result.ok ? result.request : null;
   }
 
-  test('[NORMAL] [SG2-100:AC6] the end time is the latest confirmed booking, whatever order they arrive in', async () => {
+  test('[NORMAL] [SG2-100:AC4] the end time is the latest confirmed booking, whatever order they arrive in', async () => {
     const request = await detailFor([
       { ends_at: '2026-11-04T18:00:00.000Z', status: 'confirmed' },
       { ends_at: '2026-11-06T21:30:00.000Z', status: 'confirmed' },
@@ -1842,7 +1842,7 @@ describe('the event end time on a detail read (SG2-100 AC4)', () => {
     assert.equal(request?.ends_at, '2026-11-06T21:30:00.000Z');
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] a held booking does not set an end time, and a later held one cannot extend it', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] a held booking does not set an end time, and a later held one cannot extend it', async () => {
     const heldOnly = await detailFor([{ ends_at: '2026-11-04T18:00:00.000Z', status: 'held' }]);
     assert.equal(heldOnly?.ends_at, null);
 
@@ -1853,14 +1853,14 @@ describe('the event end time on a detail read (SG2-100 AC4)', () => {
     assert.equal(mixed?.ends_at, '2026-11-04T18:00:00.000Z');
   });
 
-  test('[FAILURE] [SG2-100:AC6] an absent, empty or malformed bookings list leaves the end time unknown', async () => {
+  test('[FAILURE] [SG2-100:AC4] an absent, empty or malformed bookings list leaves the end time unknown', async () => {
     for (const bookings of [undefined, null, [], 'nonsense', [{ status: 'confirmed' }], [{ ends_at: 42, status: 'confirmed' }], [null]]) {
       const request = await detailFor(bookings);
       assert.equal(request?.ends_at, null, JSON.stringify(bookings ?? null));
     }
   });
 
-  test('[FAILURE] [SG2-100:AC6] the bookings the end time was derived from are not sent to the caller', async () => {
+  test('[FAILURE] [SG2-100:AC4] the bookings the end time was derived from are not sent to the caller', async () => {
     const request = await detailFor([{ ends_at: '2026-11-04T18:00:00.000Z', status: 'confirmed' }]);
     assert.equal('venue_bookings' in (request as object), false);
   });

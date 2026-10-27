@@ -194,7 +194,7 @@ test('SG2-69-R02 | [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-104:AC2] switching 
   expect((await request.post('/__e2e/notification-inbox', { data: { multiRole: true } })).status()).toBe(204);
   await signIn(page);
   const acting = page.getByRole('combobox', { name: 'Acting as', exact: true });
-  await expect(acting).toHaveValue('Attendee');
+  await expect(acting).toHaveText('Attendee');
   await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
   await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveCount(0);
   await expect(inbox(page).getByRole('button', { name: /^Unread:/ })).toHaveCount(2);
@@ -206,8 +206,10 @@ test('SG2-69-R02 | [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-104:AC2] switching 
   expect((await request.get('/api/notifications/event/1/event', { headers })).status()).toBe(404);
   expect((await request.put('/api/notifications/reminder-preferences', { headers, data: { frequency_days: 4 } })).status()).toBe(403);
 
-  await acting.selectOption('Event Coordinator');
-  await expect(acting).toHaveValue('Event Coordinator');
+  await acting.click();
+  await page.getByRole('listbox', { name: 'Available roles', exact: true })
+    .getByRole('option', { name: 'Event Coordinator', exact: true }).click();
+  await expect(acting).toHaveText('Event Coordinator');
   await page.getByRole('button', { name: 'Notifications (2)', exact: true }).click();
   await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveValue('1');
   await inbox(page).getByLabel('Reminder frequency (days)', { exact: true }).fill('4');
@@ -218,7 +220,9 @@ test('SG2-69-R02 | [CONFLICT] [SG2-69:AC3] [SG2-69:AC6] [SG2-104:AC2] switching 
   const receipt = (await ledger(page)).notifications.find((row: { notification_id: number }) => row.notification_id === 1).read_at;
   expect(receipt).toEqual(expect.any(String));
 
-  await acting.selectOption('Attendee');
+  await acting.click();
+  await page.getByRole('listbox', { name: 'Available roles', exact: true })
+    .getByRole('option', { name: 'Attendee', exact: true }).click();
   await page.getByRole('button', { name: 'Notifications (1)', exact: true }).click();
   await expect(inbox(page).getByLabel('Reminder frequency (days)', { exact: true })).toHaveCount(0);
   await expect(inbox(page).getByRole('button', { name: 'Read: Reminder Forum still needs: Venue booking, Equipment.', exact: true })).toBeVisible();

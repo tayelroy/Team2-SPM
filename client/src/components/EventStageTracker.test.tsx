@@ -194,7 +194,7 @@ describe('EventStageTracker at seven steps (SG2-100 AC9)', () => {
     expect(items[4]).toHaveAttribute('aria-current', 'step');
   });
 
-  test('[BOUNDARY] [SG2-100:AC9] the step track scrolls on a narrow viewport rather than squashing or overflowing the page', () => {
+  test('[BOUNDARY] [SG2-100:AC5] the step track scrolls on a narrow viewport rather than squashing or overflowing the page', () => {
     render(<EventStageTracker stage={safetyStage} />);
     const track = screen.getByTestId('stepper-track');
     // The track owns the horizontal scroll, so seven steps never push the
@@ -282,7 +282,7 @@ describe('EventStageTracker on a phone-width track (SG2-38)', () => {
     outstanding_arrangements: [],
   });
 
-  test('[NORMAL] [SG2-38:AC1] [SG2-100:AC9] the current step is scrolled to the middle of the track, never by scrolling the page', () => {
+  test('[NORMAL] [SG2-38:AC1] [SG2-100:AC5] the current step is scrolled to the middle of the track, never by scrolling the page', () => {
     const pageScroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
     render(<EventStageTracker stage={stageAt(3)} />);
     const track = screen.getByTestId('stepper-track');
@@ -293,7 +293,7 @@ describe('EventStageTracker on a phone-width track (SG2-38)', () => {
     expect(screen.getByTestId('stepper-scroll-hint')).toHaveTextContent('Swipe sideways to see all 7 steps.');
   });
 
-  test('[BOUNDARY] [SG2-38:AC1] [SG2-100:AC9] the hint follows the track as it is scrolled to an end and as the window resizes', () => {
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-100:AC5] the hint follows the track as it is scrolled to an end and as the window resizes', () => {
     render(<EventStageTracker stage={stageAt(1)} />);
     const track = screen.getByTestId('stepper-track');
     // Awaiting Assignment: 103 − (274 − 95) / 2.

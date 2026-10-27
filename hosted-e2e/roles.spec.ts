@@ -1,5 +1,6 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import policy from './policy.cjs';
+import roleControls from '../.github/scripts/acting-role-control.cjs';
 const { HOSTED_ORIGIN, ROLES, allowedRequest, excludedDeploymentRequest, excludedDeploymentConsole, consoleIssue } = policy;
 // User-requested recorded Playwright proof. No reset/APIRequestContext,
 // sessionStorage, storageState, token inspection, HAR or trace is used.
@@ -228,7 +229,7 @@ async function expectHostedRole(role: Role, page: Page, info: TestInfo) {
       authenticatedBannerVisible = true;
       info.annotations.push({ type: 'hosted-flag', description: 'authenticated-banner-visible' });
       phase('role-identity');
-      await expect(page.getByLabel('Your role', { exact: true })).toHaveText(account.label);
+      expect(await roleControls.getCurrentRole(page)).toBe(account.label);
       info.annotations.push({ type: 'hosted-flag', description: 'role-identity-matched' });
       phase('permissions-ready');
       await expect(page.getByRole('navigation')).toHaveAttribute('aria-busy', 'false');

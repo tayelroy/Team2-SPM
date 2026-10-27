@@ -1,8 +1,19 @@
 {
-  "reviewDate": "2026-10-01",
+  "reviewDate": "2026-10-26",
   "reviewedBy": "LIM JUN WEI",
-  "source": "Live SPM Jira descriptions read on 1 October 2026. AC numbers are their displayed bullet order; Jira bullets are not separately numbered.",
+  "source": "Live SPM Jira descriptions read on 26 October 2026 (SG2-96). AC numbers are their displayed bullet order; Jira bullets are not separately numbered. Formatting marks are dropped; struck-through Jira text is kept as plain text. SG2-71 is kept from the 1 October read because it is not returned by Jira search.",
   "stories": [
+    {
+      "id": "SG2-2",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-2",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "Can register with name, email, password and organisation",
+        "AC2": "Cannot register twice with the same email address",
+        "AC3": "Is told clearly whether registration succeeded or why it failed"
+      }
+    },
     {
       "id": "SG2-19",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-19",
@@ -221,9 +232,10 @@
       "id": "SG2-36",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-36",
       "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
-        "AC1": "Given a request assigned to me, when I return it for clarification with a message, then the Event Organiser is notified and can see my questions and that a response is needed",
-        "AC2": "Given a returned request, the Event Organiser can amend and resubmit it, after which it returns to my review queue and I am notified",
+        "AC1": "Can return a request assigned to me for clarification with a message; the Event Organiser is notified and can see the questions and that a response is needed",
+        "AC2": "While the request is returned for clarification, the Event Organiser can amend its details and resubmit it; the request returns to my review queue and I am notified",
         "AC3": "The clarification exchange remains visible against the event record"
       }
     },
@@ -334,9 +346,10 @@
       "originalPullRequests": [
         "https://github.com/tayelroy/Team2-SPM/pull/45"
       ],
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
         "AC1": "Given a venue with no booking in a period, when I block that period with a reason, then the venue is shown as unavailable then and is not returned by venue search",
-        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified (superseded by SG2-80, Week 7 change #2: such a period can now be blocked and its bookings are flagged as affected)",
+        "AC2": "Given a period already holding a confirmed booking, when I try to block it, then the block is refused and the conflicting booking is identified",
         "AC3": "Given a block I have created, when I remove it, then the venue becomes available for that period again"
       }
     },
@@ -389,6 +402,79 @@
       }
     },
     {
+      "id": "SG2-60",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-60",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "Given an event open for registration with places remaining, when I register, then my place is held and I am given confirmation",
+        "AC2": "Given I have already registered for that event, the duplicate is refused",
+        "AC3": "Given registration is not currently open, registration is refused and I am told when it opens or that it has closed",
+        "AC4": "Required registration information is validated before the registration is accepted"
+      },
+      "jiraStatus": "To Do"
+    },
+    {
+      "id": "SG2-61",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-61",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "Given an event whose places are all taken, when a further Attendee tries to register, then registration is refused and the event is shown as full",
+        "AC2": "Given the last remaining place and two simultaneous attempts, exactly one succeeds",
+        "AC3": "When an event reaches capacity, the Organiser and Coordinator are notified",
+        "AC4": "The capacity applied is the one the Event Organiser has currently set (SG2-63); the Organiser may raise it, including above the venue's capacity",
+        "AC5": "Given an event that is full, the Attendee is offered a place on its waiting list; the list is first come, first served and the Attendee can see their position",
+        "AC6": "An Attendee who is already registered, or already on the list, cannot join it again; an Attendee can leave the list at any time",
+        "AC7": "The Event Organiser and the assigned Event Coordinator can see the waiting list"
+      },
+      "jiraStatus": "To Do"
+    },
+    {
+      "id": "SG2-62",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-62",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "Can see my registrations with the event details and where each stands",
+        "AC2": "Can withdraw my active registration at any time before the event's current start time, after confirming, even if registration has already closed",
+        "AC3": "Withdrawing returns the place to the event's available capacity",
+        "AC4": "At or after the event's start time, withdrawal is refused and I am told that the event has started",
+        "AC5": "When a withdrawal frees a place, the Event Organiser and the assigned Event Coordinator are notified (Week 1 brief §6: \"a registered Attendee withdraws where that affects availability\")",
+        "AC6": "When a withdrawal, or a capacity increase, frees a place on an event with a waiting list, the first Attendee on the list is notified and can register for it; if they do not register within the response window the Event Organiser has set, or before registration closes, the place is offered to the next Attendee on the list"
+      },
+      "jiraStatus": "To Do"
+    },
+    {
+      "id": "SG2-64",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-64",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "Can raise a change request after an event has been submitted, including while it is Under Review, Approved, Planning or Confirmed, stating what should change, to what, and why",
+        "AC2": "The request reaches the assigned Coordinator",
+        "AC3": "The outstanding request is visible on the event to both of us",
+        "AC4": "Change requests cannot be raised against a cancelled, rejected or completed event",
+        "AC5": "While a request is returned for clarification, the Event Organiser cannot edit it directly (refused on the server side); they answer in the clarification thread and ask for any change to the request through a change request (replaces SG2-36 AC2 and the clarification exception in SG2-30 AC3)",
+        "AC6": "A rejected request is revised through the Coordinator, and the Event Organiser resubmits it when the Coordinator decides a new submission is needed; direct Organiser changes to submitted fields remain refused"
+      },
+      "jiraStatus": "To Do"
+    },
+    {
+      "id": "SG2-65",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-65",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "Given an outstanding change request, when I accept it, then the change takes effect on the event and the Organiser is notified",
+        "AC2": "Given an outstanding change request, when I refuse it, then I must give a reason and the event is unchanged",
+        "AC3": "Given any decision, the request, the decision, who made it and when are recorded against the event",
+        "AC4": "For a request returned for clarification, accepting the change applies it to the request, and I decide whether the request goes back to review or must be resubmitted by the Organiser",
+        "AC5": "Accepting a significant change on a Confirmed event, or one in Preparation, moves the event back to Planning as described in SG2-66"
+      },
+      "jiraStatus": "To Do"
+    },
+    {
       "id": "SG2-80",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-80",
       "originalPullRequests": [],
@@ -406,12 +492,12 @@
       "id": "SG2-98",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-98",
       "originalPullRequests": [],
-      "sourceReadDate": "2026-10-14",
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
-        "AC1": "Blocking a period that contains confirmed bookings is no longer refused; the bookings are flagged as affected instead (see SG2-80)",
-        "AC2": "SG2-45 AC1 (blocked venue is shown as unavailable and excluded from search) and AC3 (removing a block restores availability) still hold",
-        "AC3": "Existing blocks are kept as venue unavailability records",
-        "AC4": "Tests for SG2-45 AC2 are replaced with the new behaviour; the rest of the SG2-45 tests still pass"
+        "AC1": "Blocking a period that contains confirmed bookings is no longer refused; the bookings are flagged as affected instead (see SG2-80) — delivered by SG2-80, PR #70 (merged): server/src/venues/blocks.ts accepts the period and the database flags the affected bookings",
+        "AC2": "SG2-45 AC1 (blocked venue is shown as unavailable and excluded from search) and AC3 (removing a block restores availability) still hold — verify against current main and tag the covering tests [SG2-98:AC2]",
+        "AC3": "Existing blocks are kept as venue unavailability records — verify the SG2-45 blocks migrated into the SG2-80 unavailability model and tag the covering test [SG2-98:AC3]",
+        "AC4": "Tests for SG2-45 AC2 are replaced with the new behaviour; the rest of the SG2-45 tests still pass — delivered by PR #70: no test on main asserts the old refusal. Record the replacement in docs/regression-cases.json and mark the 17 superseded SG2-45:AC2 rows in the test-case register as \"Superseded by SG2-80 (PR #70)\""
       }
     },
     {
@@ -440,6 +526,20 @@
         "AC4": "The Event Coordinator is warned before the hold expires (e.g. 24 hours before; confirm the lead time with the customer) and notified again when it expires",
         "AC5": "The expiry is recorded in the event's history"
       }
+    },
+    {
+      "id": "SG2-102",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-102",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "acceptanceCriteria": {
+        "AC1": "When a change to an event's date, time or venue takes effect (an accepted change request, or a replacement venue after the original became unavailable), every attendee with an active registration is notified",
+        "AC2": "The notification shows the event and what changed, with old and new values",
+        "AC3": "Attendees who have withdrawn are not notified",
+        "AC4": "The attendee-facing event details (SG2-59, SG2-62) show the updated information",
+        "AC5": "Changes to internal planning information that attendees don't see do not trigger attendee notifications"
+      },
+      "jiraStatus": "To Do"
     },
     {
       "id": "SG2-106",
@@ -587,21 +687,14 @@
       "id": "SG2-100",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-100",
       "originalPullRequests": [],
-      "sourceReadDate": "2026-10-06",
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
-        "AC1": "public.event_status contains unassigned, awaiting_safety_check, safety_rejected and preparation, with all 14 values present in a fresh CI database",
-        "AC2": "Submitting a complete draft returns 200 with request.status === 'unassigned'; no row is left in 'submitted' with a null coordinator_id after the backfill",
-        "AC3": "Assigning a coordinator on an unassigned event moves it to submitted; assigning on an already-advanced event leaves its status unchanged",
-        "AC4": "canTransition returns true for exactly the edges in the status flow diagram and false for every other ordered pair, including every pair whose source is completed or cancelled",
-        "AC5": "GET the event stage returns the exact stage, stage_key and waiting_on values for unassigned, awaiting_safety_check, safety_rejected and preparation, and a stepper_steps array of length 7; planning returns stage 'Arrangements' with stage_key 'in_planning'",
-        "AC6": "Marking an event Completed by the assigned coordinator on a confirmed or preparation event whose end time has passed returns 200 with status 'completed' and completed_by/completed_at populated",
-        "AC7": "A completed event is refused by further planning updates, is absent from the work queue, and remains readable via the event and history endpoints",
-        "AC8": "Each new lifecycle transition appends exactly one event_audit_logs row with the correct old_value/new_value/actor_id; a failed audit insert does not fail the transition",
-        "AC9": "EventDetail and the 7-step stepper render without layout breakage or horizontal overflow at 390x844 and 1440x900",
-        "AC10": "npm run ci is green with 100% per-file statement, branch, line and function coverage in both server and client",
-        "AC11": "All four DoD category tags appear in the new tests and in the PR Test Case Inventory table; every commit carries [SG2-100]",
-        "AC12": "The e2e regression journeys for this story pass and are registered in docs/regression-cases.json",
-        "AC13": "No secrets are committed; every new route is permission-gated server-side; every new write repeats its guards as conditions on the update itself"
+        "AC1": "A submitted request shows as Unassigned until the Event Coordinator Lead assigns it, then moves into review",
+        "AC2": "New statuses are added: Awaiting Safety Check, Safety Rejected and Preparation, with only valid transitions allowed",
+        "AC3": "The outstanding-items view (SG2-57) includes the safety check as a step",
+        "AC4": "Once an event's end time has passed, the assigned Event Coordinator can mark it Completed, but only if it was Confirmed or in Preparation. A Completed event is read-only (no edits, change requests, registrations or cancellations), drops out of active work lists, and stays viewable in its history, with who completed it and when recorded",
+        "AC5": "The SG2-38 rule still holds: one current state, plain wording, and who the event is waiting on (e.g. \"Waiting on the Safety Officer\")",
+        "AC6": "To clarify with the customer: does the event become Confirmed before or after safety approval?"
       }
     },
     {
@@ -619,17 +712,16 @@
     {
       "id": "SG2-53",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-53",
-      "summary": "Record what equipment an event needs",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
         "AC1": "Can record required equipment against an approved event, with type, quantity and technical notes",
         "AC2": "Can amend the requirements while they are still being arranged",
         "AC3": "A quantity that is not a positive number is refused",
         "AC4": "The request reaches Technical Support Staff",
         "AC5": "Technical Support Staff can record updates on the request as equipment is arranged, including any shortfall, and the coordinator can see these updates",
-        "AC6": "For each requested item, Technical Support Staff can record where it will be placed (which venue and position within it), for the Safety Officer review (Week 7 change #6, SG2-91); an item with no placement recorded is shown as Not recorded"
-      },
-      "originalPullRequests": [],
-      "source": "Live Jira SG2-53 description verified in the in-app browser on 8 October 2026. AC numbering follows displayed bullet order."
+        "AC6": "For each requested item, Technical Support Staff can record where it will be placed (which venue and position within it), for the Safety Officer's review (Week 7 change #6, SG2-91); an item with no placement recorded is shown as \"Not recorded\""
+      }
     },
     {
       "id": "SG2-57",
@@ -694,14 +786,13 @@
     {
       "id": "SG2-58",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-58",
-      "summary": "Confirm an event",
       "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
         "AC1": "Given an event I coordinate with every required venue booking approved, any requested equipment reserved, and registration capacity and opening/closing times set if registration is needed, when I confirm it, then its status becomes Confirmed and the Event Organiser can see the confirmed arrangements and is notified",
-        "AC2": "Given an event with any of these required arrangements outstanding (including any one of several venue bookings), when I try to confirm it, confirmation is refused and the outstanding items are listed; equipment or registration that is not required does not block confirmation",
+        "AC2": "Given an event with any of these required arrangements outstanding (including any one of several venue bookings), when I try to confirm it, then confirmation is refused and the outstanding items are listed; equipment or registration that is not required does not block confirmation",
         "AC3": "Given a confirmed event for which registration is required, attendees can register once the registration period is open"
-      },
-      "source": "SG2-58 Jira acceptance criteria as recorded in the team's implementation contract; AC numbering follows displayed bullet order. Product-owner decisions: confirm only from Preparation; equipment must be reserved and placed with no shortfall; AC3 is delivered as the open-for-registration rule (SG2-60 builds registration)."
+      }
     },
     {
       "id": "SG2-68",
@@ -828,13 +919,13 @@
       "id": "SG2-94",
       "url": "https://smu-spm-group.atlassian.net/browse/SG2-94",
       "originalPullRequests": [],
-      "sourceReadDate": "2026-10-22",
+      "sourceReadDate": "2026-10-26",
       "acceptanceCriteria": {
         "AC1": "Given an event with no approved safety check, any attempt to move it to Preparation is refused on the server side, and the reason is shown",
         "AC2": "Given an event whose most recent safety decision is Approve, it can move to Preparation",
         "AC3": "If a significant change (date/time, attendance, venue, equipment) is accepted after safety approval, the approval is withdrawn and the event must be checked again",
         "AC4": "The event's status and its outstanding items show the safety check as a step",
-        "AC5": "Given an event whose most recent safety decision is not Approve, when the Event Coordinator tries to confirm it, then confirmation is refused on the server side and the safety check is listed among the outstanding items; the coordinator can confirm only once the Safety Officer has approved. This supersedes SG2-58 AC1, which allowed confirmation on venue and equipment alone",
+        "AC5": "Given an event whose most recent safety decision is not Approve, when the Event Coordinator tries to confirm it, then confirmation is refused on the server side and the safety check is listed among the outstanding items; the coordinator can confirm only once the Safety Officer has approved (customer answer, 9 Oct 2026: \"the co-ordinator needs to mark the event as confirmed once he sees all approvals are done\"). This supersedes SG2-58 AC1, which allowed confirmation on venue and equipment alone; SG2-58 tests are updated accordingly",
         "AC6": "Registration settings do not block confirmation: an event that needs registration can be confirmed before its capacity and times are set, and Attendees can register only once the Event Organiser has set them and registration is open (SG2-63). This supersedes the registration condition in SG2-57 AC1 and SG2-58 AC1/AC2"
       }
     },

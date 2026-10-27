@@ -80,7 +80,7 @@ function buildApp(options: HarnessOptions = {}) {
 }
 
 describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
-  test('[NORMAL] [SG2-100:AC6] [SG2-100:AC8] the assigned coordinator completes a confirmed event and the change is recorded once', async () => {
+  test('[NORMAL] [SG2-100:AC4] the assigned coordinator completes a confirmed event and the change is recorded once', async () => {
     const audits: InsertAuditLogInput[][] = [];
     const calls: [number, string, string][] = [];
     const response = await request(buildApp({ audits, calls }))
@@ -98,7 +98,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     ]]);
   });
 
-  test('[NORMAL] [SG2-100:AC8] completing from preparation records preparation as the previous value', async () => {
+  test('[NORMAL] [SG2-100:AC4] completing from preparation records preparation as the previous value', async () => {
     const audits: InsertAuditLogInput[][] = [];
     const response = await request(
       buildApp({
@@ -119,7 +119,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     ]]);
   });
 
-  test('[CONFLICT] [SG2-100:AC6] an event that has not finished is refused with the one error worth naming', async () => {
+  test('[CONFLICT] [SG2-100:AC4] an event that has not finished is refused with the one error worth naming', async () => {
     const audits: InsertAuditLogInput[][] = [];
     const response = await request(
       buildApp({
@@ -136,7 +136,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     assert.deepEqual(audits, []);
   });
 
-  test('[CONFLICT] [SG2-100:AC6] a second completion of the same event adds no second history row', async () => {
+  test('[CONFLICT] [SG2-100:AC4] a second completion of the same event adds no second history row', async () => {
     const audits: InsertAuditLogInput[][] = [];
     const response = await request(
       buildApp({ audits, completeResult: { ok: false, reason: 'not_found', message: 'ignored' } })
@@ -150,7 +150,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
   });
 
   for (const eventId of ['0', '-1', 'abc', '1.5']) {
-    test(`[BOUNDARY] [SG2-100:AC6] event id ${eventId} is refused before any write`, async () => {
+    test(`[BOUNDARY] [SG2-100:AC4] event id ${eventId} is refused before any write`, async () => {
       const calls: [number, string, string][] = [];
       const response = await request(buildApp({ calls }))
         .patch(`/api/event-requests/${eventId}/complete`)
@@ -162,14 +162,14 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     });
   }
 
-  test('[BOUNDARY] [SG2-100:AC6] the first positive id reaches the write', async () => {
+  test('[BOUNDARY] [SG2-100:AC4] the first positive id reaches the write', async () => {
     const calls: [number, string, string][] = [];
     const response = await request(buildApp({ calls })).patch('/api/event-requests/1/complete').send();
     assert.equal(response.status, 200);
     assert.deepEqual(calls, [[1, 'coord-1', '2026-11-05T12:00:00.000Z']]);
   });
 
-  test('[FAILURE] [SG2-100:AC6] a coordinator the event is not assigned to is told nothing about it', async () => {
+  test('[FAILURE] [SG2-100:AC4] a coordinator the event is not assigned to is told nothing about it', async () => {
     const response = await request(
       buildApp({
         principal: { userId: 'coord-other', role: 'event_coordinator' },
@@ -185,7 +185,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     assert.deepEqual(response.body, { error: 'No completable event is assigned to this account.' });
   });
 
-  test('[FAILURE] [SG2-100:AC6] no verified principal is refused before any write', async () => {
+  test('[FAILURE] [SG2-100:AC4] no verified principal is refused before any write', async () => {
     const calls: [number, string, string][] = [];
     const response = await request(buildApp({ principal: undefined, calls }))
       .patch('/api/event-requests/7/complete')
@@ -196,7 +196,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     assert.deepEqual(calls, []);
   });
 
-  test('[FAILURE] [SG2-100:AC6] an unconfigured database is reported as temporarily unavailable', async () => {
+  test('[FAILURE] [SG2-100:AC4] an unconfigured database is reported as temporarily unavailable', async () => {
     const response = await request(buildApp({ admin: null }))
       .patch('/api/event-requests/7/complete')
       .send();
@@ -207,7 +207,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     });
   });
 
-  test('[FAILURE] [SG2-100:AC6] a failing write is reported as temporarily unavailable', async () => {
+  test('[FAILURE] [SG2-100:AC4] a failing write is reported as temporarily unavailable', async () => {
     const response = await request(
       buildApp({ completeResult: { ok: false, reason: 'unavailable', message: 'connection reset' } })
     )
@@ -220,7 +220,7 @@ describe('PATCH /api/event-requests/:eventId/complete (SG2-100 AC4)', () => {
     });
   });
 
-  test('[FAILURE] [SG2-100:AC8] a lost history row does not undo a completion that really happened', async () => {
+  test('[FAILURE] [SG2-100:AC4] a lost history row does not undo a completion that really happened', async () => {
     const response = await request(
       buildApp({ auditResult: { ok: false, reason: 'unavailable', message: 'history down' } })
     )

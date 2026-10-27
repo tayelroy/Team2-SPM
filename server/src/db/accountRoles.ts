@@ -117,6 +117,9 @@ export interface CoordinatorOption {
   name: string;
 }
 
+/** Coordinator ids per profile request; 100 uuids keep the URL near 4 KB. */
+export const COORDINATOR_ID_BATCH = 100;
+
 export type ListCoordinatorsResult =
   | { ok: true; coordinators: CoordinatorOption[] }
   | { ok: false; error: string };
@@ -136,11 +139,19 @@ export async function listCoordinators(admin: SupabaseClient): Promise<ListCoord
     return { ok: true, coordinators: [] };
   }
 
-  const users = await admin.from('users').select('user_id, name').in('user_id', ids);
-  if (users.error) {
-    return { ok: false, error: users.error.message };
+  // SG2-96 capacity review: one `in` filter with every coordinator's id put
+  // ~40 characters per id into the request URL, and at 600 coordinators the
+  // database gateway refused it (the Lead's queue answered 503). Ask in batches.
+  const batches: string[][] = [];
+  for (let start = 0; start < ids.length; start += COORDINATOR_ID_BATCH) {
+    batches.push(ids.slice(start, start + COORDINATOR_ID_BATCH));
   }
-  const coordinators = ((users.data as CoordinatorOption[] | null) ?? [])
+  const pages = await Promise.all(batches.map(batch => admin.from('users').select('user_id, name').in('user_id', batch)));
+  const failed = pages.find(page => page.error);
+  if (failed) {
+    return { ok: false, error: failed.error!.message };
+  }
+  const coordinators = pages.flatMap(page => (page.data as CoordinatorOption[] | null) ?? [])
     .map(({ user_id, name }) => ({ user_id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return { ok: true, coordinators };

@@ -717,7 +717,7 @@ async function openHeld(item: WorkItem, fetch: ReturnType<typeof vi.fn>) {
   await screen.findByRole('heading', { name: item.title });
 }
 
-test('[NORMAL] [SG2-100:AC6] the assigned coordinator marks a held event completed from the work queue', async () => {
+test('[NORMAL] [SG2-100:AC4] the assigned coordinator marks a held event completed from the work queue', async () => {
   const fetch = completionFetch(held, () => Response.json({ request: { event_id: 28, status: 'completed' } }));
   await openHeld(held, fetch);
   expect(screen.getByText(/This event ended on 15 Jun 2030, 18:00 \(Singapore time\)/)).toBeVisible();
@@ -735,14 +735,14 @@ test('[NORMAL] [SG2-100:AC6] the assigned coordinator marks a held event complet
   });
 });
 
-test('[NORMAL] [SG2-100:AC6] an event in preparation can also be marked completed once held', async () => {
+test('[NORMAL] [SG2-100:AC4] an event in preparation can also be marked completed once held', async () => {
   const preparation = { ...held, status: 'preparation' };
   await openHeld(preparation, completionFetch(preparation, () => Response.json({})));
   expect(screen.getByText('preparation', { exact: true })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Mark as Completed' })).toBeEnabled();
 });
 
-test('[BOUNDARY] [SG2-100:AC6] completion is offered from the exact end time, never before it or with no confirmed booking', async () => {
+test('[BOUNDARY] [SG2-100:AC4] completion is offered from the exact end time, never before it or with no confirmed booking', async () => {
   for (const [ends_at, offered] of [[NOW, true], ['2030-06-15T12:00:00.001Z', false], [null, false]] as const) {
     const item = { ...held, ends_at };
     await openHeld(item, completionFetch(item, () => Response.json({})));
@@ -751,7 +751,7 @@ test('[BOUNDARY] [SG2-100:AC6] completion is offered from the exact end time, ne
   }
 });
 
-test('[CONFLICT] [SG2-100:AC6] a rapid double-click sends one completion and disables the button while it is in flight', async () => {
+test('[CONFLICT] [SG2-100:AC4] a rapid double-click sends one completion and disables the button while it is in flight', async () => {
   let resolve!: (response: Response) => void;
   const fetch = completionFetch(held, () => new Promise<Response>(yes => { resolve = yes; }));
   await openHeld(held, fetch);
@@ -764,7 +764,7 @@ test('[CONFLICT] [SG2-100:AC6] a rapid double-click sends one completion and dis
   expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/complete'))).toHaveLength(1);
 });
 
-test('[FAILURE] [SG2-100:AC6] a refused completion is explained and leaves the action available to retry', async () => {
+test('[FAILURE] [SG2-100:AC4] a refused completion is explained and leaves the action available to retry', async () => {
   await openHeld(held, completionFetch(held, () => Response.json({ error: 'This event has not finished yet.' }, { status: 409 })));
   fireEvent.click(screen.getByRole('button', { name: 'Mark as Completed' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('This event has not finished yet.');
@@ -772,7 +772,7 @@ test('[FAILURE] [SG2-100:AC6] a refused completion is explained and leaves the a
   expect(screen.getByText('confirmed', { exact: true })).toBeVisible();
 });
 
-test('[FAILURE] [SG2-100:AC6] completion is never offered on someone else\'s event or before the event is confirmed or in preparation', async () => {
+test('[FAILURE] [SG2-100:AC4] completion is never offered on someone else\'s event or before the event is confirmed or in preparation', async () => {
   for (const item of [{ ...held, assigned_to_me: false }, { ...held, status: 'approved' }, { ...held, status: 'planning' }]) {
     await openHeld(item, completionFetch(item, () => Response.json({})));
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
