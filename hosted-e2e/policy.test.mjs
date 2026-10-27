@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import policy from './policy.cjs';
 const { HOSTED_ORIGIN, allowedRequest, excludedDeploymentRequest, excludedDeploymentConsole, safeResult, junit, consoleIssue } = policy;
@@ -23,7 +22,6 @@ test('[FAILURE] [BOUNDARY] [SG2-25:AC2] hosted guard refuses alternate origins a
   assert.equal(excludedDeploymentConsole('error','Failed to load resource: net::ERR_FAILED',HOSTED_ORIGIN+'/api/profile',true),false);
   assert.equal(excludedDeploymentConsole('error','Application crashed',feedback,true),false);
   const observed='Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector';
-  assert.equal(createHash('sha256').update(observed).digest('hex'),'45427d24ad2d164eb9faf5df85dd0a36332d31f1ca61da52d0ddb04a097d105a');
   assert.equal(excludedDeploymentConsole('error',observed,feedback,true),true);
   assert.equal(excludedDeploymentConsole('error',observed,feedback,false),false);
   assert.equal(excludedDeploymentConsole('error',observed,HOSTED_ORIGIN+'/assets/app.js',true),false);

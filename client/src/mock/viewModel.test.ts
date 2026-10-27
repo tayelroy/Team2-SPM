@@ -72,12 +72,15 @@ describe('eventCards', () => {
   });
 
   test('[NORMAL] [SG2-20:prototype-view-model] a coordinator gets the decision they owe on each event', () => {
+    const cards = eventCards('Event Coordinator');
     const byRef = Object.fromEntries(
-      eventCards('Event Coordinator').map((c) => [c.ref, c.next]),
+      cards.map((c) => [c.ref, c.next]),
     );
     expect(byRef['E-201']).toBe('Next: decide or request clarification');
     expect(byRef['E-190']).toBe('Next: confirm equipment');
     expect(byRef['E-198']).toBe('Next: no action');
+    const card = cards[0];
+    expect(card.meta).toBe('20 Nov 2026 · 300 expected · —');
   });
 
   test('[NORMAL] [SG2-20:prototype-view-model] an organiser is told what is on them', () => {
@@ -95,11 +98,6 @@ describe('eventCards', () => {
       eventCards('Venue Staff').map((c) => [c.ref, c.next]),
     );
     expect(byRef['E-198']).toBe('Arrangements confirmed');
-  });
-
-  test('[NORMAL] [SG2-20:prototype-view-model] the summary line carries date, attendance and venue', () => {
-    const card = eventCards('Event Coordinator')[0];
-    expect(card.meta).toBe('20 Nov 2026 · 300 expected · —');
   });
 });
 
@@ -215,9 +213,6 @@ describe('calendarDays', () => {
     expect(days).toHaveLength(35);
     expect(days.slice(0, 3).every((d) => d.n === '')).toBe(true);
     expect(days[3].n).toBe('1');
-  });
-
-  test('[BOUNDARY] [SG2-20:prototype-view-model] numbers run to the end of the month and then stop', () => {
     expect(days[33].n).toBe('31');
     expect(days[34].n).toBe('');
   });
@@ -239,18 +234,12 @@ describe('calendarDays', () => {
 });
 
 describe('equipmentViews', () => {
-  test('[NORMAL] [SG2-20:prototype-view-model] offers a reserve action on available stock', () => {
+  test('[NORMAL] [CONFLICT] [SG2-20:prototype-view-model] offers a reserve action on available stock', () => {
     const rows = equipmentViews({});
     expect(rows[0].btn).toBe('Reserve');
     expect(rows[0].done).toBe(false);
-  });
-
-  test('[CONFLICT] [SG2-20:prototype-view-model] a shortfall asks for the conflict to be resolved', () => {
-    expect(equipmentViews({})[1].btn).toBe('Resolve conflict');
-  });
-
-  test('[CONFLICT] [SG2-20:prototype-view-model] items that arrived reserved are already settled', () => {
-    const alreadyReserved = equipmentViews({})[3];
+    expect(rows[1].btn).toBe('Resolve conflict');
+    const alreadyReserved = rows[3];
     expect(alreadyReserved.done).toBe(true);
     expect(alreadyReserved.avail).toBe('Reserved');
   });

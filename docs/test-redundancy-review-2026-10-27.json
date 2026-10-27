@@ -1,0 +1,3865 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-10-27",
+  "baselineRef": "0db479c25f85082ca7ee63686bc060e36b2a1b81",
+  "repository": "tayelroy/Team2-SPM",
+  "branch": "refactor/removing-redundant-test-cases",
+  "purpose": "Identify demonstrably redundant current test coverage and prepare a reviewable cleanup under the attached DoD, while preserving distinct behavior and historical evidence.",
+  "definitionOfDone": {
+    "version": "2.1",
+    "attachment": "Definition of Done (DoD) - v2.1.docx",
+    "sha256": "0259272949051ab55a275602c3f91bd62679ecdb6d765af13bb9758fd4db4c01",
+    "gatesApplied": [
+      "Public API/exported service/rendered workflow seams",
+      "Independent concrete assertions",
+      "NORMAL, BOUNDARY, CONFLICT and FAILURE per feature",
+      "100% per-file statements, branches, lines and functions",
+      "Traceability and structured teammate review before merge"
+    ]
+  },
+  "scope": {
+    "executableTestModules": 252,
+    "clientModules": 107,
+    "serverModules": 113,
+    "otherTestModules": 32,
+    "sqlSuites": 51,
+    "integrationSqlFixtures": 3,
+    "additionalConcurrencyScriptsScreened": 12,
+    "representedStories": 73,
+    "baseline": {
+      "methodDeclarations": 3328,
+      "taggedSqlEntries": 1444,
+      "combinedInventoryEntries": 4772
+    },
+    "proposed": {
+      "methodDeclarations": 3320,
+      "taggedSqlEntries": 1444,
+      "combinedInventoryEntries": 4764
+    },
+    "countMeaning": "Methods are source declarations, including parameter tables; SQL entries are tagged contracts. Neither count equals executed runner cases or user acceptance workflows."
+  },
+  "methodology": [
+    "Regenerated the current inventory from the pinned main revision and screened every represented declaration and SQL contract.",
+    "Used independent client, server and database/browser/infrastructure reviews with AST exact-body/subset screens and semantic inspection of candidate fixtures, actions and assertions.",
+    "The scoped AST screens did not identify exact duplicate callbacks. Removal proofs are semantic assertion subsets against the same inputs and seams.",
+    "Preserved distinct role, authorization/RLS, failure-injection, boundary, integration, real concurrency and browser workflow coverage.",
+    "Compared all story/requirement/category pairs before and after; no pair was lost and no retained canonical ID changed.",
+    "Read the existing worksheet and checked full revision/execution records before classifying repeated IDs."
+  ],
+  "summary": {
+    "removedTestDeclarations": 8,
+    "removedRunnerCases": 33,
+    "removedLiteralHashAssertions": 1,
+    "applicationFilesChanged": 0,
+    "coverageConfigurationChanges": 0,
+    "sqlScenariosRemoved": 0,
+    "wholeTestFilesRemoved": 0,
+    "activeRegressionReferencesToRemovedIds": 0,
+    "retainedRequirementCategoryPairsLost": [],
+    "all73RepresentedStoriesRetainFourCategories": true,
+    "worksheetRecordsPreparedForRetirement": 5,
+    "worksheetWritesPerformed": 0
+  },
+  "removals": [
+    {
+      "id": "SG2-87:s-sees-unassigned-queue-in-the-navigation-s",
+      "legacyId": "TC-988003468b65",
+      "file": "client/src/App.test.tsx",
+      "baselineLine": 257,
+      "title": "[FAILURE] [SG2-87:AC2] %s sees Unassigned queue in the navigation: %s",
+      "categories": [
+        "FAILURE"
+      ],
+      "references": [
+        {
+          "story": "SG2-87",
+          "criterion": "AC2"
+        }
+      ],
+      "runnerCasesRemoved": 5,
+      "retained": [
+        {
+          "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+          "legacyId": "TC-7e7ab4e858fd",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 235,
+          "title": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+          "categories": [
+            "NORMAL"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 235
+        },
+        {
+          "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+          "legacyId": "TC-e6927127587a",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 243,
+          "title": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+          "categories": [
+            "FAILURE"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC2"
+            }
+          ],
+          "currentLine": 243
+        }
+      ],
+      "proof": "The same signInAs role fixtures are exercised by the two retained exact-navigation matrices. Their independently specified complete button arrays prove the allowed and denied membership checks for every removed role row; the separate destination-click, permission-override, late-session and server authorization tests remain."
+    },
+    {
+      "id": "SG2-89:s-sees-coordinator-overview-in-the-navigation-s",
+      "legacyId": "TC-9debd3d4fca0",
+      "file": "client/src/App.test.tsx",
+      "baselineLine": 268,
+      "title": "[FAILURE] [SG2-89:AC4] %s sees Coordinator overview in the navigation: %s",
+      "categories": [
+        "FAILURE"
+      ],
+      "references": [
+        {
+          "story": "SG2-89",
+          "criterion": "AC4"
+        }
+      ],
+      "runnerCasesRemoved": 7,
+      "retained": [
+        {
+          "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+          "legacyId": "TC-7e7ab4e858fd",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 235,
+          "title": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+          "categories": [
+            "NORMAL"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 235
+        },
+        {
+          "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+          "legacyId": "TC-e6927127587a",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 243,
+          "title": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+          "categories": [
+            "FAILURE"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC2"
+            }
+          ],
+          "currentLine": 243
+        }
+      ],
+      "proof": "The same signInAs role fixtures are exercised by the two retained exact-navigation matrices. Their independently specified complete button arrays prove the allowed and denied membership checks for every removed role row; the separate destination-click, permission-override, late-session and server authorization tests remain."
+    },
+    {
+      "id": "SG2-97:s-sees-assign-coordinators-in-the-navigation-s",
+      "legacyId": "TC-fde9cce378ad",
+      "file": "client/src/App.test.tsx",
+      "baselineLine": 279,
+      "title": "[FAILURE] [SG2-97:AC1] %s sees Assign coordinators in the navigation: %s",
+      "categories": [
+        "FAILURE"
+      ],
+      "references": [
+        {
+          "story": "SG2-97",
+          "criterion": "AC1"
+        }
+      ],
+      "runnerCasesRemoved": 4,
+      "retained": [
+        {
+          "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+          "legacyId": "TC-7e7ab4e858fd",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 235,
+          "title": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+          "categories": [
+            "NORMAL"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 235
+        },
+        {
+          "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+          "legacyId": "TC-e6927127587a",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 243,
+          "title": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+          "categories": [
+            "FAILURE"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC2"
+            }
+          ],
+          "currentLine": 243
+        }
+      ],
+      "proof": "The same signInAs role fixtures are exercised by the two retained exact-navigation matrices. Their independently specified complete button arrays prove the allowed and denied membership checks for every removed role row; the separate destination-click, permission-override, late-session and server authorization tests remain."
+    },
+    {
+      "id": "SG2-91:s-sees-safety-checks-in-the-navigation-s",
+      "legacyId": "TC-a7d888421a49",
+      "file": "client/src/App.test.tsx",
+      "baselineLine": 289,
+      "title": "[FAILURE] [SG2-91:AC4] %s sees Safety checks in the navigation: %s",
+      "categories": [
+        "FAILURE"
+      ],
+      "references": [
+        {
+          "story": "SG2-91",
+          "criterion": "AC4"
+        }
+      ],
+      "runnerCasesRemoved": 6,
+      "retained": [
+        {
+          "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+          "legacyId": "TC-7e7ab4e858fd",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 235,
+          "title": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+          "categories": [
+            "NORMAL"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 235
+        },
+        {
+          "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+          "legacyId": "TC-e6927127587a",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 243,
+          "title": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+          "categories": [
+            "FAILURE"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC2"
+            }
+          ],
+          "currentLine": 243
+        }
+      ],
+      "proof": "The same signInAs role fixtures are exercised by the two retained exact-navigation matrices. Their independently specified complete button arrays prove the allowed and denied membership checks for every removed role row; the separate destination-click, permission-override, late-session and server authorization tests remain."
+    },
+    {
+      "id": "SG2-52:s-has-no-obsolete-equipment-preview-menu",
+      "legacyId": "TC-409d97fe9970",
+      "file": "client/src/App.test.tsx",
+      "baselineLine": 360,
+      "title": "[NORMAL] [SG2-52:AC3] %s has no obsolete equipment preview menu",
+      "categories": [
+        "NORMAL"
+      ],
+      "references": [
+        {
+          "story": "SG2-52",
+          "criterion": "AC3"
+        }
+      ],
+      "runnerCasesRemoved": 3,
+      "retained": [
+        {
+          "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+          "legacyId": "TC-7e7ab4e858fd",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 235,
+          "title": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+          "categories": [
+            "NORMAL"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 235
+        },
+        {
+          "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+          "legacyId": "TC-e6927127587a",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 243,
+          "title": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+          "categories": [
+            "FAILURE"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC2"
+            }
+          ],
+          "currentLine": 243
+        }
+      ],
+      "proof": "The same signInAs role fixtures are exercised by the two retained exact-navigation matrices. Their independently specified complete button arrays prove the allowed and denied membership checks for every removed role row; the separate destination-click, permission-override, late-session and server authorization tests remain."
+    },
+    {
+      "id": "SG2-52:s-is-not-offered-equipment-maintenance-in-the-menu",
+      "legacyId": "TC-1c0864ff1563",
+      "file": "client/src/App.test.tsx",
+      "baselineLine": 365,
+      "title": "[FAILURE] [SG2-52:AC3] %s is not offered equipment maintenance in the menu",
+      "categories": [
+        "FAILURE"
+      ],
+      "references": [
+        {
+          "story": "SG2-52",
+          "criterion": "AC3"
+        }
+      ],
+      "runnerCasesRemoved": 6,
+      "retained": [
+        {
+          "id": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+          "legacyId": "TC-7e7ab4e858fd",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 235,
+          "title": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+          "categories": [
+            "NORMAL"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 235
+        },
+        {
+          "id": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+          "legacyId": "TC-e6927127587a",
+          "file": "client/src/App.test.tsx",
+          "baselineLine": 243,
+          "title": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+          "categories": [
+            "FAILURE"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC2"
+            }
+          ],
+          "currentLine": 243
+        }
+      ],
+      "proof": "The same signInAs role fixtures are exercised by the two retained exact-navigation matrices. Their independently specified complete button arrays prove the allowed and denied membership checks for every removed role row; the separate destination-click, permission-override, late-session and server authorization tests remain."
+    },
+    {
+      "id": "SG2-91:an-approved-or-planning-event-whose-arrangements-are-in-place-can-move-to-awaiting-safety-check",
+      "legacyId": "TC-3663374a24a7",
+      "file": "server/src/events/fields.test.ts",
+      "baselineLine": 56,
+      "title": "[NORMAL] [SG2-91:AC1] an Approved or Planning event whose arrangements are in place can move to Awaiting Safety Check",
+      "categories": [
+        "NORMAL"
+      ],
+      "references": [
+        {
+          "story": "SG2-91",
+          "criterion": "AC1"
+        }
+      ],
+      "runnerCasesRemoved": 1,
+      "retained": [
+        {
+          "id": "SG2-91:only-approved-and-planning-events-enter-the-safety-check",
+          "legacyId": "TC-77b8411dc2cf",
+          "file": "server/src/events/fields.test.ts",
+          "baselineLine": 61,
+          "title": "[BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check",
+          "categories": [
+            "BOUNDARY"
+          ],
+          "references": [
+            {
+              "story": "SG2-91",
+              "criterion": "AC1"
+            }
+          ],
+          "currentLine": 56
+        }
+      ],
+      "proof": "The retained exhaustive filter calls canTransition for every EVENT_STATUSES member with awaiting_safety_check as its target and expects the literal sorted array approved/planning. It therefore includes both removed positive inputs as well as every negative input."
+    },
+    {
+      "id": "SG2-27:event-organiser-and-attendee-are-external",
+      "legacyId": "TC-b5eef00d85b5",
+      "file": "server/src/profile.test.ts",
+      "baselineLine": 394,
+      "title": "[NORMAL] [SG2-27:AC4] event_organiser and attendee are external",
+      "categories": [
+        "NORMAL"
+      ],
+      "references": [
+        {
+          "story": "SG2-27",
+          "criterion": "AC4"
+        }
+      ],
+      "runnerCasesRemoved": 1,
+      "retained": [
+        {
+          "id": "SG2-86:the-internal-role-list-holds-exactly-the-five-internal-roles",
+          "legacyId": "TC-a6f3033240e0",
+          "file": "server/src/authorization.test.ts",
+          "baselineLine": 577,
+          "title": "[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles",
+          "categories": [
+            "BOUNDARY"
+          ],
+          "references": [
+            {
+              "story": "SG2-86",
+              "criterion": "AC4"
+            }
+          ],
+          "currentLine": 577
+        }
+      ],
+      "proof": "profile/fields.ts directly re-exports auth/policy.ts isInternalRole. The retained authorization test executes the identical event_organiser and attendee calls against that same function object. Profile-specific positive re-export, validation and HTTP behavior tests remain."
+    }
+  ],
+  "retainedTitleAndTraceabilityUpdates": [
+    {
+      "retainedId": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+      "file": "client/src/App.test.tsx",
+      "before": "[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles",
+      "after": "[NORMAL] [FAILURE] [SG2-86:AC4] [SG2-87:AC2] [SG2-89:AC4] [SG2-97:AC1] [SG2-91:AC4] [SG2-52:AC3] %s navigation is unchanged by the Week 7 roles"
+    },
+    {
+      "retainedId": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+      "file": "client/src/App.test.tsx",
+      "before": "[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages",
+      "after": "[NORMAL] [FAILURE] [SG2-86:AC2] [SG2-87:AC2] [SG2-89:AC4] [SG2-97:AC1] [SG2-91:AC4] [SG2-52:AC3] %s is offered only its own screens — no All events, no Attendee pages"
+    },
+    {
+      "retainedId": "SG2-91:only-approved-and-planning-events-enter-the-safety-check",
+      "file": "server/src/events/fields.test.ts",
+      "before": "[BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check",
+      "after": "[NORMAL] [BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check"
+    },
+    {
+      "retainedId": "SG2-86:the-internal-role-list-holds-exactly-the-five-internal-roles",
+      "file": "server/src/authorization.test.ts",
+      "before": "[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles",
+      "after": "[NORMAL] [BOUNDARY] [SG2-86:AC4] [SG2-27:AC4] the internal-role list holds exactly the five internal roles"
+    }
+  ],
+  "assertionCleanup": {
+    "file": "hosted-e2e/policy.test.mjs",
+    "baselineLine": 26,
+    "reason": "Hashes a literal using Node crypto; the retained four policy calls independently assert the relevant behavior. No whole test or sheet row is removed."
+  },
+  "qualityFindingsForSeparateFollowUp": [
+    {
+      "id": "OTHER-002",
+      "kind": "masked_test_condition",
+      "confidence": "high",
+      "file": "supabase/tests/equipment_requirements.sql",
+      "line": 270,
+      "testName": "SG2-53:closed-event-update",
+      "proposal": "Repair fixture, not delete scenario: before confirming the event restore the request to pending and use its current version, so event-stage closure is the sole rejection reason.",
+      "proof": "At line 249 the requirement is made approved with no linked reservation; line 260 already expects arrange to return closed. Line 265 only confirms the event, leaving the approved requirement in place. The latest RPC first checks event status at migration 202610200002_acting_role_functions.sql:181 and then checks approved/unreserved request closure at :198. Removing the event-stage guard still yields closed from the request guard, so this test does not isolate its stated lifecycle contract.",
+      "retainedSources": [
+        {
+          "file": "supabase/tests/equipment_requirements.sql",
+          "lines": [
+            260,
+            270
+          ]
+        },
+        {
+          "file": "supabase/migrations/202610200002_acting_role_functions.sql",
+          "lines": [
+            181,
+            204
+          ]
+        }
+      ],
+      "categoriesLost": [],
+      "sheetAction": "Keep scenario; update evidence if fixture repaired.",
+      "coverageRisk": "Current test overlaps request-state refusal, but deleting it would discard an intended distinct event-lifecycle requirement."
+    },
+    {
+      "id": "OTHER-003",
+      "kind": "implementation_derived_expected_oracle",
+      "confidence": "high",
+      "file": "supabase/tests/venue_hold_booking_upgrade.sql",
+      "line": 46,
+      "testName": "SG2-70:legacy-events-categorised",
+      "proposal": "Replace private.event_category_from_name(e.name) expectation with an independent literal mapping; these fixture names Legacy hold case N are all expected to be other.",
+      "proof": "The expected category is recomputed using the same private inference helper used by the migration, so an erroneous classifier can satisfy both sides. Fixture seed names are explicitly generated in supabase/tests/fixtures/legacy_venue_hold_bookings.sql:18. Keep the actual migration/backfill scenario rather than deleting it.",
+      "categoriesLost": [],
+      "sheetAction": "Retain row; oracle correction does not remove a case.",
+      "coverageRisk": "Quality repair, not a removal candidate."
+    },
+    {
+      "id": "OTHER-004",
+      "kind": "private_algorithm_boundary_tests",
+      "confidence": "high",
+      "files": [
+        {
+          "file": "supabase/tests/event_search.sql",
+          "lines": [
+            371,
+            383
+          ]
+        },
+        {
+          "file": "supabase/tests/notification_inbox_reminders.sql",
+          "lines": [
+            185,
+            200
+          ]
+        }
+      ],
+      "proposal": "Review against DoD v2.1 public-boundary gate. Prefer equivalent actual migration/public scheduler fixtures before deleting any of these checks.",
+      "proof": "The named tests call private.event_category_from_name and private.notification_reminder_due directly as postgres. Their constant expectations are independent, but their seam is a private implementation helper. Existing public scheduler and actual concurrent sweeps cover related behavior, but do not prove every fixed-time DST/exact-hour boundary in these helper cases.",
+      "doNotRemove": "Security tests showing authenticated/anon cannot execute private helpers remain valid access-boundary tests and should be retained.",
+      "categoriesLostIfBlindlyRemoved": [
+        "NORMAL",
+        "BOUNDARY",
+        "CONFLICT",
+        "FAILURE"
+      ],
+      "sheetAction": "No deletion until equivalent public-seam replacement is reviewed.",
+      "coverageRisk": "Distinct frozen-clock and backfill inputs would otherwise be lost."
+    },
+    {
+      "file": "server/src/events/registrationWindow.test.ts",
+      "line": 35,
+      "title": "[CONFLICT] [SG2-58:AC3] a completed event is closed and a confirmed event missing a time is not yet open",
+      "finding": "Useful state/time partitions, but the test itself has no competing operation, stale update or out-of-order action. BOUNDARY/FAILURE is more descriptive under attached DoD v2.1. Do not delete; verify feature-level real concurrency/conflict tests separately.",
+      "action": "Consider retagging only, with feature-category inventory verification."
+    },
+    {
+      "file": "server/src/events/fields.test.ts",
+      "line": 66,
+      "title": "[BOUNDARY] [SG2-100:AC2] every EVENT_STATUSES member has a STATUS_TRANSITIONS entry",
+      "finding": "A structural consistency check over two implementation exports; it does not independently establish the permitted business transition matrix. Other tests give concrete transition oracles, so this is not evidence that the whole suite is weak.",
+      "action": "Optional future consolidation into an independent literal transition matrix; not a proved redundant removal in this patch."
+    }
+  ],
+  "optionalConsolidationsRequiringUniqueAssertionCarryover": [
+    {
+      "file": "client/src/screens/RequestForm.test.tsx",
+      "removeDeclarationAt": 89,
+      "testName": "[BOUNDARY] [SG2-30:AC2] submit button is disabled when the form is empty",
+      "retainAt": 109,
+      "action": "Move the initial toBeDisabled assertion into the existing empty-field-count workflow before touching the name field. This assertion is unique unless explicitly moved; do not simply delete it."
+    },
+    {
+      "file": "client/src/screens/RequestForm.test.tsx",
+      "removeDeclarationAt": 121,
+      "testName": "[FAILURE] [SG2-30:AC2] inline error appears for a touched field left blank",
+      "retainAt": 109,
+      "action": "Same DEFAULT_PROPS render and name x→empty sequence as count test. Carry Event name is required assertion and FAILURE tag into retained count/validation workflow. Unique expectation must survive."
+    },
+    {
+      "file": "client/src/screens/RequestForm.test.tsx",
+      "removeDeclarationAt": 103,
+      "testName": "[NORMAL] [SG2-30:AC2] submit button becomes enabled when all required fields are filled",
+      "retainAt": 155,
+      "action": "Move explicit enabled assertion after fillAllFields and before click in existing successful submit endpoint workflow; carry SG2-30:AC2 tag. Successful submit already indirectly requires enabled button, but preserve concrete assertion."
+    }
+  ],
+  "historicalAuditRecords": {
+    "files": [
+      "docs/test-suite-consolidation.json",
+      "docs/test-redundancy-audit.json"
+    ],
+    "note": "Their 3085/1329 counts describe older revisions; they are preserved as historical reviews and are not the current baseline."
+  },
+  "verification": {
+    "baseline": {
+      "command": "npm run ci",
+      "exitCode": 0,
+      "runnerCases": {
+        "server": 1907,
+        "client": 1951,
+        "securityReviewerHelper": 19
+      },
+      "coverage": {
+        "server": {
+          "files": 124,
+          "total": {
+            "lines": {
+              "total": 15085,
+              "covered": 15085,
+              "skipped": 0,
+              "pct": 100
+            },
+            "statements": {
+              "total": 15085,
+              "covered": 15085,
+              "skipped": 0,
+              "pct": 100
+            },
+            "functions": {
+              "total": 572,
+              "covered": 572,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branches": {
+              "total": 4623,
+              "covered": 4623,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branchesTrue": {
+              "total": 0,
+              "covered": 0,
+              "skipped": 0,
+              "pct": 100
+            }
+          }
+        },
+        "client": {
+          "files": 103,
+          "total": {
+            "lines": {
+              "total": 4291,
+              "covered": 4291,
+              "skipped": 0,
+              "pct": 100
+            },
+            "statements": {
+              "total": 5347,
+              "covered": 5347,
+              "skipped": 0,
+              "pct": 100
+            },
+            "functions": {
+              "total": 1451,
+              "covered": 1451,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branches": {
+              "total": 5301,
+              "covered": 5301,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branchesTrue": {
+              "total": 0,
+              "covered": 0,
+              "skipped": 0,
+              "pct": 100
+            }
+          }
+        }
+      }
+    },
+    "proposed": {
+      "command": "npm run ci",
+      "exitCode": 0,
+      "runnerCases": {
+        "server": 1905,
+        "client": 1920,
+        "securityReviewerHelper": 19
+      },
+      "coverage": {
+        "server": {
+          "applicationFiles": 124,
+          "perFileMetrics": {
+            "statements": 100,
+            "branches": 100,
+            "lines": 100,
+            "functions": 100
+          },
+          "totals": {
+            "lines": {
+              "total": 15085,
+              "covered": 15085,
+              "skipped": 0,
+              "pct": 100
+            },
+            "statements": {
+              "total": 15085,
+              "covered": 15085,
+              "skipped": 0,
+              "pct": 100
+            },
+            "functions": {
+              "total": 572,
+              "covered": 572,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branches": {
+              "total": 4623,
+              "covered": 4623,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branchesTrue": {
+              "total": 0,
+              "covered": 0,
+              "skipped": 0,
+              "pct": 100
+            }
+          }
+        },
+        "client": {
+          "applicationFiles": 103,
+          "perFileMetrics": {
+            "statements": 100,
+            "branches": 100,
+            "lines": 100,
+            "functions": 100
+          },
+          "totals": {
+            "lines": {
+              "total": 4291,
+              "covered": 4291,
+              "skipped": 0,
+              "pct": 100
+            },
+            "statements": {
+              "total": 5347,
+              "covered": 5347,
+              "skipped": 0,
+              "pct": 100
+            },
+            "functions": {
+              "total": 1451,
+              "covered": 1451,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branches": {
+              "total": 5301,
+              "covered": 5301,
+              "skipped": 0,
+              "pct": 100
+            },
+            "branchesTrue": {
+              "total": 0,
+              "covered": 0,
+              "skipped": 0,
+              "pct": 100
+            }
+          }
+        }
+      }
+    },
+    "sourceIdentity": "The delivered five test files and regenerated inventory are byte-identical to the isolated checkout that passed the full post-removal run; both started at the pinned main commit.",
+    "inventory": "3320 methods and 1444 SQL entries; eight removed IDs, zero unexpected new IDs, zero lost requirement/category pairs.",
+    "githubCi": "Required on the pushed review head; local runs do not claim a new hosted run.",
+    "peerApproval": "Pending an independent teammate structured Test Case Peer Review and Sign-Off.",
+    "browserAndDatabaseExecution": "No fresh browser journey, hosted database replay or concurrency execution is claimed by this static review. No browser/SQL test bodies or application logic changed."
+  },
+  "limits": [
+    "Complete structural screening with targeted semantic removal proofs does not prove that no further useful refactoring exists.",
+    "Test count alone does not establish AI authorship.",
+    "Historical test-first development and independent human approval were not reconstructed.",
+    "npm run ci has no configured lint command; its success is not evidence of a separate lint run.",
+    "The user-selected branch has no Jira ID in its name; source tags and the cleanup commit/PR retain story traceability."
+  ],
+  "worksheetPlan": "docs/test-case-sheet-cleanup-plan-2026-10-27.json",
+  "fileScreen": [
+    {
+      "file": ".github/scripts/regression-evidence.test.mjs",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": ".github/scripts/regression-gate.test.mjs",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": ".github/scripts/release-readiness.test.mjs",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 27
+      },
+      "proposed": {
+        "methodDeclarations": 27
+      }
+    },
+    {
+      "file": ".github/scripts/security-review.test.mjs",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 19
+      },
+      "proposed": {
+        "methodDeclarations": 19
+      }
+    },
+    {
+      "file": ".github/scripts/test-inventory.test.mjs",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 18
+      },
+      "proposed": {
+        "methodDeclarations": 18
+      }
+    },
+    {
+      "file": "client/src/App.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 57
+      },
+      "proposed": {
+        "methodDeclarations": 51
+      }
+    },
+    {
+      "file": "client/src/HealthCheck.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/api/assignmentQueue.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "client/src/api/changeRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/api/coordinatorOverview.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/api/equipment.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/api/equipmentAvailability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "client/src/api/equipmentRequirements.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/api/equipmentReservations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/api/eventCancellation.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/api/eventConfirmation.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "client/src/api/eventRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 137
+      },
+      "proposed": {
+        "methodDeclarations": 137
+      }
+    },
+    {
+      "file": "client/src/api/eventSearch.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/api/myRegistrations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/api/notificationInboxApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/api/notificationsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/api/organiserChangeRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "client/src/api/profile.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/api/registrableEvents.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/api/registrations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "client/src/api/safetyChecks.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 23
+      },
+      "proposed": {
+        "methodDeclarations": 23
+      }
+    },
+    {
+      "file": "client/src/api/workQueue.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 15
+      },
+      "proposed": {
+        "methodDeclarations": 15
+      }
+    },
+    {
+      "file": "client/src/auth/access.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/auth/actingRole.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "client/src/auth/session.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/components/ArrangementRechecks.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/components/CancellationPanel.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/components/ChangeRequestsPanel.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/components/ClarificationThread.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/components/ConfirmedArrangements.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "client/src/components/EquipmentAvailability.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "client/src/components/EquipmentRequirements.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 30
+      },
+      "proposed": {
+        "methodDeclarations": 30
+      }
+    },
+    {
+      "file": "client/src/components/EquipmentReservations.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 22
+      },
+      "proposed": {
+        "methodDeclarations": 22
+      }
+    },
+    {
+      "file": "client/src/components/EventArrangements.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/components/EventArrangementsPanel.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/components/EventAuditDrawer.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 31
+      },
+      "proposed": {
+        "methodDeclarations": 31
+      }
+    },
+    {
+      "file": "client/src/components/EventStageTracker.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "client/src/components/HoldNotifications.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 54
+      },
+      "proposed": {
+        "methodDeclarations": 54
+      }
+    },
+    {
+      "file": "client/src/components/OrganiserChangeRequests.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "client/src/components/RegistrationPanel.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "client/src/components/SafetyDecisionSummary.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "client/src/components/SafetyRereviewQueue.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/hooks/useInertiaScroll.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "client/src/hooks/useParticleOrb.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "client/src/main.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/mock/viewModel.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 47
+      },
+      "proposed": {
+        "methodDeclarations": 47
+      }
+    },
+    {
+      "file": "client/src/screens/AssignmentQueue.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/screens/AvailabilityCalendar.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "client/src/screens/CapacityExceptions.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "client/src/screens/CoordinatorAssignment.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "client/src/screens/CoordinatorOverview.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "client/src/screens/Dashboard.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 18
+      },
+      "proposed": {
+        "methodDeclarations": 18
+      }
+    },
+    {
+      "file": "client/src/screens/DraftRequests.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/screens/EquipmentDesk.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 15
+      },
+      "proposed": {
+        "methodDeclarations": 15
+      }
+    },
+    {
+      "file": "client/src/screens/EquipmentForm.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "client/src/screens/EventDetail.cancellation.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/screens/EventDetail.changeImpact.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/screens/EventDetail.changeRequests.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "client/src/screens/EventDetail.registration.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "client/src/screens/EventDetail.safety.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/screens/EventDetail.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 55
+      },
+      "proposed": {
+        "methodDeclarations": 55
+      }
+    },
+    {
+      "file": "client/src/screens/EventPlanningDrawer.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 41
+      },
+      "proposed": {
+        "methodDeclarations": 41
+      }
+    },
+    {
+      "file": "client/src/screens/EventSearch.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/screens/EventsTable.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/screens/FindEvents.registration.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 11
+      },
+      "proposed": {
+        "methodDeclarations": 11
+      }
+    },
+    {
+      "file": "client/src/screens/FindEvents.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/screens/Landing.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "client/src/screens/Login.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/screens/MyRegistrations.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "client/src/screens/NotificationEvent.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/screens/Profile.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/screens/RequestForm.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 59
+      },
+      "proposed": {
+        "methodDeclarations": 59
+      }
+    },
+    {
+      "file": "client/src/screens/RoleSwitcher.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "client/src/screens/SafetyChecks.decision.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "client/src/screens/SafetyChecks.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/screens/VenueHolds.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 23
+      },
+      "proposed": {
+        "methodDeclarations": 23
+      }
+    },
+    {
+      "file": "client/src/screens/VenueSearch.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 27
+      },
+      "proposed": {
+        "methodDeclarations": 27
+      }
+    },
+    {
+      "file": "client/src/screens/WorkQueue.cancellation.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/screens/WorkQueue.changeImpact.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "client/src/screens/WorkQueue.equipmentReadiness.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/screens/WorkQueue.registration.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "client/src/screens/WorkQueue.safety.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "client/src/screens/WorkQueue.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 54
+      },
+      "proposed": {
+        "methodDeclarations": 54
+      }
+    },
+    {
+      "file": "client/src/ui.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/venues/BookingClashes.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "client/src/venues/BookingConflicts.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "client/src/venues/VenueBlocks.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "client/src/venues/VenueBookings.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 22
+      },
+      "proposed": {
+        "methodDeclarations": 22
+      }
+    },
+    {
+      "file": "client/src/venues/VenueDecision.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "client/src/venues/VenueDelete.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/venues/VenueFit.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "client/src/venues/VenueLayouts.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "client/src/venues/VenueOperations.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 11
+      },
+      "proposed": {
+        "methodDeclarations": 11
+      }
+    },
+    {
+      "file": "client/src/venues/VenueRequests.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "client/src/venues/Venues.test.tsx",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 22
+      },
+      "proposed": {
+        "methodDeclarations": 22
+      }
+    },
+    {
+      "file": "client/src/venues/availability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "client/src/venues/blocksApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/venues/calendarView.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 15
+      },
+      "proposed": {
+        "methodDeclarations": 15
+      }
+    },
+    {
+      "file": "client/src/venues/capacityExceptionsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/venues/holdNotificationsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "client/src/venues/holdsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 11
+      },
+      "proposed": {
+        "methodDeclarations": 11
+      }
+    },
+    {
+      "file": "client/src/venues/layoutsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/venues/operationsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "client/src/venues/requestsApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/venues/searchApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "client/src/venues/searchPrefill.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "client/src/venues/suitabilityApi.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "e2e/capacity-exceptions.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "e2e/change-impact.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "e2e/change-requests.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "e2e/draft-history.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "e2e/equipment-availability.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "e2e/equipment-requirements.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "e2e/equipment-reservations.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "e2e/equipment.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "e2e/event-confirmation.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "e2e/event-notifications.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "e2e/event-registration.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "e2e/find-events.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "e2e/notification-inbox.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "e2e/registration-withdrawal.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "e2e/registrations.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "e2e/regression.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 84
+      },
+      "proposed": {
+        "methodDeclarations": 84
+      }
+    },
+    {
+      "file": "e2e/safety-approval.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "e2e/safety-changes.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "e2e/safety-decisions.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "e2e/small-phone.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 1
+      },
+      "proposed": {
+        "methodDeclarations": 1
+      }
+    },
+    {
+      "file": "e2e/smoke.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "e2e/staging-readiness.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "e2e/staging-role-control.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "e2e/week7-journey.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 1
+      },
+      "proposed": {
+        "methodDeclarations": 1
+      }
+    },
+    {
+      "file": "hosted-e2e/policy.test.mjs",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "hosted-e2e/roles.spec.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "integration/api.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 27
+      },
+      "proposed": {
+        "methodDeclarations": 27
+      }
+    },
+    {
+      "file": "integration/capacity-seed.sql",
+      "screen": "Integration SQL fixture structurally reviewed; not a standalone test suite",
+      "baseline": {
+        "taggedSqlEntries": 0
+      },
+      "proposed": {
+        "taggedSqlEntries": 0
+      }
+    },
+    {
+      "file": "integration/cleanup.sql",
+      "screen": "Integration SQL fixture structurally reviewed; not a standalone test suite",
+      "baseline": {
+        "taggedSqlEntries": 0
+      },
+      "proposed": {
+        "taggedSqlEntries": 0
+      }
+    },
+    {
+      "file": "integration/seed.sql",
+      "screen": "Integration SQL fixture structurally reviewed; not a standalone test suite",
+      "baseline": {
+        "taggedSqlEntries": 0
+      },
+      "proposed": {
+        "taggedSqlEntries": 0
+      }
+    },
+    {
+      "file": "server/src/app.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/assignCoordinator.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 45
+      },
+      "proposed": {
+        "methodDeclarations": 45
+      }
+    },
+    {
+      "file": "server/src/assignmentQueue.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/authorization.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 36
+      },
+      "proposed": {
+        "methodDeclarations": 36
+      }
+    },
+    {
+      "file": "server/src/authorizationRequestScope.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "server/src/changeRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 24
+      },
+      "proposed": {
+        "methodDeclarations": 24
+      }
+    },
+    {
+      "file": "server/src/changeRequestsRaise.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "server/src/clarifications.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 35
+      },
+      "proposed": {
+        "methodDeclarations": 35
+      }
+    },
+    {
+      "file": "server/src/confirmEvent.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "server/src/coordinatorOverview.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 11
+      },
+      "proposed": {
+        "methodDeclarations": 11
+      }
+    },
+    {
+      "file": "server/src/db/accountRoles.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 18
+      },
+      "proposed": {
+        "methodDeclarations": 18
+      }
+    },
+    {
+      "file": "server/src/db/assignmentQueue.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/auditLogs.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "server/src/db/changeImpact.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 15
+      },
+      "proposed": {
+        "methodDeclarations": 15
+      }
+    },
+    {
+      "file": "server/src/db/changeRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "server/src/db/clarifications.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/client-config.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "server/src/db/coordinatorOverview.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/equipment.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/equipmentAvailability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/db/equipmentRequirements.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/equipmentReservations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/db/eventArrangements.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "server/src/db/eventCancellation.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/eventConfirmation.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "server/src/db/eventNotifications.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/db/eventPlanning.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/db/eventRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 83
+      },
+      "proposed": {
+        "methodDeclarations": 83
+      }
+    },
+    {
+      "file": "server/src/db/eventSearch.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/db/myRegistrations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/db/notificationInbox.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "server/src/db/profile.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/registrableEvents.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/registrations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/db/safetyChecks.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "server/src/db/safetyDecisions.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "server/src/db/safetyRereviews.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/supabase.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/user-client.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/users.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/venueBlocks.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/venueBookingDecisions.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "server/src/db/venueBookingRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 19
+      },
+      "proposed": {
+        "methodDeclarations": 19
+      }
+    },
+    {
+      "file": "server/src/db/venueBookingWithdrawals.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 2
+      },
+      "proposed": {
+        "methodDeclarations": 2
+      }
+    },
+    {
+      "file": "server/src/db/venueBookings.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/venueClashes.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/venueConflicts.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/venueHolds.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 3
+      },
+      "proposed": {
+        "methodDeclarations": 3
+      }
+    },
+    {
+      "file": "server/src/db/venueLayouts.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/db/venueOperations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/db/venueSuitability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "server/src/db/venues.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/db/workQueue.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 4
+      },
+      "proposed": {
+        "methodDeclarations": 4
+      }
+    },
+    {
+      "file": "server/src/decideEventRequest.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 25
+      },
+      "proposed": {
+        "methodDeclarations": 25
+      }
+    },
+    {
+      "file": "server/src/deleteEventRequestDraft.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/equipment.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "server/src/equipmentAvailability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "server/src/equipmentRequirements.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 12
+      },
+      "proposed": {
+        "methodDeclarations": 12
+      }
+    },
+    {
+      "file": "server/src/equipmentReservations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 15
+      },
+      "proposed": {
+        "methodDeclarations": 15
+      }
+    },
+    {
+      "file": "server/src/eventCancellation.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "server/src/eventRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 33
+      },
+      "proposed": {
+        "methodDeclarations": 33
+      }
+    },
+    {
+      "file": "server/src/eventSearch.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "server/src/events/arrangementReadiness.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 33
+      },
+      "proposed": {
+        "methodDeclarations": 33
+      }
+    },
+    {
+      "file": "server/src/events/changeImpact.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 18
+      },
+      "proposed": {
+        "methodDeclarations": 18
+      }
+    },
+    {
+      "file": "server/src/events/complete.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 11
+      },
+      "proposed": {
+        "methodDeclarations": 11
+      }
+    },
+    {
+      "file": "server/src/events/fields.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 22
+      },
+      "proposed": {
+        "methodDeclarations": 21
+      }
+    },
+    {
+      "file": "server/src/events/getHistory.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 31
+      },
+      "proposed": {
+        "methodDeclarations": 31
+      }
+    },
+    {
+      "file": "server/src/events/registrationSettings.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 17
+      },
+      "proposed": {
+        "methodDeclarations": 17
+      }
+    },
+    {
+      "file": "server/src/events/registrationWindow.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/events/safetyDecisions.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 11
+      },
+      "proposed": {
+        "methodDeclarations": 11
+      }
+    },
+    {
+      "file": "server/src/events/updatePlanning.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 68
+      },
+      "proposed": {
+        "methodDeclarations": 68
+      }
+    },
+    {
+      "file": "server/src/getEventArrangements.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "server/src/getEventConfirmation.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "server/src/getEventStage.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "server/src/getEventStageAuth.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/index.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 1
+      },
+      "proposed": {
+        "methodDeclarations": 1
+      }
+    },
+    {
+      "file": "server/src/listAssignable.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "server/src/listEventRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 21
+      },
+      "proposed": {
+        "methodDeclarations": 21
+      }
+    },
+    {
+      "file": "server/src/login.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 18
+      },
+      "proposed": {
+        "methodDeclarations": 18
+      }
+    },
+    {
+      "file": "server/src/logout.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "server/src/multiRoles.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/myRegistrations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "server/src/notificationInbox.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "server/src/notifications.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "server/src/organisationEventRequests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "server/src/profile.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 39
+      },
+      "proposed": {
+        "methodDeclarations": 38
+      }
+    },
+    {
+      "file": "server/src/registerForEvent.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 15
+      },
+      "proposed": {
+        "methodDeclarations": 15
+      }
+    },
+    {
+      "file": "server/src/registrableEvents.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "server/src/registrationRoutes.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 19
+      },
+      "proposed": {
+        "methodDeclarations": 19
+      }
+    },
+    {
+      "file": "server/src/reviewEventRequest.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/roles.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/safetyChecks.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 7
+      },
+      "proposed": {
+        "methodDeclarations": 7
+      }
+    },
+    {
+      "file": "server/src/safetyDecisionRoutes.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "server/src/safetyRereviewRoutes.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/stageCalculator.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 23
+      },
+      "proposed": {
+        "methodDeclarations": 23
+      }
+    },
+    {
+      "file": "server/src/submitEventRequest.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 31
+      },
+      "proposed": {
+        "methodDeclarations": 31
+      }
+    },
+    {
+      "file": "server/src/updateEventRequestDraft.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 19
+      },
+      "proposed": {
+        "methodDeclarations": 19
+      }
+    },
+    {
+      "file": "server/src/venue-availability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 36
+      },
+      "proposed": {
+        "methodDeclarations": 36
+      }
+    },
+    {
+      "file": "server/src/venue-blocks.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/venue-booking-requests.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 43
+      },
+      "proposed": {
+        "methodDeclarations": 43
+      }
+    },
+    {
+      "file": "server/src/venue-bookings.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 16
+      },
+      "proposed": {
+        "methodDeclarations": 16
+      }
+    },
+    {
+      "file": "server/src/venue-clashes.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 5
+      },
+      "proposed": {
+        "methodDeclarations": 5
+      }
+    },
+    {
+      "file": "server/src/venue-conflicts.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "server/src/venue-delete-hold-expiry.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "server/src/venue-holds.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 10
+      },
+      "proposed": {
+        "methodDeclarations": 10
+      }
+    },
+    {
+      "file": "server/src/venue-layouts.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 9
+      },
+      "proposed": {
+        "methodDeclarations": 9
+      }
+    },
+    {
+      "file": "server/src/venue-operations.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/venue-search.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 21
+      },
+      "proposed": {
+        "methodDeclarations": 21
+      }
+    },
+    {
+      "file": "server/src/venue-setup-turnaround.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 13
+      },
+      "proposed": {
+        "methodDeclarations": 13
+      }
+    },
+    {
+      "file": "server/src/venue-suitability-routes.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 24
+      },
+      "proposed": {
+        "methodDeclarations": 24
+      }
+    },
+    {
+      "file": "server/src/venue-suitability.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 14
+      },
+      "proposed": {
+        "methodDeclarations": 14
+      }
+    },
+    {
+      "file": "server/src/venues.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 8
+      },
+      "proposed": {
+        "methodDeclarations": 8
+      }
+    },
+    {
+      "file": "server/src/workQueue.test.ts",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "methodDeclarations": 6
+      },
+      "proposed": {
+        "methodDeclarations": 6
+      }
+    },
+    {
+      "file": "supabase/tests/account_multi_roles.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 61
+      },
+      "proposed": {
+        "taggedSqlEntries": 61
+      }
+    },
+    {
+      "file": "supabase/tests/account_roles.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 26
+      },
+      "proposed": {
+        "taggedSqlEntries": 26
+      }
+    },
+    {
+      "file": "supabase/tests/coordinator_oversight.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 11
+      },
+      "proposed": {
+        "taggedSqlEntries": 11
+      }
+    },
+    {
+      "file": "supabase/tests/equipment_availability.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 31
+      },
+      "proposed": {
+        "taggedSqlEntries": 31
+      }
+    },
+    {
+      "file": "supabase/tests/equipment_records.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 23
+      },
+      "proposed": {
+        "taggedSqlEntries": 23
+      }
+    },
+    {
+      "file": "supabase/tests/equipment_release.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 12
+      },
+      "proposed": {
+        "taggedSqlEntries": 12
+      }
+    },
+    {
+      "file": "supabase/tests/equipment_requirements.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 42
+      },
+      "proposed": {
+        "taggedSqlEntries": 42
+      }
+    },
+    {
+      "file": "supabase/tests/equipment_reservations.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 47
+      },
+      "proposed": {
+        "taggedSqlEntries": 47
+      }
+    },
+    {
+      "file": "supabase/tests/event_cancellation.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 30
+      },
+      "proposed": {
+        "taggedSqlEntries": 30
+      }
+    },
+    {
+      "file": "supabase/tests/event_change_impact.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 26
+      },
+      "proposed": {
+        "taggedSqlEntries": 26
+      }
+    },
+    {
+      "file": "supabase/tests/event_change_requests.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 5
+      },
+      "proposed": {
+        "taggedSqlEntries": 5
+      }
+    },
+    {
+      "file": "supabase/tests/event_clarifications.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 22
+      },
+      "proposed": {
+        "taggedSqlEntries": 22
+      }
+    },
+    {
+      "file": "supabase/tests/event_confirmation.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 47
+      },
+      "proposed": {
+        "taggedSqlEntries": 47
+      }
+    },
+    {
+      "file": "supabase/tests/event_draft_audit.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 14
+      },
+      "proposed": {
+        "taggedSqlEntries": 14
+      }
+    },
+    {
+      "file": "supabase/tests/event_history_internal_fields.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 4
+      },
+      "proposed": {
+        "taggedSqlEntries": 4
+      }
+    },
+    {
+      "file": "supabase/tests/event_notifications.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 26
+      },
+      "proposed": {
+        "taggedSqlEntries": 26
+      }
+    },
+    {
+      "file": "supabase/tests/event_organisation_isolation.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 24
+      },
+      "proposed": {
+        "taggedSqlEntries": 24
+      }
+    },
+    {
+      "file": "supabase/tests/event_planning_and_audit.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 26
+      },
+      "proposed": {
+        "taggedSqlEntries": 26
+      }
+    },
+    {
+      "file": "supabase/tests/event_preferred_layout.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 12
+      },
+      "proposed": {
+        "taggedSqlEntries": 12
+      }
+    },
+    {
+      "file": "supabase/tests/event_registration.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 36
+      },
+      "proposed": {
+        "taggedSqlEntries": 36
+      }
+    },
+    {
+      "file": "supabase/tests/event_registration_settings.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 37
+      },
+      "proposed": {
+        "taggedSqlEntries": 37
+      }
+    },
+    {
+      "file": "supabase/tests/event_search.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 57
+      },
+      "proposed": {
+        "taggedSqlEntries": 57
+      }
+    },
+    {
+      "file": "supabase/tests/event_status_flow.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 11
+      },
+      "proposed": {
+        "taggedSqlEntries": 11
+      }
+    },
+    {
+      "file": "supabase/tests/internal_work_queue.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 28
+      },
+      "proposed": {
+        "taggedSqlEntries": 28
+      }
+    },
+    {
+      "file": "supabase/tests/legacy_table_rls.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 30
+      },
+      "proposed": {
+        "taggedSqlEntries": 30
+      }
+    },
+    {
+      "file": "supabase/tests/notification_inbox_reminders.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 82
+      },
+      "proposed": {
+        "taggedSqlEntries": 82
+      }
+    },
+    {
+      "file": "supabase/tests/registrable_events.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 13
+      },
+      "proposed": {
+        "taggedSqlEntries": 13
+      }
+    },
+    {
+      "file": "supabase/tests/registration_withdrawal.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 31
+      },
+      "proposed": {
+        "taggedSqlEntries": 31
+      }
+    },
+    {
+      "file": "supabase/tests/safety_approval_gate.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 26
+      },
+      "proposed": {
+        "taggedSqlEntries": 26
+      }
+    },
+    {
+      "file": "supabase/tests/safety_changes_requested.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 32
+      },
+      "proposed": {
+        "taggedSqlEntries": 32
+      }
+    },
+    {
+      "file": "supabase/tests/safety_check_queue.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 44
+      },
+      "proposed": {
+        "taggedSqlEntries": 44
+      }
+    },
+    {
+      "file": "supabase/tests/safety_decisions.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 46
+      },
+      "proposed": {
+        "taggedSqlEntries": 46
+      }
+    },
+    {
+      "file": "supabase/tests/venue_availability.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 21
+      },
+      "proposed": {
+        "taggedSqlEntries": 21
+      }
+    },
+    {
+      "file": "supabase/tests/venue_block_upgrade.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 14
+      },
+      "proposed": {
+        "taggedSqlEntries": 14
+      }
+    },
+    {
+      "file": "supabase/tests/venue_blocks.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 12
+      },
+      "proposed": {
+        "taggedSqlEntries": 12
+      }
+    },
+    {
+      "file": "supabase/tests/venue_booking_change_cancel.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 41
+      },
+      "proposed": {
+        "taggedSqlEntries": 41
+      }
+    },
+    {
+      "file": "supabase/tests/venue_booking_clashes.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 12
+      },
+      "proposed": {
+        "taggedSqlEntries": 12
+      }
+    },
+    {
+      "file": "supabase/tests/venue_booking_decisions.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 34
+      },
+      "proposed": {
+        "taggedSqlEntries": 34
+      }
+    },
+    {
+      "file": "supabase/tests/venue_booking_release.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 20
+      },
+      "proposed": {
+        "taggedSqlEntries": 20
+      }
+    },
+    {
+      "file": "supabase/tests/venue_booking_requests.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 14
+      },
+      "proposed": {
+        "taggedSqlEntries": 14
+      }
+    },
+    {
+      "file": "supabase/tests/venue_capacity_exceptions.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 16
+      },
+      "proposed": {
+        "taggedSqlEntries": 16
+      }
+    },
+    {
+      "file": "supabase/tests/venue_delete_hold_expiry.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 31
+      },
+      "proposed": {
+        "taggedSqlEntries": 31
+      }
+    },
+    {
+      "file": "supabase/tests/venue_double_booking.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 11
+      },
+      "proposed": {
+        "taggedSqlEntries": 11
+      }
+    },
+    {
+      "file": "supabase/tests/venue_hold_booking_upgrade.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 9
+      },
+      "proposed": {
+        "taggedSqlEntries": 9
+      }
+    },
+    {
+      "file": "supabase/tests/venue_holds.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 77
+      },
+      "proposed": {
+        "taggedSqlEntries": 77
+      }
+    },
+    {
+      "file": "supabase/tests/venue_layouts.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 22
+      },
+      "proposed": {
+        "taggedSqlEntries": 22
+      }
+    },
+    {
+      "file": "supabase/tests/venue_multiple_bookings.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 26
+      },
+      "proposed": {
+        "taggedSqlEntries": 26
+      }
+    },
+    {
+      "file": "supabase/tests/venue_operations.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 40
+      },
+      "proposed": {
+        "taggedSqlEntries": 40
+      }
+    },
+    {
+      "file": "supabase/tests/venue_replacement.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 44
+      },
+      "proposed": {
+        "taggedSqlEntries": 44
+      }
+    },
+    {
+      "file": "supabase/tests/venue_setup_turnaround.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 11
+      },
+      "proposed": {
+        "taggedSqlEntries": 11
+      }
+    },
+    {
+      "file": "supabase/tests/venue_temporary_unavailability.sql",
+      "screen": "complete structural inventory; focused semantic review of candidate overlaps",
+      "baseline": {
+        "taggedSqlEntries": 27
+      },
+      "proposed": {
+        "taggedSqlEntries": 27
+      }
+    }
+  ]
+}

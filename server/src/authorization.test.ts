@@ -574,10 +574,13 @@ test('[BOUNDARY] [SG2-58:AC1] the confirm and confirmation routes are matched on
   assert.equal(outsider.status, 403);
 });
 
-test('[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles', () => {
+test('[NORMAL] [BOUNDARY] [SG2-86:AC4] [SG2-27:AC4] [SG2-86:AC3] the internal-role list holds exactly the five internal roles', () => {
   assert.deepEqual([...INTERNAL_ROLES].sort(), [
     'event_coordinator', 'event_coordinator_lead', 'safety_officer', 'technical_support_staff', 'venue_staff'
   ]);
+  for (const role of ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'] as const) {
+    assert.equal(isInternalRole(role), true, role);
+  }
   assert.equal(isInternalRole('event_organiser'), false);
   assert.equal(isInternalRole('attendee'), false);
 });

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   EVENT_CATEGORIES,
   EVENT_STATUSES,
-  STATUS_TRANSITIONS,
   SUBMISSION_REQUIRED_FIELDS,
   canTransition,
   isEventCategory,
@@ -53,23 +52,9 @@ describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
     assert.equal(canTransition('safety_rejected', 'confirmed'), false);
   });
 
-  test('[NORMAL] [SG2-91:AC1] an Approved or Planning event whose arrangements are in place can move to Awaiting Safety Check', () => {
-    assert.equal(canTransition('approved', 'awaiting_safety_check'), true);
-    assert.equal(canTransition('planning', 'awaiting_safety_check'), true);
-  });
-
-  test('[BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check', () => {
+  test('[NORMAL] [BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check', () => {
     const into = EVENT_STATUSES.filter(from => canTransition(from, 'awaiting_safety_check'));
     assert.deepEqual([...into].sort(), ['approved', 'planning']);
-  });
-
-  test('[BOUNDARY] [SG2-100:AC2] every EVENT_STATUSES member has a STATUS_TRANSITIONS entry', () => {
-    for (const status of EVENT_STATUSES) {
-      assert.ok(
-        Array.isArray(STATUS_TRANSITIONS[status as EventStatus]),
-        `${status} is missing a STATUS_TRANSITIONS entry`
-      );
-    }
   });
 
   test('[BOUNDARY] [SG2-100:AC2] cancelled accepts no outgoing transition, proving it is terminal alongside completed', () => {

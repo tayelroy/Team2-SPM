@@ -424,7 +424,7 @@ begin
   raise exception '[SG2-55:legacy-approved-without-receipt-closed] [SG2-55:AC1] [FAILURE] An approved request without a reservation receipt must retain its original closed arrangement policy';
  end if;
  if public.manage_equipment_requirements('arrange',95508,95508,2,'{"shortfall":0}')->>'outcome' is distinct from 'closed' then
-  raise exception '[SG2-55:confirmed-reserved-arrangement-closed] [SG2-55:AC1] [FAILURE] Reservation arrangement support must preserve the preconfirmation event-stage restriction';
+  raise exception '[SG2-55:confirmed-reserved-arrangement-closed] [SG2-55:AC1] [SG2-53:AC5] [FAILURE] [CONFLICT] Reservation arrangement support must preserve the preconfirmation event-stage restriction';
  end if;
 end $$;
 -- Stored roles and database grants are the authority at every call.

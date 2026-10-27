@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "status": "prepared_not_applied",
+  "reviewDate": "2026-10-27",
+  "repository": "tayelroy/Team2-SPM",
+  "branch": "refactor/removing-redundant-test-cases",
+  "approvalGate": {
+    "required": true,
+    "structuredTeammateSignOff": true,
+    "approvedRevisionMustMatchReviewedHead": true,
+    "ciForReviewedRevisionMustPass": true,
+    "requirePullRequestMergedBeforeSheetMutation": true,
+    "automaticExecutionEnabled": false
+  },
+  "spreadsheetId": "1SPPWhdqrtvg7xQVbJaUia2ZbZDjwtciceW6-RgrzI8o",
+  "sheet": "Main Test Cases",
+  "snapshot": {
+    "gridRows": 4233,
+    "recordRows": 4231,
+    "distinctCaseIds": 4226
+  },
+  "identityChecks": [
+    "Re-read current cells immediately before execution.",
+    "Locate each exact canonical ID and require the recorded scenario, pinned source and full 26-cell fingerprint to match. Row numbers are hints only.",
+    "Abort and re-review if a case is missing, duplicated, moved with changed content, or edited since this snapshot.",
+    "Verify every replacement method still exists on the approved and merged code revision."
+  ],
+  "fingerprintEncoding": "SHA-256 of UTF-8 compact JSON array of 26 formatted strings (A:Z); missing values are empty strings; Unicode stays unescaped.",
+  "retirements": [
+    {
+      "caseId": "SG2-87:s-sees-unassigned-queue-in-the-navigation-s",
+      "observedRow": 2769,
+      "rangeHint": "'Main Test Cases'!A2769:Z2769",
+      "scenario": "%s sees Unassigned queue in the navigation: %s",
+      "sourceAtReview": "https://github.com/tayelroy/Team2-SPM/blob/f75963e7128393d90918c48a065ac5d55b1b4fe3/client/src/App.test.tsx#L234",
+      "formattedValuesSha256": "d7a93f89e1353fd1540f30067d83fdb1a2288374d1996c8ee11d5f4833406f25",
+      "operationAfterApproval": "Archive the complete cell records, then clear values and notes in this case range, preserving row numbers.",
+      "retainedCaseIds": [
+        "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+        "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages"
+      ]
+    },
+    {
+      "caseId": "SG2-97:s-sees-assign-coordinators-in-the-navigation-s",
+      "observedRow": 1717,
+      "rangeHint": "'Main Test Cases'!A1717:Z1717",
+      "scenario": "%s sees Assign coordinators in the navigation: %s",
+      "sourceAtReview": "https://github.com/tayelroy/Team2-SPM/blob/4258a7d254297065e283a1f76a31fd73b1be76ac/client/src/App.test.tsx#L190",
+      "formattedValuesSha256": "e08a99817b940d77f95ecf7c326d45e3406a925f3b0be255688e432619e564bf",
+      "operationAfterApproval": "Archive the complete cell records, then clear values and notes in this case range, preserving row numbers.",
+      "retainedCaseIds": [
+        "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+        "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages"
+      ]
+    },
+    {
+      "caseId": "SG2-52:s-has-no-obsolete-equipment-preview-menu",
+      "observedRow": 1606,
+      "rangeHint": "'Main Test Cases'!A1606:Z1606",
+      "scenario": "%s has no obsolete equipment preview menu",
+      "sourceAtReview": "https://github.com/tayelroy/Team2-SPM/blob/4258a7d254297065e283a1f76a31fd73b1be76ac/client/src/App.test.tsx#L199",
+      "formattedValuesSha256": "924bd54075efdc423d96c39fc7fb578101cd64fb238f1bfed7a0040d6797679a",
+      "operationAfterApproval": "Archive the complete cell records, then clear values and notes in this case range, preserving row numbers.",
+      "retainedCaseIds": [
+        "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+        "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages"
+      ]
+    },
+    {
+      "caseId": "SG2-52:s-is-not-offered-equipment-maintenance-in-the-menu",
+      "observedRow": 1607,
+      "rangeHint": "'Main Test Cases'!A1607:Z1607",
+      "scenario": "%s is not offered equipment maintenance in the menu",
+      "sourceAtReview": "https://github.com/tayelroy/Team2-SPM/blob/4258a7d254297065e283a1f76a31fd73b1be76ac/client/src/App.test.tsx#L204",
+      "formattedValuesSha256": "83dc6b448c36ca1aa8b0062eaa993129ae3bcc7ae06165636e23ba77cf3e0a61",
+      "operationAfterApproval": "Archive the complete cell records, then clear values and notes in this case range, preserving row numbers.",
+      "retainedCaseIds": [
+        "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+        "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages"
+      ]
+    },
+    {
+      "caseId": "SG2-27:event-organiser-and-attendee-are-external",
+      "observedRow": 1114,
+      "rangeHint": "'Main Test Cases'!A1114:Z1114",
+      "scenario": "isInternalRole (SG2-27 team decision, 2026-09-15) — event_organiser and attendee are external",
+      "sourceAtReview": "https://github.com/tayelroy/Team2-SPM/blob/4258a7d254297065e283a1f76a31fd73b1be76ac/server/src/profile.test.ts#L394",
+      "formattedValuesSha256": "8a2a7247c04c10c4de116889ae60a053bd74a1636776d1175950e6c75e29e7ce",
+      "operationAfterApproval": "Archive the complete cell records, then clear values and notes in this case range, preserving row numbers.",
+      "retainedCaseIds": [
+        "SG2-86:the-internal-role-list-holds-exactly-the-five-internal-roles"
+      ]
+    }
+  ],
+  "removedSourceMethodsNotPresentInSheet": [
+    {
+      "id": "SG2-89:s-sees-coordinator-overview-in-the-navigation-s",
+      "sourceFile": "client/src/App.test.tsx",
+      "action": "No worksheet mutation: no matching ID, scenario or source declaration found in this snapshot."
+    },
+    {
+      "id": "SG2-91:s-sees-safety-checks-in-the-navigation-s",
+      "sourceFile": "client/src/App.test.tsx",
+      "action": "No worksheet mutation: no matching ID, scenario or source declaration found in this snapshot."
+    },
+    {
+      "id": "SG2-91:an-approved-or-planning-event-whose-arrangements-are-in-place-can-move-to-awaiting-safety-check",
+      "sourceFile": "server/src/events/fields.test.ts",
+      "action": "No worksheet mutation: no matching ID, scenario or source declaration found in this snapshot."
+    }
+  ],
+  "retainedCaseMetadataUpdates": [
+    {
+      "caseId": "SG2-86:s-navigation-is-unchanged-by-the-week-7-roles",
+      "observedRows": [
+        2767
+      ],
+      "sourceFile": "client/src/App.test.tsx",
+      "sourceLineOnProposedBranch": 235,
+      "references": [
+        {
+          "story": "SG2-86",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-87",
+          "criterion": "AC2"
+        },
+        {
+          "story": "SG2-89",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-97",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-91",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-52",
+          "criterion": "AC3"
+        }
+      ],
+      "categories": [
+        "NORMAL",
+        "FAILURE"
+      ],
+      "sourceAfterMerge": "Resolve this method by canonical ID on the actual merge commit and pin its source link to that revision.",
+      "executionEvidence": "Preserve existing historical results. Append the successful reviewed-commit CI evidence with its actual revision; do not relabel old runs.",
+      "whenMissingFromSheet": "Report the existing inventory gap; do not delete an unrelated row or manufacture a match."
+    },
+    {
+      "caseId": "SG2-86:s-is-offered-only-its-own-screens-no-all-events-no-attendee-pages",
+      "observedRows": [
+        2768
+      ],
+      "sourceFile": "client/src/App.test.tsx",
+      "sourceLineOnProposedBranch": 243,
+      "references": [
+        {
+          "story": "SG2-86",
+          "criterion": "AC2"
+        },
+        {
+          "story": "SG2-87",
+          "criterion": "AC2"
+        },
+        {
+          "story": "SG2-89",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-97",
+          "criterion": "AC1"
+        },
+        {
+          "story": "SG2-91",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-52",
+          "criterion": "AC3"
+        }
+      ],
+      "categories": [
+        "NORMAL",
+        "FAILURE"
+      ],
+      "sourceAfterMerge": "Resolve this method by canonical ID on the actual merge commit and pin its source link to that revision.",
+      "executionEvidence": "Preserve existing historical results. Append the successful reviewed-commit CI evidence with its actual revision; do not relabel old runs.",
+      "whenMissingFromSheet": "Report the existing inventory gap; do not delete an unrelated row or manufacture a match."
+    },
+    {
+      "caseId": "SG2-91:only-approved-and-planning-events-enter-the-safety-check",
+      "observedRows": [],
+      "sourceFile": "server/src/events/fields.test.ts",
+      "sourceLineOnProposedBranch": 56,
+      "references": [
+        {
+          "story": "SG2-91",
+          "criterion": "AC1"
+        }
+      ],
+      "categories": [
+        "NORMAL",
+        "BOUNDARY"
+      ],
+      "sourceAfterMerge": "Resolve this method by canonical ID on the actual merge commit and pin its source link to that revision.",
+      "executionEvidence": "Preserve existing historical results. Append the successful reviewed-commit CI evidence with its actual revision; do not relabel old runs.",
+      "whenMissingFromSheet": "Report the existing inventory gap; do not delete an unrelated row or manufacture a match."
+    },
+    {
+      "caseId": "SG2-86:the-internal-role-list-holds-exactly-the-five-internal-roles",
+      "observedRows": [
+        1789
+      ],
+      "sourceFile": "server/src/authorization.test.ts",
+      "sourceLineOnProposedBranch": 577,
+      "references": [
+        {
+          "story": "SG2-86",
+          "criterion": "AC4"
+        },
+        {
+          "story": "SG2-27",
+          "criterion": "AC4"
+        }
+      ],
+      "categories": [
+        "NORMAL",
+        "BOUNDARY"
+      ],
+      "sourceAfterMerge": "Resolve this method by canonical ID on the actual merge commit and pin its source link to that revision.",
+      "executionEvidence": "Preserve existing historical results. Append the successful reviewed-commit CI evidence with its actual revision; do not relabel old runs.",
+      "whenMissingFromSheet": "Report the existing inventory gap; do not delete an unrelated row or manufacture a match."
+    }
+  ],
+  "evidenceHandling": [
+    "Archive complete cell records, source links, comments/notes and execution/review provenance before clearing any record.",
+    "Preserve row numbering because Evidence Detail captions and links contain fixed Main row references.",
+    "Preserve shared Evidence Detail screenshots: they document pinned historical source and several retained cases.",
+    "The hosted policy test remains a whole test and receives no worksheet retirement."
+  ],
+  "intentionalHistoricalDuplicatesToPreserve": [
+    {
+      "rows": [
+        3385,
+        4083
+      ],
+      "reason": "SG2-66 validation-message contract changed in PR113; distinct historical source and CI evidence."
+    },
+    {
+      "rows": [
+        3405,
+        4084
+      ],
+      "reason": "SG2-66 recheck-key contract changed in PR113; distinct historical source and CI evidence."
+    },
+    {
+      "rows": [
+        3531,
+        4080
+      ],
+      "reason": "SG2-92 history fixtures revised in PR113; previous execution and review provenance retained."
+    },
+    {
+      "rows": [
+        3533,
+        4081
+      ],
+      "reason": "SG2-92 late-reply fixtures revised in PR113; previous execution and review provenance retained."
+    },
+    {
+      "rows": [
+        3540,
+        4082
+      ],
+      "reason": "SG2-92 screen-leave fixtures revised in PR113; previous execution and review provenance retained."
+    }
+  ],
+  "completionChecks": [
+    "Exactly the five reviewed retired IDs cease to be active Main records.",
+    "Retained rows carry the approved requirement/category mappings and preserve their earlier evidence.",
+    "No Evidence Detail row indices or screenshot anchors move."
+  ]
+}

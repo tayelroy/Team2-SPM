@@ -233,7 +233,7 @@ describe('every role can reach every screen in its navigation', () => {
   });
   // SG2-86: the menu is exactly the screens above — nothing extra is offered.
   test.each(['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)(
-    '[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles',
+    '[NORMAL] [FAILURE] [SG2-86:AC4] [SG2-87:AC2] [SG2-89:AC4] [SG2-97:AC1] [SG2-91:AC4] [SG2-52:AC3] %s navigation is unchanged by the Week 7 roles',
     async (role) => {
       await signInAs(role);
       const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
@@ -241,7 +241,7 @@ describe('every role can reach every screen in its navigation', () => {
     },
   );
   test.each(['Event Coordinator Lead', 'Safety Officer'] as const)(
-    '[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages',
+    '[NORMAL] [FAILURE] [SG2-86:AC2] [SG2-87:AC2] [SG2-89:AC4] [SG2-97:AC1] [SG2-91:AC4] [SG2-52:AC3] %s is offered only its own screens — no All events, no Attendee pages',
     async (role) => {
       await signInAs(role);
       const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
@@ -251,49 +251,6 @@ describe('every role can reach every screen in its navigation', () => {
       expect(labels).not.toContain('My registrations');
     },
   );
-});
-
-// SG2-87: only the Event Coordinator Lead is offered the unassigned queue.
-test.each([
-  ['Event Organiser', false], ['Event Coordinator', false], ['Technical Support Staff', false], ['Safety Officer', false],
-  ['Event Coordinator Lead', true],
-] as const)('[FAILURE] [SG2-87:AC2] %s sees Unassigned queue in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(header()).queryByRole('button', { name: 'Unassigned queue' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
-});
-
-// SG2-89: only the Event Coordinator Lead is offered the coordinator overview.
-test.each([
-  ['Event Organiser', false], ['Event Coordinator', false], ['Venue Staff', false], ['Technical Support Staff', false],
-  ['Safety Officer', false], ['Attendee', false], ['Event Coordinator Lead', true],
-] as const)('[FAILURE] [SG2-89:AC4] %s sees Coordinator overview in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(await loadedNav()).queryByRole('button', { name: 'Coordinator overview' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
-});
-
-// SG2-97: only the Event Coordinator Lead is offered the assignment screen.
-test.each([
-  ['Technical Support Staff', false], ['Event Coordinator', false], ['Safety Officer', false], ['Event Coordinator Lead', true],
-] as const)('[FAILURE] [SG2-97:AC1] %s sees Assign coordinators in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(header()).queryByRole('button', { name: 'Assign coordinators' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
-});
-
-// SG2-91 AC4: only a Safety Officer is offered the safety check list.
-test.each([
-  ['Event Organiser', false], ['Event Coordinator', false], ['Venue Staff', false], ['Technical Support Staff', false],
-  ['Event Coordinator Lead', false], ['Safety Officer', true],
-] as const)('[FAILURE] [SG2-91:AC4] %s sees Safety checks in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(header()).queryByRole('button', { name: 'Safety checks' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
 });
 
 test('[FAILURE] [SG2-91:AC4] a Safety Officer the server has not granted the list is not offered it', async () => {
@@ -355,16 +312,6 @@ test('[CONFLICT] [SG2-86:AC2] a late permissions answer for a signed-out session
   await act(async () => releaseFirst(new Response(null, { status: 401 })));
   expect(within(header()).getByRole('button', { name: 'Unassigned queue' })).toBeInTheDocument();
   expect(sessionStorage.getItem('connectsphere.session')).not.toBeNull();
-});
-
-test.each(['Technical Support Staff', 'Event Coordinator', 'Venue Staff'] as const)('[NORMAL] [SG2-52:AC3] %s has no obsolete equipment preview menu', async role => {
-  await signInAs(role);
-  expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
-});
-
-test.each(['Event Coordinator', 'Venue Staff', 'Event Organiser', 'Attendee', 'Event Coordinator Lead', 'Safety Officer'] as const)('[FAILURE] [SG2-52:AC3] %s is not offered equipment maintenance in the menu', async role => {
-  await signInAs(role);
-  expect(within(header()).queryByRole('button', { name: 'Equipment' })).not.toBeInTheDocument();
 });
 
 test('[FAILURE] [SG2-24:AC2] the role shown in the header is a read-only label, not a selector', async () => {
