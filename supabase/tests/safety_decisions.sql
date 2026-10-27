@@ -372,7 +372,9 @@ end $$;
 reset role;
 do $$
 begin
- if exists(select 1 from pg_proc where proname = 'record_safety_decision' and pronargs = 5) then
+ if to_regprocedure('public.record_safety_decision(integer,uuid,text,text,jsonb)') is not null
+   or exists(select 1 from pg_catalog.pg_proc where oid=to_regprocedure('public.record_safety_decision(integer,uuid,text,text,jsonb,bigint)')
+      and pronargdefaults>0) then
   raise exception '[SG2-92:old-signature-gone] [SG2-92:AC1] [FAILURE] The decision without a revision must no longer be callable';
  end if;
 end $$;

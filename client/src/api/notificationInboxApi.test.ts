@@ -10,7 +10,7 @@ function respond(value: unknown, status = 200) {
   const fetch = vi.fn(async () => Response.json(value, { status })); vi.stubGlobal('fetch', fetch); return fetch;
 }
 
-test('[NORMAL] [SG2-69:AC1] inbox requests use the session token, no-store, global count and an encoded complete cursor', async () => {
+test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] inbox requests use the session token, no-store, global count and an encoded complete cursor', async () => {
   const notifications = [
     entry,
     ...['venue_request_approved', 'venue_request_rejected', 'venue_booking_released', 'equipment_reserved',
@@ -18,8 +18,12 @@ test('[NORMAL] [SG2-69:AC1] inbox requests use the session token, no-store, glob
       'coordinator_assigned', 'clarification_requested', 'event_approved', 'event_rejected',
       'event_returned_to_planning', 'safety_decision', 'registration_opened', 'registration_closed',
       'venue_booking_cancelled', 'venue_change_requested', 'cancellation_requested', 'event_cancelled',
-      'change_requested']
+      'change_requested', 'change_accepted', 'change_refused']
       .map((kind, index) => ({ ...entry, kind, notification_id: index + 3 })),
+    { ...entry, kind: 'registration_confirmed', notification_id: 70,
+      message: 'You are registered for Forum on 20 Jul 2030 19:00 SGT at Main hall.' },
+    { ...entry, kind: 'registration_withdrawn', notification_id: 71,
+      message: 'Ana withdrew from Forum. 9 of 10 places now remain.' },
     ...['placed', 'warning', 'expiry_changed']
       .map((kind, index) => ({ ...entry, source: 'hold', kind, notification_id: index + 100 })),
   ];
@@ -110,15 +114,3 @@ test.each([null, {}, { event: null }, { event: {} },
   '[FAILURE] [SG2-69:AC3] invalid event summary %j is rejected', async value => {
     respond(value); expect((await loadNotificationEvent('token', 'event', 2)).ok).toBe(false);
   });
-
-test('[NORMAL] [SG2-60:AC1] an attendee inbox holding a registration confirmation loads', async () => {
-  const confirmed = { ...entry, kind: 'registration_confirmed', message: 'You are registered for Forum on 20 Jul 2030 19:00 SGT at Main hall.' };
-  respond({ notifications: [confirmed], unread_count: 1, next_cursor: null });
-  expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [confirmed], unread_count: 1, next_cursor: null } });
-});
-
-test('[NORMAL] [SG2-62:AC5] an organiser inbox holding an attendee withdrawal loads', async () => {
-  const withdrew = { ...entry, kind: 'registration_withdrawn', message: 'Ana withdrew from Forum. 9 of 10 places now remain.' };
-  respond({ notifications: [withdrew], unread_count: 1, next_cursor: null });
-  expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [withdrew], unread_count: 1, next_cursor: null } });
-});

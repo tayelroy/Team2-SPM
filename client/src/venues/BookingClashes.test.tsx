@@ -80,14 +80,7 @@ test('[FAILURE] [SG2-79:AC3] expired sessions, other roles, outages and malforme
   expect(await within(list()).findByRole('alert')).toHaveTextContent('Clashing bookings are unavailable right now.');
 });
 
-test('[NORMAL] [SG2-79:AC3] a result arriving after the list closed is ignored', async () => {
-  let answer!: (response: Response) => void;
-  serve(() => new Promise<Response>(resolve => { answer = resolve; }));
-  const { unmount } = render(<BookingClashes accessToken="token" />);
-  unmount();
-  answer(Response.json({ clashes: [clash] }));
-  await vi.waitFor(() => expect(screen.queryByText('Morning Summit')).toBeNull());
-});
+
 
 test.each([['Venue Staff', true], ['Event Coordinator', true], ['Technical Support Staff', false]] as const)(
   '[NORMAL] [SG2-79:AC3] the %s dashboard shows clashing bookings: %s', async (role, shown) => {

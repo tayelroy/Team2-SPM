@@ -316,7 +316,7 @@ begin
   'event_approved','event_rejected','venue_unavailable','event_returned_to_planning','safety_decision',
   'outstanding_arrangements','registration_opened','registration_closed','venue_booking_cancelled',
   'venue_change_requested','cancellation_requested','event_cancelled','registration_confirmed',
-  'change_requested','registration_withdrawn'
+  'change_requested','registration_withdrawn','change_accepted','change_refused'
  ] loop
   insert into public.notifications(recipient_id,event_id,kind,message,equipment_reservation_id)
    values('e6300000-0000-4000-8000-000000000001',96301,notice_kind,'Allowed notification kind',

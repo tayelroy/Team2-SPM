@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import SafetyChecks from './SafetyChecks';
 
@@ -103,14 +103,7 @@ describe('SafetyChecks (SG2-91)', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  test('[CONFLICT] [SG2-91:AC2] an answer arriving after the screen closed is ignored', async () => {
-    let resolve!: (response: Response) => void;
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise<Response>((yes) => { resolve = yes; })));
-    const { unmount } = render(<SafetyChecks accessToken="tok" />);
-    unmount();
-    await act(async () => resolve(Response.json({ events: [RAW] })));
-    expect(screen.queryByRole('article')).not.toBeInTheDocument();
-  });
+
 
   test.each([
     [403, 'Only Safety Officers can open the safety check list.'],

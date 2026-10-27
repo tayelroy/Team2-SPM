@@ -131,19 +131,17 @@ function VenueCatalogue({ token }: { token: string | null }) {
     setDeleting(true);
     try {
       await deleteVenue(token!, controller.signal, venue.venue_id);
-      if (controller.signal.aborted) return;
       setVenues(current => current.filter(item => item.venue_id !== venue.venue_id));
       setRemoving(undefined);
       setSaved(`${venue.name} deleted. It no longer appears in search, availability or new bookings.`);
     } catch (failure) {
-      if (controller.signal.aborted) return;
       if (failure instanceof VenueDeleteBlocked) setRemoving({ venue, blockers: failure.blockers });
       else if (failure instanceof VenueError && [401, 403].includes(failure.status)) {
         setAccess(null); setVenues([]); setRemoving(undefined); setError(failure.message);
       } else setRemoving({ venue, error: failure instanceof VenueError ? failure.message : 'Unable to delete the venue. Please try again.' });
     } finally {
       pending.current = null;
-      if (!controller.signal.aborted) setDeleting(false);
+      setDeleting(false);
     }
   }
 

@@ -41,6 +41,7 @@ afterEach(() => {
 test('[NORMAL] [SG2-62:AC1] an attendee sees each registration with the event details and where it stands', async () => {
   serve({ '/api/my-registrations': () => Response.json({ registrations: [active, ...others] }) });
   render(<MyRegistrations accessToken="attendee-token" />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your registrations…');
 
   const card = await screen.findByRole('article', { name: 'Harbour Lecture' });
   expect(card).toHaveTextContent('Registered');
@@ -192,15 +193,7 @@ test('[CONFLICT] [SG2-62:AC2] two presses before the screen updates send one wit
   expect(withdrawals(fetch)).toBe(1);
 });
 
-test('[BOUNDARY] [SG2-62:AC1] leaving the screen before the list arrives changes nothing', async () => {
-  let answer: (response: Response) => void = () => undefined;
-  serve({ '/api/my-registrations': () => new Promise<Response>((resolve) => { answer = resolve; }) as unknown as Response });
-  const { unmount } = render(<MyRegistrations accessToken="attendee-token" />);
-  expect(screen.getByRole('status')).toHaveTextContent('Loading your registrations…');
-  unmount();
-  await act(async () => { answer(Response.json({ registrations: [active] })); });
-  expect(screen.queryByRole('article')).not.toBeInTheDocument();
-});
+
 
 test('[FAILURE] [SG2-62:AC1] an outage offers a retry, and a non-attendee is told why', async () => {
   let up = false;

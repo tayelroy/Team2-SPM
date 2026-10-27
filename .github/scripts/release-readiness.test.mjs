@@ -65,14 +65,18 @@ test('[CONFLICT] [SG2-58:AC1] wrong confirmation types or missing record constra
   ]) assertReadinessRejects(mutation, diagnostic);
 });
 
-test('[CONFLICT] [SG2-22:AC3] a stale work queue view cannot pass merely because its backing columns exist', () => {
+// These are public release-checker contracts. SQL source replacement constructs
+// the damaged deployment fixture; it is not the expected oracle. The shared
+// helper independently checks failure, named diagnostics and a healthy read-only
+// check after rollback. Native SQL suites prove the business behavior itself.
+test('[CONFLICT] [SG2-22:AC3] [SG2-22:release-checker-work-queue-shape] a stale work queue view cannot pass merely because its backing columns exist', () => {
   assertReadinessRejects(`DO $$ BEGIN
     EXECUTE 'CREATE OR REPLACE VIEW public.internal_work_items AS ' ||
       replace(pg_get_viewdef('public.internal_work_items'::regclass), '''planning_notes''', '''legacy_planning_notes''');
   END $$;`, 'internal_work_items planning key planning_notes');
 });
 
-test('[CONFLICT] [SG2-39:AC2] [SG2-58:AC2] a stale confirmation RPC missing any known planning recheck blocks release', () => {
+test('[CONFLICT] [SG2-39:release-checker-planning-recheck] [SG2-58:release-checker-confirmation] a stale confirmation RPC missing any known planning recheck blocks release', () => {
   for (const marker of ['venue_recheck', 'equipment_recheck', 'registration_recheck']) {
     assertReadinessRejects(`DO $$ BEGIN
       EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
@@ -81,14 +85,14 @@ test('[CONFLICT] [SG2-39:AC2] [SG2-58:AC2] a stale confirmation RPC missing any 
   }
 });
 
-test('[CONFLICT] [SG2-81:AC2] [SG2-58:AC2] a stale confirmation RPC missing the venue disruption guard blocks release', () => {
+test('[CONFLICT] [SG2-81:release-checker-disruption] [SG2-58:release-checker-confirmation] a stale confirmation RPC missing the venue disruption guard blocks release', () => {
   assertReadinessRejects(`DO $$ BEGIN
     EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
       'public.venue_booking_disruptions', 'public.legacy_venue_booking_disruptions');
   END $$;`, 'confirm_event venue disruption guard');
 });
 
-test('[CONFLICT] [SG2-94:AC1] [SG2-94:AC5] a database without the Preparation gate or a confirmation RPC that skips the safety approval blocks release', () => {
+test('[CONFLICT] [SG2-94:release-checker-approval] a database without the Preparation gate or a confirmation RPC that skips the safety approval blocks release', () => {
   for (const [mutation, diagnostic] of [
     ['DROP TRIGGER safety_approval_gate ON public.events;', 'events safety_approval_gate trigger'],
     ['ALTER TABLE public.events DISABLE TRIGGER safety_approval_gate;', 'events safety_approval_gate trigger'],

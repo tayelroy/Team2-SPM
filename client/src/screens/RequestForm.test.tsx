@@ -20,7 +20,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import EventDetail from './EventDetail';
 import RequestForm from './RequestForm';
 
 const SESSION_KEY = 'connectsphere.session';
@@ -995,21 +994,6 @@ describe('AC2 — server error banners', () => {
 });
 
 // ─── Event detail entry requirements ────────────────────────────────────────
-
-describe('EventDetail requires an authenticated selected request', () => {
-  test('[FAILURE] [SG2-26:AC1] a caller-supplied draft status cannot substitute for a selected request', () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    render(<EventDetail role="Event Organiser" accessToken="test-token" onNavigate={vi.fn()} eventStatus="draft" />);
-    expect(screen.queryByRole('button', { name: 'Edit request' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Select an event from your organisation/)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-  test('[FAILURE] [SG2-26:AC2] coordinator cannot view organiser request details', () => {
-    render(<EventDetail role="Event Coordinator" onNavigate={vi.fn()} eventStatus="submitted" />);
-    expect(screen.getByRole('alert')).toHaveTextContent('available only to Event Organisers');
-  });
-});
 
 describe('the event category (SG2-70)', () => {
   test('[NORMAL] [SG2-70:AC2] the organiser picks one of the seven categories and the latest choice is saved', async () => {

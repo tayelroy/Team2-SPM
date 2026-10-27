@@ -166,7 +166,7 @@ describe('ChangeRequestsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Accept change' })).not.toBeInTheDocument();
   });
 
-  test('[CONFLICT] [SG2-66:AC4] accepting is disabled when the event status does not allow a change', async () => {
+test('[BOUNDARY] [SG2-66:AC4] accepting is disabled when the event status does not allow a change', async () => {
     const accept = vi.spyOn(changeRequestsApi, 'acceptChangeRequest');
     vi.spyOn(changeRequestsApi, 'fetchChangeRequests').mockResolvedValue({
       ok: true,
@@ -236,22 +236,24 @@ describe('ChangeRequestsPanel', () => {
   });
 
   test('[FAILURE] [SG2-66:AC1] a failed load says so and retries on request', async () => {
+    let late!: (result: Awaited<ReturnType<typeof changeRequestsApi.fetchChangeRequests>>) => void;
     const fetch = vi.spyOn(changeRequestsApi, 'fetchChangeRequests')
+      .mockReturnValueOnce(new Promise(resolve => { late = resolve; }))
       .mockResolvedValueOnce({ ok: false, kind: 'unavailable', message: 'Could not reach the server. Please try again.' })
       .mockResolvedValueOnce({ ok: true, list: listOf([description]) });
-    renderPanel();
+    const onAccepted = vi.fn();
+    const view = render(<ChangeRequestsPanel eventId={12} accessToken="previous-token" onAccepted={onAccepted} />);
+    view.rerender(<ChangeRequestsPanel eventId={12} accessToken="coordinator-token" onAccepted={onAccepted} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the server. Please try again.');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByTestId('change-request-mock-12-description')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    await act(async () => late({ ok: true, list: listOf([attendance]) }));
+    expect(screen.getByTestId('change-request-mock-12-description')).toBeVisible();
+    expect(screen.queryByTestId('change-request-mock-12-attendance')).toBeNull();
+    expect(fetch.mock.calls.map(([eventId, token]) => [eventId, token])).toEqual([
+      [12, 'previous-token'], [12, 'coordinator-token'], [12, 'coordinator-token'],
+    ]);
   });
 
-  test('[BOUNDARY] [SG2-66:AC1] a reply that lands after the panel closed is ignored', async () => {
-    let resolve: (value: changeRequestsApi.FetchChangeRequestsResult) => void = () => {};
-    vi.spyOn(changeRequestsApi, 'fetchChangeRequests').mockReturnValue(new Promise((r) => { resolve = r; }));
-    renderPanel();
-    cleanup();
-    await act(async () => resolve({ ok: true, list: listOf([attendance]) }));
-    expect(screen.queryByTestId('change-request-mock-12-attendance')).not.toBeInTheDocument();
-  });
+
 });

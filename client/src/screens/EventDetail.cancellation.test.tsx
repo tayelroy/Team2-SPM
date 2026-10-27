@@ -17,12 +17,8 @@ vi.mock('../components/CancellationPanel', () => ({
 }));
 vi.mock('../components/RegistrationPanel', () => ({ default: () => null }));
 vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
-vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
-vi.mock('../components/EquipmentRequirements', () => ({ default: () => null }));
-vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
 
-// jsdom has no scrollIntoView; the planning drawer uses it (SG2-39).
-Element.prototype.scrollIntoView = vi.fn();
+vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
 
 afterEach(() => {
   cleanup();
@@ -42,35 +38,32 @@ const stage: eventRequestsApi.EventStageResult = {
   description: 'Planning.', waiting_on: null, stepper_steps: [], arrangements_recheck_needed: false, outstanding_arrangements: [],
 };
 
-function renderAs(role: 'Event Coordinator' | 'Event Organiser', request: eventRequestsApi.EventRequestDetail) {
+function renderAs(role: 'Event Organiser', request: eventRequestsApi.EventRequestDetail) {
   const fetchDetail = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request });
   vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage });
-  render(<EventDetail role={role} selectedEventId={67} accessToken="token-67" currentUserId="coord-1" onNavigate={vi.fn()} />);
+  render(<EventDetail role={role} selectedEventId={67} accessToken="token-67" onNavigate={vi.fn()} />);
   return fetchDetail;
 }
 
 describe('EventDetail cancellation panel (SG2-67)', () => {
-  test('[NORMAL] [SG2-67:AC1] the creating organiser gets the panel in organiser mode, and a request reloads the event', async () => {
+  test('[NORMAL] [SG2-67:AC1] [SG2-67:AC4] the creating organiser gets the panel in organiser mode, and a request reloads the event', async () => {
     const fetchDetail = renderAs('Event Organiser', detail);
     expect(await screen.findByTestId('cancellation-panel')).toHaveTextContent('67 organiser planning null null null');
     fireEvent.click(screen.getByRole('button', { name: 'Report change' }));
     await vi.waitFor(() => expect(fetchDetail).toHaveBeenCalledTimes(2));
-  });
-
-  test('[NORMAL] [SG2-67:AC1] [SG2-67:AC4] the assigned coordinator gets the panel with the organiser\'s request', async () => {
-    renderAs('Event Coordinator', {
-      ...detail, canManage: false, status: 'cancelled', cancellationRequestedAt: '2026-10-21T01:00:00Z',
-      cancellationReason: 'Speaker withdrew', cancelledAt: '2026-10-21T02:00:00Z'
+    cleanup();
+    renderAs('Event Organiser', {
+      ...detail, status: 'cancelled', cancellationRequestedAt: '2026-10-21T01:00:00Z',
+      cancellationReason: 'Speaker withdrew', cancelledAt: '2026-10-21T02:00:00Z',
     });
     expect(await screen.findByTestId('cancellation-panel')).toHaveTextContent(
-      '67 coordinator cancelled 2026-10-21T01:00:00Z Speaker withdrew 2026-10-21T02:00:00Z');
+      '67 organiser cancelled 2026-10-21T01:00:00Z Speaker withdrew 2026-10-21T02:00:00Z');
   });
 
   test.each([
     ['a draft, which is deleted instead', 'Event Organiser' as const, { status: 'draft' }],
     ['a completed event', 'Event Organiser' as const, { status: 'completed' }],
     ['an organisation colleague who did not create it', 'Event Organiser' as const, { canManage: false }],
-    ['a coordinator not assigned to it', 'Event Coordinator' as const, { coordinatorId: 'coord-2', canManage: false }],
   ])('[BOUNDARY] [SG2-67:AC1] %s shows no cancellation panel', async (_label, role, override) => {
     renderAs(role, { ...detail, ...override });
     expect(await screen.findByRole('heading', { name: 'Cancel Forum' })).toBeInTheDocument();

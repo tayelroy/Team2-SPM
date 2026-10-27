@@ -253,7 +253,7 @@ describe('POST /api/event-requests/:eventId/change-requests/:id/accept (SG2-66 A
     assert.deepEqual(applied[0].changes, { description: 'An evening showcase. (updated agenda)' });
   });
 
-  test('[CONFLICT] [SG2-66:AC4] an event in a status that cannot change is refused with 409', async () => {
+  test('[CONFLICT] [SG2-66:AC4] [SG2-65:AC4] an event in a status that cannot change is refused with 409', async () => {
     for (const status of ['draft', 'under_review', 'rejected', 'safety_rejected', 'completed', 'cancelled']) {
       const { app, applied } = harness({ event: { status } });
       const res = await request(app).post('/events/12/change-requests/mock-12-attendance/accept');

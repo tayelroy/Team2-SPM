@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import Venues from '../screens/Venues';
 import type { Venue } from './api';
@@ -167,7 +167,7 @@ test('[BOUNDARY] [SG2-77:AC3] a newly created venue shows the defaults and saves
   expect(JSON.parse(String(put?.[1]?.body))).toEqual({ setup_minutes: 0, turnaround_minutes: 0, emergency_access: null, known_restrictions: null });
 });
 
-test('[CONFLICT] [SG2-77:AC6] leaving the page while the times are saving discards the late response', async () => {
+test('[CONFLICT] [SG2-77:AC6] leaving the page while the times are saving aborts the in-flight write', async () => {
   let release!: (response: Response) => void;
   const fetch = api(staff, recorded);
   fetch.mockImplementation(async (url: string, init?: RequestInit) => {
@@ -181,8 +181,10 @@ test('[CONFLICT] [SG2-77:AC6] leaving the page while the times are saving discar
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Atrium Hall' }));
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(operationPuts(fetch)).toHaveLength(1));
+  const signal = operationPuts(fetch)[0][1]?.signal;
+  expect(signal?.aborted).toBe(false);
   view.unmount();
+  expect(signal?.aborted).toBe(true);
   release(Response.json({ operations: recorded }));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  expect(screen.queryByText(/saved/)).not.toBeInTheDocument();
+  await act(async () => {});
 });

@@ -23,7 +23,7 @@ const rpcClient = (data: unknown, error: unknown = null) =>
 function tableClient(reply: { data: unknown; error: unknown }) {
   const calls: unknown[][] = [];
   const builder: Record<string, unknown> = {};
-  for (const method of ['from', 'select', 'eq', 'order', 'update']) {
+  for (const method of ['from', 'select', 'eq', 'order']) {
     builder[method] = (...args: unknown[]) => { calls.push([method, ...args]); return builder; };
   }
   builder.maybeSingle = async () => { calls.push(['maybeSingle']); return reply; };
