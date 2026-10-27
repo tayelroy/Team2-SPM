@@ -9785,7 +9785,7 @@
     "status": "Pass",
     "execution_date": "27 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118); local replay of every CI job: database job (64 steps; the three SG2-65 sabotage runs were on the pre-merge tree), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,918/1,918 and client 1,961/1,961 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-27",
       "by": "YE ZHAN",
@@ -9826,7 +9826,7 @@
     "status": "Pass",
     "execution_date": "27 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118); local replay of every CI job: database job (64 steps; the three SG2-65 sabotage runs were on the pre-merge tree), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,918/1,918 and client 1,961/1,961 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-27",
       "by": "YE ZHAN",
@@ -9868,7 +9868,7 @@
     "status": "Pass",
     "execution_date": "27 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118); local replay of every CI job: database job (64 steps; the three SG2-65 sabotage runs were on the pre-merge tree), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,918/1,918 and client 1,961/1,961 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-27",
       "by": "YE ZHAN",
@@ -9910,7 +9910,7 @@
     "status": "Pass",
     "execution_date": "27 Oct 2026",
     "executed_by": "YE ZHAN",
-    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118); local replay of every CI job: database job (64 steps; the three SG2-65 sabotage runs were on the pre-merge tree), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,918/1,918 and client 1,961/1,961 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
     "review": {
       "date": "2026-10-27",
       "by": "YE ZHAN",

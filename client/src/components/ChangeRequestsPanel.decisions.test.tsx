@@ -48,65 +48,58 @@ function openRefusal(card: HTMLElement, reason: string) {
 }
 
 describe('ChangeRequestsPanel decisions (SG2-65)', () => {
-  test('[NORMAL] [SG2-65:AC2] the coordinator refuses with a reason, the request leaves the list and the event is not reloaded', async () => {
+  test('[NORMAL] [BOUNDARY] [CONFLICT] [SG2-65:AC2] the coordinator refuses only with a non-blank reason of up to 1000 characters; a request decided meanwhile stays listed, and a refusal does not reload the event', async () => {
     let resolve!: (value: RefuseChangeRequestResult) => void;
     const refuse = vi.spyOn(changeRequestsApi, 'refuseChangeRequest')
-      .mockReturnValue(new Promise((done) => { resolve = done; }));
+      .mockResolvedValueOnce({ ok: false, kind: 'conflict', message: 'This change request has already been decided.' })
+      .mockReturnValueOnce(new Promise((done) => { resolve = done; }));
     const { card, onAccepted } = await renderPanel(listed());
-    openRefusal(card, '  No larger room is free.  ');
-    fireEvent.click(within(card).getByRole('button', { name: 'Confirm refusal' }));
 
+    // BOUNDARY: a blank reason cannot be confirmed; the box holds at most 1000 characters; Cancel closes it.
+    openRefusal(card, '   ');
+    expect(within(card).getByRole('button', { name: 'Confirm refusal' })).toBeDisabled();
+    expect(within(card).getByLabelText('Reason for refusing')).toHaveAttribute('maxLength', '1000');
+    fireEvent.click(within(card).getByRole('button', { name: 'Cancel' }));
+    expect(within(card).queryByLabelText('Reason for refusing')).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Accept change' })).toBeEnabled();
+    expect(refuse).not.toHaveBeenCalled();
+
+    // CONFLICT: decided in the meantime, so the message shows and the reason is kept.
+    openRefusal(card, 'No.');
+    await act(async () => fireEvent.click(within(card).getByRole('button', { name: 'Confirm refusal' })));
+    expect(within(card).getByRole('alert')).toHaveTextContent('This change request has already been decided.');
+    expect(within(card).getByLabelText('Reason for refusing')).toHaveValue('No.');
+
+    // NORMAL: the trimmed reason is sent, the request leaves the list and the event is not reloaded.
+    fireEvent.change(within(card).getByLabelText('Reason for refusing'), { target: { value: '  No larger room is free.  ' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Confirm refusal' }));
     expect(within(card).getByRole('button', { name: 'Refusing change…' })).toBeDisabled();
-    expect(refuse).toHaveBeenCalledWith(12, '41', 'No larger room is free.', 'coordinator-token');
+    expect(refuse).toHaveBeenLastCalledWith(12, '41', 'No larger room is free.', 'coordinator-token');
     await act(async () => resolve({ ok: true }));
     expect(screen.queryByTestId('change-request-41')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Change refused. The event is unchanged and the organiser has been told why.');
     expect(onAccepted).not.toHaveBeenCalled();
   });
 
-  test('[BOUNDARY] [SG2-65:AC2] Confirm refusal stays disabled until a non-blank reason is given, and the reason is capped at 1000 characters', async () => {
-    const refuse = vi.spyOn(changeRequestsApi, 'refuseChangeRequest');
-    const { card } = await renderPanel(listed());
-    openRefusal(card, '   ');
-    expect(within(card).getByRole('button', { name: 'Confirm refusal' })).toBeDisabled();
-    expect(within(card).getByLabelText('Reason for refusing')).toHaveAttribute('maxLength', '1000');
-    fireEvent.change(within(card).getByLabelText('Reason for refusing'), { target: { value: 'r' } });
-    expect(within(card).getByRole('button', { name: 'Confirm refusal' })).toBeEnabled();
-    fireEvent.click(within(card).getByRole('button', { name: 'Cancel' }));
-    expect(within(card).queryByLabelText('Reason for refusing')).not.toBeInTheDocument();
-    expect(within(card).getByRole('button', { name: 'Accept change' })).toBeEnabled();
-    expect(refuse).not.toHaveBeenCalled();
-  });
-
-  test('[NORMAL] [SG2-65:AC4] on a request returned for clarification the coordinator accepts and chooses back to review or resubmit', async () => {
-    const accept = vi.spyOn(changeRequestsApi, 'acceptChangeRequest').mockResolvedValue(ACCEPTED);
+  test('[NORMAL] [FAILURE] [SG2-65:AC4] on a request returned for clarification the coordinator chooses back to review or resubmit; a failed acceptance keeps the request and shows why', async () => {
+    const accept = vi.spyOn(changeRequestsApi, 'acceptChangeRequest')
+      .mockResolvedValueOnce({
+        ok: false, kind: 'validation', message: 'Choose whether the request goes back to review or the organiser resubmits it.',
+      })
+      .mockResolvedValueOnce(ACCEPTED);
     const { card, onAccepted } = await renderPanel(listed('needs_clarification', true));
     expect(within(card).queryByRole('button', { name: 'Accept change' })).not.toBeInTheDocument();
-    expect(within(card).getByRole('button', { name: 'Accept and ask organiser to resubmit' })).toBeEnabled();
-    await act(async () => fireEvent.click(within(card).getByRole('button', { name: 'Accept and return to review' })));
-    expect(accept).toHaveBeenCalledWith(12, '41', 'coordinator-token', 'review');
-    expect(onAccepted).toHaveBeenCalledWith(ACCEPTED.change);
-    expect(screen.queryByTestId('change-request-41')).not.toBeInTheDocument();
-  });
 
-  test('[CONFLICT] [SG2-65:AC2] a request decided in the meantime shows the server message and stays listed', async () => {
-    vi.spyOn(changeRequestsApi, 'refuseChangeRequest').mockResolvedValue({
-      ok: false, kind: 'conflict', message: 'This change request has already been decided.',
-    });
-    const { card } = await renderPanel(listed());
-    openRefusal(card, 'No.');
-    await act(async () => fireEvent.click(within(card).getByRole('button', { name: 'Confirm refusal' })));
-    expect(within(card).getByRole('alert')).toHaveTextContent('This change request has already been decided.');
-    expect(within(card).getByLabelText('Reason for refusing')).toHaveValue('No.');
-  });
-
-  test('[FAILURE] [SG2-65:AC4] a failed clarification acceptance keeps the request and shows why', async () => {
-    vi.spyOn(changeRequestsApi, 'acceptChangeRequest').mockResolvedValue({
-      ok: false, kind: 'validation', message: 'Choose whether the request goes back to review or the organiser resubmits it.',
-    });
-    const { card, onAccepted } = await renderPanel(listed('needs_clarification', true));
+    // FAILURE: the request stays and the reason shows.
     await act(async () => fireEvent.click(within(card).getByRole('button', { name: 'Accept and ask organiser to resubmit' })));
+    expect(accept).toHaveBeenLastCalledWith(12, '41', 'coordinator-token', 'resubmit');
     expect(within(card).getByRole('alert')).toHaveTextContent('Choose whether the request goes back to review');
     expect(onAccepted).not.toHaveBeenCalled();
+
+    // NORMAL: back to review.
+    await act(async () => fireEvent.click(within(card).getByRole('button', { name: 'Accept and return to review' })));
+    expect(accept).toHaveBeenLastCalledWith(12, '41', 'coordinator-token', 'review');
+    expect(onAccepted).toHaveBeenCalledWith(ACCEPTED.change);
+    expect(screen.queryByTestId('change-request-41')).not.toBeInTheDocument();
   });
 });
