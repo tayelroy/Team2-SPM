@@ -171,6 +171,7 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/registrable_events.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_registration.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/registration_withdrawal.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/waiting_list.sql
           node .github/scripts/test-registration-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_history_internal_fields.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_clarifications.sql

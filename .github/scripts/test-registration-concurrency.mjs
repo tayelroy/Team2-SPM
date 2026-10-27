@@ -5,6 +5,9 @@
 // place. SG2-62: withdraw_registration() takes the same lock, so an
 // attendee registering while the last place is being given back waits and
 // then takes it, and the same withdrawal sent twice at once is made once.
+// SG2-61: the race for the last place sends one capacity-reached notice;
+// two attendees joining a waiting list at once are queued in turn; a place
+// freed while a newcomer is registering goes to the waiting list first.
 // CI uses its PostgreSQL container; a local run may supply PSQL_BIN.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -44,12 +47,15 @@ function connect() {
 const first = 'e6010000-0000-4000-8000-000000000001';
 const second = 'e6010000-0000-4000-8000-000000000002';
 const organiser = 'e6010000-0000-4000-8000-000000000003';
-const people = [first, second, organiser];
-const events = [96090, 96091, 96092, 96093, 96094];
+const third = 'e6010000-0000-4000-8000-000000000004';
+const people = [first, second, organiser, third];
+const events = [96090, 96091, 96092, 96093, 96094, 96095, 96096, 96097];
 const login = (session, who) => session.query(`BEGIN; SET LOCAL role authenticated; SELECT set_config('request.jwt.claim.sub','${who}',true);`);
 const register = (session, event) => session.query(`SELECT public.register_for_event(${event},'91234567',null)->>'outcome';`);
 const placeOf = (event, who) => root.query(`SELECT registration_id FROM public.registrations WHERE event_id = ${event} AND attendee_id = '${who}';`);
 const withdraw = (session, registration) => session.query(`SELECT public.withdraw_registration(${registration})->>'outcome';`);
+const join = (session, event) => session.query(`SELECT public.join_waiting_list(${event})->>'outcome';`);
+const position = (session, event) => session.query(`SELECT public.join_waiting_list(${event})->'waiting'->>'position';`);
 const held = (session, event) => session.query(`SELECT count(*) FROM public.registrations WHERE event_id = ${event};`);
 
 /** Wait until the database shows `waiting` blocked by `owner`; fail if it finishes first. */
@@ -70,8 +76,9 @@ try {
   await root.query(`BEGIN;
     INSERT INTO auth.users(id) SELECT unnest(array['${people.join("','")}'])::uuid;
     INSERT INTO public.users(user_id,name,role_id) VALUES('${first}','Race attendee one',5),('${second}','Race attendee two',5),
-      ('${organiser}','Race organiser',1);
-    INSERT INTO public.account_roles(user_id,role) VALUES('${first}','attendee'),('${second}','attendee'),('${organiser}','event_organiser');
+      ('${organiser}','Race organiser',1),('${third}','Race attendee three',5);
+    INSERT INTO public.account_roles(user_id,role) VALUES('${first}','attendee'),('${second}','attendee'),('${organiser}','event_organiser'),
+      ('${third}','attendee');
     INSERT INTO public.events(event_id,organiser_id,name,status,proposed_date,registration_needed,registration_capacity,
       registration_opens_at,registration_closes_at)
       SELECT n,'${organiser}','Race event '||n,'confirmed',now()+interval '30 days',true,1,now()-interval '1 day',now()+interval '9 days'
@@ -94,7 +101,7 @@ try {
   await one.query('COMMIT;');
   assert.equal(await again, 'duplicate'); await two.query('COMMIT;');
   assert.equal(await held(root, 96091), '1');
-  assert.equal(await root.query(`SELECT count(*) FROM public.notifications WHERE event_id = 96091;`), '1');
+  assert.equal(await root.query(`SELECT count(*) FROM public.notifications WHERE event_id = 96091 AND kind = 'registration_confirmed';`), '1');
   console.log('PASS [CONFLICT] [SG2-60:AC2] the same attendee registering twice at once holds one place and is confirmed once.');
 
   await login(one, first); assert.equal(await register(one, 96092), 'ok'); await one.query('COMMIT;');
@@ -130,6 +137,36 @@ try {
   assert.equal(await root.query(`SELECT string_agg(DISTINCT message, ';') FROM public.notifications WHERE event_id = 96094 AND kind = 'registration_withdrawn';`),
     'Race attendee one withdrew from Race event 96094. 1 of 2 places now remain.');
   console.log('PASS [CONFLICT] [SG2-62:AC5] a withdrawal waiting for a registration in flight counts that registration in the places it reports.');
+
+  await login(one, first); await login(two, second);
+  assert.equal(await register(one, 96097), 'ok');
+  const last = register(two, 96097); await waitsFor(root, last, twoPid, onePid);
+  await one.query('COMMIT;');
+  assert.equal(await last, 'full'); await two.query('COMMIT;');
+  assert.equal(await held(root, 96097), '1');
+  assert.equal(await root.query(`SELECT string_agg(recipient_id::text || ':' || message, ';') FROM public.notifications
+    WHERE event_id = 96097 AND kind = 'registration_full';`), `${organiser}:Race event 96097 is now full: all places are taken (capacity 1).`);
+  console.log('PASS [CONFLICT] [SG2-61:AC2] two attendees racing for the last place: exactly one succeeds and the organiser is told once that the event is full.');
+
+  await login(one, third); assert.equal(await register(one, 96095), 'ok'); await one.query('COMMIT;');
+  await login(one, first); await login(two, second);
+  assert.equal(await position(one, 96095), '1');
+  const queued = position(two, 96095); await waitsFor(root, queued, twoPid, onePid);
+  await one.query('COMMIT;');
+  assert.equal(await queued, '2'); await two.query('COMMIT;');
+  console.log('PASS [CONFLICT] [SG2-61:AC5] two attendees joining a full event\'s waiting list at once are queued first come, first served.');
+
+  await login(one, third); assert.equal(await register(one, 96096), 'ok'); await one.query('COMMIT;');
+  await login(one, first); assert.equal(await join(one, 96096), 'ok'); await one.query('COMMIT;');
+  const freed = await placeOf(96096, third);
+  await login(one, third); await login(two, second);
+  assert.equal(await withdraw(one, freed), 'ok');
+  const jumping = register(two, 96096); await waitsFor(root, jumping, twoPid, onePid);
+  await one.query('COMMIT;');
+  assert.equal(await jumping, 'full'); await two.query('COMMIT;');
+  assert.equal(await root.query(`SELECT status FROM public.waiting_list_entries WHERE event_id = 96096 AND attendee_id = '${first}';`), 'offered');
+  await login(one, first); assert.equal(await register(one, 96096), 'ok'); await one.query('COMMIT;');
+  console.log('PASS [CONFLICT] [SG2-62:AC6] a place freed while a newcomer is registering is offered to the first on the waiting list, who then takes it.');
 } finally {
   for (const session of sessions) await session.end();
   const ids = people.map(id => `'${id}'`).join(',');
@@ -137,6 +174,7 @@ try {
   await root.query(`ROLLBACK;
     DELETE FROM public.notifications WHERE event_id IN (${eventIds});
     DELETE FROM public.registrations WHERE event_id IN (${eventIds});
+    DELETE FROM public.waiting_list_entries WHERE event_id IN (${eventIds});
     DELETE FROM public.events WHERE event_id IN (${eventIds});
     DELETE FROM public.account_roles WHERE user_id IN (${ids});
     DELETE FROM public.users WHERE user_id IN (${ids});
