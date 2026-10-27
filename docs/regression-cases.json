@@ -9641,5 +9641,174 @@
     "expected": "Morning Run shows Event started with no Withdraw button. Answers: 6203 \u2192 409 'This event started 02 Oct 2026 07:00 SGT, so you can no longer withdraw.'; 6204 \u2192 409 'You have already withdrawn from this event.'; 6001 and 999999 \u2192 404 'This registration was not found.' Organiser, coordinator and lead get 403 for both calls. Registrations 6201-6203 stay registered, 6204 stays cancelled, and no withdrawal notices exist.",
     "evidence": "e2e/registration-withdrawal.spec.ts; e2e/support/my-registrations.ts",
     "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-65-P01",
+    "title": "the coordinator refuses a change with a reason; the event is unchanged and the organiser is told why",
+    "story": "SG2-65",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-65:AC2",
+      "SG2-65:AC3"
+    ],
+    "method_id": "SG2-65:the-coordinator-refuses-a-change-with-a-reason-the-event-is-unchanged-and-the-organiser-is-told",
+    "purpose": "Verify that the assigned coordinator must give a reason to refuse, that the refusal leaves the event as it is and tells the organiser why, and that the refusal form lays out cleanly at 390px and 1440px.",
+    "preconditions": "Reset loopback memory fixture with /__e2e/under-review; production app build. No hosted Supabase. Decisions go through e2e/support/change-requests.ts, the loopback mirror of decide_event_change_request.",
+    "steps": [
+      "As the organiser, raise an attendance change on Decision Forum (event 52, under review) from 20 to 34 with the reason 'Two partner teams have joined.'.",
+      "Sign in as coordinator@example.test at 390px; open Decision Forum from Awaiting review.",
+      "In Change requests click Refuse change; check Confirm refusal is disabled; enter 'The Kelp Room cannot seat more.'.",
+      "Check the panel at 390px and 1440px; click Confirm refusal.",
+      "As the organiser: GET /api/event-requests/52 and GET /api/notifications."
+    ],
+    "data": [
+      "Event 52 (Decision Forum) owned by user-organiser and assigned to user-coordinator; expected attendance 20."
+    ],
+    "expected": [
+      "Confirm refusal is disabled until a reason is entered.",
+      "No horizontal overflow at either width.",
+      "'Change refused. The event is unchanged and the organiser has been told why.' and no request left in the panel.",
+      "Event 52 is still under_review with attendance 20; the organiser has one change_refused notice 'Decision Forum: your change request was refused. Reason: The Kelp Room cannot seat more.'"
+    ],
+    "evidence": "e2e/change-request-decisions.spec.ts:55",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in Chromium.",
+    "status": "Pass",
+    "execution_date": "27 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-27",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-65-P02",
+    "title": "on a request returned for clarification the coordinator accepts the change and sends it back to review",
+    "story": "SG2-65",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-65:AC1",
+      "SG2-65:AC4"
+    ],
+    "method_id": "SG2-65:on-a-request-returned-for-clarification-the-coordinator-accepts-the-change-and-sends-it-back-to",
+    "purpose": "Verify that on a request returned for clarification the coordinator chooses where it goes next instead of a plain Accept, that accepting writes the change onto the request and returns it to review, and that the organiser is notified.",
+    "preconditions": "Reset loopback memory fixture with /__e2e/under-review; production app build. No hosted Supabase. Decisions go through e2e/support/change-requests.ts, the loopback mirror of decide_event_change_request.",
+    "steps": [
+      "As the coordinator, POST a clarification question on event 52 (it becomes needs_clarification).",
+      "As the organiser, raise an attendance change from 20 to 34.",
+      "Sign in as the coordinator; open Decision Forum; check there is no Accept change button.",
+      "Click Accept and return to review.",
+      "As the organiser: GET /api/event-requests/52 and GET /api/notifications."
+    ],
+    "data": [
+      "Event 52 (Decision Forum); question 'How many guests now?'."
+    ],
+    "expected": [
+      "The two AC4 choices replace Accept change; after accepting, no request is left in the panel.",
+      "Event 52 is under_review with attendance 34; the organiser has one change_accepted notice 'Decision Forum: your change request was accepted and the request is back in review.'"
+    ],
+    "evidence": "e2e/change-request-decisions.spec.ts:78",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in Chromium.",
+    "status": "Pass",
+    "execution_date": "27 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-27",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-65-N01",
+    "title": "a blank reason, a missing next step, a second decision and other roles are refused",
+    "story": "SG2-65",
+    "categories": [
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-65:AC2",
+      "SG2-65:AC4"
+    ],
+    "method_id": "SG2-65:a-blank-reason-a-missing-next-step-a-second-decision-and-other-roles-are-refused",
+    "purpose": "Verify through the real application routes that the decision routes refuse every case they must and change nothing when they do.",
+    "preconditions": "Same fixture as SG2-65-P01.",
+    "steps": [
+      "As the organiser, raise a change on event 52; as the coordinator, read its id.",
+      "POST refuse with a blank reason, a 1001-character reason, and as the organiser.",
+      "POST refuse with 'No.', then refuse the same request again.",
+      "Return event 52 for clarification, raise another change, and POST accept with no next step."
+    ],
+    "data": [
+      "Event 52 (Decision Forum), attendance 20."
+    ],
+    "expected": [
+      "400, 400 and 403; then 200 and 404 (no longer pending); the event stays under_review with attendance 20.",
+      "Accept without a next step is 400 and the event stays needs_clarification with attendance 20."
+    ],
+    "evidence": "e2e/change-request-decisions.spec.ts:96",
+    "layer": "Playwright Chromium + isolated production app (API level)",
+    "actual": "Passed in Chromium.",
+    "status": "Pass",
+    "execution_date": "27 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-27",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-65-DB01",
+    "title": "decide_event_change_request records who decided, when and why, applies an AC4 acceptance, notifies the organiser, and nobody calls it directly",
+    "story": "SG2-65",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-65:AC1",
+      "SG2-65:AC2",
+      "SG2-65:AC3",
+      "SG2-65:AC4",
+      "SG2-65:AC5"
+    ],
+    "purpose": "Verify the database function and the decision columns enforce the decision rules whoever calls them.",
+    "preconditions": "Disposable PostgreSQL 17 with the auth fixture and all migrations; transactional fixtures rolled back.",
+    "steps": [
+      "Refuse a request on planning event 96501 with a padded reason; read the request, event, history and notices.",
+      "Refuse with a blank, a 1001- and a 1000-character reason.",
+      "Apply a description change through SG2-66's apply_accepted_event_change, then record the acceptance.",
+      "Raise a significant attendance change on a Preparation and on a Confirmed event, apply it through SG2-66 with the venue to recheck, then record the acceptance (AC5).",
+      "Accept on two needs_clarification events with next 'review' and 'resubmit'.",
+      "Try a missing, unknown or misplaced next step, an unknown decision, another coordinator, an already decided request, and a refusal after SG2-66 applied the change.",
+      "Break the decision record directly; check authenticated and anon cannot execute the function."
+    ],
+    "data": "Synthetic 965xx events; e6500000 fixture identities for two coordinators and one organiser in Acme Corp.",
+    "expected": "Refusal recorded with decider, time and trimmed reason, event unchanged, 'Refused change request <id>: \u2026' history and a change_refused notice; blank and 1001 invalid, 1000 ok; the applied change recorded as accepted with a change_accepted notice and the status left to SG2-66; both significant changes return the event to Planning with attendance 150, the acceptance recorded and the organiser sent change_accepted and event_returned_to_planning (AC5); review moves to under_review with the field and status history, resubmit stays needs_clarification, both notified; every guard turned away (invalid, not_found, not_pending) with nothing changed; a refusal after apply is not_pending while the acceptance still records; every broken record rejected (check_violation); no EXECUTE for authenticated or anon.",
+    "evidence": "supabase/tests/change_request_decisions.sql; .github/workflows/ci.yml; docs/change-requests.md",
+    "layer": "Disposable PostgreSQL SQL assertions",
+    "actual": "Passed in the disposable PostgreSQL 17 replay. Sabotage runs (EXECUTE granted to authenticated; the refusal-after-apply guard removed; the refusal-reason check dropped; SG2-66's return to Planning disabled) each made it fail, naming the case. The first sabotage run found the grant check passing for the wrong reason, so an explicit EXECUTE check was added.",
+    "status": "Pass",
+    "execution_date": "27 Oct 2026",
+    "executed_by": "YE ZHAN",
+    "execution_evidence": "27 Oct 2026; feature/SG2-65-decide-change-request at d1e495b merged with main 0db479c (SG2-96 #115/#117 and SG2-62 #118), with the SG2-65 tests grouped into 12 methods and 10 SQL assertions (every assertion kept); local replay of every CI job: database job (64 steps; sabotage runs repeated after grouping), release readiness (ready; self-test 27/27), legacy upgrade, live-order replay with SG2-65 before and after SG2-60's and SG2-62's migrations (ready both ways), native integration 27/27, inventory and script self-tests in node:20, server 1,912/1,912 and client 1,954/1,954 at 100% coverage, 185/185 browser tests with the regression gate, and smoke 8/8. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-27",
+      "by": "YE ZHAN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]

@@ -10,7 +10,8 @@ export interface Notification {
     | 'event_returned_to_planning' | 'safety_decision' | 'outstanding_arrangements' | 'registration_opened'
     | 'registration_closed' | 'venue_booking_cancelled' | 'venue_change_requested'
     | 'cancellation_requested' | 'event_cancelled' | 'registration_confirmed' | 'change_requested'
-    | 'registration_withdrawn';
+    | 'registration_withdrawn'
+    | 'change_accepted' | 'change_refused';
   message: string;
   created_at: string;
 }

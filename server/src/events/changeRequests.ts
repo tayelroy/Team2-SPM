@@ -14,7 +14,7 @@ import {
   type FetchChangeImpactFactsResult,
   type SettleArrangementRecheckResult
 } from '../db/changeImpact';
-import type { ChangeRequestSource } from '../changeRequests/mockChangeRequests';
+import type { ChangeDecision, ChangeRequestSource } from '../changeRequests/mockChangeRequests';
 import {
   createDatabaseChangeRequestSource,
   raiseEventChangeRequest,
@@ -38,8 +38,10 @@ import { validatePlanningSchedule, type PlanningUpdateValues } from './updatePla
 const UNAVAILABLE_MESSAGE = 'Change request service is temporarily unavailable. Please try again later.';
 const EVENT_NOT_FOUND_MESSAGE = 'Event not found.';
 const CHANGE_NOT_FOUND_MESSAGE = 'Change request not found.';
-const NOT_CHANGEABLE_MESSAGE = 'A change can only be accepted while the event is Approved, in Planning, '
-  + 'Awaiting Safety Check, in Preparation or Confirmed.';
+const NOT_CHANGEABLE_MESSAGE = 'A change can only be accepted while the event is returned for clarification, '
+  + 'Approved, in Planning, Awaiting Safety Check, in Preparation or Confirmed.';
+const NEXT_STEP_MESSAGE = 'Choose whether the request goes back to review or the organiser resubmits it.';
+const DECIDED_MESSAGE = 'This change request has already been decided. Refresh to see the latest.';
 const STALE_MESSAGE = 'This event changed while you were deciding. Refresh and try again.';
 const NOT_WAITING_MESSAGE = 'That arrangement is not waiting for a recheck.';
 const BLOCKED_MESSAGE = 'This arrangement still needs attention before it can be marked rechecked.';
@@ -154,6 +156,13 @@ function validateRaiseInput(body: unknown):
   return { ok: true, field: field as ChangeableField, to: to as string | number, reason };
 }
 
+/** SG2-65 AC2: the trimmed refusal reason, or null when blank or too long. */
+function refusalReason(body: unknown): string | null {
+  const reason = (body as { reason?: unknown } | null)?.reason;
+  const trimmed = typeof reason === 'string' ? reason.trim() : '';
+  return trimmed.length === 0 || trimmed.length > MAX_REASON_LENGTH ? null : trimmed;
+}
+
 /**
  * The SG2-64 route for the organiser who owns the event:
  * - POST /api/event-requests/:eventId/change-requests { field, to, reason }
@@ -169,7 +178,13 @@ function validateRaiseInput(body: unknown):
  *   request with what it would break (AC1–AC3);
  * - POST /api/event-requests/:eventId/change-requests/:changeRequestId/accept
  *   — applies it; with affected arrangements they become outstanding and the
- *   event returns to Planning, telling the organiser and coordinator (AC4/AC7);
+ *   event returns to Planning, telling the organiser and coordinator (AC4/AC7).
+ *   SG2-65 records who accepted and when and notifies the organiser (AC1/AC3).
+ *   On a request returned for clarification `{ next: 'review' | 'resubmit' }`
+ *   writes the change onto the request and sends it back to review or leaves
+ *   it with the organiser (SG2-65 AC4);
+ * - POST …/change-requests/:changeRequestId/refuse { reason } — SG2-65 AC2:
+ *   refuses it with a reason, leaving the event unchanged;
  * - POST /api/event-requests/:eventId/rechecks/:key/settle — marks one
  *   outstanding recheck settled once its arrangements pass again (AC4).
  * The impact is always recomputed from fresh facts; the client is never trusted.
@@ -185,7 +200,8 @@ export function createChangeRequestHandlers({
   settleRecheck = settleArrangementRecheck,
   now = Date.now
 }: ChangeRequestDependencies): {
-  raise: RequestHandler; list: RequestHandler; accept: RequestHandler; settle: RequestHandler;
+  raise: RequestHandler; list: RequestHandler; accept: RequestHandler; refuse: RequestHandler;
+  settle: RequestHandler;
 } {
   const prelude = { getPrincipal, getAdminClient, fetchEvent };
 
@@ -288,7 +304,9 @@ export function createChangeRequestHandlers({
     }
     res.status(200).json({
       event: { event_id: event.event_id, status: event.status },
-      can_accept: isChangeableStatus(event.status),
+      can_accept: isChangeableStatus(event.status) || event.status === 'needs_clarification',
+      // SG2-65 AC4: accepting needs the coordinator's next step.
+      next_step_required: event.status === 'needs_clarification',
       change_requests: requests.map(request => ({
         ...request,
         significant: request.changes.some(change => isSignificantField(change.field)),
@@ -310,6 +328,10 @@ export function createChangeRequestHandlers({
     }
     if (!request) {
       res.status(404).json({ error: CHANGE_NOT_FOUND_MESSAGE });
+      return;
+    }
+    if (event.status === 'needs_clarification') {
+      await acceptOnClarification(req, res, loaded, request.id);
       return;
     }
     if (!isChangeableStatus(event.status)) {
@@ -345,9 +367,10 @@ export function createChangeRequestHandlers({
       return;
     }
     try {
-      await source.markAccepted(event, request.id);
+      // A refusal cannot land once the change is applied, so this records it.
+      await source.decide(event, request.id, { decision: 'accepted', by: principal.userId });
     } catch {
-      // The change is applied; only the stand-in's bookkeeping failed.
+      // The change is applied; only recording the decision failed.
       res.status(503).json({ error: UNAVAILABLE_MESSAGE });
       return;
     }
@@ -359,6 +382,71 @@ export function createChangeRequestHandlers({
       arrangements_recheck_needed: result.arrangements_recheck_needed,
       outstanding_arrangements: result.outstanding_arrangements
     });
+  };
+
+  /** Records a decision; false once a 503 or 409 has been sent. */
+  const record = async (res: Response, event: ChangeImpactEventRecord, id: string, decision: ChangeDecision) => {
+    let outcome;
+    try {
+      outcome = await source.decide(event, id, decision);
+    } catch {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return false;
+    }
+    if (outcome === 'not_pending') {
+      res.status(409).json({ error: DECIDED_MESSAGE });
+      return false;
+    }
+    if (outcome === 'not_found') {
+      // Reassigned to another coordinator since the event was loaded.
+      res.status(404).json({ error: EVENT_NOT_FOUND_MESSAGE });
+      return false;
+    }
+    return true;
+  };
+
+  /** SG2-65 AC4: the change is written onto the request, which then goes back
+   * to review or stays with the organiser to resubmit. */
+  const acceptOnClarification = async (req: Request, res: Response, { principal, event }: AssignedEvent, id: string) => {
+    const next = (req.body as { next?: unknown } | null)?.next;
+    if (next !== 'review' && next !== 'resubmit') {
+      res.status(400).json({ error: NEXT_STEP_MESSAGE });
+      return;
+    }
+    if (!await record(res, event, id, { decision: 'accepted', by: principal.userId, next })) return;
+    res.status(200).json({
+      event_id: event.event_id,
+      previous_status: event.status,
+      status: next === 'review' ? 'under_review' : 'needs_clarification',
+      returned_to_planning: false,
+      arrangements_recheck_needed: event.arrangements_recheck_needed,
+      outstanding_arrangements: event.outstanding_arrangements
+    });
+  };
+
+  /** SG2-65 AC2/AC3: refuses with a reason; the event is left as it is. */
+  const refuse: RequestHandler = async (req, res) => {
+    const loaded = await loadAssignedEvent(req, res, prelude);
+    if (!loaded) return;
+    const { principal, event } = loaded;
+    const reason = refusalReason(req.body);
+    if (reason === null) {
+      res.status(400).json({ error: `Give a reason for refusing, up to ${MAX_REASON_LENGTH} characters.` });
+      return;
+    }
+    let request;
+    try {
+      request = await source.get(event, req.params.changeRequestId);
+    } catch {
+      res.status(503).json({ error: UNAVAILABLE_MESSAGE });
+      return;
+    }
+    if (!request) {
+      res.status(404).json({ error: CHANGE_NOT_FOUND_MESSAGE });
+      return;
+    }
+    if (!await record(res, event, request.id, { decision: 'refused', by: principal.userId, reason })) return;
+    res.status(200).json({ event_id: event.event_id, change_request_id: request.id, status: 'refused' });
   };
 
   const settle: RequestHandler = async (req, res) => {
@@ -409,5 +497,5 @@ export function createChangeRequestHandlers({
     }
   };
 
-  return { raise: raiseHandler, list, accept, settle };
+  return { raise: raiseHandler, list, accept, refuse, settle };
 }

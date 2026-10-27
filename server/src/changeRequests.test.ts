@@ -79,7 +79,8 @@ describe('mock change requests for loopback workflows', () => {
     assert.deepEqual(await source.list(event({ expected_attendance: 500 })), await source.list(event()));
     assert.equal((await source.get(event(), 'mock-12-attendance'))?.changes[0].to, 180);
     assert.equal((await source.get(event(), 'mock-12-attendance'))?.reason, 'More guests have confirmed than planned.');
-    await source.markAccepted(event(), 'mock-12-attendance');
+    assert.equal(await source.decide(event(), 'mock-12-attendance', { decision: 'accepted', by: 'c' }), 'ok');
+    assert.equal(await source.decide(event(), 'mock-12-attendance', { decision: 'refused', by: 'c', reason: 'r' }), 'not_pending');
     assert.equal(await source.get(event(), 'mock-12-attendance'), null);
     assert.equal(await source.get(event(), 'mock-99-attendance'), null);
     assert.deepEqual((await source.list(event())).map(request => request.id), ['mock-12-date', 'mock-12-description']);
@@ -256,8 +257,8 @@ describe('POST /api/event-requests/:eventId/change-requests/:id/accept (SG2-66 A
     for (const status of ['draft', 'under_review', 'rejected', 'safety_rejected', 'completed', 'cancelled']) {
       const { app, applied } = harness({ event: { status } });
       const res = await request(app).post('/events/12/change-requests/mock-12-attendance/accept');
-      assert.deepEqual([res.status, res.body], [409, { error: 'A change can only be accepted while the event is Approved, in Planning, '
-        + 'Awaiting Safety Check, in Preparation or Confirmed.' }], status);
+      assert.deepEqual([res.status, res.body], [409, { error: 'A change can only be accepted while the event is returned for clarification, '
+        + 'Approved, in Planning, Awaiting Safety Check, in Preparation or Confirmed.' }], status);
       assert.equal(applied.length, 0);
     }
   });
@@ -283,7 +284,7 @@ describe('POST /api/event-requests/:eventId/change-requests/:id/accept (SG2-66 A
       { source: failing('get') },
       { fetchFacts: async () => ({ ok: false as const, reason: 'unavailable' as const }) },
       { applyChange: async () => ({ outcome: 'unavailable' as const }) },
-      { source: failing('markAccepted') }
+      { source: failing('decide') }
     ]) {
       const res = await request(harness(deps).app).post('/events/12/change-requests/mock-12-attendance/accept');
       assert.deepEqual([res.status, res.body], [503, UNAVAILABLE]);

@@ -25,7 +25,7 @@ const BODY = { field: 'expected_attendance', to: 180, reason: 'More guests confi
 const UNAVAILABLE = { error: 'Change request service is temporarily unavailable. Please try again later.' };
 
 const listing = (requests: ChangeRequest[]): ChangeRequestSource => ({
-  list: async () => requests, get: async () => null, markAccepted: async () => undefined
+  list: async () => requests, get: async () => null, decide: async () => 'ok'
 });
 
 function harness(overrides: Partial<ChangeRequestDependencies> & { principal?: Principal | null; event?: Partial<ChangeImpactEventRecord> } = {}) {

@@ -192,7 +192,7 @@ describe('ChangeRequestsPanel', () => {
     const card = await screen.findByTestId('change-request-mock-12-attendance');
 
     fireEvent.click(within(card).getByRole('button', { name: 'Accept change' }));
-    expect(accept).toHaveBeenCalledWith(12, 'mock-12-attendance', 'coordinator-token');
+    expect(accept).toHaveBeenCalledWith(12, 'mock-12-attendance', 'coordinator-token', undefined);
     expect(within(card).getByRole('button', { name: 'Accepting change…' })).toBeDisabled();
     // One acceptance at a time: the other request waits too.
     const other = screen.getByTestId('change-request-mock-12-description');
