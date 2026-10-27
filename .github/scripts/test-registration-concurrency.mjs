@@ -2,7 +2,10 @@
 // event's last place at the same moment: register_for_event() locks the event
 // row first, so the second waits for the first, then counts its place and is
 // refused as full. The same attendee registering twice at once holds one
-// place. CI uses its PostgreSQL container; a local run may supply PSQL_BIN.
+// place. SG2-62: withdraw_registration() takes the same lock, so an
+// attendee registering while the last place is being given back waits and
+// then takes it, and the same withdrawal sent twice at once is made once.
+// CI uses its PostgreSQL container; a local run may supply PSQL_BIN.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 
@@ -42,9 +45,11 @@ const first = 'e6010000-0000-4000-8000-000000000001';
 const second = 'e6010000-0000-4000-8000-000000000002';
 const organiser = 'e6010000-0000-4000-8000-000000000003';
 const people = [first, second, organiser];
-const events = [96090, 96091];
+const events = [96090, 96091, 96092, 96093, 96094];
 const login = (session, who) => session.query(`BEGIN; SET LOCAL role authenticated; SELECT set_config('request.jwt.claim.sub','${who}',true);`);
 const register = (session, event) => session.query(`SELECT public.register_for_event(${event},'91234567',null)->>'outcome';`);
+const placeOf = (event, who) => root.query(`SELECT registration_id FROM public.registrations WHERE event_id = ${event} AND attendee_id = '${who}';`);
+const withdraw = (session, registration) => session.query(`SELECT public.withdraw_registration(${registration})->>'outcome';`);
 const held = (session, event) => session.query(`SELECT count(*) FROM public.registrations WHERE event_id = ${event};`);
 
 /** Wait until the database shows `waiting` blocked by `owner`; fail if it finishes first. */
@@ -91,6 +96,40 @@ try {
   assert.equal(await held(root, 96091), '1');
   assert.equal(await root.query(`SELECT count(*) FROM public.notifications WHERE event_id = 96091;`), '1');
   console.log('PASS [CONFLICT] [SG2-60:AC2] the same attendee registering twice at once holds one place and is confirmed once.');
+
+  await login(one, first); assert.equal(await register(one, 96092), 'ok'); await one.query('COMMIT;');
+  const lastPlace = await placeOf(96092, first);
+  await login(one, first); await login(two, second);
+  assert.equal(await withdraw(one, lastPlace), 'ok');
+  const taking = register(two, 96092); await waitsFor(root, taking, twoPid, onePid);
+  await one.query('COMMIT;');
+  assert.equal(await taking, 'ok'); await two.query('COMMIT;');
+  assert.equal(await root.query(`SELECT string_agg(attendee_id::text || ':' || status, ',' ORDER BY registration_id)
+    FROM public.registrations WHERE event_id = 96092;`), `${first}:cancelled,${second}:registered`);
+  console.log('PASS [CONFLICT] [SG2-62:AC3] an attendee registering while the last place is withdrawn waits for the withdrawal, then takes the place.');
+
+  await login(one, first); assert.equal(await register(one, 96093), 'ok'); await one.query('COMMIT;');
+  const place = await placeOf(96093, first);
+  await login(one, first); await login(two, first);
+  assert.equal(await withdraw(one, place), 'ok');
+  const twice = withdraw(two, place); await waitsFor(root, twice, twoPid, onePid);
+  await one.query('COMMIT;');
+  assert.equal(await twice, 'withdrawn'); await two.query('COMMIT;');
+  assert.equal(await root.query(`SELECT count(*) FROM public.notifications WHERE event_id = 96093 AND kind = 'registration_withdrawn';`), '1');
+  console.log('PASS [CONFLICT] [SG2-62:AC5] the same withdrawal sent twice at once is made once and the organiser is told once.');
+
+  // 96094 takes two: the first attendee holds one place while the second is registering for the other.
+  await root.query(`UPDATE public.events SET registration_capacity = 2 WHERE event_id = 96094;`);
+  await login(one, first); assert.equal(await register(one, 96094), 'ok'); await one.query('COMMIT;');
+  const mine = await placeOf(96094, first);
+  await login(one, second); await login(two, first);
+  assert.equal(await register(one, 96094), 'ok');
+  const leaving = withdraw(two, mine); await waitsFor(root, leaving, twoPid, onePid);
+  await one.query('COMMIT;');
+  assert.equal(await leaving, 'ok'); await two.query('COMMIT;');
+  assert.equal(await root.query(`SELECT string_agg(DISTINCT message, ';') FROM public.notifications WHERE event_id = 96094 AND kind = 'registration_withdrawn';`),
+    'Race attendee one withdrew from Race event 96094. 1 of 2 places now remain.');
+  console.log('PASS [CONFLICT] [SG2-62:AC5] a withdrawal waiting for a registration in flight counts that registration in the places it reports.');
 } finally {
   for (const session of sessions) await session.end();
   const ids = people.map(id => `'${id}'`).join(',');

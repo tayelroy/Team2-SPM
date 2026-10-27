@@ -36,6 +36,8 @@ import { createSafetyRereviewHandlers } from '../server/src/events/safetyRerevie
 import { createRegistrationHandlers } from '../server/src/events/registrationRoutes';
 import { createRegistrableEventsRouter } from '../server/src/registrableEvents';
 import { createRegistrableEventsStore } from '../server/src/db/registrableEvents';
+import { createMyRegistrationsRouter } from '../server/src/myRegistrations';
+import { createMyRegistrationsStore } from '../server/src/db/myRegistrations';
 
 const rest = new URL(process.env.INTEGRATION_REST_URL!);
 assert.equal(rest.protocol, 'http:');
@@ -707,6 +709,56 @@ test('[NORMAL] [CONFLICT] [FAILURE] [SG2-60:AC1] [SG2-60:AC2] [SG2-60:AC4] nativ
     createRegistrableEventsStore(token, () => createClient(rest.origin, jwt('authenticated', ids[token]),
       { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: loopbackFetch } })))));
   assert.equal((await forged.post(path).set(auth('organiser')).send({ contact_phone: '91234567' })).status, 403);
+});
+
+test('[NORMAL] [CONFLICT] [FAILURE] [SG2-62:AC1] [SG2-62:AC2] [SG2-62:AC3] [SG2-62:AC5] native withdrawal lists the attendee\'s registration, gives the place back, tells the organiser and coordinator, and refuses a repeat and other roles', async () => {
+  const id = await planned();
+  await setRegistration(id);
+  assert.equal((await database.from('events').update({ status: 'confirmed', registration_opens_at: '2026-01-01T00:00:00Z',
+    registration_capacity: 1 }).eq('event_id', id)).error, null);
+  // Both routers run their SQL functions with the caller's own JWT, as in production.
+  const userClient = (token: string) => createClient(rest.origin, jwt('authenticated', ids[token]),
+    { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: loopbackFetch } });
+  const attendeeArgs = [...args] as Parameters<typeof createApp>;
+  attendeeArgs[40] = createRegistrableEventsRouter(access, token => createRegistrableEventsStore(token, () => userClient(token)));
+  attendeeArgs[44] = createMyRegistrationsRouter(access, token => createMyRegistrationsStore(token, () => userClient(token)));
+  const attendee = request(createApp(...attendeeArgs));
+  assert.equal((await attendee.get('/api/my-registrations').set(auth('other'))).status, 403);
+  assert.equal((await database.from('account_roles').update({ role: 'attendee' }).in('user_id', [ids.other, ids.support])).error, null);
+  try {
+    assert.equal((await attendee.post(`/api/registrable-events/${id}/registrations`).set(auth('other')).send({ contact_phone: '91234567' })).status, 201);
+    const mine = await attendee.get('/api/my-registrations').set(auth('other'));
+    assert.equal(mine.status, 200, JSON.stringify(mine.body));
+    const listed = mine.body.registrations.find((row: { event_id: number }) => row.event_id === id);
+    assert.deepEqual([listed.standing, listed.can_withdraw, listed.event.name, listed.contact_phone], ['registered', true, 'Integration workshop', '91234567']);
+    assert.deepEqual(Object.keys(listed.event).sort(), ['category', 'description', 'name', 'organisation', 'proposed_date', 'registration_closes_at', 'venues']);
+    assert.equal((await attendee.post(`/api/registrable-events/${id}/registrations`).set(auth('support')).send({ contact_phone: '91234567' })).body.reason, 'full');
+
+    const path = `/api/my-registrations/${listed.registration_id}/withdrawal`;
+    assert.equal((await attendee.post(path).set(auth('support'))).status, 404);
+    const withdrawn = await attendee.post(path).set(auth('other'));
+    assert.equal(withdrawn.status, 200, JSON.stringify(withdrawn.body));
+    assert.deepEqual([withdrawn.body.withdrawal.registration_id, withdrawn.body.withdrawal.event_id], [listed.registration_id, id]);
+    assert.deepEqual((await attendee.post(path).set(auth('other'))).body, { error: 'You have already withdrawn from this event.', reason: 'withdrawn' });
+    // AC3: the freed place can be taken.
+    assert.equal((await attendee.post(`/api/registrable-events/${id}/registrations`).set(auth('support')).send({ contact_phone: '91234567' })).status, 201);
+    const after = (await attendee.get('/api/my-registrations').set(auth('other'))).body.registrations.find((row: { event_id: number }) => row.event_id === id);
+    assert.deepEqual([after.standing, after.can_withdraw, typeof after.withdrawn_at], ['withdrawn', false, 'string']);
+  } finally {
+    assert.equal((await database.from('account_roles').update({ role: 'event_coordinator' }).eq('user_id', ids.other)).error, null);
+    assert.equal((await database.from('account_roles').update({ role: 'technical_support_staff' }).eq('user_id', ids.support)).error, null);
+  }
+  const rows = await database.from('registrations').select('attendee_id,status').eq('event_id', id).order('registration_id');
+  assert.deepEqual(rows.data, [{ attendee_id: ids.other, status: 'cancelled' }, { attendee_id: ids.support, status: 'registered' }]);
+  const notices = await database.from('notifications').select('recipient_id,message').eq('event_id', id).eq('kind', 'registration_withdrawn');
+  assert.deepEqual(notices.data?.map(row => row.recipient_id).sort(), [ids.organiser, ids.coordinator].sort());
+  for (const row of notices.data ?? []) assert.match(row.message, /withdrew from Integration workshop\. 1 of 1 places now remain\.$/);
+  // The database refuses a caller whose stored role is not attendee even if the route let it through.
+  const permissive = createAuthorization({ resolvePrincipal: async token => ({ userId: ids[token], roles: ['attendee'] as Role[] }) });
+  const forged = request(express().use('/api/my-registrations', createMyRegistrationsRouter(permissive, token =>
+    createMyRegistrationsStore(token, () => userClient(token)))));
+  assert.equal((await forged.get('/api/my-registrations').set(auth('organiser'))).status, 403);
+  assert.equal((await forged.post('/api/my-registrations/1/withdrawal').set(auth('organiser'))).status, 403);
 });
 
 test('[NORMAL] [CONFLICT] [FAILURE] [SG2-63:AC1] [SG2-63:AC2] [SG2-63:AC4] [SG2-63:AC5] [SG2-63:AC6] [SG2-63:AC8] [SG2-63:AC9] [SG2-63:AC10] native registration settings: the organiser changes them with history, closes and reopens with notices, and the coordinator reads the picture', async () => {

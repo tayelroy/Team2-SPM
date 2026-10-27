@@ -9651,5 +9651,102 @@
     "evidence": "e2e/staging-readiness.spec.ts; .github/scripts/staging-page-readiness.cjs; .github/scripts/staging-walkthrough.mjs",
     "actual": "12/12 browser runner cases passed across 6 test declarations, including actual event-search and equipment-availability loading messages, negative timeout and error cases.",
     "execution_evidence": "26 Oct 2026; PR #117 follow-up on 020cf5f. Focused log /tmp/sg2-96-final-readiness.log. Failed hosted run #7 artifact showed Loading venue catalogue at Coordinator/Venues/320px; its SHA-256 was verified. Final full-browser and real-staging reruns are recorded separately in PR #117."
+  },
+  {
+    "id": "SG2-62-P01",
+    "title": "An attendee sees where each registration stands and withdraws after registration closed, and the organiser and coordinator are told",
+    "type": "NORMAL",
+    "story": "SG2-62",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-62:AC1",
+      "SG2-62:AC2",
+      "SG2-62:AC5"
+    ],
+    "method_id": "SG2-62:an-attendee-sees-where-each-registration-stands-and-withdraws-after-registration-closed-and",
+    "purpose": "Catch a list that leaves out a registration or its event details, shows the wrong standing, offers withdrawal for a started or withdrawn one, withdraws without asking, refuses a withdrawal because registration has closed, or tells no one or the wrong people.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/my-registrations seed (SG2-59's and SG2-60's events plus Quartet Evening, Lantern Talk and Morning Run) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-62-see-and-withdraw-registrations at 3b0dc55 on origin/main a9eb363; npm run test:e2e locally in Chromium: 164/164 passed, required SG2-26 gate passed; npm run ci green (1897 server / 1935 client / 19 reviewer, 100% coverage) on the second of two runs (the first failed two unrelated tests, SG2-42 and SG2-39, that pass alone; untouched main showed the same intermittent kind). No hosted Supabase validation.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee at 390px and open My registrations.",
+      "Read the order of the cards, Quartet Evening's details, and the standings of Morning Run and Closed Briefing; check neither offers Withdraw and there is no horizontal overflow.",
+      "On Lantern Talk press Withdraw; read the confirmation question and check nothing is stored yet; press Confirm withdrawal.",
+      "Read the status message and that Lantern Talk now shows Withdrawn with no Withdraw button; read the ledger's registration and notices.",
+      "At 1440px sign in as the organiser, open the notifications panel and read the Attendee withdrew notice."
+    ],
+    "data": "Quartet Evening (597): open, capacity 1, held by the attendee, 1 Nov 2030 19:00 SGT at Regression Hall, needs 'Aisle seat'. Lantern Talk (598): registration closed Feb 2020, starts 15 Nov 2030, capacity 40, attendee registered. Morning Run (599): started 2 Oct 2026 07:00 SGT. Closed Briefing (593): withdrawn 2 Oct 2026 10:00 SGT. Small Recital (596): the attendee's earlier cancelled registration.",
+    "expected": "Cards in order Quartet Evening, Lantern Talk, Morning Run, Closed Briefing, Small Recital. Quartet: Registered, 1 Nov 2030 7:00 pm, Regression Hall, Harbour Foundation, needs Aisle seat. Morning Run: Event started; Closed Briefing: Withdrawn 2 Oct 2026, 10:00 am; neither offers Withdraw. The confirmation says the place goes back to the event; before confirming the registration is still registered. After: 'You have withdrawn from Lantern Talk. Your place has been given back.', the card shows Withdrawn; the row is cancelled with withdrawn_at; exactly two notices, to the organiser and the coordinator: 'Regression attendee withdrew from Lantern Talk. 40 of 40 places now remain.' The organiser's panel shows Attendee withdrew with that message. No overflow at 390px; no console errors.",
+    "evidence": "e2e/registration-withdrawal.spec.ts; e2e/support/my-registrations.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-62-P02",
+    "title": "Withdrawing from a full event gives the place back, so it can be taken again",
+    "type": "NORMAL",
+    "story": "SG2-62",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-62:AC3"
+    ],
+    "method_id": "SG2-62:withdrawing-from-a-full-event-gives-the-place-back-so-it-can-be-taken-again",
+    "purpose": "Catch a withdrawal that leaves the place counted as held, so the event stays full or the organiser's picture still lists the attendee.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/my-registrations seed (SG2-59's and SG2-60's events plus Quartet Evening, Lantern Talk and Morning Run) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-62-see-and-withdraw-registrations at 3b0dc55 on origin/main a9eb363; npm run test:e2e locally in Chromium: 164/164 passed, required SG2-26 gate passed; npm run ci green (1897 server / 1935 client / 19 reviewer, 100% coverage) on the second of two runs (the first failed two unrelated tests, SG2-42 and SG2-39, that pass alone; untouched main showed the same intermittent kind). No hosted Supabase validation.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee at 1440px; POST a registration for Quartet Evening through the API.",
+      "Open My registrations, withdraw from Quartet Evening and confirm.",
+      "As the coordinator, GET /api/event-requests/597/registrations; read the ledger's notices.",
+      "Open Find events, open Quartet Evening and press Register; GET /api/my-registrations."
+    ],
+    "data": "Quartet Evening (597): open, capacity 1, its only place held by the attendee.",
+    "expected": "The first POST answers 409 duplicate (the place is held). After withdrawing: the picture shows 0 registered, 1 place remaining, no attendees; two notices 'Regression attendee withdrew from Quartet Evening. 1 of 1 places now remain.'; registering again shows 'You are registered. Your place is held.'; the list holds Quartet Evening twice: registered then withdrawn.",
+    "evidence": "e2e/registration-withdrawal.spec.ts; e2e/support/my-registrations.ts",
+    "layer": "Playwright Chromium + isolated production app"
+  },
+  {
+    "id": "SG2-62-N01",
+    "title": "Withdrawing after the start, twice, or someone else's registration is refused, other roles are refused, and nothing changes",
+    "type": "FAILURE",
+    "story": "SG2-62",
+    "categories": [
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-62:AC2",
+      "SG2-62:AC4"
+    ],
+    "method_id": "SG2-62:withdrawing-after-the-start-twice-or-someone-else-s-registration-is-refused-other-roles-are",
+    "purpose": "Catch a withdrawal after the event has started, a second withdrawal, a withdrawal of another attendee's registration, or a non-attendee listing or withdrawing.",
+    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/my-registrations seed (SG2-59's and SG2-60's events plus Quartet Evening, Lantern Talk and Morning Run) before each case; fresh browser context. No hosted Supabase.",
+    "review": null,
+    "status": "Pass",
+    "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
+    "execution_evidence": "26 Oct 2026; feature/SG2-62-see-and-withdraw-registrations at 3b0dc55 on origin/main a9eb363; npm run test:e2e locally in Chromium: 164/164 passed, required SG2-26 gate passed; npm run ci green (1897 server / 1935 client / 19 reviewer, 100% coverage) on the second of two runs (the first failed two unrelated tests, SG2-42 and SG2-39, that pass alone; untouched main showed the same intermittent kind). No hosted Supabase validation.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local run",
+    "steps": [
+      "Sign in as attendee; open My registrations and read Morning Run.",
+      "POST withdrawals for 6203 (Morning Run), 6204 (already withdrawn), 6001 (another attendee's) and 999999 (none).",
+      "As organiser, coordinator and lead, GET /api/my-registrations and POST a withdrawal for 6201.",
+      "Read the ledger."
+    ],
+    "data": "Morning Run (599, registration 6203): started 2 Oct 2026 07:00 SGT. Closed Briefing (593, registration 6204): withdrawn. Registration 6001: Recital Guest's place on Small Recital.",
+    "expected": "Morning Run shows Event started with no Withdraw button. Answers: 6203 \u2192 409 'This event started 02 Oct 2026 07:00 SGT, so you can no longer withdraw.'; 6204 \u2192 409 'You have already withdrawn from this event.'; 6001 and 999999 \u2192 404 'This registration was not found.' Organiser, coordinator and lead get 403 for both calls. Registrations 6201-6203 stay registered, 6204 stays cancelled, and no withdrawal notices exist.",
+    "evidence": "e2e/registration-withdrawal.spec.ts; e2e/support/my-registrations.ts",
+    "layer": "Playwright Chromium + isolated production app"
   }
 ]

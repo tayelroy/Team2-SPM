@@ -32,7 +32,7 @@ const POLICY_PERMISSIONS: Partial<Record<Role, string[]>> = {
     'event_request.history.view', 'profile.read', 'profile.update'],
   'Safety Officer': ['event_request.stage.view', 'event_request.history.view', 'equipment_requirements.read',
     'safety_checks.read', 'profile.read', 'profile.update'],
-  Attendee: ['events.registrable.read', 'notifications.inbox', 'profile.read', 'profile.update'],
+  Attendee: ['events.registrable.read', 'registrations.mine.read', 'registrations.withdraw', 'notifications.inbox', 'profile.read', 'profile.update'],
 };
 
 function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ?? []) {
@@ -61,6 +61,11 @@ function mockLoginResponse(role: Role, permissions = POLICY_PERMISSIONS[role] ??
       if (url === '/api/registrable-events') return Response.json({ events: [{ event_id: 591, name: 'Harbour Lecture',
         proposed_date: '2030-07-20T11:00:00.000Z', registration_opens_at: '2020-10-01T00:00:00.000Z',
         registration_closes_at: '2030-07-19T02:00:00.000Z', venues: [{ name: 'Regression Hall', location: 'Level 1' }] }] });
+      // SG2-62: the attendee's own registrations.
+      if (url === '/api/my-registrations') return Response.json({ registrations: [{ registration_id: 7, event_id: 591,
+        standing: 'registered', can_withdraw: true, registered_at: '2026-10-23T01:00:00.000Z', withdrawn_at: null,
+        contact_phone: '91234567', needs: null, event: { name: 'Harbour Lecture', proposed_date: '2030-07-20T11:00:00.000Z',
+          venues: [{ name: 'Regression Hall', location: 'Level 1' }] } }] });
       if (url === '/api/venue-holds/notifications') return Response.json({ notifications: [{ notification_id: 1, event_id: 41, hold_id: 7,
         kind: 'placed', message: 'Tentative hold for Atrium Hall expires 14 June 2030.', created_at: '2030-06-12T01:00:00Z' }] });
       if (url.startsWith('/api/work-queue')) return Response.json({ items: [{
@@ -201,7 +206,8 @@ describe('every role can reach every screen in its navigation', () => {
       ['Dashboard', 'Equipment desk'],
       ['Venue Availability', 'Venue availability'], ['Equipment', 'Equipment records'],
     ],
-    Attendee: [['My registrations', 'My registrations'], ['Find events', 'Find events'], ['Event page', 'Event page']],
+    // SG2-62: the real list of registrations replaced the prototype dashboard's name.
+    Attendee: [['Dashboard', 'Attendee home'], ['Find events', 'Find events'], ['My registrations', 'My registrations'], ['Event page', 'Event page']],
     // SG2-86: only the screens these roles can use; neither holds
     // event_request.view, so neither is offered All events.
     // SG2-97: assignment moved here from Technical Support Staff.
@@ -431,7 +437,7 @@ test.each([500, 503, 'offline'] as const)('[FAILURE] [SG2-23:session-resume] a %
 
 test.each([
   ['Venue Staff', 'Catalogue', 'Venue desk'],
-  ['Attendee', 'My registrations', 'Event page'],
+  ['Attendee', 'Find events', 'Event page'],
 ] as const)('[NORMAL] [SG2-23:session-resume] the %s wordmark returns home without signing out, including after reload', async (role, destination, home) => {
   await signInAs(role);
   fireEvent.click(within(header()).getByRole('button', { name: destination }));
@@ -926,9 +932,23 @@ test('[NORMAL] [SG2-59:AC1] an attendee reaches the events open for registration
   await signInAs('Attendee');
   fireEvent.click(within(header()).getByRole('button', { name: 'Find events' }));
   expect(await screen.findByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('VenueRegression Hall');
-  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  fireEvent.click(within(header()).getByRole('button', { name: 'Dashboard' }));
   fireEvent.click(within(screen.getByRole('main')).getByRole('button', { name: 'Browse events' }));
   expect(screen.getByRole('heading', { level: 1, name: 'Find events' })).toBeInTheDocument();
+});
+
+test('[NORMAL] [SG2-62:AC1] an attendee reaches their registrations from the menu', async () => {
+  await signInAs('Attendee');
+  fireEvent.click(within(header()).getByRole('button', { name: 'My registrations' }));
+  expect(screen.getByRole('heading', { level: 1, name: 'My registrations' })).toBeInTheDocument();
+  const card = await screen.findByRole('article', { name: 'Harbour Lecture' });
+  expect(card).toHaveTextContent('Registered');
+  expect(within(card).getByRole('button', { name: 'Withdraw' })).toBeInTheDocument();
+});
+
+test('[FAILURE] [SG2-62:AC1] an attendee without the grant is not offered My registrations', async () => {
+  await signInAs('Attendee', ['events.registrable.read', 'profile.read']);
+  expect(within(await loadedNav()).queryByRole('button', { name: 'My registrations' })).toBeNull();
 });
 
 test('[FAILURE] [SG2-59:AC1] an attendee without the grant is not offered Find events', async () => {

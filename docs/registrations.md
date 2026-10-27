@@ -1,4 +1,4 @@
-# Registrations (SG2-63, SG2-60)
+# Registrations (SG2-63, SG2-60, SG2-62)
 
 The registration picture for an event, and the Event Organiser's control of
 its registration settings (SG2-63), and attendees registering (SG2-60, see
@@ -135,3 +135,60 @@ Migration `202610230001_event_registration.sql`; tests
 `client/src/screens/FindEvents.registration.test.tsx`, integration
 `native registration holds one place per attendee…` and browser journeys
 `SG2-60-P01` and `SG2-60-N01`.
+
+## Seeing and withdrawing (SG2-62)
+
+An attendee opens **My registrations** from the menu.
+`GET /api/my-registrations` runs `public.my_registrations()` with the
+attendee's own JWT and returns every registration they have made, active
+ones for events yet to start first, soonest first. Each carries the event's
+attendee-facing details (SG2-59's fields: name, host, category, description,
+date and time, confirmed venues) and what the attendee gave (phone, needs).
+Unlike Find events, an event stays listed after registration closes.
+
+| Standing (AC1) | When | Withdraw offered |
+| --- | --- | --- |
+| `registered` | active, and the event is yet to start | yes |
+| `withdrawn` | the registration was cancelled (`withdrawn_at` says when; older cancelled rows have none) | no |
+| `event_cancelled` | the event was cancelled (SG2-67) | no |
+| `event_completed` | the event was completed | no |
+| `event_started` | at or after the event's current start time | no |
+
+`POST /api/my-registrations/:registrationId/withdrawal` runs
+`public.withdraw_registration()`. The screen asks first (**Confirm
+withdrawal** / **Keep my place**, AC2).
+
+| Check, in order | Answer |
+| --- | --- |
+| Not one of the caller's registrations | 404 |
+| Already withdrawn | 409 `withdrawn` |
+| The event was cancelled | 409 `cancelled` |
+| The event is completed, or it is at or after its current start time (AC4) | 409 `started`, with the start time |
+| Otherwise, whether or not registration is still open (AC2) | 200: withdrawn |
+
+- **The place goes back (AC3):** the registration is stored as `cancelled`
+  with `withdrawn_at`; `cancelled` is the one status every count of places
+  leaves out (SG2-63's picture, SG2-66, `register_for_event`), so nothing
+  else had to change. A check constraint keeps `withdrawn_at` on cancelled
+  rows only.
+- **The same lock:** the function locks the event row before the
+  registration, as registering does, so a withdrawal and a registration for
+  the freed place are decided one at a time, and a withdrawal sent twice at
+  once is made once (`.github/scripts/test-registration-concurrency.mjs`).
+- **Notices (AC5):** the organiser and the assigned coordinator are each sent
+  a `registration_withdrawn` notice, "Ana Tan withdrew from Harbour Lecture.
+  80 of 80 places now remain." (no count when no capacity is set). The
+  attendee is not sent one; the screen confirms it.
+- **AC6 (waiting-list promotion)** is delivered with SG2-61, which adds the
+  waiting list it needs. A withdrawal already frees the place through the
+  same function SG2-61 will extend.
+- After withdrawing, the attendee can register again while registration is
+  open and a place remains.
+
+Migration `202610260003_registration_withdrawal.sql`; tests
+`supabase/tests/registration_withdrawal.sql`, the concurrency script above,
+`server/src/myRegistrations.test.ts`, `server/src/db/myRegistrations.test.ts`,
+`client/src/screens/MyRegistrations.test.tsx`,
+`client/src/api/myRegistrations.test.ts`, integration
+`native withdrawal lists the attendee's registration…` and browser journeys
+`SG2-62-P01`, `SG2-62-P02` and `SG2-62-N01`.

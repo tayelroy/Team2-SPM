@@ -45,7 +45,9 @@ export type Screen =
   // SG2-70: find an event across the system.
   | 'findEvent'
   // SG2-59: an attendee finds events open for registration.
-  | 'findEvents';
+  | 'findEvents'
+  // SG2-62: an attendee sees and withdraws their registrations.
+  | 'myRegistrations';
 
 /** Signed-in screens other than the dashboard, which has its own headings. */
 export type ContentScreen = Exclude<Screen, 'landing' | 'login' | 'dashboard'>;

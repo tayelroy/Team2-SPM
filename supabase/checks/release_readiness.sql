@@ -13,7 +13,7 @@ begin
     ('users', 'user_id,name,organisation,phone,department,communication_preferences'),
     ('roles', 'role_id,role_name'),
     ('account_roles', 'user_id,role'),
-    ('registrations', 'registration_id,event_id,attendee_id,status,registered_at,contact_phone,needs'),
+    ('registrations', 'registration_id,event_id,attendee_id,status,registered_at,contact_phone,needs,withdrawn_at'),
     ('event_audit_logs', 'log_id,event_id,actor_id,field_name,old_value,new_value,created_at'),
     ('notifications', 'notification_id,recipient_id,event_id,request_id,kind,message,created_at,read_at'),
     ('venue_hold_notifications', 'notification_id,recipient_id,event_id,kind,message,created_at,read_at'),
@@ -102,6 +102,8 @@ begin
     ('private.registrable_events_json(integer)'),
     -- SG2-60: attendees register for an event.
     ('public.register_for_event(integer,text,text)'),
+    -- SG2-62: attendees see and withdraw their registrations.
+    ('public.my_registrations()'), ('public.withdraw_registration(integer)'),
     -- SG2-93: Request Changes sends the named arrangements back to staff.
     ('public.confirm_safety_rereview(bigint,uuid,text)'), ('public.safety_rereview_queue(text)'),
     ('public.event_safety_rereviews(integer)'), ('public.safety_rereview_close_from_request()'),
@@ -230,7 +232,9 @@ begin
     ('safety_decision'), ('outstanding_arrangements'),
     ('registration_opened'), ('registration_closed'),
     -- SG2-60: the attendee's registration confirmation.
-    ('registration_confirmed')
+    ('registration_confirmed'),
+    -- SG2-62: the organiser and coordinator hear of a withdrawal.
+    ('registration_withdrawn')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),

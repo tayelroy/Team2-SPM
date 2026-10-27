@@ -270,6 +270,16 @@ contact details. Migration `202610230001_event_registration.sql`; tests
 `supabase/tests/event_registration.sql` (non-attendee-refused, grants) and
 browser journey `SG2-60-N01`.
 
+**See and withdraw my registrations (SG2-62).** `registrations.mine.read` and
+`registrations.withdraw` are granted to Attendees only. `my_registrations()`
+and `withdraw_registration()` run with the caller's JWT, recheck that the
+acting role is `attendee` (`acting_role()` for the read, `lock_acting_role()`
+for the write) and touch only the caller's (`auth.uid()`) registrations; any
+other registration id is 404. Both are executable by `authenticated` only.
+Migration `202610260003_registration_withdrawal.sql`; tests
+`supabase/tests/registration_withdrawal.sql` (other-roles-refused, grants,
+not-mine) and browser journey `SG2-62-N01`.
+
 Migrations: `202610180001_account_multi_roles.sql` (key, `acting_role()`,
 `change_account_roles()`), `202610200002_acting_role_functions.sql` (last on purpose: it holds the latest body of every function that reads the caller's role),
 `202610180003_separation_of_duties.sql`, `202610180004_event_relationship_reads.sql`. A later migration that redefines one of those functions must keep its acting-role line.
