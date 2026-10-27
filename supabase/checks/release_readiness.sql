@@ -22,7 +22,9 @@ begin
     ('venue_bookings', 'booking_id,venue_id,event_id,starts_at,ends_at,status'),
     ('venues', 'venue_id,name,deleted_at,deleted_by'),
     ('venue_booking_requests', 'request_id,event_id,venue_id,status,venue_booking_id,replaces_booking_id'),
-    ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details')
+    ('internal_work_items', 'kind,item_id,event_id,title,event_name,status,starts_at,ends_at,audience,assigned_to,category,details'),
+    -- SG2-65: who decided a change request, when and why.
+    ('event_change_requests', 'change_request_id,event_id,requested_by,field,from_value,to_value,reason,status,created_at,decided_by,decided_at,decision_reason')
   ), column_checks as (
     select 'column public.' || r.relation || '.' || col.name as name,
       exists (select 1 from pg_attribute a
@@ -106,7 +108,9 @@ begin
     ('public.confirm_safety_rereview(bigint,uuid,text)'), ('public.safety_rereview_queue(text)'),
     ('public.event_safety_rereviews(integer)'), ('public.safety_rereview_close_from_request()'),
     -- SG2-64: the organiser raises a change request after submitting.
-    ('public.raise_event_change_request(integer,uuid,text,jsonb,text)')
+    ('public.raise_event_change_request(integer,uuid,text,jsonb,text)'),
+    -- SG2-65: the coordinator accepts or refuses a change request.
+    ('public.decide_event_change_request(integer,bigint,uuid,text,text,text)')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -230,7 +234,9 @@ begin
     ('safety_decision'), ('outstanding_arrangements'),
     ('registration_opened'), ('registration_closed'),
     -- SG2-60: the attendee's registration confirmation.
-    ('registration_confirmed')
+    ('registration_confirmed'),
+    -- SG2-64/SG2-65: a change is requested, accepted or refused.
+    ('change_requested'), ('change_accepted'), ('change_refused')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),

@@ -20,14 +20,14 @@ own rules (`validateDraftInput` in `server/src/events/fields.ts`): text is
 trimmed, attendance is a whole number of at least 1, and a date is stored as
 an ISO instant. One request changes one field.
 
-Every other role gets 403 from the route permission. The coordinator accepts a
-request through SG2-66's `POST …/change-requests/:changeRequestId/accept`.
+Every other role gets 403 from the route permission. The coordinator accepts or
+refuses a request ([SG2-65](#deciding-on-a-change-request-sg2-65)).
 
 ## Migration `202610260001_event_change_requests.sql`
 
 - `event_change_requests` stores the event, who asked, the field, its value
   when asked (`from_value`), the new value (`to_value`), the reason and a status
-  (`pending`, `accepted`, or `refused` for SG2-65). Checks keep the field
+  (`pending`, `accepted` or `refused`; SG2-65 adds who decided, when and why). Checks keep the field
   in the changeable list, the reason 1–1000 characters, and the status known.
 - RLS is enabled and forced with no policies, and `anon` and `authenticated`
   hold no grants: only the service role reads or writes it. The API decides who
@@ -88,3 +88,81 @@ requests.
 - `e2e/change-requests.spec.ts` (SG2-64-P01, SG2-64-N01) against
   `e2e/support/change-requests.ts`, the loopback mirror of the function, and
   `e2e/draft-history.spec.ts` SG2-40-P03 for AC5.
+
+## Deciding on a change request (SG2-65)
+
+The assigned Event Coordinator accepts or refuses each pending request.
+
+| Method and path | Who | Body | Outcomes |
+| --- | --- | --- | --- |
+| `POST /api/event-requests/:eventId/change-requests/:changeRequestId/accept` | the assigned coordinator (`event_request.change_request.accept`) | none; `{ "next": "review" \| "resubmit" }` on a request returned for clarification | 200 the event's status and recheck state; 400 a missing or unknown `next` on a clarification request; 404 not their event or no such pending request; 409 a closed status, or decided in the meantime |
+| `POST /api/event-requests/:eventId/change-requests/:changeRequestId/refuse` | the assigned coordinator (`event_request.change_request.refuse`) | `{ "reason": "…" }` | 200 `{ event_id, change_request_id, status: "refused" }`; 400 no reason (1–1000 characters after trimming); 404 not their event or no such pending request; 409 decided in the meantime |
+
+- **AC1, accept:** on Approved, Planning, Awaiting Safety Check, Preparation
+  or Confirmed, SG2-66's `apply_accepted_event_change` applies the change
+  first (and returns a significant change on a Confirmed or Preparation event
+  to Planning, AC5). The decision is then recorded and the organiser gets a
+  `change_accepted` notice.
+- **AC2, refuse:** a reason is required, the event is not touched, the
+  history records "Refused change request <id>: <reason>", and the organiser
+  gets a `change_refused` notice with the reason.
+- **AC3, the record:** `event_change_requests` now has `decided_by`,
+  `decided_at` and `decision_reason` next to the request itself. Checks keep
+  the record whole: a pending request has neither decider nor time, a
+  decided one has both, and a refusal has a 1–1000 character reason.
+- **AC4, returned for clarification:** the event is still a request, so
+  accepting writes the change straight onto it (with its history line) and
+  the coordinator chooses **Accept and return to review** (`under_review`) or
+  **Accept and ask organiser to resubmit** (stays `needs_clarification`; the
+  organiser uses Resubmit for review). SG2-66's apply is not used here. The
+  list route returns `next_step_required: true` for such an event.
+
+### Migration `202610270001_change_request_decisions.sql`
+
+- Adds the three decision columns and their checks. Requests SG2-66 accepted
+  before this migration take their decider and time from the history line
+  `apply_accepted_event_change` wrote (there were none on live on 26 Oct 2026).
+- Adds `change_accepted` and `change_refused` to the notification kinds, as
+  SG2-64 did.
+- `decide_event_change_request(event, request, actor, decision, reason, next)`,
+  service role only, locks the event (the same lock SG2-66's apply takes),
+  checks the actor is its coordinator and the request is still pending,
+  records the decision and notifies the organiser in one transaction.
+  Outcomes: `ok` (with the event's status), `not_found`, `not_pending`,
+  `invalid`.
+- Accepting on an open status is two steps (SG2-66 applies, then this
+  records). Once the change is applied, its history line "Accepted change
+  request <id>" is written under the event lock, and the function refuses
+  any later refusal of that request (`not_pending`), so an applied change can
+  never be recorded as refused.
+
+Rollback: `supabase/rollbacks/202610270001_change_request_decisions_down.sql`
+drops the function and the three columns. Who decided, when and why are lost;
+the history keeps every decision, and the two notification kinds stay allowed
+so notices already sent remain valid.
+
+### Client
+
+SG2-66's Change requests panel gains **Refuse change**, which opens a
+required "Reason for refusing" box (up to 1000 characters) with **Confirm
+refusal** and **Cancel**. On a request returned for clarification, the single
+Accept button is replaced by the two AC4 choices. The bell shows
+`change_accepted` as "Change accepted" and `change_refused` as "Change
+refused".
+
+### Verification (SG2-65)
+
+- `supabase/tests/change_request_decisions.sql` (CI database job): refusal
+  record and notice, the 1000/1001-character and blank reason boundary,
+  accepting after SG2-66's apply, both AC4 next steps, the guards (missing or
+  unknown next step, another coordinator, already decided, refusal after
+  apply), the record checks, and no EXECUTE for `authenticated` or `anon`.
+  Sabotage runs (EXECUTE granted to `authenticated`; the refusal-after-apply
+  guard removed; the refusal-reason check dropped) each made it fail, naming
+  the case.
+- `server/src/changeRequestsDecide.test.ts`, `server/src/db/changeRequests.test.ts`.
+- `client/src/components/ChangeRequestsPanel.decisions.test.tsx`,
+  `client/src/api/changeRequestDecisions.test.ts`.
+- `e2e/change-request-decisions.spec.ts` (SG2-65-P01, SG2-65-P02,
+  SG2-65-N01) against the loopback mirror in `e2e/support/change-requests.ts`,
+  with the refusal form checked at 390px and 1440px.

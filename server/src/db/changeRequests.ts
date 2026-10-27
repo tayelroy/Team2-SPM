@@ -91,8 +91,8 @@ export async function raiseEventChangeRequest(
 
 /**
  * The SG2-66 seam backed by public.event_change_requests: pending requests,
- * oldest first. Any read or write failure throws, which the routes turn
- * into 503.
+ * oldest first, and SG2-65's decisions on them. Any read or write failure
+ * throws, which the routes turn into 503.
  */
 export function createDatabaseChangeRequestSource(getAdminClient: () => SupabaseClient | null): ChangeRequestSource {
   const admin = () => {
@@ -115,10 +115,20 @@ export function createDatabaseChangeRequestSource(getAdminClient: () => Supabase
       if (error) throw new Error('Change requests are unavailable.');
       return toChangeRequest(data);
     },
-    async markAccepted(event, id) {
-      const { error } = await admin().from('event_change_requests').update({ status: 'accepted' })
-        .eq('event_id', event.event_id).eq('change_request_id', Number(id)).eq('status', 'pending');
-      if (error) throw new Error('Change requests are unavailable.');
+    // SG2-65: decide_event_change_request records who decided and when,
+    // applies an AC4 acceptance and notifies the organiser, under the event lock.
+    async decide(event, id, decision) {
+      const { data, error } = await admin().rpc('decide_event_change_request', {
+        p_event_id: event.event_id,
+        p_change_request_id: Number(id),
+        p_actor_id: decision.by,
+        p_decision: decision.decision,
+        p_reason: decision.decision === 'refused' ? decision.reason : null,
+        p_next: decision.decision === 'accepted' ? decision.next ?? null : null
+      });
+      const outcome = (data as { outcome?: unknown } | null)?.outcome;
+      if (error || (outcome !== 'ok' && outcome !== 'not_pending')) throw new Error('Change requests are unavailable.');
+      return outcome;
     }
   };
 }

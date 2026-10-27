@@ -65,8 +65,13 @@ export interface ChangeRequest {
 export interface ChangeRequestList {
   event: { event_id: number; status: string };
   can_accept: boolean;
+  /** SG2-65 AC4: returned for clarification, so accepting needs a next step. */
+  next_step_required?: boolean;
   change_requests: ChangeRequest[];
 }
+
+/** SG2-65 AC4: where a clarification request goes after its change is accepted. */
+export type ClarificationNextStep = 'review' | 'resubmit';
 
 export interface AcceptedChange {
   event_id: number;
@@ -117,6 +122,8 @@ export type RaiseChangeRequestResult =
 export type FetchOwnChangeRequestsResult = { ok: true; requests: OwnChangeRequest[] } | ChangeRequestFailure;
 
 export type AcceptChangeRequestResult = { ok: true; change: AcceptedChange } | ChangeRequestFailure;
+
+export type RefuseChangeRequestResult = { ok: true } | ChangeRequestFailure;
 
 export type SettleRecheckResult =
   | { ok: true; settled: SettledRecheck }
@@ -238,24 +245,51 @@ export async function fetchOwnChangeRequests(eventId: number | string, token: st
 
 /**
  * Accepts one change request (SG2-66 AC4). The server recomputes the impact
- * from fresh facts and decides whether the event returns to Planning. Maps to
+ * from fresh facts and decides whether the event returns to Planning. On a
+ * request returned for clarification, `next` says whether it goes back to
+ * review or the organiser resubmits it (SG2-65 AC4). Maps to
  * `POST /api/event-requests/:eventId/change-requests/:changeRequestId/accept`.
  */
 export async function acceptChangeRequest(
   eventId: number | string,
   changeRequestId: string,
   token: string,
+  next?: ClarificationNextStep,
 ): Promise<AcceptChangeRequestResult> {
   const reply = await send(
     `/api/event-requests/${eventId}/change-requests/${encodeURIComponent(changeRequestId)}/accept`,
     'POST',
     token,
+    next === undefined ? undefined : { next },
   );
   if (!reply) return NETWORK_FAILURE;
   const { response, body } = reply;
   if (!response.ok) return failure(response.status, body, 'Could not accept the change');
   if (!body || typeof body.status !== 'string') return NETWORK_FAILURE;
   return { ok: true, change: body as unknown as AcceptedChange };
+}
+
+/**
+ * Refuses one change request with a reason; the event is left as it is
+ * (SG2-65 AC2). Maps to
+ * `POST /api/event-requests/:eventId/change-requests/:changeRequestId/refuse`.
+ */
+export async function refuseChangeRequest(
+  eventId: number | string,
+  changeRequestId: string,
+  reason: string,
+  token: string,
+): Promise<RefuseChangeRequestResult> {
+  const reply = await send(
+    `/api/event-requests/${eventId}/change-requests/${encodeURIComponent(changeRequestId)}/refuse`,
+    'POST',
+    token,
+    { reason },
+  );
+  if (!reply) return NETWORK_FAILURE;
+  const { response, body } = reply;
+  if (!response.ok) return failure(response.status, body, 'Could not refuse the change');
+  return { ok: true };
 }
 
 /**

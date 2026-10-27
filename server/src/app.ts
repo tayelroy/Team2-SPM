@@ -314,6 +314,12 @@ export function createApp(
     access.requirePermission('event_request.change_request.accept'),
     changeRequestHandlers.accept
   );
+  // SG2-65 AC2: the assigned coordinator refuses a change request with a reason.
+  eventRequests.post(
+    '/:eventId/change-requests/:changeRequestId/refuse',
+    access.requirePermission('event_request.change_request.refuse'),
+    changeRequestHandlers.refuse
+  );
   eventRequests.post(
     '/:eventId/rechecks/:key/settle',
     access.requirePermission('event_request.rechecks.settle'),

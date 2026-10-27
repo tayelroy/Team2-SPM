@@ -23,7 +23,9 @@ const EVENT_KINDS = new Set(['venue_request_approved', 'venue_request_rejected',
   // SG2-60: an attendee's registration is confirmed.
   'registration_confirmed',
   // SG2-64 AC2: the organiser asked for a change to the coordinator's event.
-  'change_requested']);
+  'change_requested',
+  // SG2-65 AC1/AC2: the coordinator accepted or refused the organiser's change.
+  'change_accepted', 'change_refused']);
 const HOLD_KINDS = new Set(['placed', 'warning', 'expired', 'expiry_changed']);
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const positiveId = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0;

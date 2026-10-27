@@ -27,18 +27,25 @@ export interface ChangeRequestEvent {
   description: string | null;
 }
 
+/** SG2-65: the coordinator's decision on one pending request. `next` is
+ * required when accepting on a request returned for clarification (AC4). */
+export type ChangeDecision =
+  | { decision: 'accepted'; by: string; next?: 'review' | 'resubmit' }
+  | { decision: 'refused'; by: string; reason: string };
+
 /** The seam SG2-64/SG2-65 implement with a real store. */
 export interface ChangeRequestSource {
   /** Pending change requests for the event, oldest first. */
   list(event: ChangeRequestEvent): Promise<ChangeRequest[]>;
-  /** One pending change request, or null when unknown or already accepted. */
+  /** One pending change request, or null when unknown or already decided. */
   get(event: ChangeRequestEvent, id: string): Promise<ChangeRequest | null>;
-  /** Records that the request was accepted, so it is no longer pending. */
-  markAccepted(event: ChangeRequestEvent, id: string): Promise<void>;
+  /** Records the decision, so the request is no longer pending (SG2-65 AC3).
+   * `not_pending` when it was decided in the meantime. */
+  decide(event: ChangeRequestEvent, id: string, decision: ChangeDecision): Promise<'ok' | 'not_pending'>;
 }
 
 export interface MockChangeRequestSource extends ChangeRequestSource {
-  /** Forgets every seeded and accepted request (loopback test reset). */
+  /** Forgets every seeded and decided request (loopback test reset). */
   reset(): void;
 }
 
@@ -55,11 +62,11 @@ function change(field: ChangeableField, from: string | number | null, to: string
  * 1. `mock-<id>-attendance`: attendance up by max(20, 50%), or 100 when unknown;
  * 2. `mock-<id>-date` (only when the event has a date): one week later;
  * 3. `mock-<id>-description`: an agenda wording update (not significant).
- * Accepted requests are hidden from list and get.
+ * Decided requests are hidden from list and get.
  */
 export function createMockChangeRequestSource(now: () => Date = () => new Date()): MockChangeRequestSource {
   const seeded = new Map<number, ChangeRequest[]>();
-  const accepted = new Set<string>();
+  const decided = new Set<string>();
 
   const requestsFor = (event: ChangeRequestEvent): ChangeRequest[] => {
     let requests = seeded.get(event.event_id);
@@ -87,7 +94,7 @@ export function createMockChangeRequestSource(now: () => Date = () => new Date()
       });
       seeded.set(event.event_id, requests);
     }
-    return requests.filter(request => !accepted.has(request.id));
+    return requests.filter(request => !decided.has(request.id));
   };
 
   return {
@@ -98,12 +105,14 @@ export function createMockChangeRequestSource(now: () => Date = () => new Date()
       const found = requestsFor(event).find(request => request.id === id);
       return found ? structuredClone(found) : null;
     },
-    async markAccepted(_event, id) {
-      accepted.add(id);
+    async decide(event, id, _decision) {
+      if (!requestsFor(event).some(request => request.id === id)) return 'not_pending';
+      decided.add(id);
+      return 'ok';
     },
     reset() {
       seeded.clear();
-      accepted.clear();
+      decided.clear();
     }
   };
 }

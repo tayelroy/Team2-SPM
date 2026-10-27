@@ -98,6 +98,8 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   'event_request.change_request.raise': ['event_organiser'],
   'event_request.change_request.view': ['event_coordinator', 'event_organiser'],
   'event_request.change_request.accept': ['event_coordinator'],
+  // SG2-65 AC2: the assigned coordinator refuses one (assignment per-row).
+  'event_request.change_request.refuse': ['event_coordinator'],
   'event_request.rechecks.settle': ['event_coordinator'],
   // SG2-92: the Safety Officer records Approve / Reject / Request Changes on
   // an event from SG2-91's list ('safety_checks.read'). The decisions are

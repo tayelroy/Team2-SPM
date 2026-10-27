@@ -72,7 +72,7 @@ describe('raise_event_change_request adapter (SG2-64)', () => {
 });
 
 describe('database change request source (SG2-64 AC2/AC3)', () => {
-  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-64:AC3] the database source lists and gets pending requests in the SG2-66 shape, marks one accepted only while pending, and fails closed', async () => {
+  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-64:AC3] the database source lists and gets pending requests in the SG2-66 shape, and fails closed', async () => {
     {
       const { client, calls } = tableClient({ data: [ROW, { ...ROW, change_request_id: 42, field: 'name', from_value: null, to_value: 'Gala' }], error: null });
       const list = await createDatabaseChangeRequestSource(() => client).list(EVENT);
@@ -88,10 +88,6 @@ describe('database change request source (SG2-64 AC2/AC3)', () => {
       const read = tableClient({ data: ROW, error: null });
       assert.deepEqual(await createDatabaseChangeRequestSource(() => read.client).get(EVENT, '41'), REQUEST);
       assert.deepEqual(read.calls.slice(-2), [['eq', 'change_request_id', 41], ['maybeSingle']]);
-      const write = tableClient({ data: null, error: null });
-      await createDatabaseChangeRequestSource(() => write.client).markAccepted(EVENT, '41');
-      assert.deepEqual(write.calls, [['from', 'event_change_requests'], ['update', { status: 'accepted' }],
-        ['eq', 'event_id', 7], ['eq', 'change_request_id', 41], ['eq', 'status', 'pending']]);
     }
     {
       const { client, calls } = tableClient({ data: ROW, error: null });
@@ -108,7 +104,6 @@ describe('database change request source (SG2-64 AC2/AC3)', () => {
       const failed = createDatabaseChangeRequestSource(() => tableClient({ data: null, error: { message: 'down' } }).client);
       await assert.rejects(failed.list(EVENT));
       await assert.rejects(failed.get(EVENT, '41'));
-      await assert.rejects(failed.markAccepted(EVENT, '41'));
       const odd = createDatabaseChangeRequestSource(() => tableClient({ data: 'rows', error: null }).client);
       await assert.rejects(odd.list(EVENT));
       const missing = createDatabaseChangeRequestSource(() => tableClient({ data: null, error: null }).client);
@@ -116,5 +111,33 @@ describe('database change request source (SG2-64 AC2/AC3)', () => {
       const malformed = createDatabaseChangeRequestSource(() => tableClient({ data: [ROW, { ...ROW, field: 'status' }], error: null }).client);
       assert.deepEqual(await malformed.list(EVENT), [REQUEST]);
     }
+  });
+});
+
+describe('decide_event_change_request adapter (SG2-65)', () => {
+  test('[NORMAL] [CONFLICT] [FAILURE] [SG2-65:AC1] [SG2-65:AC2] [SG2-65:AC3] [SG2-65:AC4] the decide adapter passes who decided, the reason or next step, and fails closed on an error or unknown outcome', async () => {
+    const calls: unknown[] = [];
+    let reply: { data: unknown; error: unknown } = { data: { outcome: 'ok', status: 'planning' }, error: null };
+    const client = {
+      rpc: async (name: string, args: unknown) => { calls.push([name, args]); return reply; }
+    } as unknown as SupabaseClient;
+    const source = createDatabaseChangeRequestSource(() => client);
+    assert.equal(await source.decide(EVENT, '41', { decision: 'accepted', by: 'coordinator-1' }), 'ok');
+    assert.equal(await source.decide(EVENT, '41', { decision: 'accepted', by: 'coordinator-1', next: 'review' }), 'ok');
+    assert.equal(await source.decide(EVENT, '41', { decision: 'refused', by: 'coordinator-1', reason: 'No room.' }), 'ok');
+    const base = { p_event_id: 7, p_change_request_id: 41, p_actor_id: 'coordinator-1' };
+    assert.deepEqual(calls, [
+      ['decide_event_change_request', { ...base, p_decision: 'accepted', p_reason: null, p_next: null }],
+      ['decide_event_change_request', { ...base, p_decision: 'accepted', p_reason: null, p_next: 'review' }],
+      ['decide_event_change_request', { ...base, p_decision: 'refused', p_reason: 'No room.', p_next: null }]
+    ]);
+    reply = { data: { outcome: 'not_pending' }, error: null };
+    assert.equal(await source.decide(EVENT, '41', { decision: 'accepted', by: 'coordinator-1' }), 'not_pending');
+    for (const failed of [{ data: null, error: { message: 'down' } }, { data: null, error: null },
+      { data: { outcome: 'invalid' }, error: null }, { data: { outcome: 'not_found' }, error: null }]) {
+      reply = failed;
+      await assert.rejects(source.decide(EVENT, '41', { decision: 'accepted', by: 'coordinator-1' }), JSON.stringify(failed));
+    }
+    await assert.rejects(createDatabaseChangeRequestSource(() => null).decide(EVENT, '41', { decision: 'accepted', by: 'c' }));
   });
 });

@@ -958,6 +958,20 @@
         "AC5": "While a request is returned for clarification, the Event Organiser cannot edit it directly (refused on the server side); they answer in the clarification thread and ask for any change to the request through a change request (replaces SG2-36 AC2 and the clarification exception in SG2-30 AC3)",
         "AC6": "A rejected request is revised through the Coordinator, and the Event Organiser resubmits it when the Coordinator decides a new submission is needed; direct Organiser changes to submitted fields remain refused"
       }
+    },
+    {
+      "id": "SG2-65",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-65",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-26",
+      "source": "Live SG2-65 Jira description (updated 15 Oct 2026), bullet order, read through the Atlassian connector.",
+      "acceptanceCriteria": {
+        "AC1": "Given an outstanding change request, when I accept it, then the change takes effect on the event and the Organiser is notified",
+        "AC2": "Given an outstanding change request, when I refuse it, then I must give a reason and the event is unchanged",
+        "AC3": "Given any decision, the request, the decision, who made it and when are recorded against the event",
+        "AC4": "For a request returned for clarification, accepting the change applies it to the request, and I decide whether the request goes back to review or must be resubmitted by the Organiser",
+        "AC5": "Accepting a significant change on a Confirmed event, or one in Preparation, moves the event back to Planning as described in SG2-66"
+      }
     }
   ]
 }
