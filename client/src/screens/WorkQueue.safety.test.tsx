@@ -72,6 +72,7 @@ describe('work queue safety decision (SG2-92)', () => {
   test.each([
     ['not assigned to them', { assigned_to_me: false }],
     ['still approved, before any check', { status: 'approved' }],
+    ['still under review', { status: 'under_review' }],
     ['completed', { status: 'completed' }],
   ])('[BOUNDARY] [SG2-92:AC6] an event %s shows no safety decision', async (_label, override) => {
     serveQueue({ ...rejected, ...override });

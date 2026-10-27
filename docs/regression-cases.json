@@ -1932,26 +1932,69 @@
   },
   {
     "id": "DB-SG2-98-01",
-    "title": "Venue blocks recorded under SG2-45 survive the SG2-80 upgrade in SQL",
+    "title": "Existing legacy venue blocks remain readable and enforce current availability rules",
     "type": "Positive / negative / upgrade integrity",
     "story": "SG2-98",
-    "purpose": "Test that the SG2-80 migration keeps blocks recorded before it as venue unavailability records: unchanged period and reason, filed under other, no recorder or time invented, a confirmed booking already inside one flagged, and SG2-45 AC1 and AC3 still holding for them. Also confirms for SG2-98 AC4 that the SG2-45 AC2 refusal trigger is gone after the upgrade.",
-    "preconditions": "Separate disposable postgres:17 container; supabase/tests/fixtures/auth.sql, the migrations before 202610100001_venue_temporary_unavailability.sql, supabase/tests/fixtures/legacy_venue_blocks.sql, then the remaining migrations in filename order. No shared database or deployed Supabase.",
+    "purpose": "Protect current use of already-stored blocks with unknown recorder/time: list their real reason and affected events, omit ended blocks from upcoming results, refuse holds during them, require Venue Staff removal, and restore availability after removal. No old migration is replayed.",
+    "preconditions": "Disposable current-schema PostgreSQL with post-migration synthetic legacy-shaped rows; fixture origin triggers are restored before every asserted current operation and the transaction rolls back.",
     "steps": [
-      "Run venue_block_upgrade.sql with ON_ERROR_STOP=1.",
-      "As the owner, check the old blocks, their category, recorder and flags, and that the SG2-45 refusal trigger is gone; try to stamp a recorder onto an old block.",
-      "As Venue Staff, list the old blocks, try to place a hold inside one, and block a period over a confirmed booking.",
-      "As coordinator, then Venue Staff, remove an old block and place the hold again; roll back."
+      "Seed existing upcoming and ended blocks, null recorder/time, a confirmed affected booking and a touching booking on the current schema.",
+      "Attempt to stamp a recorder onto the old ended record; require it remains unknown. List active old blocks as Venue Staff and verify their exact identity, reason, category and affected event.",
+      "Refuse a hold overlapping an existing block; accept a new block overlapping a confirmed booking and flag the booking.",
+      "Refuse coordinator deletion; allow Venue Staff removal, clear its disruption, keep its confirmed booking and create a hold in the released period."
     ],
-    "data": "Venues 9801 and 9802; old blocks 98201\u201398203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
-    "expected": "All three old blocks keep their period and reason, are filed under other with no recorder or time; booking 98301 is flagged and stays confirmed, 98302 is not flagged; the hold is refused while the old block exists and created after Venue Staff remove it; the coordinator removes nothing; a new block over a booking is accepted and flags it.",
-    "evidence": "supabase/tests/venue_block_upgrade.sql",
-    "layer": "Disposable PostgreSQL SQL assertions",
-    "status": "Pass",
-    "actual": "Passed on the replayed upgrade. Weakening the SG2-80 migration (no backfill of existing overlaps, the SG2-45 refusal trigger kept, or a default recording time) made the suite fail on the matching assertion each time.",
-    "execution_evidence": "14 Oct 2026; feature/SG2-98-stop-refusing-overlapping-blocks working tree; Docker postgres:17; the ci.yml upgrade step reproduced locally, plus the main database-tests step (all suites passed).",
-    "execution_date": "14 Oct 2026",
-    "executed_by": "Automated test runner"
+    "data": "Venues 9801 and 9802; old blocks 98201–98203 (one ended); confirmed booking 98301 inside block 98201 and 98302 touching block 98202; one account per role",
+    "expected": "All seven current venue_legacy_blocks.sql contracts hold. Existing old records remain usable without invented recorder/time; their availability and role restrictions remain enforced. This does not claim replay of the retired conversion, backfill or obsolete-trigger removal.",
+    "evidence": "supabase/tests/venue_legacy_blocks.sql",
+    "layer": "Current-schema PostgreSQL public operations over retained legacy-shaped records",
+    "status": "Not Executed",
+    "actual": "Current scenario/source mapping was reconciled on27 Oct2026. This revised register scenario has not been executed as a complete workflow; prior results remain in reference_revisions.previous_record_reference and are not evidence of a new run.",
+    "execution_evidence": "Source inspection only; no new CI, browser, native, SQL, hosted or independent peer execution is claimed by this revision.",
+    "execution_date": "",
+    "executed_by": "Not executed for this revised register scenario",
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Completed SG2-45→SG2-80 conversion/backfill replay retired; retain seven existing old-record runtime assertions on the current schema.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/45/reference_revisions/0/previous_record",
+          "recordId": "DB-SG2-98-01",
+          "canonicalJsonSha256": "42defdac9882ceb5675dc955c1a8f4b9b69eac86c0b9568d978fbc2efbccb13f"
+        }
+      }
+    ],
+    "historical_source_sql_contract_ids": [
+      "SG2-98:legacy-blocks-kept",
+      "SG2-98:legacy-reason-other",
+      "SG2-98:legacy-recorder-unknown",
+      "SG2-98:legacy-overlap-flagged",
+      "SG2-98:legacy-overlap-kept",
+      "SG2-98:legacy-touching-not-flagged",
+      "SG2-98:old-refusal-removed"
+    ],
+    "source_sql_contract_ids": [
+      "SG2-98:legacy-recorder-not-backfilled",
+      "SG2-98:list-legacy-block",
+      "SG2-98:legacy-ended-not-listed",
+      "SG2-98:legacy-block-unavailable",
+      "SG2-98:block-over-booking-accepted",
+      "SG2-98:legacy-remove-staff-only",
+      "SG2-98:legacy-remove-restores"
+    ],
+    "review": {
+      "date": "2026-10-27",
+      "by": "Codex (source-reference reconciliation only)",
+      "note": "Current references checked against the prepared inventory and exact surviving assertions. This is not independent peer approval or execution evidence."
+    },
+    "mapped_acs": [
+      "SG2-98:AC3",
+      "SG2-98:AC2",
+      "SG2-98:AC1"
+    ],
+    "revision_note": "27 Oct2026: Full prior upgrade scenario and its execution are archived in reference_revisions.previous_record_reference. Current runtime assertions are retained equivalences only for ongoing old-record operations, never for the retired conversion proof."
   },
   {
     "id": "SG2-46-P01",
@@ -6341,12 +6384,42 @@
     "mapped_acs": [
       "SG2-58:AC1"
     ],
-    "status": "Pass",
+    "status": "Archived",
     "actual": "All12 release regression cases passed. The exact guarded005 operator transaction repaired a separate schema missing both columns; repeated source applications succeeded, full confirmation SQL suite passed and rolled back, release gate returned ready, procedure hash stayed21d177 and only005 was recorded. Missing constraints/types were previously missed by the guard and now fail with diagnostics.",
     "execution_evidence": "/tmp/spm-confirmation-record-repair-red.log; /tmp/spm-confirmation-record-repair-green.log; /tmp/spm-confirmation-record-repair-rehearsal.log. No hosted writes by this agent.",
     "execution_date": "15 Oct 2026",
     "executed_by": "Codex automated verification",
-    "review": null
+    "review": null,
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Completed one-time operator schema repair/reapplication rehearsal; active readiness and legacy receipt contracts remain separately retained.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/172/reference_revisions/0/previous_record",
+          "recordId": "SG2-58-HOTFIX-CONFIRMATION-RECORD-SCHEMA",
+          "canonicalJsonSha256": "cd6cb61afd62af166767215db724db674a53ec1e4948ac86bb9ac93c6817d33d"
+        }
+      }
+    ],
+    "lifecycle": "archived_completed_one_time",
+    "archived_date": "2026-10-27",
+    "archive_reason": "The recorded one-time installation repair and repeat-apply rehearsal is complete. Do not treat that operator reproduction as a recurring current workflow. Historical execution and every prior field remain in this archived record and its full snapshot.",
+    "current_runtime_followups": {
+      "records": [
+        "SG2-22-READINESS-HEALTHY",
+        "SG2-22-READINESS-MISSING-CONTRACTS"
+      ],
+      "contract_ids": [
+        "SG2-58:missing-confirmation-record-columns-block-release-even-when-the-rpc-exists",
+        "SG2-58:wrong-confirmation-types-or-missing-record-constraints-block-release",
+        "SG2-58:legacy-confirmed-valid"
+      ],
+      "note": "These retain release drift detection and reading existing null receipt metadata. They do not replay or freshly execute the completed operator repair."
+    },
+    "revision_note": "27 Oct2026: Archived completed operator rehearsal. Historical Pass/date/evidence are retained as history; status Archived is not a current execution result."
   },
   {
     "id": "SG2-39-SG2-81-HOTFIX-COMBINED-READINESS",
@@ -6354,19 +6427,18 @@
     "type": "Conflict / failure / native API / migration regression",
     "story": "SG2-39 / SG2-57 / SG2-58 / SG2-81",
     "purpose": "Keep the planning impact gate when venue replacement replaces confirm_event; display and enforce both persisted outstanding reasons without releasing bookings or clearing saved markers.",
-    "preconditions": "Disposable native PostgreSQL/PostgREST after all migrations; Preparation event with physically ready arrangements, active known recheck markers and a confirmed booking affected by unavailability. Exact operator rehearsal starts from verified160004/160005 schema.",
+    "preconditions": "Disposable current PostgreSQL/PostgREST after all migrations; an event with physically ready arrangements, active planning rechecks and a confirmed booking affected by venue unavailability.",
     "steps": [
       "Run combined public readiness computation and native GET arrangements after a planning impact and venue unavailability.",
       "Call confirm_event with the venue outstanding only because of its disruption and equipment/registration outstanding only because of saved flags.",
       "Compare stage, flags, confirmed booking, equipment receipt and audit/notification counts.",
-      "Temporarily remove the disruption gate in an isolated rollback transaction and require release refusal.",
-      "Rehearse170001 and170002 atomically with exact baseline hash, actual migration ledger bodies and duplicate-apply protection."
+      "Temporarily remove the disruption gate in an isolated rollback transaction and require release refusal."
     ],
     "data": "Synthetic event with attendance21, active venue/equipment flags; independent combined SQL fixture with equipment/registration flags and affected confirmed booking. No hosted fixture mutations.",
-    "expected": "Both venue explanations remain visible; effective outstanding keys contain all affected arrangements once. Confirmation refuses unchanged physical receipts, stage and flags with no audit/notice mutations. Healthy release check passes; stale disruption guard fails. Atomic upgrade keeps original event JSON unchanged and finishes with confirm_event hash d58767f00d8611cab462c850fbd7c781.",
-    "evidence": "server/src/events/arrangementReadiness.test.ts; integration/api.test.ts; supabase/tests/venue_replacement.sql; .github/scripts/release-readiness.test.mjs; supabase/migrations/202610170002_confirmation_rechecks_and_disruptions.sql",
-    "layer": "Public readmodel + native API/PostgreSQL + rollback release guard + exact migration rehearsal",
-    "status": "Pass",
+    "expected": "Both venue explanations remain visible; effective outstanding keys contain affected arrangements once. Confirmation refuses while either disruption or known planning rechecks remain, without changing physical receipts, stage, flags, audit or notices. Current release guards refuse a missing planning/disruption condition. No exact historical migration rehearsal or fixed function hash is required.",
+    "evidence": "server/src/events/arrangementReadiness.test.ts; .github/scripts/release-readiness.test.mjs; supabase/tests/venue_replacement.sql; supabase/tests/event_confirmation.sql",
+    "layer": "Current public readmodel, native API/PostgreSQL and release-contract checks",
+    "status": "Not Executed",
     "relatedCases": [
       "SG2-39:venue-disruptions-and-planning-impacts-remain-outstanding-together-without-hiding-either",
       "SG2-39:confirmed-planning-impacts-mark-ready-arrangements-outstanding-without-changing-bookings-or",
@@ -6381,15 +6453,43 @@
     ],
     "mapped_acs": [
       "SG2-39:AC2",
-      "SG2-57:AC2",
-      "SG2-58:AC2",
-      "SG2-81:AC2"
+      "SG2-81:AC2",
+      "SG2-58:AC2"
     ],
-    "actual": "PASS local merged validation: backend1453/1453, native9/9, release13/13,30 SQL suites,31 race cases. Hosted combined deployment pending root application.",
-    "execution_evidence": "/tmp/spm-combined-readiness-backend-retry.log; /tmp/spm-combined-readiness-native.log; /tmp/spm-combined-readiness-release.log; /tmp/spm-combined-readiness-sql.log; /tmp/spm-combined-readiness-upgrade.log; /tmp/spm-combined-readiness-rehearsal.log",
-    "execution_date": "16 Oct 2026",
-    "executed_by": "Codex automated verification",
-    "review": null
+    "actual": "Current scenario/source mapping was reconciled on27 Oct2026. This revised register scenario has not been executed as a complete workflow; prior results remain in reference_revisions.previous_record_reference and are not evidence of a new run.",
+    "execution_evidence": "Source inspection only; no new CI, browser, native, SQL, hosted or independent peer execution is claimed by this revision.",
+    "execution_date": "",
+    "executed_by": "Not executed for this revised register scenario",
+    "review": {
+      "date": "2026-10-27",
+      "by": "Codex (source-reference reconciliation only)",
+      "note": "Current references checked against the prepared inventory and exact surviving assertions. This is not independent peer approval or execution evidence."
+    },
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Keep recurring combined disruption/planning readiness; archive the completed exact170001/170002 migration rehearsal and fixed historical function hash.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/173/reference_revisions/0/previous_record",
+          "recordId": "SG2-39-SG2-81-HOTFIX-COMBINED-READINESS",
+          "canonicalJsonSha256": "f6668fb026d7a0efcc5c05446e92e174437428d252845584d9b536c14edfa3cc"
+        }
+      }
+    ],
+    "source_method_ids": [
+      "SG2-39:venue-disruptions-and-planning-impacts-remain-outstanding-together-without-hiding-either",
+      "SG2-39:a-stale-confirmation-rpc-missing-any-known-planning-recheck-blocks-release",
+      "SG2-81:a-stale-confirmation-rpc-missing-the-venue-disruption-guard-blocks-release"
+    ],
+    "source_sql_contract_ids": [
+      "SG2-39:disruptions-and-rechecks-combined",
+      "SG2-39:known-rechecks-block-confirmation",
+      "SG2-39:recheck-refusal-preserves-arrangements"
+    ],
+    "revision_note": "27 Oct2026: The active description is current business readiness and deployment-contract behavior. The prior exact migration/operator/hash proof is archived in the full prior record and is not a retained-runtime equivalence."
   },
   {
     "id": "SG2-81-HOTFIX-NOTIFICATION-CONTRACT",
@@ -6571,27 +6671,27 @@
   },
   {
     "id": "SG2-40-DRAFT-HISTORY-01",
-    "title": "Draft and clarification edits commit their exact field history atomically",
+    "title": "Draft saves commit exact field history; clarification requests refuse direct edits and retain conversation/history",
     "type": "Normal / boundary / failure / conflict",
     "story": "SG2-40",
-    "purpose": "Repair the controlled hosted Draft23 reproduction: saved attendance and description persisted while change history remained empty. Record truthful per-field history without inventing earlier values or changing future rework policy.",
-    "preconditions": "Owner draft or needs_clarification request; existing public PATCH and history endpoints. Local SQL/native use disposable PostgreSQL/PostgREST; browser uses resettable external memory RPC fixture. Hosted repaired-preview acceptance is separate.",
+    "purpose": "Protect atomic per-field history for current creator-owned draft saves, including no-op/refusal/rollback and owner-only history. Returned-for-clarification requests now refuse direct edits: organisers answer, request changes through the current change-request workflow and resubmit with the existing coordinator conversation and review history.",
+    "preconditions": "Creator-owned draft for editable fields; a separate needs_clarification request for current direct-edit refusal and answer/change-request/resubmit behavior. Controlled identities and disposable storage; hosted acceptance is separate.",
     "steps": [
-      "Edit all nine supported fields, save, reopen and inspect old/new values, actor identity and save time.",
+      "Edit all nine supported fields of an owned draft, save, reopen and inspect old/new values, actor identity and save time.",
       "Save unchanged data and an equivalent timestamp instant; verify no phantom history. Clear a nullable value and change registration true to false.",
-      "Refuse wrong role, colleague ownership, changed/blank organisation membership, closed status and invalid private RPC input without a saved change or history.",
+      "Refuse wrong role, colleague ownership, changed/blank organisation membership, closed or needs_clarification public edits and invalid private RPC input without a saved direct edit or new field history.",
       "Inject an audit insert failure inside a disposable rollback test and verify both event and history remain unchanged. Serialize concurrent native saves and verify the old/new chain; submission closes editing.",
-      "Verify direct authenticated/anonymous RPC execution is refused, missing/broadened/revoked RPC deployment contracts fail readiness, and clarification conversation/review history remains intact."
+      "Verify direct authenticated/anonymous draft RPC execution and unsafe deployment contracts are refused. On a returned-for-clarification request, answer the coordinator, use a change request, resubmit, and retain the existing conversation/review history without direct field editing."
     ],
-    "data": "Nine draft fields; attendance null\u219212; nullable description; registration true\u2192false; equivalent +08:00/UTC date; owner/colleague/attendee identities; concurrent A/B names; transaction-local failing audit trigger.",
-    "expected": "Each actual changed field has one committed row identifying the real actor, old/new values and save time. No-op/refused saves add no rows. Failed audit insertion rolls back all saved values. Only the creator with current membership can edit draft/clarification states; no direct client RPC execution. Existing history privacy and public response shape remain.",
-    "evidence": "server/src/{db/eventRequests.test.ts,updateEventRequestDraft.test.ts}; integration/api.test.ts; supabase/tests/event_draft_audit.sql; .github/scripts/release-readiness.test.mjs; e2e/draft-history.spec.ts; client/src/components/EventAuditDrawer.test.tsx",
+    "data": "Nine draft fields; attendance null→12; nullable description; registration true→false; equivalent +08:00/UTC date; owner/colleague/attendee identities; concurrent A/B names; transaction-local failing audit trigger.",
+    "expected": "Each actual permitted draft field change has one committed row with real actor, old/new values and save time. No-op/refused saves add no rows and audit failure rolls back the event write. Current ownership/membership and service-only RPC access remain enforced. A public needs_clarification direct edit is409; answering/change-request/resubmission retains existing conversation/history.",
+    "evidence": ".github/scripts/release-readiness.test.mjs; e2e/draft-history.spec.ts; integration/api.test.ts; server/src/db/eventRequests.test.ts; server/src/updateEventRequestDraft.test.ts; supabase/tests/event_draft_audit.sql",
     "layer": "HTTP/adapter fixtures; real API/PostgREST/PostgreSQL; rollback SQL; structural readiness; React/Express browser with resettable memory RPC fixture",
-    "status": "Pass",
-    "actual": "Local backend 1,468/1,468 passed with 100% statements, branches, functions and lines. Native integration 12/12, fourteen new tagged SQL rollback assertions and readiness 15/15 passed. Full browser 113/113 passed with zero skipped, retried or flaky cases, including three draft-history journeys and four smoke journeys (subsets). Revised Drawer label checks passed in the focused 23-case client suite; current-head full client coverage and pushed-head CI remain separate checks.",
-    "execution_evidence": "16 Oct 2026 local server/native/SQL/readiness runners and draft-history E2E handoff; ignored verification/draft-history-full-browser-113 membership and draft-history-local traces/videos/screenshots. Hosted structural install verified migration170003 and service-only grants, not hosted save/history acceptance.",
-    "execution_date": "16 Oct 2026",
-    "executed_by": "Codex (local automated checks; not independent peer review)",
+    "status": "Not Executed",
+    "actual": "Current scenario/source mapping was reconciled on27 Oct2026. This revised register scenario has not been executed as a complete workflow; prior results remain in reference_revisions.previous_record_reference and are not evidence of a new run.",
+    "execution_evidence": "Source inspection only; no new CI, browser, native, SQL, hosted or independent peer execution is claimed by this revision.",
+    "execution_date": "",
+    "executed_by": "Not executed for this revised register scenario",
     "categories": [
       "NORMAL",
       "BOUNDARY",
@@ -6599,30 +6699,35 @@
       "CONFLICT"
     ],
     "mapped_acs": [
-      "SG2-29:AC1",
-      "SG2-29:AC2",
-      "SG2-30:AC3",
-      "SG2-31:AC3",
-      "SG2-36:AC1",
-      "SG2-36:AC2",
-      "SG2-36:AC3",
-      "SG2-40:AC1",
       "SG2-40:AC2",
+      "SG2-25:AC2",
+      "SG2-29:AC1",
       "SG2-40:AC3",
       "SG2-25:AC1",
-      "SG2-25:AC2",
       "SG2-25:AC3",
+      "SG2-40:AC1",
+      "SG2-30:AC3",
+      "SG2-36:AC1",
+      "SG2-36:AC3",
+      "SG2-64:AC5",
+      "SG2-64:AC1",
+      "SG2-64:AC2",
+      "SG2-64:AC3",
+      "SG2-64:AC6",
+      "SG2-36:AC2",
       "SG2-26:AC2"
     ],
     "source_method_ids": [
       "SG2-40:release-readiness-refuses-a-missing-atomic-draft-audit-rpc",
       "SG2-25:release-readiness-requires-service-only-execution-of-the-draft-audit-rpc",
       "SG2-29:unchanged-and-refused-draft-saves-add-no-phantom-history-and-other-accounts-cannot-read-the",
-      "SG2-36:an-explicit-clarification-revision-records-the-organiser-field-changes-while-retaining-the",
       "SG2-29:native-draft-saves-commit-exact-field-history-and-preserve-owner-only-access",
       "SG2-29:native-concurrent-draft-saves-serialize-their-old-new-chain-and-submission-closes-the-write-path",
       "SG2-29:atomic-draft-refusals-preserve-not-found-closed-and-invalid-outcomes",
-      "SG2-29:locked-draft-save-refusals-cannot-be-reported-as-successful-after-a-stale-precheck"
+      "SG2-29:locked-draft-save-refusals-cannot-be-reported-as-successful-after-a-stale-precheck",
+      "SG2-36:a-request-returned-for-clarification-is-answered-and-resubmitted-without-direct-edits-retaining",
+      "SG2-64:a-request-returned-for-clarification-refuses-direct-edits-takes-a-native-change-request-that",
+      "SG2-64:refuses-to-edit-a-request-returned-for-clarification-or-rejected"
     ],
     "source_sql_contract_ids": [
       "SG2-40:draft-all-field-diffs",
@@ -6640,7 +6745,33 @@
       "SG2-40:draft-authenticated-execute",
       "SG2-40:draft-effective-execute-grants"
     ],
-    "method_scope": {
+    "notes": "Current source and SQL IDs below are supporting contracts, not a count of independently accepted workflows. All original counts, historical results and prior direct-clarification-edit expectations remain in reference_revisions.previous_record_reference.",
+    "historical_source_method_ids": [
+      "TC-6086a521446b",
+      "SG2-36:an-explicit-clarification-revision-records-the-organiser-field-changes-while-retaining-the"
+    ],
+    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed.",
+    "revision_note": "25 Oct 2026 (SG2-64 AC5): a request returned for clarification can no longer be edited directly (409); the organiser answers, asks for any change through a change request and resubmits. SG2-40-P03 (e2e/draft-history.spec.ts:239) now verifies that refusal and the retained history, and passed in the SG2-64 run.\n27 Oct2026: Superseded direct-edit source ID is historical only. Exact current refusal, native change-request/resubmit and browser answer/resubmit IDs replace it; no prior CI is relabelled as execution of this revised scenario.",
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Replace superseded direct clarification editing with exact current refusal/answer/change-request/resubmit workflows; retain atomic draft audit and access/rollback contracts.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/177/reference_revisions/0/previous_record",
+          "recordId": "SG2-40-DRAFT-HISTORY-01",
+          "canonicalJsonSha256": "3fde7a00def327da10c9bc3c8cffe46bc443c44a093212619eae2e93fa8ca6b0"
+        }
+      }
+    ],
+    "review": {
+      "date": "2026-10-27",
+      "by": "Codex (source-reference reconciliation only)",
+      "note": "Current references checked against the prepared inventory and exact surviving assertions. This is not independent peer approval or execution evidence."
+    },
+    "historical_method_scope": {
       "new_source_records": 23,
       "new_executable_methods": 9,
       "new_sql_assertions": 14,
@@ -6666,13 +6797,7 @@
         "SG2-40-N02",
         "SG2-40-P03"
       ]
-    },
-    "notes": "The23 records are supporting methods/contracts, not23 independently accepted workflows. Existing SG2-40 history records and historical executions remain unchanged. All four required categories are represented. DoD inventory now2,396 methods+758SQL; human peer review and remaining hosted Done acceptance remain open. No earlier missing draft values are fabricated.",
-    "historical_source_method_ids": [
-      "TC-6086a521446b"
-    ],
-    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed.",
-    "revision_note": "25 Oct 2026 (SG2-64 AC5): a request returned for clarification can no longer be edited directly (409); the organiser answers, asks for any change through a change request and resubmits. SG2-40-P03 (e2e/draft-history.spec.ts:239) now verifies that refusal and the retained history, and passed in the SG2-64 run."
+    }
   },
   {
     "id": "REG-EQUIPMENT-SUMMARY-AND-READINESS-REFRESH",
@@ -6722,81 +6847,27 @@
     ]
   },
   {
-    "id": "REG-OPTIONAL-HOSTED-SEVEN-ROLE-READONLY",
-    "title": "Opt-in seven-role hosted page proof has strict read-only guards and safe recorded output",
-    "type": "Normal / boundary / failure",
-    "story": "SG2-23",
-    "purpose": "Provide actual approved hosted role/page screenshots and videos without sending application mutations, retaining credentials or conflating read-only page proof with full business acceptance.",
-    "preconditions": "Explicitly approved optional hosted run against the exact allowlisted preview, runtime-only QA password and seven existing authorised QA roles; one fresh context per role, serial logins, no retries. Discovery and CI policy tests require no hosted credentials. The ordinary loopback fixture suite remains the CI default.",
-    "steps": [
-      "Offline, verify exact-origin/read-only request policy, credential-free discovery, refusal before browser startup without runtime credentials, and sanitised JSON/JUnit attachments.",
-      "For each of seven roles, sign in normally, assert role-specific loaded/empty states before every screenshot, visit only allowed read-only pages, then log out to Landing.",
-      "Capture each of47 role/page checkpoints at1440px and390px, recording94 PNGs and seven videos; inspect all94 actual images for loading, overflow, overlap and readability.",
-      "Stop the entire batch on authentication failure, throttling, network/application error or forbidden write; do not retain traces/HAR/auth storage/browser profiles/raw sign-in failures."
-    ],
-    "data": "Existing Organiser Draft23/history and My Events; Coordinator assigned QA22/readiness; Venue Staff calendar/holds/catalogue; TSS equipment; Lead queue; Safety placeholder and real profile; Attendee prototypes and real profile.",
-    "expected": "Seven approved role contexts complete only normal sign-in/logout and navigation; all other application writes and alternate origins are blocked. Reports retain scoped page/media proof without runtime secrets. Positive page-settled assertions run before each width. The Organiser's own Draft23 detail must show the separately loaded Event stage progress region, stage Draft, waiting-on Event Organiser, and next step Complete and submit event request; the heading alone is not a ready-state oracle. Coordinator QA22 uses its distinct equipment/readiness view rather than requiring an Organiser-only region. Safety placeholder and Attendee prototype screens never imply delivery of those full workflows.",
-    "evidence": "hosted-e2e/roles.spec.ts; hosted-e2e/policy.test.mjs; .github/scripts/test-inventory.test.mjs; playwright.hosted.config.ts; .github/scripts/test-hosted-roles.mjs",
-    "layer": "Four offline Node policy declarations plus one inventory declaration; seven optional recorded hosted Playwright declarations, separate from loopback CI browser tests",
-    "status": "Pass",
-    "actual": "Twelve new declarations: seven opt-in hosted role cases, four offline policy cases, one inventory integration case. b3 introduced the harness; c04 strengthened page-settled oracles. Current c04 CI38839394116 passed all eight jobs and its18 inventory/policy runner cases (14 inventory plus4 policy). Approved actual hosted run2026-10-16T02-21-44.294Z passed7/7 roles,47 page checkpoints,94 screenshots and7 videos, with no HTTP/network/application-console/page/write failures. All94 images received scoped visual review, including exact-SHA reuse of67 previously reviewed images and direct inspection of27 changed images.",
-    "execution_evidence": "Source checkpoints b3c6d6b600f63c602af3c9d119a4e9d749a8a11a and c04b2212df1a002b3ceb36e6b2216412ec0f142d; CI38839394116; ignored output/hosted-role-smoke/2026-10-16T02-21-44.294Z/report.json and verification/hosted-playwright-c04-visual-review.json. Private professor evidence bundle remains local; no public upload or human peer approval is implied.",
-    "execution_date": "16 Oct 2026",
-    "executed_by": "Codex (approved recorded read-only QA and visual review; not independent peer review)",
-    "categories": [
-      "NORMAL",
-      "BOUNDARY",
-      "FAILURE"
-    ],
-    "mapped_acs": [
-      "SG2-22:AC3",
-      "SG2-23:AC1",
-      "SG2-25:AC2",
-      "SG2-40:AC1",
-      "SG2-57:AC1",
-      "SG2-86:AC2"
-    ],
-    "source_method_ids": [
-      "SG2-22:optional-hosted-role-declarations-enter-the-ledger-without-a-hosted-directory-being-required",
-      "SG2-25:hosted-read-only-guard-permits-normal-auth-but-blocks-booking-profile-and-implicit-review-writes",
-      "SG2-25:hosted-guard-refuses-alternate-origins-and-lookalike-hosts-while-allowing-only-existing-static",
-      "SG2-25:hosted-json-and-junit-omit-password-token-raw-failure-steps-config-and-unsafe-attachments",
-      "SG2-25:optional-hosted-execution-refuses-missing-runtime-credentials-before-starting-playwright",
-      "SG2-23:hosted-role-1-organiser-pages-and-owned-draft23-history-are-read-only",
-      "SG2-23:hosted-role-2-coordinator-pages-and-assigned-event22-readiness-are-read-only",
-      "SG2-23:hosted-role-3-venue-staff-pages-calendar-holds-and-catalogue-are-read-only",
-      "SG2-23:hosted-role-4-technical-support-pages-and-equipment-are-read-only",
-      "SG2-23:hosted-role-5-lead-queue-and-assignment-pages-are-inspected-without-assigning",
-      "SG2-23:hosted-role-7-attendee-prototype-pages-and-real-profile-render-without-registration-mutations"
-    ],
-    "historical_source_method_ids": [
-      "TC-636d33e52f44"
-    ],
-    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
-  },
-  {
     "id": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
     "title": "Converted hold bookings keep canonical request links through release and replacement",
     "type": "Normal / boundary / conflict / failure",
     "story": "SG2-84",
-    "purpose": "Repair the actual hosted Hold4 sequence: conversion created booking18; its reasoned release preserved original booking16 but left request22 Approved/unlinked, creating phantom venue demand. Show converted holds as historical conversion receipts rather than a claim that their booking is still Confirmed.",
-    "preconditions": "Disposable PostgreSQL migrations and transaction-local fixtures, including true pre-upgrade legacy link shapes; current local client fixtures. Hosted before-fix failure is recorded; new-head CI and hosted repaired-preview retest are separate pending gates.",
+    "purpose": "Protect current converted-hold canonical booking links through conversion, reasoned release and replacement, preventing phantom approved demand while preserving other bookings. A converted card remains a historical conversion receipt and must not claim its booking is still Confirmed after release.",
+    "preconditions": "Disposable current PostgreSQL and current client/loopback fixtures; actual linked converted holds, assigned/unassigned identities and other confirmed bookings. Completed legacy-repair replay is outside the active scenario.",
     "steps": [
       "Convert a valid tentative hold through normal approval and verify its approved request points to the actual canonical booking. Refuse an elapsed/timer-changed or missing booking path.",
       "Release the converted booking with a real assigned actor and required reason; verify its request stops contributing venue demand while original other booking remains Confirmed, with real history/notices only.",
       "Approve a replacement for a converted-hold booking and verify the replaced request/booking retires, preserving unaffected arrangements and confirmation guards.",
-      "Upgrade proven legacy converted links, including already-released bookings; reconcile only matching hold/event/venue/period identities, preserve original release metadata and skip ambiguous/mismatched rows. Apply again with no row/history/notification churn.",
       "At390px/1440px, verify the converted card says Converted to booking, keeps Booking #N and directs users to the booking record for current status. Refresh/in-flight approval retains the receipt; failed approval cannot display it."
     ],
-    "data": "Linked/unlinked converted holds, released/confirmed canonical bookings, additional original booking, assigned versus other coordinator, missing release reason,15 legacy upgrade variants, repeat migration, converted receipt after later booking release.",
-    "expected": "Converted requests are linked to their real bookings. Release/replacement cannot leave a phantom Approved venue requirement or damage the other booking. Legacy repair changes only verifiable relationships/status, preserving known metadata and adding no invented audit actor/time/notice. Receipt wording truthfully records conversion without pretending to know current booking status.",
-    "evidence": "supabase/migrations/202610170004_venue_hold_booking_links.sql; related hold/confirmation/release/replacement SQL and upgrade tests; client/src/screens/VenueHolds.test.tsx; e2e/regression.spec.ts SG2-84-P02",
-    "layer": "Transaction SQL, full disposable legacy migration upgrade, React component tests and strengthened loopback browser journey; hosted repaired-preview acceptance pending",
-    "status": "Pass",
-    "actual": "Local seven related SQL suites passed; full45-migration legacy upgrade passed15 variants. Actual pre-fix SQL red reproduced the fault; repeat170004 application changed0 rows/unchanged xmin, with no invented activity. Twenty-one new SQL assertions and two revised SQL assertions are linked below. Three existing client methods now assert historical receipt wording; pre-fix copy check failed2/passed17, then focused and full client1,427/1,427 passed with100% statements/branches/functions/lines and build passed. Existing SG2-84-P02 strengthened for390px/1440px passed in the full113/113 browser run (136.9s, zero skips/retries/flaky). Full local npm run ci passed: backend1,468 and frontend1,427, both100% statements/branches/functions/lines; reviewer19 and inventory/policy18. Hosted170004 canonical migration plus atomic ledger was applied: request22 Cancelled and directly linked to booking18; booking18 Released and baseline16 Confirmed. Actual Coordinator child Refresh recovered Ready with venue1/equipment2. Remote new-head CI and native integration completion remain separate pending gates.",
-    "execution_evidence": "16 Oct 2026 local seven-suite/45-migration/15-variant handoff, repeated migration no-op and root client coverage/build results. Historical hosted counterexample: ignored verification/hold4-release-stale-approved-readiness-before.txt/.png and hold4-release-booking16-preserved-before.txt. Full local113-browser/local CI completion and applied-schema existing Hold4 recovery were subsequently verified; ignored verification/hold4-release-readiness-recovered-after.* records actual Ready. An earlier112/1 browser interruption was caused by overlapping build output replacement and is retained as infrastructure history, not a product failure. New-head remote CI and native integration completion remain pending at this checkpoint; a fresh post-fix conversion/release cycle is not claimed.",
-    "execution_date": "16 Oct 2026",
-    "executed_by": "Codex (local automated verification; not independent peer review)",
+    "data": "Current linked converted holds and released/confirmed canonical bookings, another original booking, assigned/other coordinator, missing release reason, timer-changed/missing conversion target and converted receipt after later release.",
+    "expected": "New converted requests link to their actual canonical booking. Release/replacement cannot leave phantom approved venue demand or damage other bookings. Only actual release metadata/history/notices are recorded; refusal has no side effects. Receipt wording describes conversion and directs current-status questions to the booking. Completed backfill and repeat-migration behavior is historical only.",
+    "evidence": "client/src/screens/VenueHolds.test.tsx; e2e/regression.spec.ts; supabase/tests/venue_holds.sql; supabase/tests/venue_replacement.sql; supabase/tests/event_confirmation.sql",
+    "layer": "Current transactional SQL, component assertions and existing loopback conversion/release browser workflow",
+    "status": "Not Executed",
+    "actual": "Current scenario/source mapping was reconciled on27 Oct2026. This revised register scenario has not been executed as a complete workflow; prior results remain in reference_revisions.previous_record_reference and are not evidence of a new run.",
+    "execution_evidence": "Source inspection only; no new CI, browser, native, SQL, hosted or independent peer execution is claimed by this revision.",
+    "execution_date": "",
+    "executed_by": "Not executed for this revised register scenario",
     "categories": [
       "NORMAL",
       "BOUNDARY",
@@ -6805,18 +6876,18 @@
     ],
     "mapped_acs": [
       "SG2-84:AC5",
+      "SG2-85:AC3",
+      "SG2-85:AC1",
+      "SG2-85:AC2",
       "SG2-51:AC1",
       "SG2-51:AC2",
       "SG2-51:AC3",
       "SG2-51:AC4",
       "SG2-51:AC5",
       "SG2-58:AC1",
-      "SG2-58:AC2",
-      "SG2-81:AC3",
       "SG2-81:AC5",
-      "SG2-57:AC2",
-      "SG2-57:AC3",
-      "SG2-82:AC5"
+      "SG2-81:AC3",
+      "SG2-58:AC2"
     ],
     "source_method_ids": [
       "SG2-84:approval-updates-only-that-hold-to-a-confirmed-booking-and-removes-its-actions",
@@ -6839,19 +6910,41 @@
       "SG2-81:converted-hold-replacement-approved",
       "SG2-81:replacement-retires-converted-hold-request",
       "SG2-81:replaced-held-venue-no-phantom-demand",
+      "SG2-84:converted-booking-missing-or-timer-changed-it",
+      "SG2-58:hold-requests-linked-and-released"
+    ],
+    "source_sql_aliases": {
+      "SG2-58:hold-requests-approved-unlinked": "SG2-58:hold-requests-linked-and-released"
+    },
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Remove seven completed converted-hold backfill/idempotence replay contracts; preserve current canonical conversion, release/replacement, receipt and confirmation behavior.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/179/reference_revisions/0/previous_record",
+          "recordId": "REG-CONVERTED-HOLD-BOOKING-RELEASE",
+          "canonicalJsonSha256": "070bb27b45a326a5aec401e157054b977255b76c5757526c452ac9bd719a4afe"
+        }
+      }
+    ],
+    "historical_source_sql_contract_ids": [
       "SG2-84:hold-upgrade-fixture-complete",
       "SG2-84:legacy-hold-canonical-links-repaired",
       "SG2-51:legacy-released-hold-requests-cancelled",
       "SG2-84:legacy-hold-mismatches-not-guessed",
       "SG2-51:legacy-hold-release-metadata-preserved",
       "SG2-51:legacy-hold-repair-no-invented-activity",
-      "SG2-84:hold-link-upgrade-idempotent",
-      "SG2-84:converted-booking-missing-or-timer-changed-it",
-      "SG2-58:hold-requests-linked-and-released"
+      "SG2-84:hold-link-upgrade-idempotent"
     ],
-    "source_sql_aliases": {
-      "SG2-58:hold-requests-approved-unlinked": "SG2-58:hold-requests-linked-and-released"
-    }
+    "review": {
+      "date": "2026-10-27",
+      "by": "Codex (source-reference reconciliation only)",
+      "note": "Current references checked against the prepared inventory and exact surviving assertions. This is not independent peer approval or execution evidence."
+    },
+    "revision_note": "27 Oct2026: Seven upgrade-only IDs are historical_source_sql_contract_ids. Current conversion/link/release/receipt contracts remain; none is claimed as equivalent proof of the retired migration replay."
   },
   {
     "id": "REG-VENUE-SEARCH-ARRANGEMENT-REVALIDATION",
@@ -6902,24 +6995,24 @@
     "title": "Venue-operation history records persisted changes rather than discarded upsert insertion attempts",
     "type": "Normal / boundary / conflict / failure",
     "story": "SG2-77",
-    "purpose": "Repair SG2-77 AC6: the former BEFORE INSERT trigger generated false null-to-current audit rows when a Staff upsert updated an existing venue. Split metadata stamping before persistence from field history after the actual insert/update, retaining every existing audit row.",
+    "purpose": "Protect current Staff upserts: record only persisted field transitions with real actor/time, keep existing history, add no phantom rows on unchanged saves and roll back failed writes. This is ongoing behavior whenever a venue-operation setting is saved.",
     "preconditions": "Owned disposable PostgreSQL/PostgREST; real Express operations route and caller-JWT adapter; two synthetic Venue Staff and a Coordinator. No hosted credentials or business data.",
     "steps": [
       "Save a new venue operation through the normal Staff PUT with setup10/turnaround15 and null notes; verify exactly two initialized numeric fields, Staff identity and matching persisted timestamp.",
       "Save turnaround16 and require exactly one15-to16 audit transition; repeat the same save and require no extra history.",
       "Set and clear an emergency-access note with two different Staff; require exactly the real null/value transitions with each actor.",
       "Refuse Coordinator403 and invalidnegative400 saves without history; run simultaneous Staff17/18 saves and require a coherent serialized old/new chain, final actor and metadata.",
-      "In rollback SQL exercise failed and rolled-back writes; preserve old records. Reproduce the old trigger failure, install170006 twice over legacy populated data and compare exact values, metadata and old history; rerun operations RLS, venue-clash and release-readiness suites."
+      "In current-schema rollback SQL, exercise failed and rolled-back writes and preserve existing history; verify only committed field transitions produce audit rows. No old trigger installation or repeated repair migration is part of this scenario."
     ],
-    "data": "Native setup10, turnaround15\u219216\u219217/18; emergency_access null\u2192Use the signed east exit\u2192null; SQL probe97704 with Signed east exit\u2192null\u2192Signed west exit; upgrade preservation fixture97790. Synthetic fixed local JWTs only.",
-    "expected": "Exactly one audit row per actual changed field, zero additional field history on unchanged saves, and no false insertion-attempt rows. Real Staff actor/timestamp and nullable transitions are retained. Invalid/forbidden/rolled-back writes do not add history. Upgrade/replay preserves existing records and does not rewrite ambiguous old history; role security and venue clashes remain unchanged.",
-    "evidence": "supabase/migrations/202610170006_venue_operations_persisted_audit.sql; supabase/tests/venue_operations.sql; integration/api.test.ts",
+    "data": "Native setup10, turnaround15→16→17/18; emergency_access null→Use the signed east exit→null; SQL probe97704 with Signed east exit→null→Signed west exit. Synthetic fixed local JWTs only.",
+    "expected": "Exactly one history row per actual committed field change, zero extra rows on unchanged saves, with real Staff actor/time and null/value transitions. Invalid, forbidden and rolled-back writes add no history; existing persisted history remains readable. Completed trigger-repair installation/replay remains historical evidence only.",
+    "evidence": "integration/api.test.ts; supabase/tests/venue_operations.sql",
     "layer": "Real local public API/PostgREST/PostgreSQL integration + rollback SQL + explicit upgrade/replay verification",
-    "status": "Pass (local automated)",
-    "actual": "Before the fix, new real API case failed: turnaround15\u219216 added false null\u2192setup10 and null\u2192turnaround16 plus the actual15\u219216 transition (13 existing native cases passed). After170006 all14 native API cases passed; operations SQL and venue-clash SQL passed;17 readiness regressions passed. The old SQL suite failed at upsert-only-actual-transition before migration, and exact historical row/value/metadata preservation passed after two installs. Integration TypeScript compilation passed. No production TypeScript/React code changed; prior coverage is not represented as a new run.",
-    "execution_evidence": "Ignored output/staging-e2e-2026-10-16/verification/venue-operations-persisted-audit/ contains red/green logs, upgrade runner and source/case handoff. Current local source is uncommitted; new pushed CI and hosted retest remain separate gates.",
-    "execution_date": "16 Oct 2026",
-    "executed_by": "Codex local automated verification; not human peer review",
+    "status": "Not Executed",
+    "actual": "Current scenario/source mapping was reconciled on27 Oct2026. This revised register scenario has not been executed as a complete workflow; prior results remain in reference_revisions.previous_record_reference and are not evidence of a new run.",
+    "execution_evidence": "Source inspection only; no new CI, browser, native, SQL, hosted or independent peer execution is claimed by this revision.",
+    "execution_date": "",
+    "executed_by": "Not executed for this revised register scenario",
     "categories": [
       "NORMAL",
       "BOUNDARY",
@@ -6931,7 +7024,23 @@
       "SG2-77:AC4"
     ],
     "source_method_ids": [
-      "SG2-77:actual-staff-upserts-record-only-persisted-venue-operation-changes-no-op-saves-add-no-history",
+      "SG2-77:actual-staff-upserts-record-only-persisted-venue-operation-changes-no-op-saves-add-no-history"
+    ],
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Keep current persisted-upsert/audit/no-op/failure/native contracts; archive completed old-trigger repair/reapplication language and classify existing SQL IDs in the SQL field.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/181/reference_revisions/0/previous_record",
+          "recordId": "SG2-77-PERSISTED-AUDIT",
+          "canonicalJsonSha256": "9b82232f7c0280a03b615c3bbe2eaa9d626ddab87eda441ec065709be7786c24"
+        }
+      }
+    ],
+    "source_sql_contract_ids": [
       "SG2-77:upsert-initial-persisted-audit",
       "SG2-77:upsert-only-actual-transition",
       "SG2-77:upsert-history-preserved",
@@ -6939,7 +7048,13 @@
       "SG2-77:upsert-nullable-actor-chain",
       "SG2-77:upsert-invalid-refused",
       "SG2-77:upsert-failure-rolls-back-history"
-    ]
+    ],
+    "review": {
+      "date": "2026-10-27",
+      "by": "Codex (source-reference reconciliation only)",
+      "note": "Current references checked against the prepared inventory and exact surviving assertions. This is not independent peer approval or execution evidence."
+    },
+    "revision_note": "27 Oct2026: The seven already-current SQL IDs moved from source_method_ids into source_sql_contract_ids; no assertion was retired by that namespace correction. Completed installation/replay evidence is retained only in the full prior record."
   },
   {
     "id": "SG2-66-P01",
@@ -9443,60 +9558,6 @@
     }
   },
   {
-    "id": "SG2-104-R01",
-    "title": "Native staging selector reads only the selected role and preserves current-role no-op",
-    "story": "SG2-104",
-    "type": "NORMAL",
-    "categories": [
-      "NORMAL",
-      "BOUNDARY"
-    ],
-    "mapped_acs": [
-      "SG2-104:AC1"
-    ],
-    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
-    "preconditions": "Native browser SELECT with Event Organiser first and Event Coordinator selected second; a real change-event counter begins at zero.",
-    "steps": [
-      "Read current and held roles; request the current role while Profile holds focus; choose Organiser, then Coordinator."
-    ],
-    "expected": "Only the selected role is reported; both held labels are returned; no-op preserves focus and dispatches zero changes; two actual selections dispatch exactly two changes.",
-    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
-    "layer": "Playwright browser DOM and production application + local fixture API",
-    "status": "Pass",
-    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
-    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
-    "execution_date": "26 Oct 2026",
-    "executed_by": "Automated local verification",
-    "review": null
-  },
-  {
-    "id": "SG2-104-R02",
-    "title": "Native staging adapter refuses unheld roles without changing selection",
-    "story": "SG2-104",
-    "type": "CONFLICT",
-    "categories": [
-      "CONFLICT",
-      "FAILURE"
-    ],
-    "mapped_acs": [
-      "SG2-104:AC2"
-    ],
-    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
-    "preconditions": "The same genuine native SELECT and zero change-event counter.",
-    "steps": [
-      "Request Technical Support Staff, which is absent from the held-role options."
-    ],
-    "expected": "The request is rejected before a change event; Event Coordinator remains selected and the counter remains zero.",
-    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
-    "layer": "Playwright browser DOM and production application + local fixture API",
-    "status": "Pass",
-    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
-    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
-    "execution_date": "26 Oct 2026",
-    "executed_by": "Automated local verification",
-    "review": null
-  },
-  {
     "id": "SG2-104-R03",
     "title": "Single-role staging headers remain readable and cannot switch roles",
     "story": "SG2-104",
@@ -9514,7 +9575,7 @@
       "Read current/held roles; request Safety Officer again; request unheld Event Coordinator."
     ],
     "expected": "The role remains Safety Officer; a no-op preserves Profile focus, the unheld role is rejected, and no switcher is fabricated.",
-    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs",
     "layer": "Playwright browser DOM and production application + local fixture API",
     "status": "Pass",
     "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
@@ -9543,7 +9604,7 @@
       "Enumerate roles with the menu initially closed and open; visit My Profile and request the existing role; choose each held role; request unheld Safety Officer."
     ],
     "expected": "Both held roles are read accurately; enumeration closes the menu; current-role no-op preserves the page, focus and permissions; each held role reaches its own navigation; unheld choices leave the current role and closed menu intact.",
-    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs",
     "layer": "Playwright browser DOM and production application + local fixture API",
     "status": "Pass",
     "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
@@ -9665,7 +9726,7 @@
       "SG2-62:AC2",
       "SG2-62:AC5"
     ],
-    "method_id": "SG2-62:an-attendee-sees-where-each-registration-stands-and-withdraws-after-registration-closed-and",
+    "method_id": "SG2-62:an-attendee-sees-where-each-registration-stands-and-withdraws-after-registration-closed-and-the",
     "purpose": "Catch a list that leaves out a registration or its event details, shows the wrong standing, offers withdrawal for a started or withdrawn one, withdraws without asking, refuses a withdrawal because registration has closed, or tells no one or the wrong people.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/my-registrations seed (SG2-59's and SG2-60's events plus Quartet Evening, Lantern Talk and Morning Run) before each case; fresh browser context. No hosted Supabase.",
     "review": null,
@@ -9684,7 +9745,25 @@
     "data": "Quartet Evening (597): open, capacity 1, held by the attendee, 1 Nov 2030 19:00 SGT at Regression Hall, needs 'Aisle seat'. Lantern Talk (598): registration closed Feb 2020, starts 15 Nov 2030, capacity 40, attendee registered. Morning Run (599): started 2 Oct 2026 07:00 SGT. Closed Briefing (593): withdrawn 2 Oct 2026 10:00 SGT. Small Recital (596): the attendee's earlier cancelled registration.",
     "expected": "Cards in order Quartet Evening, Lantern Talk, Morning Run, Closed Briefing, Small Recital. Quartet: Registered, 1 Nov 2030 7:00 pm, Regression Hall, Harbour Foundation, needs Aisle seat. Morning Run: Event started; Closed Briefing: Withdrawn 2 Oct 2026, 10:00 am; neither offers Withdraw. The confirmation says the place goes back to the event; before confirming the registration is still registered. After: 'You have withdrawn from Lantern Talk. Your place has been given back.', the card shows Withdrawn; the row is cancelled with withdrawn_at; exactly two notices, to the organiser and the coordinator: 'Regression attendee withdrew from Lantern Talk. 40 of 40 places now remain.' The organiser's panel shows Attendee withdrew with that message. No overflow at 390px; no console errors.",
     "evidence": "e2e/registration-withdrawal.spec.ts; e2e/support/my-registrations.ts",
-    "layer": "Playwright Chromium + isolated production app"
+    "layer": "Playwright Chromium + isolated production app",
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Canonical source-ID alias correction for the same named e2e/registration-withdrawal.spec.ts journey; no semantic change or new execution.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/252/reference_revisions/0/previous_record",
+          "recordId": "SG2-62-P01",
+          "canonicalJsonSha256": "898d886ff959ca40dc457d6282ed465124b7ef716c9e5c8d77a8939e1798b59d"
+        }
+      }
+    ],
+    "historical_source_method_ids": [
+      "SG2-62:an-attendee-sees-where-each-registration-stands-and-withdraws-after-registration-closed-and"
+    ],
+    "revision_note": "27 Oct2026: The prior method_id is a historical descriptive-ID alias. The active ID names the exact same browser journey and matches its literal registration/status/recipient assertions; existing execution fields are unchanged historical results."
   },
   {
     "id": "SG2-62-P02",
@@ -9729,7 +9808,7 @@
       "SG2-62:AC2",
       "SG2-62:AC4"
     ],
-    "method_id": "SG2-62:withdrawing-after-the-start-twice-or-someone-else-s-registration-is-refused-other-roles-are",
+    "method_id": "SG2-62:withdrawing-after-the-start-twice-or-someone-elses-registration-is-refused-other-roles-are",
     "purpose": "Catch a withdrawal after the event has started, a second withdrawal, a withdrawal of another attendee's registration, or a non-attendee listing or withdrawing.",
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/my-registrations seed (SG2-59's and SG2-60's events plus Quartet Evening, Lantern Talk and Morning Run) before each case; fresh browser context. No hosted Supabase.",
     "review": null,
@@ -9745,9 +9824,27 @@
       "Read the ledger."
     ],
     "data": "Morning Run (599, registration 6203): started 2 Oct 2026 07:00 SGT. Closed Briefing (593, registration 6204): withdrawn. Registration 6001: Recital Guest's place on Small Recital.",
-    "expected": "Morning Run shows Event started with no Withdraw button. Answers: 6203 \u2192 409 'This event started 02 Oct 2026 07:00 SGT, so you can no longer withdraw.'; 6204 \u2192 409 'You have already withdrawn from this event.'; 6001 and 999999 \u2192 404 'This registration was not found.' Organiser, coordinator and lead get 403 for both calls. Registrations 6201-6203 stay registered, 6204 stays cancelled, and no withdrawal notices exist.",
+    "expected": "Morning Run shows Event started with no Withdraw button. Answers: 6203 → 409 'This event started 02 Oct 2026 07:00 SGT, so you can no longer withdraw.'; 6204 → 409 'You have already withdrawn from this event.'; 6001 and 999999 → 404 'This registration was not found.' Organiser, coordinator and lead get 403 for both calls. Registrations 6201-6203 stay registered, 6204 stays cancelled, and no withdrawal notices exist.",
     "evidence": "e2e/registration-withdrawal.spec.ts; e2e/support/my-registrations.ts",
-    "layer": "Playwright Chromium + isolated production app"
+    "layer": "Playwright Chromium + isolated production app",
+    "reference_revisions": [
+      {
+        "date": "2026-10-27",
+        "scope": "Source/contract reconciliation only; no execution or independent peer approval is claimed.",
+        "reason": "Canonical source-ID alias correction for the same named e2e/registration-withdrawal.spec.ts journey; no semantic change or new execution.",
+        "previous_record_reference": {
+          "commit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+          "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/regression-cases.json",
+          "jsonPointer": "/254/reference_revisions/0/previous_record",
+          "recordId": "SG2-62-N01",
+          "canonicalJsonSha256": "728745729e2de7f27bb8e4801bafb1b53c28dcb8f7fa5acf21e28c021acfb397"
+        }
+      }
+    ],
+    "historical_source_method_ids": [
+      "SG2-62:withdrawing-after-the-start-twice-or-someone-else-s-registration-is-refused-other-roles-are"
+    ],
+    "revision_note": "27 Oct2026: The prior method_id is a historical descriptive-ID alias. The active ID names the exact same browser journey and matches its literal registration/status/recipient assertions; existing execution fields are unchanged historical results."
   },
   {
     "id": "SG2-65-P01",

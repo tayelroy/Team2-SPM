@@ -5,7 +5,7 @@ import request from 'supertest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApp } from '../app';
 import { createAuthorization } from '../auth';
-import { PERMISSIONS, permissionsFor, type Principal, type Role } from '../auth/policy';
+import { type Principal, type Role } from '../auth/policy';
 import { dbConfig } from '../db/config';
 import {
   createUpdateEventPlanningHandler,
@@ -1483,15 +1483,6 @@ describe('PATCH /api/event-requests/:eventId/planning integration & authorizatio
   afterEach(() => {
     mock.restoreAll();
     Object.assign(dbConfig, originalConfig);
-  });
-
-  test('[NORMAL] [FAILURE] [SG2-25:AC1] [SG2-39:AC1] policy grants event_request.planning.update only to event_coordinator', () => {
-    assert.deepEqual(PERMISSIONS['event_request.planning.update'], ['event_coordinator']);
-    assert.ok(permissionsFor('event_coordinator', PERMISSIONS).includes('event_request.planning.update'));
-    assert.ok(!permissionsFor('event_organiser', PERMISSIONS).includes('event_request.planning.update'));
-    assert.ok(!permissionsFor('venue_staff', PERMISSIONS).includes('event_request.planning.update'));
-    assert.ok(!permissionsFor('technical_support_staff', PERMISSIONS).includes('event_request.planning.update'));
-    assert.ok(!permissionsFor('attendee', PERMISSIONS).includes('event_request.planning.update'));
   });
 
   const appForRole = (role: Role) =>

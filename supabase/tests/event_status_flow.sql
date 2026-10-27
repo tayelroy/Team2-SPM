@@ -27,10 +27,7 @@ begin
     'confirmed', 'completed', 'cancelled', 'rejected', 'needs_clarification',
     'unassigned', 'awaiting_safety_check', 'safety_rejected', 'preparation'
   ] then
-    raise exception '[SG2-100:all-14-statuses] [SG2-100:AC2] [NORMAL] public.event_status must contain exactly the 14 documented values in order, got: %', values_found;
-  end if;
-  if array_length(values_found, 1) <> 14 then
-    raise exception '[SG2-100:fourteen-statuses] [SG2-100:AC2] [BOUNDARY] public.event_status must have exactly 14 values, got %', array_length(values_found, 1);
+    raise exception '[SG2-100:all-14-statuses] [SG2-100:AC2] [NORMAL] [BOUNDARY] public.event_status must contain exactly the 14 documented values in order, got: %', values_found;
   end if;
 end $$;
 

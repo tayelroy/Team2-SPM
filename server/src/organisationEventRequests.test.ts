@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getEventRequestsHandler, getEventRequestDetailHandler } from './events/list';
 import {
   fetchOrganisationEventRequests, fetchOrganisationEventRequest,
-  fetchOwnEventRequest
+  fetchManageableEventRequest
 } from './db/eventRequests';
 import { createEventDraftHandler } from './events/createDraft';
 import { createUpdateEventDraftHandler } from './events/updateDraft';
@@ -25,7 +25,7 @@ const EVENTS: Row[] = [
 ];
 
 /** Exercise the real Supabase query builder against an isolated dataset. */
-function database(options: { users?: Row[]; events?: Row[]; fail?: string; throw?: boolean; nullEvents?: boolean } = {}) {
+function database(options: { users?: Row[]; events?: Row[]; fail?: string; failureMessage?: string; throw?: boolean; nullEvents?: boolean } = {}) {
   const queries: URL[] = [];
   const users = options.users ?? [{ user_id: 'alice', organisation: 'Acme' }, { user_id: 'bob', organisation: 'Acme' }];
   const client = createClient('https://sg2-26.test.supabase.co', 'test-key', {
@@ -35,7 +35,7 @@ function database(options: { users?: Row[]; events?: Row[]; fail?: string; throw
       queries.push(url);
       const table = url.pathname.split('/').pop();
       if (options.throw) throw new Error('Database transport failed');
-      if (options.fail === table) return new Response(JSON.stringify({ message: 'internal database details' }), { status: 500 });
+      if (options.fail === table) return new Response(JSON.stringify({ message: options.failureMessage ?? 'internal database details' }), { status: 500 });
       let rows = table === 'users' ? users : options.events ?? EVENTS;
       for (const [column, filter] of url.searchParams) {
         if (!filter.startsWith('eq.')) continue;
@@ -57,34 +57,79 @@ function appFor(db: ReturnType<typeof database>, userId = 'alice', role: Princip
 }
 
 describe('SG2-26 organisation access', () => {
-  test('[NORMAL] [SG2-26:AC1] [SG2-26:AC3] colleagues see the same organisation events and only their own rows are manageable', async () => {
-    const db = database();
+  test('[NORMAL] [FAILURE] [SG2-26:AC1] [SG2-26:AC3] [SG2-31:AC1] colleagues see the same organisation events and only their own rows are manageable', async () => {
+    const db = database({ events: [
+      ...EVENTS,
+      { event_id: 101, organiser_id: 'alice', organisation: 'Acme', name: 'Leadership Retreat',
+        proposed_date: '2026-11-15T09:00:00.000Z', status: 'draft', coordinator_id: 'coord-uuid-1',
+        coordinator: { name: 'Sarah Coordinator' } },
+      { event_id: 102, organiser_id: 'bob', organisation: 'Acme', name: 'Annual Gala',
+        proposed_date: '2026-12-01T18:00:00.000Z', status: 'submitted', coordinator_id: 'coord-uuid-2',
+        coordinator: [{ name: 'Alex Coordinator' }] },
+      { event_id: 103, organiser_id: 'alice', organisation: 'Acme', name: 'Tech Talk',
+        proposed_date: null, status: 'approved', coordinator_id: 'coord-uuid-3', coordinator_name: 'Jordan Coordinator' },
+      { event_id: '104', organiser_id: 'alice', organisation: 'Acme', name: null,
+        proposed_date: null, status: null, coordinator_id: null, coordinator: null }
+    ] });
     for (const user of ['alice', 'bob']) {
       const response = await request(appFor(db, user)).get('/api/event-requests');
       assert.equal(response.status, 200);
-      assert.deepEqual(response.body.requests.map((row: Row) => row.event_id), [2, 1]);
-      assert.deepEqual(response.body.requests.map((row: Row) => row.can_manage), user === 'alice' ? [false, true] : [true, false]);
+      assert.deepEqual(response.body.requests.map((row: Row) => row.event_id), [104, 103, 102, 101, 2, 1]);
+      assert.deepEqual(response.body.requests.map((row: Row) => row.can_manage),
+        user === 'alice' ? [true, true, false, true, false, true] : [false, false, true, false, true, false]);
+      assert.deepEqual(response.body.requests.slice(0, 4), [
+        { event_id: 104, name: '', proposed_date: null, status: 'draft', coordinator_id: null,
+          coordinator_name: null, can_manage: user === 'alice' },
+        { event_id: 103, name: 'Tech Talk', proposed_date: null, status: 'approved', coordinator_id: 'coord-uuid-3',
+          coordinator_name: 'Jordan Coordinator', can_manage: user === 'alice' },
+        { event_id: 102, name: 'Annual Gala', proposed_date: '2026-12-01T18:00:00.000Z', status: 'submitted',
+          coordinator_id: 'coord-uuid-2', coordinator_name: 'Alex Coordinator', can_manage: user === 'bob' },
+        { event_id: 101, name: 'Leadership Retreat', proposed_date: '2026-11-15T09:00:00.000Z', status: 'draft',
+          coordinator_id: 'coord-uuid-1', coordinator_name: 'Sarah Coordinator', can_manage: user === 'alice' }
+      ]);
     }
     const query = db.queries.find(url => url.pathname.endsWith('/events'))!;
     assert.equal(query.searchParams.get('organisation'), 'eq.Acme');
     assert.equal(query.searchParams.has('organiser_id'), false);
+    assert.equal(query.searchParams.has('status'), false);
+    assert.equal(query.searchParams.get('order'), 'event_id.desc');
     assert.match(query.searchParams.get('select')!, /organiser_id/);
   });
 
-  test('[NORMAL] [FAILURE] [SG2-26:AC2] [SG2-26:AC3] detail reads allow colleagues while creator-only mutation lookups remain restricted', async () => {
+  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-26:AC2] [SG2-26:AC3] [SG2-31:AC3] [SG2-33:AC3] [SG2-34:AC3] detail reads allow colleagues while creator-only mutation lookups remain restricted', async () => {
     const db = database();
     const colleague = await request(appFor(db)).get('/api/event-requests/2');
     assert.equal(colleague.status, 200);
     assert.equal(colleague.body.request.can_manage, false);
     const owner = await request(appFor(db)).get('/api/event-requests/1');
     assert.equal(owner.body.request.can_manage, true);
-    const mutationLookup = await fetchOwnEventRequest(db.client, 2, 'alice');
+    assert.equal(owner.body.request.coordinator_id, null);
+    assert.equal(owner.body.request.coordinator_name, null);
+    const mutationLookup = await fetchManageableEventRequest(db.client, 2, 'alice');
     assert.equal(mutationLookup.ok, false);
     if (!mutationLookup.ok) assert.equal(mutationLookup.reason, 'not_found');
     for (const eventId of [3, 4, 999]) {
       const denied = await request(appFor(db)).get(`/api/event-requests/${eventId}`);
       assert.equal(denied.status, 404);
       assert.deepEqual(denied.body, { error: 'No event request found for this account.' });
+    }
+    const contacts: [unknown, string | null, string | null][] = [
+      [{ name: 'Sarah', phone: '+65 9123 4567' }, 'Sarah', '+65 9123 4567'],
+      [[{ name: 'Sarah', phone: '+65 9123 4567' }], 'Sarah', '+65 9123 4567'],
+      [{ name: 'Sarah', phone: null }, 'Sarah', null],
+      [{ name: 'Sarah', phone: '   ' }, 'Sarah', null],
+      [{ name: 'Sarah Coordinator' }, 'Sarah Coordinator', null],
+      [null, null, null]
+    ];
+    for (const [coordinator, expectedName, expectedPhone] of contacts) {
+      const contactDb = database({ events: [{ ...EVENTS[0], coordinator,
+        coordinator_id: coordinator === null ? null : 'coord-uuid-1' }] });
+      const response = await request(appFor(contactDb)).get('/api/event-requests/1');
+      assert.equal(response.status, 200);
+      assert.equal(response.body.request.event_id, 1);
+      assert.equal(response.body.request.coordinator_id, coordinator === null ? null : 'coord-uuid-1');
+      assert.equal(response.body.request.coordinator_name, expectedName);
+      assert.equal(response.body.request.coordinator_phone, expectedPhone);
     }
   });
 
@@ -96,6 +141,9 @@ describe('SG2-26 organisation access', () => {
     const query = db.queries[1];
     assert.equal(query.searchParams.get('organisation'), 'eq.Acme');
     assert.equal(query.searchParams.get('organiser_id'), 'eq.alice');
+    const submitted = await request(appFor(db)).get('/api/event-requests?scope=mine&status=submitted');
+    assert.deepEqual([submitted.status, submitted.body], [200, { requests: [] }]);
+    assert.equal(db.queries.filter(url => url.pathname.endsWith('/events')).at(-1)?.searchParams.get('status'), 'eq.submitted');
     assert.equal(query.searchParams.get('status'), 'eq.draft');
     const filtered = await request(appFor(db)).get('/api/event-requests?scope=organisation&status=submitted');
     assert.deepEqual(filtered.body.requests.map((row: Row) => row.event_id), [2]);
@@ -128,21 +176,32 @@ describe('SG2-26 organisation access', () => {
   }
 
   for (const fail of ['users', 'events']) {
-    test(`[FAILURE] [SG2-26:AC1] returns generic 503 when ${fail} lookup fails`, async () => {
-      const db = database({ fail });
-      for (const suffix of ['', '/1']) {
-        const response = await request(appFor(db)).get(`/api/event-requests${suffix}`);
-        assert.equal(response.status, 503);
-        assert.doesNotMatch(JSON.stringify(response.body), /internal database details/);
+    test(`[FAILURE] [SG2-26:AC1] [SG2-31:AC1] [SG2-31:AC3] returns generic 503 when ${fail} lookup fails`, async () => {
+      for (const failureMessage of ['internal database details', 'connection failed', 'connection reset']) {
+        const db = database({ fail, failureMessage });
+        for (const suffix of ['', '/1']) {
+          const response = await request(appFor(db)).get(`/api/event-requests${suffix}`);
+          assert.equal(response.status, 503);
+          assert.doesNotMatch(JSON.stringify(response.body), /internal database details|connection failed|connection reset/);
+        }
+        const list = await fetchOrganisationEventRequests(db.client, 'alice');
+        const detail = await fetchOrganisationEventRequest(db.client, 1, 'alice');
+        assert.equal(list.ok, false);
+        assert.equal(detail.ok, false);
+        if (!list.ok) assert.deepEqual([list.reason, list.message], ['unavailable', failureMessage]);
+        if (!detail.ok) assert.deepEqual([detail.reason, detail.message], ['unavailable', failureMessage]);
       }
     });
   }
 
-  test('[BOUNDARY] [SG2-26:AC1] empty database responses produce empty list and missing detail', async () => {
-    const db = database({ nullEvents: true });
-    assert.deepEqual(await fetchOrganisationEventRequests(db.client, 'alice'), { ok: true, requests: [] });
-    const detail = await fetchOrganisationEventRequest(db.client, 1, 'alice');
-    assert.equal(detail.ok, false);
+  test('[BOUNDARY] [FAILURE] [SG2-26:AC1] [SG2-31:AC1] [SG2-31:AC3] empty database responses produce empty list and missing detail', async () => {
+    for (const nullEvents of [false, true]) {
+      const db = database({ events: [], nullEvents });
+      assert.deepEqual(await fetchOrganisationEventRequests(db.client, 'alice'), { ok: true, requests: [] });
+      const detail = await fetchOrganisationEventRequest(db.client, 1, 'alice');
+      assert.equal(detail.ok, false);
+      if (!detail.ok) assert.equal(detail.reason, 'not_found');
+    }
   });
 
   for (const role of ['event_coordinator', 'attendee', 'venue_staff', 'technical_support_staff'] as const) {

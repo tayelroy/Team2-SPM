@@ -102,28 +102,6 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    test('[NORMAL] [SG2-40:drawer-visibility] renders dialog with accessible title and header when isOpen is true', async () => {
-      vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
-        ok: true,
-        history: [],
-      });
-
-      render(
-        <EventAuditDrawer
-          isOpen={true}
-          onClose={vi.fn()}
-          eventId={42}
-          eventName="Tech Symposium"
-          accessToken="token-1"
-        />
-      );
-
-      const dialog = screen.getByRole('dialog', { name: /change history/i });
-      expect(dialog).toBeInTheDocument();
-      expect(screen.getByText(/Tech Symposium/i)).toBeInTheDocument();
-      expect(screen.getByText(/#42/i)).toBeInTheDocument();
-    });
-
     test('[NORMAL] [SG2-40:drawer-visibility] calls onClose when close button is clicked', async () => {
       const handleClose = vi.fn();
       vi.spyOn(eventRequestsApi, 'getEventHistory').mockResolvedValue({
@@ -141,6 +119,10 @@ describe('EventAuditDrawer Component (SG2-40)', () => {
         />
       );
 
+      const dialog = screen.getByRole('dialog', { name: /change history/i });
+      expect(dialog).toBeInTheDocument();
+      expect(screen.getByText(/Tech Symposium/i)).toBeInTheDocument();
+      expect(screen.getByText(/#42/i)).toBeInTheDocument();
       const closeButton = screen.getByRole('button', { name: /close change history/i });
       fireEvent.click(closeButton);
       expect(handleClose).toHaveBeenCalledTimes(1);

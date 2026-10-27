@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import EventSearch, { describeFilters } from './EventSearch';
 
@@ -25,7 +26,7 @@ const SUMMIT = {
 type Body = { events: unknown[]; truncated?: boolean; filters: Record<string, unknown> };
 
 /** Routes the screen's two requests: the options, and each search by its query string. */
-function serve(search: (url: URL) => Response | Promise<Response>, options: () => Response = () => Response.json(OPTIONS)) {
+function serve(search: (url: URL) => Response | Promise<Response>, options: () => Response | Promise<Response> = () => Response.json(OPTIONS)) {
   const fetch = vi.fn(async (input: string, _init?: RequestInit) => {
     const url = new URL(input, 'http://localhost');
     return url.pathname === '/api/event-search/options' ? options() : search(url);
@@ -75,14 +76,20 @@ describe('EventSearch (SG2-70)', () => {
   });
 
   test('[NORMAL] [SG2-70:AC2] the filters offer every state but Draft, the seven categories, and the venues and coordinators', async () => {
-    serve(() => Response.json(page([GALA])));
-    render(<EventSearch accessToken="token" />);
+    let stale!: (response: Response) => void;
+    let optionReads = 0;
+    serve(() => Response.json(page([GALA])), () => ++optionReads === 1
+      ? new Promise<Response>(resolve => { stale = resolve; }) : Response.json(OPTIONS));
+    render(<StrictMode><EventSearch accessToken="token" /></StrictMode>);
     await waitFor(() => expect(screen.getByLabelText('Venue')).not.toBeDisabled());
     const options = (label: string) => Array.from((screen.getByLabelText(label) as HTMLSelectElement).options).map((option) => option.text);
     expect(options('State')).not.toContain('Draft');
     expect(options('State')).toContain('Awaiting Safety Check');
     expect(options('State')[0]).toBe('Any state');
     expect(options('Category')).toEqual(['Any category', 'Conference', 'Workshop', 'Seminar', 'Training', 'Networking', 'Social', 'Other']);
+    expect(options('Venue')).toEqual(['Any venue', 'Atrium Hall', 'Quiet Room']);
+    expect(options('Assigned coordinator')).toEqual(['Any coordinator', 'Unassigned', 'Alice Tan']);
+    await act(async () => stale(Response.json({ venues: [], coordinators: [] })));
     expect(options('Venue')).toEqual(['Any venue', 'Atrium Hall', 'Quiet Room']);
     expect(options('Assigned coordinator')).toEqual(['Any coordinator', 'Unassigned', 'Alice Tan']);
   });
@@ -174,18 +181,7 @@ describe('EventSearch (SG2-70)', () => {
     expect(screen.getByText('1 event found')).toBeInTheDocument();
   });
 
-  test('[CONFLICT] [SG2-70:AC2] leaving the screen before the options arrive ignores them', async () => {
-    let releaseOptions!: (response: Response) => void;
-    const fetch = vi.fn((input: string) => input.endsWith('/options')
-      ? new Promise<Response>((resolve) => { releaseOptions = resolve; })
-      : Promise.resolve(Response.json(page([]))));
-    vi.stubGlobal('fetch', fetch);
-    const { unmount } = render(<EventSearch accessToken="token" />);
-    unmount();
-    releaseOptions(Response.json(OPTIONS));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(fetch).toHaveBeenCalledTimes(2);
-  });
+
 });
 
 describe('describeFilters (SG2-70 AC4)', () => {

@@ -107,7 +107,7 @@ end $$;
 select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000004', true);
 do $$
 begin
-  if public.release_venue_bookings(98311, array[]::bigint[], 'Not my event')->>'outcome' <> 'missing' then
+  if public.release_venue_bookings(98311, array[]::bigint[], 'Not my event')->>'outcome' IS DISTINCT FROM 'missing' then
     raise exception '[SG2-83:unassigned-coordinator-hidden] [SG2-83:AC5] [FAILURE] A coordinator not assigned to the event must see the booking as missing';
   end if;
 end $$;
@@ -116,14 +116,14 @@ end $$;
 select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002', true);
 do $$
 begin
-  if public.release_venue_bookings(98311, array[98321]::bigint[], 'Another event''s booking')->>'outcome' <> 'others_invalid'
-      or public.release_venue_bookings(98311, array[98314]::bigint[], 'A past booking')->>'outcome' <> 'others_invalid'
-      or public.release_venue_bookings(98311, array[-1]::bigint[], 'An unknown booking')->>'outcome' <> 'others_invalid' then
+  if public.release_venue_bookings(98311, array[98321]::bigint[], 'Another event''s booking')->>'outcome' IS DISTINCT FROM 'others_invalid'
+      or public.release_venue_bookings(98311, array[98314]::bigint[], 'A past booking')->>'outcome' IS DISTINCT FROM 'others_invalid'
+      or public.release_venue_bookings(98311, array[-1]::bigint[], 'An unknown booking')->>'outcome' IS DISTINCT FROM 'others_invalid' then
     raise exception '[SG2-83:others-must-belong] [SG2-83:AC2] [BOUNDARY] Other bookings cancelled alongside must be live bookings of the same event';
   end if;
-  if public.release_venue_bookings(98311, array(select generate_series(1, 51)::bigint), 'Too many')->>'outcome' <> 'invalid'
-      or public.release_venue_bookings(98311, array[]::bigint[], repeat('x', 501))->>'outcome' <> 'invalid'
-      or public.release_venue_bookings(98311, array[]::bigint[], '  ')->>'outcome' <> 'invalid' then
+  if public.release_venue_bookings(98311, array(select generate_series(1, 51)::bigint), 'Too many')->>'outcome' IS DISTINCT FROM 'invalid'
+      or public.release_venue_bookings(98311, array[]::bigint[], repeat('x', 501))->>'outcome' IS DISTINCT FROM 'invalid'
+      or public.release_venue_bookings(98311, array[]::bigint[], '  ')->>'outcome' IS DISTINCT FROM 'invalid' then
     raise exception '[SG2-83:limits] [SG2-83:AC4] [BOUNDARY] A cancellation needs a reason of 500 characters or fewer and at most 50 other bookings';
   end if;
 end $$;
@@ -144,7 +144,7 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000001
 do $$
 declare result jsonb := public.decide_venue_booking_request(98320, 'approve', null);
 begin
-  if result->>'outcome' <> 'conflict' or result->>'kind' <> 'booking' then
+  if result->>'outcome' IS DISTINCT FROM 'conflict' or result->>'kind' IS DISTINCT FROM 'booking' then
     raise exception '[SG2-83:turnaround-held] [SG2-83:AC3] [CONFLICT] A request inside the booked turnaround must clash before the cancellation: %', result;
   end if;
 end $$;
@@ -157,8 +157,8 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002
 do $$
 declare result jsonb := public.release_venue_bookings(98311, array[]::bigint[], '  ' || repeat('h', 500) || '  ');
 begin
-  if result->>'outcome' <> 'released' or result->'also_released' <> '[]'::jsonb
-      or (result->>'returned_to_planning')::boolean then
+  if result->>'outcome' IS DISTINCT FROM 'released' or result->'also_released' IS DISTINCT FROM '[]'::jsonb
+      or (result->>'returned_to_planning')::boolean IS DISTINCT FROM false then
     raise exception '[SG2-83:cancel-one] [SG2-83:AC1] [NORMAL] The coordinator could not cancel one venue: %', result;
   end if;
 end $$;
@@ -168,7 +168,7 @@ begin
   if (select count(*) from public.venue_bookings where booking_id in (98312, 98313) and status = 'confirmed'
       and starts_at = '2031-03-01 01:00+00' and ends_at = '2031-03-01 05:00+00') <> 2
       or (select count(*) from public.venue_booking_requests where request_id in (98312, 98313) and status = 'approved') <> 2
-      or (select venue_booking_id from public.events where event_id = 98301) <> 98312 then
+      or (select venue_booking_id from public.events where event_id = 98301) IS DISTINCT FROM 98312 then
     raise exception '[SG2-83:others-unchanged] [SG2-83:AC1] [NORMAL] The event''s other venue bookings must stay as they were';
   end if;
   if not exists (select 1 from public.venue_bookings where booking_id = 98311 and status = 'cancelled'
@@ -203,7 +203,7 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000001
 do $$
 declare result jsonb := public.decide_venue_booking_request(98320, 'approve', null);
 begin
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-83:turnaround-freed] [SG2-83:AC3] [NORMAL] A request inside the cancelled booking''s turnaround must now be approvable: %', result;
   end if;
 end $$;
@@ -221,11 +221,11 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002
 do $$
 declare result jsonb := public.release_venue_bookings(98312, array[98313, 98313]::bigint[], 'Event moved online');
 begin
-  if result->>'outcome' <> 'released' or result->'also_released' <> '[98313]'::jsonb then
+  if result->>'outcome' IS DISTINCT FROM 'released' or result->'also_released' IS DISTINCT FROM '[98313]'::jsonb then
     raise exception '[SG2-83:cancel-others-chosen] [SG2-83:AC2] [NORMAL] Bookings the coordinator names must be cancelled too: %', result;
   end if;
   result := public.release_venue_bookings(98312, array[]::bigint[], 'Again');
-  if result->>'outcome' <> 'inactive' or result->>'status' <> 'cancelled' then
+  if result->>'outcome' IS DISTINCT FROM 'inactive' or result->>'status' IS DISTINCT FROM 'cancelled' then
     raise exception '[SG2-83:cancel-twice] [SG2-83:AC1] [CONFLICT] A booking already cancelled was cancelled again: %', result;
   end if;
 end $$;
@@ -239,7 +239,7 @@ begin
       or (select venue_booking_id from public.events where event_id = 98301) is not null then
     raise exception '[SG2-83:others-recorded] [SG2-83:AC2] [NORMAL] Each booking cancelled alongside must be recorded and the event left without a main venue';
   end if;
-  if (select status from public.venue_bookings where booking_id = 98321) <> 'confirmed' then
+  if (select status from public.venue_bookings where booking_id = 98321) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-83:other-events-kept] [SG2-83:AC1] [CONFLICT] Another event''s booking must not be touched';
   end if;
 end $$;
@@ -251,7 +251,7 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002
 do $$
 declare result jsonb := public.release_venue_bookings(98331, null, 'Hall A no longer needed');
 begin
-  if result->>'outcome' <> 'released' or not (result->>'returned_to_planning')::boolean then
+  if result->>'outcome' IS DISTINCT FROM 'released' or (result->>'returned_to_planning')::boolean IS DISTINCT FROM true then
     raise exception '[SG2-83:confirmed-cancel] [SG2-83:AC7] [NORMAL] Cancelling a venue of a Confirmed event must return it to Planning: %', result;
   end if;
 end $$;
@@ -263,7 +263,7 @@ begin
       and outstanding_arrangements @> '["venue_recheck"]'::jsonb and venue_booking_id = 98332) then
     raise exception '[SG2-83:confirmed-back-to-planning] [SG2-83:AC7] [NORMAL] The event must be in Planning with its confirmation cleared and a venue recheck outstanding';
   end if;
-  if (select status from public.venue_bookings where booking_id = 98332) <> 'confirmed' then
+  if (select status from public.venue_bookings where booking_id = 98332) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-83:confirmed-others-intact] [SG2-83:AC7] [NORMAL] The Confirmed event''s other venue must stay booked';
   end if;
   if not exists (select 1 from public.event_audit_logs where event_id = 98303 and field_name = 'status'
@@ -313,7 +313,7 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000006
 do $$
 declare result jsonb := public.decide_venue_booking_request(98343, 'approve', null);
 begin
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-83:change-approved] [SG2-83:AC7] [NORMAL] Venue Staff must be able to approve the change: %', result;
   end if;
 end $$;
@@ -322,7 +322,7 @@ do $$
 begin
   if not exists (select 1 from public.venue_bookings where booking_id = 98341 and status = 'cancelled'
       and cancellation_reason = 'Changed to Change Hall A: Hall C is too small for the new seating plan')
-      or (select status from public.venue_bookings where booking_id = 98342) <> 'confirmed'
+      or (select status from public.venue_bookings where booking_id = 98342) IS DISTINCT FROM 'confirmed'
       or not exists (select 1 from public.venue_bookings where event_id = 98304 and venue_id = 98301 and status = 'confirmed') then
     raise exception '[SG2-83:change-applied] [SG2-83:AC1] [NORMAL] Approving the change must release only the replaced booking, with the coordinator''s reason';
   end if;
@@ -359,7 +359,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000002', true);
 do $$
 begin
-  if public.release_venue_bookings(98332, array[]::bigint[], 'Gala moved off site')->>'outcome' <> 'released' then
+  if public.release_venue_bookings(98332, array[]::bigint[], 'Gala moved off site')->>'outcome' IS DISTINCT FROM 'released' then
     raise exception '[SG2-83:cancel-with-pending-change] [SG2-83:AC1] [NORMAL] The coordinator could not cancel a booking with a pending change';
   end if;
 end $$;
@@ -367,7 +367,7 @@ select set_config('request.jwt.claim.sub', 'e8300000-0000-4000-8000-000000000001
 do $$
 declare result jsonb := public.decide_venue_booking_request(98344, 'approve', null);
 begin
-  if result->>'outcome' <> 'decided' or result->>'status' <> 'cancelled' then
+  if result->>'outcome' IS DISTINCT FROM 'decided' or result->>'status' IS DISTINCT FROM 'cancelled' then
     raise exception '[SG2-83:withdrawn-change-not-approvable] [SG2-83:AC1] [CONFLICT] A change whose booking was cancelled must not be approvable: %', result;
   end if;
 end $$;

@@ -11,7 +11,6 @@ import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import AssignmentQueue from './screens/AssignmentQueue';
 import CoordinatorOverview from './screens/CoordinatorOverview';
 import CapacityExceptions from './screens/CapacityExceptions';
-import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
 import EquipmentDesk from './screens/EquipmentDesk';
@@ -285,7 +284,6 @@ export default function App() {
     capacityExceptions: <CapacityExceptions key={session!.accessToken} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
     attendee: <AttendeeEvent />,
-    change: <ChangeRequest />,
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,

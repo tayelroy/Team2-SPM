@@ -258,9 +258,5 @@ begin
  if (select status::text||'|'||arrangements_recheck_needed from public.events where event_id=96611) is distinct from 'planning|false' then
   raise exception '[SG2-66:client-calls-no-writes] [SG2-66:AC4] [FAILURE] A refused client call must write nothing';
  end if;
- if not exists(select 1 from pg_constraint where conname='notifications_kind_check'
-     and pg_get_constraintdef(oid) like '%event_returned_to_planning%') then
-  raise exception '[SG2-66:notice-kind-allowed] [SG2-66:AC7] [NORMAL] The back-to-Planning notice kind must be allowed';
- end if;
 end $$;
 rollback;

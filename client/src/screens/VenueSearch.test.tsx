@@ -177,9 +177,12 @@ test('[CONFLICT] [SG2-46:search-supersession] a newer search supersedes one stil
   expect(fetch.mock.calls[0][1]!.signal!.aborted).toBe(true);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-  vi.stubGlobal('fetch', vi.fn(abortable));
+  const pendingFetch = vi.fn(abortable);
+  vi.stubGlobal('fetch', pendingFetch);
   fireEvent.submit(screen.getByRole('form', { name: 'Venue search criteria' }));
+  const signal = pendingFetch.mock.calls[0][1]?.signal;
   unmount();
+  expect(signal?.aborted).toBe(true);
   await act(async () => {});
 });
 
@@ -557,7 +560,9 @@ test('[BOUNDARY] [SG2-48:AC3] [SG2-82:AC4] leaving an event aborts its search an
   });
   vi.stubGlobal('fetch', fetch);
   const first = render(<VenueSearch accessToken="old-token" prefill={prefill} />);
+  const signal = fetch.mock.calls[0][1]?.signal;
   first.unmount();
+  expect(signal?.aborted).toBe(true);
   render(<VenueSearch accessToken="new-token" prefill={{ ...prefill, eventId: 20, eventName: 'Second Forum' }} />);
   await screen.findByText('No venues have been requested for this event yet.');
   await act(async () => old(Response.json({ venues: [terrace] })));

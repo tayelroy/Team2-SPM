@@ -1,3 +1,5 @@
+> Historical record: the completed hosted-role proof harness was retired on 27 October 2026. These commands describe the old run. Its full proof and compatibility records are preserved at [audit commit 1d6fd68](https://github.com/tayelroy/Team2-SPM/tree/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/test-audit-history). Current recurring browser journeys are in `e2e/`.
+
 # Optional recorded hosted read-only role smoke
 
 This user-authorised suite is separate from the resettable loopback regression

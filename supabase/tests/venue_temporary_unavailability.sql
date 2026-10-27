@@ -108,16 +108,21 @@ set local role authenticated;
 do $$
 declare
   touching bigint;
+  touching_before bigint;
   overlap bigint;
 begin
   insert into public.venue_unavailability (venue_id, starts_at, ends_at, category, reason)
     values (981, '2031-03-01 17:00+00', '2031-03-01 18:00+00', 'maintenance', 'Right after the booking')
     returning unavailability_id into touching;
   insert into public.venue_unavailability (venue_id, starts_at, ends_at, category, reason)
+    values (981, '2031-03-01 08:00+00', '2031-03-01 09:00+00', 'maintenance', 'Right before the booking')
+    returning unavailability_id into touching_before;
+  insert into public.venue_unavailability (venue_id, starts_at, ends_at, category, reason)
     values (981, '2031-03-01 16:59:59.999999+00', '2031-03-01 17:30+00', 'renovation', 'One microsecond')
     returning unavailability_id into overlap;
-  if exists (select 1 from public.venue_booking_disruptions where unavailability_id = touching) then
-    raise exception '[SG2-80:touching-not-flagged] [SG2-80:AC3] [BOUNDARY] A period starting as a booking ends must not flag it';
+  if (select count(*) from public.venue_unavailability where unavailability_id in (touching_before, touching)) <> 2
+    or exists (select 1 from public.venue_booking_disruptions where unavailability_id in (touching_before, touching)) then
+    raise exception '[SG2-80:touching-not-flagged] [SG2-80:AC3] [BOUNDARY] Periods touching either booking edge must be retained without flagging it';
   end if;
   if not exists (select 1 from public.venue_booking_disruptions where unavailability_id = overlap and booking_id = 98004) then
     raise exception '[SG2-80:one-microsecond-flagged] [SG2-80:AC3] [BOUNDARY] A one-microsecond overlap must flag the booking';
@@ -133,17 +138,17 @@ declare
   item jsonb := listed->0;
 begin
   if jsonb_array_length(listed) <> 1
-    or item->>'category' <> 'equipment_failure' or item->>'reason' <> 'Air conditioning failed'
-    or item->>'created_by_name' <> 'Vera Staff' or item->>'created_at' is null then
+    or item->>'category' IS DISTINCT FROM 'equipment_failure' or item->>'reason' IS DISTINCT FROM 'Air conditioning failed'
+    or item->>'created_by_name' IS DISTINCT FROM 'Vera Staff' or item->>'created_at' is null then
     raise exception '[SG2-80:list-recorded-details] [SG2-80:AC6] [NORMAL] The listing must show the reason, note, recorder and time';
   end if;
   if jsonb_array_length(item->'affected') <> 2
-    or item#>>'{affected,0,event_name}' <> 'Gala Night' or item#>>'{affected,0,event_status}' <> 'planning'
-    or item#>>'{affected,1,booking_id}' <> '98002' then
+    or item#>>'{affected,0,event_name}' IS DISTINCT FROM 'Gala Night' or item#>>'{affected,0,event_status}' IS DISTINCT FROM 'planning'
+    or item#>>'{affected,1,booking_id}' IS DISTINCT FROM '98002' then
     raise exception '[SG2-80:list-affected-events] [SG2-80:AC3] [NORMAL] The listing must identify each affected event, earliest first';
   end if;
-  if jsonb_array_length(public.list_venue_unavailability(980, '2031-03-03 00:00+00')) <> 0
-    or jsonb_array_length(public.list_venue_unavailability(980, '2031-03-02 23:59:59.999999+00')) <> 1 then
+  if jsonb_array_length(public.list_venue_unavailability(980, '2031-03-03 00:00+00')) IS DISTINCT FROM 0
+    or jsonb_array_length(public.list_venue_unavailability(980, '2031-03-02 23:59:59.999999+00')) IS DISTINCT FROM 1 then
     raise exception '[SG2-80:list-ended-boundary] [SG2-80:AC1] [BOUNDARY] A period is listed until the instant it ends';
   end if;
 end $$;

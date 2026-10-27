@@ -58,7 +58,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','d9100000-0000-4000-8000-000000000002',true);
 do $$
 begin
- if public.manage_equipment_requirements('create',99101,null,null,'{"equipment_id":99101,"quantity":2}')->>'outcome' <> 'ok' then
+ if public.manage_equipment_requirements('create',99101,null,null,'{"equipment_id":99101,"quantity":2}')->>'outcome' IS DISTINCT FROM 'ok' then
   raise exception '[SG2-91:fixture-equipment-request] [SG2-91:AC1] [NORMAL] The coordinator must be able to request equipment';
  end if;
 end $$;
@@ -76,7 +76,7 @@ end $$;
 reset role;
 do $$
 begin
- if (select status from public.events where event_id=99101) <> 'planning' then
+ if (select status from public.events where event_id=99101) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:waits-for-equipment] [SG2-91:AC1] [FAILURE] An approved venue alone must not move an event whose requested equipment is not reserved';
  end if;
 end $$;
@@ -89,12 +89,12 @@ begin
  request := (result#>>'{requests,0,request_id}')::bigint;
  result := public.manage_equipment_requirements('arrange',99101,request,(result#>>'{requests,0,version}')::bigint,
   '{"shortfall":0,"placement_venue_id":99101,"placement_position":"Stage left","arrangement_notes":"Cable ramps"}');
- if result->>'outcome' <> 'ok' or result#>>'{event,status}' <> 'planning' then
+ if result->>'outcome' IS DISTINCT FROM 'ok' or result#>>'{event,status}' IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:waits-for-reservation] [SG2-91:AC1] [FAILURE] Placed equipment that is not yet reserved must keep the event in Planning: %',result;
  end if;
  result := public.manage_equipment_reservations('reserve',99101,request,(result#>>'{requests,0,version}')::bigint,
   '2031-11-01T09:00Z','2031-11-01T17:00Z');
- if result->>'outcome' <> 'ok' then
+ if result->>'outcome' IS DISTINCT FROM 'ok' then
   raise exception '[SG2-91:fixture-equipment-reserved] [SG2-91:AC1] [NORMAL] Technical Support must be able to reserve the equipment: %',result;
  end if;
 end $$;
@@ -127,7 +127,7 @@ begin
    is distinct from 'd9100000-0000-4000-8000-000000000002|approved' then
   raise exception '[SG2-91:approved-event-without-equipment-awaits] [SG2-91:AC1] [BOUNDARY] An Approved event with a booked venue and no equipment must await the check, attributed to its coordinator when there is no caller';
  end if;
- if (select status from public.events where event_id=99109) <> 'awaiting_safety_check' then
+ if (select status from public.events where event_id=99109) IS DISTINCT FROM 'awaiting_safety_check' then
   raise exception '[SG2-91:rejected-equipment-not-required] [SG2-91:AC1] [BOUNDARY] A rejected equipment request must not hold the event back';
  end if;
 end $$;
@@ -145,19 +145,19 @@ select pg_temp.book(99106,99103,6);
 select pg_temp.book(99114,99103,14);
 do $$
 begin
- if (select status from public.events where event_id=99103) <> 'planning' then
+ if (select status from public.events where event_id=99103) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:no-venue-not-ready] [SG2-91:AC1] [BOUNDARY] An event whose only venue request was cancelled has no venue and must stay in Planning';
  end if;
- if (select status from public.events where event_id=99104) <> 'planning' then
+ if (select status from public.events where event_id=99104) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:unbooked-approval-not-ready] [SG2-91:AC1] [FAILURE] An approved request without a confirmed booking must not count as a booked venue';
  end if;
- if (select status from public.events where event_id=99105) <> 'planning' then
+ if (select status from public.events where event_id=99105) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:shortfall-not-ready] [SG2-91:AC1] [FAILURE] Equipment with a shortfall and no reservation must keep the event in Planning';
  end if;
- if (select status from public.events where event_id=99106) <> 'planning' then
+ if (select status from public.events where event_id=99106) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:recheck-not-ready] [SG2-91:AC1] [FAILURE] A venue flagged for recheck by a planning edit must keep the event in Planning';
  end if;
- if (select status from public.events where event_id=99114) <> 'preparation'
+ if (select status from public.events where event_id=99114) IS DISTINCT FROM 'preparation'
    or exists(select 1 from public.event_audit_logs where event_id in (99103,99104,99105,99106,99114)) then
   raise exception '[SG2-91:other-statuses-untouched] [SG2-91:AC1] [BOUNDARY] Events that do not move must keep their status and history unchanged';
  end if;
@@ -175,7 +175,7 @@ begin
  insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status,venue_booking_id) values
   (99107,99102,'2031-12-07T09:00Z','2031-12-07T17:00Z','pending',first_booking),
   (99107,99102,'2031-12-08T09:00Z','2031-12-08T17:00Z','pending',second_booking);
- if (select status from public.events where event_id=99107) <> 'planning' then
+ if (select status from public.events where event_id=99107) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:pending-not-ready] [SG2-91:AC1] [FAILURE] Pending venue requests must keep the event in Planning';
  end if;
  update public.venue_booking_requests set status='approved' where event_id=99107;
@@ -203,7 +203,7 @@ begin
  end if;
  select safety_check_revision into revision from public.events where event_id=99101;
  update public.equipment_requests set placement_position='Stage right' where event_id=99101;
- if (select status from public.events where event_id=99101) <> 'awaiting_safety_check'
+ if (select status from public.events where event_id=99101) IS DISTINCT FROM 'awaiting_safety_check'
    or (select safety_check_revision from public.events where event_id=99101) <> revision+1 then
   raise exception '[SG2-91:arrangement-edit-bumps-revision] [SG2-91:AC3] [CONFLICT] A placement moved while awaiting must bump the revision without leaving the list';
  end if;
@@ -219,7 +219,7 @@ do $$
 declare result jsonb;
 begin
  result := public.manage_equipment_requirements('create',99113,null,null,'{"equipment_id":99101,"quantity":1}');
- if result->>'outcome' <> 'ok' or result#>>'{event,status}' <> 'planning' or (result->>'can_request')::boolean is not true then
+ if result->>'outcome' IS DISTINCT FROM 'ok' or result#>>'{event,status}' IS DISTINCT FROM 'planning' or (result->>'can_request')::boolean is not true then
   raise exception '[SG2-91:awaiting-event-takes-equipment] [SG2-91:AC1] [CONFLICT] A coordinator adding equipment to an awaiting event must succeed and report it back in Planning: %',result;
  end if;
 end $$;
@@ -246,8 +246,8 @@ begin
   '{"shortfall":0,"placement_venue_id":99102,"placement_position":"Back wall"}');
  result := public.manage_equipment_reservations('reserve',99113,request,(result#>>'{requests,0,version}')::bigint,
   '2031-11-14T09:00Z','2031-11-14T17:00Z');
- if result->>'outcome' <> 'ok'
-   or public.manage_equipment_requirements('read',99113)#>>'{event,status}' <> 'awaiting_safety_check' then
+ if result->>'outcome' IS DISTINCT FROM 'ok'
+   or public.manage_equipment_requirements('read',99113)#>>'{event,status}' IS DISTINCT FROM 'awaiting_safety_check' then
   raise exception '[SG2-91:rearranged-event-returns] [SG2-91:AC1] [NORMAL] Once the added equipment is reserved the event must await the check again: %',result;
  end if;
 end $$;
@@ -260,7 +260,7 @@ do $$
 declare hold jsonb;
 begin
  hold := public.create_venue_hold(99109,99101,'2031-12-20T09:00Z','2031-12-20T17:00Z',clock_timestamp()+interval '5 days');
- if hold->>'outcome' <> 'created' then
+ if hold->>'outcome' IS DISTINCT FROM 'created' then
   raise exception '[SG2-91:awaiting-event-takes-hold] [SG2-91:AC1] [CONFLICT] Venue Staff must be able to hold a venue for an awaiting event: %',hold;
  end if;
  perform set_config('sg2_91.hold',hold#>>'{hold,hold_id}',true);
@@ -268,7 +268,7 @@ end $$;
 reset role;
 do $$
 begin
- if (select status from public.events where event_id=99109) <> 'planning' then
+ if (select status from public.events where event_id=99109) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:hold-returns-to-planning] [SG2-91:AC1] [CONFLICT] The hold''s pending request must return the event to Planning';
  end if;
 end $$;
@@ -277,14 +277,14 @@ do $$
 declare released jsonb;
 begin
  released := public.change_venue_hold(current_setting('sg2_91.hold')::bigint,'release');
- if released->>'outcome' <> 'updated' then
+ if released->>'outcome' IS DISTINCT FROM 'updated' then
   raise exception '[SG2-91:hold-release-fixture] [SG2-91:AC1] [CONFLICT] Venue Staff must be able to release the hold: %',released;
  end if;
 end $$;
 reset role;
 do $$
 begin
- if (select status from public.events where event_id=99109) <> 'awaiting_safety_check' then
+ if (select status from public.events where event_id=99109) IS DISTINCT FROM 'awaiting_safety_check' then
   raise exception '[SG2-91:released-hold-returns] [SG2-91:AC1] [CONFLICT] Releasing that hold must put the event back in the list';
  end if;
 end $$;
@@ -300,7 +300,7 @@ do $$
 declare result jsonb;
 begin
  result := public.release_venue_booking(current_setting('sg2_91.booking')::bigint,'Ceiling repairs');
- if result->>'outcome' <> 'released' then
+ if result->>'outcome' IS DISTINCT FROM 'released' then
   raise exception '[SG2-91:booking-release-fixture] [SG2-91:AC1] [CONFLICT] The coordinator must be able to release the booking: %',result;
  end if;
 end $$;
@@ -308,7 +308,7 @@ select set_config('request.jwt.claim.sub','d9100000-0000-4000-8000-000000000003'
 reset role;
 do $$
 begin
- if (select status from public.events where event_id=99109) <> 'planning'
+ if (select status from public.events where event_id=99109) IS DISTINCT FROM 'planning'
    or (select awaiting_safety_check_since from public.events where event_id=99109) is not null then
   raise exception '[SG2-91:released-booking-returns-to-planning] [SG2-91:AC1] [CONFLICT] Releasing an awaiting event''s booking must return it to Planning and clear the wait';
  end if;
@@ -317,7 +317,7 @@ insert into public.venue_unavailability(venue_id,starts_at,ends_at,category,reas
  values (99102,'2031-12-07T00:00Z','2031-12-08T00:00Z','equipment_failure','Sprinklers under repair');
 do $$
 begin
- if (select status from public.events where event_id=99107) <> 'planning' then
+ if (select status from public.events where event_id=99107) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:disrupted-booking-returns-to-planning] [SG2-91:AC1] [CONFLICT] A booked venue made unavailable must return an awaiting event to Planning';
  end if;
  -- SG2-66 AC7: both people hear the event is back in Planning, once each.
@@ -342,11 +342,11 @@ select pg_temp.book(99112,99103,12);
 do $$
 declare result jsonb;
 begin
- if (select status from public.events where event_id=99112) <> 'planning' then
+ if (select status from public.events where event_id=99112) IS DISTINCT FROM 'planning' then
   raise exception '[SG2-91:any-recheck-not-ready] [SG2-91:AC1] [FAILURE] An outstanding registration recheck must keep the event in Planning until it is settled';
  end if;
  result := public.settle_arrangement_recheck(99112,'d9100000-0000-4000-8000-000000000002','registration_recheck');
- if result->>'outcome' <> 'ok' or (select status from public.events where event_id=99112) <> 'awaiting_safety_check'
+ if result->>'outcome' IS DISTINCT FROM 'ok' or (select status from public.events where event_id=99112) <> 'awaiting_safety_check'
    or (select actor_id::text||'|'||old_value||'|'||new_value from public.event_audit_logs
      where event_id=99112 and field_name='status' order by log_id desc limit 1)
    is distinct from 'd9100000-0000-4000-8000-000000000002|planning|awaiting_safety_check' then
@@ -355,7 +355,7 @@ begin
  perform set_config('sg2_91.revision',(select safety_check_revision from public.events where event_id=99112)::text,true);
  result := public.apply_accepted_event_change(99112,'d9100000-0000-4000-8000-000000000002','awaiting_safety_check',
   'CR-1','{"expected_attendance":150}','["venue_recheck"]');
- if result->>'status' <> 'planning'
+ if result->>'status' IS DISTINCT FROM 'planning'
    or (select awaiting_safety_check_since from public.events where event_id=99112) is not null
    or (select safety_check_revision from public.events where event_id=99112) <= current_setting('sg2_91.revision')::bigint
    or (select count(*) from public.event_audit_logs where event_id=99112 and field_name='status'

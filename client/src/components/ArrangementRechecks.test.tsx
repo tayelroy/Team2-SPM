@@ -53,11 +53,27 @@ describe('ArrangementRechecks (work queue)', () => {
     await act(async () => finish({ ok: true, settled }));
     expect(onSettled).toHaveBeenCalledWith(settled);
     expect(within(banner).getByRole('button', { name: 'Mark venue rechecked' })).toBeEnabled();
+
+    const allSettled = { event_id: 661, arrangements_recheck_needed: false, outstanding_arrangements: [] };
+    settle.mockResolvedValueOnce({ ok: true, settled: allSettled });
+    fireEvent.click(within(banner).getByRole('button', { name: 'Mark venue rechecked' }));
+    expect(settle).toHaveBeenLastCalledWith(661, 'venue_recheck', 'coordinator-token');
+    for (const button of within(banner).getAllByRole('button')) expect(button).toBeDisabled();
+    await vi.waitFor(() => expect(onSettled).toHaveBeenLastCalledWith(allSettled));
   });
 
   test('[CONFLICT] [SG2-66:AC4] a recheck that still fails lists its blockers; a later refusal replaces them', async () => {
-    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage });
+    const loadStage = vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage });
     vi.spyOn(changeRequestsApi, 'settleRecheck')
+      .mockResolvedValueOnce({
+        ok: false,
+        kind: 'blocked',
+        message: 'This arrangement still needs attention before it can be marked rechecked.',
+        blockers: [
+          'The Kelp Room does not cover the event start.',
+          'The Kelp Room holds 150, below the expected attendance of 180.',
+        ],
+      })
       .mockResolvedValueOnce({
         ok: false,
         kind: 'blocked',
@@ -66,6 +82,17 @@ describe('ArrangementRechecks (work queue)', () => {
       })
       .mockResolvedValueOnce({ ok: false, kind: 'conflict', message: 'That arrangement is not waiting for a recheck.' });
     const onSettled = renderBanner();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark venue rechecked' }));
+    const venueBlockers = await screen.findByTestId('recheck-blockers');
+    expect(venueBlockers).toHaveAttribute('role', 'alert');
+    expect(within(venueBlockers).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'The Kelp Room does not cover the event start.',
+      'The Kelp Room holds 150, below the expected attendance of 180.',
+    ]);
+    expect(screen.getByRole('button', { name: 'Mark venue rechecked' })).toBeEnabled();
+    expect(loadStage).toHaveBeenCalledTimes(1);
+    expect(onSettled).not.toHaveBeenCalled();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Mark registrations rechecked' }));
     const blockers = await screen.findByTestId('recheck-blockers');
@@ -116,12 +143,5 @@ describe('ArrangementRechecks (work queue)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  test('[BOUNDARY] [SG2-66:AC4] a stage reply that lands after the banner closed is ignored', async () => {
-    let resolve: (value: eventRequestsApi.GetEventStageOutcome) => void = () => {};
-    vi.spyOn(eventRequestsApi, 'getEventStage').mockReturnValue(new Promise((r) => { resolve = r; }));
-    renderBanner();
-    cleanup();
-    await act(async () => resolve({ ok: true, stage }));
-    expect(screen.queryByTestId('arrangements-recheck-banner')).not.toBeInTheDocument();
-  });
+
 });

@@ -43,7 +43,7 @@ do $$
 declare result jsonb;
 begin
   result := public.release_venue_booking(95101, 'Not my event');
-  if result->>'outcome' <> 'missing' or (select status from public.venue_bookings where booking_id = 95101) <> 'confirmed' then
+  if result->>'outcome' IS DISTINCT FROM 'missing' or (select status from public.venue_bookings where booking_id = 95101) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-51:unassigned-coordinator-refused] [SG2-51:AC1] [FAILURE] A coordinator released a booking for an event not assigned to them: %', result;
   end if;
 end $$;
@@ -60,16 +60,16 @@ select set_config('request.jwt.claim.sub', 'e5100000-0000-4000-8000-000000000002
 do $$
 declare result jsonb;
 begin
-  if public.release_venue_booking(95101, '   ')->>'outcome' <> 'invalid'
-      or public.release_venue_booking(95101, null)->>'outcome' <> 'invalid'
-      or public.release_venue_booking(95101, repeat('x', 501))->>'outcome' <> 'invalid' then
+  if public.release_venue_booking(95101, '   ')->>'outcome' IS DISTINCT FROM 'invalid'
+      or public.release_venue_booking(95101, null)->>'outcome' IS DISTINCT FROM 'invalid'
+      or public.release_venue_booking(95101, repeat('x', 501))->>'outcome' IS DISTINCT FROM 'invalid' then
     raise exception '[SG2-51:reason-required] [SG2-51:AC1] [BOUNDARY] A release without a reason, or with more than 500 characters, was accepted';
   end if;
   result := public.release_venue_booking(95103, 'Already over');
-  if result->>'outcome' <> 'past' then
+  if result->>'outcome' IS DISTINCT FROM 'past' then
     raise exception '[SG2-51:past-booking-refused] [SG2-51:AC1] [BOUNDARY] A booking that has already ended was released: %', result;
   end if;
-  if public.release_venue_booking(-1, 'Nothing here')->>'outcome' <> 'missing' then
+  if public.release_venue_booking(-1, 'Nothing here')->>'outcome' IS DISTINCT FROM 'missing' then
     raise exception '[SG2-51:unknown-booking] [SG2-51:AC1] [FAILURE] An unknown booking was not reported missing';
   end if;
 end $$;
@@ -79,7 +79,7 @@ do $$
 declare result jsonb;
 begin
   result := public.release_venue_booking(95101, '  ' || repeat('r', 498) || '  ');
-  if result->>'outcome' <> 'released' then
+  if result->>'outcome' IS DISTINCT FROM 'released' then
     raise exception '[SG2-51:coordinator-releases] [SG2-51:AC1] [NORMAL] The assigned coordinator could not release a booking: %', result;
   end if;
   if not exists (select 1 from public.venue_bookings where booking_id = 95101 and status = 'cancelled'
@@ -90,12 +90,12 @@ begin
   if exists (select 1 from public.venue_booking_occupancy where venue_id = 95101 and starts_at = '2030-09-01 01:00+00') then
     raise exception '[SG2-51:period-freed] [SG2-51:AC2] [NORMAL] A released booking must no longer occupy its venue';
   end if;
-  if (select status from public.venue_booking_requests where request_id = 95101) <> 'cancelled' then
+  if (select status from public.venue_booking_requests where request_id = 95101) IS DISTINCT FROM 'cancelled' then
     raise exception '[SG2-51:request-no-longer-live] [SG2-51:AC2] [NORMAL] The request that committed the booking must no longer be live';
   end if;
   if (select status from public.venue_bookings where booking_id = 95102) <> 'confirmed'
       or not exists (select 1 from public.venue_booking_occupancy where venue_id = 95102)
-      or (select venue_booking_id from public.events where event_id = 95101) <> 95102 then
+      or (select venue_booking_id from public.events where event_id = 95101) IS DISTINCT FROM 95102 then
     raise exception '[SG2-51:other-venues-kept] [SG2-51:AC3] [NORMAL] Releasing one venue must leave the event''s other booking confirmed and make it the main venue';
   end if;
   if (select count(*) from public.notifications where event_id = 95101 and kind = 'venue_booking_released'
@@ -108,7 +108,7 @@ begin
     raise exception '[SG2-51:release-in-history] [SG2-51:AC5] [NORMAL] The release must appear in the event history with its actor and reason';
   end if;
   result := public.release_venue_booking(95101, 'Again');
-  if result->>'outcome' <> 'inactive' or result->>'status' <> 'cancelled' then
+  if result->>'outcome' IS DISTINCT FROM 'inactive' or result->>'status' IS DISTINCT FROM 'cancelled' then
     raise exception '[SG2-51:second-release-refused] [SG2-51:AC1] [CONFLICT] A booking already released was released again: %', result;
   end if;
 end $$;
@@ -124,7 +124,7 @@ begin
     raise exception '[SG2-83:staff-release-refused] [SG2-83:AC6] [FAILURE] Venue Staff released a venue booking';
   exception when insufficient_privilege then null;
   end;
-  if (select status from public.venue_bookings where booking_id = 95102) <> 'confirmed' then
+  if (select status from public.venue_bookings where booking_id = 95102) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-83:staff-release-no-change] [SG2-83:AC6] [FAILURE] A refused Venue Staff release changed the booking';
   end if;
 end $$;
@@ -133,7 +133,7 @@ do $$
 declare result jsonb;
 begin
   result := public.release_venue_booking(95102, 'Annex flooded');
-  if result->>'outcome' <> 'released' or (select venue_booking_id from public.events where event_id = 95101) is not null then
+  if result->>'outcome' IS DISTINCT FROM 'released' or (select venue_booking_id from public.events where event_id = 95101) is not null then
     raise exception '[SG2-51:last-venue-released] [SG2-51:AC1] [NORMAL] The coordinator could not release the last venue, or the event kept pointing at it: %', result;
   end if;
   insert into public.venue_bookings (venue_id, starts_at, ends_at, status)

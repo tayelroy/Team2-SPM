@@ -88,7 +88,7 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.deepEqual(decisions, [1]);
   });
 
-  test('[NORMAL] [SG2-37:AC1] [SG2-40:AC1] [SG2-40:AC2] approves a request under review, recording the deciding coordinator and the under_review → approved history entry', async () => {
+  test('[NORMAL] [SG2-37:AC1] [SG2-40:AC1] [SG2-40:AC2] [SG2-68:AC1] [SG2-68:AC2] approves a request under review, recording the deciding coordinator and the under_review → approved history entry', async () => {
     let decided: { eventId: number; coordinatorId: string; decision: Decision; reason: string | null } | undefined;
     const app = buildApp({
       captureDecide: (eventId, coordinatorId, decision, reason) =>
@@ -109,6 +109,9 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
     assert.deepEqual(app.history, [[{
       event_id: 7, actor_id: 'coordinator-1', field_name: 'status', old_value: 'under_review', new_value: 'approved'
     }]]);
+    assert.deepEqual(app.notices, [{ afterHistory: 1, batch: [
+      { recipient_id: 'organiser-1', event_id: 7, kind: 'event_approved', message: 'Partner Forum was approved.' }
+    ] }]);
   });
 
   test('[NORMAL] [SG2-37:AC1] an approval may carry a reason, trimmed before it is stored', async () => {
@@ -275,14 +278,6 @@ describe('PATCH /api/event-requests/:eventId/decision (SG2-37)', () => {
 });
 
 describe('PATCH /api/event-requests/:eventId/decision notices (SG2-68)', () => {
-  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] an approval tells the organiser, after the history row', async () => {
-    const app = buildApp();
-    assert.equal((await request(app).patch('/api/event-requests/7/decision').send({ decision: 'approved' })).status, 200);
-    assert.deepEqual(app.notices, [{ afterHistory: 1, batch: [
-      { recipient_id: 'organiser-1', event_id: 7, kind: 'event_approved', message: 'Partner Forum was approved.' }
-    ] }]);
-  });
-
   test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] a rejection tells the organiser why, using the reason as stored', async () => {
     const app = buildApp({
       decideResult: { ok: true, request: { ...DECIDED_REQUEST, status: 'rejected', decision_reason: 'Clashes with the AGM' } }

@@ -1,57 +1,51 @@
--- Numeric AC tags follow verified SPM Jira criteria; descriptive tags identify supporting contracts.
--- Upgrade suite: run only on the disposable database prepared by
--- supabase/tests/fixtures/legacy_venue_blocks.sql (see the database-tests job
--- in .github/workflows/ci.yml). Test records are rolled back. Never run
--- against production.
---
--- Covers SG2-98 (remediation of SG2-45 AC2 for Week 7 change #2): blocks
--- recorded under SG2-45 survive SG2-80's migration as venue unavailability
--- records (AC3), a period holding a confirmed booking is now accepted and the
--- booking flagged (AC1), and SG2-45 AC1 and AC3 still hold for those blocks
--- (AC2).
+-- SG2-98: current reads, edits, availability and removal of retained old records.
+-- Disposable current-schema PostgreSQL only; every fixture change rolls back.
+-- The fixed rows represent already-stored records with unknown recorder/time.
+-- Suppress origin triggers only while arranging that historical starting state;
+-- restore them before every operation whose current behavior is asserted.
 begin;
+set local session_replication_role = replica;
+insert into auth.users (id) values
+  ('d9800000-0000-4000-8000-000000000001'),  -- venue_staff
+  ('d9800000-0000-4000-8000-000000000002'),  -- event_coordinator
+  ('d9800000-0000-4000-8000-000000000003');  -- event_organiser
+insert into public.users (user_id, name, role_id) values
+  ('d9800000-0000-4000-8000-000000000001', 'Vince Staff', 3),
+  ('d9800000-0000-4000-8000-000000000002', 'Cora Coordinator', 2),
+  ('d9800000-0000-4000-8000-000000000003', 'Otto Organiser', 1);
+insert into public.account_roles (user_id, role) values
+  ('d9800000-0000-4000-8000-000000000001', 'venue_staff'),
+  ('d9800000-0000-4000-8000-000000000002', 'event_coordinator'),
+  ('d9800000-0000-4000-8000-000000000003', 'event_organiser');
 
--- AC3: every old block is still there, unchanged, filed under 'other', with
--- no recorder or time invented for it.
+insert into public.venues (venue_id, name) values (9801, 'Legacy Hall'), (9802, 'Quiet Room');
+insert into public.events (event_id, organiser_id, coordinator_id, name, status) values
+  (98101, 'd9800000-0000-4000-8000-000000000003', 'd9800000-0000-4000-8000-000000000002', 'Alumni Dinner', 'confirmed'),
+  (98102, 'd9800000-0000-4000-8000-000000000003', 'd9800000-0000-4000-8000-000000000002', 'Planning Workshop', 'planning');
+
+-- Blocks as SG2-45 wrote them: an upcoming one, one ending as a booking
+-- starts, and one that has already ended.
+insert into public.venue_unavailability (unavailability_id, venue_id, starts_at, ends_at, reason) values
+  (98201, 9801, '2031-05-10 00:00+00', '2031-05-12 00:00+00', 'Scheduled maintenance'),
+  (98202, 9801, '2031-05-20 09:00+00', '2031-05-20 17:00+00', 'Carpet replacement'),
+  (98203, 9802, '2020-01-01 00:00+00', '2020-01-02 00:00+00', 'Past repair');
+
+-- 98301 was written after block 98201 and inside it; 98302 starts as block
+-- 98202 ends.
+insert into public.venue_bookings (booking_id, venue_id, event_id, starts_at, ends_at, status) values
+  (98301, 9801, 98101, '2031-05-11 09:00+00', '2031-05-11 17:00+00', 'confirmed'),
+  (98302, 9801, null,  '2031-05-20 17:00+00', '2031-05-20 19:00+00', 'confirmed');
+
+
+insert into public.venue_booking_disruptions(unavailability_id,booking_id) values(98201,98301);
+set local session_replication_role = origin;
+
 do $$
 begin
-  if (select count(*) from public.venue_unavailability where (unavailability_id, venue_id, starts_at, ends_at, reason) in (
-      (98201, 9801, '2031-05-10 00:00+00'::timestamptz, '2031-05-12 00:00+00'::timestamptz, 'Scheduled maintenance'),
-      (98202, 9801, '2031-05-20 09:00+00'::timestamptz, '2031-05-20 17:00+00'::timestamptz, 'Carpet replacement'),
-      (98203, 9802, '2020-01-01 00:00+00'::timestamptz, '2020-01-02 00:00+00'::timestamptz, 'Past repair'))) <> 3 then
-    raise exception '[SG2-98:legacy-blocks-kept] [SG2-98:AC3] [NORMAL] Every block recorded before SG2-80 must keep its venue, period and reason';
-  end if;
-  if exists (select 1 from public.venue_unavailability where unavailability_id in (98201, 98202, 98203) and category <> 'other') then
-    raise exception '[SG2-98:legacy-reason-other] [SG2-98:AC3] [NORMAL] A block recorded before SG2-80 must be filed under the reason other';
-  end if;
-  if exists (select 1 from public.venue_unavailability where unavailability_id in (98201, 98202, 98203)
-      and (created_by is not null or created_at is not null)) then
-    raise exception '[SG2-98:legacy-recorder-unknown] [SG2-98:AC3] [BOUNDARY] The recorder and time of an old block must stay unknown, not be filled in by the upgrade';
-  end if;
-end $$;
-
--- AC1/AC3: the confirmed booking already inside an old block is flagged by
--- the upgrade and kept; one that only touches a block is not flagged.
-do $$
-begin
-  if not exists (select 1 from public.venue_booking_disruptions where unavailability_id = 98201 and booking_id = 98301) then
-    raise exception '[SG2-98:legacy-overlap-flagged] [SG2-98:AC1] [SG2-98:AC3] [CONFLICT] A confirmed booking inside an old block must be flagged by the upgrade';
-  end if;
-  if (select status from public.venue_bookings where booking_id = 98301) <> 'confirmed'
-    or (select status from public.events where event_id = 98101) <> 'confirmed' then
-    raise exception '[SG2-98:legacy-overlap-kept] [SG2-98:AC1] [NORMAL] A booking inside an old block and its event must stay confirmed';
-  end if;
-  if exists (select 1 from public.venue_booking_disruptions where booking_id = 98302) then
-    raise exception '[SG2-98:legacy-touching-not-flagged] [SG2-98:AC3] [BOUNDARY] A booking starting as an old block ends must not be flagged';
-  end if;
-  if exists (select 1 from pg_trigger where tgname = 'venue_unavailability_refuse_confirmed_overlap')
-    or to_regprocedure('public.venue_unavailability_refuse_confirmed_overlap()') is not null then
-    raise exception '[SG2-98:old-refusal-removed] [SG2-98:AC1] [SG2-98:AC4] [CONFLICT] The SG2-45 refusal of blocks over confirmed bookings must no longer exist';
-  end if;
   -- An edit to an old block cannot invent who recorded it.
   update public.venue_unavailability set created_by = 'd9800000-0000-4000-8000-000000000001', created_at = now()
     where unavailability_id = 98203;
-  if (select created_by is not null or created_at is not null from public.venue_unavailability where unavailability_id = 98203) then
+  if (select created_by is not null or created_at is not null from public.venue_unavailability where unavailability_id = 98203) is distinct from false then
     raise exception '[SG2-98:legacy-recorder-not-backfilled] [SG2-98:AC3] [CONFLICT] An edit to an old block must not set who recorded it or when';
   end if;
 end $$;
@@ -66,12 +60,12 @@ declare
   item jsonb := listed->0;
 begin
   if jsonb_array_length(listed) <> 2
-    or item->>'unavailability_id' <> '98201' or item->>'category' <> 'other' or item->>'reason' <> 'Scheduled maintenance'
+    or item->>'unavailability_id' IS DISTINCT FROM '98201' or item->>'category' IS DISTINCT FROM 'other' or item->>'reason' IS DISTINCT FROM 'Scheduled maintenance'
     or item->>'created_by_name' is not null or item->>'created_at' is not null
-    or item#>>'{affected,0,event_name}' <> 'Alumni Dinner' or item#>>'{affected,0,event_status}' <> 'confirmed' then
+    or item#>>'{affected,0,event_name}' IS DISTINCT FROM 'Alumni Dinner' or item#>>'{affected,0,event_status}' IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-98:list-legacy-block] [SG2-98:AC3] [NORMAL] Venue Staff must see an old block with its reason, unknown recorder and affected event';
   end if;
-  if jsonb_array_length(public.list_venue_unavailability(9802, '2026-01-01 00:00+00')) <> 0 then
+  if jsonb_array_length(public.list_venue_unavailability(9802, '2026-01-01 00:00+00')) IS DISTINCT FROM 0 then
     raise exception '[SG2-98:legacy-ended-not-listed] [SG2-98:AC3] [BOUNDARY] An old block that has ended must be kept but not listed as upcoming';
   end if;
 end $$;
