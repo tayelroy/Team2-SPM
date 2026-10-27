@@ -1,4 +1,5 @@
 import { AccessError } from '../../server/src/auth/policy';
+import { refreshSafetyCheckStatus } from './safety-handoff';
 import type { DecisionResult, VenueBookingDecisionStore } from '../../server/src/db/venueBookingDecisions';
 import type { NotificationRecord } from '../../server/src/db/notifications';
 import type { VenueBookingWithdrawalStore, WithdrawalResult } from '../../server/src/db/venueBookingWithdrawals';
@@ -96,6 +97,8 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       const status = decision === 'approve' ? 'approved' : 'rejected';
       Object.assign(request, { status, decided_by: userId, decided_at: now, decision_reason: reason, venue_booking_id: booking });
       if (booking !== null && request.replaces_booking_id) releaseReplaced(database, request, String(venue.name), userId, now);
+      // SG2-91: the database's arrangement trigger, when a case turns it on.
+      refreshSafetyCheckStatus(database, request.event_id, userId);
       database.tables.event_audit_logs.push({ log_id: nextId(database.tables.event_audit_logs, 'log_id'), event_id: request.event_id,
         actor_id: userId, field_name: 'venue_booking_request', old_value: `Pending: ${venue.name} (request ${requestId})`,
         new_value: `${status[0].toUpperCase()}${status.slice(1)}: ${venue.name} (request ${requestId})${reason ? ` — ${reason}` : ''}`, created_at: now });

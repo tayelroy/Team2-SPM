@@ -2043,10 +2043,10 @@ test('SG2-104-P01 | [SG2-104:AC1] [SG2-104:AC2] [SG2-104:AC3] [SG2-104:AC5] [NOR
   // The venue account also holds the Event Coordinator role.
   expect((await request.post('/__e2e/multi-role')).status()).toBe(204);
   await signIn(page, 'venue');
-  const acting = page.getByLabel('Acting as');
+  const acting = page.getByRole('combobox', { name: 'Acting as', exact: true });
   const catalogue = page.getByRole('navigation').getByRole('button', { name: 'Catalogue', exact: true });
   // It starts as its less-privileged role, without the Venue Staff catalogue.
-  await expect(acting).toHaveValue('Event Coordinator');
+  await expect(acting).toHaveText('Event Coordinator');
   await expect(catalogue).toHaveCount(0);
 
   // AC2/AC5: the server allows only what the acting role allows.
@@ -2057,7 +2057,9 @@ test('SG2-104-P01 | [SG2-104:AC1] [SG2-104:AC2] [SG2-104:AC3] [SG2-104:AC5] [NOR
   expect((await venueBookings('technical_support_staff')).status()).toBe(403);
 
   // AC1: switching to Venue Staff brings that role's functions.
-  await acting.selectOption('Venue Staff');
+  await acting.click();
+  await page.getByRole('listbox', { name: 'Available roles', exact: true })
+    .getByRole('option', { name: 'Venue Staff', exact: true }).click();
   await expect(catalogue).toBeVisible();
 
   // AC3: the profile lists both roles.
@@ -2507,7 +2509,7 @@ test('SG2-49-N01 | [SG2-49:AC1] [SG2-49:AC2] [CONFLICT] [FAILURE] a clash, an un
   expect((await page.request.post('/api/venue-booking-requests/102/decision', { data: { decision: 'approve' } })).status()).toBe(401);
 });
 
-test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2-100:AC13] [SG2-38:AC1] [SG2-38:AC2] [SG2-31:AC4] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
+test('SG2-100-P01 | [SG2-100:AC1] [SG2-100:AC2] [SG2-100:AC5] [SG2-38:AC1] [SG2-38:AC2] [SG2-31:AC4] [NORMAL] [BOUNDARY] a request moves through the Week 7 lifecycle with the stage tracker and waiting-on text at each hop', async ({ page, request }) => {
   await signIn(page, 'organiser');
   // AC2: submission with no coordinator lands in unassigned, not submitted.
   expect((await request.patch('/api/event-requests/1/submit', { headers: await authHeaders(page) })).status()).toBe(200);
@@ -2592,7 +2594,7 @@ test('SG2-100-P01 | [SG2-100:AC2] [SG2-100:AC3] [SG2-100:AC5] [SG2-100:AC9] [SG2
 
 // SG2-100 AC4: the coordinator closes out a held event from their own work
 // queue — the screen they already use for every event assigned to them.
-test('SG2-100-P02 | [SG2-100:AC6] [SG2-100:AC7] [SG2-100:AC8] [SG2-100:AC9] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ page, request }) => {
+test('SG2-100-P02 | [SG2-100:AC4] [SG2-100:AC5] [NORMAL] [BOUNDARY] marking a held event completed makes it read-only, clears it from the work queue and is recorded in history', async ({ page, request }) => {
   expect((await request.post('/__e2e/lifecycle')).status()).toBe(204);
   await signIn(page, 'coordinator');
   const assigned = page.getByRole('region', { name: 'My assigned events' });

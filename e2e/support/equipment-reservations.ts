@@ -2,6 +2,7 @@ import { AccessError } from '../../server/src/auth/policy';
 import type { EquipmentReservationsStore } from '../../server/src/db/equipmentReservations';
 import type { MemoryDatabase } from './memory-database';
 import { createMemoryRequirementsStore } from './equipment-requirements';
+import { refreshSafetyCheckStatus } from './safety-handoff';
 
 /** Loopback UI fixture only. Native SQL and multi-session tests independently
  * prove the production transaction, peak calculation, locks and recipient RLS. */
@@ -46,6 +47,7 @@ export function createMemoryReservationsStore(database: MemoryDatabase, token: s
         database.tables.equipment_reservations.push({ reservation_id: reservationId, request_id: requestId, event_id: eventId,
           equipment_id: request.equipment_id, quantity_reserved: request.quantity, ...period, reserved_at: reservedAt });
         Object.assign(request, { status: 'approved', shortfall: 0, version: Number(version) + 1 });
+        refreshSafetyCheckStatus(database, eventId, principal.userId);
         database.tables.notifications.push({ notification_id: Math.max(0, ...database.tables.notifications.map(row => Number(row.notification_id))) + 1,
           recipient_id: event.coordinator_id, event_id: eventId, request_id: null, equipment_reservation_id: reservationId,
           kind: 'equipment_reserved', message: `Equipment reserved for ${String(event.name || 'Untitled event').slice(0, 500)}: ${request.quantity} × ${equipment.name}.`, created_at: reservedAt });

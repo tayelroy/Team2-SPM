@@ -72,7 +72,7 @@ describe('EventArrangementsPanel once confirmed (SG2-58)', () => {
 });
 
 describe('EventArrangementsPanel safety check (SG2-94)', () => {
-  test('[NORMAL] [SG2-94:AC4] the safety check is a step: outstanding with its reason, holding the event back', () => {
+  test('[NORMAL] [SG2-94:AC4] [SG2-100:AC3] the safety check is a step: outstanding with its reason, holding the event back', () => {
     const detail = "Awaiting the Safety Officer's operational safety check.";
     render(<EventArrangementsPanel arrangements={{
       ...READY,

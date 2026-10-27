@@ -186,7 +186,7 @@ export default function Landing({ onOpenApp }: { onOpenApp: () => void }) {
               width: '100%',
               margin: '0 auto',
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
+              gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,280px),1fr))',
               gap: '48px',
               alignItems: 'start',
             }}

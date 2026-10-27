@@ -79,7 +79,15 @@ jobs:
     name: Test browser regression
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Match package-lock.json; browsers and OS dependencies are already installed.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --shm-size=1gb
+    defaults:
+      run:
+        shell: bash
+    # Reserve time for the regression suite and result uploads.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,8 +98,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - name: Run browser journeys against the real application with isolated storage
+        timeout-minutes: 10
         run: npm run test:regression
       - name: Upload browser results and failure evidence
         if: ${{ !cancelled() }}
@@ -245,6 +253,13 @@ jobs:
     name: Test browser smoke
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
+    # Match package-lock.json; avoid runtime apt downloads exhausting this job.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --shm-size=1gb
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -256,7 +271,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run build
       - name: Exercise critical roles and request workflow on isolated loopback fixtures
         run: npm run test:smoke
@@ -313,6 +327,8 @@ jobs:
               process.exit(1);
             }
           '
+      - name: Verify regression evidence generation
+        run: node --test .github/scripts/regression-evidence.test.mjs
       - name: Collect backend coverage
         if: ${{ !cancelled() && needs.build.result == 'success' && needs.application-tests.result == 'success' && needs.browser-tests.result == 'success' && needs.browser-smoke.result == 'success' && needs.database-tests.result == 'success' && needs.reviewer-tests.result == 'success' }}
         uses: actions/download-artifact@v4
@@ -336,5 +352,17 @@ jobs:
           path: |
             server/coverage/
             client/coverage/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record tested commit and CI run evidence
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+          EXPECTED_TESTED_SHA: ${{ github.event.action == 'closed' && github.event.pull_request.merge_commit_sha || github.sha }}
+        run: node .github/scripts/regression-evidence.mjs
+      - name: Upload immutable regression evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/regression-evidence-${{ github.run_id }}-${{ github.run_attempt }}/
           if-no-files-found: error
           retention-days: 14

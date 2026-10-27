@@ -254,6 +254,11 @@ begin
             (select string_agg(quote_literal(kind) || '::text', ', ')
               from unnest(c.allowed_kinds) kind) || ']))') as passed
     from required_notification_kinds r
+  ), index_checks as (
+    -- SG2-96: per-event lookups on the arrangement tables (202610260002).
+    select 'index public.' || expected.name as name, to_regclass('public.' || expected.name) is not null as passed
+    from (values ('venue_bookings_event_idx'), ('venue_booking_requests_event_idx'),
+      ('equipment_requests_event_idx'), ('equipment_reservations_event_idx')) expected(name)
   ), checks as (
     select * from column_checks union all select * from type_checks
     union all select * from relation_checks union all select * from status_checks
@@ -269,6 +274,7 @@ begin
     union all select * from grant_checks union all select * from view_checks
     union all select * from confirmation_pair_check
     union all select * from notification_checks
+    union all select * from index_checks
   )
   select array_agg(name order by name) into failures from checks where not passed;
 

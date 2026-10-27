@@ -25,7 +25,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[1].status, 'upcoming');
   });
 
-  test('[BOUNDARY] [SG2-38:AC1] [SG2-100:AC2] submitted means assigned-and-awaiting-review even with no coordinator on the row', () => {
+  test('[BOUNDARY] [SG2-38:AC1] [SG2-100:AC1] submitted means assigned-and-awaiting-review even with no coordinator on the row', () => {
     // SG2-100 Unit 2 deleted the old "submitted + null coordinator means
     // awaiting assignment" branch: submission writes `unassigned` now, and
     // 202610060002 backfilled the rows that used to take that branch. A
@@ -53,7 +53,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[3].status, 'upcoming');
   });
 
-  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] unassigned status returns "Awaiting Assignment" stage waiting on the Event Coordinator Lead', () => {
+  test('[NORMAL] [SG2-100:AC2] [SG2-100:AC5] unassigned status returns "Awaiting Assignment" stage waiting on the Event Coordinator Lead', () => {
     const result = computeEventStage({
       event_id: 20,
       status: 'unassigned',
@@ -72,7 +72,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[2].status, 'upcoming');
   });
 
-  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] awaiting_safety_check status waits on the Safety Officer at the safety_check step', () => {
+  test('[NORMAL] [SG2-100:AC2] [SG2-100:AC5] awaiting_safety_check status waits on the Safety Officer at the safety_check step', () => {
     const result = computeEventStage({
       event_id: 21,
       status: 'awaiting_safety_check',
@@ -91,7 +91,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[4].status, 'current');
   });
 
-  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] [SG2-92:AC4] safety_rejected status waits on the coordinator to rework it and stays at the safety_check step', () => {
+  test('[NORMAL] [SG2-100:AC2] [SG2-100:AC5] [SG2-92:AC4] safety_rejected status waits on the coordinator to rework it and stays at the safety_check step', () => {
     const result = computeEventStage({
       event_id: 22,
       status: 'safety_rejected',
@@ -119,7 +119,7 @@ describe('computeEventStage (SG2-38)', () => {
     });
   });
 
-  test('[NORMAL] [SG2-100:AC1] [SG2-100:AC5] preparation status waits on the named coordinator at the preparation step', () => {
+  test('[NORMAL] [SG2-100:AC2] [SG2-100:AC5] preparation status waits on the named coordinator at the preparation step', () => {
     const result = computeEventStage({
       event_id: 23,
       status: 'preparation',
@@ -138,7 +138,7 @@ describe('computeEventStage (SG2-38)', () => {
     assert.equal(result.stepper_steps[5].status, 'current');
   });
 
-  test('[BOUNDARY] [SG2-100:AC1] preparation status with no coordinator_id falls back to a null user_id', () => {
+  test('[BOUNDARY] [SG2-100:AC2] preparation status with no coordinator_id falls back to a null user_id', () => {
     const result = computeEventStage({
       event_id: 24,
       status: 'preparation'
@@ -287,7 +287,7 @@ describe('computeEventStage (SG2-38)', () => {
     ]);
   });
 
-  test('[BOUNDARY] [SG2-100:AC6] confirmed status produces a stepper array of exactly 7 steps, all completed', () => {
+  test('[BOUNDARY] [SG2-100:AC4] confirmed status produces a stepper array of exactly 7 steps, all completed', () => {
     const result = computeEventStage({ event_id: 7, status: 'confirmed' });
     assert.equal(result.stepper_steps.length, 7);
     assert.ok(result.stepper_steps.every(step => step.status === 'completed'));

@@ -386,7 +386,7 @@ test('[CONFLICT] [SG2-25:AC2] concurrent requests use separate user tokens and d
 // SG2-97 gives the Lead its own dedicated test below, so this loop now covers
 // only the Safety Officer.
 for (const role of ['safety_officer'] as const) {
-  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC13] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] [SG2-70:AC3] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision, and event search`, async () => {
+  test(`[NORMAL] [SG2-86:AC1] [SG2-100:AC5] [SG2-53:AC6] [SG2-77:AC5] [SG2-91:AC4] [SG2-92:AC1] [SG2-70:AC3] GET /api/auth/me for ${role} returns the profile grants plus the SG2-100 reads, venue safety details, read-only equipment placement, the safety check list and its decision, and event search`, async () => {
     const fetchMock = provider({ role });
     const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
     assert.equal(res.status, 200);
@@ -415,7 +415,7 @@ for (const role of ['safety_officer'] as const) {
   });
 }
 
-test('[NORMAL] [SG2-97:AC1] [SG2-100:AC13] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] [SG2-89:AC4] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, the coordinator overview, stage, history, their own notices and event search to the profile grants', async () => {
+test('[NORMAL] [SG2-97:AC1] [SG2-100:AC5] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3] [SG2-89:AC4] GET /api/auth/me for the Event Coordinator Lead adds assignment, the unassigned queue, the coordinator overview, stage, history, their own notices and event search to the profile grants', async () => {
   const fetchMock = provider({ role: 'event_coordinator_lead' });
   const res = await request(createApp()).get('/api/auth/me').set('Authorization', 'Bearer test-token');
   assert.equal(res.status, 200);
@@ -490,7 +490,7 @@ for (const role of [
   'event_organiser', 'attendee', 'venue_staff', 'technical_support_staff',
   'safety_officer', 'event_coordinator_lead'
 ] as const) {
-  test(`[FAILURE] [SG2-100:AC13] ${role} is refused event_request.complete server-side`, async () => {
+  test(`[FAILURE] [SG2-100:AC4] ${role} is refused event_request.complete server-side`, async () => {
     const access = createAuthorization({
       resolvePrincipal: async () => ({ userId, role }),
       permissions: PERMISSIONS
@@ -509,7 +509,7 @@ for (const role of [
   });
 }
 
-test('[BOUNDARY] [SG2-100:AC6] the complete route is matched on its own, not captured by the draft-update catch-all', async () => {
+test('[BOUNDARY] [SG2-100:AC4] the complete route is matched on its own, not captured by the draft-update catch-all', async () => {
   // '/:eventId' would swallow '/7/complete' if it were registered first, and
   // the symptom would be silent: the request would be gated by
   // event_request.update instead. The two permissions have disjoint role

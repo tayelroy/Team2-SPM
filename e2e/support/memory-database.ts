@@ -27,6 +27,8 @@ type QueryResult = { data: Row[] | Row | null; error: null; status: number };
  * query operations fail rather than silently ignoring query constraints. */
 export class MemoryDatabase {
   tables: Record<string, Row[]> = {};
+  /** SG2-96: mirror the database's safety-check hand-off (support/safety-handoff.ts). */
+  safetyHandoff = false;
   sessions = new Map<string, string>();
   venueHoldNow: () => number = Date.now;
   private sessionSequence = 0;
@@ -36,6 +38,7 @@ export class MemoryDatabase {
   constructor() { this.reset(); }
 
   reset() {
+    this.safetyHandoff = false;
     this.sessions.clear();
     this.sessionSequence = 0;
     this.seededAccounts = [];
