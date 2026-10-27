@@ -3,6 +3,7 @@ import { refreshSafetyCheckStatus } from './safety-handoff';
 import type { DecisionResult, VenueBookingDecisionStore } from '../../server/src/db/venueBookingDecisions';
 import type { NotificationRecord } from '../../server/src/db/notifications';
 import type { VenueBookingWithdrawalStore, WithdrawalResult } from '../../server/src/db/venueBookingWithdrawals';
+import { announceAttendeeChange, attendeeDetails } from './attendee-change-notices';
 import type { MemoryDatabase } from './memory-database';
 
 type Row = Record<string, unknown>;
@@ -68,6 +69,7 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
       const event = database.tables.events.find(row => row.event_id === request.event_id)!;
       const venue = database.tables.venues.find(row => row.venue_id === request.venue_id)!;
       const now = new Date().toISOString();
+      const shown = attendeeDetails(database, Number(request.event_id));
       let booking: number | null = null;
       if (decision === 'approve') {
         // SG2-81/SG2-83: a replacement is also decided once the event is in Preparation or Confirmed.
@@ -110,6 +112,8 @@ export function createMemoryDecisionStore(database: MemoryDatabase) {
         database.tables.notifications.push({ notification_id: nextId(database.tables.notifications, 'notification_id'),
           recipient_id: recipient, event_id: request.event_id, request_id: requestId, kind: `venue_request_${status}`, message, created_at: now });
       }
+      // SG2-102: a new or replaced venue reaches registered attendees at commit.
+      announceAttendeeChange(database, Number(request.event_id), shown);
       return { outcome: 'updated', request_id: requestId, status, venue_booking_id: booking, decided_at: now };
     }
   });

@@ -13,6 +13,7 @@ import {
   SIGNIFICANT_CHANGE_FIELDS,
   type RecheckKey
 } from '../../server/src/events/changeImpact';
+import { announceAttendeeChange, attendeeDetails } from './attendee-change-notices';
 import type { MemoryDatabase } from './memory-database';
 import { returnWhenSettled, waitingOn } from './safety-rereviews';
 import { latestSafetyDecision } from './safety-decisions';
@@ -63,6 +64,7 @@ export function createMemoryChangeImpact(database: MemoryDatabase) {
   const applyChange = async (_admin: unknown, input: ApplyAcceptedEventChangeInput): Promise<ApplyAcceptedEventChangeResult> => {
     const event = database.tables.events.find(row => row.event_id === input.eventId);
     if (!event || event.status !== input.expectedStatus || event.coordinator_id !== input.actorId) return { outcome: 'stale' };
+    const shown = attendeeDetails(database, input.eventId);
     const previous = String(event.status);
     const wasApproved = isSafetyApproved(previous, latestSafetyDecision(database, input.eventId));
     let changedSignificant = false;
@@ -105,6 +107,8 @@ export function createMemoryChangeImpact(database: MemoryDatabase) {
     // With no recheck named, nothing else refreshes the event: one whose
     // arrangements are all still in place goes straight back to the check.
     if (withdrawn && added.length === 0) await refreshSafetyCheck(event, input.eventId, input.actorId);
+    // SG2-102: the change reaches the event's registered attendees at commit.
+    announceAttendeeChange(database, input.eventId, shown);
     return { outcome: 'ok', previous_status: previous, status: String(event.status), returned_to_planning: returned,
       arrangements_recheck_needed: Boolean(event.arrangements_recheck_needed),
       outstanding_arrangements: [...((event.outstanding_arrangements ?? []) as RecheckKey[])] };

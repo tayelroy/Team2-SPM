@@ -9917,5 +9917,90 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-102-P01",
+    "title": "an accepted date change tells each registered attendee the old and new date, skips the one who withdrew, and My registrations shows the new date",
+    "story": "SG2-102",
+    "categories": [
+      "NORMAL"
+    ],
+    "mapped_acs": [
+      "SG2-102:AC1",
+      "SG2-102:AC2",
+      "SG2-102:AC3",
+      "SG2-102:AC4"
+    ],
+    "method_id": "SG2-102:an-accepted-date-change-tells-each-registered-attendee-the-old-and-new-date-skips-the-one-who",
+    "purpose": "Verify that when the coordinator accepts a date change, every attendee with an active registration gets one Event changed notice with the old and new date and time, an attendee who withdrew gets none, and the attendee goes from the notice to My registrations, which shows the new date, laid out cleanly at 1440px.",
+    "preconditions": "Reset loopback memory fixture with /__e2e/change-impact; production app build. No hosted Supabase. The notices come from e2e/support/attendee-change-notices.ts, the loopback mirror of private.announce_event_attendee_details, called by the change-impact fixture.",
+    "steps": [
+      "Sign in as coordinator@example.test at 1440px; open Harbour Showcase from My assigned events.",
+      "Click Accept change on the date sample request (moves the start a week).",
+      "GET /__e2e/change-impact-ledger and read the event_changed notices.",
+      "Sign in as attendee@example.test; open Notifications; open the Event changed notice.",
+      "Click View my registrations and read the Harbour Showcase registration."
+    ],
+    "data": [
+      "Event 661 (Harbour Showcase), Confirmed, starting 20 Jun 2030 10:00 SGT at Regression Hall; registrations for user-attendee and user-colleague, and a cancelled one for user-organiser2."
+    ],
+    "expected": [
+      "Exactly two event_changed notices, to user-attendee and user-colleague, each 'Harbour Showcase has changed. Date and time: 20 Jun 2030 10:00 SGT → 27 Jun 2030 10:00 SGT. Open My registrations for the latest details.'; none to user-organiser2.",
+      "The attendee's inbox labels it Event changed; opening it shows Harbour Showcase with a View my registrations button.",
+      "My registrations shows Harbour Showcase on 27 Jun 2030 and no longer 20 Jun 2030.",
+      "No horizontal overflow and no browser errors."
+    ],
+    "evidence": "e2e/attendee-event-changes.spec.ts:40",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in Chromium.",
+    "status": "Pass",
+    "execution_date": "27 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "27 Oct 2026; feature/SG2-102-notify-attendees-event-change on main fc63814 (SG2-65 #119). Local runs listed in the PR description. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-27",
+      "by": "LIM DAO JUN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
+  },
+  {
+    "id": "SG2-102-N01",
+    "title": "an accepted change to internal planning information sends attendees nothing, at phone width",
+    "story": "SG2-102",
+    "categories": [
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-102:AC5",
+      "SG2-102:AC3"
+    ],
+    "method_id": "SG2-102:an-accepted-change-to-internal-planning-information-sends-attendees-nothing-at-phone-width",
+    "purpose": "Verify that accepting a change attendees do not see (expected attendance) sends no Event changed notice to anyone, and that the attendee's inbox stays clear of it at 390px.",
+    "preconditions": "Same fixture as SG2-102-P01.",
+    "steps": [
+      "Sign in as coordinator@example.test at 390px; open Harbour Showcase; click Accept change on the attendance sample request (80 to 120).",
+      "GET /__e2e/change-impact-ledger and read the event_changed notices.",
+      "Sign in as attendee@example.test; open Notifications."
+    ],
+    "data": [
+      "Event 661 (Harbour Showcase) as in SG2-102-P01; the attendance sample raises expected attendance from 80 to 120."
+    ],
+    "expected": [
+      "No event_changed notice for any recipient, the withdrawn user-organiser2 included.",
+      "The attendee's inbox shows no Event changed notice and nothing saying Harbour Showcase has changed.",
+      "No horizontal overflow at 390px and no browser errors."
+    ],
+    "evidence": "e2e/attendee-event-changes.spec.ts:67",
+    "layer": "Playwright browser + fixture API",
+    "actual": "Passed in Chromium.",
+    "status": "Pass",
+    "execution_date": "27 Oct 2026",
+    "executed_by": "LIM DAO JUN",
+    "execution_evidence": "27 Oct 2026; feature/SG2-102-notify-attendees-event-change on main fc63814 (SG2-65 #119). Local runs listed in the PR description. Hosted CI evidence comes from the PR check.",
+    "review": {
+      "date": "2026-10-27",
+      "by": "LIM DAO JUN",
+      "method_inventory": "docs/test-case-inventory.json"
+    }
   }
 ]
