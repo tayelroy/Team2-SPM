@@ -192,8 +192,8 @@ do $$
 declare result jsonb;
 begin
  result := public.cancel_event(96701);
- if result->>'outcome' is distinct from 'ok' or (result->>'bookings_released')::int <> 2
-   or (result->>'attendees_notified')::int <> 1 then
+ if result->>'outcome' is distinct from 'ok' or (result->>'bookings_released')::int IS DISTINCT FROM 2
+   or (result->>'attendees_notified')::int IS DISTINCT FROM 1 then
   raise exception '[SG2-67:coordinator-cancels] [SG2-67:AC1] [SG2-67:AC2] [SG2-67:AC3] [NORMAL] The assigned coordinator must cancel, freeing both future venues and telling the one registered attendee: %', result;
  end if;
 end $$;
@@ -205,8 +205,8 @@ begin
  if (select count(*) from public.venue_bookings where event_id = 96701 and status = 'cancelled'
      and cancelled_by = 'd6700000-0000-4000-8000-000000000003'
      and cancellation_reason = 'Event cancelled: The keynote speaker withdrew') <> 2
-   or (select status from public.venue_bookings where booking_id = 96703) <> 'confirmed'
-   or (select status from public.venue_booking_requests where request_id = 96701) <> 'cancelled'
+   or (select status from public.venue_bookings where booking_id = 96703) IS DISTINCT FROM 'confirmed'
+   or (select status from public.venue_booking_requests where request_id = 96701) IS DISTINCT FROM 'cancelled'
    or (select venue_booking_id from public.events where event_id = 96701) is not null then
   raise exception '[SG2-67:venues-released] [SG2-67:AC2] [NORMAL] Both future bookings must be released with the reason, the past one kept and the committing request closed';
  end if;
@@ -214,9 +214,9 @@ begin
      and released_by = 'd6700000-0000-4000-8000-000000000003' and release_reason = 'Event cancelled') then
   raise exception '[SG2-67:equipment-released] [SG2-67:AC2] [NORMAL] Cancelling must release the equipment through SG2-56';
  end if;
- if (select status from public.venue_holds where hold_id = 96701) <> 'released'
-   or (select status from public.venue_booking_requests where request_id = 96702) <> 'cancelled'
-   or (select status from public.equipment_requests where request_id = 96701) <> 'cancelled'
+ if (select status from public.venue_holds where hold_id = 96701) IS DISTINCT FROM 'released'
+   or (select status from public.venue_booking_requests where request_id = 96702) IS DISTINCT FROM 'cancelled'
+   or (select status from public.equipment_requests where request_id = 96701) IS DISTINCT FROM 'cancelled'
    or not exists (select 1 from public.event_audit_logs where event_id = 96701 and field_name = 'venue_hold_status'
      and new_value = 'Released hold 96701 — Event cancelled') then
   raise exception '[SG2-67:holds-and-requests-released] [SG2-67:AC2] [NORMAL] The tentative hold must be released with history, and pending venue and equipment requests cancelled';
@@ -283,7 +283,7 @@ begin
   end;
  end loop;
  update public.events set name = 'Cancel Summit (renamed)' where event_id = 96701;
- if (select status from public.events where event_id = 96701) <> 'cancelled' then
+ if (select status from public.events where event_id = 96701) IS DISTINCT FROM 'cancelled' then
   raise exception '[SG2-67:other-edits-kept-cancelled] [SG2-67:AC5] [CONFLICT] Another edit changed a cancelled event''s status';
  end if;
  begin

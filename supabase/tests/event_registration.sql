@@ -85,16 +85,16 @@ do $$
 declare result jsonb;
 begin
  perform pg_temp.act('e6000000-0000-4000-8000-000000000003', null);
- if public.registrable_event(96001)->'registered' <> 'false'::jsonb then
+ if public.registrable_event(96001)->'registered' IS DISTINCT FROM 'false'::jsonb then
   raise exception '[SG2-60:not-yet-registered] [SG2-60:AC2] [NORMAL] Before registering, the detail must say the attendee holds no place';
  end if;
  result := public.register_for_event(96001, '  +65 9123 4567 ', '  Wheelchair access  ');
- if result->>'outcome' <> 'ok' or result->'registration'->>'event_id' <> '96001'
-   or result->'registration'->>'contact_phone' <> '+65 9123 4567' or result->'registration'->>'needs' <> 'Wheelchair access'
+ if result->>'outcome' IS DISTINCT FROM 'ok' or result->'registration'->>'event_id' IS DISTINCT FROM '96001'
+   or result->'registration'->>'contact_phone' IS DISTINCT FROM '+65 9123 4567' or result->'registration'->>'needs' IS DISTINCT FROM 'Wheelchair access'
    or (result->'registration'->>'registration_id') is null or (result->'registration'->>'registered_at') is null then
   raise exception '[SG2-60:registers-open-event] [SG2-60:AC1] [SG2-60:AC4] [NORMAL] An open event with places must register the attendee with their trimmed details: %', result;
  end if;
- if public.registrable_event(96001)->'registered' <> 'true'::jsonb
+ if public.registrable_event(96001)->'registered' IS DISTINCT FROM 'true'::jsonb
    or not (select (e->'registered')::boolean from jsonb_array_elements(public.registrable_events()) e where e->>'event_id' = '96001') then
   raise exception '[SG2-60:detail-shows-registered] [SG2-60:AC1] [NORMAL] Once registered, the list and the detail must say the attendee holds a place';
  end if;
@@ -104,7 +104,7 @@ reset role;
 do $$
 begin
  if (select count(*) from public.registrations where event_id = 96001) <> 1
-   or (select status from public.registrations where event_id = 96001) <> 'registered' then
+   or (select status from public.registrations where event_id = 96001) IS DISTINCT FROM 'registered' then
   raise exception '[SG2-60:place-held] [SG2-60:AC1] [NORMAL] Registering must store one registration that holds a place';
  end if;
  if (select string_agg(kind || '|' || message, ';') from public.notifications
@@ -171,12 +171,12 @@ declare result jsonb; target integer;
 begin
  perform pg_temp.act('e6000000-0000-4000-8000-000000000004', null);
  result := public.register_for_event(96002, '91234567', null);
- if result->>'outcome' <> 'not_open'
+ if result->>'outcome' IS DISTINCT FROM 'not_open'
    or (result->>'registration_opens_at')::timestamptz <> (select registration_opens_at from public.events where event_id = 96002) then
   raise exception '[SG2-60:not-open-says-when] [SG2-60:AC3] [FAILURE] Before opening, registration must be refused with the opening time: %', result;
  end if;
  result := public.register_for_event(96003, '91234567', null);
- if result->>'outcome' <> 'closed'
+ if result->>'outcome' IS DISTINCT FROM 'closed'
    or (result->>'registration_closes_at')::timestamptz <> (select registration_closes_at from public.events where event_id = 96003) then
   raise exception '[SG2-60:closed-refused] [SG2-60:AC3] [FAILURE] After closing, registration must be refused as closed: %', result;
  end if;
@@ -265,7 +265,7 @@ begin
  if (select coalesce(needs, '-') from public.registrations where event_id = 96001 and attendee_id = 'e6000000-0000-4000-8000-000000000004') <> '-' then
   raise exception '[SG2-60:blank-needs-null] [SG2-60:AC4] [BOUNDARY] Blank needs are stored as none';
  end if;
- if (select message from public.notifications where event_id = 96012) <> 'You are registered for Untitled event on 01 Aug 2030 10:30 SGT.' then
+ if (select message from public.notifications where event_id = 96012) IS DISTINCT FROM 'You are registered for Untitled event on 01 Aug 2030 10:30 SGT.' then
   raise exception '[SG2-60:confirmation-no-venue] [SG2-60:AC1] [BOUNDARY] An unnamed event with no venue is confirmed as Untitled event, without a venue';
  end if;
  begin

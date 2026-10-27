@@ -1,15 +1,10 @@
-/**
- * Fixture content for the ConnectSphere mockups. Everything here is static
- * sample data — the screens are a clickable prototype, not wired to the API.
- */
+/** Static content for the remaining previews and shared navigation. */
 
 import { color } from '../theme';
 import type {
   ActionItem,
   ContentScreen,
-  EquipmentRequest,
   EventRecord,
-  Notification,
   Role,
   Screen,
   Stat,
@@ -221,7 +216,6 @@ export const PAGE_TITLE: Record<ContentScreen, string> = {
   equipment: 'Equipment records',
   capacityExceptions: 'Capacity exceptions',
   attendee: 'Event page',
-  change: 'Change request',
   drafts: 'My draft requests',
   editDraft: 'Edit draft request',
   profile: 'My profile',
@@ -251,8 +245,6 @@ export const PAGE_BLURB: Record<ContentScreen, string> = {
   equipment:
     'Keep equipment type, stock, location and operational status current for request assessment.',
   attendee: 'Confirmed event details, registration, and your current status.',
-  change:
-    'Ask for a change after submission — the coordinator sees the knock-on impact.',
   drafts:
     'Requests you have saved but not yet submitted. Delete one you no longer intend to send.',
   editDraft: 'Update the details, then save your changes or submit when ready.',
@@ -358,87 +350,11 @@ export const STATUS_FILTERS: readonly StatusFilter[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-export const EQUIPMENT: EquipmentRequest[] = [
-  {
-    item: 'PA system — large hall',
-    event: 'E-201 Investor Forum',
-    qty: '1',
-    window: '12 Oct 10:00–17:00',
-    avail: '2 of 3 free in this window',
-    status: 1,
-  },
-  {
-    item: '4K projector + screen',
-    event: 'E-201 Investor Forum',
-    qty: '2',
-    window: '12 Oct 10:00–17:00',
-    avail: 'Only 1 free — overlaps E-190',
-    status: 0,
-  },
-  {
-    item: 'Hearing loop kit',
-    event: 'E-201 Investor Forum',
-    qty: '1',
-    window: '12 Oct 10:00–17:00',
-    avail: '4 of 5 free',
-    status: 1,
-  },
-  {
-    item: 'Staging risers (set of 6)',
-    event: 'E-190 Open Day',
-    qty: '1',
-    window: '28 Sep 08:00–18:00',
-    avail: 'Reserved',
-    status: 2,
-  },
-  {
-    item: 'Handheld mic set',
-    event: 'E-186 Board Offsite',
-    qty: '4',
-    window: '15 Oct 09:00–16:00',
-    avail: '8 of 12 free',
-    status: 1,
-  },
-];
-
 export const EQUIPMENT_STOCK: Stat[] = [
   { value: '31', label: 'Items in stock' },
   { value: '12', label: 'Reserved' },
   { value: '1', label: 'Shortfall' },
   { value: '5', label: 'Open requests' },
-];
-
-export const NOTIFICATIONS: Notification[] = [
-  {
-    title: 'Clarification requested on E-201',
-    body: 'A. Vance asked about catering headcount and stage size.',
-    when: '12 minutes ago',
-    dot: color.accent,
-  },
-  {
-    title: 'Coordinator assigned',
-    body: 'A. Vance is now coordinating E-201 Northbridge Investor Forum.',
-    when: '1 hour ago',
-    dot: color.teal,
-  },
-  {
-    title: 'Booking decision — Atrium Hall',
-    body: 'Venue staff flagged an overlap with E-190 and proposed 14:00–21:00.',
-    when: '3 hours ago',
-    dot: color.accent,
-  },
-  {
-    title: 'E-198 confirmed',
-    body: 'Venue and equipment settled. Attendees can now register.',
-    when: 'Yesterday',
-    dot: color.teal,
-  },
-  {
-    title: 'E-181 rejected',
-    body: 'No venue with capacity 400 was available on 9 Sep.',
-    when: '2 days ago',
-    dot: color.slate,
-  },
 ];
 
 export const ACTIVITY = [
@@ -522,28 +438,6 @@ export const ATTENDEE_FACTS = [
   { label: 'Time', value: '10:00 – 17:00' },
   { label: 'Venue', value: 'Atrium Hall, Level 1' },
   { label: 'Places left', value: '42 of 180' },
-];
-
-export const CHANGE_CHIPS = [
-  'Date or time',
-  'Expected attendance',
-  'Venue requirements',
-  'Equipment needs',
-];
-
-export const IMPACTS = [
-  {
-    text: "140 guests exceeds The Kelp Room's capacity of 120 — the venue booking must be re-checked.",
-    dot: color.accent,
-  },
-  {
-    text: 'Atrium Hall (320) and Harbour Terrace (200) are free on 3 Nov.',
-    dot: color.teal,
-  },
-  {
-    text: 'Equipment reservation unchanged; PA and mics cover 140.',
-    dot: color.teal,
-  },
 ];
 
 export const FOOTER_LINKS = [

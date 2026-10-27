@@ -275,13 +275,6 @@ test.each(['Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Event
     expect(api.loadReminderPreferences).toHaveBeenCalledTimes(role === 'Event Coordinator' ? 1 : 0);
   });
 
-test('[BOUNDARY] [SG2-84:AC6] prototype shell without a token preserves sample internal notifications', () => {
-  render(<AppShell role="Event Coordinator" screen="dashboard" onNavigate={vi.fn()} onSignOut={vi.fn()}>Prototype</AppShell>);
-  fireEvent.click(screen.getByRole('button', { name: 'Notifications (5)' })); expect(screen.getByText('Clarification requested on E-201')).toBeVisible();
-  expect(api.loadNotificationInbox).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'Close notifications' })); expect(screen.queryByText('Clarification requested on E-201')).not.toBeInTheDocument();
-});
-
 test('[BOUNDARY] [SG2-69:AC1] tokenless attendee prototype retains empty preview drawer', () => {
   render(<AppShell role="Attendee" screen="attendee" onNavigate={vi.fn()} onSignOut={vi.fn()}>Prototype</AppShell>);
   fireEvent.click(screen.getByRole('button', { name: 'Notifications (0)' })); expect(screen.getByText('No notifications available.')).toBeVisible();
@@ -344,7 +337,6 @@ test.each(['unmount', 'mutation'] as const)('[CONFLICT] [SG2-69:AC2] %s stops a 
   await act(async () => pending(value([placed], 1, cursor)));
   expect(api.loadNotificationInbox).toHaveBeenCalledTimes(4);
 });
-
 
 test('[CONFLICT] [SG2-69:AC1] [SG2-69:AC6] [SG2-104:AC1] changing acting role with the same token discards pending inbox and coordinator preferences', async () => {
   let inbox!: (result: InboxOutcome<InboxPage>) => void;

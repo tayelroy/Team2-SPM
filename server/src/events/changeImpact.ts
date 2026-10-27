@@ -44,17 +44,6 @@ export const RECHECK_KEYS = [
   'safety_other_recheck',
 ] as const;
 
-/** Registration settings stay editable on Confirmed and Preparation events
- * (SG2-66 AC6), and are never part of a change request. Capacity and times
- * are the organiser's own setting (SG2-63 AC5); the coordinator can only say
- * whether registration is needed. */
-export const REGISTRATION_SETTINGS = [
-  'registration_needed',
-  'registration_capacity',
-  'registration_opens_at',
-  'registration_closes_at',
-] as const;
-
 export type ChangeableStatus = (typeof CHANGEABLE_STATUSES)[number];
 export type ChangeableField = (typeof CHANGEABLE_FIELDS)[number];
 export type RecheckKey = (typeof RECHECK_KEYS)[number];

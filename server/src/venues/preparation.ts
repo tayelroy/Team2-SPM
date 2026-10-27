@@ -31,15 +31,6 @@ export function gapMinutes(times: PreparationTimes): number {
 }
 
 /**
- * SG2-78 AC1: the period a booking keeps its venue busy, from setup before it
- * starts until turnaround after it ends. 10:00-12:00 with 30 minutes setup
- * and 45 minutes turnaround is 09:30-12:45.
- */
-export function effectivePeriod(period: Period, times: PreparationTimes): Period {
-  return { starts_at: shiftIso(period.starts_at, -times.setup_minutes), ends_at: shiftIso(period.ends_at, times.turnaround_minutes) };
-}
-
-/**
  * SG2-78 AC2: two periods at one venue clash when their effective periods
  * overlap, which is when the gap between them is shorter than setup plus
  * turnaround. Periods exactly that far apart do not clash.

@@ -1,0 +1,61 @@
+{
+  "retiredOn": "2026-10-27",
+  "sourceCommit": "c5697076e98394cde68d6bf14fd9ccec4db6e8f7",
+  "reason": "Previous native selector rollout compatibility; current AppShell uses the custom switcher and single-role header. Current R03/R04/R05 workflows remain; completed old-control proof is historical.",
+  "originalRecords": [
+    {
+      "id": "SG2-104-R01",
+      "title": "Native staging selector reads only the selected role and preserves current-role no-op",
+      "story": "SG2-104",
+      "type": "NORMAL",
+      "categories": [
+        "NORMAL",
+        "BOUNDARY"
+      ],
+      "mapped_acs": [
+        "SG2-104:AC1"
+      ],
+      "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+      "preconditions": "Native browser SELECT with Event Organiser first and Event Coordinator selected second; a real change-event counter begins at zero.",
+      "steps": [
+        "Read current and held roles; request the current role while Profile holds focus; choose Organiser, then Coordinator."
+      ],
+      "expected": "Only the selected role is reported; both held labels are returned; no-op preserves focus and dispatches zero changes; two actual selections dispatch exactly two changes.",
+      "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs",
+      "layer": "Playwright browser DOM and production application + local fixture API",
+      "status": "Pass",
+      "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+      "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+      "execution_date": "26 Oct 2026",
+      "executed_by": "Automated local verification",
+      "review": null
+    },
+    {
+      "id": "SG2-104-R02",
+      "title": "Native staging adapter refuses unheld roles without changing selection",
+      "story": "SG2-104",
+      "type": "CONFLICT",
+      "categories": [
+        "CONFLICT",
+        "FAILURE"
+      ],
+      "mapped_acs": [
+        "SG2-104:AC2"
+      ],
+      "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+      "preconditions": "The same genuine native SELECT and zero change-event counter.",
+      "steps": [
+        "Request Technical Support Staff, which is absent from the held-role options."
+      ],
+      "expected": "The request is rejected before a change event; Event Coordinator remains selected and the counter remains zero.",
+      "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs",
+      "layer": "Playwright browser DOM and production application + local fixture API",
+      "status": "Pass",
+      "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+      "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+      "execution_date": "26 Oct 2026",
+      "executed_by": "Automated local verification",
+      "review": null
+    }
+  ]
+}

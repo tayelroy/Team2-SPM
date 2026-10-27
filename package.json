@@ -19,12 +19,10 @@
     "ci:full": "npm run ci && npm run test:e2e",
     "test:reviewer": "node --test .github/scripts/security-review.test.mjs",
     "test:coverage": "npm run test:inventory && npm run test:coverage --workspace server && npm run test:coverage --workspace client && npm run test:reviewer",
-    "test:inventory": "node .github/scripts/test-inventory.mjs && node --test .github/scripts/test-inventory.test.mjs hosted-e2e/policy.test.mjs",
+    "test:inventory": "node .github/scripts/test-inventory.mjs && node --test .github/scripts/test-inventory.test.mjs",
     "test:inventory:update": "node .github/scripts/test-inventory.mjs --write",
     "test:integration": "node .github/scripts/test-api-integration.mjs",
-    "test:smoke": "tsc -p e2e/tsconfig.json && playwright test e2e/smoke.spec.ts",
-    "test:hosted:readonly": "node .github/scripts/test-hosted-roles.mjs",
-    "test:hosted:policy": "node --test hosted-e2e/policy.test.mjs"
+    "test:smoke": "tsc -p e2e/tsconfig.json && playwright test e2e/smoke.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

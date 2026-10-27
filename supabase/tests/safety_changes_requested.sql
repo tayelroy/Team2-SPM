@@ -85,8 +85,8 @@ begin
  end if;
  if (select status||placement_position||shortfall from public.equipment_requests where event_id=99301) is distinct from 'approvedStage left0'
    or not exists(select 1 from public.equipment_reservations where event_id=99301)
-   or (select status from public.venue_bookings where event_id=99301) <> 'confirmed'
-   or (select status from public.venue_booking_requests where event_id=99301) <> 'approved' then
+   or (select status from public.venue_bookings where event_id=99301) IS DISTINCT FROM 'confirmed'
+   or (select status from public.venue_booking_requests where event_id=99301) IS DISTINCT FROM 'approved' then
   raise exception '[SG2-93:arrangements-kept] [SG2-93:AC3] [BOUNDARY] Requesting changes must not release or reopen any booking, request or reservation';
  end if;
 end $$;
@@ -221,7 +221,7 @@ begin
   raise exception '[SG2-93:equipment-needs-support] [SG2-93:AC2] [FAILURE] Venue Staff must not confirm equipment again';
  end if;
  result := public.confirm_safety_rereview(pg_temp.flag(99302,'equipment'),'d9300000-0000-4000-8000-000000000004','technical_support_staff');
- if result->>'status' is distinct from 'awaiting_safety_check' or result->'outstanding_arrangements' <> '[]'::jsonb then
+ if result->>'status' is distinct from 'awaiting_safety_check' or result->'outstanding_arrangements' IS DISTINCT FROM '[]'::jsonb then
   raise exception '[SG2-93:equipment-confirmed-returns] [SG2-93:AC4] [NORMAL] Confirming the last equipment flag must return the event to the check: %', result;
  end if;
 end $$;

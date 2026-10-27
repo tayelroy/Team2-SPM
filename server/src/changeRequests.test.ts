@@ -15,7 +15,6 @@ import type {
 } from './db/changeImpact';
 import {
   createMockChangeRequestSource,
-  mockChangeRequests,
   type ChangeRequestEvent,
   type ChangeRequestSource
 } from './changeRequests/mockChangeRequests';
@@ -42,12 +41,13 @@ const FACTS: ChangeImpactFacts = {
 };
 const ADMIN = {} as SupabaseClient;
 
-describe('mock change requests (stand-in for SG2-64/SG2-65)', () => {
+describe('mock change requests for loopback workflows', () => {
   const event = (overrides: Partial<ChangeRequestEvent> = {}): ChangeRequestEvent =>
     ({ event_id: 12, expected_attendance: 120, proposed_date: START, description: 'Agenda', ...overrides });
 
-  test('[NORMAL] [SG2-66:AC1] seeds an attendance, a date and a description request per event', async () => {
-    const source = createMockChangeRequestSource(() => CLOCK);
+  test('[NORMAL] [SG2-66:AC1] seeds an attendance, a date and a description request per event', async (t) => {
+    t.mock.timers.enable({ apis: ['Date'], now: CLOCK });
+    const source = createMockChangeRequestSource();
     assert.deepEqual(await source.list(event()), [
       { id: 'mock-12-attendance', requested_at: '2026-10-19T02:00:00.000Z', reason: 'More guests have confirmed than planned.',
         status: 'pending', changes: [{ field: 'expected_attendance', label: 'Expected attendance', from: 120, to: 180 }] },
@@ -86,12 +86,6 @@ describe('mock change requests (stand-in for SG2-64/SG2-65)', () => {
     source.reset();
     const reseeded = await source.list(event({ expected_attendance: 500 }));
     assert.deepEqual([reseeded.length, reseeded[0].changes[0].to, reseeded[0].requested_at], [3, 750, '2027-01-01T00:00:00.000Z']);
-  });
-
-  test('[NORMAL] [SG2-66:AC1] the process-wide stand-in uses the real clock', async () => {
-    const [attendance] = await mockChangeRequests.list(event({ event_id: 2147483000 }));
-    assert.equal(Number.isNaN(Date.parse(attendance.requested_at)), false);
-    mockChangeRequests.reset();
   });
 });
 

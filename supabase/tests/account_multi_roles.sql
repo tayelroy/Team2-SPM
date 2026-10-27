@@ -189,7 +189,7 @@ begin
   perform set_config('request.headers', '{"x-acting-role":"event_coordinator"}', true);
   result := public.release_venue_booking(104101, 'Room no longer needed');
   if result ->> 'outcome' is distinct from 'missing'
-      or (select status from public.venue_bookings where booking_id = 104101) <> 'confirmed' then
+      or (select status from public.venue_bookings where booking_id = 104101) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-104:release-scoped-by-acting-role] [SG2-104:AC2] [FAILURE] Acting as coordinator must only release bookings of assigned events: %', result;
   end if;
   perform set_config('request.headers', '{"x-acting-role":"attendee"}', true);
@@ -206,7 +206,7 @@ begin
     raise exception '[SG2-83:acting-venue-staff-release-refused] [SG2-83:AC5] [FAILURE] Acting as Venue Staff must not release a booking';
   exception when insufficient_privilege then null;
   end;
-  if (select status from public.venue_bookings where booking_id = 104101) <> 'confirmed' then
+  if (select status from public.venue_bookings where booking_id = 104101) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-83:acting-venue-staff-release-no-change] [SG2-83:AC5] [FAILURE] A refused release changed the booking';
   end if;
 end $$;
@@ -253,7 +253,7 @@ begin
     raise exception '[SG2-104:requirements-as-coordinator] [SG2-104:AC1] [NORMAL] Acting as the assigned coordinator must request equipment: %', result;
   end if;
   result := public.confirm_event(104004);
-  if result ->> 'outcome' is distinct from 'outstanding' or result -> 'outstanding' <> '["venue"]'::jsonb then
+  if result ->> 'outcome' is distinct from 'outstanding' or result -> 'outstanding' IS DISTINCT FROM '["venue"]'::jsonb then
     raise exception '[SG2-104:confirm-as-coordinator] [SG2-104:AC1] [NORMAL] Acting as the assigned coordinator must reach the confirmation check: %', result;
   end if;
 end $$;
@@ -285,7 +285,7 @@ begin
   end;
   update public.events set coordinator_id = null where event_id = 104003;
   update public.events set coordinator_id = 'd1040000-0000-4000-8000-000000000009' where event_id = 104003;
-  if (select coordinator_id from public.events where event_id = 104003) <> 'd1040000-0000-4000-8000-000000000009' then
+  if (select coordinator_id from public.events where event_id = 104003) IS DISTINCT FROM 'd1040000-0000-4000-8000-000000000009' then
     raise exception '[SG2-104:other-coordinator-allowed] [SG2-104:AC2] [BOUNDARY] No coordinator, or someone other than the organiser, must stay allowed';
   end if;
 end $$;
@@ -329,7 +329,7 @@ reset role;
 do $$
 begin
   if current_setting('sg2104.own_result')::jsonb ->> 'outcome' is distinct from 'own_request'
-      or (select status from public.venue_booking_requests where request_id = 104201) <> 'pending'
+      or (select status from public.venue_booking_requests where request_id = 104201) IS DISTINCT FROM 'pending'
       or exists (select 1 from public.event_audit_logs where event_id = 104001 and field_name = 'venue_booking_request')
       or exists (select 1 from public.notifications where request_id = 104201) then
     raise exception '[SG2-104:venue-staff-own-request-refused] [SG2-104:AC2] [FAILURE] Venue Staff must not decide a request they raised, and nothing may change: %',

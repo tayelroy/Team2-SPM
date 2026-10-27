@@ -1,3 +1,11 @@
+# Historical hosted role proof — 16 October 2026
+
+Retired from current automation on 27 October 2026: this completed proof was fixed to one old preview, named records and prototype pages. Current repeatable role behavior remains in the loopback suites and configurable staging walkthrough. The original evidence and execution claims below are historical; they are not fresh execution or current acceptance.
+
+[Original executable source](https://github.com/tayelroy/Team2-SPM/tree/c04b2212df1a002b3ceb36e6b2216412ec0f142d/hosted-e2e) and [original run instructions](https://github.com/tayelroy/Team2-SPM/blob/c04b2212df1a002b3ceb36e6b2216412ec0f142d/docs/hosted-role-smoke.md). Relative source paths below refer to that commit. Existing private media is unchanged.
+
+---
+
 # Optional recorded hosted read-only role smoke
 
 This user-authorised suite is separate from the resettable loopback regression

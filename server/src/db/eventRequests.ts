@@ -251,7 +251,7 @@ export async function insertEventRequestDraft(
   return { ok: true, request: data[0] as unknown as EventRequestRecord };
 }
 
-/** Shape shared by owner and organisation list reads. */
+/** Summary returned by organisation and scope=mine list reads. */
 function summarizeEventRequest(row: Record<string, unknown>): EventRequestSummaryRecord {
   return {
     event_id: Number(row.event_id),
@@ -340,73 +340,6 @@ export async function fetchManageableEventRequest(
     return { ok: false, reason: 'not_found', message: 'No event request found for this account.' };
   }
   return result;
-}
-
-/**
- * Reads all event requests belonging to the organiser (SG2-31).
- *
- * Scoped by `organiser_id` so an organiser never sees events from another
- * tenant. Optionally filters by `status` if provided. Results are ordered by
- * `event_id` descending so the newest requests appear first. Coordinator
- * details are retrieved via foreign key join with public.users.
- */
-export async function fetchOwnEventRequests(
-  admin: SupabaseClient,
-  organiserId: string,
-  statusFilter?: string
-): Promise<FetchEventRequestsResult> {
-  let query = admin
-    .from('events')
-    .select(SUMMARY_COLUMNS)
-    .eq('organiser_id', organiserId);
-
-  if (statusFilter) {
-    query = query.eq('status', statusFilter);
-  }
-
-  const { data, error } = await query.order('event_id', { ascending: false });
-
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
-  }
-
-  const rows = (data as unknown as Record<string, unknown>[] | null) ?? [];
-  const requests = rows.map(summarizeEventRequest);
-
-  return { ok: true, requests };
-}
-
-/**
- * Reads an event request scoped to its owning organiser (SG2-30, SG2-31).
- *
- * Scoping the lookup by `organiser_id` in the same query — rather than
- * fetching by `event_id` alone and comparing ownership afterwards — means a
- * request belonging to someone else is indistinguishable from one that does
- * not exist at all. Coordinator details are retrieved via foreign key join.
- */
-export async function fetchOwnEventRequest(
-  admin: SupabaseClient,
-  eventId: number,
-  organiserId: string
-): Promise<FetchEventRequestResult> {
-  const { data, error } = await admin
-    .from('events')
-    .select(DETAIL_COLUMNS)
-    .eq('event_id', eventId)
-    .eq('organiser_id', organiserId);
-
-  if (error) {
-    return { ok: false, reason: 'unavailable', message: error.message };
-  }
-  if (!data || data.length === 0) {
-    return { ok: false, reason: 'not_found', message: 'No event request found for this account.' };
-  }
-  const row = data[0] as unknown as Record<string, unknown>;
-  const request: EventRequestRecord = {
-    ...toDetailRecord(row),
-    coordinator_phone: extractCoordinatorPhone(row)
-  };
-  return { ok: true, request };
 }
 
 /** Statuses a row may transition from when submitted (SG2-30). */
@@ -643,7 +576,7 @@ export async function requestClarification(
  * Deletes an event request, but only while it is the caller's own and still
  * a draft (SG2-32).
  *
- * Callers already check ownership and status via fetchOwnEventRequest first
+ * Callers already check ownership and status via fetchManageableEventRequest first
  * — the same shape submitEventRequestHandler uses (SG2-30) — but
  * `organiser_id` is repeated here as a condition on the write itself, not
  * just relied on as a pre-check: an AI security review flagged that a
@@ -680,7 +613,7 @@ export async function deleteEventRequestDraft(
  * Reads an event request by id, unscoped by organiser (SG2-33/SG2-34).
  *
  * The Event Coordinator Lead acts across every organisation, unlike
- * fetchOwnEventRequest's organiser-scoped lookup — there is no owning
+ * fetchManageableEventRequest's organisation-and-creator lookup — there is no owning
  * caller to scope this to.
  */
 export async function fetchEventRequestById(

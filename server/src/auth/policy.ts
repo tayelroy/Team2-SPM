@@ -45,7 +45,7 @@ export const PERMISSIONS: PermissionMap = Object.freeze({
   // SG2-26: the organisation event view is restricted to Event Organisers.
   'event_request.view': ['event_organiser'],
   // SG2-32: an organiser can delete their own event requests. Ownership
-  // itself is enforced per-row in the handler (fetchOwnEventRequest) and
+  // itself is enforced per-row in the handler (fetchManageableEventRequest) and
   // atomically in the delete query itself, not by this role grant.
   'event_request.delete': ['event_organiser'],
   // SG2-29: an organiser can edit their own request's fields while it is

@@ -1,0 +1,58 @@
+{
+  "retiredOn": "2026-10-27",
+  "sourceCommit": "c04b2212df1a002b3ceb36e6b2216412ec0f142d",
+  "reason": "Completed preview-specific proof; fixed old origin, named Draft23/event22 records and prototype pages. The sole-consumer harness, policy helpers and optional inventory branch are retired together. Historical execution is preserved without claiming current equivalence.",
+  "originalRecord": {
+    "id": "REG-OPTIONAL-HOSTED-SEVEN-ROLE-READONLY",
+    "title": "Opt-in seven-role hosted page proof has strict read-only guards and safe recorded output",
+    "type": "Normal / boundary / failure",
+    "story": "SG2-23",
+    "purpose": "Provide actual approved hosted role/page screenshots and videos without sending application mutations, retaining credentials or conflating read-only page proof with full business acceptance.",
+    "preconditions": "Explicitly approved optional hosted run against the exact allowlisted preview, runtime-only QA password and seven existing authorised QA roles; one fresh context per role, serial logins, no retries. Discovery and CI policy tests require no hosted credentials. The ordinary loopback fixture suite remains the CI default.",
+    "steps": [
+      "Offline, verify exact-origin/read-only request policy, credential-free discovery, refusal before browser startup without runtime credentials, and sanitised JSON/JUnit attachments.",
+      "For each of seven roles, sign in normally, assert role-specific loaded/empty states before every screenshot, visit only allowed read-only pages, then log out to Landing.",
+      "Capture each of47 role/page checkpoints at1440px and390px, recording94 PNGs and seven videos; inspect all94 actual images for loading, overflow, overlap and readability.",
+      "Stop the entire batch on authentication failure, throttling, network/application error or forbidden write; do not retain traces/HAR/auth storage/browser profiles/raw sign-in failures."
+    ],
+    "data": "Existing Organiser Draft23/history and My Events; Coordinator assigned QA22/readiness; Venue Staff calendar/holds/catalogue; TSS equipment; Lead queue; Safety placeholder and real profile; Attendee prototypes and real profile.",
+    "expected": "Seven approved role contexts complete only normal sign-in/logout and navigation; all other application writes and alternate origins are blocked. Reports retain scoped page/media proof without runtime secrets. Positive page-settled assertions run before each width. The Organiser's own Draft23 detail must show the separately loaded Event stage progress region, stage Draft, waiting-on Event Organiser, and next step Complete and submit event request; the heading alone is not a ready-state oracle. Coordinator QA22 uses its distinct equipment/readiness view rather than requiring an Organiser-only region. Safety placeholder and Attendee prototype screens never imply delivery of those full workflows.",
+    "evidence": "hosted-e2e/roles.spec.ts; hosted-e2e/policy.test.mjs; .github/scripts/test-inventory.test.mjs; playwright.hosted.config.ts; .github/scripts/test-hosted-roles.mjs",
+    "layer": "Four offline Node policy declarations plus one inventory declaration; seven optional recorded hosted Playwright declarations, separate from loopback CI browser tests",
+    "status": "Pass",
+    "actual": "Twelve new declarations: seven opt-in hosted role cases, four offline policy cases, one inventory integration case. b3 introduced the harness; c04 strengthened page-settled oracles. Current c04 CI38839394116 passed all eight jobs and its18 inventory/policy runner cases (14 inventory plus4 policy). Approved actual hosted run2026-10-16T02-21-44.294Z passed7/7 roles,47 page checkpoints,94 screenshots and7 videos, with no HTTP/network/application-console/page/write failures. All94 images received scoped visual review, including exact-SHA reuse of67 previously reviewed images and direct inspection of27 changed images.",
+    "execution_evidence": "Source checkpoints b3c6d6b600f63c602af3c9d119a4e9d749a8a11a and c04b2212df1a002b3ceb36e6b2216412ec0f142d; CI38839394116; ignored output/hosted-role-smoke/2026-10-16T02-21-44.294Z/report.json and verification/hosted-playwright-c04-visual-review.json. Private professor evidence bundle remains local; no public upload or human peer approval is implied.",
+    "execution_date": "16 Oct 2026",
+    "executed_by": "Codex (approved recorded read-only QA and visual review; not independent peer review)",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3",
+      "SG2-23:AC1",
+      "SG2-25:AC2",
+      "SG2-40:AC1",
+      "SG2-57:AC1",
+      "SG2-86:AC2"
+    ],
+    "source_method_ids": [
+      "SG2-22:optional-hosted-role-declarations-enter-the-ledger-without-a-hosted-directory-being-required",
+      "SG2-25:hosted-read-only-guard-permits-normal-auth-but-blocks-booking-profile-and-implicit-review-writes",
+      "SG2-25:hosted-guard-refuses-alternate-origins-and-lookalike-hosts-while-allowing-only-existing-static",
+      "SG2-25:hosted-json-and-junit-omit-password-token-raw-failure-steps-config-and-unsafe-attachments",
+      "SG2-25:optional-hosted-execution-refuses-missing-runtime-credentials-before-starting-playwright",
+      "SG2-23:hosted-role-1-organiser-pages-and-owned-draft23-history-are-read-only",
+      "SG2-23:hosted-role-2-coordinator-pages-and-assigned-event22-readiness-are-read-only",
+      "SG2-23:hosted-role-3-venue-staff-pages-calendar-holds-and-catalogue-are-read-only",
+      "SG2-23:hosted-role-4-technical-support-pages-and-equipment-are-read-only",
+      "SG2-23:hosted-role-5-lead-queue-and-assignment-pages-are-inspected-without-assigning",
+      "SG2-23:hosted-role-7-attendee-prototype-pages-and-real-profile-render-without-registration-mutations"
+    ],
+    "historical_source_method_ids": [
+      "TC-636d33e52f44"
+    ],
+    "historical_source_method_note": "Legacy source references retained for provenance only. These IDs are absent from the current method inventory and are excluded from current method references; no current equivalence or fresh execution is claimed."
+  }
+}

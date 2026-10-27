@@ -1,9 +1,6 @@
-// STAND-IN FOR SG2-64 / SG2-65 (Ye Zhan): submitting a change request and
-// deciding on one are not built yet. Until they are, SG2-66 reads SAMPLE
-// change requests from this in-memory mock. SG2-64/65 replace it by passing a
-// database-backed ChangeRequestSource to createChangeRequestHandlers; nothing
-// else in SG2-66 (impact, acceptance, return to Planning, notices, history,
-// rechecks) depends on where change requests come from.
+// In-memory fixture source for loopback change-request workflows. The
+// application defaults to the database-backed source; e2e and integration
+// harnesses create isolated factory instances that can be reset.
 import {
   CHANGE_FIELD_LABELS,
   type ChangeRequestChange,
@@ -107,6 +104,3 @@ export function createMockChangeRequestSource(now: () => Date = () => new Date()
     }
   };
 }
-
-/** The process-wide SG2-64/SG2-65 stand-in the production app uses. */
-export const mockChangeRequests = createMockChangeRequestSource();

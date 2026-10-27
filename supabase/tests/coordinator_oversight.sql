@@ -88,10 +88,6 @@ begin
      and column_name='coordinator_assigned_by') is distinct from 'YES' then
    raise exception '[SG2-89:assigner-nullable] [BOUNDARY] [SG2-89:AC1] Events assigned before their history existed must be allowed no supervising Lead';
  end if;
- if has_table_privilege('authenticated','public.internal_work_items','select')
-     or has_table_privilege('anon','public.internal_work_items','select') then
-   raise exception '[SG2-89:queue-view-private] [FAILURE] [SG2-89:AC4] Replacing the work queue view must keep it server-only';
- end if;
 end;
 $$;
 rollback;

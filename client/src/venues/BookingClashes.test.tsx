@@ -6,7 +6,6 @@ import { describePeriod, eventLabel, fetchVenueClashes, type ClashBooking, type 
 import { formatSgt } from './searchApi';
 import Dashboard from '../screens/Dashboard';
 import HoldNotifications from '../components/HoldNotifications';
-import * as notices from '../api/notificationsApi';
 import * as inbox from '../api/notificationInboxApi';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -106,10 +105,4 @@ test('[NORMAL] [SG2-79:AC4] the coordinator\'s notifications show a flagged clas
   (await screen.findByRole('button', { name: 'Notifications (1)' })).click();
   expect(await screen.findByText('Booking clash flagged')).toBeVisible();
   expect(screen.getByText('Clash Hall: Morning Summit now clashes with another event.')).toBeVisible();
-});
-
-test('[BOUNDARY] [SG2-79:AC4] a clash notice is accepted as a notification kind', async () => {
-  serve(() => Response.json({ notifications: [{ notification_id: 5, event_id: 7, request_id: null, kind: 'venue_booking_clash',
-    message: 'm', created_at: '2030-01-01T00:00:00.000Z' }] }));
-  expect((await notices.loadNotifications('token')).ok).toBe(true);
 });

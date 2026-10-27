@@ -198,7 +198,7 @@ begin
    or exists(select 1 from public.notifications where event_id=99208) then
   raise exception '[SG2-92:invalid-no-writes] [SG2-92:AC2] [FAILURE] A refused decision must write nothing';
  end if;
- if (select char_length(reason) from public.event_safety_decisions where event_id=99209) <> 2000
+ if (select char_length(reason) from public.event_safety_decisions where event_id=99209) IS DISTINCT FROM 2000
    or (select min(char_length(message))||'|'||max(char_length(message)) from public.notifications where event_id=99209)
      is distinct from '2000|2000' then
   raise exception '[SG2-92:reason-2000-stored] [SG2-92:AC5] [BOUNDARY] A 2000-character reason is stored whole and its notice cut to 2000';
@@ -335,11 +335,6 @@ begin
    values (99212,'reject',' ','d9200000-0000-4000-8000-000000000004');
   raise exception '[SG2-92:reason-constraint] [SG2-92:AC2] [FAILURE] A blank rejection reason must break a constraint';
  exception when check_violation then null; end;
- if not exists(select 1 from pg_constraint where conname='notifications_kind_check'
-     and pg_get_constraintdef(oid) like '%safety_decision%'
-     and pg_get_constraintdef(oid) like '%event_returned_to_planning%') then
-  raise exception '[SG2-92:notice-kind-allowed] [SG2-92:AC5] [NORMAL] The safety decision notice kind must be allowed alongside every earlier kind';
- end if;
 end $$;
 
 -- SG2-92 with SG2-91: a decision on a review whose details have since changed

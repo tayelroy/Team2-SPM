@@ -6,7 +6,6 @@ import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
 import EventsTable from './screens/EventsTable';
-import ChangeRequest from './screens/ChangeRequest';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
 // this project does not, so unmount between tests explicitly.
@@ -320,10 +319,10 @@ test('[FAILURE] [SG2-24:AC2] the role shown in the header is a read-only label, 
   expect(roleLabel).toHaveTextContent('Event Coordinator');
   // Only Technical Support Staff can change a role (SG2-24) — not the user
   // themselves, so this must not be an interactive control.
-  expect(roleLabel.tagName).not.toBe('SELECT');
+  expect(within(header()).queryByRole('combobox')).not.toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-86:AC3] a Safety Officer sees their own role in the header, not another role', async () => {
+test('[NORMAL] [SG2-86:role-header-display] a Safety Officer sees their own role in the header, not another role', async () => {
   await signInAs('Safety Officer');
   const roleLabel = screen.getByLabelText('Your role');
   expect(roleLabel).toHaveTextContent('Safety Officer');
@@ -921,19 +920,6 @@ test('[NORMAL] [SG2-20:prototype-registration] an attendee can withdraw and re-r
   ).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-20:prototype-amendment] standalone change-request prototype categories toggle', () => {
-  render(<ChangeRequest />);
-
-  const selected = screen.getByRole('button', { name: 'Expected attendance' });
-  expect(selected).toHaveAttribute('aria-pressed', 'true');
-
-  const other = screen.getByRole('button', { name: 'Date or time' });
-  expect(other).toHaveAttribute('aria-pressed', 'false');
-  fireEvent.click(other);
-  expect(other).toHaveAttribute('aria-pressed', 'true');
-  fireEvent.click(other);
-  expect(other).toHaveAttribute('aria-pressed', 'false');
-});
 
 test('[NORMAL] [SG2-26:AC1] organiser dashboard opens the selected real event and has no mock notifications', async () => {
   await signInAs('Event Organiser');

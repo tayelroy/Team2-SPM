@@ -7,8 +7,6 @@ import {
   fetchAssignableRequests,
   fetchEventRequestById,
   fetchOrganiserOrganisation,
-  fetchOwnEventRequest,
-  fetchOwnEventRequests,
   decideEventRequest,
   requestClarification,
   insertEventRequestDraft,
@@ -74,38 +72,6 @@ function fakeEventsSelectClient(
             then(resolve: (value: Result) => unknown) {
               capture?.({ eventId: filters.eventId, organiserId: filters.organiserId });
               return Promise.resolve(result).then(resolve);
-            }
-          };
-          return chain;
-        }
-      };
-    }
-  } as unknown as SupabaseClient;
-}
-
-function fakeEventsListClient(
-  result: Result,
-  capture?: (filters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown }) => void
-): SupabaseClient {
-  return {
-    from(table: string) {
-      assert.equal(table, 'events');
-      return {
-        select: (_columns: string) => {
-          const filters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown } = {};
-          const chain = {
-            eq(column: string, value: unknown) {
-              if (column === 'organiser_id') filters.organiserId = value;
-              if (column === 'status') filters.status = value;
-              return chain;
-            },
-            order(column: string, options: unknown) {
-              filters.orderColumn = column;
-              filters.orderOptions = options;
-              return Promise.resolve(result).then((res) => {
-                capture?.(filters);
-                return res;
-              });
             }
           };
           return chain;
@@ -447,7 +413,7 @@ describe('the event category is read back (SG2-70)', () => {
     } as unknown as SupabaseClient;
 
     const created = await insertEventRequestDraft(admin, { organiserId: 'user-1', organisation: null, values: { ...EMPTY_VALUES, category: 'seminar' } });
-    const detail = await fetchOwnEventRequest(admin, 7, 'user-1');
+    const detail = await fetchEventRequestById(admin, 7);
     assert.equal(created.ok && created.request.category, 'seminar');
     assert.equal(detail.ok && detail.request.category, 'seminar');
     for (const columns of selected) assert.ok(columns.split(/,\s*/).includes('category'), columns);
@@ -473,213 +439,11 @@ describe('the preferred room layout is read back (SG2-105)', () => {
     } as unknown as SupabaseClient;
 
     const created = await insertEventRequestDraft(admin, { organiserId: 'user-1', organisation: null, values: EMPTY_VALUES });
-    const detail = await fetchOwnEventRequest(admin, 7, 'user-1');
+    const detail = await fetchEventRequestById(admin, 7);
     assert.equal(created.ok && created.request.preferred_layout, 'Theatre');
     assert.equal(detail.ok && detail.request.preferred_layout, 'Theatre');
     assert.equal(selected.length, 2);
     for (const columns of selected) assert.ok(columns.split(/,\s*/).includes('preferred_layout'), columns);
-  });
-});
-
-describe('fetchOwnEventRequest', () => {
-  test('[NORMAL] [SG2-31:AC3] returns the request scoped to the given event and organiser', async () => {
-    let filters: { eventId: unknown; organiserId: unknown } | undefined;
-    const result = await fetchOwnEventRequest(
-      fakeEventsSelectClient({ data: [{ event_id: 7, organiser_id: 'user-1', status: 'draft' }], error: null }, (f) => (filters = f)),
-      7,
-      'user-1'
-    );
-    assert.equal(result.ok, true);
-    if (result.ok) {
-      assert.equal(result.request.event_id, 7);
-      assert.equal(result.request.coordinator_id, null);
-      assert.equal(result.request.coordinator_name, null);
-    }
-    assert.deepEqual(filters, { eventId: 7, organiserId: 'user-1' });
-  });
-
-  test('[NORMAL] [SG2-33:AC3] extracts coordinator information from joined relation', async () => {
-    const result = await fetchOwnEventRequest(
-      fakeEventsSelectClient({
-        data: [
-          {
-            event_id: 101,
-            organiser_id: 'user-1',
-            status: 'draft',
-            coordinator_id: 'coord-uuid-1',
-            coordinator: { name: 'Sarah Coordinator' }
-          }
-        ],
-        error: null
-      }),
-      101,
-      'user-1'
-    );
-    assert.equal(result.ok, true);
-    if (result.ok) {
-      assert.equal(result.request.event_id, 101);
-      assert.equal(result.request.coordinator_id, 'coord-uuid-1');
-      assert.equal(result.request.coordinator_name, 'Sarah Coordinator');
-    }
-  });
-
-  test('[FAILURE] [SG2-31:AC3] reports not_found when no row matches the event and organiser', async () => {
-    const result = await fetchOwnEventRequest(fakeEventsSelectClient({ data: [], error: null }), 7, 'user-1');
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.reason, 'not_found');
-  });
-
-  test('[FAILURE] [SG2-31:AC3] reports unavailable when the query errors', async () => {
-    const result = await fetchOwnEventRequest(
-      fakeEventsSelectClient({ data: null, error: { message: 'connection reset' } }),
-      7,
-      'user-1'
-    );
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-      assert.equal(result.reason, 'unavailable');
-      assert.equal(result.message, 'connection reset');
-    }
-  });
-});
-
-describe('fetchOwnEventRequests', () => {
-  test('[NORMAL] [SG2-31:AC1] returns list of event requests with coordinator name extracted from joined object', async () => {
-    let capturedFilters: { organiserId?: unknown; status?: unknown; orderColumn?: unknown; orderOptions?: unknown } | undefined;
-    const result = await fetchOwnEventRequests(
-      fakeEventsListClient(
-        {
-          data: [
-            {
-              event_id: 101,
-              name: 'Leadership Retreat',
-              proposed_date: '2026-11-15T09:00:00.000Z',
-              status: 'draft',
-              coordinator_id: 'coord-uuid-1',
-              coordinator: { name: 'Sarah Coordinator' }
-            }
-          ],
-          error: null
-        },
-        (f) => (capturedFilters = f)
-      ),
-      'user-1'
-    );
-
-    assert.equal(result.ok, true);
-    if (result.ok) {
-      assert.deepEqual(result.requests, [
-        {
-          event_id: 101,
-          name: 'Leadership Retreat',
-          proposed_date: '2026-11-15T09:00:00.000Z',
-          status: 'draft',
-          coordinator_id: 'coord-uuid-1',
-          coordinator_name: 'Sarah Coordinator'
-        }
-      ]);
-    }
-    assert.equal(capturedFilters?.organiserId, 'user-1');
-    assert.equal(capturedFilters?.status, undefined);
-    assert.equal(capturedFilters?.orderColumn, 'event_id');
-    assert.deepEqual(capturedFilters?.orderOptions, { ascending: false });
-  });
-
-  test('[NORMAL] [SG2-31:AC1] extracts coordinator name when coordinator is an array or coordinator_name string', async () => {
-    const result = await fetchOwnEventRequests(
-      fakeEventsListClient({
-        data: [
-          {
-            event_id: 102,
-            name: 'Annual Gala',
-            proposed_date: '2026-12-01T18:00:00.000Z',
-            status: 'submitted',
-            coordinator_id: 'coord-uuid-2',
-            coordinator: [{ name: 'Alex Coordinator' }]
-          },
-          {
-            event_id: 103,
-            name: 'Tech Talk',
-            proposed_date: null,
-            status: 'approved',
-            coordinator_id: 'coord-uuid-3',
-            coordinator_name: 'Jordan Coordinator'
-          }
-        ],
-        error: null
-      }),
-      'user-1'
-    );
-
-    assert.equal(result.ok, true);
-    if (result.ok) {
-      assert.equal(result.requests[0].coordinator_name, 'Alex Coordinator');
-      assert.equal(result.requests[1].coordinator_name, 'Jordan Coordinator');
-    }
-  });
-
-  test('[FAILURE] [SG2-31:AC1] handles null/missing coordinator, dates, and non-string fields safely', async () => {
-    const result = await fetchOwnEventRequests(
-      fakeEventsListClient({
-        data: [
-          {
-            event_id: '104',
-            name: null,
-            proposed_date: null,
-            status: null,
-            coordinator_id: null,
-            coordinator: null
-          }
-        ],
-        error: null
-      }),
-      'user-1'
-    );
-
-    assert.equal(result.ok, true);
-    if (result.ok) {
-      assert.deepEqual(result.requests[0], {
-        event_id: 104,
-        name: '',
-        proposed_date: null,
-        status: 'draft',
-        coordinator_id: null,
-        coordinator_name: null
-      });
-    }
-  });
-
-  test('[NORMAL] [SG2-31:AC2] applies status filter when provided', async () => {
-    let capturedFilters: { organiserId?: unknown; status?: unknown } | undefined;
-    const result = await fetchOwnEventRequests(
-      fakeEventsListClient({ data: [], error: null }, (f) => (capturedFilters = f)),
-      'user-1',
-      'submitted'
-    );
-
-    assert.equal(result.ok, true);
-    if (result.ok) assert.deepEqual(result.requests, []);
-    assert.equal(capturedFilters?.status, 'submitted');
-  });
-
-  for (const data of [[], null]) {
-    test(`[BOUNDARY] [SG2-31:AC1] returns empty array when data is ${JSON.stringify(data)}`, async () => {
-      const result = await fetchOwnEventRequests(fakeEventsListClient({ data, error: null }), 'user-1');
-      assert.equal(result.ok, true);
-      if (result.ok) assert.deepEqual(result.requests, []);
-    });
-  }
-
-  test('[FAILURE] [SG2-31:AC1] reports unavailable when the query errors', async () => {
-    const result = await fetchOwnEventRequests(
-      fakeEventsListClient({ data: null, error: { message: 'connection failed' } }),
-      'user-1'
-    );
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-      assert.equal(result.reason, 'unavailable');
-      assert.equal(result.message, 'connection failed');
-    }
   });
 });
 
@@ -1423,38 +1187,6 @@ describe('assignEventCoordinator supervision (SG2-89)', () => {
     assert.equal(result.ok && result.request.status, 'needs_clarification');
     assert.deepEqual(captured?.row, { coordinator_id: 'coord-new', coordinator_assigned_by: 'lead-2' });
     assert.ok((captured?.filters.find(([, column]) => column === 'status')?.[2] as string[]).includes('needs_clarification'));
-  });
-});
-
-describe('coordinator contact on a single request (SG2-33 AC3)', () => {
-  async function phoneFor(coordinator: unknown) {
-    const result = await fetchOwnEventRequest(
-      fakeEventsSelectClient({
-        data: [{ event_id: 1, organiser_id: 'user-1', status: 'submitted', coordinator }],
-        error: null
-      }),
-      1,
-      'user-1'
-    );
-    assert.equal(result.ok, true);
-    return result.ok ? result.request.coordinator_phone : undefined;
-  }
-
-  test('[NORMAL] [SG2-33:AC3] [SG2-34:AC3] returns the phone from an object relation', async () => {
-    assert.equal(await phoneFor({ name: 'Sarah', phone: '+65 9123 4567' }), '+65 9123 4567');
-  });
-
-  test('[NORMAL] [SG2-33:AC3] [SG2-34:AC3] returns the phone from an array relation', async () => {
-    assert.equal(await phoneFor([{ name: 'Sarah', phone: '+65 9123 4567' }]), '+65 9123 4567');
-  });
-
-  test('[BOUNDARY] [SG2-33:AC3] [SG2-34:AC3] reports null when the coordinator has no usable phone', async () => {
-    assert.equal(await phoneFor({ name: 'Sarah', phone: null }), null);
-    assert.equal(await phoneFor({ name: 'Sarah', phone: '   ' }), null);
-  });
-
-  test('[BOUNDARY] [SG2-33:AC3] reports null when no coordinator is assigned', async () => {
-    assert.equal(await phoneFor(null), null);
   });
 });
 
