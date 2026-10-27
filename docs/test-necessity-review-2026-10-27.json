@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 3,
+  "status": "COMPLETE_REVIEW_DATA_AT_IMMUTABLE_AUDIT_COMMIT",
+  "reviewDate": "2026-10-27",
+  "preparedApplicationSource": "a49f5217d995af03bfcb14787d19ae8fe6c9e8e0",
+  "auditCommit": "1d6fd680d116fed09a200c5917915fef1e56c81e",
+  "completeReportUrl": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/test-redundancy-review-2026-10-27.json",
+  "completeReportSha256": "b24485338055e02d8ba7e8fb819d5ae236139dbf17365a91af9b1e2823e54a00",
+  "reasonForReference": "Keep complete case-by-case evidence available while removing generated review data from the implementation diff. Application changes and the source inventory remain fully visible to the unchanged security review.",
+  "sourceSummary": {
+    "baselineEntries": 4794,
+    "remainingMethodDeclarations": 3149,
+    "remainingSqlTags": 1418,
+    "retiredDeclarations": 190,
+    "retiredSqlTags": 37,
+    "newDeclarations": 0
+  },
+  "workbookResult": {
+    "addedExistingRecords": 723,
+    "retiredDefinitions": 372,
+    "correctedRetainedDefinitions": 863,
+    "activeUniqueIds": 4605,
+    "duplicates": 0,
+    "missingCurrentCases": 0,
+    "sameWorkbookArchiveSheetId": 19761003,
+    "evidenceDetailEdited": false
+  },
+  "localValidation": {
+    "fullAppCoveragePercent": {
+      "statements": 100,
+      "branches": 100,
+      "functions": 100,
+      "lines": 100
+    },
+    "backendTests": 1857,
+    "frontendTests": 1771,
+    "browserTests": 183,
+    "sqlSuitesAndChecks": 52,
+    "concurrencyScripts": 12,
+    "nativeHttpTests": 27
+  },
+  "pendingIndependentReview": true,
+  "limits": "The full report records existing category metadata gaps and the upstream accept/refuse transaction gap. Passing coverage is not complete business correctness.",
+  "fullReports": [
+    {
+      "path": "docs/test-redundancy-audit.json",
+      "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/test-redundancy-audit.json",
+      "sha256": "4a33ce51473f7e53bfcc1c072292159afa40591080ae2a79d2df7a4cdd3abdd5"
+    },
+    {
+      "path": "docs/test-redundancy-review-2026-10-27.json",
+      "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/test-redundancy-review-2026-10-27.json",
+      "sha256": "b24485338055e02d8ba7e8fb819d5ae236139dbf17365a91af9b1e2823e54a00"
+    },
+    {
+      "path": "docs/test-case-sheet-cleanup-plan-2026-10-27.json",
+      "url": "https://github.com/tayelroy/Team2-SPM/blob/1d6fd680d116fed09a200c5917915fef1e56c81e/docs/test-case-sheet-cleanup-plan-2026-10-27.json",
+      "sha256": "a86cd846b03791aafac8ba129a1931a0f3d37679eaed6eafcbade5c3e39cc53e"
+    }
+  ]
+}
