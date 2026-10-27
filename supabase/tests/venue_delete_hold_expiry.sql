@@ -25,6 +25,9 @@ insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status) va
 insert into public.venue_booking_requests(event_id,venue_id,starts_at,ends_at,status) values
  (98601,98601,now()+interval '25 days',now()+interval '25 days 2 hours','pending');
 -- Old Studio: only a finished booking, which must keep its venue name.
+-- SG2-102's deferred check runs first: a table with pending trigger events
+-- cannot be altered.
+set constraints public.venue_booking_attendee_details_changed immediate;
 alter table public.venue_bookings disable trigger user;
 insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status) values
  (98603,98602,now()-interval '5 days',now()-interval '5 days'+interval '2 hours','confirmed');

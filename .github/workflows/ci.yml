@@ -218,6 +218,7 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/notification_inbox_reminders.sql
           node .github/scripts/test-notification-reminders-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/coordinator_oversight.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/attendee_event_change_notices.sql
       # SG2-98 AC3: replay the live upgrade on its own database. Blocks written
       # under SG2-45 are seeded just before SG2-80's migration, then the
       # remaining migrations run and the suite checks what survived.

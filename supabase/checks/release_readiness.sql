@@ -112,7 +112,9 @@ begin
     -- SG2-64: the organiser raises a change request after submitting.
     ('public.raise_event_change_request(integer,uuid,text,jsonb,text)'),
     -- SG2-65: the coordinator accepts or refuses a change request.
-    ('public.decide_event_change_request(integer,bigint,uuid,text,text,text)')
+    ('public.decide_event_change_request(integer,bigint,uuid,text,text,text)'),
+    -- SG2-102: registered attendees are told when their event changes.
+    ('private.announce_event_attendee_details(integer)'), ('private.event_attendee_details_changed()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -240,7 +242,9 @@ begin
     -- SG2-62: the organiser and coordinator hear of a withdrawal.
     ('registration_withdrawn'),
     -- SG2-64/SG2-65: a change is requested, accepted or refused.
-    ('change_requested'), ('change_accepted'), ('change_refused')
+    ('change_requested'), ('change_accepted'), ('change_refused'),
+    -- SG2-102: attendees hear their event's date, time or venue changed.
+    ('event_changed')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),
