@@ -17,8 +17,9 @@ function nextId(rows: Row[], key: string) {
   return Math.max(0, ...rows.map(row => Number(row[key]))) + 1;
 }
 
-/** Loopback UI fixture mirroring public.raise_event_change_request and the
- * public.event_change_requests reads (SG2-64) over the in-memory tables. The
+/** Loopback UI fixture mirroring public.raise_event_change_request, the
+ * public.event_change_requests reads (SG2-64) and
+ * public.decide_event_change_request (SG2-65) over the in-memory tables. The
  * SQL suite (supabase/tests/event_change_requests.sql) proves the production
  * function, its row lock, whitelist and grants.
  *
@@ -54,10 +55,32 @@ export function createMemoryChangeRequests(database: MemoryDatabase, samples: Mo
       if (row) return toRequest(row);
       return sampleEvents.has(event.event_id) ? samples.get(event, id) : null;
     },
-    async markAccepted(event, id) {
+    // Mirrors public.decide_event_change_request (SG2-65): records who decided
+    // and when, writes an AC4 acceptance onto the request, notifies the organiser.
+    async decide(event, id, decision) {
       const row = pending(event).find(candidate => String(candidate.change_request_id) === id);
-      if (row) row.status = 'accepted';
-      else await samples.markAccepted(event, id);
+      if (!row) return sampleEvents.has(event.event_id) ? samples.decide(event, id, decision) : 'not_pending';
+      const { tables } = database;
+      const stored = tables.events.find(candidate => candidate.event_id === event.event_id) as Row;
+      const label = String(stored.name || 'Untitled event').slice(0, 500);
+      let message = `${label}: your change request was accepted.`;
+      if (decision.decision === 'refused') {
+        message = `${label}: your change request was refused. Reason: ${decision.reason}`;
+        Object.assign(row, { decision_reason: decision.reason });
+      } else if (decision.next) {
+        stored[String(row.field)] = row.to_value;
+        if (decision.next === 'review') stored.status = 'under_review';
+        message = decision.next === 'review'
+          ? `${label}: your change request was accepted and the request is back in review.`
+          : `${label}: your change request was accepted. Resubmit the request for review.`;
+      }
+      Object.assign(row, { status: decision.decision, decided_by: decision.by, decided_at: new Date().toISOString() });
+      const notices = tables.notifications;
+      notices.push({ notification_id: nextId(notices, 'notification_id'), recipient_id: row.requested_by,
+        event_id: event.event_id, request_id: null,
+        kind: decision.decision === 'refused' ? 'change_refused' : 'change_accepted',
+        message, created_at: row.decided_at });
+      return 'ok';
     }
   };
 

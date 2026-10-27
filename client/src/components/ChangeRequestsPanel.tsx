@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   acceptChangeRequest,
   fetchChangeRequests,
+  refuseChangeRequest,
   type AcceptedChange,
   type AffectedArrangementKind,
   type ChangeRequestList,
+  type ClarificationNextStep,
   type ImpactReasonCode,
   type RecheckKey,
 } from '../api/changeRequests';
@@ -47,6 +49,14 @@ const REASONS: Record<ImpactReasonCode, { label: string; bg: string; fg: string 
 const SIGNIFICANT = { label: 'Significant change', bg: 'rgba(255, 180, 0, 0.2)', fg: '#fde047' };
 const NOT_SIGNIFICANT = { label: 'No revalidation needed', bg: 'rgba(0,130,124,0.35)', fg: color.mist };
 
+const MAX_REASON_LENGTH = 1000;
+
+/** SG2-65 AC4: the two ways to accept a change on a request returned for clarification. */
+const NEXT_STEPS: { next: ClarificationNextStep; label: string }[] = [
+  { next: 'review', label: 'Accept and return to review' },
+  { next: 'resubmit', label: 'Accept and ask organiser to resubmit' },
+];
+
 const RECHECK_NAMES: Record<RecheckKey, string> = {
   venue_recheck: 'venue',
   equipment_recheck: 'equipment',
@@ -60,6 +70,8 @@ const RECHECK_NAMES: Record<RecheckKey, string> = {
  * SG2-66 AC1–AC4: the assigned coordinator sees what each change request
  * would break before accepting it. The requests are the ones organisers
  * raised (SG2-64); the impact is always recomputed by the server.
+ * SG2-65: the coordinator can also refuse one with a reason (AC2), and on a
+ * request returned for clarification chooses where it goes next (AC4).
  */
 export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }: ChangeRequestsPanelProps) {
   const [list, setList] = useState<ChangeRequestList | null>(null);
@@ -68,6 +80,10 @@ export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }
   // One acceptance in flight at a time: every Accept button is disabled meanwhile.
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState<{ id: string; message: string } | null>(null);
+  // SG2-65 AC2: the request whose refusal form is open, and its reason.
+  const [refusingId, setRefusingId] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [refused, setRefused] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,18 +99,37 @@ export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }
     };
   }, [eventId, accessToken, attempt]);
 
-  const accept = async (id: string) => {
+  const decided = (id: string) =>
+    setList((current) => current && { ...current, change_requests: current.change_requests.filter((r) => r.id !== id) });
+
+  const accept = async (id: string, next?: ClarificationNextStep) => {
     setAcceptingId(id);
     setAcceptError(null);
-    const result = await acceptChangeRequest(eventId, id, accessToken);
+    setRefused(false);
+    const result = await acceptChangeRequest(eventId, id, accessToken, next);
     setAcceptingId(null);
     if (!result.ok) {
       setAcceptError({ id, message: [result.message, ...(result.details ?? [])].join(' ') });
       return;
     }
     // Accepted requests are no longer listed by the server either.
-    setList((current) => current && { ...current, change_requests: current.change_requests.filter((r) => r.id !== id) });
+    decided(id);
     onAccepted(result.change);
+  };
+
+  const refuse = async (id: string) => {
+    setAcceptingId(id);
+    setAcceptError(null);
+    const result = await refuseChangeRequest(eventId, id, reason.trim(), accessToken);
+    setAcceptingId(null);
+    if (!result.ok) {
+      setAcceptError({ id, message: [result.message, ...(result.details ?? [])].join(' ') });
+      return;
+    }
+    setRefusingId(null);
+    setReason('');
+    setRefused(true);
+    decided(id);
   };
 
   return (
@@ -104,6 +139,11 @@ export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }
       style={{ display: 'grid', gap: '16px', minWidth: 0, overflowWrap: 'anywhere' }}
     >
       <h3 style={{ margin: 0 }}>Change requests</h3>
+      {refused ? (
+        <p role="status" style={{ margin: 0, color: color.silver }}>
+          Change refused. The event is unchanged and the organiser has been told why.
+        </p>
+      ) : null}
       {loadError !== null ? (
         <div style={{ display: 'grid', gap: '10px', justifyItems: 'start' }}>
           <p role="alert" style={{ margin: 0 }}>{loadError}</p>
@@ -223,13 +263,57 @@ export default function ChangeRequestsPanel({ eventId, accessToken, onAccepted }
                 {acceptError?.id === request.id ? (
                   <p role="alert" style={{ margin: 0 }}>{acceptError.message}</p>
                 ) : null}
-                <GradientButton
-                  onClick={() => void accept(request.id)}
-                  disabled={!list.can_accept || acceptingId !== null}
-                  style={{ justifySelf: 'start' }}
-                >
-                  {acceptingId === request.id ? 'Accepting change…' : 'Accept change'}
-                </GradientButton>
+                {refusingId === request.id ? (
+                  <div style={{ display: 'grid', gap: '8px', minWidth: 0 }}>
+                    <label htmlFor={`refuse-reason-${request.id}`}>Reason for refusing</label>
+                    <textarea
+                      id={`refuse-reason-${request.id}`}
+                      rows={3}
+                      maxLength={MAX_REASON_LENGTH}
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      className="organisation-textarea"
+                    />
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <GradientButton
+                        onClick={() => void refuse(request.id)}
+                        disabled={reason.trim() === '' || acceptingId !== null}
+                      >
+                        {acceptingId === request.id ? 'Refusing change…' : 'Confirm refusal'}
+                      </GradientButton>
+                      <GhostButton onClick={() => { setRefusingId(null); setReason(''); }} disabled={acceptingId !== null}>
+                        Cancel
+                      </GhostButton>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {list.next_step_required ? (
+                      NEXT_STEPS.map(({ next, label }) => (
+                        <GradientButton
+                          key={next}
+                          onClick={() => void accept(request.id, next)}
+                          disabled={acceptingId !== null}
+                        >
+                          {label}
+                        </GradientButton>
+                      ))
+                    ) : (
+                      <GradientButton
+                        onClick={() => void accept(request.id)}
+                        disabled={!list.can_accept || acceptingId !== null}
+                      >
+                        {acceptingId === request.id ? 'Accepting change…' : 'Accept change'}
+                      </GradientButton>
+                    )}
+                    <GhostButton
+                      onClick={() => { setRefusingId(request.id); setReason(''); setAcceptError(null); }}
+                      disabled={acceptingId !== null}
+                    >
+                      Refuse change
+                    </GhostButton>
+                  </div>
+                )}
               </article>
             );
           })}

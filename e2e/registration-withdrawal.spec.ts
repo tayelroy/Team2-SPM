@@ -57,7 +57,7 @@ test('SG2-62-P01 | [NORMAL] [SG2-62:AC1] [SG2-62:AC2] [SG2-62:AC5] an attendee s
   expect(await noOverflow(page)).toBe(true);
   expect((await ledger(page)).registrations.find((row: { registration_id: number }) => row.registration_id === 6202).status).toBe('registered');
   await confirm.getByRole('button', { name: 'Confirm withdrawal', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('You have withdrawn from Lantern Talk. Your place has been given back.');
+  await expect(page.getByRole('status').filter({ hasText: 'You have withdrawn from' })).toContainText('You have withdrawn from Lantern Talk. Your place has been given back.');
   await expect(lantern).toContainText('Withdrawn');
   await expect(lantern.getByRole('button', { name: 'Withdraw', exact: true })).toHaveCount(0);
 
@@ -90,7 +90,7 @@ test('SG2-62-P02 | [NORMAL] [SG2-62:AC3] withdrawing from a full event gives the
   const list = await openMine(page);
   await list.getByRole('article', { name: 'Quartet Evening', exact: true }).getByRole('button', { name: 'Withdraw', exact: true }).click();
   await page.getByRole('button', { name: 'Confirm withdrawal', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('You have withdrawn from Quartet Evening.');
+  await expect(page.getByRole('status').filter({ hasText: 'You have withdrawn from' })).toContainText('You have withdrawn from Quartet Evening.');
 
   // AC3: the place is back. The coordinator's picture shows it, and registering takes it again.
   const picture = await (await page.request.get('/api/event-requests/597/registrations', { headers: await auth(page, 'coordinator') })).json();
