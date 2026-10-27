@@ -125,6 +125,46 @@ begin
   end if;
 end $$;
 
+-- 3b. AC5: accepting a significant change on an event in Preparation or
+-- Confirmed sends it back to Planning (SG2-66's apply, with the venue to
+-- recheck), and the decision is still recorded and the organiser told both:
+do $$
+declare
+  probe record;
+  request_id bigint;
+  applied jsonb;
+  result jsonb;
+begin
+  insert into public.events (event_id, organiser_id, coordinator_id, organisation, name, status,
+      expected_attendance, confirmed_by, confirmed_at) values
+    (96504, 'e6500000-0000-4000-8000-000000000002', 'e6500000-0000-4000-8000-000000000001',
+      'Acme Corp', 'Prep Forum', 'preparation', 100, null, null),
+    (96505, 'e6500000-0000-4000-8000-000000000002', 'e6500000-0000-4000-8000-000000000001',
+      'Acme Corp', 'Confirmed Forum', 'confirmed', 100, 'e6500000-0000-4000-8000-000000000001', now());
+  for probe in select * from (values (96504, 'preparation'), (96505, 'confirmed')) v(event_id, status) loop
+    perform public.raise_event_change_request(probe.event_id, 'e6500000-0000-4000-8000-000000000002',
+      'expected_attendance', '150'::jsonb, 'More guests.');
+    request_id := (select max(change_request_id) from public.event_change_requests where event_id = probe.event_id);
+    applied := public.apply_accepted_event_change(probe.event_id, 'e6500000-0000-4000-8000-000000000001',
+      probe.status::public.event_status, 'change request ' || request_id, '{"expected_attendance": 150}'::jsonb,
+      '["venue_recheck"]'::jsonb);
+    result := public.decide_event_change_request(probe.event_id, request_id, 'e6500000-0000-4000-8000-000000000001',
+      'accepted', null, null);
+    if applied ->> 'status' <> 'planning' or (applied ->> 'returned_to_planning')::boolean is not true
+        or result ->> 'outcome' <> 'ok' or result ->> 'status' <> 'planning'
+        or (select (status::text, expected_attendance) from public.events where event_id = probe.event_id)
+          is distinct from ('planning'::text, 150)
+        or not exists (select 1 from public.event_change_requests where change_request_id = request_id
+          and status = 'accepted' and decided_by = 'e6500000-0000-4000-8000-000000000001' and decided_at is not null)
+        or (select array_agg(kind::text order by kind) from public.notifications
+            where recipient_id = 'e6500000-0000-4000-8000-000000000002' and event_id = probe.event_id)
+          is distinct from array['change_accepted', 'event_returned_to_planning'] then
+      raise exception '[SG2-65:significant-change-returns-to-planning] [SG2-65:AC5] [SG2-65:AC3] [NORMAL] A significant change accepted on a % event must return it to Planning and still record the decision, got % and %',
+        probe.status, applied, result;
+    end if;
+  end loop;
+end $$;
+
 -- 4. On a request returned for clarification, accepting writes the change
 -- onto the request; "review" sends it back to under_review, "resubmit"
 -- leaves it with the organiser. Both record and notify (AC4/AC3):

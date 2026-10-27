@@ -40,8 +40,9 @@ export interface ChangeRequestSource {
   /** One pending change request, or null when unknown or already decided. */
   get(event: ChangeRequestEvent, id: string): Promise<ChangeRequest | null>;
   /** Records the decision, so the request is no longer pending (SG2-65 AC3).
-   * `not_pending` when it was decided in the meantime. */
-  decide(event: ChangeRequestEvent, id: string, decision: ChangeDecision): Promise<'ok' | 'not_pending'>;
+   * `not_pending` when it was decided in the meantime; `not_found` when the
+   * event is no longer assigned to the decider (reassigned meanwhile). */
+  decide(event: ChangeRequestEvent, id: string, decision: ChangeDecision): Promise<'ok' | 'not_pending' | 'not_found'>;
 }
 
 export interface MockChangeRequestSource extends ChangeRequestSource {

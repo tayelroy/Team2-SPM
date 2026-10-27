@@ -154,12 +154,17 @@ refused".
 
 - `supabase/tests/change_request_decisions.sql` (CI database job): refusal
   record and notice, the 1000/1001-character and blank reason boundary,
-  accepting after SG2-66's apply, both AC4 next steps, the guards (missing or
-  unknown next step, another coordinator, already decided, refusal after
-  apply), the record checks, and no EXECUTE for `authenticated` or `anon`.
-  Sabotage runs (EXECUTE granted to `authenticated`; the refusal-after-apply
-  guard removed; the refusal-reason check dropped) each made it fail, naming
-  the case.
+  accepting after SG2-66's apply, AC5 (a significant change accepted on a
+  Preparation and on a Confirmed event returns it to Planning and the decision
+  is still recorded), both AC4 next steps, the guards (missing or unknown next
+  step, another coordinator, already decided, refusal after apply), the record
+  checks, and no EXECUTE for `authenticated` or `anon`. Sabotage runs (EXECUTE
+  granted to `authenticated`; the refusal-after-apply guard removed; the
+  refusal-reason check dropped; SG2-66's return to Planning disabled) each made
+  it fail, naming the case.
+- A decision on an event reassigned to another coordinator in the meantime
+  (`not_found` from the function) answers 404, like any event not assigned to
+  the caller.
 - `server/src/changeRequestsDecide.test.ts`, `server/src/db/changeRequests.test.ts`.
 - `client/src/components/ChangeRequestsPanel.decisions.test.tsx`,
   `client/src/api/changeRequestDecisions.test.ts`.

@@ -397,6 +397,11 @@ export function createChangeRequestHandlers({
       res.status(409).json({ error: DECIDED_MESSAGE });
       return false;
     }
+    if (outcome === 'not_found') {
+      // Reassigned to another coordinator since the event was loaded.
+      res.status(404).json({ error: EVENT_NOT_FOUND_MESSAGE });
+      return false;
+    }
     return true;
   };
 

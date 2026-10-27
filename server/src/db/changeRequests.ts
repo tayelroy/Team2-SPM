@@ -127,7 +127,9 @@ export function createDatabaseChangeRequestSource(getAdminClient: () => Supabase
         p_next: decision.decision === 'accepted' ? decision.next ?? null : null
       });
       const outcome = (data as { outcome?: unknown } | null)?.outcome;
-      if (error || (outcome !== 'ok' && outcome !== 'not_pending')) throw new Error('Change requests are unavailable.');
+      if (error || (outcome !== 'ok' && outcome !== 'not_pending' && outcome !== 'not_found')) {
+        throw new Error('Change requests are unavailable.');
+      }
       return outcome;
     }
   };

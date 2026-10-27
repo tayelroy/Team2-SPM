@@ -27,7 +27,7 @@ const REASON_ERROR = { error: 'Give a reason for refusing, up to 1000 characters
 const NEXT_STEP_ERROR = { error: 'Choose whether the request goes back to review or the organiser resubmits it.' };
 
 /** One stored request; records every decision and answers with `outcome`. */
-function store(outcome: 'ok' | 'not_pending' | 'throws' = 'ok') {
+function store(outcome: 'ok' | 'not_pending' | 'not_found' | 'throws' = 'ok') {
   const decisions: [string, ChangeDecision][] = [];
   const source: ChangeRequestSource = {
     list: async () => [STORED],
@@ -47,7 +47,7 @@ function harness(overrides: Partial<ChangeRequestDependencies> & { event?: Parti
     getPrincipal: () => ({ userId: COORDINATOR, role: 'event_coordinator' }),
     getAdminClient: () => ({}) as SupabaseClient,
     fetchEvent: async () => ({ ok: true, event: { ...EVENT, ...overrides.event } }),
-    fetchFacts: async () => ({ ok: true, facts: { venue_bookings: [], equipment: [], registrations: 0 } as never }),
+    fetchFacts: async () => ({ ok: true, facts: { venues: [], equipment: [], registrations: 0 } }),
     applyChange: async (_admin, input) => {
       applied.push(input);
       return { outcome: 'ok', previous_status: input.expectedStatus, status: input.expectedStatus, returned_to_planning: false,
@@ -99,9 +99,11 @@ describe('refusing a change request (SG2-65 AC2/AC3)', () => {
     assert.deepEqual(applied, []);
   });
 
-  test('[CONFLICT] [FAILURE] [SG2-65:AC2] [SG2-65:AC3] a request decided meanwhile is 409, an unknown one or another coordinator\'s event 404, a failing store 503, and only an Event Coordinator reaches the mounted route', async () => {
+  test('[CONFLICT] [FAILURE] [SG2-65:AC2] [SG2-65:AC3] a request decided meanwhile is 409, an unknown one, another coordinator\'s event or one reassigned meanwhile 404, a failing store 503, and only an Event Coordinator reaches the mounted route', async () => {
     assert.deepEqual(await refuse(harness({ source: store('not_pending').source }).app, { reason: 'No.' })
       .then(res => [res.status, res.body]), [409, DECIDED]);
+    assert.deepEqual(await refuse(harness({ source: store('not_found').source }).app, { reason: 'No.' })
+      .then(res => [res.status, res.body]), [404, { error: 'Event not found.' }]);
     const unknown = await refuse(harness({ source: store().source }).app, { reason: 'No.' }, '99');
     assert.deepEqual([unknown.status, unknown.body], [404, { error: 'Change request not found.' }]);
     const other = await refuse(harness({ event: { coordinator_id: 'coordinator-2' } }).app, { reason: 'No.' });
@@ -126,7 +128,7 @@ describe('refusing a change request (SG2-65 AC2/AC3)', () => {
 });
 
 describe('accepting a change request (SG2-65 AC1/AC4/AC5)', () => {
-  test('[NORMAL] [SG2-65:AC1] [SG2-65:AC3] [SG2-65:AC5] on an open status SG2-66 applies the change first and then the acceptance is recorded against the coordinator', async () => {
+  test('[NORMAL] [SG2-65:AC1] [SG2-65:AC3] [SG2-65:AC5] on an open status SG2-66 applies the change first and then the acceptance is recorded; a significant change on a Confirmed event comes back in Planning', async () => {
     const { source, decisions } = store();
     const { app, applied } = harness({ source });
     const listed = await request(app).get('/events/12/change-requests');
@@ -135,6 +137,29 @@ describe('accepting a change request (SG2-65 AC1/AC4/AC5)', () => {
     assert.equal(res.status, 200);
     assert.deepEqual(applied.map(input => input.changes), [{ description: 'New agenda' }]);
     assert.deepEqual(decisions, [['41', { decision: 'accepted', by: COORDINATOR }]]);
+
+    // AC5: the significant attendance change on a Confirmed event is applied
+    // as Confirmed, and SG2-66's return to Planning is what the route reports.
+    const significant = store();
+    significant.source.get = async () => ({ ...STORED,
+      changes: [{ field: 'expected_attendance', label: 'Expected attendance', from: 120, to: 180 }] });
+    const returned: ApplyAcceptedEventChangeInput[] = [];
+    const confirmed = harness({
+      source: significant.source,
+      event: { status: 'confirmed' },
+      applyChange: async (_admin, input) => {
+        returned.push(input);
+        return { outcome: 'ok', previous_status: 'confirmed', status: 'planning', returned_to_planning: true,
+          arrangements_recheck_needed: true, outstanding_arrangements: ['venue_recheck'] };
+      }
+    });
+    const back = await accept(confirmed.app);
+    assert.deepEqual([back.status, back.body], [200, {
+      event_id: 12, previous_status: 'confirmed', status: 'planning', returned_to_planning: true,
+      arrangements_recheck_needed: true, outstanding_arrangements: ['venue_recheck']
+    }]);
+    assert.deepEqual(returned.map(input => [input.expectedStatus, input.changes]), [['confirmed', { expected_attendance: 180 }]]);
+    assert.deepEqual(significant.decisions, [['41', { decision: 'accepted', by: COORDINATOR }]]);
   });
 
   test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-65:AC4] on a request returned for clarification the coordinator must choose back to review or resubmit, SG2-66\'s apply is not used, and a decided request, a closed event or a failing store are refused', async () => {

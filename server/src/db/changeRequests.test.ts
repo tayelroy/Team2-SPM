@@ -133,8 +133,10 @@ describe('decide_event_change_request adapter (SG2-65)', () => {
     ]);
     reply = { data: { outcome: 'not_pending' }, error: null };
     assert.equal(await source.decide(EVENT, '41', { decision: 'accepted', by: 'coordinator-1' }), 'not_pending');
+    reply = { data: { outcome: 'not_found' }, error: null };
+    assert.equal(await source.decide(EVENT, '41', { decision: 'refused', by: 'coordinator-1', reason: 'No.' }), 'not_found');
     for (const failed of [{ data: null, error: { message: 'down' } }, { data: null, error: null },
-      { data: { outcome: 'invalid' }, error: null }, { data: { outcome: 'not_found' }, error: null }]) {
+      { data: { outcome: 'invalid' }, error: null }, { data: { outcome: 'other' }, error: null }]) {
       reply = failed;
       await assert.rejects(source.decide(EVENT, '41', { decision: 'accepted', by: 'coordinator-1' }), JSON.stringify(failed));
     }
