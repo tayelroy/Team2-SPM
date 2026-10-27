@@ -1120,7 +1120,15 @@ test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that r
   mockLoginResponse('Event Coordinator');
   render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Coordination desk' })).toBeInTheDocument();
-  fireEvent.change(screen.getByRole('combobox', { name: 'Acting as' }), { target: { value: 'Venue Staff' } });
+  const scrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
+  try {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Acting as' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Venue Staff' }));
+  } finally {
+    if (scrollIntoView) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollIntoView);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
   expect(await screen.findByRole('heading', { level: 1, name: 'Venue desk' })).toBeInTheDocument();
   expect(JSON.parse(sessionStorage.getItem('connectsphere.session')!).user.role).toBe('Venue Staff');
 });

@@ -79,7 +79,14 @@ jobs:
     name: Test browser regression
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
-    # Reserve time for browser provisioning, the regression suite and result uploads.
+    # Match package-lock.json; browsers and OS dependencies are already installed.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --shm-size=1gb
+    defaults:
+      run:
+        shell: bash
+    # Reserve time for the regression suite and result uploads.
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -91,8 +98,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-        timeout-minutes: 12
       - name: Run browser journeys against the real application with isolated storage
         timeout-minutes: 10
         run: npm run test:regression
@@ -247,6 +252,13 @@ jobs:
     name: Test browser smoke
     if: ${{ github.event.action != 'closed' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
+    # Match package-lock.json; avoid runtime apt downloads exhausting this job.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --init --shm-size=1gb
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -258,7 +270,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run build
       - name: Exercise critical roles and request workflow on isolated loopback fixtures
         run: npm run test:smoke

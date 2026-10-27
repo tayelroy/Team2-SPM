@@ -2043,10 +2043,10 @@ test('SG2-104-P01 | [SG2-104:AC1] [SG2-104:AC2] [SG2-104:AC3] [SG2-104:AC5] [NOR
   // The venue account also holds the Event Coordinator role.
   expect((await request.post('/__e2e/multi-role')).status()).toBe(204);
   await signIn(page, 'venue');
-  const acting = page.getByLabel('Acting as');
+  const acting = page.getByRole('combobox', { name: 'Acting as', exact: true });
   const catalogue = page.getByRole('navigation').getByRole('button', { name: 'Catalogue', exact: true });
   // It starts as its less-privileged role, without the Venue Staff catalogue.
-  await expect(acting).toHaveValue('Event Coordinator');
+  await expect(acting).toHaveText('Event Coordinator');
   await expect(catalogue).toHaveCount(0);
 
   // AC2/AC5: the server allows only what the acting role allows.
@@ -2057,7 +2057,9 @@ test('SG2-104-P01 | [SG2-104:AC1] [SG2-104:AC2] [SG2-104:AC3] [SG2-104:AC5] [NOR
   expect((await venueBookings('technical_support_staff')).status()).toBe(403);
 
   // AC1: switching to Venue Staff brings that role's functions.
-  await acting.selectOption('Venue Staff');
+  await acting.click();
+  await page.getByRole('listbox', { name: 'Available roles', exact: true })
+    .getByRole('option', { name: 'Venue Staff', exact: true }).click();
   await expect(catalogue).toBeVisible();
 
   // AC3: the profile lists both roles.

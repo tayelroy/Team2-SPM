@@ -8,6 +8,7 @@ import { color, layout, radius, rule, surface } from '../theme';
 import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
 import type { NotificationSource } from '../api/notificationInboxApi';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 /** Slide-over notification panel. */
 function NotificationDrawer({ onClose, notifications }: { onClose: () => void; notifications: Notification[] }) {
@@ -258,7 +259,7 @@ export default function AppShell({
             })}
           </nav>
 
-          <div className="app-header-controls" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', maxWidth: '100%' }}>
+          <div className="app-header-controls">
             {/* SG2-51 AC4: Event Organisers are told when a venue for their event is released.
                 SG2-68: the Event Coordinator Lead is told when an event is waiting for a coordinator;
                 neither has hold notices. */}
@@ -299,16 +300,9 @@ export default function AppShell({
               </span>
             </button>}
 
-            {roles.length > 1 && onSwitchRole && (
-              <label className="app-role-switcher" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', color: color.mist, fontSize: '12px', minWidth: 0 }}>
-                Acting as
-                <select aria-label="Acting as" value={role} onChange={event => onSwitchRole(event.target.value as Role)}
-                  style={{ background: color.kelp, border: rule.control, borderRadius: radius.sm, color: color.mist,
-                    fontSize: '12px', letterSpacing: '0.06em', padding: '8px 10px', maxWidth: '100%' }}>
-                  {roles.map(held => <option key={held} value={held}>{held}</option>)}
-                </select>
-              </label>
-            )}
+            {roles.length > 1 && onSwitchRole
+              ? <RoleSwitcher role={role} roles={roles} onSwitchRole={onSwitchRole} />
+              : <span className="app-current-role" aria-label="Your role">{role}</span>}
 
             <div
               ref={profileRef}
@@ -327,11 +321,13 @@ export default function AppShell({
                 aria-expanded={profileOpen}
                 aria-controls="profile-options"
                 onClick={() => setProfileOpen(open => !open)}
-                style={{ background: color.kelp, border: rule.control, borderRadius: radius.sm,
-                  color: color.mist, fontSize: '12px', letterSpacing: '0.06em',
-                  padding: '8px 10px', cursor: 'pointer' }}
+                title="Profile"
+                className="app-profile-trigger"
               >
-                <span aria-label="Your role">{role}</span> <span aria-hidden="true">▾</span>
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M4 17v-1a6 6 0 0 1 12 0v1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
               </button>
               {profileOpen && (
                 <div id="profile-options" role="group" aria-label="Profile options"

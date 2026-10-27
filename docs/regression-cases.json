@@ -9185,21 +9185,23 @@
       "SG2-71:AC1",
       "SG2-71:AC2"
     ],
-    "purpose": "SG2-96 walkthrough finding: the other phone cases use 390px. At 320px a grid track with a fixed 300-320px minimum made the organiser's request form and the attendee's registrations and event pages scroll sideways. The grids now use minmax(min(100%, ...), 1fr); this case visits every navigation page of all seven roles at 320x568.",
-    "preconditions": "Production React build and real Express handlers on loopback; reset in-memory fixture before each role's sign-in; one browser page at 320x568.",
+    "purpose": "SG2-96 responsive regression: visit every navigation page of all seven roles at 320x568, then exercise the styled open role menu and header controls for all three multi-role combinations at 320, 375, 390, 768 and 1440px. Covers the original fixed-grid overflow, duplicate header role label and the native unstyled role menu reported during the hosted walkthrough.",
+    "preconditions": "Stable production React build and real Express handlers on loopback; reset in-memory fixture before each role's sign-in. Single-role pages use 320x568; multi-role controls use the five explicit phone, tablet and desktop viewports. No shared hosted data.",
     "steps": [
       "For each of organiser, coordinator, Lead, venue staff, technical support, Safety Officer and attendee: reset the fixture, sign in, read the header navigation.",
-      "Open each navigation page in turn, wait until it is the current page and its heading shows, and compare the document's scroll width with the viewport width."
+      "Open each navigation page in turn, wait until it is the current page and its heading shows, and compare the document's scroll width with the viewport width.",
+      "Seed Venue Staff + Coordinator, Coordinator + Attendee and Organiser + Coordinator accounts. For both held roles at each viewport, open the styled role menu, verify its options/current selection and viewport bounds, then choose the role and verify its own navigation.",
+      "Exercise the profile and notifications controls, keyboard role selection, cancellation, outside dismissal and selecting the already-current role without clearing navigation. Reload after a role change and verify the held role persists."
     ],
     "data": "Fixture accounts organiser, coordinator, lead, venue, support, safety and attendee @example.test.",
-    "expected": "No page is wider than the 320px viewport; the organiser's New request page is among those visited; no page errors.",
-    "evidence": "e2e/small-phone.spec.ts; client/src/screens/RequestForm.tsx; client/src/screens/Dashboard.tsx; client/src/screens/AttendeeEvent.tsx",
+    "expected": "Every single-role page fits 320px; the organiser's New request page is visited. The custom role menu, its held-role options, Profile and Notifications fit all five multi-role viewports, including a wrapped tablet header. Role choice and reload preserve the correct permissions; cancellation and choosing the current role leave navigation usable; no page errors.",
+    "evidence": "e2e/small-phone.spec.ts; client/src/components/RoleSwitcher.tsx; client/src/screens/AppShell.tsx; client/src/index.css; client/src/screens/RequestForm.tsx; client/src/screens/Dashboard.tsx; client/src/screens/AttendeeEvent.tsx",
     "layer": "Playwright browser + fixture API",
     "status": "Pass",
-    "actual": "Failed before the grid fix (organiser New request 8px too wide); passed after it.",
-    "execution_evidence": "26 Oct 2026; SG2-96 working tree on main b7e2b1a; local production build, Playwright Chromium: failed on the unfixed build, passed after rebuilding with the fix.",
+    "actual": "Original grid overflow failed before its fix and passed after it. The styled role-menu follow-up passed all seven single-role pages and all three multi-role pairs, including open-menu bounds at 320/375/390/768/1440px, keyboard interaction, header controls and reload persistence.",
+    "execution_evidence": "Original 26 Oct 2026 grid verification on main b7e2b1a retained. Follow-up: feature/SG2-96-role-switcher based on main 3b4ae4b; immutable local production build; full Chromium regression started 2026-10-26T14:14:26.581Z and passed 163/163 in 179.34s, no skips/flaky/unexpected/runner errors, required gate passed. Separate local walkthrough adapter passed 90 page/menu views at five widths with no failures or overflow; manual menu review at 390/768/1440px. No hosted business-record writes.",
     "execution_date": "26 Oct 2026",
-    "executed_by": "Claude (automated local verification)",
+    "executed_by": "Automated local verification",
     "review": null
   },
   {
@@ -9439,5 +9441,215 @@
       "by": "YE ZHAN",
       "method_inventory": "docs/test-case-inventory.json"
     }
+  },
+  {
+    "id": "SG2-104-R01",
+    "title": "Native staging selector reads only the selected role and preserves current-role no-op",
+    "story": "SG2-104",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC1"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "Native browser SELECT with Event Organiser first and Event Coordinator selected second; a real change-event counter begins at zero.",
+    "steps": [
+      "Read current and held roles; request the current role while Profile holds focus; choose Organiser, then Coordinator."
+    ],
+    "expected": "Only the selected role is reported; both held labels are returned; no-op preserves focus and dispatches zero changes; two actual selections dispatch exactly two changes.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "id": "SG2-104-R02",
+    "title": "Native staging adapter refuses unheld roles without changing selection",
+    "story": "SG2-104",
+    "type": "CONFLICT",
+    "categories": [
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "The same genuine native SELECT and zero change-event counter.",
+    "steps": [
+      "Request Technical Support Staff, which is absent from the held-role options."
+    ],
+    "expected": "The request is rejected before a change event; Event Coordinator remains selected and the counter remains zero.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "id": "SG2-104-R03",
+    "title": "Single-role staging headers remain readable and cannot switch roles",
+    "story": "SG2-104",
+    "type": "BOUNDARY",
+    "categories": [
+      "BOUNDARY",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC4"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "A single-role Safety Officer header with the existing Your role label and Profile button.",
+    "steps": [
+      "Read current/held roles; request Safety Officer again; request unheld Event Coordinator."
+    ],
+    "expected": "The role remains Safety Officer; a no-op preserves Profile focus, the unheld role is rejected, and no switcher is fabricated.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "id": "SG2-104-R04",
+    "title": "The staging adapter supports every custom multi-role account pair",
+    "story": "SG2-104",
+    "type": "NORMAL",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-104:AC1",
+      "SG2-104:AC2"
+    ],
+    "purpose": "Prevent the shared staging checker from misreporting authenticated multi-role accounts as failed logins when the deployed version still uses the native selector. Preserve validation of the new styled control.",
+    "preconditions": "Immutable production React build with reset in-memory API fixture, all three supported multi-role combinations and example.test accounts.",
+    "steps": [
+      "Enumerate roles with the menu initially closed and open; visit My Profile and request the existing role; choose each held role; request unheld Safety Officer."
+    ],
+    "expected": "Both held roles are read accurately; enumeration closes the menu; current-role no-op preserves the page, focus and permissions; each held role reaches its own navigation; unheld choices leave the current role and closed menu intact.",
+    "evidence": "e2e/staging-role-control.spec.ts; .github/scripts/acting-role-control.cjs; .github/scripts/staging-walkthrough.mjs; hosted-e2e/roles.spec.ts",
+    "layer": "Playwright browser DOM and production application + local fixture API",
+    "status": "Pass",
+    "actual": "Focused Chromium regression: 4/4 new cases passed in 5.4s; no mocked locator objects.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on base 62687de. Focused log /tmp/sg2-96-acting-role-control-focused.log. Full browser and hosted staging reruns are recorded separately in the PR.",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null
+  },
+  {
+    "story": "SG2-96",
+    "type": "NORMAL",
+    "layer": "Public HTTP middleware, React screen, or Playwright browser DOM as named per case",
+    "status": "Pass",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null,
+    "id": "SG2-96-R01",
+    "title": "Sibling protected routers share only a request-local verified identity",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-25:AC1",
+      "SG2-25:AC2",
+      "SG2-25:AC3",
+      "SG2-104:AC2",
+      "SG2-104:AC5"
+    ],
+    "purpose": "Remove repeated hosted identity reads without carrying permissions across requests or trusting changed credentials.",
+    "preconditions": "Express application with multiple sibling protected routers, independently controllable identity resolver and real HTTP requests.",
+    "steps": [
+      "Pass an unchanged request through sibling routers and an intervening acting-role context.",
+      "Send new requests after role changes and session revocation.",
+      "Change, remove, duplicate or invalidate authorization and acting-role headers; fail a recheck.",
+      "Run concurrent identities and separate authorization factories."
+    ],
+    "expected": "One resolution for unchanged sibling traversal; every new request and changed header revalidates. Invalid or revoked identity clears the earlier principal. Database acting roles, concurrent requests and factories remain isolated.",
+    "evidence": "server/src/authorizationRequestScope.test.ts; server/src/auth/index.ts",
+    "actual": "8/8 new HTTP cases passed. Full server suite: 1,882/1,882 with 100% statements, branches, functions and lines per covered file.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on 020cf5f. One-worker coverage log /tmp/sg2-96-auth-request-scope-server-coverage.log. Mounted catalogue/layout/operations probes reduced identity resolutions from 4/5/6 to 1/1/1 per HTTP request; this is a deterministic call-count result, not a hosted latency claim."
+  },
+  {
+    "story": "SG2-96",
+    "type": "NORMAL",
+    "layer": "Public HTTP middleware, React screen, or Playwright browser DOM as named per case",
+    "status": "Pass",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null,
+    "id": "SG2-96-R02",
+    "title": "Venue layout and operational details load concurrently with preserved fallbacks and cancellation",
+    "categories": [
+      "NORMAL",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-43:AC2",
+      "SG2-77:AC3"
+    ],
+    "purpose": "Avoid serial layout and operational request waves while retaining complete catalogue loading and independent failure behavior.",
+    "preconditions": "Venue reader with both detail permissions and independently deferred public API responses.",
+    "steps": [
+      "Keep either detail wave pending while the other finishes.",
+      "Fail either detail read and inspect the unaffected details.",
+      "Leave while both reads are pending, then complete one and reject the other."
+    ],
+    "expected": "Both waves start together; the catalogue stays loading until both settle. Existing NA/Unavailable fallbacks and successful details remain independent. Leaving aborts both reads and late outcomes cannot restore data.",
+    "evidence": "client/src/venues/Venues.test.tsx:167; client/src/screens/Venues.tsx",
+    "actual": "5/5 new runner cases passed across 3 test declarations. Full client suite: 1,930/1,930 with 100% statements, branches, functions and lines per covered file.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on 020cf5f. Coverage log /tmp/sg2-96-venue-details-client-coverage-final.log. The concurrency case failed against the former sequential implementation before remediation."
+  },
+  {
+    "story": "SG2-96",
+    "type": "NORMAL",
+    "layer": "Public HTTP middleware, React screen, or Playwright browser DOM as named per case",
+    "status": "Pass",
+    "execution_date": "26 Oct 2026",
+    "executed_by": "Automated local verification",
+    "review": null,
+    "id": "SG2-96-R03",
+    "title": "Staging readiness observes completed content within one bounded deadline",
+    "categories": [
+      "NORMAL",
+      "BOUNDARY",
+      "CONFLICT",
+      "FAILURE"
+    ],
+    "mapped_acs": [
+      "SG2-22:AC3"
+    ],
+    "purpose": "Avoid treating unrelated in-flight requests as unfinished UI while continuing to reject loading pages and visible errors.",
+    "preconditions": "Real Chromium DOM with controlled content, notification states and an actually pending unrelated HTTP request.",
+    "steps": [
+      "Check healthy content while an unrelated request remains in flight.",
+      "Leave each supported loading message visible through a short bounded deadline.",
+      "Expose an error alert or unavailable notifications.",
+      "Finish content before notifications and verify both share the same deadline.",
+      "Display legitimate Loading bay venue content."
+    ],
+    "expected": "Only healthy completed content passes. Loading, notification loading, visible alerts and unavailable notifications fail. The production combined content budget stays 35 seconds; it is not reset between loading phases.",
+    "evidence": "e2e/staging-readiness.spec.ts; .github/scripts/staging-page-readiness.cjs; .github/scripts/staging-walkthrough.mjs",
+    "actual": "12/12 browser runner cases passed across 6 test declarations, including actual event-search and equipment-availability loading messages, negative timeout and error cases.",
+    "execution_evidence": "26 Oct 2026; PR #117 follow-up on 020cf5f. Focused log /tmp/sg2-96-final-readiness.log. Failed hosted run #7 artifact showed Loading venue catalogue at Coordinator/Venues/320px; its SHA-256 was verified. Final full-browser and real-staging reruns are recorded separately in PR #117."
   }
 ]
