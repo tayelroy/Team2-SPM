@@ -203,7 +203,10 @@ export default function App() {
     notificationEvent: notificationTarget && <NotificationEvent accessToken={session!.accessToken}
       source={notificationTarget.source} notificationId={notificationTarget.id}
       onViewEvent={role === 'Event Organiser' || role === 'Event Coordinator'
-        ? id => { setSelectedEventId(id); setScreen(role === 'Event Coordinator' ? 'notificationWork' : 'detail'); } : undefined} />,
+        ? id => { setSelectedEventId(id); setScreen(role === 'Event Coordinator' ? 'notificationWork' : 'detail'); }
+        // SG2-102 AC4: an attendee's event details are on My registrations.
+        : role === 'Attendee' ? () => setScreen('myRegistrations') : undefined}
+      viewLabel={role === 'Attendee' ? 'View my registrations' : undefined} />,
     dashboard: (
       <Dashboard
         role={role}

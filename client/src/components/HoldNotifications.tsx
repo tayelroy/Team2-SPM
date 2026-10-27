@@ -55,6 +55,8 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandi
   // SG2-65 AC1/AC2: the coordinator's decision on the organiser's change.
   change_accepted: 'Change accepted',
   change_refused: 'Change refused',
+  // SG2-102 AC1/AC2: the attendee's event moved date, time or venue.
+  event_changed: 'Event changed',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstanding_arrangements', string> = {
   placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
@@ -83,6 +85,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandin
   registration_withdrawn: color.silver,
   change_accepted: color.accent,
   change_refused: color.silver,
+  event_changed: color.accent,
 };
 
 const identity = (entry: InboxNotification) => `${entry.source}:${entry.notification_id}`;

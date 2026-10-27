@@ -92,6 +92,16 @@ test('[NORMAL] [SG2-63:AC10] registration opened and closed notices survive resp
   expect(await loadNotifications('coordinator-token')).toEqual({ ok: true, notifications: [opened, closed] });
 });
 
+test('[BOUNDARY] [SG2-102:AC1] the event_changed notice survives validation and a near-miss kind is refused', async () => {
+  const changed = { notification_id: 91, event_id: 7, request_id: null, kind: 'event_changed',
+    message: 'Partner Forum has changed. Venue: Main Hall → Annex. Open My registrations for the latest details.',
+    created_at: '2026-10-27T02:00:00.000Z' };
+  respond(() => Response.json({ notifications: [changed] }));
+  expect(await loadNotifications('attendee-token')).toEqual({ ok: true, notifications: [changed] });
+  respond(() => Response.json({ notifications: [{ ...changed, kind: 'event_change' }] }));
+  expect(await loadNotifications('attendee-token')).toEqual({ ok: false, message: 'Could not load notifications. Please try again.' });
+});
+
 test('[FAILURE] [SG2-63:AC10] a near-miss registration notice kind is refused rather than shown unlabelled', async () => {
   for (const kind of ['registration_open', 'registration_closed ', 'Registration_opened']) {
     respond(() => Response.json({ notifications: [{ ...rejected, kind }] }));

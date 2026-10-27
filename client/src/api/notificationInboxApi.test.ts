@@ -103,6 +103,17 @@ test('[NORMAL] [SG2-60:AC1] an attendee inbox holding a registration confirmatio
   expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [confirmed], unread_count: 1, next_cursor: null } });
 });
 
+test('[NORMAL] [SG2-102:AC1] [SG2-102:AC2] an attendee inbox holding an event change loads with the old and new values', async () => {
+  const changed = { ...entry, kind: 'event_changed', message: 'Forum has changed. Date and time: 20 Jul 2030 19:00 SGT → 21 Jul 2030 19:00 SGT. Open My registrations for the latest details.' };
+  respond({ notifications: [changed], unread_count: 1, next_cursor: null });
+  expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [changed], unread_count: 1, next_cursor: null } });
+});
+
+test('[FAILURE] [SG2-102:AC1] a hold notice claiming the event_changed kind is rejected', async () => {
+  respond({ notifications: [{ ...entry, source: 'hold', kind: 'event_changed' }], unread_count: 1, next_cursor: null });
+  expect((await loadNotificationInbox('token')).ok).toBe(false);
+});
+
 test('[NORMAL] [SG2-62:AC5] an organiser inbox holding an attendee withdrawal loads', async () => {
   const withdrew = { ...entry, kind: 'registration_withdrawn', message: 'Ana withdrew from Forum. 9 of 10 places now remain.' };
   respond({ notifications: [withdrew], unread_count: 1, next_cursor: null });
