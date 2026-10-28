@@ -1,33 +1,15 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createAccountRole, changeAccountRoles, deleteAccountRole, getHeldRoles, getAccountRoles, listCoordinators, COORDINATOR_ID_BATCH } from './accountRoles';
+import { changeAccountRoles, getHeldRoles, getAccountRoles, listCoordinators, COORDINATOR_ID_BATCH } from './accountRoles';
 
 function fakeAdmin(options: {
-  insert?: (row: any) => Promise<{ error: { message: string } | null }>;
-  update?: (payload: any) => Promise<{ data: any; error: { message: string } | null }>;
-  delete?: () => Promise<{ error: { message: string } | null }>;
   select?: (userId: unknown) => Promise<{ data: any; error: { message: string } | null }>;
-  captureFilter?: (column: string, userId: string) => void;
 }): SupabaseClient {
   return {
     from(table: string) {
       assert.equal(table, 'account_roles');
       return {
-        insert: options.insert ?? (async () => ({ error: null })),
-        update: (payload: any) => ({
-          eq: (column: string, userId: string) => {
-            options.captureFilter?.(column, userId);
-            return { select: async () =>
-              options.update ? options.update(payload) : { data: [{ user_id: 'target-1' }], error: null } };
-          }
-        }),
-        delete: () => ({
-          eq: async (column: string, userId: string) => {
-            options.captureFilter?.(column, userId);
-            return options.delete ? options.delete() : { error: null };
-          }
-        }),
         select: (columns: string) => {
           assert.equal(columns, 'role');
           return {
@@ -46,29 +28,6 @@ function fakeAdmin(options: {
     }
   } as unknown as SupabaseClient;
 }
-
-describe('createAccountRole', () => {
-  test('[NORMAL] [SG2-24:AC1] inserts the given snake_case role for the user', async () => {
-    let insertedRow: any;
-    const admin = fakeAdmin({
-      insert: async (row) => {
-        insertedRow = row;
-        return { error: null };
-      }
-    });
-
-    const result = await createAccountRole(admin, 'user-123', 'attendee');
-
-    assert.deepEqual(result, { ok: true });
-    assert.deepEqual(insertedRow, { user_id: 'user-123', role: 'attendee' });
-  });
-
-  test('[FAILURE] [SG2-24:AC1] surfaces the database error when the insert fails', async () => {
-    const admin = fakeAdmin({ insert: async () => ({ error: { message: 'duplicate key value' } }) });
-    const result = await createAccountRole(admin, 'user-123', 'attendee');
-    assert.deepEqual(result, { ok: false, error: 'duplicate key value' });
-  });
-});
 
 describe('changeAccountRoles', () => {
   function rpcAdmin(answer: { data: unknown; error: { code?: string; message: string } | null }, calls: unknown[] = []): SupabaseClient {
@@ -93,26 +52,6 @@ describe('changeAccountRoles', () => {
     assert.deepEqual(await changeAccountRoles(rpcAdmin({ data: null, error: { message: 'down' } }), 'a', 'b', 'replace', 'attendee'), { outcome: 'error' });
     assert.deepEqual(await changeAccountRoles(rpcAdmin({ data: null, error: { code: '22P02', message: 'bad uuid' } }), 'a', 'x', 'replace', 'attendee'), { outcome: 'missing' });
   });
-});
-
-describe('deleteAccountRole', () => {
-  for (const outcome of ['success', 'database error', 'transport rejection'] as const) {
-    test(`${outcome === 'success' ? '[NORMAL]' : '[FAILURE]'} [SG2-24:account-cleanup] attempts cleanup of only the target account and resolves on ${outcome}`, async () => {
-      let deletes = 0;
-      let filter: unknown;
-      const admin = fakeAdmin({
-        captureFilter: (column, userId) => { filter = { column, userId }; },
-        delete: async () => {
-          deletes++;
-          if (outcome === 'transport rejection') throw new Error('connection reset');
-          return { error: outcome === 'database error' ? { message: 'connection reset' } : null };
-        }
-      });
-      await assert.doesNotReject(() => deleteAccountRole(admin, 'user-123'));
-      assert.equal(deletes, 1);
-      assert.deepEqual(filter, { column: 'user_id', userId: 'user-123' });
-    });
-  }
 });
 
 describe('getHeldRoles', () => {

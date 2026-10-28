@@ -2,86 +2,12 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   EVENT_CATEGORIES,
-  EVENT_STATUSES,
-  STATUS_TRANSITIONS,
   SUBMISSION_REQUIRED_FIELDS,
-  canTransition,
   isEventCategory,
   missingForSubmission,
   validateDraftInput,
-  type DraftValues,
-  type EventStatus
+  type DraftValues
 } from './fields';
-
-describe('STATUS_TRANSITIONS / canTransition (SG2-100 Unit 1)', () => {
-  test('[NORMAL] [SG2-100:AC2] unassigned legally transitions to submitted once a coordinator is assigned', () => {
-    assert.equal(canTransition('unassigned', 'submitted'), true);
-  });
-
-  test('[NORMAL] [SG2-100:AC2] awaiting_safety_check legally transitions to preparation once safety passes', () => {
-    assert.equal(canTransition('awaiting_safety_check', 'preparation'), true);
-  });
-
-  test('[BOUNDARY] [SG2-100:AC2] completed accepts no outgoing transition, to any status, proving it is terminal', () => {
-    for (const to of EVENT_STATUSES) {
-      assert.equal(canTransition('completed', to), false, `completed -> ${to} should be illegal`);
-    }
-  });
-
-  test('[CONFLICT] [SG2-100:AC2] awaiting_safety_check cannot skip Preparation straight to confirmed', () => {
-    assert.equal(canTransition('awaiting_safety_check', 'confirmed'), false);
-  });
-
-  test('[FAILURE] [SG2-100:AC2] draft cannot jump straight to confirmed', () => {
-    assert.equal(canTransition('draft', 'confirmed'), false);
-  });
-
-  test('[NORMAL] [SG2-100:AC2] cancellation is reachable from preparation, awaiting_safety_check and safety_rejected', () => {
-    assert.equal(canTransition('preparation', 'cancelled'), true);
-    assert.equal(canTransition('awaiting_safety_check', 'cancelled'), true);
-    assert.equal(canTransition('safety_rejected', 'cancelled'), true);
-  });
-
-  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-81:AC6] [SG2-92:AC4] Planning is reachable only from approved (the normal way in), the safety check and its rejection, Preparation and Confirmed, never from the earlier stages or the terminal ones', () => {
-    const back = EVENT_STATUSES.filter(from => canTransition(from, 'planning'));
-    assert.deepEqual([...back].sort(), ['approved', 'awaiting_safety_check', 'confirmed', 'preparation', 'safety_rejected']);
-  });
-
-  test('[CONFLICT] [SG2-92:AC4] a Safety Rejected event can go back to Planning but never straight to Preparation or Confirmed', () => {
-    assert.equal(canTransition('safety_rejected', 'planning'), true);
-    assert.equal(canTransition('safety_rejected', 'preparation'), false);
-    assert.equal(canTransition('safety_rejected', 'confirmed'), false);
-  });
-
-  test('[NORMAL] [SG2-91:AC1] an Approved or Planning event whose arrangements are in place can move to Awaiting Safety Check', () => {
-    assert.equal(canTransition('approved', 'awaiting_safety_check'), true);
-    assert.equal(canTransition('planning', 'awaiting_safety_check'), true);
-  });
-
-  test('[BOUNDARY] [SG2-91:AC1] only Approved and Planning events enter the safety check', () => {
-    const into = EVENT_STATUSES.filter(from => canTransition(from, 'awaiting_safety_check'));
-    assert.deepEqual([...into].sort(), ['approved', 'planning']);
-  });
-
-  test('[BOUNDARY] [SG2-100:AC2] every EVENT_STATUSES member has a STATUS_TRANSITIONS entry', () => {
-    for (const status of EVENT_STATUSES) {
-      assert.ok(
-        Array.isArray(STATUS_TRANSITIONS[status as EventStatus]),
-        `${status} is missing a STATUS_TRANSITIONS entry`
-      );
-    }
-  });
-
-  test('[BOUNDARY] [SG2-100:AC2] cancelled accepts no outgoing transition, proving it is terminal alongside completed', () => {
-    for (const to of EVENT_STATUSES) {
-      assert.equal(canTransition('cancelled', to), false, `cancelled -> ${to} should be illegal`);
-    }
-  });
-
-  test('[FAILURE] [SG2-100:AC2] an unrecognised from-status falls back to no legal transitions instead of throwing', () => {
-    assert.equal(canTransition('not_a_real_status' as EventStatus, 'confirmed'), false);
-  });
-});
 
 describe('the customer minimum for submission (SG2-105)', () => {
   // Customer clarification session 2 is the oracle, written out independently of the validator.

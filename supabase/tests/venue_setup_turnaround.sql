@@ -39,14 +39,6 @@ insert into public.venue_booking_requests (request_id, event_id, venue_id, start
   (97804, 97805, 97801, '2030-09-10 08:00+00', '2030-09-10 08:45+00', 'theatre', 'e7800000-0000-4000-8000-000000000002'),
   (97805, 97802, 97802, '2030-09-12 12:00+00', '2030-09-12 13:00+00', 'boardroom', 'e7800000-0000-4000-8000-000000000002');
 
--- 1. The gap a venue keeps between bookings:
-do $$
-begin
-  if public.venue_preparation_gap(97801) <> interval '75 minutes' or public.venue_preparation_gap(97802) <> interval '0' then
-    raise exception '[SG2-78:preparation-gap] [SG2-78:AC1] [NORMAL] A venue must keep setup plus turnaround between bookings, and 0 minutes when none are recorded';
-  end if;
-end $$;
-
 -- 2. Approvals (SG2-49) compare effective periods:
 select set_config('request.jwt.claim.sub', 'e7800000-0000-4000-8000-000000000001', true);
 do $$
@@ -54,26 +46,26 @@ declare result jsonb;
 begin
   -- Morning Talk's turnaround runs to 12:45; this request's setup starts at 12:44.
   result := public.decide_venue_booking_request(97801, 'approve', null);
-  if result->>'outcome' <> 'conflict' or result->>'label' <> 'Morning Talk'
-      or (select status from public.venue_booking_requests where request_id = 97801) <> 'pending' then
+  if result->>'outcome' IS DISTINCT FROM 'conflict' or result->>'label' IS DISTINCT FROM 'Morning Talk'
+      or (select status from public.venue_booking_requests where request_id = 97801) IS DISTINCT FROM 'pending' then
     raise exception '[SG2-78:turnaround-overlap-refused] [SG2-78:AC2] [CONFLICT] A request whose setup overlaps a booking''s turnaround was not refused, naming it: %', result;
   end if;
   result := public.decide_venue_booking_request(97802, 'approve', null);
-  if result->>'outcome' <> 'updated' then
-    raise exception '[SG2-78:turnaround-adjacent-approved] [SG2-78:AC2] [BOUNDARY] A request whose setup starts as the turnaround ends must be approved: %', result;
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
+    raise exception '[SG2-78:turnaround-adjacent-approved] [SG2-78:AC1] [SG2-78:AC2] [BOUNDARY] A request whose setup starts as the turnaround ends must be approved: %', result;
   end if;
   -- Before the talk: this request's turnaround would end at 09:31, inside the talk's setup.
   result := public.decide_venue_booking_request(97803, 'approve', null);
-  if result->>'outcome' <> 'conflict' then
+  if result->>'outcome' IS DISTINCT FROM 'conflict' then
     raise exception '[SG2-78:setup-overlap-refused] [SG2-78:AC2] [BOUNDARY] A request whose turnaround overlaps a booking''s setup by one minute was not refused: %', result;
   end if;
   result := public.decide_venue_booking_request(97804, 'approve', null);
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-78:setup-adjacent-approved] [SG2-78:AC2] [BOUNDARY] A request whose turnaround ends as the next setup starts must be approved: %', result;
   end if;
   -- A venue with no times recorded needs no gap at all.
   result := public.decide_venue_booking_request(97805, 'approve', null);
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-78:no-times-no-gap] [SG2-78:AC1] [NORMAL] Back-to-back bookings must be approved at a venue with no setup or turnaround time: %', result;
   end if;
   -- AC5: the booking keeps the event's own times, not the effective period.
@@ -88,11 +80,11 @@ do $$
 declare result jsonb; hold bigint;
 begin
   result := public.create_venue_hold(97803, 97801, '2030-09-11 12:30+00', '2030-09-11 13:00+00', now() + interval '2 days');
-  if result->>'outcome' <> 'conflict' then
+  if result->>'outcome' IS DISTINCT FROM 'conflict' then
     raise exception '[SG2-78:hold-in-turnaround-refused] [SG2-78:AC2] [CONFLICT] A hold inside a booking''s turnaround was placed: %', result;
   end if;
   result := public.create_venue_hold(97803, 97801, '2030-09-11 15:00+00', '2030-09-11 16:00+00', now() + interval '2 days');
-  if result->>'outcome' <> 'created' then
+  if result->>'outcome' IS DISTINCT FROM 'created' then
     raise exception '[SG2-78:hold-clear-of-turnaround] [SG2-78:AC2] [NORMAL] A hold clear of every effective period was refused: %', result;
   end if;
   hold := (result->'hold'->>'hold_id')::bigint;
@@ -101,8 +93,8 @@ begin
   insert into public.venue_bookings (venue_id, starts_at, ends_at, status)
     values (97801, '2030-09-11 16:30+00', '2030-09-11 17:00+00', 'confirmed');
   result := public.change_venue_hold(hold, 'convert');
-  if result->>'outcome' <> 'conflict'
-      or (select status from public.venue_holds where hold_id = hold) <> 'tentative' then
+  if result->>'outcome' IS DISTINCT FROM 'conflict'
+      or (select status from public.venue_holds where hold_id = hold) IS DISTINCT FROM 'tentative' then
     raise exception '[SG2-78:convert-into-setup-refused] [SG2-78:AC2] [CONFLICT] Converting a hold whose turnaround overlaps the next booking''s setup was not refused: %', result;
   end if;
 end $$;

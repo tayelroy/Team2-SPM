@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { BookingRequestConflicts } from './BookingConflicts';
 import { requestedNotice } from './VenueRequests';
 import { describeConflict, fetchRequestConflicts, requestVenue, type VenueConflict, type VenueRequest } from './requestsApi';
@@ -62,14 +62,7 @@ test('[FAILURE] [SG2-50:AC1] a failed or malformed check says so instead of clai
   expect(await within(panel()).findByText('Your session has expired. Sign in again.')).toBeVisible();
 });
 
-test('[NORMAL] [SG2-50:AC1] a result arriving after the panel closed is ignored', async () => {
-  let reply!: (response: Response) => void;
-  respond(() => new Promise<Response>(resolve => { reply = resolve; }));
-  const { unmount } = render(<BookingRequestConflicts accessToken="token" requestId={41} />);
-  unmount();
-  reply(Response.json({ conflicts: [gala] }));
-  await vi.waitFor(() => expect(screen.queryByRole('region', { name: 'Booking conflicts' })).toBeNull());
-});
+
 
 test('[NORMAL] [SG2-50:AC1] the coordinator is told when a new request overlaps a booking, by number and period', async () => {
   respond(() => Response.json({ request: pending, booking: 'allowed', conflicts: [gala] }, { status: 201 }));
@@ -94,9 +87,15 @@ test('[NORMAL] [SG2-50:AC1] a held booking and one whose event has no name are s
 });
 
 test('[NORMAL] [SG2-50:AC2] the number of standing conflicts is reported so Approve can be held back', async () => {
-  respond(() => Response.json({ conflicts: [gala, hidden] }));
+  const fetch = respond(() => Response.json({ conflicts: [gala, hidden] }));
   const onConflicts = vi.fn();
-  render(<BookingRequestConflicts accessToken="staff-token" requestId={41} onConflicts={onConflicts} />);
+  const view = render(<BookingRequestConflicts accessToken="staff-token" requestId={41} onConflicts={onConflicts} />);
   expect(await within(panel()).findByText(galaText)).toBeInTheDocument();
   expect(onConflicts).toHaveBeenCalledWith(2);
+  let reply!: (response: Response) => void;
+  fetch.mockImplementationOnce(async () => new Promise<Response>(resolve => { reply = resolve; }));
+  view.rerender(<BookingRequestConflicts accessToken="staff-token" requestId={42} onConflicts={onConflicts} />);
+  view.unmount();
+  await act(async () => reply(Response.json({ conflicts: [] })));
+  expect(onConflicts.mock.calls).toEqual([[2]]);
 });

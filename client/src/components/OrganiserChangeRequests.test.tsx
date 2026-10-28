@@ -26,7 +26,7 @@ function fill(field: string, value: string, reason: string) {
 }
 
 describe('OrganiserChangeRequests: outstanding requests (SG2-64 AC3)', () => {
-  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-64:AC1] [SG2-64:AC3] outstanding requests list what, from, to and why; none says so, a failed load says why, and a late reply is ignored', async () => {
+  test('[NORMAL] [BOUNDARY] [FAILURE] [SG2-64:AC1] [SG2-64:AC3] outstanding requests list what, from, to and why; none says so and a failed load says why', async () => {
     {
       const list = listing([REQUEST, {
         ...REQUEST, id: '42', reason: 'Speaker moved.',
@@ -53,15 +53,6 @@ describe('OrganiserChangeRequests: outstanding requests (SG2-64 AC3)', () => {
     }
     {
       cleanup(); vi.restoreAllMocks();
-      let resolve!: (value: api.FetchOwnChangeRequestsResult) => void;
-      vi.spyOn(api, 'fetchOwnChangeRequests').mockReturnValue(new Promise((done) => { resolve = done; }));
-      const { unmount } = render(<OrganiserChangeRequests eventId={12} accessToken="t" />);
-      unmount();
-      await act(async () => resolve({ ok: true, requests: [REQUEST] }));
-      expect(screen.queryByRole('list', { name: 'Outstanding change requests' })).not.toBeInTheDocument();
-    }
-    {
-      cleanup(); vi.restoreAllMocks();
       expect(formatChangeValue('name', 'Gala')).toBe('Gala');
       expect(formatChangeValue('description', '')).toBe('Not set');
       expect(formatChangeValue('proposed_date', 'not a date')).toBe('Date not available');
@@ -72,16 +63,22 @@ describe('OrganiserChangeRequests: outstanding requests (SG2-64 AC3)', () => {
 describe('OrganiserChangeRequests: asking for a change (SG2-64 AC1/AC2)', () => {
   test("[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-64:AC1] [SG2-64:AC2] [SG2-64:AC4] asking sends a number, a date or text and confirms; incomplete or over-long asks are stopped, and the server's refusal keeps the form", async () => {
     {
-      const list = listing();
+      let initial!: (result: Awaited<ReturnType<typeof api.fetchOwnChangeRequests>>) => void;
+      const list = vi.spyOn(api, 'fetchOwnChangeRequests')
+        .mockReturnValueOnce(new Promise(resolve => { initial = resolve; }))
+        .mockResolvedValue({ ok: true, requests: [REQUEST] });
       const raise = vi.spyOn(api, 'raiseChangeRequest').mockResolvedValue({ ok: true, request: REQUEST, coordinatorNotified: true });
       render(<OrganiserChangeRequests eventId={12} accessToken="token-12" />);
-      await screen.findByText('You have no outstanding change requests on this event.');
       fill('expected_attendance', '180', '  More guests confirmed.  ');
       expect(await screen.findByRole('status')).toHaveTextContent('Your change request was sent to your coordinator.');
       expect(raise).toHaveBeenCalledWith(12, { field: 'expected_attendance', to: 180, reason: 'More guests confirmed.' }, 'token-12');
       expect(screen.getByLabelText('What should change')).toHaveValue('');
       expect(screen.getByLabelText('Why it should change')).toHaveValue('');
       await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+      const pending = await screen.findByRole('list', { name: 'Outstanding change requests' });
+      expect(pending).toHaveTextContent('Expected attendance: 120 → 180. Reason: More guests confirmed.');
+      await act(async () => initial({ ok: true, requests: [] }));
+      expect(screen.getByRole('list', { name: 'Outstanding change requests' })).toHaveTextContent('Expected attendance: 120 → 180. Reason: More guests confirmed.');
     }
     {
       cleanup(); vi.restoreAllMocks();

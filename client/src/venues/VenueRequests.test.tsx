@@ -114,7 +114,7 @@ test('[NORMAL] [SG2-48:AC3] [SG2-48:AC4] the event\'s requests are listed, pendi
   await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 });
 
-test('[BOUNDARY] [FAILURE] [SG2-48:AC3] an event with no requests says so; an unavailable list explains why; a late reply after leaving is ignored', async () => {
+test('[BOUNDARY] [FAILURE] [SG2-48:AC3] an event with no requests says so; an unavailable list explains why', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ requests: [], arrangement: arrangement(0, 0) })));
   render(<EventVenueRequests accessToken="token" eventId={10} eventName="Meridian Forum" refresh={0} />);
   expect(await screen.findByText('No venues have been requested for this event yet.')).toBeVisible();
@@ -122,13 +122,6 @@ test('[BOUNDARY] [FAILURE] [SG2-48:AC3] an event with no requests says so; an un
   vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })));
   render(<EventVenueRequests accessToken="token" eventId={10} eventName="Meridian Forum" refresh={0} />);
   expect(await screen.findByText('Venue requests are unavailable right now. Please try again.')).toBeVisible();
-  cleanup();
-  let reply!: (response: Response) => void;
-  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { reply = resolve; })));
-  const { unmount } = render(<EventVenueRequests accessToken="token" eventId={10} eventName="Meridian Forum" refresh={0} />);
-  unmount();
-  await act(async () => reply(Response.json({ requests: [pending], arrangement: arrangement(0, 1) })));
-  expect(screen.queryByText('Rooftop Terrace')).not.toBeInTheDocument();
 });
 
 test('[NORMAL] [SG2-49:AC2] [SG2-49:AC3] the coordinator sees who decided each request, when, and why it was rejected', async () => {

@@ -91,7 +91,7 @@ test('[FAILURE] [SG2-106:AC1] missing venues and network failures stay in the pa
   expect(screen.getByRole('heading', { name: 'Atrium Hall' })).toBeInTheDocument();
 });
 
-test('[CONFLICT] [SG2-106:AC1] a second click while deleting sends one request, and unmounting ignores the reply', async () => {
+test('[CONFLICT] [SG2-106:AC1] a second click while deleting sends one request, and unmounting aborts it', async () => {
   let finish!: (value: Response) => void;
   const fetch = await open(staff, () => new Promise<Response>(resolve => { finish = resolve; }));
   fireEvent.click(screen.getByRole('button', { name: 'Delete Atrium Hall' }));
@@ -100,7 +100,10 @@ test('[CONFLICT] [SG2-106:AC1] a second click while deleting sends one request, 
   expect(await screen.findByRole('button', { name: 'Deleting…' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Deleting…' }));
   expect(deletes(fetch)).toHaveLength(1);
+  const signal = deletes(fetch)[0][1]?.signal;
+  expect(signal?.aborted).toBe(false);
   cleanup();
+  expect(signal?.aborted).toBe(true);
   await act(async () => finish(Response.json({ venue: { venue_id: 1 } })));
 });
 
@@ -109,16 +112,4 @@ test('[FAILURE] [SG2-106:AC1] a refusal without a readable body still refuses wi
   const failure = await deleteVenue('token', new AbortController().signal, 1).catch(error => error);
   expect(failure).toBeInstanceOf(VenueDeleteBlocked);
   expect(failure.blockers).toEqual([]);
-});
-
-test('[FAILURE] [SG2-106:AC1] a failure that arrives after leaving the page is ignored', async () => {
-  let fail!: (reason: Error) => void;
-  const fetch = await open(staff, () => new Promise<Response>((_resolve, reject) => { fail = reject; }));
-  fireEvent.click(screen.getByRole('button', { name: 'Delete Atrium Hall' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }));
-  await screen.findByRole('button', { name: 'Deleting…' });
-  cleanup();
-  await act(async () => fail(new TypeError('offline')));
-  expect(deletes(fetch)).toHaveLength(1);
-  expect(screen.queryByText('Unable to delete the venue. Please try again.')).not.toBeInTheDocument();
 });

@@ -429,11 +429,6 @@ test('[NORMAL] [SG2-97:AC1] [SG2-100:AC5] [SG2-87:AC2] [SG2-68:AC1] [SG2-70:AC3]
   assert.equal(fetchMock.mock.callCount(), 2);
 });
 
-test('[FAILURE] [SG2-89:AC4] no role but the Event Coordinator Lead holds the coordinator overview grant', () => {
-  const holders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('event_request.oversight.view'));
-  assert.deepEqual(holders, ['event_coordinator_lead']);
-});
-
 test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejecting near misses', () => {
   assert.equal(isRole('event_coordinator_lead'), true);
   assert.equal(isRole('safety_officer'), true);
@@ -441,7 +436,17 @@ test('[BOUNDARY] [SG2-86:AC1] isRole accepts the two new roles exactly, rejectin
   assert.equal(isRole('lead'), false);
 });
 
-test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] [SG2-60:AC1] [SG2-93:AC2] [SG2-65:AC2] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] [SG2-54:AC1] [SG2-55:AC1] [SG2-58:AC1] [SG2-82:AC5] [SG2-66:AC1] [SG2-66:AC5] [SG2-66:AC4] [SG2-92:AC4] [SG2-92:AC6] [SG2-63:AC3] [SG2-63:AC5] [SG2-63:AC8] [SG2-70:AC3] [SG2-83:AC5] [SG2-67:AC1] [SG2-59:AC1] [SG2-60:AC1] [SG2-93:AC2] [FAILURE] [SG2-25:AC1] [SG2-39:AC1] [SG2-40:AC3] [SG2-97:AC2] [SG2-100:AC4] [SG2-89:AC4] [SG2-65:AC2] permissionsFor existing roles separates requesting equipment from arranging and reserving it', () => {
+  assert.deepEqual(PERMISSIONS['event_request.planning.update'], ['event_coordinator']);
+  const historyRoles = PERMISSIONS['event_request.history.view'];
+  assert.ok(historyRoles, 'event_request.history.view permission must exist');
+  assert.deepEqual([...historyRoles].sort(), [
+    'event_coordinator', 'event_coordinator_lead', 'event_organiser',
+    'safety_officer', 'technical_support_staff', 'venue_staff'
+  ]);
+  assert.equal(historyRoles.includes('attendee' as never), false);
+  const overviewHolders = SUPPORTED_ROLES.filter(role => permissionsFor(role, PERMISSIONS).includes('event_request.oversight.view'));
+  assert.deepEqual(overviewHolders, ['event_coordinator_lead']);
   const EXPECTED: Record<string, string[]> = {
     event_organiser: [
       'event_request.create', 'event_request.submit', 'event_request.view', 'event_request.delete',
@@ -479,7 +484,18 @@ test('[NORMAL] [SG2-86:AC4] [SG2-97:AC1] [SG2-52:AC3] [SG2-53:AC1] [SG2-53:AC5] 
       'equipment.read', 'equipment.create', 'equipment.update', 'equipment.availability.read', 'equipment.reservations.manage', 'equipment_requirements.read', 'equipment_requirements.arrange', 'events.search',
       'safety_rereviews.read', 'safety_rereviews.confirm', 'profile.read', 'profile.update'
     ],
-    attendee: ['notifications.inbox', 'events.registrable.read', 'events.register', 'registrations.mine.read', 'registrations.withdraw', 'profile.read', 'profile.update']
+    attendee: ['notifications.inbox', 'events.registrable.read', 'events.register', 'registrations.mine.read', 'registrations.withdraw', 'profile.read', 'profile.update'],
+    event_coordinator_lead: [
+      'event_request.assign_coordinator', 'event_request.queue.view', 'event_request.oversight.view',
+      'event_request.stage.view', 'event_request.history.view', 'notifications.read', 'notifications.inbox',
+      'events.search', 'profile.read', 'profile.update'
+    ],
+    safety_officer: [
+      'event_request.safety_decision.record', 'event_request.safety_decisions.view',
+      'event_request.stage.view', 'event_request.history.view', 'venues.operations.read',
+      'notifications.inbox', 'equipment_requirements.read', 'safety_checks.read',
+      'events.search', 'profile.read', 'profile.update'
+    ]
   };
   for (const [role, expected] of Object.entries(EXPECTED)) {
     assert.deepEqual(permissionsFor(role as Principal['role'], PERMISSIONS).sort(), [...expected].sort(), role);
@@ -575,10 +591,13 @@ test('[BOUNDARY] [SG2-58:AC1] the confirm and confirmation routes are matched on
   assert.equal(outsider.status, 403);
 });
 
-test('[BOUNDARY] [SG2-86:AC4] the internal-role list holds exactly the five internal roles', () => {
+test('[NORMAL] [BOUNDARY] [SG2-86:AC4] [SG2-27:AC4] [SG2-86:AC3] the internal-role list holds exactly the five internal roles', () => {
   assert.deepEqual([...INTERNAL_ROLES].sort(), [
     'event_coordinator', 'event_coordinator_lead', 'safety_officer', 'technical_support_staff', 'venue_staff'
   ]);
+  for (const role of ['event_coordinator', 'venue_staff', 'technical_support_staff', 'event_coordinator_lead', 'safety_officer'] as const) {
+    assert.equal(isInternalRole(role), true, role);
+  }
   assert.equal(isInternalRole('event_organiser'), false);
   assert.equal(isInternalRole('attendee'), false);
 });

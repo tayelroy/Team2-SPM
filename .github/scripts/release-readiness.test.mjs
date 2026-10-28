@@ -7,8 +7,6 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const sql = readFileSync(new URL('../../supabase/checks/release_readiness.sql', import.meta.url), 'utf8');
-const confirmationRepair = readFileSync(new URL('../../supabase/migrations/202610160005_event_confirmation_record_repair.sql', import.meta.url), 'utf8')
-  .replace(/^begin;\s*$/mi, '').replace(/^commit;\s*$/mi, '');
 
 function run(mutation = '') {
   const container = process.env.POSTGRES_CONTAINER;
@@ -67,46 +65,18 @@ test('[CONFLICT] [SG2-58:AC1] wrong confirmation types or missing record constra
   ]) assertReadinessRejects(mutation, diagnostic);
 });
 
-test('[NORMAL] [BOUNDARY] [SG2-58:AC1] additive confirmation record repair is repeatable and preserves the installed RPC', () => {
-  const result = run(`CREATE TEMP TABLE confirmation_repair_baseline AS
-      SELECT md5(pg_get_functiondef('public.confirm_event(integer)'::regprocedure)) AS hash;
-    ALTER TABLE public.events DROP COLUMN confirmed_by CASCADE, DROP COLUMN confirmed_at CASCADE;
-    ${confirmationRepair}
-    ${confirmationRepair}
-    DO $$ BEGIN
-      IF md5(pg_get_functiondef('public.confirm_event(integer)'::regprocedure))
-          IS DISTINCT FROM (SELECT hash FROM confirmation_repair_baseline) THEN
-        RAISE EXCEPTION 'The additive repair must not replace the tested confirmation function';
-      END IF;
-    END $$;`);
-  assert.equal(result.status, 0, result.output);
-  assert.match(result.output, /ready/);
-});
-
-test('[FAILURE] [SG2-58:AC1] confirmation record repair refuses incompatible types, foreign keys and pair constraints', () => {
-  for (const mutation of [
-    'ALTER TABLE public.events ALTER COLUMN confirmed_at TYPE text USING confirmed_at::text;',
-    `ALTER TABLE public.events DROP CONSTRAINT events_confirmed_by_fkey;
-      ALTER TABLE public.events ADD CONSTRAINT events_confirmed_by_fkey FOREIGN KEY(confirmed_by) REFERENCES auth.users(id) NOT VALID;`,
-    `ALTER TABLE public.events DROP CONSTRAINT events_confirmation_recorded_together;
-      ALTER TABLE public.events ADD CONSTRAINT events_confirmation_recorded_together CHECK(confirmed_by IS NULL OR confirmed_at IS NULL) NOT VALID;`,
-  ]) {
-    const result = run(`${mutation}\n${confirmationRepair}`);
-    assert.notEqual(result.status, 0);
-    assert.match(result.output, /Confirmation record repair.*incompatible/);
-    const restored = run();
-    assert.equal(restored.status, 0, restored.output);
-  }
-});
-
-test('[CONFLICT] [SG2-22:AC3] a stale work queue view cannot pass merely because its backing columns exist', () => {
+// These are public release-checker contracts. SQL source replacement constructs
+// the damaged deployment fixture; it is not the expected oracle. The shared
+// helper independently checks failure, named diagnostics and a healthy read-only
+// check after rollback. Native SQL suites prove the business behavior itself.
+test('[CONFLICT] [SG2-22:AC3] [SG2-22:release-checker-work-queue-shape] a stale work queue view cannot pass merely because its backing columns exist', () => {
   assertReadinessRejects(`DO $$ BEGIN
     EXECUTE 'CREATE OR REPLACE VIEW public.internal_work_items AS ' ||
       replace(pg_get_viewdef('public.internal_work_items'::regclass), '''planning_notes''', '''legacy_planning_notes''');
   END $$;`, 'internal_work_items planning key planning_notes');
 });
 
-test('[CONFLICT] [SG2-39:AC2] [SG2-58:AC2] a stale confirmation RPC missing any known planning recheck blocks release', () => {
+test('[CONFLICT] [SG2-39:release-checker-planning-recheck] [SG2-58:release-checker-confirmation] a stale confirmation RPC missing any known planning recheck blocks release', () => {
   for (const marker of ['venue_recheck', 'equipment_recheck', 'registration_recheck']) {
     assertReadinessRejects(`DO $$ BEGIN
       EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
@@ -115,14 +85,14 @@ test('[CONFLICT] [SG2-39:AC2] [SG2-58:AC2] a stale confirmation RPC missing any 
   }
 });
 
-test('[CONFLICT] [SG2-81:AC2] [SG2-58:AC2] a stale confirmation RPC missing the venue disruption guard blocks release', () => {
+test('[CONFLICT] [SG2-81:release-checker-disruption] [SG2-58:release-checker-confirmation] a stale confirmation RPC missing the venue disruption guard blocks release', () => {
   assertReadinessRejects(`DO $$ BEGIN
     EXECUTE replace(pg_get_functiondef('public.confirm_event(integer)'::regprocedure),
       'public.venue_booking_disruptions', 'public.legacy_venue_booking_disruptions');
   END $$;`, 'confirm_event venue disruption guard');
 });
 
-test('[CONFLICT] [SG2-94:AC1] [SG2-94:AC5] a database without the Preparation gate or a confirmation RPC that skips the safety approval blocks release', () => {
+test('[CONFLICT] [SG2-94:release-checker-approval] a database without the Preparation gate or a confirmation RPC that skips the safety approval blocks release', () => {
   for (const [mutation, diagnostic] of [
     ['DROP TRIGGER safety_approval_gate ON public.events;', 'events safety_approval_gate trigger'],
     ['ALTER TABLE public.events DISABLE TRIGGER safety_approval_gate;', 'events safety_approval_gate trigger'],

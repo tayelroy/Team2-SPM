@@ -176,43 +176,117 @@ reset role;
 update public.users set organisation='SG69 Org' where user_id='e6900000-0000-4000-8000-000000000003';
 update public.events set coordinator_id='e6900000-0000-4000-8000-000000000001' where event_id=96901;
 insert into public.equipment_requests(request_id,event_id,equipment_id,quantity) values(96901,96901,96901,2);
--- Scheduler public seam: first send lists all unmet SG2-57 arrangements exactly once.
--- Fixed instants exercise the production cadence helper without relying on the
--- test runner's position within an hour. Last delivery was two seconds into a
--- UTC hour; the next hourly cron can run one second earlier without drifting.
-set local timezone='America/New_York';
-do $$ begin
- if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-10T04:00:02Z',1) is distinct from true then
-   raise exception '[SG2-69:daily-exact-interval] [SG2-69:AC6] [BOUNDARY] Daily cadence must be due at exactly twenty-four hours'; end if;
- if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-10T04:00:01Z',1) is distinct from true then
-   raise exception '[SG2-69:daily-hour-aligned] [SG2-69:AC6] [BOUNDARY] Daily cadence one second before twenty-four hours must remain due in the same UTC scheduled hour'; end if;
- if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-10T03:00:02Z',1) is distinct from false then
-   raise exception '[SG2-69:daily-hour-early] [SG2-69:AC6] [BOUNDARY] Daily cadence one full hour early must remain not due'; end if;
- if private.notification_reminder_due('2030-03-10T04:00:01Z','2030-03-10T04:59:59Z',1) is distinct from false then
-   raise exception '[SG2-69:daily-bucket-no-repeat] [SG2-69:AC6] [CONFLICT] Daily delivery must not repeat later in its sent UTC hour'; end if;
- if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-12T04:00:02Z',3) is distinct from true then
-   raise exception '[SG2-69:custom-exact-interval] [SG2-69:AC6] [BOUNDARY] Three-day cadence must be due at exactly seventy-two hours across daylight saving time'; end if;
- if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-12T04:00:01Z',3) is distinct from true then
-   raise exception '[SG2-69:custom-hour-aligned] [SG2-69:AC6] [BOUNDARY] Three-day cadence one second before seventy-two hours must remain due in the same UTC scheduled hour'; end if;
- if private.notification_reminder_due('2030-03-09T04:00:02Z','2030-03-12T03:00:02Z',3) is distinct from false then
-   raise exception '[SG2-69:custom-hour-early] [SG2-69:AC6] [BOUNDARY] Three-day cadence one full hour early must remain not due'; end if;
- if private.notification_reminder_due('2030-03-12T04:00:01Z','2030-03-12T04:59:59Z',3) is distinct from false then
-   raise exception '[SG2-69:custom-bucket-no-repeat] [SG2-69:AC6] [CONFLICT] Three-day delivery must not repeat later in its sent UTC hour'; end if;
-end $$;
-set local timezone='UTC';
-do $$ declare sent integer; begin
+-- Public worker cadence: UTC bucket boundaries for one- and three-day settings.
+-- Session-only POSIX zones place a spring-forward/fall-back transition twelve
+-- hours before the probe on any run date. The server clock is never replaced.
+do $$
+declare
+ sent integer;
+ days integer;
+ phase text;
+ zone text;
+ zones text[];
+ utc_now timestamp := clock_timestamp() at time zone 'UTC';
+ recent timestamp;
+ utc_bucket timestamp;
+ last_delivery timestamptz;
+ delivered_at timestamptz;
+ before_count bigint;
+ expected_count integer;
+ attempt integer;
+ stable boolean;
+ probe_ok boolean;
+ daily_ok boolean := true;
+ custom_ok boolean := true;
+ no_duplicate_ok boolean;
+ failures text[] := array[]::text[];
+ original_zone text := current_setting('TimeZone');
+begin
  sent:=public.send_outstanding_arrangement_reminders();
  if sent is distinct from 1 or (select message from public.notifications where event_id=96901 and kind='outstanding_arrangements') is distinct from 'Upcoming event Upcoming forum still needs: Venue booking, Equipment, Registration.'
    or exists(select 1 from public.notifications where kind='outstanding_arrangements' and recipient_id is distinct from 'e6900000-0000-4000-8000-000000000001') then
    raise exception '[SG2-69:reminder-outstanding-list] [SG2-69:AC5] [SG2-69:AC7] [NORMAL] One reminder per assigned event must list all current unmet arrangements'; end if;
- if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:cadence-no-duplicate] [SG2-69:AC6] [CONFLICT] Same-day sweep must not duplicate reminders'; end if;
- update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '1 day 1 second' where event_id=96901;
- if public.send_outstanding_arrangement_reminders() is distinct from 1 then raise exception '[SG2-69:daily-due] [SG2-69:AC6] [BOUNDARY] Daily reminder must become due after one day'; end if;
- update public.notification_reminder_settings set frequency_days=3 where user_id='e6900000-0000-4000-8000-000000000001';
+ no_duplicate_ok := public.send_outstanding_arrangement_reminders() is not distinct from 0;
+ recent:=utc_now-interval '12 hours';
+ zones:=array[
+  format('TST0TDT,%s/%s,%s/0',extract(doy from recent)::integer-1,extract(hour from recent)::integer,
+    extract(doy from utc_now+interval '100 days')::integer-1),
+  format('TST0TDT,%s/0,%s/%s',extract(doy from utc_now-interval '100 days')::integer-1,
+    extract(doy from recent)::integer-1,extract(hour from recent)::integer)
+ ];
+ foreach zone in array zones loop
+  perform set_config('TimeZone',zone,true);
+  foreach days in array array[1,3] loop
+   insert into public.notification_reminder_settings(user_id,frequency_days)
+    values('e6900000-0000-4000-8000-000000000001',days)
+    on conflict(user_id) do update set frequency_days=excluded.frequency_days;
+   foreach phase in array array['exact_bucket','hour_aligned','hour_early'] loop
+    stable:=false;
+    for attempt in 1..3 loop
+     begin
+      utc_bucket:=date_trunc('hour',clock_timestamp() at time zone 'UTC');
+      last_delivery:=(utc_bucket-make_interval(hours=>24*days)
+        +case phase when 'hour_aligned' then interval '59 minutes 59.999999 seconds'
+                    when 'hour_early' then interval '1 hour' else interval '0' end) at time zone 'UTC';
+      update public.notification_reminder_receipts set last_sent_at=last_delivery where event_id=96901;
+      select count(*) into before_count from public.notifications where event_id=96901 and kind='outstanding_arrangements';
+      set local role service_role;
+      sent:=public.send_outstanding_arrangement_reminders();
+      reset role;
+      select last_sent_at into delivered_at from public.notification_reminder_receipts where event_id=96901;
+      -- A real hour crossing changes the arranged input. Roll back only that
+      -- probe and arrange the new bucket; never retry a product assertion.
+      if date_trunc('hour',clock_timestamp() at time zone 'UTC') is distinct from utc_bucket then
+       raise sqlstate 'ZC001' using message='UTC hour changed while arranging cadence input';
+      end if;
+      expected_count:=case when phase='hour_early' then 0 else 1 end;
+      probe_ok:=sent is not distinct from expected_count
+        and (select count(*) from public.notifications where event_id=96901 and kind='outstanding_arrangements') is not distinct from before_count+expected_count
+        and extract(timezone from delivered_at) is distinct from extract(timezone from (utc_bucket-make_interval(hours=>24*days)) at time zone 'UTC');
+      if expected_count=0 then
+       -- For a suppressed delivery the saved receipt is still the old instant;
+       -- use the actual current instant to verify the DST fixture, instead.
+       probe_ok:=sent is not distinct from 0
+         and (select count(*) from public.notifications where event_id=96901 and kind='outstanding_arrangements') is not distinct from before_count
+         and delivered_at is not distinct from last_delivery
+         and extract(timezone from clock_timestamp()) is distinct from extract(timezone from last_delivery);
+      else
+       probe_ok:=probe_ok
+         and date_trunc('hour',delivered_at at time zone 'UTC') is not distinct from utc_bucket
+         and coalesce(delivered_at>last_delivery,false);
+       if phase='hour_aligned' then
+        probe_ok:=probe_ok and coalesce(delivered_at-last_delivery<make_interval(hours=>24*days),false);
+       end if;
+       set local role service_role;
+       sent:=public.send_outstanding_arrangement_reminders();
+       reset role;
+       no_duplicate_ok:=no_duplicate_ok and sent is not distinct from 0
+         and (select count(*) from public.notifications where event_id=96901 and kind='outstanding_arrangements') is not distinct from before_count+1
+         and (select last_sent_at from public.notification_reminder_receipts where event_id=96901) is not distinct from delivered_at;
+      end if;
+      stable:=true;
+     exception when sqlstate 'ZC001' then null;
+     end;
+     exit when stable;
+    end loop;
+    if not stable then probe_ok:=false; end if;
+    if probe_ok is distinct from true then failures:=failures||format('%s day(s), %s, %s',days,phase,zone); end if;
+    if days=1 then daily_ok:=daily_ok and probe_ok; else custom_ok:=custom_ok and probe_ok; end if;
+   end loop;
+  end loop;
+ end loop;
+ perform set_config('TimeZone',original_zone,true);
+ if daily_ok is distinct from true then
+  raise exception '[SG2-69:daily-due] [SG2-69:AC6] [BOUNDARY] Daily worker must honor the inclusive UTC due bucket, sub-day hour alignment and one-hour-early suppression across both DST directions: %',failures;
+ end if;
+ if custom_ok is distinct from true then
+  raise exception '[SG2-69:custom-frequency-due] [SG2-69:AC6] [BOUNDARY] Three-day worker must honor the inclusive UTC due bucket, sub-interval hour alignment and one-hour-early suppression across both DST directions: %',failures;
+ end if;
+ if no_duplicate_ok is distinct from true then
+  raise exception '[SG2-69:cadence-no-duplicate] [SG2-69:AC6] [CONFLICT] Repeated public sweeps must add no notice and preserve the original receipt for both frequencies and DST directions';
+ end if;
  update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '2 days' where event_id=96901;
  if public.send_outstanding_arrangement_reminders() is distinct from 0 then raise exception '[SG2-69:custom-frequency-not-due] [SG2-69:AC6] [NORMAL] Three-day preference must suppress day-two reminder'; end if;
- update public.notification_reminder_receipts set last_sent_at=clock_timestamp()-interval '3 days 1 second' where event_id=96901;
- if public.send_outstanding_arrangement_reminders() is distinct from 1 then raise exception '[SG2-69:custom-frequency-due] [SG2-69:AC6] [BOUNDARY] Three-day reminder must become due at its interval'; end if;
 end $$;
 -- Make all arrangements ready without altering event history. Approved requests
 -- need actual confirmed booking links, equipment needs receipt and placement.

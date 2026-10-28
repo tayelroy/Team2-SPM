@@ -127,15 +127,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-      postgres_upgrade:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: ci-only-password
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -205,6 +196,7 @@ jobs:
           node .github/scripts/test-equipment-requirements-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/event_status_flow.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_temporary_unavailability.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_legacy_blocks.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_replacement.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_booking_release.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_booking_change_cancel.sql
@@ -219,33 +211,6 @@ jobs:
           node .github/scripts/test-notification-reminders-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/coordinator_oversight.sql
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/attendee_event_change_notices.sql
-      # SG2-98 AC3: replay the live upgrade on its own database. Blocks written
-      # under SG2-45 are seeded just before SG2-80's migration, then the
-      # remaining migrations run and the suite checks what survived.
-      - name: Check legacy venue blocks and converted hold booking links survive upgrades
-        env:
-          POSTGRES_CONTAINER: ${{ job.services.postgres_upgrade.id }}
-        run: |
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/auth.sql
-          seeded=false
-          holds_seeded=false
-          for migration in supabase/migrations/*.sql; do
-            if [ "$seeded" = false ] && [[ "$(basename "$migration")" > 202610100001 ]]; then
-              docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/legacy_venue_blocks.sql
-              seeded=true
-            fi
-            if [ "$holds_seeded" = false ] && [ "$(basename "$migration")" = 202610170004_venue_hold_booking_links.sql ]; then
-              docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/fixtures/legacy_venue_hold_bookings.sql
-              holds_seeded=true
-            fi
-            docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$migration"
-          done
-          test "$holds_seeded" = true
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_block_upgrade.sql
-          docker exec "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 -c 'create table hold_link_upgrade_fixture.after_first as select request_id,xmin::text as row_version from public.venue_booking_requests where request_id between 988402 and 988416'
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202610170004_venue_hold_booking_links.sql
-          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/venue_hold_booking_upgrade.sql
-
       - name: Test APIs against native PostgreSQL through PostgREST
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}

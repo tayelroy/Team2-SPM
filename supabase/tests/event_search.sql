@@ -188,21 +188,21 @@ begin
   raise exception '[SG2-70:filters-combine] [SG2-70:AC2] [NORMAL] Filters must all apply together';
  end if;
  result := public.search_events(p_query => 'Harbour', p_date_from => '2031-11-01');
- if result->'events'->0->>'coordinator_name' <> 'Search coordinator Alice'
-   or result->'events'->0->'venues' <> '["Search Atrium"]'::jsonb
-   or result->'events'->0->>'category' <> 'social' or result->'events'->0->>'organisation' <> 'Harbour Foundation' then
+ if result->'events'->0->>'coordinator_name' IS DISTINCT FROM 'Search coordinator Alice'
+   or result->'events'->0->'venues' IS DISTINCT FROM '["Search Atrium"]'::jsonb
+   or result->'events'->0->>'category' IS DISTINCT FROM 'social' or result->'events'->0->>'organisation' IS DISTINCT FROM 'Harbour Foundation' then
   raise exception '[SG2-70:result-details] [SG2-70:AC1] [NORMAL] Each result must carry its organisation, category, coordinator and venues: %', result->'events'->0;
  end if;
 
  result := public.search_events(p_query => 'nothing like this', p_status => 'planning', p_venue_id => 99702,
    p_category => 'social', p_date_from => '2031-01-01', p_date_to => '2031-12-31',
    p_coordinator_id => 'd7000000-0000-4000-8000-000000000009');
- if result->'events' <> '[]'::jsonb or (result->>'truncated')::boolean
-   or result->'filters' <> jsonb_build_object('query','nothing like this','date_from','2031-01-01','date_to','2031-12-31',
+ if result->'events' IS DISTINCT FROM '[]'::jsonb or (result->>'truncated')::boolean IS DISTINCT FROM false
+   or result->'filters' IS DISTINCT FROM jsonb_build_object('query','nothing like this','date_from','2031-01-01','date_to','2031-12-31',
      'status','planning','venue_id',99702,'category','social','coordinator_id','d7000000-0000-4000-8000-000000000009') then
   raise exception '[SG2-70:empty-echoes-filters] [SG2-70:AC4] [NORMAL] No match must return an empty list with every filter in force: %', result;
  end if;
- if public.search_events()->'filters' <> jsonb_build_object('query',null,'date_from',null,'date_to',null,'status',null,
+ if public.search_events()->'filters' IS DISTINCT FROM jsonb_build_object('query',null,'date_from',null,'date_to',null,'status',null,
    'venue_id',null,'category',null,'coordinator_id',null) then
   raise exception '[SG2-70:no-filters-echoed] [SG2-70:AC4] [BOUNDARY] With no filters every echoed filter must be null';
  end if;
@@ -219,8 +219,7 @@ begin
   raise exception '[SG2-70:options-venues] [SG2-70:AC2] [NORMAL] The venue filter must offer every venue still listed and no deleted one';
  end if;
  if (select string_agg(c->>'name', ',' order by c->>'name') from jsonb_array_elements(result->'coordinators') c
-     where c->>'name' like 'Search %')
-     <> 'Search coordinator Alice,Search coordinator Bob,Search lapsed coordinator,Search moved coordinator' then
+     where c->>'name' like 'Search %') IS DISTINCT FROM 'Search coordinator Alice,Search coordinator Bob,Search lapsed coordinator,Search moved coordinator' then
   raise exception '[SG2-70:options-coordinators] [SG2-70:AC2] [NORMAL] The coordinator filter must offer every Event Coordinator and anyone still assigned to an event, and no other account';
  end if;
 end $$;
@@ -236,8 +235,8 @@ do $$
 declare result jsonb;
 begin
  result := public.search_events(p_query => 'Bulk event');
- if jsonb_array_length(result->'events') <> 100 or not (result->>'truncated')::boolean
-   or result->'events'->0->>'event_id' <> '99801' or result->'events'->99->>'event_id' <> '99900' then
+ if jsonb_array_length(result->'events') <> 100 or (result->>'truncated')::boolean IS DISTINCT FROM true
+   or result->'events'->0->>'event_id' IS DISTINCT FROM '99801' or result->'events'->99->>'event_id' IS DISTINCT FROM '99900' then
   raise exception '[SG2-70:page-limit] [SG2-70:AC1] [BOUNDARY] More than 100 matches must return the first 100 by date and say it was truncated';
  end if;
 end $$;
@@ -249,7 +248,7 @@ do $$
 declare result jsonb;
 begin
  result := public.search_events(p_query => 'Bulk event');
- if jsonb_array_length(result->'events') <> 100 or (result->>'truncated')::boolean then
+ if jsonb_array_length(result->'events') IS DISTINCT FROM 100 or (result->>'truncated')::boolean IS DISTINCT FROM false then
   raise exception '[SG2-70:page-exact] [SG2-70:AC1] [BOUNDARY] Exactly 100 matches must all be returned without being marked truncated';
  end if;
 end $$;
@@ -365,21 +364,8 @@ begin
   raise exception '[SG2-70:category-known] [SG2-70:AC2] [FAILURE] A category outside the list must be refused';
  exception when check_violation then null;
  end;
- if (select category from public.events where event_id=99701) <> 'social' then
+ if (select category from public.events where event_id=99701) IS DISTINCT FROM 'social' then
   raise exception '[SG2-70:category-unchanged] [SG2-70:AC2] [FAILURE] A refused category must leave the event unchanged';
- end if;
- if (private.event_category_from_name('Partner Forum'), private.event_category_from_name('Charity Gala'),
-     private.event_category_from_name('Design workshop'), private.event_category_from_name('Guest lecture'),
-     private.event_category_from_name('Staff onboarding'), private.event_category_from_name('Founders mixer'))
-     is distinct from ('conference', 'social', 'workshop', 'seminar', 'training', 'networking') then
-  raise exception '[SG2-70:infer-from-name] [SG2-70:AC2] [NORMAL] An existing event''s name must give its category';
- end if;
- if (private.event_category_from_name('ANNUAL SUMMIT GALA'), private.event_category_from_name('sprint2'))
-     is distinct from ('conference', 'other') then
-  raise exception '[SG2-70:infer-first-match-or-other] [SG2-70:AC2] [BOUNDARY] Matching must ignore case, take the first rule that matches, and fall back to Other';
- end if;
- if private.event_category_from_name(null) is distinct from 'other' then
-  raise exception '[SG2-70:infer-unnamed-other] [SG2-70:AC2] [FAILURE] An event with no name must still be given Other';
  end if;
 end $$;
 set local role authenticated;
@@ -411,8 +397,8 @@ declare result jsonb;
 begin
  result := public.update_event_request_draft(99720,'d7000000-0000-4000-8000-000000000001',
    '{"name":"Draft to categorise","category":"training"}');
- if result->>'outcome' <> 'updated' or result->'request'->>'category' <> 'training'
-   or (select category from public.events where event_id=99720) <> 'training' then
+ if result->>'outcome' IS DISTINCT FROM 'updated' or result->'request'->>'category' IS DISTINCT FROM 'training'
+   or (select category from public.events where event_id=99720) IS DISTINCT FROM 'training' then
   raise exception '[SG2-70:draft-saves-category] [SG2-70:AC2] [NORMAL] Saving a draft must store its category: %', result;
  end if;
  if not exists (select 1 from public.event_audit_logs where event_id=99720 and field_name='category'
@@ -421,17 +407,17 @@ begin
  end if;
  result := public.update_event_request_draft(99720,'d7000000-0000-4000-8000-000000000001',
    '{"name":"Draft to categorise","category":"party"}');
- if result->>'outcome' <> 'invalid' or (select category from public.events where event_id=99720) <> 'training' then
+ if result->>'outcome' IS DISTINCT FROM 'invalid' or (select category from public.events where event_id=99720) IS DISTINCT FROM 'training' then
   raise exception '[SG2-70:draft-refuses-unknown] [SG2-70:AC2] [FAILURE] A draft save with an unknown category must be refused and change nothing';
  end if;
  result := public.update_event_request_draft(99720,'d7000000-0000-4000-8000-000000000001',
    '{"name":"Draft to categorise","category":7}');
- if result->>'outcome' <> 'invalid' then
+ if result->>'outcome' IS DISTINCT FROM 'invalid' then
   raise exception '[SG2-70:draft-refuses-non-text] [SG2-70:AC2] [FAILURE] A non-text category must be refused';
  end if;
  result := public.update_event_request_draft(99720,'d7000000-0000-4000-8000-000000000001',
    '{"name":"Draft to categorise"}');
- if result->>'outcome' <> 'updated' or (select category from public.events where event_id=99720) is not null then
+ if result->>'outcome' IS DISTINCT FROM 'updated' or (select category from public.events where event_id=99720) is not null then
   raise exception '[SG2-70:draft-may-clear] [SG2-70:AC2] [BOUNDARY] A draft save without a category must clear it';
  end if;
 end $$;

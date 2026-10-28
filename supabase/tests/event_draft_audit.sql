@@ -23,7 +23,7 @@ declare
  before_count integer;
 begin
  result := public.update_event_request_draft(94091,actor,payload);
- if result ->> 'outcome' <> 'updated' or result -> 'request' ->> 'name' <> 'Audit forum'
+ if result ->> 'outcome' IS DISTINCT FROM 'updated' or result -> 'request' ->> 'name' IS DISTINCT FROM 'Audit forum'
      or (select count(*) from public.event_audit_logs where event_id=94091) <> 9 then
    raise exception '[SG2-40:draft-all-field-diffs] [NORMAL] [SG2-29:AC1] [SG2-40:AC2] Every changed draft field must commit with its history';
  end if;
@@ -38,13 +38,13 @@ begin
    raise exception '[SG2-40:draft-typed-values] [BOUNDARY] [SG2-40:AC2] Typed date, number and boolean history must retain their actual values';
  end if;
  result := public.update_event_request_draft(94091,actor,payload || '{"proposed_date":"2090-06-15T02:00:00Z"}');
- if result ->> 'outcome' <> 'updated' or (select count(*) from public.event_audit_logs where event_id=94091) <> 9 then
+ if result ->> 'outcome' IS DISTINCT FROM 'updated' or (select count(*) from public.event_audit_logs where event_id=94091) <> 9 then
    raise exception '[SG2-40:draft-equivalent-no-op] [BOUNDARY] [SG2-40:AC2] An unchanged save including equivalent timestamp offsets must not invent history';
  end if;
  update public.events set status='needs_clarification' where event_id=94091;
  payload := payload || '{"description":null,"registration_needed":false}';
  result := public.update_event_request_draft(94091,actor,payload);
- if result ->> 'outcome' <> 'updated' or (select count(*) from public.event_audit_logs where event_id=94091) <> 11
+ if result ->> 'outcome' IS DISTINCT FROM 'updated' or (select count(*) from public.event_audit_logs where event_id=94091) <> 11
      or not exists (select 1 from public.event_audit_logs where event_id=94091 and field_name='description' and old_value='Original description' and new_value is null)
      or not exists (select 1 from public.event_audit_logs where event_id=94091 and field_name='registration_needed' and old_value='true' and new_value='false') then
    raise exception '[SG2-40:draft-clarification-null-boolean] [NORMAL] [SG2-36:AC2] [SG2-40:AC2] Clarification edits must record null clears and true-to-false changes';
@@ -54,30 +54,30 @@ begin
      '{"expected_attendance":1.5}', '{"expected_attendance":0}', '{"expected_attendance":2147483648}', '{"registration_needed":"false"}',
      '{"proposed_date":"not-a-date"}', '{"proposed_date":"infinity"}', jsonb_build_object('name',repeat('a',256)),jsonb_build_object('purpose',repeat('a',5001))] loop
    result := public.update_event_request_draft(94091,actor,invalid);
-   if result ->> 'outcome' <> 'invalid' then
+   if result ->> 'outcome' IS DISTINCT FROM 'invalid' then
      raise exception '[SG2-40:draft-invalid-rpc-shape] [FAILURE] [SG2-29:AC1] Invalid private RPC values must be refused before a save: %',invalid;
    end if;
  end loop;
  if (select count(*) from public.event_audit_logs where event_id=94091) <> before_count
-     or (select name from public.events where event_id=94091) <> 'Audit forum' then
+     or (select name from public.events where event_id=94091) IS DISTINCT FROM 'Audit forum' then
    raise exception '[SG2-40:draft-invalid-save-unchanged] [FAILURE] [SG2-40:AC2] Invalid saves must not alter values or history';
  end if;
- if public.update_event_request_draft(94091,'ef400000-0000-4000-8000-000000000002',payload) ->> 'outcome' <> 'not_found'
-     or public.update_event_request_draft(94091,'ef400000-0000-4000-8000-000000000003',payload) ->> 'outcome' <> 'not_found'
-     or public.update_event_request_draft(94092,actor,payload) ->> 'outcome' <> 'not_found' then
+ if public.update_event_request_draft(94091,'ef400000-0000-4000-8000-000000000002',payload) ->> 'outcome' IS DISTINCT FROM 'not_found'
+     or public.update_event_request_draft(94091,'ef400000-0000-4000-8000-000000000003',payload) ->> 'outcome' IS DISTINCT FROM 'not_found'
+     or public.update_event_request_draft(94092,actor,payload) ->> 'outcome' IS DISTINCT FROM 'not_found' then
    raise exception '[SG2-40:draft-creator-role-scope] [FAILURE] [SG2-26:AC2] [SG2-29:AC1] A colleague, wrong role or missing event must not save as the creator';
  end if;
  update public.users set organisation='Different organisation' where user_id=actor;
- if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' <> 'not_found' then
+ if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' IS DISTINCT FROM 'not_found' then
    raise exception '[SG2-40:draft-stale-membership] [FAILURE] [SG2-26:AC2] A stale membership precheck must not permit a save';
  end if;
  update public.users set organisation=U&'\00A0\2003\FEFF' where user_id=actor;
- if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' <> 'not_found' then
+ if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' IS DISTINCT FROM 'not_found' then
    raise exception '[SG2-40:draft-blank-membership] [BOUNDARY] [SG2-26:AC2] Unicode blank membership must not authorize a save';
  end if;
  update public.users set organisation='Draft audit A' where user_id=actor;
  update public.events set status='submitted' where event_id=94091;
- if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' <> 'not_editable'
+ if public.update_event_request_draft(94091,actor,payload) ->> 'outcome' IS DISTINCT FROM 'not_editable'
      or (select count(*) from public.event_audit_logs where event_id=94091) <> before_count then
    raise exception '[SG2-40:draft-stale-status] [CONFLICT] [SG2-30:AC3] [SG2-40:AC2] A status change before the locked write must refuse the stale edit without history';
  end if;

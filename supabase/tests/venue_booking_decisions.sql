@@ -221,7 +221,7 @@ begin
   if has_table_privilege('authenticated', 'public.internal_work_items', 'SELECT')
       or has_table_privilege('anon', 'public.internal_work_items', 'SELECT')
       or not has_table_privilege('service_role', 'public.internal_work_items', 'SELECT') then
-    raise exception '[SG2-49:queue-view-server-only] [SG2-49:AC1] [FAILURE] Only the server may read the work queue view';
+    raise exception '[SG2-49:queue-view-server-only] [SG2-49:AC1] [SG2-89:AC4] [FAILURE] Only the server may read the work queue view';
   end if;
   if not (select relrowsecurity and relforcerowsecurity from pg_class where oid = 'public.notifications'::regclass) then
     raise exception '[SG2-49:notifications-rls-forced] [SG2-49:AC1] [FAILURE] Row level security must be enabled and forced on notifications';

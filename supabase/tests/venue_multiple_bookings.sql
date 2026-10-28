@@ -59,12 +59,12 @@ do $$
 declare result jsonb;
 begin
   result := public.decide_venue_booking_request(98202, 'approve', null);
-  if result->>'outcome' <> 'conflict' or result->>'kind' <> 'booking'
-      or (select status from public.venue_booking_requests where request_id = 98202) <> 'pending' then
+  if result->>'outcome' IS DISTINCT FROM 'conflict' or result->>'kind' IS DISTINCT FROM 'booking'
+      or (select status from public.venue_booking_requests where request_id = 98202) IS DISTINCT FROM 'pending' then
     raise exception '[SG2-82:own-turnaround] [SG2-82:AC2] [CONFLICT] Breakout One''s hour of setup and turnaround must refuse a booking 15 minutes after another: %', result;
   end if;
   result := public.decide_venue_booking_request(98201, 'approve', null);
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-82:independent-check] [SG2-82:AC2] [SG2-82:AC3] [NORMAL] The auditorium has no setup or turnaround, so the same gap must not refuse it: %', result;
   end if;
   if (select venue_booking_id from public.events where event_id = 98201) <> (result->>'venue_booking_id')::bigint then
@@ -77,11 +77,11 @@ do $$
 declare result jsonb;
 begin
   result := public.decide_venue_booking_request(98202, 'reject', 'Breakout One needs its reset time');
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-82:reject-one] [SG2-82:AC3] [NORMAL] One of the event''s venues could not be rejected: %', result;
   end if;
   result := public.decide_venue_booking_request(98203, 'approve', null);
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-82:approve-another] [SG2-82:AC3] [NORMAL] Rejecting one venue blocked approving another for the same event: %', result;
   end if;
   if (select count(*) from public.venue_bookings where event_id = 98201 and status = 'confirmed') <> 2
@@ -107,7 +107,7 @@ do $$
 declare result jsonb;
 begin
   result := public.withdraw_venue_booking_request(98202);
-  if result->>'outcome' <> 'missing' or (select status from public.venue_booking_requests where request_id = 98202) <> 'rejected' then
+  if result->>'outcome' IS DISTINCT FROM 'missing' or (select status from public.venue_booking_requests where request_id = 98202) IS DISTINCT FROM 'rejected' then
     raise exception '[SG2-82:unassigned-coordinator-refused] [SG2-82:AC5] [FAILURE] A coordinator withdrew a request for an event not assigned to them: %', result;
   end if;
 end $$;
@@ -116,10 +116,10 @@ do $$
 declare result jsonb;
 begin
   result := public.withdraw_venue_booking_request(98201);
-  if result->>'outcome' <> 'inactive' or result->>'status' <> 'approved' then
+  if result->>'outcome' IS DISTINCT FROM 'inactive' or result->>'status' IS DISTINCT FROM 'approved' then
     raise exception '[SG2-82:approved-not-withdrawn] [SG2-82:AC5] [BOUNDARY] An approved request was withdrawn instead of its booking being released: %', result;
   end if;
-  if public.withdraw_venue_booking_request(-1)->>'outcome' <> 'missing' then
+  if public.withdraw_venue_booking_request(-1)->>'outcome' IS DISTINCT FROM 'missing' then
     raise exception '[SG2-82:unknown-request] [SG2-82:AC5] [FAILURE] An unknown request was not reported missing';
   end if;
 end $$;
@@ -129,7 +129,7 @@ do $$
 declare result jsonb;
 begin
   result := public.withdraw_venue_booking_request(98202);
-  if result->>'outcome' <> 'withdrawn' then
+  if result->>'outcome' IS DISTINCT FROM 'withdrawn' then
     raise exception '[SG2-82:withdraw-rejected] [SG2-82:AC5] [NORMAL] The coordinator could not withdraw a rejected request: %', result;
   end if;
   if not exists (select 1 from public.venue_booking_requests where request_id = 98202 and status = 'cancelled'
@@ -143,12 +143,12 @@ begin
     raise exception '[SG2-82:withdrawal-in-history] [SG2-82:AC4] [NORMAL] The withdrawal must appear in the event history with its actor';
   end if;
   result := public.withdraw_venue_booking_request(98202);
-  if result->>'outcome' <> 'inactive' or result->>'status' <> 'cancelled' then
+  if result->>'outcome' IS DISTINCT FROM 'inactive' or result->>'status' IS DISTINCT FROM 'cancelled' then
     raise exception '[SG2-82:second-withdrawal-refused] [SG2-82:AC5] [CONFLICT] A request already withdrawn was withdrawn again: %', result;
   end if;
   result := public.withdraw_venue_booking_request(98204);
-  if result->>'outcome' <> 'withdrawn' or (select old_value from public.event_audit_logs
-      where event_id = 98201 and new_value = 'Withdrawn: Multi Breakout Three (request 98204)') <> 'Pending: Multi Breakout Three (request 98204)' then
+  if result->>'outcome' IS DISTINCT FROM 'withdrawn' or (select old_value from public.event_audit_logs
+      where event_id = 98201 and new_value = 'Withdrawn: Multi Breakout Three (request 98204)') IS DISTINCT FROM 'Pending: Multi Breakout Three (request 98204)' then
     raise exception '[SG2-82:withdraw-pending] [SG2-82:AC5] [NORMAL] The coordinator could not withdraw a pending request: %', result;
   end if;
   -- A withdrawn venue can be asked for again.
@@ -163,7 +163,7 @@ do $$
 declare result jsonb;
 begin
   result := public.decide_venue_booking_request(98204, 'approve', null);
-  if result->>'outcome' <> 'decided' or result->>'status' <> 'cancelled' then
+  if result->>'outcome' IS DISTINCT FROM 'decided' or result->>'status' IS DISTINCT FROM 'cancelled' then
     raise exception '[SG2-82:withdrawn-not-decided] [SG2-82:AC5] [CONFLICT] A withdrawn request was decided: %', result;
   end if;
 end $$;
@@ -173,13 +173,13 @@ do $$
 declare result jsonb; held bigint;
 begin
   result := public.create_venue_hold(98201, 98204, '2030-10-02 01:00+00', '2030-10-02 05:00+00', '2030-09-30 00:00+00');
-  if result->>'outcome' <> 'created' then
+  if result->>'outcome' IS DISTINCT FROM 'created' then
     raise exception '[SG2-82:hold-fixture] [SG2-82:AC5] [FAILURE] The hold fixture could not be placed: %', result;
   end if;
   held := (result->'hold'->>'request_id')::bigint;
   perform set_config('request.jwt.claim.sub', 'e8200000-0000-4000-8000-000000000002', true);
   result := public.withdraw_venue_booking_request(held);
-  if result->>'outcome' <> 'hold' or (select status from public.venue_booking_requests where request_id = held) <> 'pending' then
+  if result->>'outcome' IS DISTINCT FROM 'hold' or (select status from public.venue_booking_requests where request_id = held) IS DISTINCT FROM 'pending' then
     raise exception '[SG2-82:hold-not-withdrawn] [SG2-82:AC5] [BOUNDARY] A tentative hold''s request was withdrawn instead of released: %', result;
   end if;
 end $$;
@@ -205,14 +205,14 @@ declare result jsonb;
 begin
   result := public.confirm_event(98203);
   if result is distinct from '{"outcome":"outstanding","outstanding":["venue"]}'::jsonb
-      or (select status from public.events where event_id = 98203) <> 'preparation' then
+      or (select status from public.events where event_id = 98203) IS DISTINCT FROM 'preparation' then
     raise exception '[SG2-82:rejected-venue-blocks-confirmation] [SG2-82:AC5] [CONFLICT] An event with one venue approved and another rejected was confirmed: %', result;
   end if;
-  if public.withdraw_venue_booking_request(98206)->>'outcome' <> 'withdrawn' then
+  if public.withdraw_venue_booking_request(98206)->>'outcome' IS DISTINCT FROM 'withdrawn' then
     raise exception '[SG2-82:withdraw-before-confirming] [SG2-82:AC5] [NORMAL] The coordinator could not withdraw the rejected venue';
   end if;
   result := public.confirm_event(98203);
-  if result->>'outcome' <> 'ok' or (select status from public.events where event_id = 98203) <> 'confirmed' then
+  if result->>'outcome' IS DISTINCT FROM 'ok' or (select status from public.events where event_id = 98203) IS DISTINCT FROM 'confirmed' then
     raise exception '[SG2-82:confirm-once-every-venue-approved] [SG2-82:AC5] [NORMAL] Once the rejected venue was withdrawn, the event with every needed venue approved must confirm: %', result;
   end if;
 end $$;

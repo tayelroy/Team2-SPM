@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import FindEvents, { registrationState } from './FindEvents';
 import type { RegistrableEvent } from '../api/registrableEvents';
@@ -16,7 +17,7 @@ const upcoming = {
 };
 
 /** Each call gets a fresh Response (StrictMode runs effects twice). */
-function serve(routes: Record<string, () => Response>) {
+function serve(routes: Record<string, () => Response | Promise<Response>>) {
   const fetch = vi.fn(async (url: string) => {
     const route = routes[url];
     if (!route) throw new Error(`Unexpected ${url}`);
@@ -36,6 +37,7 @@ const card = (name: string) => screen.getByRole('article', { name });
 test('[NORMAL] [SG2-59:AC1] an attendee sees each event open or opening for registration with name, date, time, venue and where registration stands', async () => {
   serve({ '/api/registrable-events': () => Response.json({ events: [upcoming, open] }) });
   render(<FindEvents accessToken="attendee-token" />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading events…');
   expect(await screen.findByRole('article', { name: 'Bayfront Workshop' })).toBeVisible();
   const items = within(screen.getByRole('region', { name: 'Events open for registration' })).getAllByRole('article');
   expect(items.map((item) => item.getAttribute('aria-labelledby'))).toEqual(['find-events-592', 'find-events-591']);
@@ -49,12 +51,16 @@ test('[NORMAL] [SG2-59:AC1] an attendee sees each event open or opening for regi
 });
 
 test('[NORMAL] [SG2-59:AC3] opening an event shows its attendee-facing details and returns to the list', async () => {
+  let stale!: (response: Response) => void;
+  let detailReads = 0;
   const fetch = serve({
     '/api/registrable-events': () => Response.json({ events: [open] }),
-    '/api/registrable-events/591': () => Response.json({ event: open }),
+    '/api/registrable-events/591': () => ++detailReads === 1
+      ? new Promise<Response>(resolve => { stale = resolve; }) : Response.json({ event: open }),
   });
-  render(<FindEvents accessToken="attendee-token" />);
+  render(<StrictMode><FindEvents accessToken="attendee-token" /></StrictMode>);
   fireEvent.click(within(await screen.findByRole('article', { name: 'Harbour Lecture' })).getByRole('button', { name: 'View details' }));
+  expect(screen.getByRole('status')).toHaveTextContent('Loading event…');
   const detail = await screen.findByRole('article', { name: 'Harbour Lecture' });
   expect(detail).toHaveTextContent('An evening lecture on the harbour.');
   for (const text of ['CategorySeminar', 'Hosted byHarbour Foundation', 'Registration opens1 Oct 2020, 8:00 am',
@@ -64,6 +70,9 @@ test('[NORMAL] [SG2-59:AC3] opening an event shows its attendee-facing details a
   expect(within(within(detail).getByRole('region', { name: 'Venue' })).getAllByRole('listitem').map((item) => item.textContent))
     .toEqual(['Regression Hall, Level 1', 'Annex']);
   expect(fetch).toHaveBeenCalledWith('/api/registrable-events/591', expect.anything());
+  await act(async () => stale(Response.json({ error: 'gone' }, { status: 404 })));
+  expect(screen.getByRole('article', { name: 'Harbour Lecture' })).toHaveTextContent('An evening lecture on the harbour.');
+  expect(screen.queryByRole('alert')).toBeNull();
   fireEvent.click(within(detail).getByRole('button', { name: 'Back to events' }));
   expect(await screen.findByRole('region', { name: 'Events open for registration' })).toBeVisible();
 });
@@ -141,29 +150,4 @@ test('[BOUNDARY] [SG2-59:AC1] registration counts as open from its opening time 
   expect(registrationState(event, opens)).toEqual({ label: 'Registration open', when: 'Closes 25 Jun 2030, 8:00 am', open: true });
   expect(registrationState({ ...event, registrationOpensAt: null, registrationClosesAt: null }, opens))
     .toEqual({ label: 'Registration open', when: 'Open now', open: true });
-});
-
-test('[BOUNDARY] [SG2-59:AC3] a detail that arrives after the attendee has left is ignored', async () => {
-  let release: (response: Response) => void = () => {};
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/registrable-events'
-    ? Response.json({ events: [open] })
-    : new Promise<Response>((resolve) => { release = resolve; })));
-  const { unmount } = render(<FindEvents accessToken="t" />);
-  fireEvent.click(within(await screen.findByRole('article', { name: 'Harbour Lecture' })).getByRole('button', { name: 'View details' }));
-  expect(screen.getByRole('status')).toHaveTextContent('Loading event…');
-  unmount();
-  release(Response.json({ event: open }));
-  await Promise.resolve();
-  expect(screen.queryByText('An evening lecture on the harbour.')).toBeNull();
-});
-
-test('[BOUNDARY] [SG2-59:AC1] a list that arrives after the attendee has left is ignored', async () => {
-  let release: (response: Response) => void = () => {};
-  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { release = resolve; })));
-  const { unmount } = render(<FindEvents accessToken="t" />);
-  expect(screen.getByRole('status')).toHaveTextContent('Loading events…');
-  unmount();
-  release(Response.json({ events: [open] }));
-  await Promise.resolve();
-  expect(screen.queryByRole('article')).toBeNull();
 });

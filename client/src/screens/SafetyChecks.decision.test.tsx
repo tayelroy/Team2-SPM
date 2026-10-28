@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { StrictMode } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as api from '../api/safetyChecks';
@@ -46,15 +47,24 @@ const galaDecision = async () => within(await screen.findByRole('region', { name
 describe('the decision history on each review (SG2-92 AC6)', () => {
   test('[NORMAL] [SG2-92:AC6] each event awaiting a check shows its earlier decisions, with who decided and why', async () => {
     lists([GALA]);
-    const read = history([EARLIER]);
-    render(<SafetyChecks accessToken="safety-token" />);
+    let previous!: (result: FetchSafetyDecisionsResult) => void;
+    let answer!: (result: FetchSafetyDecisionsResult) => void;
+    const read = vi.spyOn(api, 'fetchSafetyDecisions')
+      .mockReturnValueOnce(new Promise(resolve => { previous = resolve; }))
+      .mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+    render(<StrictMode><SafetyChecks accessToken="safety-token" /></StrictMode>);
     const review = await galaDecision();
+    expect(review.getByRole('status')).toHaveTextContent('Loading earlier decisions…');
+    await act(async () => answer({ ok: true, decisions: [EARLIER], rereviews: [] }));
     const earlier = await review.findByRole('list', { name: 'Earlier safety decisions' });
     expect(earlier).toHaveTextContent('Changes requested');
     expect(earlier).toHaveTextContent('Widen the aisles');
     expect(earlier).toHaveTextContent('Venue, Other');
     expect(earlier).toHaveTextContent('Sam Safety');
     expect(read).toHaveBeenCalledWith(12, 'safety-token');
+    await act(async () => previous({ ok: false, kind: 'unavailable', message: 'History is down.' }));
+    expect(review.getByRole('list', { name: 'Earlier safety decisions' })).toHaveTextContent('Widen the aisles');
+    expect(review.queryByRole('alert')).toBeNull();
   });
 
   test('[BOUNDARY] [SG2-92:AC6] an event never decided says so', async () => {
@@ -73,17 +83,7 @@ describe('the decision history on each review (SG2-92 AC6)', () => {
     expect(review.getByRole('button', { name: 'Record decision' })).toBeEnabled();
   });
 
-  test('[CONFLICT] [SG2-92:AC6] a history arriving after leaving the screen is ignored', async () => {
-    lists([GALA]);
-    // The client's ES2020 lib has no Promise.withResolvers, so the executor form holds the resolver.
-    let resolveHistory!: (value: FetchSafetyDecisionsResult) => void;
-    vi.spyOn(api, 'fetchSafetyDecisions').mockReturnValue(new Promise((resolve) => { resolveHistory = resolve; }));
-    render(<SafetyChecks accessToken="t" />);
-    expect((await galaDecision()).getByRole('status')).toHaveTextContent('Loading earlier decisions…');
-    cleanup();
-    await act(async () => resolveHistory({ ok: true, decisions: [EARLIER], rereviews: [] }));
-    expect(screen.queryByRole('list', { name: 'Earlier safety decisions' })).toBeNull();
-  });
+
 });
 
 describe('the decision form on each review (SG2-92 AC1–AC5)', () => {

@@ -6,7 +6,6 @@ import { describePeriod, eventLabel, fetchVenueClashes, type ClashBooking, type 
 import { formatSgt } from './searchApi';
 import Dashboard from '../screens/Dashboard';
 import HoldNotifications from '../components/HoldNotifications';
-import * as notices from '../api/notificationsApi';
 import * as inbox from '../api/notificationInboxApi';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -81,14 +80,7 @@ test('[FAILURE] [SG2-79:AC3] expired sessions, other roles, outages and malforme
   expect(await within(list()).findByRole('alert')).toHaveTextContent('Clashing bookings are unavailable right now.');
 });
 
-test('[NORMAL] [SG2-79:AC3] a result arriving after the list closed is ignored', async () => {
-  let answer!: (response: Response) => void;
-  serve(() => new Promise<Response>(resolve => { answer = resolve; }));
-  const { unmount } = render(<BookingClashes accessToken="token" />);
-  unmount();
-  answer(Response.json({ clashes: [clash] }));
-  await vi.waitFor(() => expect(screen.queryByText('Morning Summit')).toBeNull());
-});
+
 
 test.each([['Venue Staff', true], ['Event Coordinator', true], ['Technical Support Staff', false]] as const)(
   '[NORMAL] [SG2-79:AC3] the %s dashboard shows clashing bookings: %s', async (role, shown) => {
@@ -106,10 +98,4 @@ test('[NORMAL] [SG2-79:AC4] the coordinator\'s notifications show a flagged clas
   (await screen.findByRole('button', { name: 'Notifications (1)' })).click();
   expect(await screen.findByText('Booking clash flagged')).toBeVisible();
   expect(screen.getByText('Clash Hall: Morning Summit now clashes with another event.')).toBeVisible();
-});
-
-test('[BOUNDARY] [SG2-79:AC4] a clash notice is accepted as a notification kind', async () => {
-  serve(() => Response.json({ notifications: [{ notification_id: 5, event_id: 7, request_id: null, kind: 'venue_booking_clash',
-    message: 'm', created_at: '2030-01-01T00:00:00.000Z' }] }));
-  expect((await notices.loadNotifications('token')).ok).toBe(true);
 });

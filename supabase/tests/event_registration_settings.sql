@@ -135,7 +135,7 @@ begin
 
   -- AC7: above every booked venue's capacity is allowed (the server warns).
   result := public.update_registration_settings(96302, owner, '{"registration_capacity": 500}', false);
-  if result ->> 'outcome' is distinct from 'ok' or (select registration_capacity from public.events where event_id = 96302) <> 500 then
+  if result ->> 'outcome' is distinct from 'ok' or (select registration_capacity from public.events where event_id = 96302) IS DISTINCT FROM 500 then
     raise exception '[SG2-63:capacity-above-venue] [BOUNDARY] [SG2-63:AC5] [SG2-63:AC7] A confirmed event takes a capacity above its venues';
   end if;
 
@@ -156,7 +156,7 @@ begin
   -- Nobody already registered loses their place: 96302 holds two.
   if public.update_registration_settings(96302, owner, '{"registration_capacity": 1}', false)
       is distinct from '{"outcome": "below_registered", "registered": 2}'::jsonb
-      or (select registration_capacity from public.events where event_id = 96302) <> 500
+      or (select registration_capacity from public.events where event_id = 96302) IS DISTINCT FROM 500
       or public.update_registration_settings(96302, owner, '{"registration_capacity": 2}', false) ->> 'outcome' is distinct from 'ok'
       or public.update_registration_settings(96302, owner, '{"registration_capacity": 500}', false) ->> 'outcome' is distinct from 'ok' then
     raise exception '[SG2-63:capacity-not-below-registered] [BOUNDARY] [SG2-63:AC5] Capacity can come down to the registered count but not below it';
@@ -184,7 +184,7 @@ begin
       or public.update_registration_settings(96305, owner, '{}', true) ->> 'outcome' is distinct from 'started' then
     raise exception '[SG2-63:settings-started] [BOUNDARY] [SG2-63:AC5] Settings are refused once the event has started';
   end if;
-  if (select registration_capacity from public.events where event_id = 96301) <> 151 then
+  if (select registration_capacity from public.events where event_id = 96301) IS DISTINCT FROM 151 then
     raise exception '[SG2-63:settings-refused-no-write] [FAILURE] [SG2-63:AC8] A refused change writes nothing';
   end if;
 
@@ -208,7 +208,7 @@ begin
     raise exception '[SG2-63:close-now-alone] [FAILURE] [SG2-63:AC6] Closing now carries no other change';
   end if;
   select count(*) into audit_count from public.event_audit_logs where event_id = 96301;
-  if audit_count <> 4 or (select registration_capacity from public.events where event_id = 96301) <> 151 then
+  if audit_count <> 4 or (select registration_capacity from public.events where event_id = 96301) IS DISTINCT FROM 151 then
     raise exception '[SG2-63:settings-invalid-no-write] [FAILURE] [SG2-63:AC5] A refused change writes nothing';
   end if;
   if public.update_registration_settings(96301, owner, jsonb_build_object('registration_closes_at',
@@ -261,7 +261,7 @@ begin
       or (select message from public.notifications where event_id = 96307) is distinct from 'Registration for Closed forum has closed.' then
     raise exception '[SG2-63:sweep-announces] [NORMAL] [SG2-63:AC10] Scheduled opening and closing are announced, once per person: %', announced;
   end if;
-  if public.process_registration_windows() <> 0 or exists(
+  if public.process_registration_windows() IS DISTINCT FROM 0 or exists(
       select 1 from public.notifications where event_id in (96301, 96304, 96306, 96308)) then
     raise exception '[SG2-63:sweep-once] [BOUNDARY] [SG2-63:AC10] Nothing is announced twice, early, or for an unconfirmed event';
   end if;
@@ -274,14 +274,14 @@ begin
   -- Vocabulary and access.
   insert into public.registrations(event_id, attendee_id) values (96301, 'e6300000-0000-4000-8000-000000000005');
   if (select status from public.registrations where event_id = 96301) is distinct from 'registered'
-      or jsonb_array_length(public.event_registration_overview(96301) -> 'attendees') <> 1 then
+      or jsonb_array_length(public.event_registration_overview(96301) -> 'attendees') IS DISTINCT FROM 1 then
     raise exception '[SG2-63:registration-default] [BOUNDARY] [SG2-63:AC1] A new registration holds a place';
   end if;
   -- As SG2-66 counts: only a cancelled registration, in any case, gives its place back.
   insert into public.registrations(event_id, attendee_id, status) values
     (96301, 'e6300000-0000-4000-8000-000000000006', null),
     (96301, 'e6300000-0000-4000-8000-000000000007', 'CANCELLED');
-  if jsonb_array_length(public.event_registration_overview(96301) -> 'attendees') <> 2 then
+  if jsonb_array_length(public.event_registration_overview(96301) -> 'attendees') IS DISTINCT FROM 2 then
     raise exception '[SG2-63:registration-cancelled] [BOUNDARY] [SG2-63:AC1] Any registration not cancelled holds a place, as SG2-66 counts it';
   end if;
   if exists(select 1 from unnest(array['anon', 'authenticated']) role_name
@@ -292,14 +292,48 @@ begin
       or has_function_privilege('service_role', 'public.announce_registration_window(integer, boolean)', 'execute') then
     raise exception '[SG2-63:functions-server-only] [FAILURE] [SG2-63:AC3] [SG2-63:AC4] Only the server reads or changes registration settings';
   end if;
-  if exists(select 1 from unnest(array['venue_request_approved', 'venue_request_rejected',
-      'venue_booking_released', 'equipment_reserved', 'venue_booking_clash', 'event_confirmed', 'event_submitted',
-      'coordinator_assigned', 'clarification_requested', 'event_approved', 'event_rejected', 'venue_unavailable',
-      'event_returned_to_planning', 'safety_decision', 'registration_opened', 'registration_closed']) kind
-      where not exists(select 1 from pg_constraint where conname = 'notifications_kind_check'
-        and pg_get_constraintdef(oid) like '%''' || kind || '''%')) then
-    raise exception '[SG2-63:notice-kinds] [NORMAL] [SG2-63:AC10] The registration notice kinds are allowed alongside every earlier kind';
-  end if;
+end;
+$$;
+-- Probe the installed notification constraint through real inserts. The literal
+-- supported kinds are the oracle; SQL definition formatting is irrelevant.
+-- equipment_reserved alone requires a valid reservation receipt.
+reset role;
+insert into public.equipment(equipment_id,name,quantity_total)
+ values(96399,'Notice constraint fixture',1);
+insert into public.equipment_reservations(reservation_id,event_id,equipment_id,quantity_reserved)
+ values(96399,96301,96399,1);
+do $$
+declare
+ notice_kind text;
+ stored_kind text;
+ kinds_stored_unchanged boolean := true;
+ rejected_constraint text;
+ invalid_kind_refused boolean := false;
+begin
+ foreach notice_kind in array array[
+  'venue_request_approved','venue_request_rejected','venue_booking_released','equipment_reserved',
+  'venue_booking_clash','event_confirmed','event_submitted','coordinator_assigned','clarification_requested',
+  'event_approved','event_rejected','venue_unavailable','event_returned_to_planning','safety_decision',
+  'outstanding_arrangements','registration_opened','registration_closed','venue_booking_cancelled',
+  'venue_change_requested','cancellation_requested','event_cancelled','registration_confirmed',
+  'change_requested','registration_withdrawn','change_accepted','change_refused'
+ ] loop
+  insert into public.notifications(recipient_id,event_id,kind,message,equipment_reservation_id)
+   values('e6300000-0000-4000-8000-000000000001',96301,notice_kind,'Allowed notification kind',
+    case when notice_kind='equipment_reserved' then 96399 else null end)
+   returning kind into stored_kind;
+  kinds_stored_unchanged := kinds_stored_unchanged and (stored_kind is not distinct from notice_kind);
+ end loop;
+ begin
+  insert into public.notifications(recipient_id,event_id,kind,message)
+   values('e6300000-0000-4000-8000-000000000001',96301,'unsupported_notice_kind','Invalid notification kind');
+ exception when check_violation then
+  get stacked diagnostics rejected_constraint = constraint_name;
+  invalid_kind_refused := rejected_constraint is not distinct from 'notifications_kind_check';
+ end;
+ if not kinds_stored_unchanged or not invalid_kind_refused then
+  raise exception '[SG2-63:notice-kinds] [NORMAL] [FAILURE] [SG2-63:AC10] [SG2-66:AC7] [SG2-92:AC5] All supported notice kinds must store unchanged and the kind constraint must reject an unsupported kind';
+ end if;
 end;
 $$;
 rollback;

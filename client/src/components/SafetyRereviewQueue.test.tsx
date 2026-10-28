@@ -156,12 +156,5 @@ describe('SafetyRereviewQueue (SG2-93 AC2/AC4)', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  test('[FAILURE] [SG2-93:AC2] a list arriving after leaving the screen is ignored', async () => {
-    let resolve!: (value: FetchSafetyRereviewsResult) => void;
-    vi.spyOn(api, 'fetchSafetyRereviews').mockReturnValue(new Promise((done) => { resolve = done; }));
-    const { unmount } = render(<SafetyRereviewQueue accessToken="t" />);
-    unmount();
-    await act(async () => resolve({ ok: true, arrangement: 'venue', rereviews: [VENUE] }));
-    expect(screen.queryByRole('region', { name: 'Safety changes to confirm' })).toBeNull();
-  });
+
 });

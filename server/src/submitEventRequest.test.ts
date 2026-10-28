@@ -102,7 +102,7 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.deepEqual(writes, [1]);
   });
 
-  test('[NORMAL] [SG2-30:AC1] [SG2-40:AC1] [SG2-40:AC2] submits a complete draft owned by the caller and records draft → unassigned with the organiser as actor', async () => {
+  test('[NORMAL] [SG2-30:AC1] [SG2-40:AC1] [SG2-40:AC2] [SG2-68:AC1] [SG2-68:AC2] submits a complete draft owned by the caller and records draft → unassigned with the organiser as actor', async () => {
     let fetched: { eventId: number; organiserId: string } | undefined;
     let submitted: number | undefined;
     const app = buildApp({
@@ -119,6 +119,11 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
     assert.deepEqual(app.history, [[{
       event_id: 7, actor_id: 'user-1', field_name: 'status', old_value: 'draft', new_value: 'unassigned'
     }]]);
+    assert.deepEqual(app.leadReads, [1]);
+    assert.deepEqual(app.notices, [[
+      { recipient_id: 'lead-1', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was submitted and is waiting for a coordinator.' },
+      { recipient_id: 'lead-2', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was submitted and is waiting for a coordinator.' }
+    ]]);
   });
 
   test('[FAILURE] [SG2-30:AC1] returns 400 for a non-numeric eventId', async () => {
@@ -377,17 +382,6 @@ describe('PATCH /api/event-requests/:eventId/submit (SG2-30)', () => {
 
 describe('PATCH /api/event-requests/:eventId/submit notices (SG2-68)', () => {
   const UNAVAILABLE = { error: 'Event requests are temporarily unavailable. Please try again later.' };
-
-  test('[NORMAL] [SG2-68:AC1] [SG2-68:AC2] a submission waiting for a coordinator tells every Event Coordinator Lead, after the history row', async () => {
-    const app = buildApp({ submitResult: { ok: true, request: { ...COMPLETE_DRAFT, status: 'unassigned' } } });
-    const response = await request(app).patch('/api/event-requests/7/submit');
-    assert.equal(response.status, 200);
-    assert.deepEqual(app.leadReads, [1]);
-    assert.deepEqual(app.notices, [[
-      { recipient_id: 'lead-1', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was submitted and is waiting for a coordinator.' },
-      { recipient_id: 'lead-2', event_id: 7, kind: 'event_submitted', message: 'Partner Forum was submitted and is waiting for a coordinator.' }
-    ]]);
-  });
 
   test('[NORMAL] [SG2-68:AC1] [SG2-68:AC3] a resubmission that goes back to its coordinator tells only that coordinator, not the Leads', async () => {
     const app = buildApp({

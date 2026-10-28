@@ -32,7 +32,6 @@ export type Screen =
   | 'capacityExceptions'
   | 'equipment'
   | 'attendee'
-  | 'change'
   | 'drafts'
   | 'editDraft'
   | 'profile'
@@ -78,23 +77,6 @@ export interface EventCard extends EventRecord {
   badgeFg: string;
   meta: string;
   next: string;
-}
-
-export interface EquipmentRequest {
-  item: string;
-  event: string;
-  qty: string;
-  window: string;
-  avail: string;
-  /** 1 = available, 0 = short, 2 = already reserved. */
-  status: 0 | 1 | 2;
-}
-
-export interface Notification {
-  title: string;
-  body: string;
-  when: string;
-  dot: string;
 }
 
 export interface ActionItem {

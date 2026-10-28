@@ -45,7 +45,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','d5600000-0000-4000-8000-000000000001',true);
 do $$
 begin
- if (public.check_equipment_availability(95603,95602,'2031-11-01T09:00Z','2031-11-01T17:00Z')->>'quantity_remaining')::int <> 0 then
+ if (public.check_equipment_availability(95603,95602,'2031-11-01T09:00Z','2031-11-01T17:00Z')->>'quantity_remaining')::int IS DISTINCT FROM 0 then
   raise exception '[SG2-56:held-before-cancel] [SG2-56:AC2] [NORMAL] Reserved microphones were counted as free before any cancellation';
  end if;
 end $$;
@@ -80,7 +80,7 @@ select set_config('request.jwt.claim.sub','d5600000-0000-4000-8000-000000000001'
 do $$
 declare result jsonb;
 begin
- if (public.check_equipment_availability(95603,95602,'2031-11-01T09:00Z','2031-11-01T17:00Z')->>'quantity_remaining')::int <> 6 then
+ if (public.check_equipment_availability(95603,95602,'2031-11-01T09:00Z','2031-11-01T17:00Z')->>'quantity_remaining')::int IS DISTINCT FROM 6 then
   raise exception '[SG2-56:freed-not-committed] [SG2-56:AC2] [NORMAL] Released microphones must return, less those still committed to another event';
  end if;
  result := public.manage_equipment_reservations('reserve',95603,95601,1,'2031-11-01T09:00Z','2031-11-01T17:00Z');
@@ -92,7 +92,7 @@ begin
   raise exception '[SG2-56:exactly-freed-reserved] [SG2-56:AC2] [BOUNDARY] Reserving exactly the 6 freed microphones must succeed: %', result;
  end if;
  -- The projectors were released, but they are under maintenance.
- if (public.check_equipment_availability(95603,95603,'2031-11-01T09:00Z','2031-11-01T17:00Z')->>'quantity_remaining')::int <> 0 then
+ if (public.check_equipment_availability(95603,95603,'2031-11-01T09:00Z','2031-11-01T17:00Z')->>'quantity_remaining')::int IS DISTINCT FROM 0 then
   raise exception '[SG2-56:maintenance-stays-unavailable] [SG2-56:AC2] [BOUNDARY] Released equipment under maintenance must remain unavailable';
  end if;
 end $$;

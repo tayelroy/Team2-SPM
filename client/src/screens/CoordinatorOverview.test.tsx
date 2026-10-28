@@ -191,14 +191,7 @@ describe('CoordinatorOverview (SG2-89)', () => {
     await vi.waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
-  test('[FAILURE] [SG2-89:AC1] an answer arriving after the screen closed is ignored', async () => {
-    let release!: (response: Response) => void;
-    api(() => new Promise<Response>((resolve) => { release = resolve; }));
-    const { unmount } = render(<CoordinatorOverview accessToken="tok" />);
-    unmount();
-    await act(async () => release(overview()));
-    expect(screen.queryByRole('article')).not.toBeInTheDocument();
-  });
+
 
   test('[BOUNDARY] [SG2-89:AC1] shows "Updating" while a filter change is loading', async () => {
     let release!: (response: Response) => void;

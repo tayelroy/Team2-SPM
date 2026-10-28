@@ -87,7 +87,7 @@ describe('Helper functions', () => {
       ).toContain('Expected attendance must be at most 2147483647.');
     });
 
-    test.each(['1', '2147483647'])('[BOUNDARY] [SG2-39:AC4] accepts the exact inclusive attendance limit %s', (limit) => {
+    test.each(['1', '2147483647'])('[BOUNDARY] [SG2-39:AC1] accepts the exact inclusive attendance limit %s', (limit) => {
       expect(validatePlanningForm({ ...baseValid, expectedAttendance: limit,
         registrationNeeded: true, registrationOpensAt: '2026-11-10T10:00', registrationClosesAt: '2026-11-15T08:59',
       })).toEqual([]);
@@ -116,7 +116,7 @@ describe('Helper functions', () => {
       expect(errors).toContain('Planning notes must be 5000 characters or fewer.');
     });
 
-    test('[BOUNDARY] [SG2-39:AC4] a newly chosen proposed date must be in the future', () => {
+    test('[BOUNDARY] [SG2-39:AC1] a newly chosen proposed date must be in the future', () => {
       const past = 'Proposed date must be in the future.';
       expect(validatePlanningForm({ ...baseValid, proposedDate: '2020-01-01T01:00' })).toEqual([past]);
       expect(validatePlanningForm({ ...baseValid, proposedDate: '2026-10-01T00:00' })).toEqual([past]);
@@ -126,7 +126,7 @@ describe('Helper functions', () => {
         initialProposedDate: '2020-01-01T01:00' })).toEqual([]);
     });
 
-    test('[FAILURE] [SG2-39:AC4] [SG2-63:AC5] the event must still start after the organiser\'s registration times', () => {
+    test('[FAILURE] [SG2-39:AC1] [SG2-63:AC5] the event must still start after the organiser\'s registration times', () => {
       const event = { ...baseValid, proposedDate: '2030-06-20T01:00', initialProposedDate: '2030-06-20T01:00',
         registrationNeeded: true };
       expect(validatePlanningForm({ ...event, registrationOpensAt: '2030-06-01T01:00',
@@ -145,7 +145,7 @@ describe('Helper functions', () => {
         registrationClosesAt: '2030-12-31T01:00' })).toEqual([]);
     });
 
-    test('[NORMAL] [SG2-39:AC4] ignores registration fields when registrationNeeded is false', () => {
+    test('[NORMAL] [SG2-39:AC1] ignores registration fields when registrationNeeded is false', () => {
       const errors = validatePlanningForm({
         ...baseValid,
         registrationNeeded: false,
@@ -283,7 +283,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(screen.getByLabelText(/Planning Notes/i)).toHaveValue('Catering booked');
   });
 
-  test('[FAILURE] [SG2-39:AC4] a validation error is scrolled into view and focused, again on every failed save', () => {
+  test('[FAILURE] [SG2-39:AC1] a validation error is scrolled into view and focused, again on every failed save', () => {
     const scroll = vi.mocked(Element.prototype.scrollIntoView);
     render(<EventPlanningDrawer eventId={91} onClose={vi.fn()} initialValues={{ expected_attendance: 100 }} />);
     fireEvent.change(screen.getByLabelText('Expected Attendance'), { target: { value: '0' } });
@@ -320,7 +320,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(scroll.mock.contexts).toEqual([warning]);
   });
 
-  test('[FAILURE] [SG2-39:AC4] a refusal from the server is scrolled into view and focused', async () => {
+  test('[FAILURE] [SG2-39:AC1] a refusal from the server is scrolled into view and focused', async () => {
     const scroll = vi.mocked(Element.prototype.scrollIntoView);
     vi.spyOn(eventRequestsApi, 'updateEventPlanning').mockResolvedValue({
       ok: false, kind: 'validation', message: 'Invalid planning details',
@@ -335,7 +335,7 @@ describe('EventPlanningDrawer Component', () => {
     expect(scroll.mock.contexts).toEqual([alert]);
   });
 
-  test('[FAILURE] [SG2-39:AC4] [SG2-63:AC5] a past proposed date, or one before registration closes, is refused before saving', () => {
+  test('[FAILURE] [SG2-39:AC1] [SG2-63:AC5] a past proposed date, or one before registration closes, is refused before saving', () => {
     const updateSpy = vi.spyOn(eventRequestsApi, 'updateEventPlanning');
     render(
       <EventPlanningDrawer

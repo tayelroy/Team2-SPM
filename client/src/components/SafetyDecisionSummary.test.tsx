@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as api from '../api/safetyChecks';
-import type { FetchSafetyDecisionsResult, SafetyDecision, SafetyRereview } from '../api/safetyChecks';
+import type { SafetyDecision, SafetyRereview } from '../api/safetyChecks';
 import SafetyDecisionSummary, { type SafetyDecisionSummaryProps } from './SafetyDecisionSummary';
 import { formatSgtTimestamp } from './EventAuditDrawer';
 
@@ -64,13 +64,20 @@ describe('SafetyDecisionSummary (SG2-92 AC4–AC6)', () => {
   });
 
   test('[BOUNDARY] [SG2-92:AC6] an approval without a note or a known name reads plainly', async () => {
-    decisions([APPROVED]);
-    renderSummary({ status: 'preparation', canRework: false });
+    let late!: (result: Awaited<ReturnType<typeof api.fetchSafetyDecisions>>) => void;
+    vi.spyOn(api, 'fetchSafetyDecisions')
+      .mockReturnValueOnce(new Promise(resolve => { late = resolve; }))
+      .mockResolvedValue({ ok: true, decisions: [APPROVED], rereviews: [] });
+    const { view } = renderSummary({ status: 'planning', canRework: false });
+    view.rerender(<SafetyDecisionSummary eventId={12} accessToken="token" status="preparation" canRework={false} onReworked={vi.fn()} />);
     const summary = await screen.findByTestId('safety-decision-summary');
     expect(summary).toHaveTextContent('Approved');
     expect(summary).not.toHaveTextContent('Reason');
     expect(summary).not.toHaveTextContent('Arrangements to change');
     expect(summary).toHaveTextContent('Recorded bySafety Officer');
+    await act(async () => late({ ok: true, decisions: [EARLIER], rereviews: [] }));
+    expect(summary).toHaveTextContent('Approved');
+    expect(summary).not.toHaveTextContent('Widen the aisles');
   });
 
   test('[BOUNDARY] [SG2-92:AC4] nothing is shown without a decision unless a rejected event still needs reworking', async () => {
@@ -105,15 +112,7 @@ describe('SafetyDecisionSummary (SG2-92 AC4–AC6)', () => {
     expect(onReworked).not.toHaveBeenCalled();
   });
 
-  test('[CONFLICT] [SG2-92:AC6] a history reply after unmounting is ignored', async () => {
-    // The client's ES2020 lib has no Promise.withResolvers, so the executor form holds the resolver.
-    let resolve!: (value: FetchSafetyDecisionsResult) => void;
-    vi.spyOn(api, 'fetchSafetyDecisions').mockReturnValue(new Promise((done) => { resolve = done; }));
-    const { view } = renderSummary();
-    view.unmount();
-    await act(async () => resolve({ ok: true, decisions: [REJECTED], rereviews: [] }));
-    expect(screen.queryByTestId('safety-decision-summary')).toBeNull();
-  });
+
 });
 
 describe('SafetyDecisionSummary: arrangements sent back to staff (SG2-93)', () => {

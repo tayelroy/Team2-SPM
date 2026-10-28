@@ -38,12 +38,12 @@ declare result jsonb;
 begin
   result := public.raise_event_change_request(96401, 'e6400000-0000-4000-8000-000000000002',
     'expected_attendance', '180'::jsonb, '  More guests confirmed.  ');
-  if result ->> 'outcome' <> 'ok' or (result ->> 'coordinator_notified')::boolean is not true
+  if result ->> 'outcome' IS DISTINCT FROM 'ok' or (result ->> 'coordinator_notified')::boolean is not true
       or not exists (select 1 from public.event_change_requests
         where event_id = 96401 and field = 'expected_attendance' and from_value = '120'::jsonb
           and to_value = '180'::jsonb and reason = 'More guests confirmed.' and status = 'pending'
           and requested_by = 'e6400000-0000-4000-8000-000000000002')
-      or (select expected_attendance from public.events where event_id = 96401) <> 120
+      or (select expected_attendance from public.events where event_id = 96401) IS DISTINCT FROM 120
       or not exists (select 1 from public.notifications
         where recipient_id = 'e6400000-0000-4000-8000-000000000001' and event_id = 96401
           and kind = 'change_requested'
@@ -80,8 +80,8 @@ begin
         case when probe.status = 'completed' then now() end);
     result := public.raise_event_change_request(96410 + seq, 'e6400000-0000-4000-8000-000000000002',
       'description', to_jsonb('Agenda for ' || probe.status), 'Agenda changed.');
-    if (probe.open and (result ->> 'outcome' <> 'ok' or (result ->> 'coordinator_notified')::boolean is not false))
-        or (not probe.open and (result ->> 'outcome' <> 'closed' or result ->> 'status' <> probe.status
+    if (probe.open and (result ->> 'outcome' IS DISTINCT FROM 'ok' or (result ->> 'coordinator_notified')::boolean is not false))
+        or (not probe.open and (result ->> 'outcome' IS DISTINCT FROM 'closed' or result ->> 'status' IS DISTINCT FROM probe.status
           or exists (select 1 from public.event_change_requests where event_id = 96410 + seq))) then
       raise exception '[SG2-64:status-boundaries] [SG2-64:AC1] [SG2-64:AC2] [SG2-64:AC4] [BOUNDARY] A % event must % a change request, got %', probe.status, case when probe.open then 'accept' else 'refuse' end, result;
     end if;

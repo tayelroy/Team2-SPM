@@ -42,6 +42,7 @@ test('[NORMAL] [SG2-51:AC1] [SG2-51:AC3] [SG2-51:AC5] the coordinator releases o
   });
   const onReleased = vi.fn();
   render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} onReleased={onReleased} />);
+  expect(screen.getByRole('status')).toHaveTextContent('Loading bookings…');
   expect(await within(list()).findAllByRole('listitem')).toHaveLength(2);
   expect(within(item(12)).getByText('Confirmed')).toBeVisible();
   fireEvent.click(within(item(11)).getByRole('button', { name: 'Release booking' }));
@@ -121,18 +122,10 @@ test('[BOUNDARY] [SG2-51:AC1] with no bookings each list says so', async () => {
   expect(await screen.findByText('No venues are booked for this event yet.')).toBeVisible();
 });
 
-test('[FAILURE] [SG2-51:AC1] bookings that cannot be loaded are explained, and a late answer after closing is ignored', async () => {
+test('[FAILURE] [SG2-51:AC1] bookings that cannot be loaded are explained', async () => {
   serve(() => new Response(null, { status: 503 }));
   render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
   expect(await screen.findByText('Venue bookings are unavailable right now. Please try again.')).toBeVisible();
-  cleanup();
-  let answer!: (response: Response) => void;
-  serve(() => new Promise<Response>(resolve => { answer = resolve; }));
-  const { unmount } = render(<EventVenueBookings accessToken="token" eventId={7} eventName="Leadership Summit" refresh={0} />);
-  expect(screen.getByRole('status')).toHaveTextContent('Loading bookings…');
-  unmount();
-  answer(Response.json({ bookings: [hall] }));
-  await vi.waitFor(() => expect(screen.queryByText('Atrium Hall')).toBeNull());
 });
 
 test('[FAILURE] [SG2-51:AC1] expired sessions, other roles, missing records, network errors and malformed replies are explained', async () => {

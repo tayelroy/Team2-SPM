@@ -221,7 +221,6 @@ function HoldNotificationsSession({ accessToken, coordinator, onOpenNotification
     if (mutation.current || loadingOlder.current) return;
     startMutation();
     void readAllNotifications(accessToken).then(result => {
-      if (!active.current) return;
       finishMutation();
       if (!result.ok) { setError(result.message); return; }
       const readAt = new Date().toISOString();
@@ -234,7 +233,6 @@ function HoldNotificationsSession({ accessToken, coordinator, onOpenNotification
     loadingOlder.current = true; revision.current++; setBusy(true); setLoading(false); setError('');
     void loadNotificationInbox(accessToken, page!.next_cursor!).then(result => {
       loadingOlder.current = false;
-      if (!active.current) return;
       setBusy(false);
       if (!result.ok) { setError(result.message); return; }
       loadedDepth.current++;

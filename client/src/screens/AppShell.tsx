@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
-import { HEAD, NOTIFICATIONS, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
-import type { Notification, Role, Screen } from '../mock/types';
+import { HEAD, PAGE_BLURB, PAGE_TITLE } from '../mock/data';
+import type { Role, Screen } from '../mock/types';
 import { navFor, primaryActionFor } from '../mock/viewModel';
 import type { Access } from '../auth/access';
 import { color, layout, radius, rule, surface } from '../theme';
-import { Dot, GhostButton, GradientButton, IconButton, Mark } from '../ui';
+import { GhostButton, GradientButton, IconButton, Mark } from '../ui';
 import HoldNotifications from '../components/HoldNotifications';
 import type { NotificationSource } from '../api/notificationInboxApi';
 import RoleSwitcher from '../components/RoleSwitcher';
 
 /** Slide-over notification panel. */
-function NotificationDrawer({ onClose, notifications }: { onClose: () => void; notifications: Notification[] }) {
+function NotificationDrawer({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div
@@ -64,39 +64,7 @@ function NotificationDrawer({ onClose, notifications }: { onClose: () => void; n
             ✕
           </IconButton>
         </div>
-        {notifications.length === 0 ? <p style={{ color: color.silver }}>No notifications available.</p> : null}
-        {notifications.map((n) => (
-          <div
-            key={n.title}
-            style={{
-              display: 'flex',
-              gap: '14px',
-              alignItems: 'flex-start',
-              paddingBottom: '18px',
-              borderBottom: rule.faint,
-            }}
-          >
-            <Dot tone={n.dot} style={{ marginTop: '7px' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <span style={{ fontSize: '15px', lineHeight: 1.4, color: color.platinum }}>
-                {n.title}
-              </span>
-              <span style={{ fontSize: '13px', lineHeight: 1.4, color: color.silver }}>
-                {n.body}
-              </span>
-              <span
-                style={{
-                  fontSize: '10px',
-                  letterSpacing: '0.15em',
-                  textTransform: 'uppercase',
-                  color: color.slate,
-                }}
-              >
-                {n.when}
-              </span>
-            </div>
-          </div>
-        ))}
+        <p style={{ color: color.silver }}>No notifications available.</p>
       </aside>
     </>
   );
@@ -174,8 +142,6 @@ export default function AppShell({
   const profileRef = useRef<HTMLDivElement>(null);
   const profileButton = useRef<HTMLButtonElement>(null);
   const head = HEAD[role];
-  const internalRole = role === 'Event Coordinator' || role === 'Venue Staff' || role === 'Technical Support Staff';
-  const notifications = internalRole ? NOTIFICATIONS : [];
   const primary = primaryActionFor(role);
 
   useDismissOutside(profileOpen, profileRef, setProfileOpen);
@@ -267,7 +233,7 @@ export default function AppShell({
               ? <HoldNotifications key={`${accessToken}:${role}`} accessToken={accessToken} coordinator={role === 'Event Coordinator'} onOpenNotification={onOpenNotification} /> : <button
               type="button"
               onClick={() => setNotifOpen((open) => !open)}
-              aria-label={`Notifications (${notifications.length})`}
+              aria-label="Notifications (0)"
               style={{
                 position: 'relative',
                 background: surface.iconButton,
@@ -296,7 +262,7 @@ export default function AppShell({
                   letterSpacing: '0.04em',
                 }}
               >
-                {notifications.length}
+                0
               </span>
             </button>}
 
@@ -420,7 +386,7 @@ export default function AppShell({
         {children}
       </main>
 
-      {notifOpen ? <NotificationDrawer notifications={notifications} onClose={() => setNotifOpen(false)} /> : null}
+      {notifOpen ? <NotificationDrawer onClose={() => setNotifOpen(false)} /> : null}
     </div>
   );
 }

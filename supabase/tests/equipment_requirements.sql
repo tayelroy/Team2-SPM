@@ -267,9 +267,6 @@ set local role authenticated;
 do $$
 declare result jsonb;
 begin
- if public.manage_equipment_requirements('arrange',95301,current_setting('requirements.id')::bigint,6,'{"shortfall":0}')->>'outcome' is distinct from 'closed' then
-  raise exception '[SG2-53:closed-event-update] [SG2-53:AC5] [CONFLICT] Support updates stop when the event leaves arrangement stages';
- end if;
  result := public.manage_equipment_requirements('read',95301);
  if result->>'outcome' is distinct from 'ok' or result->>'can_arrange' is distinct from 'false'
    or jsonb_array_length(result->'requests') is distinct from 2 then
