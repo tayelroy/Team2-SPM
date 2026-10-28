@@ -9377,7 +9377,7 @@
     "execution_date": "23 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
-      "Sign in as attendee; open Small Recital and press Register.",
+      "Sign in as attendee; open Small Recital (since SG2-61 it is refused as full before the form is shown).",
       "Open Bayfront Workshop and read the Registration section.",
       "Open Harbour Lecture, clear the phone, enter 501 characters of needs and press Register.",
       "As attendee, POST registrations to 592 (opens later), 593 (closed), 594 (planning) and 591 with phone '9123 456' and with 501 characters of needs.",
@@ -9385,7 +9385,7 @@
       "Read the ledger."
     ],
     "data": "Small Recital (596): confirmed, open, capacity 1 held by Recital Guest; the attendee's own earlier registration is cancelled. Bayfront Workshop (592) opens 1 Jun 2030 08:00 SGT. Closed Briefing (593) closed in 2020. Planning Forum (594) is in planning.",
-    "expected": "Small Recital: alert 'This event is full.' and no Register button. Bayfront: 'Registration opens 1 Jun 2030, 8:00 am. Come back then to register.' and no Register button. Harbour: 'Enter a contact phone number.' and 'Keep accessibility or dietary needs to 500 characters.'. API: 592 409 'Registration opens 01 Jun 2030 08:00 SGT.', 593 409 'Registration for this event has closed.', 594 404, both bad bodies 400 'Check your registration details.'; other roles 403. The attendee holds no active registration and no confirmation was sent.",
+    "expected": "Small Recital: alert starting 'This event is full.' and no Register button. Bayfront: 'Registration opens 1 Jun 2030, 8:00 am. Come back then to register.' and no Register button. Harbour: 'Enter a contact phone number.' and 'Keep accessibility or dietary needs to 500 characters.'. API: 592 409 'Registration opens 01 Jun 2030 08:00 SGT.', 593 409 'Registration for this event has closed.', 594 404, both bad bodies 400 'Check your registration details.'; other roles 403. The attendee holds no active registration and no confirmation was sent.",
     "evidence": "e2e/event-registration.spec.ts",
     "layer": "Playwright Chromium + isolated production app"
   },
