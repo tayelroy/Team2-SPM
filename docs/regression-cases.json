@@ -9373,8 +9373,8 @@
     "review": null,
     "status": "Pass",
     "actual": "PASS: ran in the full local Chromium run against the production app build and reset loopback fixture.",
-    "execution_evidence": "23 Oct 2026; feature/SG2-60-register-for-event at 0776b1e on origin/main adf51ff; npm run test:e2e locally in Chromium: 157/157 passed, required SG2-26 gate passed; npm run ci green (1841 server / 1885 client / 19 reviewer, 100% coverage). No hosted Supabase validation.",
-    "execution_date": "23 Oct 2026",
+    "execution_evidence": "28 Oct 2026; PR #122 at 5415672 (main 91c46b5, SG2-22 #120 and SG2-102 #121, merged in): passed in CI run 40706184808 (https://github.com/tayelroy/Team2-SPM/actions/runs/40706184808) with the regression gate. Its full-event step changed in 6f65809 (refused before the form, SG2-61); re-run at f1c5848 passed locally in Chromium on 28 Oct 2026 (npm run test:e2e: 187/187, SG2-26 gate passed); hosted CI for them is the PR's next run. No hosted Supabase validation.",
+    "execution_date": "28 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
       "Sign in as attendee; open Small Recital (since SG2-61 it is refused as full before the form is shown).",
@@ -10121,8 +10121,8 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/waiting-list seed (Chamber Concert, capacity 1, held by a guest) before each case; fresh browser context. No hosted Supabase.",
     "review": null,
     "status": "Pass",
-    "actual": "PASS: ran locally in Chromium against the production app build and reset loopback fixture.",
-    "execution_evidence": "28 Oct 2026; feature/SG2-61-waiting-list on origin/main 91c46b5; npx playwright test e2e/waiting-list.spec.ts locally in Chromium. No hosted Supabase validation.",
+    "actual": "Passed in Chromium.",
+    "execution_evidence": "28 Oct 2026; PR #122 at 5415672 (main 91c46b5, SG2-22 #120 and SG2-102 #121, merged in): passed in CI run 40706184808 (https://github.com/tayelroy/Team2-SPM/actions/runs/40706184808) with the regression gate. The 390/1440 px width checks added in f1c5848 passed locally in Chromium on 28 Oct 2026 (npm run test:e2e: 187/187, SG2-26 gate passed); hosted CI for them is the PR's next run. No hosted Supabase validation.",
     "execution_date": "28 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
@@ -10153,8 +10153,8 @@
     "preconditions": "Production React build and real Express handlers on loopback; reset in-memory identity/database fixture and /__e2e/waiting-list seed (Chamber Concert, capacity 1, held by a guest) before each case; fresh browser context. No hosted Supabase.",
     "review": null,
     "status": "Pass",
-    "actual": "PASS: ran locally in Chromium against the production app build and reset loopback fixture.",
-    "execution_evidence": "28 Oct 2026; feature/SG2-61-waiting-list on origin/main 91c46b5; npx playwright test e2e/waiting-list.spec.ts locally in Chromium. No hosted Supabase validation.",
+    "actual": "Passed in Chromium.",
+    "execution_evidence": "28 Oct 2026; PR #122 at 5415672 (main 91c46b5, SG2-22 #120 and SG2-102 #121, merged in): passed in CI run 40706184808 (https://github.com/tayelroy/Team2-SPM/actions/runs/40706184808) with the regression gate. The 390/1440 px width checks added in f1c5848 passed locally in Chromium on 28 Oct 2026 (npm run test:e2e: 187/187, SG2-26 gate passed); hosted CI for them is the PR's next run. No hosted Supabase validation.",
     "execution_date": "28 Oct 2026",
     "executed_by": "Automated local run",
     "steps": [
