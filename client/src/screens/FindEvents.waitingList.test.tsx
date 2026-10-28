@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import FindEvents, { waitingLabel } from './FindEvents';
 import { fetchProfile } from '../api/profile';
@@ -168,6 +168,22 @@ test('[BOUNDARY] [SG2-61:AC5] a join refused because a place came free, the wind
     expect(registration().queryByRole('button', { name: 'Register' }) !== null).toBe(form);
     cleanup();
   }
+});
+
+test('[CONFLICT] [SG2-61:AC6] two clicks in the same moment join or leave once', async () => {
+  const joining = await openDetail(full, { [`POST ${LIST}`]: () => Response.json({ waiting: second }, { status: 201 }) });
+  const join = registration().getByRole('button', { name: 'Join the waiting list' });
+  // Both clicks land before React re-renders the button as disabled.
+  act(() => { join.click(); join.click(); });
+  await registration().findByText('You are number 2 on the waiting list.');
+  expect(joining.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+  cleanup();
+
+  const leaving = await openDetail({ ...full, waiting: second }, { [`DELETE ${LIST}`]: () => Response.json({ left: true }) });
+  const leave = registration().getByRole('button', { name: 'Leave the waiting list' });
+  act(() => { leave.click(); leave.click(); });
+  await registration().findByText('You have left the waiting list.');
+  expect(leaving.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1);
 });
 
 test('[NORMAL] [SG2-61:AC5] the badge names the position, or that a place is held', () => {
