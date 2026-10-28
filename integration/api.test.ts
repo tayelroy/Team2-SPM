@@ -649,8 +649,8 @@ test('[NORMAL] [FAILURE] [SG2-59:AC1] [SG2-59:AC2] [SG2-59:AC3] native attendee 
     assert.deepEqual(ours.map((event: { event_id: number }) => event.event_id), [listed]);
     const detail = await attendee.get(`/api/registrable-events/${listed}`).set(auth('other'));
     assert.equal(detail.status, 200, JSON.stringify(detail.body));
-    assert.deepEqual(Object.keys(detail.body.event).sort(), ['category', 'description', 'event_id', 'name', 'organisation',
-      'proposed_date', 'registered', 'registration_closes_at', 'registration_opens_at', 'venues']);
+    assert.deepEqual(Object.keys(detail.body.event).sort(), ['category', 'description', 'event_id', 'full', 'name', 'organisation',
+      'proposed_date', 'registered', 'registration_closes_at', 'registration_opens_at', 'venues', 'waiting']);
     assert.equal(detail.body.event.name, 'Integration workshop');
     assert.doesNotMatch(JSON.stringify(detail.body), /Integration internal note|Exercise actual storage|confirmed/);
     assert.equal((await attendee.get(`/api/registrable-events/${unconfirmed}`).set(auth('other'))).status, 404);
