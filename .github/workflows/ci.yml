@@ -210,6 +210,7 @@ jobs:
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/notification_inbox_reminders.sql
           node .github/scripts/test-notification-reminders-concurrency.mjs
           docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/coordinator_oversight.sql
+          docker exec -i "$POSTGRES_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/attendee_event_change_notices.sql
       - name: Test APIs against native PostgreSQL through PostgREST
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}

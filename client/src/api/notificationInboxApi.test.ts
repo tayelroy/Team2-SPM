@@ -10,7 +10,7 @@ function respond(value: unknown, status = 200) {
   const fetch = vi.fn(async () => Response.json(value, { status })); vi.stubGlobal('fetch', fetch); return fetch;
 }
 
-test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] inbox requests use the session token, no-store, global count and an encoded complete cursor', async () => {
+test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] [SG2-102:AC1] [SG2-102:AC2] inbox requests use the session token, no-store, global count and an encoded complete cursor', async () => {
   const notifications = [
     entry,
     ...['venue_request_approved', 'venue_request_rejected', 'venue_booking_released', 'equipment_reserved',
@@ -24,6 +24,8 @@ test('[NORMAL] [SG2-69:AC1] [SG2-60:AC1] [SG2-62:AC5] [SG2-65:AC1] [SG2-65:AC2] 
       message: 'You are registered for Forum on 20 Jul 2030 19:00 SGT at Main hall.' },
     { ...entry, kind: 'registration_withdrawn', notification_id: 71,
       message: 'Ana withdrew from Forum. 9 of 10 places now remain.' },
+    { ...entry, kind: 'event_changed', notification_id: 72,
+      message: 'Forum has changed. Date and time: 20 Jul 2030 19:00 SGT → 21 Jul 2030 19:00 SGT. Open My registrations for the latest details.' },
     ...['placed', 'warning', 'expiry_changed']
       .map((kind, index) => ({ ...entry, source: 'hold', kind, notification_id: index + 100 })),
   ];
@@ -82,9 +84,11 @@ const malformedPages = [null, [], {}, { ...page, notifications: null }, { ...pag
   { ...page, notifications: [{ ...entry, kind: null }] }, { ...page, notifications: [{ ...entry, kind: 'unknown' }] },
   ...['registration_closed ', 'Safety_decision', 'toString', 7].map(kind => ({ ...page, notifications: [{ ...entry, kind }] })),
   { ...page, notifications: [{ ...entry, source: 'hold', kind: 'event_submitted' }] },
+  { ...page, notifications: [{ ...entry, source: 'hold', kind: 'event_changed' }] },
+  { ...page, notifications: [{ ...entry, kind: 'event_change' }] },
   { ...page, notifications: [{ ...entry, read_at: 'invalid' }] }, { ...page, unread_count: -1 },
   { ...page, unread_count: 1.5 }, { ...page, unread_count: '1' }, { ...page, next_cursor: {} }];
-test.each(malformedPages.map((value, index) => [index, value] as const))('[FAILURE] [SG2-69:AC1] malformed inbox response %i cannot become a trusted count/list', async (_index, value) => {
+test.each(malformedPages.map((value, index) => [index, value] as const))('[FAILURE] [SG2-69:AC1] [SG2-102:AC1] malformed inbox response %i cannot become a trusted count/list', async (_index, value) => {
   respond(value); expect((await loadNotificationInbox('token')).ok).toBe(false);
 });
 

@@ -1,5 +1,6 @@
 import { AccessError } from '../../server/src/auth/policy';
 import type { ReleaseResult, VenueBookingReleaseStore } from '../../server/src/db/venueBookings';
+import { announceAttendeeChange, attendeeDetails } from './attendee-change-notices';
 import type { MemoryDatabase } from './memory-database';
 
 const nextId = (rows: Record<string, unknown>[], key: string) => Math.max(0, ...rows.map(row => Number(row[key]))) + 1;
@@ -31,6 +32,7 @@ export function createMemoryReleaseStore(database: MemoryDatabase) {
       if (others.some(other => !other || other.event_id !== event.event_id || other.status !== 'confirmed' || String(other.ends_at) <= now)) {
         return { outcome: 'others_invalid' };
       }
+      const shown = attendeeDetails(database, Number(event.event_id));
       const actor = database.tables.users.find(row => row.user_id === userId)?.name ?? 'The coordinator';
       for (const cancelled of [booking, ...others as typeof booking[]]) {
         const id = cancelled.booking_id;
@@ -79,6 +81,8 @@ export function createMemoryReleaseStore(database: MemoryDatabase) {
         Object.assign(event, { status: 'planning', confirmed_by: null, confirmed_at: null, arrangements_recheck_needed: true,
           outstanding_arrangements: outstanding.includes('venue_recheck') ? outstanding : [...outstanding, 'venue_recheck'] });
       }
+      // SG2-102: a cancelled venue reaches registered attendees at commit.
+      announceAttendeeChange(database, Number(event.event_id), shown);
       return { outcome: 'released', booking_id: bookingId, cancelled_at: now, also_released: also, returned_to_planning: returned };
     }
   });

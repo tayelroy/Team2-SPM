@@ -1063,6 +1063,20 @@
         "AC5": "While a request is returned for clarification, the Event Organiser cannot edit it directly (refused on the server side); they answer in the clarification thread and ask for any change to the request through a change request (replaces SG2-36 AC2 and the clarification exception in SG2-30 AC3)",
         "AC6": "A rejected request is revised through the Coordinator, and the Event Organiser resubmits it when the Coordinator decides a new submission is needed; direct Organiser changes to submitted fields remain refused"
       }
+    },
+    {
+      "id": "SG2-102",
+      "url": "https://smu-spm-group.atlassian.net/browse/SG2-102",
+      "originalPullRequests": [],
+      "sourceReadDate": "2026-10-27",
+      "source": "Live SG2-102 Jira description, bullet order, read through the Atlassian connector.",
+      "acceptanceCriteria": {
+        "AC1": "When a change to an event's date, time or venue takes effect (an accepted change request, or a replacement venue after the original became unavailable), every attendee with an active registration is notified",
+        "AC2": "The notification shows the event and what changed, with old and new values",
+        "AC3": "Attendees who have withdrawn are not notified",
+        "AC4": "The attendee-facing event details (SG2-59, SG2-62) show the updated information",
+        "AC5": "Changes to internal planning information that attendees don't see do not trigger attendee notifications"
+      }
     }
   ]
 }

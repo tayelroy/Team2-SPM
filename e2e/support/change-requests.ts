@@ -7,6 +7,7 @@ import type {
 } from '../../server/src/changeRequests/mockChangeRequests';
 import type { RaiseChangeRequestInput, RaiseChangeRequestResult } from '../../server/src/db/changeRequests';
 import { CHANGE_FIELD_LABELS } from '../../server/src/events/changeImpact';
+import { announceAttendeeChange, attendeeDetails } from './attendee-change-notices';
 import type { MemoryDatabase } from './memory-database';
 
 type Row = Record<string, unknown>;
@@ -68,7 +69,10 @@ export function createMemoryChangeRequests(database: MemoryDatabase, samples: Mo
         message = `${label}: your change request was refused. Reason: ${decision.reason}`;
         Object.assign(row, { decision_reason: decision.reason });
       } else if (decision.next) {
+        const shown = attendeeDetails(database, event.event_id);
         stored[String(row.field)] = row.to_value;
+        // SG2-102: an accepted date change reaches registered attendees.
+        announceAttendeeChange(database, event.event_id, shown);
         if (decision.next === 'review') stored.status = 'under_review';
         message = decision.next === 'review'
           ? `${label}: your change request was accepted and the request is back in review.`

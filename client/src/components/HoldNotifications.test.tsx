@@ -24,7 +24,7 @@ beforeEach(() => {
 async function open(count = 1) { fireEvent.click(await screen.findByRole('button', { name: `Notifications (${count})` })); }
 function clickBatch(...buttons: HTMLElement[]) { act(() => { for (const button of buttons) button.dispatchEvent(new MouseEvent('click', { bubbles: true })); }); }
 
-test('[NORMAL] [SG2-69:AC1] [SG2-69:AC2] [SG2-55:AC4] [SG2-58:AC1] [SG2-51:AC4] [SG2-49:AC1] [SG2-49:AC2] [SG2-81:AC1] [SG2-79:AC4] [SG2-68:AC1] [SG2-68:AC2] [SG2-66:AC7] [SG2-92:AC5] [SG2-63:AC10] [SG2-60:AC1] [SG2-62:AC5] [SG2-69:AC5] [SG2-84:AC6] [SG2-85:AC4] [SG2-106:AC4] [SG2-65:AC1] [SG2-65:AC2] badge counts all unread and rows visibly distinguish read state', async () => {
+test('[NORMAL] [SG2-69:AC1] [SG2-69:AC2] [SG2-55:AC4] [SG2-58:AC1] [SG2-51:AC4] [SG2-49:AC1] [SG2-49:AC2] [SG2-81:AC1] [SG2-79:AC4] [SG2-68:AC1] [SG2-68:AC2] [SG2-66:AC7] [SG2-92:AC5] [SG2-63:AC10] [SG2-60:AC1] [SG2-62:AC5] [SG2-69:AC5] [SG2-84:AC6] [SG2-85:AC4] [SG2-106:AC4] [SG2-65:AC1] [SG2-65:AC2] [SG2-102:AC2] badge counts all unread and rows visibly distinguish read state', async () => {
   const expectedLabels = [
     ['equipment_reserved', 'Equipment reserved'],
     ['event_confirmed', 'Event confirmed'],
@@ -56,6 +56,7 @@ test('[NORMAL] [SG2-69:AC1] [SG2-69:AC2] [SG2-55:AC4] [SG2-58:AC1] [SG2-51:AC4] 
     ['change_requested', 'Change requested'],
     ['change_accepted', 'Change accepted'],
     ['change_refused', 'Change refused'],
+    ['event_changed', 'Event changed'],
   ] as const;
   const notifications: InboxNotification[] = expectedLabels.map(([kind], index) => ({
     ...notice(kind, kind === 'placed' ? placed.message : kind === 'event_confirmed' ? kind : `Message for ${kind}.`),

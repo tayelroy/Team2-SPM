@@ -1065,6 +1065,29 @@ test.each(['Event Coordinator', 'Event Organiser', 'Safety Officer'] as const)('
   }
 });
 
+test('[NORMAL] [SG2-102:AC2] [SG2-102:AC4] an attendee opens an event change notice and goes on to the updated registration', async () => {
+  await signInAs('Attendee');
+  const message = 'Harbour Lecture has changed. Venue: Old Hall → Regression Hall. Open My registrations for the latest details.';
+  const changed = { source: 'event', notification_id: 5, event_id: 591, kind: 'event_changed', message, created_at: '2026-10-27T02:00:00.000Z' };
+  const fetch = vi.mocked(globalThis.fetch); const existing = fetch.getMockImplementation()!;
+  fetch.mockImplementation(async (...args) => {
+    const url = String(args[0]);
+    if (url === '/api/notifications/inbox') return Response.json({ notifications: [{ ...changed, read_at: null }], unread_count: 1, next_cursor: null });
+    if (url === '/api/notifications/event/5/read') return Response.json({ notification: { ...changed, read_at: '2026-10-27T03:00:00Z' }, unread_count: 0 });
+    if (url === '/api/notifications/event/5/event') return Response.json({ event: { event_id: 591, name: 'Harbour Lecture',
+      status: 'confirmed', proposed_date: '2030-07-20T11:00:00.000Z' } });
+    return existing(...args);
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /^Notifications \(/ }));
+  expect(await screen.findByText('Event changed')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: `Unread: ${message}` }));
+  expect(await screen.findByRole('heading', { name: 'Harbour Lecture' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'View event details' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View my registrations' }));
+  const registrations = await screen.findByRole('region', { name: 'My registrations' });
+  expect(await within(registrations).findByText('Regression Hall', { exact: false })).toBeVisible();
+});
+
 test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that role's home and remembers it", async () => {
   await signInAs('Event Coordinator');
   cleanup();

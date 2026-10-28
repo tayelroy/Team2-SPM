@@ -11,7 +11,8 @@ export interface Notification {
     | 'registration_closed' | 'venue_booking_cancelled' | 'venue_change_requested'
     | 'cancellation_requested' | 'event_cancelled' | 'registration_confirmed' | 'change_requested'
     | 'registration_withdrawn'
-    | 'change_accepted' | 'change_refused';
+    | 'change_accepted' | 'change_refused'
+    | 'event_changed';
   message: string;
   created_at: string;
 }
