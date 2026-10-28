@@ -52,13 +52,24 @@ describe('validateRegistrationSettings (SG2-63)', () => {
       { valid: false, errors: ['Send at least one registration setting to change.'] });
     assert.deepEqual(validateRegistrationSettings({ registration_capacity: 10, registration_needed: false }), {
       valid: false,
-      errors: ['Only registration_capacity, registration_opens_at, registration_closes_at can be changed here.']
+      errors: ['Only registration_capacity, registration_opens_at, registration_closes_at, waiting_list_response_hours can be changed here.']
     });
   });
 
-  test('[NORMAL] [SG2-63:AC8] only capacity and the two times are registration settings', () => {
-    assert.deepEqual(['registration_capacity', 'registration_opens_at', 'registration_closes_at', 'registration_needed', 'planning_notes']
-      .map(isRegistrationSettingField), [true, true, true, false, false]);
+  test('[NORMAL] [SG2-63:AC8] [SG2-62:AC6] only capacity, the two times and the response window are registration settings', () => {
+    assert.deepEqual(['registration_capacity', 'registration_opens_at', 'registration_closes_at', 'waiting_list_response_hours',
+      'registration_needed', 'planning_notes'].map(isRegistrationSettingField), [true, true, true, true, false, false]);
+  });
+
+  test('[BOUNDARY] [SG2-62:AC6] the response window is whole hours from one to a week, and is never cleared', () => {
+    for (const hours of [1, 24, 168]) {
+      assert.deepEqual(validateRegistrationSettings({ waiting_list_response_hours: hours }),
+        { valid: true, values: { waiting_list_response_hours: hours } });
+    }
+    for (const hours of [0, 169, 1.5, null, '5', -1]) {
+      assert.deepEqual(validateRegistrationSettings({ waiting_list_response_hours: hours }),
+        { valid: false, errors: ['waiting_list_response_hours must be a whole number of hours from 1 to 168.'] }, String(hours));
+    }
   });
 });
 

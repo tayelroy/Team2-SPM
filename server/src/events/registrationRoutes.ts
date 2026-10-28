@@ -67,9 +67,10 @@ async function accessFor(
 
 /** The registration picture as one response (AC1, AC2, AC4, AC5, AC7, AC8). */
 function view(overview: RegistrationOverview, access: { owner: boolean; contactDetails: boolean }, now: number) {
-  const { event, attendees, venues } = overview;
+  const { event, attendees, venues, waiting_list: waitingList } = overview;
   const capacity = event.registration_capacity;
   const started = event.proposed_date !== null && now >= Date.parse(event.proposed_date);
+  let waitingPosition = 0;
   return {
     event_id: event.event_id,
     name: event.name,
@@ -78,6 +79,7 @@ function view(overview: RegistrationOverview, access: { owner: boolean; contactD
     registration_capacity: capacity,
     registration_opens_at: event.registration_opens_at,
     registration_closes_at: event.registration_closes_at,
+    waiting_list_response_hours: event.waiting_list_response_hours,
     window: registrationWindow(event, new Date(now)),
     registered_count: attendees.length,
     places_remaining: placesRemaining(capacity, attendees.length),
@@ -85,6 +87,8 @@ function view(overview: RegistrationOverview, access: { owner: boolean; contactD
     // SG2-60: the needs an attendee gave are kept with their contact details.
     attendees: attendees.map(({ email, phone, needs, ...attendee }) =>
       (access.contactDetails ? { ...attendee, email, phone, needs } : attendee)),
+    // SG2-61 AC7: the list in order; those still waiting are numbered from 1.
+    waiting_list: waitingList.map(entry => ({ ...entry, position: entry.status === 'waiting' ? ++waitingPosition : null })),
     venues,
     capacity_warnings: capacityWarnings(capacity, venues),
     // AC5, AC8: only the organiser who created it, before it starts.

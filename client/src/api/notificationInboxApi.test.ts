@@ -108,3 +108,14 @@ test('[NORMAL] [SG2-62:AC5] an organiser inbox holding an attendee withdrawal lo
   respond({ notifications: [withdrew], unread_count: 1, next_cursor: null });
   expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: [withdrew], unread_count: 1, next_cursor: null } });
 });
+
+test('[NORMAL] [SG2-61:AC3] [SG2-62:AC6] inboxes holding a full event, a waiting-list offer and a lapsed offer load', async () => {
+  const notices = [
+    { ...entry, kind: 'registration_full', message: 'Forum is now full: all places are taken (capacity 10).' },
+    { ...entry, notification_id: 2, kind: 'waiting_list_offer', message: 'A place has opened at Forum.' },
+    { ...entry, notification_id: 3, kind: 'waiting_list_offer_lapsed', message: 'The place held for you at Forum was not taken.' },
+  ];
+  respond({ notifications: notices, unread_count: 3, next_cursor: null });
+  expect(await loadNotificationInbox('token')).toEqual({ ok: true, value: { notifications: notices, unread_count: 3, next_cursor: null } });
+});
+

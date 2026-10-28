@@ -30,7 +30,8 @@ const OVERVIEW: RegistrationOverview = {
   event: {
     event_id: 12, name: 'Partner Forum', status: 'confirmed', organisation: 'Acme', organiser_id: OWNER,
     coordinator_id: COORDINATOR, proposed_date: '2030-06-20T01:00:00.000Z', registration_needed: true,
-    registration_capacity: 3, registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z'
+    registration_capacity: 3, registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z',
+    waiting_list_response_hours: 24
   },
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', email: 'ana@attendee.test', phone: '+65 6000 0001',
@@ -38,13 +39,15 @@ const OVERVIEW: RegistrationOverview = {
     { registration_id: 4, name: 'Ben Attendee', organisation: null, email: 'ben@attendee.test', phone: null,
       needs: null, registered_at: '2030-06-03T01:00:00.000Z' }
   ],
+  waiting_list: [],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 2 }]
 };
 
 /** What the creating organiser sees of OVERVIEW at NOW. */
 const OWNER_VIEW = {
   event_id: 12, name: 'Partner Forum', status: 'confirmed', registration_needed: true, registration_capacity: 3,
-  registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z', window: 'open',
+  registration_opens_at: '2030-06-01T01:00:00.000Z', registration_closes_at: '2030-06-10T01:00:00.000Z',
+  waiting_list_response_hours: 24, window: 'open',
   registered_count: 2, places_remaining: 1, contact_details_visible: true,
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z',
@@ -52,6 +55,7 @@ const OWNER_VIEW = {
     { registration_id: 4, name: 'Ben Attendee', organisation: null, registered_at: '2030-06-03T01:00:00.000Z',
       email: 'ben@attendee.test', phone: null, needs: null }
   ],
+  waiting_list: [],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 2 }],
   capacity_warnings: ['A capacity of 3 is more than Main hall holds (2).'],
   can_edit: true
@@ -207,6 +211,45 @@ describe('GET /api/event-requests/:eventId/registrations (SG2-63)', () => {
   });
 });
 
+describe('the waiting list in the registration picture (SG2-61, SG2-62 AC6)', () => {
+  const WAITING = { ...OVERVIEW, event: { ...OVERVIEW.event, waiting_list_response_hours: 6 }, waiting_list: [
+    { entry_id: 5, name: 'Cara Waiting', organisation: null, status: 'offered' as const, joined_at: '2030-06-03T02:00:00.000Z',
+      offer_expires_at: '2030-06-05T06:00:00.000Z' },
+    { entry_id: 6, name: 'Dev Waiting', organisation: 'Guests Ltd', status: 'waiting' as const, joined_at: '2030-06-03T03:00:00.000Z',
+      offer_expires_at: null },
+    { entry_id: 8, name: 'Eve Waiting', organisation: null, status: 'waiting' as const, joined_at: '2030-06-04T03:00:00.000Z',
+      offer_expires_at: null }
+  ] };
+  const LIST = [
+    { ...WAITING.waiting_list[0], position: null },
+    { ...WAITING.waiting_list[1], position: 1 },
+    { ...WAITING.waiting_list[2], position: 2 }
+  ];
+
+  test('[NORMAL] [SG2-61:AC7] [SG2-62:AC6] the organiser and the assigned coordinator see the list in order, the offer and the response window', async () => {
+    for (const viewer of [as(OWNER), as(COORDINATOR, 'event_coordinator')]) {
+      const res = await request(harness(viewer, { overview: WAITING }).app).get('/events/12/registrations');
+      assert.equal(res.status, 200);
+      assert.deepEqual([res.body.waiting_list, res.body.waiting_list_response_hours], [LIST, 6], viewer.userId);
+    }
+  });
+
+  test('[FAILURE] [SG2-61:AC7] someone outside the event sees no list, only that it was not found', async () => {
+    const res = await request(harness(as(OUTSIDER), { overview: WAITING }).app).get('/events/12/registrations');
+    assert.deepEqual([res.status, res.body], [404, NOT_FOUND]);
+  });
+
+  test('[NORMAL] [SG2-62:AC6] the creating organiser sets the response window, which only they can change', async () => {
+    const { app, writes } = harness(as(OWNER), { reread: { ok: true, overview: WAITING } });
+    const res = await request(app).patch('/events/12/registration-settings').send({ waiting_list_response_hours: 6 });
+    assert.deepEqual([res.status, res.body.waiting_list_response_hours], [200, 6]);
+    assert.deepEqual(writes, [{ eventId: 12, actorId: OWNER, values: { waiting_list_response_hours: 6 }, closeNow: false }]);
+    const coordinator = harness(as(COORDINATOR, 'event_coordinator'));
+    assert.equal((await request(coordinator.app).patch('/events/12/registration-settings').send({ waiting_list_response_hours: 6 })).status, 403);
+    assert.deepEqual(coordinator.writes, []);
+  });
+});
+
 describe('PATCH and close of the registration settings (SG2-63)', () => {
   test('[NORMAL] [SG2-63:AC5] the creating organiser changes the settings as themselves and gets the picture as it now stands', async () => {
     const changed = { ...OVERVIEW, event: { ...OVERVIEW.event, registration_capacity: 150 } };
@@ -262,7 +305,7 @@ describe('PATCH and close of the registration settings (SG2-63)', () => {
     const { app, writes } = harness(as(OWNER));
     const shape = await request(app).patch('/events/12/registration-settings').send({ registration_capacity: 0, planning_notes: 'x' });
     assert.deepEqual([shape.status, shape.body], [400, { error: 'Invalid registration settings', details: [
-      'Only registration_capacity, registration_opens_at, registration_closes_at can be changed here.',
+      'Only registration_capacity, registration_opens_at, registration_closes_at, waiting_list_response_hours can be changed here.',
       'registration_capacity must be a whole number from 1 to 2147483647.'
     ] }]);
     const schedule = await request(app).patch('/events/12/registration-settings')

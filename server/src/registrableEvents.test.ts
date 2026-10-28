@@ -11,7 +11,7 @@ const open: RegistrableEvent = {
   event_id: 41, name: 'Harbour Lecture', organisation: 'Harbour Foundation', category: 'seminar',
   description: 'Talks and a panel.', proposed_date: '2030-07-20T02:00:00+00:00',
   registration_opens_at: '2026-10-01T00:00:00+00:00', registration_closes_at: '2030-07-19T02:00:00+00:00',
-  venues: [{ name: 'Regression Hall', location: 'Level 1' }], registered: false
+  venues: [{ name: 'Regression Hall', location: 'Level 1' }], registered: false, full: false, waiting: null
 };
 const upcoming: RegistrableEvent = {
   ...open, event_id: 42, name: 'Bayfront Talk', registration_opens_at: '2030-06-01T00:00:00+00:00', venues: []
@@ -27,7 +27,9 @@ function fixture(role: Role = 'attendee', overrides: Partial<RegistrableEventsSt
     return {
       list: overrides.list ?? (async () => { lists++; return [upcoming, open]; }),
       get: overrides.get ?? (async (eventId) => { asked.push(eventId); return eventId === 41 ? open : null; }),
-      register: async () => assert.fail('SG2-59 reads never register')
+      register: async () => assert.fail('SG2-59 reads never register'),
+      joinWaitingList: async () => assert.fail('SG2-59 reads never join a waiting list'),
+      leaveWaitingList: async () => assert.fail('SG2-59 reads never leave a waiting list')
     };
   };
   const router = createRegistrableEventsRouter(access, store);

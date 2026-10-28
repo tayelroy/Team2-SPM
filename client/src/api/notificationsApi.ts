@@ -11,7 +11,8 @@ export interface Notification {
     | 'registration_closed' | 'venue_booking_cancelled' | 'venue_change_requested'
     | 'cancellation_requested' | 'event_cancelled' | 'registration_confirmed' | 'change_requested'
     | 'registration_withdrawn'
-    | 'change_accepted' | 'change_refused';
+    | 'change_accepted' | 'change_refused'
+    | 'registration_full' | 'waiting_list_offer' | 'waiting_list_offer_lapsed';
   message: string;
   created_at: string;
 }
@@ -37,7 +38,9 @@ const KINDS: Record<Notification['kind'], true> = {
   // SG2-62 AC5: an attendee withdrew, giving a place back.
   registration_withdrawn: true,
   // SG2-65 AC1/AC2: the coordinator accepted or refused the organiser's change.
-  change_accepted: true, change_refused: true
+  change_accepted: true, change_refused: true,
+  // SG2-61 AC3: the event is full; SG2-62 AC6: a waiting-list place is offered, or the offer lapsed.
+  registration_full: true, waiting_list_offer: true, waiting_list_offer_lapsed: true
 };
 
 function isNotification(value: unknown): value is Notification {

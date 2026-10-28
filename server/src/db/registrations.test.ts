@@ -12,13 +12,15 @@ const OVERVIEW = {
   event: {
     event_id: 12, name: 'Partner Forum', status: 'confirmed', organisation: 'Acme', organiser_id: 'organiser-1',
     coordinator_id: 'coordinator-1', proposed_date: '2030-06-20T01:00:00+00:00', registration_needed: true,
-    registration_capacity: 120, registration_opens_at: '2030-06-01T01:00:00+00:00', registration_closes_at: '2030-06-10T01:00:00+00:00'
+    registration_capacity: 120, registration_opens_at: '2030-06-01T01:00:00+00:00', registration_closes_at: '2030-06-10T01:00:00+00:00',
+    waiting_list_response_hours: 24
   },
   attendees: [
     { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', email: 'ana@attendee.test', phone: '+65 6000 0001',
       needs: 'Step-free access', registered_at: '2030-06-02T01:00:00+00:00' },
     { registration_id: 4, name: 'Ben Attendee', organisation: null, email: null, phone: null, needs: null, registered_at: '2030-06-03T01:00:00+00:00' }
   ],
+  waiting_list: [],
   venues: [{ venue_id: 7, name: 'Main hall', capacity: 100 }, { venue_id: 8, name: 'Lawn', capacity: null }]
 };
 
@@ -39,8 +41,27 @@ describe('fetchRegistrationOverview (SG2-63)', () => {
     assert.deepEqual(result, { ok: true, overview: { event: {
       event_id: 13, name: null, status: 'planning', organisation: null, organiser_id: null, coordinator_id: null,
       proposed_date: null, registration_needed: null, registration_capacity: null, registration_opens_at: null,
-      registration_closes_at: null
-    }, attendees: [], venues: [] } });
+      registration_closes_at: null, waiting_list_response_hours: 24
+    }, attendees: [], waiting_list: [], venues: [] } });
+  });
+
+  test('[NORMAL] [SG2-61:AC7] [SG2-62:AC6] the waiting list is read in order, with each offer and its time', async () => {
+    const list = [
+      { entry_id: 5, name: 'Cara', organisation: null, status: 'offered', joined_at: 'a', offer_expires_at: 'b' },
+      { entry_id: 6, name: 'Dev', organisation: 'Guests Ltd', status: 'waiting', joined_at: 'c', offer_expires_at: null }
+    ];
+    const result = await fetchRegistrationOverview(rpcClient({ ...OVERVIEW, waiting_list: list,
+      event: { ...OVERVIEW.event, waiting_list_response_hours: 6 } }), 12);
+    assert.ok(result.ok);
+    assert.deepEqual([result.overview.waiting_list, result.overview.event.waiting_list_response_hours], [list, 6]);
+  });
+
+  test('[BOUNDARY] [SG2-61:AC7] a picture read before the waiting list existed has an empty list and the default window', async () => {
+    const { waiting_list: _list, ...older } = OVERVIEW;
+    const { waiting_list_response_hours: _hours, ...event } = OVERVIEW.event;
+    const result = await fetchRegistrationOverview(rpcClient({ ...older, event }), 12);
+    assert.ok(result.ok);
+    assert.deepEqual([result.overview.waiting_list, result.overview.event.waiting_list_response_hours], [[], 24]);
   });
 
   test('[FAILURE] [SG2-63:AC3] a missing event, a failed read and a malformed answer are told apart', async () => {

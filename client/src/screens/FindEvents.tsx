@@ -4,8 +4,11 @@ import { fetchProfile } from '../api/profile';
 import {
   fetchRegistrableEvent,
   fetchRegistrableEvents,
+  joinWaitingList,
+  leaveWaitingList,
   registerForEvent,
   type RegistrableEvent,
+  type WaitingStanding,
 } from '../api/registrableEvents';
 import { color } from '../theme';
 import { Badge, Card, Fact, Field, GhostButton, GradientButton, Notice, TextField } from '../ui';
@@ -74,31 +77,60 @@ function StateBadge({ event }: { event: RegistrableEvent }) {
   );
 }
 
+/** SG2-61: where the attendee stands on a waiting list, in their words. */
+export function waitingLabel(waiting: WaitingStanding): string {
+  return waiting.status === 'offered' ? 'Place held for you' : `Waiting list #${waiting.position}`;
+}
+
+/** SG2-61 AC1, AC5: full, or the attendee's place on its waiting list. */
+function PlacesBadge({ event }: { event: RegistrableEvent }) {
+  if (event.registered) return <Badge bg={color.teal} fg={color.abyss}>Registered</Badge>;
+  if (event.waiting) return <Badge bg={color.accent} fg={color.abyss}>{waitingLabel(event.waiting)}</Badge>;
+  if (event.full) return <Badge bg="rgba(112,119,119,0.35)" fg={color.silver}>Full</Badge>;
+  return null;
+}
+
 type Registering =
   | { kind: 'form'; problems: string[]; message: string | null }
   | { kind: 'sending' }
   /** The place is held: just now, or it already was (AC2). */
   | { kind: 'registered'; message: string }
-  /** Refused for good on this screen: full, closed, or no longer open (AC1, AC3). */
-  | { kind: 'refused'; message: string };
+  /** Refused for good on this screen: closed, or no longer open (AC3). */
+  | { kind: 'refused'; message: string }
+  /** SG2-61 AC1, AC5: every place is taken; the waiting list is offered. */
+  | { kind: 'full'; message: string }
+  /** SG2-61 AC5: on the waiting list at a position (1 is next). */
+  | { kind: 'waiting'; position: number; message: string | null };
 
 const REGISTERED = 'You are registered. Your place is held.';
+const FULL = 'This event is full. Join the waiting list and you will be told if a place opens.';
+
+function initialState(event: RegistrableEvent): Registering {
+  if (event.registered) return { kind: 'registered', message: 'You are already registered for this event.' };
+  if (event.waiting?.status === 'waiting') return { kind: 'waiting', position: event.waiting.position, message: null };
+  if (event.full && !event.waiting) return { kind: 'full', message: FULL };
+  return { kind: 'form', problems: [], message: null };
+}
 
 /**
  * SG2-60: register for an open event with a contact phone (filled in from the
  * profile) and any accessibility or dietary needs (AC4). Confirms the place
  * with the event's date, time and venue (AC1); an event already registered
  * for shows that instead of the form (AC2); one not yet open says when it
- * opens (AC3).
+ * opens (AC3). SG2-61: a full event offers its waiting list instead (AC1,
+ * AC5), shows the attendee's position and lets them leave (AC6); a place
+ * offered from the list (SG2-62 AC6) shows the form with how long it is held.
  */
 function RegisterSection({ event, accessToken }: { event: RegistrableEvent; accessToken: string }) {
   const [phone, setPhone] = useState('');
   const [needs, setNeeds] = useState('');
-  const [state, setState] = useState<Registering>(
-    event.registered ? { kind: 'registered', message: 'You are already registered for this event.' } : { kind: 'form', problems: [], message: null });
+  const [state, setState] = useState<Registering>(() => initialState(event));
+  const [offer, setOffer] = useState(event.waiting?.status === 'offered' ? event.waiting : null);
+  /** A join or leave is in flight (SG2-61). */
+  const [busy, setBusy] = useState(false);
   const sending = useRef(false);
   const opening = registrationState(event, Date.now());
-  const showForm = opening.open && !event.registered;
+  const showForm = opening.open && state.kind === 'form';
 
   useEffect(() => {
     if (!showForm) return;
@@ -123,10 +155,54 @@ function RegisterSection({ event, accessToken }: { event: RegistrableEvent; acce
     sending.current = false;
     if (result.ok) setState({ kind: 'registered', message: REGISTERED });
     else if (result.kind === 'duplicate') setState({ kind: 'registered', message: result.message });
-    else if (result.kind === 'full' || result.kind === 'closed' || result.kind === 'not_open') setState({ kind: 'refused', message: result.message });
+    else if (result.kind === 'full') setState({ kind: 'full', message: FULL });
+    else if (result.kind === 'closed' || result.kind === 'not_open') setState({ kind: 'refused', message: result.message });
     else if (result.kind === 'not_found') setState({ kind: 'refused', message: 'This event is no longer open for registration.' });
     else if (result.kind === 'invalid') setState({ kind: 'form', problems: result.errors, message: result.message });
     else setState({ kind: 'form', problems: [], message: result.kind === 'unauthorized' ? UNAUTHORIZED : 'Registration could not be completed. Please try again.' });
+  }
+
+  /** Where the attendee now stands on the list. */
+  function standOn(waiting: WaitingStanding) {
+    if (waiting.status === 'waiting') {
+      setState({ kind: 'waiting', position: waiting.position, message: null });
+    } else {
+      setOffer(waiting);
+      setState({ kind: 'form', problems: [], message: null });
+    }
+  }
+
+  async function join() {
+    if (sending.current) return;
+    sending.current = true;
+    setBusy(true);
+    const result = await joinWaitingList(event.eventId, accessToken);
+    sending.current = false;
+    setBusy(false);
+    if (result.ok) standOn(result.waiting);
+    else if (result.kind === 'already' && result.waiting) standOn(result.waiting);
+    else if (result.kind === 'registered') setState({ kind: 'registered', message: result.message });
+    else if (result.kind === 'not_full') setState({ kind: 'form', problems: [], message: 'A place is free again. Register now to take it.' });
+    else if (result.kind === 'not_open' || result.kind === 'closed') setState({ kind: 'refused', message: result.message });
+    else if (result.kind === 'not_found') setState({ kind: 'refused', message: 'This event is no longer open for registration.' });
+    else setState({ kind: 'full', message: result.kind === 'unauthorized' ? UNAUTHORIZED : 'The waiting list could not be joined. Please try again.' });
+  }
+
+  async function leave() {
+    if (sending.current) return;
+    sending.current = true;
+    setBusy(true);
+    const result = await leaveWaitingList(event.eventId, accessToken);
+    sending.current = false;
+    setBusy(false);
+    // Not on the list (404) is where leaving would have left them anyway.
+    if (result.ok || result.kind === 'not_found') {
+      setOffer(null);
+      setState({ kind: 'full', message: 'You have left the waiting list.' });
+    } else {
+      const message = result.kind === 'unauthorized' ? UNAUTHORIZED : 'You could not be taken off the waiting list. Please try again.';
+      setState((current) => (current.kind === 'waiting' ? { ...current, message } : { kind: 'form', problems: [], message }));
+    }
   }
 
   const heading = <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 500 }}>Registration</h3>;
@@ -142,6 +218,32 @@ function RegisterSection({ event, accessToken }: { event: RegistrableEvent; acce
           </div>
           <p style={{ margin: 0, color: color.silver }}>A confirmation is in your notifications.</p>
         </Notice>
+      </section>
+    );
+  }
+  if (state.kind === 'full') {
+    return (
+      <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {heading}
+        <Notice><p role="alert" style={{ margin: 0 }}>{state.message}</p></Notice>
+        <div><GradientButton onClick={() => void join()} disabled={busy}>{busy ? 'Joining…' : 'Join the waiting list'}</GradientButton></div>
+      </section>
+    );
+  }
+  if (state.kind === 'waiting') {
+    return (
+      <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {heading}
+        <Notice role="status">
+          <p style={{ margin: 0, fontSize: '16px', color: color.mist }}>
+            You are number {state.position} on the waiting list.
+          </p>
+          <p style={{ margin: 0, color: color.silver }}>
+            The list is first come, first served. If a place opens for you, it is held for a while and you are told in your notifications.
+          </p>
+        </Notice>
+        {state.message ? <p role="alert" style={{ margin: 0, color: color.mist }}>{state.message}</p> : null}
+        <div><GhostButton onClick={() => void leave()} disabled={busy}>Leave the waiting list</GhostButton></div>
       </section>
     );
   }
@@ -167,6 +269,14 @@ function RegisterSection({ event, accessToken }: { event: RegistrableEvent; acce
   return (
     <section aria-label="Registration" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {heading}
+      {offer ? (
+        <Notice role="status">
+          <p style={{ margin: 0, fontSize: '16px', color: color.mist }}>
+            A place has opened for you from the waiting list. It is held until {formatSgt(offer.offerExpiresAt)}.
+          </p>
+          <p style={{ margin: 0, color: color.silver }}>Register before then to take it, or leave the list to pass it on.</p>
+        </Notice>
+      ) : null}
       <p style={{ margin: 0, color: color.silver }}>Your name and email come from your account.</p>
       <Field label="Contact phone" type="tel" value={phone} onChange={setPhone}
         hint="Required. A Singapore number with 8 digits, optionally starting with +65." />
@@ -182,10 +292,11 @@ function RegisterSection({ event, accessToken }: { event: RegistrableEvent; acce
           ) : null}
         </div>
       ) : null}
-      <div>
-        <GradientButton onClick={() => void submit()} disabled={state.kind === 'sending'}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+        <GradientButton onClick={() => void submit()} disabled={state.kind === 'sending' || busy}>
           {state.kind === 'sending' ? 'Registering…' : 'Register'}
         </GradientButton>
+        {offer ? <GhostButton onClick={() => void leave()} disabled={state.kind === 'sending' || busy}>Leave the waiting list</GhostButton> : null}
       </div>
     </section>
   );
@@ -225,6 +336,7 @@ function EventDetails({ eventId, accessToken, onBack }: { eventId: number; acces
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
           <h2 id="find-events-detail-title" style={{ margin: 0, fontSize: '32px', fontWeight: 500, overflowWrap: 'anywhere' }}>{title}</h2>
           <StateBadge event={event} />
+          <PlacesBadge event={event} />
         </div>
         <p style={{ margin: 0, fontSize: '16px', lineHeight: 1.5, color: color.silver, overflowWrap: 'anywhere' }}>
           {event.description?.trim() || 'No description yet.'}
@@ -317,7 +429,7 @@ export default function FindEvents({ accessToken }: { accessToken: string }) {
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                     <h3 id={titleId} style={{ margin: 0, fontSize: '22px', fontWeight: 500, overflowWrap: 'anywhere' }}>{title}</h3>
                     <StateBadge event={event} />
-                    {event.registered ? <Badge bg={color.teal} fg={color.abyss}>Registered</Badge> : null}
+                    <PlacesBadge event={event} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '16px' }}>
                     <Fact label="Date and time" value={event.proposedDate ? formatSgt(event.proposedDate) : NOT_ANNOUNCED} />

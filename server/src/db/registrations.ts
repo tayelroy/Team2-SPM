@@ -14,6 +14,17 @@ export interface RegisteredAttendee {
   registered_at: string;
 }
 
+/** One attendee on the waiting list, in the order they joined (SG2-61 AC7). */
+export interface WaitingAttendee {
+  entry_id: number;
+  name: string;
+  organisation: string | null;
+  /** offered: a place is held for them until offer_expires_at (SG2-62 AC6). */
+  status: 'waiting' | 'offered';
+  joined_at: string;
+  offer_expires_at: string | null;
+}
+
 /** The event facts the registration picture and its access checks need. */
 export interface RegistrationEvent {
   event_id: number;
@@ -27,11 +38,14 @@ export interface RegistrationEvent {
   registration_capacity: number | null;
   registration_opens_at: string | null;
   registration_closes_at: string | null;
+  /** SG2-62 AC6: how long an offered place is held. */
+  waiting_list_response_hours: number;
 }
 
 export interface RegistrationOverview {
   event: RegistrationEvent;
   attendees: RegisteredAttendee[];
+  waiting_list: WaitingAttendee[];
   venues: BookedVenue[];
 }
 
@@ -58,7 +72,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value : null);
 const count = (value: unknown) => (typeof value === 'number' ? value : null);
 
 /**
- * Reads the event, its active registrations and its booked venues through
+ * Reads the event, its active registrations, its waiting list (SG2-61) and its booked venues through
  * `public.event_registration_overview` (service role). The caller decides who
  * may see it and which contact details to keep.
  */
@@ -88,7 +102,8 @@ export async function fetchRegistrationOverview(
         registration_needed: typeof event.registration_needed === 'boolean' ? event.registration_needed : null,
         registration_capacity: count(event.registration_capacity),
         registration_opens_at: text(event.registration_opens_at),
-        registration_closes_at: text(event.registration_closes_at)
+        registration_closes_at: text(event.registration_closes_at),
+        waiting_list_response_hours: count(event.waiting_list_response_hours) ?? 24
       },
       attendees: (data.attendees as Record<string, unknown>[]).map(row => ({
         registration_id: Number(row.registration_id),
@@ -98,6 +113,15 @@ export async function fetchRegistrationOverview(
         phone: text(row.phone),
         needs: text(row.needs),
         registered_at: String(row.registered_at)
+      })),
+      // Read before SG2-61's migration, there is no list yet.
+      waiting_list: (Array.isArray(data.waiting_list) ? data.waiting_list as Record<string, unknown>[] : []).map(row => ({
+        entry_id: Number(row.entry_id),
+        name: String(row.name),
+        organisation: text(row.organisation),
+        status: row.status === 'offered' ? 'offered' as const : 'waiting' as const,
+        joined_at: String(row.joined_at),
+        offer_expires_at: text(row.offer_expires_at)
       })),
       venues: (data.venues as Record<string, unknown>[]).map(row => ({
         venue_id: Number(row.venue_id),
