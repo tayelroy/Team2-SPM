@@ -18,6 +18,14 @@ async function openConcert(page: Page) {
 }
 const ledger = async (page: Page) => (await page.request.get('/__e2e/waiting-list-ledger')).json();
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+/** The same screen at phone and laptop width: still visible, and nothing scrolls sideways. */
+async function atBothWidths(page: Page, visible: () => ReturnType<Page['getByText']>) {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 900 : 1000 });
+    await expect(visible()).toBeVisible();
+    expect(await noOverflow(page), `overflow at ${width}px`).toBe(true);
+  }
+}
 
 test.beforeEach(async ({ request }) => {
   expect((await request.post('/__e2e/reset')).status()).toBe(204);
@@ -37,9 +45,9 @@ test('SG2-61-P01 | [NORMAL] [SG2-61:AC1] [SG2-61:AC4] [SG2-61:AC5] [SG2-61:AC7] 
   let registration = page.getByRole('region', { name: 'Registration', exact: true });
   await expect(registration.getByRole('alert')).toContainText('This event is full.');
   await expect(registration.getByRole('button', { name: 'Register', exact: true })).toHaveCount(0);
+  await atBothWidths(page, () => registration.getByRole('button', { name: 'Join the waiting list', exact: true }));
   await registration.getByRole('button', { name: 'Join the waiting list', exact: true }).click();
-  await expect(registration.getByText('You are number 1 on the waiting list.', { exact: true })).toBeVisible();
-  expect(await noOverflow(page)).toBe(true);
+  await atBothWidths(page, () => registration.getByText('You are number 1 on the waiting list.', { exact: true }));
   expect((await ledger(page)).entries).toEqual([expect.objectContaining({ attendee_id: 'user-attendee', status: 'waiting' })]);
 
   // AC7, AC4: the organiser sees the list and raises capacity above nothing in its way; the place is offered (SG2-62 AC6).
@@ -51,12 +59,12 @@ test('SG2-61-P01 | [NORMAL] [SG2-61:AC1] [SG2-61:AC4] [SG2-61:AC5] [SG2-61:AC7] 
   const waiting = panel.getByRole('list', { name: 'Waiting list', exact: true }).getByRole('listitem');
   await expect(waiting).toHaveCount(1);
   await expect(waiting.first()).toContainText('Regression attendee');
-  await expect(waiting.first()).toContainText('Waiting, number 1');
+  await atBothWidths(page, () => waiting.first().getByText('Waiting, number 1', { exact: true }));
   const form = panel.getByRole('form', { name: 'Registration settings', exact: true });
   await form.getByLabel('Capacity', { exact: true }).fill('2');
   await form.getByRole('button', { name: 'Save settings', exact: true }).click();
   await expect(form.getByRole('status')).toHaveText('Registration settings saved.');
-  await expect(waiting.first()).toContainText('Place offered, held until');
+  await atBothWidths(page, () => waiting.first().getByText(/^Place offered, held until/));
 
   // SG2-62 AC6: the attendee sees the place held for them and takes it; AC3: the event is now full again.
   await page.setViewportSize({ width: 390, height: 900 });
@@ -66,10 +74,11 @@ test('SG2-61-P01 | [NORMAL] [SG2-61:AC1] [SG2-61:AC4] [SG2-61:AC5] [SG2-61:AC7] 
   await card.getByRole('button', { name: 'View details', exact: true }).click();
   registration = page.getByRole('region', { name: 'Registration', exact: true });
   await expect(registration.getByRole('status')).toContainText('A place has opened for you from the waiting list. It is held until');
+  await atBothWidths(page, () => registration.getByRole('button', { name: 'Register', exact: true }));
+  await page.setViewportSize({ width: 390, height: 900 });
   await expect(registration.getByLabel('Contact phone')).not.toHaveValue('');
   await registration.getByRole('button', { name: 'Register', exact: true }).click();
-  await expect(registration.getByText('You are registered. Your place is held.', { exact: true })).toBeVisible();
-  expect(await noOverflow(page)).toBe(true);
+  await atBothWidths(page, () => registration.getByText('You are registered. Your place is held.', { exact: true }));
 
   const stored = await ledger(page);
   expect(stored.entries).toEqual([expect.objectContaining({ attendee_id: 'user-attendee', status: 'registered' })]);
@@ -96,12 +105,12 @@ test('SG2-61-N01 | [CONFLICT] [SG2-61:AC6] an attendee cannot join the waiting l
 
   // Leaving from the event's details; afterwards the list can be joined again.
   const card = await openConcert(page);
-  await expect(card.getByText('Waiting list #1', { exact: true })).toBeVisible();
+  await atBothWidths(page, () => card.getByText('Waiting list #1', { exact: true }));
   await card.getByRole('button', { name: 'View details', exact: true }).click();
   const registration = page.getByRole('region', { name: 'Registration', exact: true });
   await registration.getByRole('button', { name: 'Leave the waiting list', exact: true }).click();
   await expect(registration.getByRole('alert')).toHaveText('You have left the waiting list.');
-  await expect(registration.getByRole('button', { name: 'Join the waiting list', exact: true })).toBeVisible();
+  await atBothWidths(page, () => registration.getByRole('button', { name: 'Join the waiting list', exact: true }));
   expect((await ledger(page)).entries).toEqual([expect.objectContaining({ status: 'left', ended_at: expect.any(String) })]);
   expect((await page.request.delete('/api/registrable-events/611/waiting-list', { headers })).status()).toBe(404);
 });

@@ -7,6 +7,7 @@ do $readiness$
 declare
   failures text[];
   reminder_job_ready boolean;
+  waiting_list_job_ready boolean;
 begin
   with required_columns(relation, columns) as (values
     ('events', 'event_id,organiser_id,coordinator_id,organisation,status,name,purpose,description,proposed_date,expected_attendance,venue_requirements,accessibility_needs,equipment_requirements,registration_needed,preferred_layout,category,registration_capacity,registration_opens_at,registration_closes_at,registration_announced,waiting_list_response_hours,planning_notes,arrangements_recheck_needed,outstanding_arrangements,decided_at,decision_reason,completed_by,completed_at,submitted_at,confirmed_by,confirmed_at'),
@@ -309,6 +310,13 @@ begin
       into reminder_job_ready;
     if not coalesce(reminder_job_ready,false) then
       raise exception 'Release schema readiness failed: SG2-69 hourly reminder cron job missing or inactive';
+    end if;
+    -- SG2-61 / SG2-62 AC6: lapsed waiting-list offers pass to the next attendee every minute.
+    execute $cron$ select exists(select 1 from cron.job where jobname='waiting-list-offers'
+      and schedule='* * * * *' and active and command='select public.process_waiting_list_offers();') $cron$
+      into waiting_list_job_ready;
+    if not coalesce(waiting_list_job_ready,false) then
+      raise exception 'Release schema readiness failed: SG2-61 waiting-list offer cron job missing or inactive';
     end if;
   end if;
 

@@ -15,7 +15,9 @@ export interface NotificationRecord {
   request_id: number | null;
   kind: 'venue_request_approved' | 'venue_request_rejected' | 'venue_booking_released' | 'equipment_reserved' | 'venue_booking_clash'
     | 'venue_unavailable' | 'event_confirmed' | 'outstanding_arrangements' | 'venue_booking_cancelled' | 'venue_change_requested'
-    | 'event_changed' | EventNoticeKind;
+    | 'event_changed' | EventNoticeKind
+    // SG2-61 AC3: the event is full; SG2-62 AC6: a waiting-list place is offered, or the offer lapsed.
+    | 'registration_full' | 'waiting_list_offer' | 'waiting_list_offer_lapsed';
   message: string;
   created_at: string;
 }
