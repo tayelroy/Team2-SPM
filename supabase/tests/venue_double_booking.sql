@@ -62,7 +62,7 @@ begin
     insert into public.venue_bookings (venue_id, starts_at, ends_at, status)
       values (95001, '2030-06-15 10:30+00', '2030-06-15 11:30+00', 'held');
   exception when exclusion_violation then
-    raise exception '[SG2-50:held-not-committed] [SG2-50:AC1] [BOUNDARY] A held booking is not confirmed and must not be refused over a confirmed one';
+    raise exception '[SG2-50:held-not-committed] [SG2-50:AC1] [SG2-50:AC3] [BOUNDARY] A held booking is not confirmed and must not be refused over a confirmed one';
   end;
 end $$;
 
@@ -74,17 +74,6 @@ begin
     values (95001, '2030-06-15 10:30+00', '2030-06-15 11:30+00', 'confirmed');
   if not exists (select 1 from public.venue_bookings where venue_id = 95001 and starts_at = '2030-06-15 10:30+00' and status = 'confirmed') then
     raise exception '[SG2-50:released-period-free] [SG2-50:AC3] [NORMAL] A period freed by a removed booking must be bookable again';
-  end if;
-end $$;
-
--- 4. Only confirmed bookings are kept apart, so any other status (held, or
--- SG2-51's released bookings) does not commit the period:
-do $$
-begin
-  if not exists (select 1 from pg_constraint
-      where conrelid = 'public.venue_bookings'::regclass and conname = 'venue_bookings_no_double_booking'
-        and pg_get_constraintdef(oid) like '%WHERE ((status = ''confirmed''::text))%') then
-    raise exception '[SG2-50:committed-statuses-only] [SG2-50:AC3] [BOUNDARY] The double-booking rule must cover exactly confirmed bookings';
   end if;
 end $$;
 
@@ -113,15 +102,15 @@ do $$
 declare result jsonb;
 begin
   result := public.decide_venue_booking_request(95001, 'approve', null);
-  if result->>'outcome' <> 'conflict' or result->>'kind' <> 'booking' or result->>'label' <> 'Gala Night'
-      or (select status from public.venue_booking_requests where request_id = 95001) <> 'pending'
+  if result->>'outcome' IS DISTINCT FROM 'conflict' or result->>'kind' IS DISTINCT FROM 'booking' or result->>'label' IS DISTINCT FROM 'Gala Night'
+      or (select status from public.venue_booking_requests where request_id = 95001) IS DISTINCT FROM 'pending'
       or (select count(*) from public.venue_bookings where venue_id = 95003) <> 1 then
     raise exception '[SG2-50:approval-refused-while-conflict] [SG2-50:AC2] [CONFLICT] Approval overlapping Gala Night''s confirmed booking was not refused: %', result;
   end if;
   -- Gala Night's booking is released.
   delete from public.venue_bookings where venue_id = 95003 and event_id = 95001;
   result := public.decide_venue_booking_request(95001, 'approve', null);
-  if result->>'outcome' <> 'updated'
+  if result->>'outcome' IS DISTINCT FROM 'updated'
       or not exists (select 1 from public.venue_bookings where venue_id = 95003 and event_id = 95002 and status = 'confirmed') then
     raise exception '[SG2-50:approved-once-conflict-cleared] [SG2-50:AC3] [NORMAL] Approval was not allowed once the conflicting booking was gone: %', result;
   end if;

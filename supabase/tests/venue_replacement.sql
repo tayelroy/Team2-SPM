@@ -63,7 +63,7 @@ select set_config('request.jwt.claim.sub', 'f8100000-0000-4000-8000-000000000002
 select set_config('request.jwt.claims', '{"sub":"f8100000-0000-4000-8000-000000000002","role":"authenticated"}', true);
 do $$
 begin
-  if public.confirm_event(98101)->>'outcome' <> 'ok' then
+  if public.confirm_event(98101)->>'outcome' IS DISTINCT FROM 'ok' then
     raise exception '[SG2-81:baseline-confirmable] [SG2-81:AC2] [NORMAL] The summit must be confirmable before its venue is unavailable';
   end if;
 end $$;
@@ -138,16 +138,16 @@ end $$;
 -- being approved, keeps its status.
 do $$
 begin
-  if (select status::text from public.events where event_id = 98101) <> 'planning'
-    or (select status::text from public.events where event_id = 98105) <> 'planning' then
+  if (select status::text from public.events where event_id = 98101) IS DISTINCT FROM 'planning'
+    or (select status::text from public.events where event_id = 98105) IS DISTINCT FROM 'planning' then
     raise exception '[SG2-81:preparation-and-confirmed-revert] [SG2-81:AC6] [NORMAL] A Preparation and a Confirmed event with an affected booking must move back to Planning';
   end if;
   if (select confirmed_by from public.events where event_id = 98105) is not null
     or (select confirmed_at from public.events where event_id = 98105) is not null then
     raise exception '[SG2-81:confirmation-cleared] [SG2-81:AC6] [NORMAL] A reverted event is no longer confirmed, so its confirmation stamp must be cleared';
   end if;
-  if (select status::text from public.events where event_id = 98102) <> 'preparation'
-    or (select status::text from public.events where event_id = 98103) <> 'approved' then
+  if (select status::text from public.events where event_id = 98102) IS DISTINCT FROM 'preparation'
+    or (select status::text from public.events where event_id = 98103) IS DISTINCT FROM 'approved' then
     raise exception '[SG2-81:unaffected-or-early-events-keep-status] [SG2-81:AC6] [BOUNDARY] An unaffected Preparation event and an Approved affected one must keep their status';
   end if;
   if (select array_agg(old_value order by event_id) from public.event_audit_logs
@@ -199,7 +199,7 @@ do $$
 declare
   result jsonb := public.confirm_event(98101);
 begin
-  if result->>'outcome' <> 'outstanding' or result->'outstanding' <> '["venue"]'::jsonb then
+  if result->>'outcome' IS DISTINCT FROM 'outstanding' or result->'outstanding' IS DISTINCT FROM '["venue"]'::jsonb then
     raise exception '[SG2-81:affected-booking-outstanding] [SG2-81:AC2] [NORMAL] An affected booking must leave the venue arrangement outstanding: %', result;
   end if;
 end $$;
@@ -269,7 +269,7 @@ do $$
 declare
   result jsonb := public.decide_venue_booking_request(98104, 'reject', 'Not available');
 begin
-  if result->>'outcome' <> 'updated' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' then
     raise exception '[SG2-81:reject-replacement] [SG2-81:AC5] [CONFLICT] A replacement request must be rejectable: %', result;
   end if;
   if not exists (select 1 from public.venue_bookings where booking_id = 98101 and status = 'confirmed')
@@ -283,7 +283,7 @@ do $$
 declare
   result jsonb := public.decide_venue_booking_request(98103, 'approve', null);
 begin
-  if result->>'outcome' <> 'updated' or result->>'status' <> 'approved' then
+  if result->>'outcome' IS DISTINCT FROM 'updated' or result->>'status' IS DISTINCT FROM 'approved' then
     raise exception '[SG2-81:approve-replacement] [SG2-81:AC5] [NORMAL] An event back in Planning must be able to have a replacement approved: %', result;
   end if;
 end $$;
@@ -341,7 +341,7 @@ select set_config('request.jwt.claim.sub', 'f8100000-0000-4000-8000-000000000002
 select set_config('request.jwt.claims', '{"sub":"f8100000-0000-4000-8000-000000000002","role":"authenticated"}', true);
 do $$
 begin
-  if public.confirm_event(98101)->>'outcome' <> 'ok' then
+  if public.confirm_event(98101)->>'outcome' IS DISTINCT FROM 'ok' then
     raise exception '[SG2-81:no-longer-outstanding] [SG2-81:AC5] [NORMAL] Once the replacement is approved the event must no longer show alternative arrangements as required';
   end if;
 end $$;
@@ -380,7 +380,7 @@ begin
     raise exception '[SG2-81:foreign-booking-not-released] [SG2-81:AC4] [FAILURE] A replacement naming another event''s booking must not release it';
   end if;
   result := public.decide_venue_booking_request(98106, 'approve', null);
-  if result->>'outcome' <> 'closed' then
+  if result->>'outcome' IS DISTINCT FROM 'closed' then
     raise exception '[SG2-81:ordinary-request-closed-in-preparation] [SG2-81:AC4] [FAILURE] Only a replacement may be approved for an event in preparation: %', result;
   end if;
 end $$;

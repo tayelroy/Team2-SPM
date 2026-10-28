@@ -61,8 +61,8 @@ declare
 begin
   result := public.decide_event_change_request(96501, request_id, 'e6500000-0000-4000-8000-000000000001',
     'refused', '  No larger room is free.  ', null);
-  if result ->> 'outcome' <> 'ok'
-      or (select expected_attendance from public.events where event_id = 96501) <> 120
+  if result ->> 'outcome' IS DISTINCT FROM 'ok'
+      or (select expected_attendance from public.events where event_id = 96501) IS DISTINCT FROM 120
       or not exists (select 1 from public.event_change_requests where change_request_id = request_id
         and status = 'refused' and decided_by = 'e6500000-0000-4000-8000-000000000001'
         and decided_at is not null and decision_reason = 'No larger room is free.')
@@ -94,7 +94,7 @@ begin
   -- 1000-character refusal would come back not_pending.
   at_limit := public.decide_event_change_request(96501, request_id, 'e6500000-0000-4000-8000-000000000001',
     'refused', repeat('r', 1000), null);
-  if blank ->> 'outcome' <> 'invalid' or too_long ->> 'outcome' <> 'invalid' or at_limit ->> 'outcome' <> 'ok'
+  if blank ->> 'outcome' IS DISTINCT FROM 'invalid' or too_long ->> 'outcome' IS DISTINCT FROM 'invalid' or at_limit ->> 'outcome' IS DISTINCT FROM 'ok'
       or (select char_length(decision_reason) from public.event_change_requests
         where change_request_id = request_id) is distinct from 1000 then
     raise exception '[SG2-65:refusal-reason-boundary] [SG2-65:AC2] [BOUNDARY] A blank or 1001-character reason must be invalid and a 1000-character one recorded, got %, % and %', blank, too_long, at_limit;
@@ -113,8 +113,8 @@ begin
     'change request ' || request_id, '{"description": "New agenda"}'::jsonb, '[]'::jsonb);
   result := public.decide_event_change_request(96501, request_id, 'e6500000-0000-4000-8000-000000000001',
     'accepted', null, null);
-  if result ->> 'outcome' <> 'ok' or result ->> 'status' <> 'planning'
-      or (select description from public.events where event_id = 96501) <> 'New agenda'
+  if result ->> 'outcome' IS DISTINCT FROM 'ok' or result ->> 'status' IS DISTINCT FROM 'planning'
+      or (select description from public.events where event_id = 96501) IS DISTINCT FROM 'New agenda'
       or not exists (select 1 from public.event_change_requests where change_request_id = request_id
         and status = 'accepted' and decided_by = 'e6500000-0000-4000-8000-000000000001'
         and decided_at is not null and decision_reason is null)
@@ -150,8 +150,8 @@ begin
       '["venue_recheck"]'::jsonb);
     result := public.decide_event_change_request(probe.event_id, request_id, 'e6500000-0000-4000-8000-000000000001',
       'accepted', null, null);
-    if applied ->> 'status' <> 'planning' or (applied ->> 'returned_to_planning')::boolean is not true
-        or result ->> 'outcome' <> 'ok' or result ->> 'status' <> 'planning'
+    if applied ->> 'status' IS DISTINCT FROM 'planning' or (applied ->> 'returned_to_planning')::boolean is not true
+        or result ->> 'outcome' IS DISTINCT FROM 'ok' or result ->> 'status' IS DISTINCT FROM 'planning'
         or (select (status::text, expected_attendance) from public.events where event_id = probe.event_id)
           is distinct from ('planning'::text, 150)
         or not exists (select 1 from public.event_change_requests where change_request_id = request_id
@@ -177,7 +177,7 @@ begin
     'e6500000-0000-4000-8000-000000000001', 'accepted', null, 'review');
   resubmit := public.decide_event_change_request(96503, (select id from ids where n = 5),
     'e6500000-0000-4000-8000-000000000001', 'accepted', null, 'resubmit');
-  if review ->> 'outcome' <> 'ok' or review ->> 'status' <> 'under_review'
+  if review ->> 'outcome' IS DISTINCT FROM 'ok' or review ->> 'status' IS DISTINCT FROM 'under_review'
       or (select (expected_attendance, status::text) from public.events where event_id = 96502)
         is distinct from (90, 'under_review'::text)
       or not exists (select 1 from public.event_audit_logs where event_id = 96502
@@ -188,7 +188,7 @@ begin
         and message = 'Clarify Review: your change request was accepted and the request is back in review.') then
     raise exception '[SG2-65:clarification-back-to-review] [SG2-65:AC4] [NORMAL] Accepting with review must apply the change and return the request to under_review, got %', review;
   end if;
-  if resubmit ->> 'outcome' <> 'ok' or resubmit ->> 'status' <> 'needs_clarification'
+  if resubmit ->> 'outcome' IS DISTINCT FROM 'ok' or resubmit ->> 'status' IS DISTINCT FROM 'needs_clarification'
       or (select (name::text, status::text) from public.events where event_id = 96503)
         is distinct from ('Clarified name'::text, 'needs_clarification'::text)
       or not exists (select 1 from public.event_change_requests where event_id = 96503
@@ -225,13 +225,13 @@ begin
       v(event_id, request_id, actor, decision, reason, next_step, expected) loop
     result := public.decide_event_change_request(probe.event_id, probe.request_id, probe.actor,
       probe.decision, probe.reason, probe.next_step);
-    if result ->> 'outcome' <> probe.expected then
+    if result ->> 'outcome' IS DISTINCT FROM probe.expected then
       wrong := wrong || format('%s %s by %s with next %s must be %s, got %s',
         probe.decision, probe.request_id, probe.actor, probe.next_step, probe.expected, result);
     end if;
   end loop;
-  if (select status from public.event_change_requests where change_request_id = pending_id) <> 'pending'
-      or (select name from public.events where event_id = 96502) <> 'Clarify Review' then
+  if (select status from public.event_change_requests where change_request_id = pending_id) IS DISTINCT FROM 'pending'
+      or (select name from public.events where event_id = 96502) IS DISTINCT FROM 'Clarify Review' then
     wrong := wrong || 'a turned-away decision changed the request or the event'::text;
   end if;
   if cardinality(wrong) > 0 then
@@ -247,7 +247,7 @@ begin
     'refused', 'Too late.', null);
   accepted := public.decide_event_change_request(96502, pending_id, 'e6500000-0000-4000-8000-000000000001',
     'accepted', null, null);
-  if result ->> 'outcome' <> 'not_pending' or accepted ->> 'outcome' <> 'ok' then
+  if result ->> 'outcome' IS DISTINCT FROM 'not_pending' or accepted ->> 'outcome' IS DISTINCT FROM 'ok' then
     raise exception '[SG2-65:no-refusal-after-apply] [SG2-65:AC1] [SG2-65:AC2] [CONFLICT] An applied change must not be refused but must still be recorded as accepted, got % and %', result, accepted;
   end if;
 end $$;

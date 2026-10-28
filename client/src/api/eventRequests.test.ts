@@ -837,7 +837,7 @@ describe('listMyDraftRequests', () => {
     expect(init.headers.Authorization).toBe('Bearer token-1');
   });
 
-  test('[CONFLICT] [SG2-36:AC2] keeps drafts and returned requests but drops ones already with staff', async () => {
+  test('[BOUNDARY] [SG2-36:draft-list-visibility] keeps drafts and returned requests but drops ones already with staff', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
       requests: [
         { event_id: 1, status: 'draft' },

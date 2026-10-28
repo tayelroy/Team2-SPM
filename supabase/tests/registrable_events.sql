@@ -88,11 +88,11 @@ begin
  end if;
 
  detail := (select e from jsonb_array_elements(listed) e where e->>'event_id' = '95901');
- if detail->>'name' <> 'Open forum' or (detail->>'proposed_date')::timestamptz is null
-   or detail->'venues' <> '[{"name":"Find Annex","location":"Level 2"},{"name":"Find Hall","location":"Level 1, Find Building"}]'::jsonb then
+ if detail->>'name' IS DISTINCT FROM 'Open forum' or (detail->>'proposed_date')::timestamptz is null
+   or detail->'venues' IS DISTINCT FROM '[{"name":"Find Annex","location":"Level 2"},{"name":"Find Hall","location":"Level 1, Find Building"}]'::jsonb then
   raise exception '[SG2-59:list-name-date-venue] [SG2-59:AC1] [NORMAL] Each listed event must carry its name, date and time and its confirmed venues only: %', detail;
  end if;
- if (select e->'venues' from jsonb_array_elements(listed) e where e->>'event_id' = '95902') <> '[]'::jsonb then
+ if (select e->'venues' from jsonb_array_elements(listed) e where e->>'event_id' = '95902') IS DISTINCT FROM '[]'::jsonb then
   raise exception '[SG2-59:no-venue-empty-list] [SG2-59:AC1] [BOUNDARY] An event with no confirmed booking must list no venue, not fail';
  end if;
  if (select (e->>'registration_opens_at')::timestamptz > now() from jsonb_array_elements(listed) e where e->>'event_id' = '95902') is not true then
@@ -109,10 +109,10 @@ begin
  if detail::text ~ '(Secret planning note|Internal purpose text|Big room|Ramp for the speaker|lapel|e5900000|confirmed"|"120"|: 120|: 100)' then
   raise exception '[SG2-59:detail-no-internal-values] [SG2-59:AC3] [FAILURE] No planning, requirement, people, status, attendance or capacity value may reach an attendee: %', detail;
  end if;
- if detail->>'description' <> 'Talks and a panel.' or detail->>'category' <> 'seminar' or detail->>'organisation' <> 'Find org' then
+ if detail->>'description' IS DISTINCT FROM 'Talks and a panel.' or detail->>'category' IS DISTINCT FROM 'seminar' or detail->>'organisation' IS DISTINCT FROM 'Find org' then
   raise exception '[SG2-59:detail-attendee-facts] [SG2-59:AC3] [NORMAL] The detail must describe the event to an attendee: %', detail;
  end if;
- if public.registrable_event(95902)->>'name' <> 'Upcoming forum' then
+ if public.registrable_event(95902)->>'name' IS DISTINCT FROM 'Upcoming forum' then
   raise exception '[SG2-59:detail-upcoming] [SG2-59:AC3] [NORMAL] An event opening later must open too';
  end if;
 end $$;

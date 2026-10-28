@@ -92,10 +92,10 @@ begin
   raise exception '[SG2-62:lists-mine-with-standing] [SG2-62:AC1] [NORMAL] Every registration the attendee made must be listed with where it stands, active upcoming ones first, soonest first: %', mine;
  end if;
  open := (select m from jsonb_array_elements(mine) m where m->>'event_id' = '96202');
- if open->'event'->>'name' <> 'Open forum' or open->'event'->>'organisation' <> 'Wd org'
-   or (open->'event'->>'proposed_date')::timestamptz <> '2030-07-20 11:00+00'
-   or open->'event'->'venues' <> '[{"name": "Wd Hall", "location": "Level 3"}]'::jsonb
-   or open->>'contact_phone' <> '91234567' or (open->>'registration_id')::integer <> 962002 then
+ if open->'event'->>'name' IS DISTINCT FROM 'Open forum' or open->'event'->>'organisation' IS DISTINCT FROM 'Wd org'
+   or (open->'event'->>'proposed_date')::timestamptz IS DISTINCT FROM '2030-07-20 11:00+00'
+   or open->'event'->'venues' IS DISTINCT FROM '[{"name": "Wd Hall", "location": "Level 3"}]'::jsonb
+   or open->>'contact_phone' IS DISTINCT FROM '91234567' or (open->>'registration_id')::integer IS DISTINCT FROM 962002 then
   raise exception '[SG2-62:event-details] [SG2-62:AC1] [NORMAL] Each registration must carry the event name, organiser, date, time, venue and what the attendee gave: %', open;
  end if;
  if (select m->'event'->>'category' || '|' || (m->'event'->>'description') || '|' || (m->>'needs')
@@ -112,7 +112,7 @@ begin
 
  -- Holding two roles, they say they act as an attendee (SG2-104).
  perform pg_temp.act('e6200000-0000-4000-8000-000000000005', 'attendee');
- if public.my_registrations() <> '[]'::jsonb then
+ if public.my_registrations() IS DISTINCT FROM '[]'::jsonb then
   raise exception '[SG2-62:none-yet] [SG2-62:AC1] [BOUNDARY] An attendee with no registrations gets an empty list';
  end if;
 end $$;
@@ -162,12 +162,12 @@ declare result jsonb;
 begin
  perform pg_temp.act('e6200000-0000-4000-8000-000000000003', null);
  result := public.withdraw_registration(962001);
- if result->>'outcome' <> 'ok' or (result->'registration'->>'registration_id')::integer <> 962001
-   or (result->'registration'->>'event_id')::integer <> 96201 or (result->'registration'->>'withdrawn_at') is null then
+ if result->>'outcome' IS DISTINCT FROM 'ok' or (result->'registration'->>'registration_id')::integer IS DISTINCT FROM 962001
+   or (result->'registration'->>'event_id')::integer IS DISTINCT FROM 96201 or (result->'registration'->>'withdrawn_at') is null then
   raise exception '[SG2-62:withdraws-after-close] [SG2-62:AC2] [NORMAL] An active registration must be withdrawable before the start even though registration has closed: %', result;
  end if;
  if (select m->>'standing' || '|' || (m->>'can_withdraw') || '|' || ((m->>'withdrawn_at') is not null)::text
-     from jsonb_array_elements(public.my_registrations()) m where m->>'event_id' = '96201') <> 'withdrawn|false|true' then
+     from jsonb_array_elements(public.my_registrations()) m where m->>'event_id' = '96201') IS DISTINCT FROM 'withdrawn|false|true' then
   raise exception '[SG2-62:shown-withdrawn] [SG2-62:AC1] [SG2-62:AC2] [NORMAL] Once withdrawn the list must say so, with when, and offer no withdrawal';
  end if;
  if pg_temp.try(962001) <> 'withdrawn' or pg_temp.try(962007) <> 'withdrawn' then
@@ -178,10 +178,10 @@ reset role;
 
 do $$
 begin
- if (select status || '|' || (withdrawn_at is not null)::text from public.registrations where registration_id = 962001) <> 'cancelled|true' then
+ if (select status || '|' || (withdrawn_at is not null)::text from public.registrations where registration_id = 962001) IS DISTINCT FROM 'cancelled|true' then
   raise exception '[SG2-62:stored-cancelled] [SG2-62:AC3] [NORMAL] A withdrawal must store the registration as cancelled with when it was withdrawn';
  end if;
- if (public.event_registration_overview(96201)->'attendees') <> '[]'::jsonb then
+ if (public.event_registration_overview(96201)->'attendees') IS DISTINCT FROM '[]'::jsonb then
   raise exception '[SG2-62:left-the-picture] [SG2-62:AC3] [NORMAL] The withdrawn attendee must leave the organiser''s registration picture';
  end if;
  begin
@@ -198,18 +198,18 @@ set local role authenticated;
 do $$
 begin
  perform pg_temp.act('e6200000-0000-4000-8000-000000000004', null);
- if public.register_for_event(96201, '98765432', null)->>'outcome' <> 'ok' then
+ if public.register_for_event(96201, '98765432', null)->>'outcome' IS DISTINCT FROM 'ok' then
   raise exception '[SG2-62:place-returned] [SG2-62:AC3] [NORMAL] The place a withdrawal frees must be available to register for';
  end if;
- if public.register_for_event(96201, '98765432', null)->>'outcome' <> 'duplicate' then
+ if public.register_for_event(96201, '98765432', null)->>'outcome' IS DISTINCT FROM 'duplicate' then
   raise exception '[SG2-62:capacity-counted] [SG2-62:AC3] [BOUNDARY] The new registration fills the place again';
  end if;
  -- The attendee who withdrew may come back when a place is free.
  perform pg_temp.act('e6200000-0000-4000-8000-000000000003', null);
- if public.register_for_event(96201, '91234567', null)->>'outcome' <> 'full' then
+ if public.register_for_event(96201, '91234567', null)->>'outcome' IS DISTINCT FROM 'full' then
   raise exception '[SG2-62:refilled-full] [SG2-62:AC3] [BOUNDARY] With the freed place taken the event is full again';
  end if;
- if public.register_for_event(96207, '91234567', null)->>'outcome' <> 'ok' then
+ if public.register_for_event(96207, '91234567', null)->>'outcome' IS DISTINCT FROM 'ok' then
   raise exception '[SG2-62:register-again] [SG2-62:AC3] [NORMAL] An attendee who withdrew can register again while registration is open';
  end if;
 end $$;
@@ -222,7 +222,7 @@ declare result jsonb;
 begin
  perform pg_temp.act('e6200000-0000-4000-8000-000000000003', null);
  result := public.withdraw_registration(962003);
- if result->>'outcome' <> 'started' or (result->>'proposed_date') is null then
+ if result->>'outcome' IS DISTINCT FROM 'started' or (result->>'proposed_date') is null then
   raise exception '[SG2-62:refused-after-start] [SG2-62:AC4] [FAILURE] After the start time the withdrawal must be refused as started, with the start time: %', result;
  end if;
  if pg_temp.try(962009) <> 'started' then
@@ -243,8 +243,7 @@ reset role;
 do $$
 begin
  if (select string_agg(registration_id::text || ':' || status, ',' order by registration_id) from public.registrations
-     where registration_id in (962003, 962004, 962005, 962008, 962009))
-   <> '962003:registered,962004:registered,962005:registered,962008:registered,962009:registered' then
+     where registration_id in (962003, 962004, 962005, 962008, 962009)) IS DISTINCT FROM '962003:registered,962004:registered,962005:registered,962008:registered,962009:registered' then
   raise exception '[SG2-62:refusals-change-nothing] [SG2-62:AC4] [FAILURE] A refused withdrawal must leave the registration as it was';
  end if;
 end $$;

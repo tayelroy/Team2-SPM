@@ -6,8 +6,8 @@ import { GhostButton, Notice } from '../ui';
 import { formatSgtTimestamp } from '../components/EventAuditDrawer';
 
 /** Minimal event summary resolved from a recipient-owned notice, never an arbitrary event id. */
-function NotificationEventSession({ accessToken, source, notificationId, onViewEvent }: {
-  accessToken: string; source: NotificationSource; notificationId: number; onViewEvent?: (eventId: number) => void;
+function NotificationEventSession({ accessToken, source, notificationId, onViewEvent, viewLabel = 'View event details' }: {
+  accessToken: string; source: NotificationSource; notificationId: number; onViewEvent?: (eventId: number) => void; viewLabel?: string;
 }) {
   const [event, setEvent] = useState<NotificationEventSummary | null>(null);
   const [error, setError] = useState('');
@@ -31,10 +31,11 @@ function NotificationEventSession({ accessToken, source, notificationId, onViewE
       <dt>Status</dt><dd style={{ margin: 0 }}>{statusLabel(event.status)}</dd>
       <dt>Event date</dt><dd style={{ margin: 0 }}>{event.proposed_date === null ? 'Date not set' : formatSgtTimestamp(event.proposed_date)}</dd>
     </dl>
-    {onViewEvent ? <GhostButton onClick={() => onViewEvent(event.event_id)}>View event details</GhostButton> : null}
+    {onViewEvent ? <GhostButton onClick={() => onViewEvent(event.event_id)}>{viewLabel}</GhostButton> : null}
   </section>;
 }
 
-export default function NotificationEvent(props: { accessToken: string; source: NotificationSource; notificationId: number; onViewEvent?: (eventId: number) => void }) {
+export default function NotificationEvent(props: { accessToken: string; source: NotificationSource; notificationId: number;
+  onViewEvent?: (eventId: number) => void; viewLabel?: string }) {
   return <NotificationEventSession key={`${props.accessToken}:${props.source}:${props.notificationId}`} {...props} />;
 }

@@ -3,60 +3,6 @@ import actingRoleControl from '../.github/scripts/acting-role-control.cjs';
 
 const { roleControlKind, getCurrentRole, getHeldRoles, selectActingRole } = actingRoleControl;
 
-// The main-branch control before the styled switcher: genuine browser SELECT
-// semantics, with a non-first selected option. The counter observes actual DOM
-// change events; no locator or adapter implementation is mocked.
-async function legacyHeader(page: Page) {
-  await page.setContent(`
-    <header>
-      <label>Acting as
-        <select aria-label="Acting as">
-          <option value="Event Organiser">Event Organiser</option>
-          <option value="Event Coordinator" selected>Event Coordinator</option>
-        </select>
-      </label>
-      <button type="button">Profile</button>
-      <output aria-label="Role changes">0</output>
-    </header>
-    <main><h1>Existing event screen</h1></main>
-    <script>
-      document.querySelector('select').addEventListener('change', () => {
-        const counter = document.querySelector('output');
-        counter.textContent = String(Number(counter.textContent) + 1);
-      });
-    </script>
-  `);
-}
-
-test('SG2-104-R01 | [NORMAL] [BOUNDARY] [SG2-104:AC1] the native staging selector reports only the selected role, includes every held role and does not reselect the current one', async ({ page }) => {
-  await legacyHeader(page);
-  const native = page.getByRole('combobox', { name: 'Acting as', exact: true });
-  const counter = page.getByLabel('Role changes', { exact: true });
-  expect(await roleControlKind(page)).toBe('native');
-  expect(await getCurrentRole(page)).toBe('Event Coordinator');
-  expect(await getHeldRoles(page)).toEqual(['Event Organiser', 'Event Coordinator']);
-  await page.getByRole('button', { name: 'Profile', exact: true }).focus();
-  expect(await selectActingRole(page, 'Event Coordinator')).toBe(false);
-  await expect(page.getByRole('button', { name: 'Profile', exact: true })).toBeFocused();
-  await expect(counter).toHaveText('0');
-  await expect(native).toHaveValue('Event Coordinator');
-  expect(await selectActingRole(page, 'Event Organiser')).toBe(true);
-  await expect(native).toHaveValue('Event Organiser');
-  expect(await getCurrentRole(page)).toBe('Event Organiser');
-  await expect(counter).toHaveText('1');
-  expect(await selectActingRole(page, 'Event Coordinator')).toBe(true);
-  expect(await getCurrentRole(page)).toBe('Event Coordinator');
-  await expect(counter).toHaveText('2');
-});
-
-test('SG2-104-R02 | [CONFLICT] [FAILURE] [SG2-104:AC2] the native staging adapter refuses an unheld role without dispatching a change or changing the selected role', async ({ page }) => {
-  await legacyHeader(page);
-  await expect(selectActingRole(page, 'Technical Support Staff')).rejects.toThrow('not listed by this account');
-  expect(await getCurrentRole(page)).toBe('Event Coordinator');
-  expect(await getHeldRoles(page)).toEqual(['Event Organiser', 'Event Coordinator']);
-  await expect(page.getByLabel('Role changes', { exact: true })).toHaveText('0');
-});
-
 test('SG2-104-R03 | [BOUNDARY] [FAILURE] [SG2-104:AC4] the single-role staging header stays readable and cannot be switched to another role', async ({ page }) => {
   await page.setContent('<header><span aria-label="Your role">Safety Officer</span><button>Profile</button></header><main><h1>Safety desk</h1></main>');
   expect(await roleControlKind(page)).toBe('single');

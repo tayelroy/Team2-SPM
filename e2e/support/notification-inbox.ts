@@ -56,7 +56,8 @@ export function createMemoryNotificationInbox(database: MemoryDatabase) {
         const selectedRole = role();
         const viewer = database.tables.users.find(row => row.user_id === user());
         if (selectedRole === 'attendee') {
-          if (!database.tables.registrations.some(row => row.event_id === event.event_id && row.user_id === user())) return null;
+          // As public.notification_event: the attendee holds a registration for it.
+          if (!database.tables.registrations.some(row => row.event_id === event.event_id && row.attendee_id === user())) return null;
         } else {
           const relationship = await hasEventRelationship(database.client, selectedRole, user(), {
             event_id: Number(event.event_id), organiser_id: String(event.organiser_id),

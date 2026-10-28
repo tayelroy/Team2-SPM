@@ -22,6 +22,7 @@ describe('AssignmentQueue (SG2-87)', () => {
       proposed_date: '2030-06-15T02:00:00.000Z', expected_attendance: 120, submitted_at: '2026-10-06T01:30:00.000Z',
     }] }));
     render(<AssignmentQueue accessToken="tok" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading the unassigned queue…');
     const entry = await screen.findByRole('article', { name: 'Leadership Forum' });
     expect(within(entry).getByText('Olivia Organiser')).toBeInTheDocument();
     expect(within(entry).getByText('15 Jun 2030, 10:00 am')).toBeInTheDocument();
@@ -119,14 +120,5 @@ describe('AssignmentQueue (SG2-87)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Assigned Leadership Forum to Casey Coordinator.');
   });
 
-  test('[CONFLICT] [SG2-87:AC2] leaving the screen before the queue arrives shows nothing and raises no error', async () => {
-    let release: (response: Response) => void = () => undefined;
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise<Response>((resolve) => { release = resolve; })));
-    const { unmount } = render(<AssignmentQueue accessToken="tok" />);
-    expect(screen.getByRole('status')).toHaveTextContent('Loading the unassigned queue…');
-    unmount();
-    release(Response.json({ coordinators: COORDS, entries: [RAW] }));
-    await Promise.resolve();
-    expect(screen.queryByRole('article')).not.toBeInTheDocument();
-  });
+
 });

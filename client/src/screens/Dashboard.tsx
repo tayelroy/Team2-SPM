@@ -305,7 +305,7 @@ export default function Dashboard(props: DashboardProps) {
 
 /** The Attendee's dashboard: still the clickable prototype, by design. */
 function AttendeeDashboard({ onNavigate }: Pick<DashboardProps, 'onNavigate'>) {
-  const cards = eventCards('Attendee').slice(0, 4);
+  const cards = eventCards().slice(0, 4);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>

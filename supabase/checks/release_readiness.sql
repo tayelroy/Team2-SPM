@@ -118,7 +118,9 @@ begin
     -- SG2-61: the waiting list, and SG2-62 AC6's offers from it.
     ('public.join_waiting_list(integer)'), ('public.leave_waiting_list(integer)'),
     ('public.process_waiting_list_offers()'), ('private.offer_waiting_places(integer)'),
-    ('private.places_held(integer,uuid)')
+    ('private.places_held(integer,uuid)'),
+    -- SG2-102: registered attendees are told when their event changes.
+    ('private.announce_event_attendee_details(integer)'), ('private.event_attendee_details_changed()')
   ), function_checks as (
     select 'RPC ' || signature as name, to_regprocedure(signature) is not null as passed
     from required_functions
@@ -250,7 +252,9 @@ begin
     -- SG2-64/SG2-65: a change is requested, accepted or refused.
     ('change_requested'), ('change_accepted'), ('change_refused'),
     -- SG2-61: the event is full; SG2-62 AC6: a waiting-list offer and its lapse.
-    ('registration_full'), ('waiting_list_offer'), ('waiting_list_offer_lapsed')
+    ('registration_full'), ('waiting_list_offer'), ('waiting_list_offer_lapsed'),
+    -- SG2-102: attendees hear their event's date, time or venue changed.
+    ('event_changed')
   ), notification_constraint as (
     select c.convalidated, pg_get_expr(c.conbin, c.conrelid) as expression,
       array(select literal[1] from regexp_matches(pg_get_expr(c.conbin, c.conrelid),

@@ -228,7 +228,7 @@ test('[BOUNDARY] [SG2-39:AC1] [SG2-57:AC2] turning registration back off restore
   expect(current.state).toMatchObject({ queueReads: 2, requirementReads: 1 });
 });
 
-test('[FAILURE] [SG2-39:AC4] [SG2-57:AC2] a failed planning save leaves readiness unchanged and keeps the registration choice', async () => {
+test('[FAILURE] [SG2-39:AC1] [SG2-57:AC2] a failed planning save leaves readiness unchanged and keeps the registration choice', async () => {
   const current = registrationFixture(true);
   await openRegistrationPlanning();
   fireEvent.click(screen.getByRole('button', { name: 'Save Planning Details' }));
@@ -268,7 +268,7 @@ async function openSupport() {
   return screen.getByRole('article', { name: 'Equipment request' });
 }
 function summaryFact(article: HTMLElement, name: string) {
-  return within(article.querySelector('.organisation-detail-facts')!).getByText(name, { selector: 'dt' }).nextElementSibling;
+  return within(article).getByText(name, { selector: 'dt' }).nextElementSibling;
 }
 
 test('[NORMAL] [CONFLICT] [SG2-53:AC2] [SG2-41:AC4] refreshing an amended equipment requirement updates the selected request summary by identity rather than the first event requirement', async () => {

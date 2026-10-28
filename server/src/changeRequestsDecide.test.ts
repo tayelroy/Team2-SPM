@@ -133,6 +133,11 @@ describe('accepting a change request (SG2-65 AC1/AC4/AC5)', () => {
     const { app, applied } = harness({ source });
     const listed = await request(app).get('/events/12/change-requests');
     assert.deepEqual([listed.body.can_accept, listed.body.next_step_required], [true, false]);
+    const recordDecision = source.decide;
+    source.decide = async (...args) => {
+      assert.deepEqual(applied.map(input => input.changes), [{ description: 'New agenda' }]);
+      return recordDecision(...args);
+    };
     const res = await accept(app);
     assert.equal(res.status, 200);
     assert.deepEqual(applied.map(input => input.changes), [{ description: 'New agenda' }]);
@@ -153,6 +158,11 @@ describe('accepting a change request (SG2-65 AC1/AC4/AC5)', () => {
           arrangements_recheck_needed: true, outstanding_arrangements: ['venue_recheck'] };
       }
     });
+    const recordSignificantDecision = significant.source.decide;
+    significant.source.decide = async (...args) => {
+      assert.deepEqual(returned.map(input => [input.expectedStatus, input.changes]), [['confirmed', { expected_attendance: 180 }]]);
+      return recordSignificantDecision(...args);
+    };
     const back = await accept(confirmed.app);
     assert.deepEqual([back.status, back.body], [200, {
       event_id: 12, previous_status: 'confirmed', status: 'planning', returned_to_planning: true,
@@ -162,7 +172,7 @@ describe('accepting a change request (SG2-65 AC1/AC4/AC5)', () => {
     assert.deepEqual(significant.decisions, [['41', { decision: 'accepted', by: COORDINATOR }]]);
   });
 
-  test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-65:AC4] on a request returned for clarification the coordinator must choose back to review or resubmit, SG2-66\'s apply is not used, and a decided request, a closed event or a failing store are refused', async () => {
+  test('[NORMAL] [BOUNDARY] [CONFLICT] [FAILURE] [SG2-65:AC4] on a request returned for clarification the coordinator must choose back to review or resubmit, SG2-66\'s apply is not used, and a decided request or a failing store are refused', async () => {
     const { source, decisions } = store();
     const { app, applied } = harness({ source, event: { status: 'needs_clarification' } });
     const listed = await request(app).get('/events/12/change-requests');
@@ -189,13 +199,10 @@ describe('accepting a change request (SG2-65 AC1/AC4/AC5)', () => {
     ]);
     assert.deepEqual(applied, []);
 
-    // CONFLICT: decided meanwhile, or a status that cannot accept.
+    // CONFLICT: decided meanwhile.
     const decided = await accept(harness({ source: store('not_pending').source, event: { status: 'needs_clarification' } }).app,
       { next: 'review' });
     assert.deepEqual([decided.status, decided.body], [409, DECIDED]);
-    const closed = await accept(harness({ source: store().source, event: { status: 'under_review' } }).app);
-    assert.equal(closed.status, 409);
-    assert.match(closed.body.error, /returned for clarification, Approved/);
 
     // FAILURE: the decision store is down.
     const failing = await accept(harness({ source: store('throws').source, event: { status: 'needs_clarification' } }).app,

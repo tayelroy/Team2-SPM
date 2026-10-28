@@ -349,7 +349,7 @@ reset role;
 alter table public.notifications drop constraint confirmation_test_notification_failure;
 do $$
 begin
- if (select status::text||'|'||coalesce(confirmed_at::text,'null') from public.events where event_id=95877) <> 'preparation|null'
+ if (select status::text||'|'||coalesce(confirmed_at::text,'null') from public.events where event_id=95877) IS DISTINCT FROM 'preparation|null'
    or exists(select 1 from public.event_audit_logs where event_id=95877) then
   raise exception '[SG2-58:notification-failure-no-partial-write] [SG2-58:AC1] [FAILURE] A failed notification must leave the event and history unchanged';
  end if;
@@ -437,7 +437,7 @@ begin
    -- (both audited), so only a confirmation row would be a side effect.
    or exists(select 1 from public.event_audit_logs where event_id=95892 and field_name='status' and new_value='confirmed')
    or exists(select 1 from public.notifications where event_id in (95890,95892) and kind='event_confirmed')
-   or (select status from public.events where event_id=95891) <> 'confirmed' then
+   or (select status from public.events where event_id=95891) IS DISTINCT FROM 'confirmed' then
   raise exception '[SG2-58:unbooked-venue-no-side-effects] [SG2-58:AC2] [FAILURE] Refusing an unbooked venue must not confirm, audit or notify';
  end if;
 end $$;

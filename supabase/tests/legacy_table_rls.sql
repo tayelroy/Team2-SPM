@@ -10,6 +10,8 @@ declare
   sequence_name text;
   definition record;
   writable boolean;
+  expected_rpc_oids oid[];
+  actual_rpc_oids oid[];
 begin
   foreach relation_name in array array['users', 'events', 'venues', 'roles', 'registrations', 'equipment_reservations'] loop
     if not exists (select 1 from pg_catalog.pg_class c
@@ -45,11 +47,22 @@ begin
       raise exception '[FAILURE] [SG2-25:legacy-sequence-acls] [SG2-25:AC2] Client sequence access must be limited to venue allocation: %', sequence_name;
     end if;
   end loop;
-  if (select count(*) from pg_catalog.pg_proc p
+  -- Compare the exact installed public overloads, not a count of matching names.
+  select array_agg(to_regprocedure(signature)::oid order by to_regprocedure(signature)::oid)
+    into expected_rpc_oids from unnest(array[
+      'public.change_venue_hold(bigint,text)',
+      'public.create_venue_hold(integer,integer,timestamptz,timestamptz,timestamptz)',
+      'public.decide_venue_booking_request(bigint,text,text)',
+      'public.is_clarification_participant(integer)',
+      'public.list_venue_hold_notifications()', 'public.list_venue_holds()',
+      'public.venue_hold_occupancy()', 'public.venue_hold_options()'
+    ]) signatures(signature);
+  select array_agg(p.oid order by p.oid) into actual_rpc_oids from pg_catalog.pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.proname in (
         'change_venue_hold', 'create_venue_hold', 'decide_venue_booking_request', 'is_clarification_participant',
-        'list_venue_hold_notifications', 'list_venue_holds', 'venue_hold_occupancy', 'venue_hold_options')) <> 8 then
-    raise exception '[NORMAL] [SG2-25:legacy-guarded-rpc-presence] [SG2-25:AC1] All eight existing guarded RPCs must remain present';
+        'list_venue_hold_notifications', 'list_venue_holds', 'venue_hold_occupancy', 'venue_hold_options');
+  if array_position(expected_rpc_oids, null) is not null or actual_rpc_oids is distinct from expected_rpc_oids then
+    raise exception '[NORMAL] [SG2-25:legacy-guarded-rpc-presence] [SG2-25:AC1] Exactly the eight expected public guarded RPC overloads must remain present';
   end if;
   for definition in select p.* from pg_catalog.pg_proc p
       where p.pronamespace = 'public'::regnamespace and p.proname in (

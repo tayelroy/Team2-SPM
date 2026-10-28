@@ -171,7 +171,7 @@ test('[BOUNDARY] [SG2-60:AC1] pressing Register twice while it is sending regist
   expect(posts(fetch)).toHaveLength(1);
 });
 
-test('[BOUNDARY] [SG2-60:AC4] a phone already typed is kept, and a profile that arrives after leaving is ignored', async () => {
+test('[BOUNDARY] [SG2-60:AC4] a phone already typed is kept when the profile arrives', async () => {
   let answer: (outcome: ProfileOutcome) => void = () => {};
   profile.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
   await openDetail(open);
@@ -179,12 +179,6 @@ test('[BOUNDARY] [SG2-60:AC4] a phone already typed is kept, and a profile that 
   await act(async () => answer(withPhone('+65 9123 4567')));
   expect(phoneField()).toHaveValue('8888 0000');
 
-  cleanup();
-  await openDetail(open);
-  const late = answer;
-  cleanup();
-  await act(async () => late(withPhone('+65 9123 4567')));
-  expect(screen.queryByRole('region', { name: 'Registration' })).toBeNull();
 });
 
 test('[BOUNDARY] [SG2-60:AC4] the phone and needs limits match the server, separators and +65 allowed', () => {

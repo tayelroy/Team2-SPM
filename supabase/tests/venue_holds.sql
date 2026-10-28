@@ -90,13 +90,13 @@ begin
  -- coordinator placement includes deadline.
  if (select count(*) from public.venue_hold_notifications where hold_id = current_setting('holds.primary')::bigint and kind = 'placed'
    and recipient_id = 'd8400000-0000-4000-8000-000000000002' and message like '%expiry %') <> 1 then raise exception '[SG2-84:placement-notification-missing] [NORMAL] [SG2-84:AC6] placement notification missing'; end if;
- if (select status from public.events where event_id = 98401) <> 'planning' or (select venue_booking_id from public.events where event_id = 98401) is not null then raise exception '[SG2-84:hold-changed-event-stage] [FAILURE] [SG2-84:AC4] hold changed event stage'; end if;
+ if (select status from public.events where event_id = 98401) IS DISTINCT FROM 'planning' or (select venue_booking_id from public.events where event_id = 98401) is not null then raise exception '[SG2-84:hold-changed-event-stage] [FAILURE] [SG2-84:AC4] hold changed event stage'; end if;
  begin
   insert into public.venue_bookings(venue_id,event_id,starts_at,ends_at,status) values(98401,98401,now()+interval '10 days',now()+interval '10 days 1 hour','confirmed');
   raise exception '[SG2-84:direct-booking-bypassed-hold-conflict] [CONFLICT] [SG2-84:AC3] direct booking bypassed hold conflict';
  exception when exclusion_violation then null; end;
  -- adjustable default lead-time warns once before expiry.
- if (select warning_lead_seconds from public.venue_hold_settings) <> 86400 then raise exception '[SG2-85:default-warning-is-not-24-hours] [NORMAL] [SG2-85:AC4] default warning is not 24 hours'; end if;
+ if (select warning_lead_seconds from public.venue_hold_settings) IS DISTINCT FROM 86400 then raise exception '[SG2-85:default-warning-is-not-24-hours] [NORMAL] [SG2-85:AC4] default warning is not 24 hours'; end if;
  update public.venue_hold_settings set warning_lead_seconds = 259200;
  perform public.process_venue_hold_deadlines(); perform public.process_venue_hold_deadlines();
  if (select count(*) from public.venue_hold_notifications where hold_id = current_setting('holds.primary')::bigint and kind = 'warning') <> 1 then raise exception '[SG2-85:warning-missing-or-repeated] [NORMAL] [SG2-85:AC4] warning missing or repeated'; end if;
@@ -130,7 +130,7 @@ begin
   or not exists(select 1 from public.venue_bookings where event_id = 98401 and status = 'confirmed')
   or not exists(select 1 from public.venue_booking_requests r join public.venue_holds h using(request_id) where h.hold_id = current_setting('holds.convert')::bigint and r.status = 'approved' and r.venue_booking_id = h.booking_id)
   then raise exception '[SG2-84:converted-booking-missing-or-timer-changed-it] [NORMAL] [SG2-84:AC5] converted booking missing or timer changed it'; end if;
- if (select status from public.events where event_id = 98401) <> 'planning' then raise exception '[SG2-84:venue-approval-falsely-confirmed-event] [FAILURE] [SG2-84:AC4] venue approval falsely confirmed event'; end if;
+ if (select status from public.events where event_id = 98401) IS DISTINCT FROM 'planning' then raise exception '[SG2-84:venue-approval-falsely-confirmed-event] [FAILURE] [SG2-84:AC4] venue approval falsely confirmed event'; end if;
 end;
 $$;
 
@@ -191,7 +191,7 @@ $$;
 select set_config('request.jwt.claim.sub','d8400000-0000-4000-8000-000000000004',true);
 do $$
 begin
- if public.list_venue_hold_notifications() <> '[]'::jsonb or public.list_venue_holds() <> '[]'::jsonb or exists(select 1 from public.venue_hold_notifications) then raise exception '[SG2-84:unassigned-coordinator-saw-another-person-notifications-or-event] [FAILURE] [SG2-84:AC6] unassigned coordinator saw another person notifications or event details'; end if;
+ if public.list_venue_hold_notifications() IS DISTINCT FROM '[]'::jsonb or public.list_venue_holds() IS DISTINCT FROM '[]'::jsonb or exists(select 1 from public.venue_hold_notifications) then raise exception '[SG2-84:unassigned-coordinator-saw-another-person-notifications-or-event] [FAILURE] [SG2-84:AC6] unassigned coordinator saw another person notifications or event details'; end if;
  if exists(select 1 from public.venue_holds) then raise exception '[SG2-84:unassigned-coordinator-direct-holds-denied] [FAILURE] [SG2-84:AC1] Unassigned coordinator must not read raw hold metadata in any lifecycle state'; end if;
  if not exists(select 1 from public.venue_booking_occupancy where venue_id = 98401 and starts_at = now()+interval '20 days' and status = 'tentative' and event_id is null)
   or exists(select 1 from public.venue_hold_occupancy() where event_id is not null)
@@ -288,11 +288,11 @@ begin
  end loop;
 end;
 $$;
--- Notification failure rolls back hold, request and history. The tagged
+-- Notification failure rolls back hold, request and history. The
 -- trigger failure below is an injection fixture, not an independent assertion;
 -- the expected-error and unchanged-state checks establish the test result.
 create function pg_temp.reject_hold_notice() returns trigger language plpgsql as $$
-begin raise exception using errcode = 'P0001',message = '[SG2-84:notification-failure-injection] [FAILURE] [SG2-84:AC6] Supporting failure-injection fixture: injected_notification_failure'; end;
+begin raise sqlstate 'P0001' using message = 'Supporting failure-injection fixture: injected_notification_failure'; end;
 $$;
 create trigger reject_hold_notice before insert on public.venue_hold_notifications for each row execute function pg_temp.reject_hold_notice();
 select set_config('holds.before_requests',(select count(*)::text from public.venue_booking_requests),true);
@@ -375,7 +375,7 @@ update public.venue_holds set expires_at = created_at+interval '1 microsecond' w
 create function pg_temp.reject_expiry_notice() returns trigger language plpgsql as $$
 begin
  if new.kind = 'expired' and new.hold_id = current_setting('holds.expiry_rollback')::bigint then
-  raise exception using errcode = 'P0001',message = '[SG2-85:expiry-notice-failure-injection] [FAILURE] [SG2-85:AC4] Supporting failure-injection fixture: injected_expiry_notice_failure';
+  raise sqlstate 'P0001' using message = 'Supporting failure-injection fixture: injected_expiry_notice_failure';
  end if;
  return new;
 end;
@@ -424,7 +424,7 @@ update public.venue_holds set expires_at = clock_timestamp()+interval '2 days' w
 create function pg_temp.reject_warning_notice() returns trigger language plpgsql as $$
 begin
  if new.kind = 'warning' and new.hold_id = current_setting('holds.warning_rollback')::bigint then
-  raise exception using errcode = 'P0001',message = '[SG2-85:warning-notice-failure-injection] [FAILURE] [SG2-85:AC4] Supporting failure-injection fixture: injected_warning_notice_failure';
+  raise sqlstate 'P0001' using message = 'Supporting failure-injection fixture: injected_warning_notice_failure';
  end if;
  return new;
 end;

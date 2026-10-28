@@ -11,7 +11,6 @@ import CoordinatorAssignment from './screens/CoordinatorAssignment';
 import AssignmentQueue from './screens/AssignmentQueue';
 import CoordinatorOverview from './screens/CoordinatorOverview';
 import CapacityExceptions from './screens/CapacityExceptions';
-import ChangeRequest from './screens/ChangeRequest';
 import Dashboard from './screens/Dashboard';
 import DraftRequests from './screens/DraftRequests';
 import EquipmentDesk from './screens/EquipmentDesk';
@@ -203,7 +202,10 @@ export default function App() {
     notificationEvent: notificationTarget && <NotificationEvent accessToken={session!.accessToken}
       source={notificationTarget.source} notificationId={notificationTarget.id}
       onViewEvent={role === 'Event Organiser' || role === 'Event Coordinator'
-        ? id => { setSelectedEventId(id); setScreen(role === 'Event Coordinator' ? 'notificationWork' : 'detail'); } : undefined} />,
+        ? id => { setSelectedEventId(id); setScreen(role === 'Event Coordinator' ? 'notificationWork' : 'detail'); }
+        // SG2-102 AC4: an attendee's event details are on My registrations.
+        : role === 'Attendee' ? () => setScreen('myRegistrations') : undefined}
+      viewLabel={role === 'Attendee' ? 'View my registrations' : undefined} />,
     dashboard: (
       <Dashboard
         role={role}
@@ -285,7 +287,6 @@ export default function App() {
     capacityExceptions: <CapacityExceptions key={session!.accessToken} accessToken={session!.accessToken} />,
     equipment: <EquipmentDesk accessToken={session!.accessToken} />,
     attendee: <AttendeeEvent />,
-    change: <ChangeRequest />,
     profile: <Profile role={role} roles={roles} />,
     assign: <CoordinatorAssignment accessToken={session!.accessToken} />,
     queue: <AssignmentQueue accessToken={session!.accessToken} />,

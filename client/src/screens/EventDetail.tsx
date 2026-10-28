@@ -1,22 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   categoryLabel,
-  completeEvent,
   fetchOwnEventDetail,
   getEventStage,
   submitEventRequest,
   type EventRequestDetail,
   type EventStageResult
 } from '../api/eventRequests';
-import EventPlanningDrawer from './EventPlanningDrawer';
 import EventAuditDrawer from '../components/EventAuditDrawer';
-import { loadSession } from '../auth/session';
 import EventStageTracker from '../components/EventStageTracker';
 import ClarificationThread from '../components/ClarificationThread';
-import EquipmentRequirements from '../components/EquipmentRequirements';
 import ConfirmedArrangements from '../components/ConfirmedArrangements';
-import RecheckSettleActions from '../components/RecheckSettleActions';
-import ChangeRequestsPanel from '../components/ChangeRequestsPanel';
 import SafetyDecisionSummary from '../components/SafetyDecisionSummary';
 import RegistrationPanel from '../components/RegistrationPanel';
 import CancellationPanel from '../components/CancellationPanel';
@@ -31,19 +25,8 @@ import { formatSgtTimestamp } from '../components/EventAuditDrawer';
 export interface EventDetailProps {
   role: Role;
   onNavigate: (screen: Screen) => void;
-  /**
-   * The current status of the event request. When `'submitted'`, organiser
-   * actions are disabled (AC3). Defaults to `undefined` (no restriction).
-   */
-  eventStatus?: string;
   selectedEventId?: number;
   accessToken?: string;
-  currentUserId?: string;
-  /**
-   * Current instant, injected so "has the event finished?" is testable
-   * without a real clock (SG2-100 AC4). Defaults to now.
-   */
-  now?: () => Date;
 }
 
 const ARRANGEMENT_LABELS: Record<string, string> = {
@@ -65,12 +48,8 @@ export default function EventDetail({
   onNavigate,
   selectedEventId,
   accessToken,
-  currentUserId,
-  now = () => new Date(),
 }: EventDetailProps) {
   const isOrganiser = role === 'Event Organiser';
-  const isCoordinator = role === 'Event Coordinator';
-  const isAuthorizedRole = isOrganiser || (isCoordinator && Boolean(selectedEventId));
 
   const [detail, setDetail] = useState<EventRequestDetail | null>(null);
   const [stage, setStage] = useState<EventStageResult | null>(null);
@@ -78,17 +57,14 @@ export default function EventDetail({
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [isPlanningDrawerOpen, setIsPlanningDrawerOpen] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
-  // SG2-100 AC4: one in-flight completion at a time, so a double-click sends
-  // one request rather than two.
-  const [completing, setCompleting] = useState(false);
-  const [completeError, setCompleteError] = useState<string | null>(null);
   const [resubmitting, setResubmitting] = useState(false);
   const [resubmitError, setResubmitError] = useState<string | null>(null);
 
+  const reload = () => setReloadKey((key) => key + 1);
+
   useEffect(() => {
-    if (!isAuthorizedRole || !selectedEventId || !accessToken) {
+    if (!isOrganiser || !selectedEventId || !accessToken) {
       setLoading(false);
       return;
     }
@@ -107,7 +83,7 @@ export default function EventDetail({
           // SG2-38: a colleague's view-only copy has no stage access on the
           // server, so asking for it would only earn a 403. The stage is
           // fetched once the detail says whose event this is.
-          if (result.request.canManage || isCoordinator) {
+          if (result.request.canManage) {
             getEventStage(selectedEventId, accessToken)
               .then((stageResult) => {
                 if (!cancelled && stageResult.ok) {
@@ -142,9 +118,9 @@ export default function EventDetail({
     return () => {
       cancelled = true;
     };
-  }, [isAuthorizedRole, isCoordinator, selectedEventId, accessToken, reloadKey]);
+  }, [isOrganiser, selectedEventId, accessToken, reloadKey]);
 
-  if (!isAuthorizedRole) {
+  if (!isOrganiser) {
     return <Card><p role="alert">Event requests are available only to Event Organisers.</p></Card>;
   }
 
@@ -207,7 +183,7 @@ export default function EventDetail({
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               type="button"
-              onClick={() => setReloadKey((k) => k + 1)}
+              onClick={reload}
               style={{
                 background: color.kelp,
                 border: '1px solid rgba(255,255,255,0.12)',
@@ -251,46 +227,8 @@ export default function EventDetail({
       // thread and changed through a change request, never edited directly.
       const canEditRequest = !isLocked && !needsClarification;
       // SG2-64 AC1/AC4: change requests on any submitted, still-open event.
-      const canRequestChange = isOrganiser && detail.canManage && Boolean(accessToken)
+      const canRequestChange = detail.canManage && Boolean(accessToken)
         && !['draft', 'cancelled', 'rejected', 'completed'].includes(detail.status.toLowerCase());
-
-      const session = loadSession();
-      const resolvedUserId = currentUserId ?? session?.user?.userId;
-      const isAssignedCoordinator =
-        isCoordinator &&
-        Boolean(
-          detail.coordinatorId &&
-            (!resolvedUserId || detail.coordinatorId === resolvedUserId),
-        );
-      const canEditPlanning = isAssignedCoordinator && !isTerminal;
-
-      // SG2-100 AC4: an event can be closed out once it has actually been
-      // held. `endsAt` is the latest of its confirmed venue bookings; null
-      // means nothing says when it ends, which reads as "not finished",
-      // never as finished. The server re-checks all of this — this only
-      // decides whether to offer the action.
-      const isCompletable = ['confirmed', 'preparation'].includes(detail.status.toLowerCase());
-      const hasFinished = detail.endsAt !== null && Date.parse(detail.endsAt) <= now().getTime();
-      const canComplete = isAssignedCoordinator && isCompletable && hasFinished;
-
-      // No re-entrancy guard here: `completing` disables the button, so a
-      // second click never reaches this at all (the [CONFLICT] test in
-      // EventDetail.test.tsx asserts one request for three clicks). A token
-      // check would be dead for the same reason — this whole branch sits
-      // inside the `selectedEventId && accessToken` gate above.
-      const markCompleted = async () => {
-        setCompleting(true);
-        setCompleteError(null);
-        const result = await completeEvent(detail.eventId, accessToken);
-        if (result.ok) {
-          // Re-read rather than patching local state: the completion also
-          // moves the stage and the history, and both come from the server.
-          setReloadKey((key) => key + 1);
-        } else {
-          setCompleteError(result.message);
-        }
-        setCompleting(false);
-      };
 
       // SG2-36/SG2-64 AC5: once the question is answered, the organiser sends
       // the request back to review as it stands.
@@ -299,7 +237,7 @@ export default function EventDetail({
         setResubmitError(null);
         const result = await submitEventRequest(detail.eventId, accessToken!);
         setResubmitting(false);
-        if (result.ok) setReloadKey((key) => key + 1);
+        if (result.ok) reload();
         else setResubmitError(result.kind === 'error' ? result.message : 'Could not resubmit the request. Please try again.');
       };
 
@@ -384,15 +322,6 @@ export default function EventDetail({
                             </Badge>
                           ))}
                         </div>
-                        {/* SG2-66 AC4: settling re-reads the event so the banner and stage move. */}
-                        {isAssignedCoordinator && (
-                          <RecheckSettleActions
-                            eventId={detail.eventId}
-                            accessToken={accessToken}
-                            outstanding={stage.outstanding_arrangements}
-                            onSettled={() => setReloadKey((value) => value + 1)}
-                          />
-                        )}
                       </>
                     )}
                   </div>
@@ -414,7 +343,7 @@ export default function EventDetail({
               <p className="organisation-detail-description">{detail.decisionReason}</p>
             </section>
           ) : null}
-          {isOrganiser && detail.canManage && detail.status.toLowerCase() !== 'draft' && accessToken ? (
+          {detail.canManage && detail.status.toLowerCase() !== 'draft' && accessToken ? (
             <ClarificationThread
               eventId={detail.eventId}
               accessToken={accessToken}
@@ -430,22 +359,10 @@ export default function EventDetail({
               </div>
             ))}
           </dl>
-          {/* SG2-58 AC1/AC3: the creating organiser and the assigned coordinator
-              see what was confirmed; the server returns 404 to anyone else. */}
-          {['confirmed', 'completed'].includes(detail.status.toLowerCase()) && ((isOrganiser && detail.canManage) || isAssignedCoordinator) && (
+          {/* SG2-58 AC1/AC3: the creating organiser sees what was confirmed;
+              the server returns 404 to anyone else. */}
+          {['confirmed', 'completed'].includes(detail.status.toLowerCase()) && detail.canManage && (
             <ConfirmedArrangements eventId={detail.eventId} accessToken={accessToken} />
-          )}
-          {isAssignedCoordinator && ['approved', 'planning', 'confirmed'].includes(detail.status.toLowerCase()) && (
-            <EquipmentRequirements eventId={detail.eventId} accessToken={accessToken} />
-          )}
-          {/* SG2-66 AC1–AC4: the assigned coordinator decides change requests
-              knowing what each would break. */}
-          {isAssignedCoordinator && !isTerminal && (
-            <ChangeRequestsPanel
-              eventId={detail.eventId}
-              accessToken={accessToken}
-              onAccepted={() => setReloadKey((value) => value + 1)}
-            />
           )}
           {/* SG2-64 AC1/AC3: the creating organiser asks for a change and sees
               what is still waiting on the coordinator. */}
@@ -453,43 +370,42 @@ export default function EventDetail({
             <OrganiserChangeRequests eventId={detail.eventId} accessToken={accessToken!} />
           )}
           {/* SG2-92 AC4–AC6: the latest safety decision for the creating
-              organiser and the assigned coordinator, who can rework a Safety
-              Rejected event back to Planning. */}
-          {((isOrganiser && detail.canManage) || isAssignedCoordinator) && accessToken
+              organiser; coordinator rework is available from the work queue. */}
+          {detail.canManage && accessToken
             && ['planning', 'awaiting_safety_check', 'safety_rejected', 'preparation', 'confirmed'].includes(detail.status.toLowerCase()) && (
             <SafetyDecisionSummary
               eventId={detail.eventId}
               accessToken={accessToken}
               status={detail.status.toLowerCase()}
-              canRework={isAssignedCoordinator}
-              onReworked={() => setReloadKey((value) => value + 1)}
+              canRework={false}
+              onReworked={reload}
             />
           )}
-          {/* SG2-63: the registration picture for the organisation's organisers
-              and the assigned coordinator; only the creating organiser changes
+          {/* SG2-63: the registration picture for the organisation's organisers;
+              only the creating organiser changes
               the settings, and the server decides who sees contact details. */}
-          {(isOrganiser || isAssignedCoordinator) && accessToken && detail.registrationNeeded
+          {accessToken && detail.registrationNeeded
             && detail.status.toLowerCase() !== 'draft' && (
             <RegistrationPanel eventId={detail.eventId} accessToken={accessToken} />
           )}
-          {/* SG2-67: the creating organiser asks to cancel with a reason, and the
-              assigned coordinator carries it out; both see a cancellation. */}
-          {accessToken && ((isOrganiser && detail.canManage) || isAssignedCoordinator)
+          {/* SG2-67: the creating organiser asks to cancel with a reason and sees
+              the recorded cancellation; the coordinator acts from the work queue. */}
+          {accessToken && detail.canManage
             && !['draft', 'completed'].includes(detail.status.toLowerCase()) && (
             <CancellationPanel
               eventId={detail.eventId}
               accessToken={accessToken}
-              mode={isOrganiser ? 'organiser' : 'coordinator'}
+              mode="organiser"
               status={detail.status.toLowerCase()}
               requestedAt={detail.cancellationRequestedAt ?? null}
               reason={detail.cancellationReason ?? null}
               cancelledAt={detail.cancelledAt ?? null}
-              onChanged={() => setReloadKey((value) => value + 1)}
+              onChanged={reload}
             />
           )}
           <footer className="organisation-detail-footer">
             <h3>Your options</h3>
-            {!detail.canManage && !isCoordinator ? (
+            {!detail.canManage ? (
               // SG2-38: view only means the creator's history and stage stay
               // with the creator; the server refuses both to colleagues.
               <p role="status" className="organisation-detail-notice">
@@ -497,7 +413,7 @@ export default function EventDetail({
               </p>
             ) : (
               <>
-                {needsClarification && isOrganiser ? (
+                {needsClarification ? (
                   <div className="organisation-detail-notice" role="status" aria-label="Your coordinator has a question">
                     <strong>Your coordinator has a question</strong>
                     <p>Answer it in the conversation above. Ask for any change to the request through a change request, then resubmit it for review.</p>
@@ -506,19 +422,16 @@ export default function EventDetail({
                 {resubmitError ? (
                   <p role="alert" className="organisation-detail-notice">{resubmitError}</p>
                 ) : null}
-                {completeError ? (
-                  <p role="alert" className="organisation-detail-notice">{completeError}</p>
-                ) : null}
-                {isLocked && isOrganiser ? (
+                {isLocked ? (
                   <p role="status" aria-label="Editing disabled" className="organisation-detail-notice">
                     {lockedRequestNotice(detail)}
                   </p>
                 ) : null}
                 <div className="organisation-detail-actions">
-                  {canEditRequest && isOrganiser ? (
+                  {canEditRequest ? (
                     <button className="organisation-button organisation-button-primary" type="button" onClick={() => onNavigate('drafts')}>Edit request</button>
                   ) : null}
-                  {needsClarification && isOrganiser && accessToken ? (
+                  {needsClarification && accessToken ? (
                     <button
                       className="organisation-button organisation-button-primary"
                       type="button"
@@ -526,25 +439,6 @@ export default function EventDetail({
                       disabled={resubmitting}
                     >
                       {resubmitting ? 'Resubmitting…' : 'Resubmit for review'}
-                    </button>
-                  ) : null}
-                  {canEditPlanning ? (
-                    <button
-                      className="organisation-button organisation-button-primary"
-                      type="button"
-                      onClick={() => setIsPlanningDrawerOpen(true)}
-                    >
-                      Edit Planning Information
-                    </button>
-                  ) : null}
-                  {canComplete ? (
-                    <button
-                      className="organisation-button organisation-button-primary"
-                      type="button"
-                      onClick={markCompleted}
-                      disabled={completing}
-                    >
-                      {completing ? 'Marking as Completed…' : 'Mark as Completed'}
                     </button>
                   ) : null}
                   <button
@@ -558,54 +452,18 @@ export default function EventDetail({
               </>
             )}
             <p className="organisation-detail-hint">
-              {isCoordinator
-                ? canEditPlanning
-                  ? 'Update event planning information, dates, attendance, and requirements.'
-                  : isTerminal
-                    ? 'Planning details cannot be modified for terminal events.'
-                    : 'Awaiting assignment to coordinator.'
-                : !detail.canManage
-                  ? 'Contact the request creator if this event needs updating.'
-                  : isRejected
-                    ? 'The rejection reason and change history remain available.'
-                    : needsClarification
-                      ? 'Answer your coordinator, then resubmit the request for review.'
-                      : isLocked
-                        ? 'Your coordinator will be in touch if clarification is needed.'
-                        : 'You can edit and submit this request while it is a draft.'}
+              {!detail.canManage
+                ? 'Contact the request creator if this event needs updating.'
+                : isRejected
+                  ? 'The rejection reason and change history remain available.'
+                  : needsClarification
+                    ? 'Answer your coordinator, then resubmit the request for review.'
+                    : isLocked
+                      ? 'Your coordinator will be in touch if clarification is needed.'
+                      : 'You can edit and submit this request while it is a draft.'}
             </p>
           </footer>
-          {canEditPlanning && (
-            <EventPlanningDrawer
-              isOpen={isPlanningDrawerOpen}
-              onClose={() => setIsPlanningDrawerOpen(false)}
-              eventId={detail.eventId}
-              accessToken={accessToken}
-              initialValues={{
-                proposed_date: detail.proposedDate,
-                expected_attendance: detail.expectedAttendance,
-                venue_requirements: detail.venueRequirements,
-                equipment_requirements: detail.equipmentRequirements,
-                accessibility_needs: detail.accessibilityNeeds,
-                registration_needed: detail.registrationNeeded,
-                status: detail.status,
-              }}
-              onSuccess={(updatedEvent) => {
-                setDetail({
-                  ...detail,
-                  status: updatedEvent.status,
-                  expectedAttendance: updatedEvent.expected_attendance,
-                  proposedDate: updatedEvent.proposed_date,
-                  venueRequirements: updatedEvent.venue_requirements,
-                  equipmentRequirements: updatedEvent.equipment_requirements,
-                  accessibilityNeeds: updatedEvent.accessibility_needs,
-                  registrationNeeded: updatedEvent.registration_needed,
-                });
-                setReloadKey((k) => k + 1);
-              }}
-            />
-          )}
-          {detail.canManage || isCoordinator ? (
+          {detail.canManage ? (
             <EventAuditDrawer
               isOpen={isHistoryDrawerOpen}
               onClose={() => setIsHistoryDrawerOpen(false)}

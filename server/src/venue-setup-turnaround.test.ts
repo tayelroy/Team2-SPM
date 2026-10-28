@@ -5,7 +5,7 @@ import { AccessError } from './auth/policy';
 import { getAllVenuesAvailability, getVenueAvailability } from './venues/availability';
 import { searchVenues } from './venues/search';
 import { createVenueConflictStore } from './db/venueConflicts';
-import { NO_PREPARATION, clashes, effectivePeriod, gapMinutes, preparationByVenue, shiftIso } from './venues/preparation';
+import { NO_PREPARATION, clashes, gapMinutes, preparationByVenue, shiftIso } from './venues/preparation';
 import type { VenueSearchCriteria } from './venues/searchFields';
 
 type Result = { data: unknown; error: unknown };
@@ -33,9 +33,9 @@ const talk = { starts_at: '2030-09-10T10:00:00.000Z', ends_at: '2030-09-10T12:00
 // --- The rule -----------------------------------------------------------------
 
 test('[NORMAL] [SG2-78:AC1] a 10:00-12:00 event with 30 minutes setup and 45 minutes turnaround occupies 09:30-12:45', () => {
-  assert.deepEqual(effectivePeriod(talk, PREP), { starts_at: '2030-09-10T09:30:00.000Z', ends_at: '2030-09-10T12:45:00.000Z' });
   assert.equal(gapMinutes(PREP), 75);
   assert.equal(shiftIso('2030-09-10T10:00:00.000Z', -30), '2030-09-10T09:30:00.000Z');
+  assert.equal(shiftIso('2030-09-10T12:00:00.000Z', 45), '2030-09-10T12:45:00.000Z');
 });
 
 test('[BOUNDARY] [SG2-78:AC2] bookings exactly setup plus turnaround apart do not clash; a minute closer on either side does', () => {

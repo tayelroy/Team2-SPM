@@ -5,7 +5,6 @@ import {
   CHANGEABLE_STATUSES,
   CHANGE_FIELD_LABELS,
   RECHECK_KEYS,
-  REGISTRATION_SETTINGS,
   RETURNS_TO_PLANNING,
   SIGNIFICANT_CHANGE_FIELDS,
   assessChangeImpact,
@@ -54,7 +53,7 @@ const codes = (impact: ChangeImpact) =>
   impact.arrangements.map(item => [item.kind, item.id, item.reasons.map(reason => reason.code)]);
 
 describe('shared SG2-66 vocabulary', () => {
-  test('[NORMAL] [SG2-66:AC1] [SG2-66:AC4] statuses, significant fields, recheck keys and registration settings are fixed', () => {
+  test('[NORMAL] [SG2-66:AC1] [SG2-66:AC4] statuses, significant fields and recheck keys are fixed', () => {
     assert.deepEqual([...CHANGEABLE_STATUSES], ['approved', 'planning', 'awaiting_safety_check', 'preparation', 'confirmed']);
     assert.deepEqual([...RETURNS_TO_PLANNING], ['awaiting_safety_check', 'preparation', 'confirmed']);
     assert.deepEqual([...SIGNIFICANT_CHANGE_FIELDS],
@@ -62,8 +61,6 @@ describe('shared SG2-66 vocabulary', () => {
     assert.deepEqual([...CHANGEABLE_FIELDS], [...SIGNIFICANT_CHANGE_FIELDS, 'name', 'purpose', 'description']);
     assert.deepEqual([...RECHECK_KEYS], ['venue_recheck', 'equipment_recheck', 'registration_recheck',
       'safety_venue_recheck', 'safety_equipment_recheck', 'safety_other_recheck']);
-    assert.deepEqual([...REGISTRATION_SETTINGS],
-      ['registration_needed', 'registration_capacity', 'registration_opens_at', 'registration_closes_at']);
     assert.deepEqual(Object.keys(CHANGE_FIELD_LABELS), [...CHANGEABLE_FIELDS]);
   });
 

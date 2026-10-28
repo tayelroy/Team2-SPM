@@ -115,7 +115,7 @@ if (existsSync(migrationDirectory)) {
     if (names.length > 1 && !historicalPair) errors.push(`Duplicate migration version ${version}: ${names.join(', ')}`);
   }
 }
-const paths = ['server/src', 'client/src', 'e2e', 'integration', '.github/scripts'].concat(existsSync(resolve(root, 'hosted-e2e')) ? ['hosted-e2e'] : []).flatMap(directory =>
+const paths = ['server/src', 'client/src', 'e2e', 'integration', '.github/scripts'].flatMap(directory =>
   files(resolve(root, directory)).filter(path => /\.(?:test|spec)\.(?:ts|tsx|mjs)$/.test(path))).sort();
 
 for (const path of paths) {
@@ -171,8 +171,7 @@ for (const path of paths) {
           parameterized: ts.isTemplateExpression(title) || /\.each/.test(node.expression.getText(source)),
           ...metadata, acceptanceCriteria: mapped,
           supportingContracts: metadata.references.filter(reference => !/^AC\d+$/.test(reference.criterion)),
-          preconditions: file.startsWith('hosted-e2e/') && file.endsWith('.spec.ts') ? 'Optional explicitly authorised authenticated shared-staging run on the exact allowlisted preview using approved QA roles and a runtime-only password; fresh role context and read-only visible UI, no loopback fixtures/reset/data writes/token extraction. Not run by default CI.'
-            : file.startsWith('e2e/') ? 'Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.'
+          preconditions: file.startsWith('e2e/') ? 'Fresh browser context, reset loopback memory fixture and fixed browser clock; production app build. No hosted Supabase.'
             : file.startsWith('client/') ? 'Isolated jsdom render or public exported helper; file setup resets mocks/session and controls clocks where relevant.'
               : file.startsWith('server/') ? 'Isolated exported handler/service or loopback Express API; controlled identity and storage fixtures. No hosted Supabase.'
                 : file.startsWith('integration/') ? 'Disposable local PostgreSQL and PostgREST, committed migrations and synthetic role identities; real Express/Supabase adapters over loopback HTTP. No hosted Supabase.'

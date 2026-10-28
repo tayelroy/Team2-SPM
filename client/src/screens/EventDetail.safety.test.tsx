@@ -1,27 +1,22 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as eventRequestsApi from '../api/eventRequests';
 import EventDetail from './EventDetail';
 
 // The summary's own fetching and rework are covered in SafetyDecisionSummary.test.tsx;
-// this stub shows what EventDetail hands it and lets a test report a rework.
+// this stub shows the organiser's read-only event and role capability.
 vi.mock('../components/SafetyDecisionSummary', () => ({
-  default: ({ eventId, accessToken, status, canRework, onReworked }: {
-    eventId: number; accessToken: string; status: string; canRework: boolean; onReworked: () => void;
+  default: ({ eventId, accessToken, status, canRework }: {
+    eventId: number; accessToken: string; status: string; canRework: boolean;
   }) => (
     <section data-testid="safety-decision-summary">
       Safety for event {eventId} with {accessToken}, {status}, {canRework ? 'can rework' : 'read only'}
-      <button type="button" onClick={onReworked}>Stub rework</button>
     </section>
   ),
 }));
-vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
-vi.mock('../components/EquipmentRequirements', () => ({ default: () => null }));
-vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
 
-// jsdom has no scrollIntoView; the planning drawer uses it (SG2-39).
-Element.prototype.scrollIntoView = vi.fn();
+vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
 
 afterEach(() => {
   cleanup();
@@ -42,22 +37,11 @@ const stage: eventRequestsApi.EventStageResult = {
   arrangements_recheck_needed: false, outstanding_arrangements: [],
 };
 
-function renderAs(role: 'Event Coordinator' | 'Event Organiser') {
-  render(<EventDetail role={role} selectedEventId={92} accessToken="token-92" currentUserId="coord-1" onNavigate={vi.fn()} />);
+function renderAs(role: 'Event Organiser') {
+  render(<EventDetail role={role} selectedEventId={92} accessToken="token-92" onNavigate={vi.fn()} />);
 }
 
 describe('EventDetail safety decision (SG2-92)', () => {
-  test('[NORMAL] [SG2-92:AC4] the assigned coordinator of a Safety Rejected event can rework it, which reloads the event', async () => {
-    const load = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail')
-      .mockResolvedValueOnce({ ok: true, request: detail })
-      .mockResolvedValueOnce({ ok: true, request: { ...detail, status: 'planning' } });
-    vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage });
-    renderAs('Event Coordinator');
-    expect(await screen.findByTestId('safety-decision-summary')).toHaveTextContent('Safety for event 92 with token-92, safety_rejected, can rework');
-    fireEvent.click(screen.getByRole('button', { name: 'Stub rework' }));
-    expect(await screen.findByText(/Safety for event 92 with token-92, planning, can rework/)).toBeInTheDocument();
-    expect(load).toHaveBeenCalledTimes(2);
-  });
 
   test('[NORMAL] [SG2-92:AC5] [SG2-92:AC6] the creating organiser sees the decision but cannot rework', async () => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: { ...detail, canManage: true } });
@@ -68,8 +52,6 @@ describe('EventDetail safety decision (SG2-92)', () => {
 
   test.each([
     ['an organisation colleague who did not create it', 'Event Organiser' as const, {}],
-    ['a coordinator not assigned to it', 'Event Coordinator' as const, { coordinatorId: 'coord-2' }],
-    ['an event still under review', 'Event Coordinator' as const, { status: 'under_review' }],
   ])('[BOUNDARY] [SG2-92:AC6] %s shows no safety decision', async (_label, role, override) => {
     vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request: { ...detail, ...override } });
     vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage });

@@ -357,7 +357,7 @@ test('[NORMAL] [SG2-39:AC1] saving updates in event planning drawer updates item
   expect(screen.getByText('PA System')).toBeVisible();
 });
 
-test('[CONFLICT] [SG2-39:AC5] Edit Planning Information button is hidden for terminal statuses and unassigned events', async () => {
+test('[CONFLICT] [FAILURE] [SG2-39:AC5] [SG2-39:AC1] Edit Planning Information button is hidden for terminal statuses and unassigned events', async () => {
   const cancelled: WorkItem = {
     ...review,
     item_id: 31,
@@ -374,22 +374,29 @@ test('[CONFLICT] [SG2-39:AC5] Edit Planning Information button is hidden for ter
     status: 'submitted',
     assigned_to_me: false,
   };
+  const terminal: WorkItem[] = [
+    cancelled,
+    { ...cancelled, item_id: 33, event_id: 33, title: 'Completed Gala', status: 'completed' },
+    { ...cancelled, item_id: 34, event_id: 34, title: 'Rejected Gala', status: 'rejected' },
+  ];
   const fetch = vi.fn(async (url: string) => {
-    if (url.endsWith('/event/31')) return Response.json({ items: [cancelled] });
+    const selected = terminal.find((item) => url.endsWith(`/event/${item.item_id}`));
+    if (selected) return Response.json({ items: [selected] });
     if (url.endsWith('/event/32')) return Response.json({ items: [unassigned] });
-    return Response.json({ items: [cancelled, unassigned] });
+    return Response.json({ items: [...terminal, unassigned] });
   });
   vi.stubGlobal('fetch', fetch);
 
   render(<Dashboard role="Event Coordinator" accessToken="token" onNavigate={vi.fn()} />);
-  await screen.findByText('2 items in your work queue');
+  await screen.findByText('4 items in your work queue');
 
-  fireEvent.click(screen.getByRole('button', { name: /Cancelled Gala/ }));
-  expect(await screen.findByRole('heading', { name: 'Cancelled Gala' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
-  await screen.findByText('2 items in your work queue');
+  for (const item of terminal) {
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(item.title) }));
+    expect(await screen.findByRole('heading', { name: item.title })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to work queue' }));
+    await screen.findByText('4 items in your work queue');
+  }
   fireEvent.click(screen.getByRole('button', { name: /Unassigned Gala/ }));
   expect(await screen.findByRole('heading', { name: 'Unassigned Gala' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit Planning Information' })).not.toBeInTheDocument();
@@ -772,8 +779,11 @@ test('[FAILURE] [SG2-100:AC4] a refused completion is explained and leaves the a
   expect(screen.getByText('confirmed', { exact: true })).toBeVisible();
 });
 
-test('[FAILURE] [SG2-100:AC4] completion is never offered on someone else\'s event or before the event is confirmed or in preparation', async () => {
-  for (const item of [{ ...held, assigned_to_me: false }, { ...held, status: 'approved' }, { ...held, status: 'planning' }]) {
+test('[FAILURE] [BOUNDARY] [SG2-100:AC4] completion is never offered on someone else\'s event or before the event is confirmed or in preparation', async () => {
+  for (const item of [{ ...held, assigned_to_me: false }, ...[
+    'draft', 'unassigned', 'submitted', 'under_review', 'approved', 'planning',
+    'awaiting_safety_check', 'safety_rejected', 'completed', 'cancelled', 'rejected',
+  ].map((status) => ({ ...held, status }))]) {
     await openHeld(item, completionFetch(item, () => Response.json({})));
     expect(screen.queryByRole('button', { name: 'Mark as Completed' })).not.toBeInTheDocument();
     cleanup();

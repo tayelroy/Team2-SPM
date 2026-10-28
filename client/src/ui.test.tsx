@@ -140,7 +140,7 @@ test('[BOUNDARY] [SG2-20:ui-primitives] controlled Field and TextField treat an 
   expect(onArea).toHaveBeenCalledWith('Two keynotes');
 });
 
-test('[CONFLICT] [SG2-20:ui-primitives] a disabled GhostButton does not fire its click handler', () => {
+test('[BOUNDARY] [SG2-20:ui-primitives] a disabled GhostButton does not fire its click handler', () => {
   const onClick = vi.fn();
   render(<GhostButton onClick={onClick} disabled>Save draft</GhostButton>);
   const button = screen.getByRole('button', { name: 'Save draft' });

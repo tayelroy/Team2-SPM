@@ -6,7 +6,6 @@ import { ROLES } from './mock/types';
 import type { Role } from './mock/types';
 import EventDetail from './screens/EventDetail';
 import EventsTable from './screens/EventsTable';
-import ChangeRequest from './screens/ChangeRequest';
 
 // Auto-cleanup only registers when vitest runs with globals enabled, which
 // this project does not, so unmount between tests explicitly.
@@ -233,7 +232,7 @@ describe('every role can reach every screen in its navigation', () => {
   });
   // SG2-86: the menu is exactly the screens above — nothing extra is offered.
   test.each(['Event Organiser', 'Event Coordinator', 'Venue Staff', 'Technical Support Staff', 'Attendee'] as const)(
-    '[NORMAL] [SG2-86:AC4] %s navigation is unchanged by the Week 7 roles',
+    '[NORMAL] [FAILURE] [SG2-86:AC4] [SG2-87:AC2] [SG2-89:AC4] [SG2-97:AC1] [SG2-91:AC4] [SG2-52:AC3] %s navigation is unchanged by the Week 7 roles',
     async (role) => {
       await signInAs(role);
       const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
@@ -241,7 +240,7 @@ describe('every role can reach every screen in its navigation', () => {
     },
   );
   test.each(['Event Coordinator Lead', 'Safety Officer'] as const)(
-    '[FAILURE] [SG2-86:AC2] %s is offered only its own screens — no All events, no Attendee pages',
+    '[NORMAL] [FAILURE] [SG2-86:AC2] [SG2-87:AC2] [SG2-89:AC4] [SG2-97:AC1] [SG2-91:AC4] [SG2-52:AC3] %s is offered only its own screens — no All events, no Attendee pages',
     async (role) => {
       await signInAs(role);
       const labels = within(await loadedNav()).getAllByRole('button').map((button) => button.textContent);
@@ -251,49 +250,6 @@ describe('every role can reach every screen in its navigation', () => {
       expect(labels).not.toContain('My registrations');
     },
   );
-});
-
-// SG2-87: only the Event Coordinator Lead is offered the unassigned queue.
-test.each([
-  ['Event Organiser', false], ['Event Coordinator', false], ['Technical Support Staff', false], ['Safety Officer', false],
-  ['Event Coordinator Lead', true],
-] as const)('[FAILURE] [SG2-87:AC2] %s sees Unassigned queue in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(header()).queryByRole('button', { name: 'Unassigned queue' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
-});
-
-// SG2-89: only the Event Coordinator Lead is offered the coordinator overview.
-test.each([
-  ['Event Organiser', false], ['Event Coordinator', false], ['Venue Staff', false], ['Technical Support Staff', false],
-  ['Safety Officer', false], ['Attendee', false], ['Event Coordinator Lead', true],
-] as const)('[FAILURE] [SG2-89:AC4] %s sees Coordinator overview in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(await loadedNav()).queryByRole('button', { name: 'Coordinator overview' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
-});
-
-// SG2-97: only the Event Coordinator Lead is offered the assignment screen.
-test.each([
-  ['Technical Support Staff', false], ['Event Coordinator', false], ['Safety Officer', false], ['Event Coordinator Lead', true],
-] as const)('[FAILURE] [SG2-97:AC1] %s sees Assign coordinators in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(header()).queryByRole('button', { name: 'Assign coordinators' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
-});
-
-// SG2-91 AC4: only a Safety Officer is offered the safety check list.
-test.each([
-  ['Event Organiser', false], ['Event Coordinator', false], ['Venue Staff', false], ['Technical Support Staff', false],
-  ['Event Coordinator Lead', false], ['Safety Officer', true],
-] as const)('[FAILURE] [SG2-91:AC4] %s sees Safety checks in the navigation: %s', async (role, offered) => {
-  await signInAs(role);
-  const button = within(header()).queryByRole('button', { name: 'Safety checks' });
-  if (offered) expect(button).toBeInTheDocument();
-  else expect(button).not.toBeInTheDocument();
 });
 
 test('[FAILURE] [SG2-91:AC4] a Safety Officer the server has not granted the list is not offered it', async () => {
@@ -357,26 +313,16 @@ test('[CONFLICT] [SG2-86:AC2] a late permissions answer for a signed-out session
   expect(sessionStorage.getItem('connectsphere.session')).not.toBeNull();
 });
 
-test.each(['Technical Support Staff', 'Event Coordinator', 'Venue Staff'] as const)('[NORMAL] [SG2-52:AC3] %s has no obsolete equipment preview menu', async role => {
-  await signInAs(role);
-  expect(within(header()).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
-});
-
-test.each(['Event Coordinator', 'Venue Staff', 'Event Organiser', 'Attendee', 'Event Coordinator Lead', 'Safety Officer'] as const)('[FAILURE] [SG2-52:AC3] %s is not offered equipment maintenance in the menu', async role => {
-  await signInAs(role);
-  expect(within(header()).queryByRole('button', { name: 'Equipment' })).not.toBeInTheDocument();
-});
-
 test('[FAILURE] [SG2-24:AC2] the role shown in the header is a read-only label, not a selector', async () => {
   await signInAs('Event Coordinator');
   const roleLabel = screen.getByLabelText('Your role');
   expect(roleLabel).toHaveTextContent('Event Coordinator');
   // Only Technical Support Staff can change a role (SG2-24) — not the user
   // themselves, so this must not be an interactive control.
-  expect(roleLabel.tagName).not.toBe('SELECT');
+  expect(within(header()).queryByRole('combobox')).not.toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-86:AC3] a Safety Officer sees their own role in the header, not another role', async () => {
+test('[NORMAL] [SG2-86:role-header-display] a Safety Officer sees their own role in the header, not another role', async () => {
   await signInAs('Safety Officer');
   const roleLabel = screen.getByLabelText('Your role');
   expect(roleLabel).toHaveTextContent('Safety Officer');
@@ -974,19 +920,6 @@ test('[NORMAL] [SG2-20:prototype-registration] an attendee can withdraw and re-r
   ).toBeInTheDocument();
 });
 
-test('[NORMAL] [SG2-20:prototype-amendment] standalone change-request prototype categories toggle', () => {
-  render(<ChangeRequest />);
-
-  const selected = screen.getByRole('button', { name: 'Expected attendance' });
-  expect(selected).toHaveAttribute('aria-pressed', 'true');
-
-  const other = screen.getByRole('button', { name: 'Date or time' });
-  expect(other).toHaveAttribute('aria-pressed', 'false');
-  fireEvent.click(other);
-  expect(other).toHaveAttribute('aria-pressed', 'true');
-  fireEvent.click(other);
-  expect(other).toHaveAttribute('aria-pressed', 'false');
-});
 
 test('[NORMAL] [SG2-26:AC1] organiser dashboard opens the selected real event and has no mock notifications', async () => {
   await signInAs('Event Organiser');
@@ -1130,6 +1063,29 @@ test.each(['Event Coordinator', 'Event Organiser', 'Safety Officer'] as const)('
       expect(await screen.findByRole('heading', { level: 1, name: 'Find venues' })).toBeVisible();
     } else await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/event-requests/41', expect.anything()));
   }
+});
+
+test('[NORMAL] [SG2-102:AC2] [SG2-102:AC4] an attendee opens an event change notice and goes on to the updated registration', async () => {
+  await signInAs('Attendee');
+  const message = 'Harbour Lecture has changed. Venue: Old Hall → Regression Hall. Open My registrations for the latest details.';
+  const changed = { source: 'event', notification_id: 5, event_id: 591, kind: 'event_changed', message, created_at: '2026-10-27T02:00:00.000Z' };
+  const fetch = vi.mocked(globalThis.fetch); const existing = fetch.getMockImplementation()!;
+  fetch.mockImplementation(async (...args) => {
+    const url = String(args[0]);
+    if (url === '/api/notifications/inbox') return Response.json({ notifications: [{ ...changed, read_at: null }], unread_count: 1, next_cursor: null });
+    if (url === '/api/notifications/event/5/read') return Response.json({ notification: { ...changed, read_at: '2026-10-27T03:00:00Z' }, unread_count: 0 });
+    if (url === '/api/notifications/event/5/event') return Response.json({ event: { event_id: 591, name: 'Harbour Lecture',
+      status: 'confirmed', proposed_date: '2030-07-20T11:00:00.000Z' } });
+    return existing(...args);
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /^Notifications \(/ }));
+  expect(await screen.findByText('Event changed')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: `Unread: ${message}` }));
+  expect(await screen.findByRole('heading', { name: 'Harbour Lecture' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'View event details' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View my registrations' }));
+  const registrations = await screen.findByRole('region', { name: 'My registrations' });
+  expect(await within(registrations).findByText('Regression Hall', { exact: false })).toBeVisible();
 });
 
 test("[NORMAL] [SG2-104:AC1] switching the acting role reopens the app at that role's home and remembers it", async () => {

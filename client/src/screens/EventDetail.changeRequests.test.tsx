@@ -16,12 +16,8 @@ vi.mock('../components/ClarificationThread', () => ({ default: () => null }));
 vi.mock('../components/CancellationPanel', () => ({ default: () => null }));
 vi.mock('../components/RegistrationPanel', () => ({ default: () => null }));
 vi.mock('../components/SafetyDecisionSummary', () => ({ default: () => null }));
-vi.mock('../components/ChangeRequestsPanel', () => ({ default: () => null }));
-vi.mock('../components/EquipmentRequirements', () => ({ default: () => null }));
-vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
 
-// jsdom has no scrollIntoView; the planning drawer uses it (SG2-39).
-Element.prototype.scrollIntoView = vi.fn();
+vi.mock('../components/ConfirmedArrangements', () => ({ default: () => null }));
 
 afterEach(() => {
   cleanup();
@@ -41,10 +37,10 @@ const stage: eventRequestsApi.EventStageResult = {
   description: 'Planning.', waiting_on: null, stepper_steps: [], arrangements_recheck_needed: false, outstanding_arrangements: [],
 };
 
-function renderAs(role: 'Event Coordinator' | 'Event Organiser', request: eventRequestsApi.EventRequestDetail) {
+function renderAs(role: 'Event Organiser', request: eventRequestsApi.EventRequestDetail) {
   const fetchDetail = vi.spyOn(eventRequestsApi, 'fetchOwnEventDetail').mockResolvedValue({ ok: true, request });
   vi.spyOn(eventRequestsApi, 'getEventStage').mockResolvedValue({ ok: true, stage });
-  render(<EventDetail role={role} selectedEventId={64} accessToken="token-64" currentUserId="coord-1" onNavigate={vi.fn()} />);
+  render(<EventDetail role={role} selectedEventId={64} accessToken="token-64" onNavigate={vi.fn()} />);
   return fetchDetail;
 }
 
@@ -63,7 +59,6 @@ describe('EventDetail change requests for the organiser (SG2-64)', () => {
       ['a rejected event', 'Event Organiser', { status: 'rejected' }],
       ['a completed event', 'Event Organiser', { status: 'completed' }],
       ['an organisation colleague who did not create it', 'Event Organiser', { canManage: false }],
-      ['the assigned coordinator', 'Event Coordinator', { canManage: false }],
     ] as const) {
       cleanup(); vi.restoreAllMocks();
       renderAs(role, { ...detail, ...override });

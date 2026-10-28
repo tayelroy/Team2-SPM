@@ -59,6 +59,8 @@ const LABEL: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandi
   registration_full: 'Event full',
   waiting_list_offer: 'Place offered',
   waiting_list_offer_lapsed: 'Offer lapsed',
+  // SG2-102 AC1/AC2: the attendee's event moved date, time or venue.
+  event_changed: 'Event changed',
 };
 const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstanding_arrangements', string> = {
   placed: color.accent, warning: color.silver, expired: color.slate, expiry_changed: color.accent,
@@ -90,6 +92,7 @@ const TONE: Record<HoldNotification['kind'] | Notification['kind'] | 'outstandin
   registration_full: color.silver,
   waiting_list_offer: color.accent,
   waiting_list_offer_lapsed: color.slate,
+  event_changed: color.accent,
 };
 
 const identity = (entry: InboxNotification) => `${entry.source}:${entry.notification_id}`;
@@ -225,7 +228,6 @@ function HoldNotificationsSession({ accessToken, coordinator, onOpenNotification
     if (mutation.current || loadingOlder.current) return;
     startMutation();
     void readAllNotifications(accessToken).then(result => {
-      if (!active.current) return;
       finishMutation();
       if (!result.ok) { setError(result.message); return; }
       const readAt = new Date().toISOString();
@@ -238,7 +240,6 @@ function HoldNotificationsSession({ accessToken, coordinator, onOpenNotification
     loadingOlder.current = true; revision.current++; setBusy(true); setLoading(false); setError('');
     void loadNotificationInbox(accessToken, page!.next_cursor!).then(result => {
       loadingOlder.current = false;
-      if (!active.current) return;
       setBusy(false);
       if (!result.ok) { setError(result.message); return; }
       loadedDepth.current++;

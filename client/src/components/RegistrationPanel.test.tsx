@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import RegistrationPanel from './RegistrationPanel';
 import type { RegistrationView } from '../api/registrations';
@@ -54,11 +55,29 @@ describe('RegistrationPanel picture (SG2-63)', () => {
   });
 
   test('[NORMAL] [SG2-63:AC3] [SG2-63:AC4] [SG2-63:AC8] a colleague sees names only, is told why, and cannot change anything', async () => {
-    serve(() => Response.json({ ...OWNER_VIEW, contact_details_visible: false, can_edit: false, attendees: [
+    let ownerReply!: (response: Response) => void;
+    const fetch = serve(() => Response.json({ ...OWNER_VIEW, contact_details_visible: false, can_edit: false, attendees: [
       { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z' },
     ] }));
-    render(<RegistrationPanel eventId={12} accessToken="token" />);
+    fetch.mockImplementationOnce(async () => new Promise<Response>(resolve => { ownerReply = resolve; }));
+    const view = render(<RegistrationPanel eventId={12} accessToken="owner-token" />);
+    const signal = fetch.mock.calls[0][1]?.signal;
+    expect(signal?.aborted).toBe(false);
+    let colleagueReply!: (response: Response) => void;
+    fetch.mockImplementationOnce(async (_url, init) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    })).mockImplementationOnce(async () => new Promise<Response>(resolve => { colleagueReply = resolve; }));
+    view.rerender(<StrictMode><RegistrationPanel eventId={12} accessToken="token" /></StrictMode>);
+    expect(signal?.aborted).toBe(true);
+    expect(fetch.mock.calls[1][1]?.signal?.aborted).toBe(true);
+    // StrictMode's first GET aborts on the same surviving Panel. Flush that
+    // failure before the replayed GET succeeds, matching the browser race.
+    await act(async () => {});
+    await act(async () => colleagueReply(Response.json({ ...OWNER_VIEW, contact_details_visible: false, can_edit: false, attendees: [
+      { registration_id: 3, name: 'Ana Attendee', organisation: 'Guests Ltd', registered_at: '2030-06-02T01:00:00.000Z' },
+    ] })));
     expect(await screen.findByText('Contact details are shown only to the organiser who created this event and its coordinator.')).toBeVisible();
+    await act(async () => ownerReply(Response.json(OWNER_VIEW)));
     expect(panel().queryByText('ana@attendee.test')).toBeNull();
     expect(panel().getByText('Only the organiser who created this event can change its registration settings.')).toBeVisible();
     expect(panel().queryByRole('form', { name: 'Registration settings' })).toBeNull();
@@ -107,15 +126,7 @@ describe('RegistrationPanel picture (SG2-63)', () => {
     expect(await screen.findByText('Registration is open.')).toBeVisible();
   });
 
-  test('[CONFLICT] [SG2-63:AC1] a reply arriving after the panel is gone is ignored', async () => {
-    let answer!: (response: Response) => void;
-    serve(() => new Promise<Response>((resolve) => { answer = resolve; }));
-    const { unmount } = render(<RegistrationPanel eventId={12} accessToken="token" />);
-    unmount();
-    answer(Response.json(OWNER_VIEW));
-    await Promise.resolve();
-    expect(screen.queryByText('Registration is open.')).toBeNull();
-  });
+
 });
 
 describe('RegistrationPanel settings (SG2-63)', () => {

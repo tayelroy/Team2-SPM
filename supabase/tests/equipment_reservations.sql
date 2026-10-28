@@ -88,7 +88,7 @@ begin
    or (select count(*) from public.equipment_reservations where request_id=95501) <> 1 then
   raise exception '[SG2-55:notify-once-to-assigned-coordinator] [SG2-55:AC4] [NORMAL] Exactly one linked receipt and accurate notification must reach the assigned coordinator, including after replay';
  end if;
- if (select status||'|'||version from public.equipment_requests where request_id=95504) <> 'pending|1' then
+ if (select status||'|'||version from public.equipment_requests where request_id=95504) IS DISTINCT FROM 'pending|1' then
   raise exception '[SG2-55:unrelated-request-unchanged] [SG2-55:AC1] [NORMAL] Reserving one event must leave an unrelated request unchanged';
  end if;
 end $$;
@@ -157,7 +157,7 @@ begin
   end if;
  end loop;
  if exists(select 1 from public.equipment_reservations where request_id=95504)
-  or (select status||'|'||version from public.equipment_requests where request_id=95504) <> 'pending|1' then
+  or (select status||'|'||version from public.equipment_requests where request_id=95504) IS DISTINCT FROM 'pending|1' then
   raise exception '[SG2-55:insufficient-has-no-side-effects] [SG2-55:AC3] [FAILURE] Failed stock checks must not approve a request or persist a receipt';
  end if;
 end $$;
@@ -279,7 +279,7 @@ do $$
 begin
  if exists(select 1 from public.equipment_reservations where request_id=95510)
   or exists(select 1 from public.notifications where event_id=95510)
-  or (select status||'|'||version from public.equipment_requests where request_id=95510) <> 'pending|1' then
+  or (select status||'|'||version from public.equipment_requests where request_id=95510) IS DISTINCT FROM 'pending|1' then
   raise exception '[SG2-55:notification-failure-no-partial-write] [SG2-55:AC4] [FAILURE] A failed notification must leave request, receipt and notification unchanged';
  end if;
 end $$;
@@ -424,7 +424,7 @@ begin
   raise exception '[SG2-55:legacy-approved-without-receipt-closed] [SG2-55:AC1] [FAILURE] An approved request without a reservation receipt must retain its original closed arrangement policy';
  end if;
  if public.manage_equipment_requirements('arrange',95508,95508,2,'{"shortfall":0}')->>'outcome' is distinct from 'closed' then
-  raise exception '[SG2-55:confirmed-reserved-arrangement-closed] [SG2-55:AC1] [FAILURE] Reservation arrangement support must preserve the preconfirmation event-stage restriction';
+  raise exception '[SG2-55:confirmed-reserved-arrangement-closed] [SG2-55:AC1] [SG2-53:AC5] [FAILURE] [CONFLICT] Reservation arrangement support must preserve the preconfirmation event-stage restriction';
  end if;
 end $$;
 -- Stored roles and database grants are the authority at every call.
