@@ -28,6 +28,13 @@ async function acceptSample(page: Page, sample: 'date' | 'attendance') {
 }
 const inbox = (page: Page) => page.getByRole('complementary', { name: 'Notifications' });
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+// DoD v2.1: the current screen fits at phone and laptop width; ends on `last`.
+async function fitsBothWidths(page: Page, last: 390 | 1440) {
+  for (const width of last === 390 ? [1440, 390] : [390, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    await expect.poll(() => noOverflow(page), { message: `no horizontal overflow at ${width}px` }).toBe(true);
+  }
+}
 
 const DATE_NOTICE = 'Harbour Showcase has changed. Date and time: 20 Jun 2030 10:00 SGT → 27 Jun 2030 10:00 SGT.'
   + ' Open My registrations for the latest details.';
@@ -53,14 +60,16 @@ test('SG2-102-P01 | [SG2-102:AC1] [SG2-102:AC2] [SG2-102:AC3] [SG2-102:AC4] [NOR
   await page.getByRole('button', { name: /^Notifications \(/ }).click();
   const drawer = inbox(page);
   await expect(drawer.getByText('Event changed', { exact: true })).toBeVisible();
+  await fitsBothWidths(page, 1440);
   await drawer.getByRole('button', { name: `Unread: ${DATE_NOTICE}`, exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Harbour Showcase', exact: true })).toBeVisible();
+  await fitsBothWidths(page, 1440);
   await page.getByRole('button', { name: 'View my registrations', exact: true }).click();
   const mine = page.getByRole('region', { name: 'Registrations', exact: true });
   const showcase = mine.getByRole('article', { name: 'Harbour Showcase', exact: true });
   await expect(showcase).toContainText('27 Jun 2030');
   await expect(showcase).not.toContainText('20 Jun 2030');
-  expect(await noOverflow(page)).toBe(true);
+  await fitsBothWidths(page, 1440);
   expect(errors).toEqual([]);
 });
 
@@ -76,6 +85,7 @@ test('SG2-102-N01 | [SG2-102:AC5] [SG2-102:AC3] [BOUNDARY] an accepted change to
   await page.getByRole('button', { name: /^Notifications \(/ }).click();
   await expect(inbox(page).getByText('Event changed', { exact: true })).toHaveCount(0);
   await expect(inbox(page).getByText(/Harbour Showcase has changed/)).toHaveCount(0);
-  expect(await noOverflow(page)).toBe(true);
+  await expect(inbox(page)).toBeVisible();
+  await fitsBothWidths(page, 390);
   expect(errors).toEqual([]);
 });
