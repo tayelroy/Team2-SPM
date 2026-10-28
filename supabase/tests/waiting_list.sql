@@ -247,6 +247,8 @@ begin
      || 'e6110000-0000-4000-8000-000000000002|Full forum is now full: all places are taken (capacity 2).' then
   raise exception '[SG2-61:full-notice] [SG2-61:AC3] [NORMAL] When an event reaches capacity the organiser and coordinator are each told once: %', (select string_agg(recipient_id::text || '|' || kind || '|' || message, ';') from public.notifications where event_id = 96101);
  end if;
+ -- The organiser shortens the window before the next offer is made.
+ perform public.update_registration_settings(96101, 'e6110000-0000-4000-8000-000000000001', '{"waiting_list_response_hours": 6}', false);
 end $$;
 
 set local role authenticated;
@@ -267,6 +269,10 @@ reset role;
 -- SG2-62 AC6: an offer not taken in time lapses and the place goes to the next.
 do $$
 begin
+ if (select offer_expires_at - offered_at from public.waiting_list_entries
+     where event_id = 96101 and attendee_id = 'e6110000-0000-4000-8000-000000000007' and status = 'offered') is distinct from interval '6 hours' then
+  raise exception '[SG2-62:window-applies] [SG2-62:AC6] [NORMAL] An offer is held for the response window the organiser set, here 6 hours';
+ end if;
  update public.waiting_list_entries set offered_at = clock_timestamp() - interval '25 hours',
    offer_expires_at = clock_timestamp() - interval '1 hour'
   where event_id = 96101 and attendee_id = 'e6110000-0000-4000-8000-000000000007' and status = 'offered';
